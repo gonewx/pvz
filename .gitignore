@@ -3,3 +3,6 @@
 .bmad-*/
 
 .claude/settings.local.json
+
+/docs/prd
+/docs/architecture
