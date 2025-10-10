@@ -1,0 +1,5 @@
+# BMAD (local only)
+.bmad-core/
+.bmad-*/
+
+.claude/settings.local.json

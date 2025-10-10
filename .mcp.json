@@ -1,0 +1,29 @@
+{
+    "mcpServers": {
+        "deepwiki": {
+            "command": "npx",
+            "args": [
+                "-y",
+                "mcp-remote",
+                "https://mcp.deepwiki.com/sse"
+            ]
+        },
+        "playwright": {
+            "command": "npx",
+            "args": [
+                "@playwright/mcp@latest",
+                "--extension",
+                "--browser",
+                "chrome"
+            ]
+        },
+        "spec-workflow": {
+            "command": "npx",
+            "args": ["-y", "@pimzino/spec-workflow-mcp@latest", "/mnt/disk0/project/flange/flange_v4"]
+        },
+        "chrome-devtools": {
+            "command": "npx",
+            "args": ["chrome-devtools-mcp@latest"]
+        }
+    }   
+}
