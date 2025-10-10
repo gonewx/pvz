@@ -121,11 +121,11 @@
 > **so that** I have a running window which will serve as the canvas for the game.
 
 **Acceptance Criteria:**
-1.  项目遵循Go Modules的標準結構。
-2.  Ebitengine被成功添加為項目依賴。
-3.  運行 `go run .` 指令後，螢幕上會顯示一個固定大小（例如800x600像素）的空白視窗。
-4.  視窗標題應設置為“植物大戰殭屍 - Go復刻版”。
-5.  可以通過點擊視窗的關閉按鈕正常退出應用程式。
+1.  项目遵循Go Modules的标准结构。
+2.  Ebitengine被成功添加为项目依赖。
+3.  运行 `go run .` 指令后，屏幕上会显示一个固定大小（例如800x600像素）的空白窗口。
+4.  窗口标题应设置为"植物大战僵尸 - Go复刻版"。
+5.  可以通过点击窗口的关闭按钮正常退出应用程序。
 
 ---
 **Story 1.2: 游戏状态机与场景管理**
@@ -134,11 +134,11 @@
 > **so that** the game can switch between different scenes like 'Main Menu' and 'In-Game'.
 
 **Acceptance Criteria:**
-1.  存在一個遊戲狀態管理器（例如 `SceneManager`）。
-2.  定義了至少兩種場景狀態：`MainMenuScene` 和 `GameScene`。
-3.  遊戲啟動時，默認進入並顯示 `MainMenuScene`。
-4.  `SceneManager` 提供了切換場景的功能（例如 `SwitchToScene(...)`）。
-5.  每個場景都有自己的 `Update` 和 `Draw` 邏輯。
+1.  存在一个游戏状态管理器（例如 `SceneManager`）。
+2.  定义了至少两种场景状态：`MainMenuScene` 和 `GameScene`。
+3.  游戏启动时，默认进入并显示 `MainMenuScene`。
+4.  `SceneManager` 提供了切换场景的功能（例如 `SwitchToScene(...)`）。
+5.  每个场景都有自己的 `Update` 和 `Draw` 逻辑。
 
 ---
 **Story 1.3: 资源管理器框架**
@@ -147,11 +147,11 @@
 > **so that** game assets can be centrally managed and accessed by any part of the game.
 
 **Acceptance Criteria:**
-1.  存在一個資源管理器（例如 `ResourceManager`），在遊戲啟動時初始化。
-2.  可以成功加載一個PNG格式的圖片文件（例如主菜單背景）並在場景中使用。
-3.  可以成功加載一個音頻文件（例如主菜單背景音樂）並循環播放。
-4.  如果資源加載失敗，遊戲應能打印錯誤日誌而不是直接崩潰。
-5.  資源應只被加載一次，並在內存中重複使用。
+1.  存在一个资源管理器（例如 `ResourceManager`），在游戏启动时初始化。
+2.  可以成功加载一个PNG格式的图片文件（例如主菜单背景）并在场景中使用。
+3.  可以成功加载一个音频文件（例如主菜单背景音乐）并循环播放。
+4.  如果资源加载失败，游戏应能打印错误日志而不是直接崩溃。
+5.  资源应只被加载一次，并在内存中重复使用。
 
 ---
 **Story 1.4: 主菜单UI与交互**
@@ -160,11 +160,11 @@
 > **so that** I can start the game or exit.
 
 **Acceptance Criteria:**
-1.  主菜單場景 (`MainMenuScene`) 必須顯示正確的背景圖片。
-2.  主菜單必須顯示“開始冒險”和“退出遊戲”兩個按鈕（暫時可以是文字或簡單圖形）。
-3.  鼠標懸停在按鈕上時，按鈕有視覺變化（例如變色或放大）。
-4.  點擊“開始冒險”按鈕後，遊戲狀態會通過 `SceneManager` 切換到 `GameScene`。
-5.  點擊“退出遊戲”按鈕後，應用程式會正常關閉。
+1.  主菜单场景 (`MainMenuScene`) 必须显示正确的背景图片。
+2.  主菜单必须显示"开始冒险"和"退出游戏"两个按钮（暂时可以是文字或简单图形）。
+3.  鼠标悬停在按钮上时，按钮有视觉变化（例如变色或放大）。
+4.  点击"开始冒险"按钮后，游戏状态会通过 `SceneManager` 切换到 `GameScene`。
+5.  点击"退出游戏"按钮后，应用程序会正常关闭。
 
 ## **Epic 2: 核心资源与玩家交互 (Core Resources & Player Interaction)**
 **史诗目标:** 实现阳光的生成、收集和计数系统，并建立玩家与游戏世界的基础交互，如通过鼠标点击进行操作。
@@ -176,7 +176,7 @@
 > **so that** I have the foundational layout for placing game state information.
 
 **Acceptance Criteria:**
-1.  `GameScene` 啟動時，會繪製正確的草坪背景。
+1.  `GameScene` 启动时，会绘制正确的草坪背景。
 2.  屏幕左上角会绘制植物选择栏的背景框。
 3.  植物选择栏左侧会绘制阳光计数器的背景框。
 4.  铲子的图标和背景会绘制在植物选择栏下方。
