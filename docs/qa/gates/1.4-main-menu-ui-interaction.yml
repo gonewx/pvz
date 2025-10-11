@@ -1,0 +1,134 @@
+# Quality Gate Decision for Story 1.4
+# Powered by BMAD™ Core - QA Gate Template v1
+
+schema: 1
+story: "1.4"
+story_title: "主菜单UI与交互"
+gate: CONCERNS
+status_reason: "所有AC已实现且功能正常，代码质量良好，但存在可靠性降级方案不足和技术债务问题"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-10-11T00:00:00Z"
+
+# Waiver status
+waiver:
+  active: false
+
+# Top Issues Identified
+top_issues:
+  - id: "RELIABILITY-001"
+    severity: medium
+    finding: "按钮图片全部加载失败时用户无法看到或操作按钮"
+    suggested_action: "添加ebitenutil.DebugPrint文字按钮作为最终降级方案"
+    suggested_owner: dev
+
+  - id: "ARCH-001"
+    severity: medium
+    finding: "GameScene不接收SceneManager参数，与MainMenuScene架构不一致"
+    suggested_action: "在需要从GameScene返回主菜单时重构GameScene构造函数"
+    suggested_owner: dev
+
+  - id: "TEST-001"
+    severity: low
+    finding: "Update方法核心状态转换逻辑未测试，覆盖率仅1.1%"
+    suggested_action: "为Update方法添加单元测试验证状态转换"
+    suggested_owner: dev
+
+# Risk Summary
+risk_summary:
+  totals:
+    critical: 0
+    high: 0
+    medium: 2  # RELIABILITY-001, ARCH-001
+    low: 1     # TEST-001
+  recommendations:
+    must_fix: []
+    monitor:
+      - "监控按钮资源加载成功率"
+      - "在下一个需要场景切换的Story前处理GameScene架构问题"
+
+# Quality Score (100 - 10*medium_issues - 5*low_issues)
+quality_score: 75
+
+# Evidence
+evidence:
+  tests_reviewed: 3  # TestUIState, TestUIComponent, TestButton, TestIsPointInRect (15 cases)
+  risks_identified: 3
+  trace:
+    ac_covered: [3]  # AC3部分覆盖（isPointInRect测试）
+    ac_gaps: [1, 2, 4, 5]  # 其他AC缺少自动化测试
+
+# NFR Validation
+nfr_validation:
+  security:
+    status: PASS
+    notes: "UI相关功能，无数据处理/网络通信，无安全风险"
+  performance:
+    status: PASS
+    notes: "O(n)复杂度 n=2，60fps下性能充足，无内存泄漏"
+  reliability:
+    status: CONCERNS
+    notes: "资源加载有降级方案，但按钮全失败时用户无法操作"
+  maintainability:
+    status: PASS
+    notes: "代码清晰，注释完整，窗口尺寸常量重复已通过重构修复"
+
+# Recommendations
+recommendations:
+  immediate: []  # 无必须立即修复的问题
+  future:
+    - action: "为按钮加载失败添加文字降级方案"
+      refs: ["pkg/scenes/main_menu_scene.go:175-248"]
+    - action: "重构GameScene以接收SceneManager参数"
+      refs: ["pkg/scenes/game_scene.go:14-16"]
+    - action: "提升测试覆盖率，为Update方法添加单元测试"
+      refs: ["pkg/scenes/main_menu_scene.go:69-109"]
+    - action: "考虑将窗口尺寸提取到配置文件或game包"
+      refs: ["pkg/scenes/main_menu_scene.go:15-18"]
+
+# Compliance Summary
+compliance:
+  coding_standards: PASS  # gofmt通过，命名约定符合规范
+  project_structure: PASS  # 文件位置正确，测试文件命名规范
+  testing_strategy: PARTIAL  # 符合"UI/场景无强制要求"，但覆盖率偏低
+  all_ac_met: PASS  # 5个验收标准全部实现
+
+# Refactoring Performed
+refactoring:
+  - file: "pkg/scenes/main_menu_scene.go"
+    change: "提取窗口尺寸常量到包级别"
+    why: "消除代码重复（windowWidth/Height在多处定义）"
+    impact: "提高可维护性，符合DRY原则"
+
+# Technical Debt
+technical_debt:
+  - id: "DEBT-001"
+    title: "GameScene架构不一致"
+    priority: medium
+    estimated_effort: "1-2小时"
+    when_to_fix: "下一个需要场景切换功能的Story"
+
+  - id: "DEBT-002"
+    title: "测试覆盖率低"
+    priority: low
+    estimated_effort: "2-4小时"
+    when_to_fix: "有时间时改进"
+
+  - id: "DEBT-003"
+    title: "降级方案不完善"
+    priority: low
+    estimated_effort: "1小时"
+    when_to_fix: "生产环境发现资源加载问题时"
+
+# Final Decision
+decision:
+  gate_status: CONCERNS
+  ready_for_done: true
+  rationale: |
+    所有验收标准已实现且功能正常，代码质量良好，测试通过。
+    识别的3个问题均为中低优先级的改进建议，不影响当前功能的正常使用。
+    建议Story owner将状态更新为Done，同时将技术债务记录到后续backlog。
+
+  next_steps:
+    - "将状态更新为Done"
+    - "记录技术债务到backlog或相关Story"
+    - "在未来迭代中逐步改进测试覆盖率和降级方案"

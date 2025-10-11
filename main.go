@@ -47,8 +47,8 @@ func main() {
 	// Create scene manager
 	sceneManager := game.NewSceneManager()
 
-	// Create and set the initial scene (Main Menu) with resource manager
-	mainMenuScene := scenes.NewMainMenuScene(resourceManager)
+	// Create and set the initial scene (Main Menu) with resource manager and scene manager
+	mainMenuScene := scenes.NewMainMenuScene(resourceManager, sceneManager)
 	sceneManager.SwitchTo(mainMenuScene)
 
 	// Create a new game instance with the scene manager
