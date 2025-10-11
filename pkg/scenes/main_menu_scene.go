@@ -251,7 +251,8 @@ func (m *MainMenuScene) initButtons() {
 // It switches the current scene to the GameScene.
 func (m *MainMenuScene) onStartAdventureClicked() {
 	log.Println("Start Adventure button clicked")
-	gameScene := NewGameScene()
+	// Pass ResourceManager and SceneManager to GameScene (fixes architectural inconsistency)
+	gameScene := NewGameScene(m.resourceManager, m.sceneManager)
 	m.sceneManager.SwitchTo(gameScene)
 }
 

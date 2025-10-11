@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"image"
-	_ "image/png" // Register PNG decoder
+	_ "image/jpeg" // Register JPEG decoder
+	_ "image/png"  // Register PNG decoder
 	"io"
 	"os"
 	"path/filepath"
