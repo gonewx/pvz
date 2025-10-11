@@ -6,6 +6,7 @@ import (
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/scenes"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/audio"
 )
 
 // Game represents the main game structure.
@@ -37,11 +38,17 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 }
 
 func main() {
+	// Initialize audio context with 48000 Hz sample rate
+	audioContext := audio.NewContext(48000)
+
+	// Create resource manager
+	resourceManager := game.NewResourceManager(audioContext)
+
 	// Create scene manager
 	sceneManager := game.NewSceneManager()
 
-	// Create and set the initial scene (Main Menu)
-	mainMenuScene := scenes.NewMainMenuScene()
+	// Create and set the initial scene (Main Menu) with resource manager
+	mainMenuScene := scenes.NewMainMenuScene(resourceManager)
 	sceneManager.SwitchTo(mainMenuScene)
 
 	// Create a new game instance with the scene manager

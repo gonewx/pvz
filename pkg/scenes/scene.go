@@ -1,17 +1,10 @@
 package scenes
 
 import (
-	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/decker502/pvz/pkg/game"
 )
 
-// Scene represents a game scene (e.g., main menu, gameplay, pause menu).
-// Each scene has its own update and rendering logic.
-type Scene interface {
-	// Update updates the scene logic based on the elapsed time.
-	// deltaTime is the time elapsed since the last update in seconds.
-	Update(deltaTime float64)
+// Scene is a type alias for game.Scene to maintain backward compatibility.
+// All scene implementations should implement the game.Scene interface.
+type Scene = game.Scene
 
-	// Draw renders the scene to the provided screen.
-	// screen is the target image where the scene should be drawn.
-	Draw(screen *ebiten.Image)
-}

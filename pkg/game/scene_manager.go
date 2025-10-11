@@ -1,14 +1,13 @@
 package game
 
 import (
-	"github.com/decker502/pvz/pkg/scenes"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // SceneManager manages the game's high-level state by controlling which scene is active.
 // It ensures only one scene's Update and Draw methods are called at any given time.
 type SceneManager struct {
-	currentScene scenes.Scene
+	currentScene Scene
 }
 
 // NewSceneManager creates and returns a new SceneManager instance.
@@ -21,7 +20,7 @@ func NewSceneManager() *SceneManager {
 
 // SwitchTo changes the active scene to the provided scene.
 // The new scene's Update and Draw methods will be called on subsequent game loop iterations.
-func (sm *SceneManager) SwitchTo(scene scenes.Scene) {
+func (sm *SceneManager) SwitchTo(scene Scene) {
 	sm.currentScene = scene
 }
 
