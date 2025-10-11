@@ -44,6 +44,13 @@ func (em *EntityManager) AddComponent(id EntityID, component interface{}) {
 	}
 }
 
+// RemoveComponent 从实体移除指定类型的组件
+func (em *EntityManager) RemoveComponent(id EntityID, componentType reflect.Type) {
+	if compMap, exists := em.components[id]; exists {
+		delete(compMap, componentType)
+	}
+}
+
 // GetComponent 获取实体的特定类型组件
 func (em *EntityManager) GetComponent(id EntityID, componentType reflect.Type) (interface{}, bool) {
 	if compMap, exists := em.components[id]; exists {

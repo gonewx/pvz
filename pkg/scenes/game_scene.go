@@ -67,11 +67,14 @@ type GameScene struct {
 	introAnimTimer     float64 // Timer for intro animation
 
 	// ECS Framework and Systems
-	entityManager     *ecs.EntityManager
-	sunSpawnSystem    *systems.SunSpawnSystem
-	sunMovementSystem *systems.SunMovementSystem
-	lifetimeSystem    *systems.LifetimeSystem
-	renderSystem      *systems.RenderSystem
+	entityManager       *ecs.EntityManager
+	sunSpawnSystem      *systems.SunSpawnSystem
+	sunMovementSystem   *systems.SunMovementSystem
+	lifetimeSystem      *systems.LifetimeSystem
+	renderSystem        *systems.RenderSystem
+	inputSystem         *systems.InputSystem
+	animationSystem     *systems.AnimationSystem
+	sunCollectionSystem *systems.SunCollectionSystem
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -106,6 +109,29 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	scene.renderSystem = systems.NewRenderSystem(scene.entityManager)
 	scene.sunMovementSystem = systems.NewSunMovementSystem(scene.entityManager)
 	scene.lifetimeSystem = systems.NewLifetimeSystem(scene.entityManager)
+	scene.animationSystem = systems.NewAnimationSystem(scene.entityManager)
+
+	// Calculate sun collection target position from sun counter UI position
+	// This ensures the suns fly to the exact center of the sun counter display
+	sunCollectionTargetX := float64(SeedBankX + SunCounterOffsetX)
+	sunCollectionTargetY := float64(SeedBankY + SunCounterOffsetY)
+
+	// Initialize input system with sun counter target position (飞向目标)
+	scene.inputSystem = systems.NewInputSystem(
+		scene.entityManager,
+		rm,
+		scene.gameState,
+		sunCollectionTargetX, // sunCounterX - 阳光计数器X坐标
+		sunCollectionTargetY, // sunCounterY - 阳光计数器Y坐标
+	)
+
+	// Initialize sun collection system with the same target position
+	scene.sunCollectionSystem = systems.NewSunCollectionSystem(
+		scene.entityManager,
+		scene.gameState,      // 传入 GameState 以便在阳光到达时增加数值
+		sunCollectionTargetX, // targetX
+		sunCollectionTargetY, // targetY
+	)
 
 	// Initialize sun spawn system with lawn area parameters
 	scene.sunSpawnSystem = systems.NewSunSpawnSystem(
@@ -182,8 +208,8 @@ func (s *GameScene) loadResources() {
 //
 // This method handles:
 //   - Intro animation (camera scrolling left → right → center)
-//   - ECS system updates (sun spawning, movement, lifetime management)
-//   - Future: Input handling, collision detection, AI behavior
+//   - ECS system updates (input, sun spawning, movement, collection, lifetime management)
+//   - System execution order ensures correct game logic flow
 func (s *GameScene) Update(deltaTime float64) {
 	// Handle intro animation
 	if s.isIntroAnimPlaying {
@@ -191,13 +217,14 @@ func (s *GameScene) Update(deltaTime float64) {
 		return // Don't update game systems during intro animation
 	}
 
-	// Update all ECS systems in order
-	s.sunSpawnSystem.Update(deltaTime)     // Generate new suns
-	s.sunMovementSystem.Update(deltaTime)  // Move falling suns
-	s.lifetimeSystem.Update(deltaTime)     // Check for expired entities
-	s.entityManager.RemoveMarkedEntities() // Clean up deleted entities
-
-	// Future: Input system, collision system, AI system, etc.
+	// Update all ECS systems in order (order matters for correct game logic)
+	s.inputSystem.Update(deltaTime)         // 1. Process player input (highest priority)
+	s.sunSpawnSystem.Update(deltaTime)      // 2. Generate new suns
+	s.sunMovementSystem.Update(deltaTime)   // 3. Move suns (includes collection animation)
+	s.sunCollectionSystem.Update(deltaTime) // 4. Check if collection is complete
+	s.animationSystem.Update(deltaTime)     // 5. Update animation frames
+	s.lifetimeSystem.Update(deltaTime)      // 6. Check for expired entities
+	s.entityManager.RemoveMarkedEntities()  // 7. Clean up deleted entities (always last)
 }
 
 // updateIntroAnimation updates the intro camera animation that showcases the entire lawn.
@@ -245,17 +272,27 @@ func (s *GameScene) easeOutQuad(t float64) float64 {
 
 // Draw renders the game scene to the screen.
 // It draws the lawn background, all game entities, and UI elements in the correct order.
+// Rendering order (back to front):
+// 1. Background (lawn)
+// 2. UI base layer (seed bank, shovel) - drawn first so suns appear on top
+// 3. Game entities (suns, plants, zombies) - drawn on top of UI
+// 4. UI overlay (sun counter text) - drawn last for best visibility
 func (s *GameScene) Draw(screen *ebiten.Image) {
-	// Draw lawn background
+	// Layer 1: Draw lawn background
 	s.drawBackground(screen)
 
-	// Draw all game entities (suns, plants, zombies, etc.)
+	// Layer 2: Draw UI base elements (seed bank and shovel)
+	// These are drawn before entities so suns can fly over them
+	s.drawSeedBank(screen)
+	s.drawShovel(screen)
+
+	// Layer 3: Draw all game entities (suns, plants, zombies, etc.)
+	// This ensures suns appear on top of the seed bank
 	s.renderSystem.Draw(screen)
 
-	// Draw UI elements on top
-	s.drawSeedBank(screen)
+	// Layer 4: Draw UI overlays (sun counter text)
+	// Drawn last to ensure text is always visible
 	s.drawSunCounter(screen)
-	s.drawShovel(screen)
 }
 
 // drawBackground renders the lawn background.

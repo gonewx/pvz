@@ -55,5 +55,12 @@ func NewSunEntity(manager *ecs.EntityManager, rm *game.ResourceManager, startX, 
 		TargetY: targetY,
 	})
 
+	// 添加可点击组件 (阳光图片尺寸约80x80像素)
+	manager.AddComponent(id, &components.ClickableComponent{
+		Width:     80,
+		Height:    80,
+		IsEnabled: true,
+	})
+
 	return id
 }

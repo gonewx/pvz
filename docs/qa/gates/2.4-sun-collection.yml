@@ -1,0 +1,80 @@
+# Quality Gate Decision
+# Story 2.4: 阳光收集
+
+schema: 1
+story: "2.4"
+story_title: "阳光收集"
+gate: CONCERNS
+status_reason: "功能实现完整且测试充分，但测试文件与实现存在不一致，已修复。建议开发者更新File List并验证修复。"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-10-11T16:23:00Z"
+
+waiver:
+  active: false
+
+top_issues:
+  - id: "TEST-001"
+    severity: medium
+    finding: "SunCollectionSystem测试文件签名与实现不匹配(缺少GameState参数)"
+    suggested_action: "已修复测试文件,添加了GameState参数。建议开发者确认修改并更新File List。"
+    suggested_owner: dev
+  - id: "TEST-002"
+    severity: medium
+    finding: "InputSystem测试错误假设点击时立即增加阳光数值"
+    suggested_action: "已修复测试逻辑,验证点击时数值不变,到达目标时才增加。需要开发者审查修改。"
+    suggested_owner: dev
+  - id: "DESIGN-001"
+    severity: low
+    finding: "InputSystem允许点击掉落中的阳光(SunFalling状态),与AC描述略有差异"
+    suggested_action: "代码实现允许点击下落中的阳光(非常符合原版体验),但AC未明确说明。建议更新AC或代码注释。"
+    suggested_owner: sm
+
+risk_summary:
+  totals:
+    critical: 0
+    high: 0
+    medium: 2
+    low: 1
+  recommendations:
+    must_fix:
+      - "验证测试修复并更新Story的File List"
+    monitor:
+      - "确认点击下落中阳光的行为是否符合产品预期"
+
+quality_score: 80
+expires: "2025-10-25T16:23:00Z"
+
+evidence:
+  tests_reviewed: 15
+  risks_identified: 3
+  trace:
+    ac_covered: [1, 2, 3, 4, 5]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "无安全风险。输入验证合理，无数据泄露风险。"
+  performance:
+    status: PASS
+    notes: "碰撞检测使用高效的AABB算法。系统调用顺序合理，无明显性能瓶颈。"
+  reliability:
+    status: PASS
+    notes: "错误处理良好。音效加载失败不阻塞游戏。测试覆盖充分。"
+  maintainability:
+    status: PASS
+    notes: "代码结构清晰，遵循ECS模式。组件和系统职责分离良好。GoDoc注释完整。"
+
+recommendations:
+  immediate:
+    - action: "开发者审查并确认测试文件修复"
+      refs:
+        - "pkg/systems/sun_collection_system_test.go"
+        - "pkg/systems/input_system_test.go"
+    - action: "更新Story的File List,标记测试文件为已修改"
+      refs: ["docs/stories/2.4.story.md"]
+  future:
+    - action: "考虑明确AC中关于点击下落阳光的行为描述"
+      refs: ["docs/stories/2.4.story.md"]
+    - action: "考虑添加性能测试验证大量阳光同时收集的场景"
+      refs: ["pkg/systems/input_system_test.go"]

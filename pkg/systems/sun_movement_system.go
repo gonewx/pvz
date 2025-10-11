@@ -1,6 +1,7 @@
 package systems
 
 import (
+	"log"
 	"reflect"
 
 	"github.com/decker502/pvz/pkg/components"
@@ -58,8 +59,11 @@ func (s *SunMovementSystem) Update(deltaTime float64) {
 			// 无需任何操作
 
 		case components.SunCollecting:
-			// 正在被收集:由 Story 2.4 实现收集动画
-			// 本故事暂不处理
+			// 正在被收集:执行飞向阳光计数器的动画
+			pos.X += vel.VX * deltaTime
+			pos.Y += vel.VY * deltaTime
+			log.Printf("[SunMovementSystem] 阳光收集中 位置:(%.1f, %.1f) 速度:(%.1f, %.1f)",
+				pos.X, pos.Y, vel.VX, vel.VY)
 		}
 	}
 }

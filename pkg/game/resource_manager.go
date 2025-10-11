@@ -238,6 +238,83 @@ func (rm *ResourceManager) LoadAudio(path string) (*audio.Player, error) {
 	return player, nil
 }
 
+// LoadSoundEffect loads a sound effect from the specified path and caches it for future use.
+// Unlike LoadAudio, this method does NOT wrap the audio in an infinite loop,
+// making it suitable for one-shot sound effects like button clicks, collection sounds, etc.
+// Supported formats: MP3 (.mp3) and OGG Vorbis (.ogg).
+//
+// Parameters:
+//   - path: The file path to the sound effect resource (e.g., "assets/audio/Sound/points.ogg").
+//
+// Returns:
+//   - A pointer to the audio player (ready to play, but not started).
+//   - An error if the file cannot be opened, decoded, or the format is unsupported.
+//
+// Example:
+//
+//	player, err := rm.LoadSoundEffect("assets/audio/Sound/points.ogg")
+//	if err != nil {
+//	    log.Printf("Failed to load sound effect: %v", err)
+//	    return err
+//	}
+//	player.Play() // Play once
+func (rm *ResourceManager) LoadSoundEffect(path string) (*audio.Player, error) {
+	// Check if the audio is already cached
+	if cachedPlayer, exists := rm.audioCache[path]; exists {
+		return cachedPlayer, nil
+	}
+
+	// Open the audio file
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open sound effect file %s: %w", path, err)
+	}
+	defer file.Close()
+
+	// Read the entire file into memory
+	audioData, err := io.ReadAll(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read sound effect file %s: %w", path, err)
+	}
+
+	// Create a reader from the in-memory data
+	reader := bytes.NewReader(audioData)
+
+	// Determine the file format by extension
+	ext := strings.ToLower(filepath.Ext(path))
+
+	// Decode based on format (without infinite loop)
+	var stream io.ReadSeeker
+
+	switch ext {
+	case ".mp3":
+		decodedStream, err := mp3.DecodeWithoutResampling(reader)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode MP3 sound effect %s: %w", path, err)
+		}
+		stream = decodedStream
+	case ".ogg":
+		decodedStream, err := vorbis.DecodeWithoutResampling(reader)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode OGG sound effect %s: %w", path, err)
+		}
+		stream = decodedStream
+	default:
+		return nil, fmt.Errorf("unsupported audio format: %s (supported: .mp3, .ogg)", ext)
+	}
+
+	// Create an audio player WITHOUT infinite loop
+	player, err := rm.audioContext.NewPlayer(stream)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create audio player for %s: %w", path, err)
+	}
+
+	// Store in cache
+	rm.audioCache[path] = player
+
+	return player, nil
+}
+
 // GetAudioPlayer retrieves a previously loaded audio player from the cache.
 // If the audio has not been loaded yet, it returns nil.
 // Use LoadAudio to load and cache an audio player before calling this method.
