@@ -1,9 +1,15 @@
 package game
 
+import "github.com/decker502/pvz/pkg/components"
+
 // GameState 存储全局游戏状态
 // 这是一个单例，用于管理跨场景和跨系统的全局状态数据
 type GameState struct {
 	Sun int // 当前阳光数量
+
+	// Story 3.2: 种植模式状态
+	IsPlantingMode    bool                 // 是否处于种植模式
+	SelectedPlantType components.PlantType // 当前选择的植物类型
 	// 未来可扩展：Level, Wave, Score 等
 }
 
@@ -45,7 +51,21 @@ func (gs *GameState) GetSun() int {
 	return gs.Sun
 }
 
+// EnterPlantingMode 进入种植模式
+// 设置游戏进入种植状态，并记录玩家选择的植物类型
+func (gs *GameState) EnterPlantingMode(plantType components.PlantType) {
+	gs.IsPlantingMode = true
+	gs.SelectedPlantType = plantType
+}
 
+// ExitPlantingMode 退出种植模式
+// 将游戏状态恢复到正常模式
+func (gs *GameState) ExitPlantingMode() {
+	gs.IsPlantingMode = false
+}
 
-
-
+// GetPlantingMode 获取当前种植模式状态
+// 返回是否处于种植模式以及选择的植物类型
+func (gs *GameState) GetPlantingMode() (bool, components.PlantType) {
+	return gs.IsPlantingMode, gs.SelectedPlantType
+}

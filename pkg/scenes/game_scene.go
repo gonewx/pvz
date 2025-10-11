@@ -87,6 +87,10 @@ type GameScene struct {
 	// Story 3.1: Plant Card Systems
 	plantCardSystem       *systems.PlantCardSystem
 	plantCardRenderSystem *systems.PlantCardRenderSystem
+
+	// Story 3.2: Plant Preview Systems
+	plantPreviewSystem       *systems.PlantPreviewSystem
+	plantPreviewRenderSystem *systems.PlantPreviewRenderSystem
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -158,6 +162,10 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	// Story 3.1: Initialize plant card systems
 	scene.initPlantCardSystems(rm)
 
+	// Story 3.2: Initialize plant preview systems
+	scene.plantPreviewSystem = systems.NewPlantPreviewSystem(scene.entityManager, scene.gameState)
+	scene.plantPreviewRenderSystem = systems.NewPlantPreviewRenderSystem(scene.entityManager)
+
 	return scene
 }
 
@@ -173,11 +181,19 @@ func (s *GameScene) initPlantCardSystems(rm *game.ResourceManager) {
 	cardY := float64(SeedBankY + PlantCardOffsetY)
 
 	// 向日葵卡片（第一张）
-	entities.NewPlantCardEntity(s.entityManager, rm, components.PlantSunflower, firstCardX, cardY)
+	_, err := entities.NewPlantCardEntity(s.entityManager, rm, components.PlantSunflower, firstCardX, cardY)
+	if err != nil {
+		log.Printf("Warning: Failed to create sunflower card: %v", err)
+		// 继续执行，游戏在没有卡片的情况下也能运行（用于测试环境）
+	}
 
 	// 豌豆射手卡片（第二张）
 	secondCardX := firstCardX + PlantCardSpacing
-	entities.NewPlantCardEntity(s.entityManager, rm, components.PlantPeashooter, secondCardX, cardY)
+	_, err = entities.NewPlantCardEntity(s.entityManager, rm, components.PlantPeashooter, secondCardX, cardY)
+	if err != nil {
+		log.Printf("Warning: Failed to create peashooter card: %v", err)
+		// 继续执行，游戏在没有卡片的情况下也能运行（用于测试环境）
+	}
 
 	// Initialize PlantCardSystem
 	s.plantCardSystem = systems.NewPlantCardSystem(
@@ -271,8 +287,9 @@ func (s *GameScene) Update(deltaTime float64) {
 	s.sunMovementSystem.Update(deltaTime)   // 4. Move suns (includes collection animation)
 	s.sunCollectionSystem.Update(deltaTime) // 5. Check if collection is complete
 	s.animationSystem.Update(deltaTime)     // 6. Update animation frames
-	s.lifetimeSystem.Update(deltaTime)      // 7. Check for expired entities
-	s.entityManager.RemoveMarkedEntities()  // 8. Clean up deleted entities (always last)
+	s.plantPreviewSystem.Update(deltaTime)  // 7. Update plant preview position (Story 3.2)
+	s.lifetimeSystem.Update(deltaTime)      // 8. Check for expired entities
+	s.entityManager.RemoveMarkedEntities()  // 9. Clean up deleted entities (always last)
 }
 
 // updateIntroAnimation updates the intro camera animation that showcases the entire lawn.
@@ -346,6 +363,10 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	// Layer 5: Draw plant cards (Story 3.1)
 	// Drawn on top of everything for best visibility
 	s.plantCardRenderSystem.Draw(screen)
+
+	// Layer 6: Draw plant preview (Story 3.2)
+	// Drawn on top of everything including plant cards
+	s.plantPreviewRenderSystem.Draw(screen)
 }
 
 // drawBackground renders the lawn background.

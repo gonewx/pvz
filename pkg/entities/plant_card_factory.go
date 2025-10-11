@@ -1,6 +1,9 @@
 package entities
 
 import (
+	"fmt"
+	"log"
+
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
@@ -8,8 +11,8 @@ import (
 
 // NewPlantCardEntity 创建一个植物卡片实体
 // 根据植物类型设置相应的属性（消耗、冷却、图像）
-// 返回创建的实体ID
-func NewPlantCardEntity(em *ecs.EntityManager, rm *game.ResourceManager, plantType components.PlantType, x, y float64) ecs.EntityID {
+// 返回创建的实体ID和可能的错误
+func NewPlantCardEntity(em *ecs.EntityManager, rm *game.ResourceManager, plantType components.PlantType, x, y float64) (ecs.EntityID, error) {
 	entity := em.CreateEntity()
 
 	// 根据植物类型设置属性
@@ -29,9 +32,11 @@ func NewPlantCardEntity(em *ecs.EntityManager, rm *game.ResourceManager, plantTy
 	// 加载卡片图像
 	cardImage, err := rm.LoadImage(imagePath)
 	if err != nil {
-		// 如果加载失败，记录错误但继续创建实体
-		// 实际游戏中应该有更健壮的错误处理
-		panic("Failed to load plant card image: " + imagePath)
+		// 删除已创建但无法完成的实体
+		em.DestroyEntity(entity)
+		em.RemoveMarkedEntities()
+		log.Printf("[PlantCardFactory] Failed to load card image for %v: %v", plantType, err)
+		return 0, fmt.Errorf("failed to load plant card image %s: %w", imagePath, err)
 	}
 
 	// 获取卡片图像的实际尺寸
@@ -67,9 +72,10 @@ func NewPlantCardEntity(em *ecs.EntityManager, rm *game.ResourceManager, plantTy
 	// 添加 ClickableComponent (可点击)
 	// 使用卡片图像的实际尺寸
 	em.AddComponent(entity, &components.ClickableComponent{
-		Width:  cardWidth,
-		Height: cardHeight,
+		Width:     cardWidth,
+		Height:    cardHeight,
+		IsEnabled: true, // 初始状态为可点击
 	})
 
-	return entity
+	return entity, nil
 }

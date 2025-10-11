@@ -1,6 +1,10 @@
 package game
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/decker502/pvz/pkg/components"
+)
 
 // TestGameStateSingleton 测试单例模式是否正确实现
 // 验证多次调用 GetGameState() 返回同一个实例
@@ -123,7 +127,80 @@ func TestSpendSunZeroSun(t *testing.T) {
 	}
 }
 
+// TestEnterPlantingMode 测试进入种植模式
+// 验证 IsPlantingMode 设置为 true，SelectedPlantType 正确设置
+func TestEnterPlantingMode(t *testing.T) {
+	gs := GetGameState()
+	gs.IsPlantingMode = false // 初始状态
 
+	gs.EnterPlantingMode(components.PlantSunflower)
 
+	if !gs.IsPlantingMode {
+		t.Error("Expected IsPlantingMode to be true")
+	}
+	if gs.SelectedPlantType != components.PlantSunflower {
+		t.Errorf("Expected SelectedPlantType to be PlantSunflower, got %v", gs.SelectedPlantType)
+	}
+}
 
+// TestExitPlantingMode 测试退出种植模式
+// 验证 IsPlantingMode 设置为 false
+func TestExitPlantingMode(t *testing.T) {
+	gs := GetGameState()
+	gs.IsPlantingMode = true // 先进入种植模式
+	gs.SelectedPlantType = components.PlantPeashooter
 
+	gs.ExitPlantingMode()
+
+	if gs.IsPlantingMode {
+		t.Error("Expected IsPlantingMode to be false")
+	}
+	// SelectedPlantType 保持不变（可选行为）
+	if gs.SelectedPlantType != components.PlantPeashooter {
+		t.Errorf("Expected SelectedPlantType to remain PlantPeashooter, got %v", gs.SelectedPlantType)
+	}
+}
+
+// TestGetPlantingMode 测试获取种植模式状态
+// 验证正确返回当前状态和选择的植物类型
+func TestGetPlantingMode(t *testing.T) {
+	gs := GetGameState()
+	gs.IsPlantingMode = true
+	gs.SelectedPlantType = components.PlantSunflower
+
+	isPlanting, plantType := gs.GetPlantingMode()
+
+	if !isPlanting {
+		t.Error("Expected isPlanting to be true")
+	}
+	if plantType != components.PlantSunflower {
+		t.Errorf("Expected plantType to be PlantSunflower, got %v", plantType)
+	}
+}
+
+// TestPlantingModeToggle 测试种植模式切换
+// 验证可以正确进入和退出种植模式多次
+func TestPlantingModeToggle(t *testing.T) {
+	gs := GetGameState()
+
+	// 第一次进入
+	gs.EnterPlantingMode(components.PlantSunflower)
+	if !gs.IsPlantingMode {
+		t.Error("Expected IsPlantingMode to be true after first enter")
+	}
+
+	// 退出
+	gs.ExitPlantingMode()
+	if gs.IsPlantingMode {
+		t.Error("Expected IsPlantingMode to be false after exit")
+	}
+
+	// 第二次进入（不同植物类型）
+	gs.EnterPlantingMode(components.PlantPeashooter)
+	if !gs.IsPlantingMode {
+		t.Error("Expected IsPlantingMode to be true after second enter")
+	}
+	if gs.SelectedPlantType != components.PlantPeashooter {
+		t.Errorf("Expected SelectedPlantType to be PlantPeashooter, got %v", gs.SelectedPlantType)
+	}
+}

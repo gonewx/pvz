@@ -34,6 +34,11 @@ func (s *RenderSystem) Draw(screen *ebiten.Image) {
 			continue
 		}
 
+		// 跳过植物预览实体（它们由 PlantPreviewRenderSystem 专门渲染）
+		if _, hasPlantPreview := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PlantPreviewComponent{})); hasPlantPreview {
+			continue
+		}
+
 		// 获取组件
 		posComp, _ := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PositionComponent{}))
 		spriteComp, _ := s.entityManager.GetComponent(id, reflect.TypeOf(&components.SpriteComponent{}))
