@@ -149,12 +149,6 @@ func TestGameSceneConstants(t *testing.T) {
 		t.Error("SeedBankHeight should be positive")
 	}
 
-	if SunCounterX < 0 {
-		t.Error("SunCounterX should be non-negative")
-	}
-	if SunCounterY < 0 {
-		t.Error("SunCounterY should be non-negative")
-	}
 	if SunCounterWidth <= 0 {
 		t.Error("SunCounterWidth should be positive")
 	}
@@ -254,9 +248,9 @@ func TestEaseOutQuad(t *testing.T) {
 	scene := NewGameScene(rm, sm)
 
 	tests := []struct {
-		name     string
-		input    float64
-		expected float64
+		name      string
+		input     float64
+		expected  float64
 		tolerance float64
 	}{
 		{"Start (t=0)", 0.0, 0.0, 0.001},

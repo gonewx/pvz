@@ -9,6 +9,7 @@ import (
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
 const (
@@ -19,11 +20,12 @@ const (
 	SeedBankWidth  = 500
 	SeedBankHeight = 87
 
-	// Sun Counter (阳光计数器)
-	SunCounterX      = 10
-	SunCounterY      = 10
-	SunCounterWidth  = 130
-	SunCounterHeight = 60
+	// Sun Counter (阳光计数器) - relative to SeedBank position
+	SunCounterOffsetX  = 45 // 相对于 SeedBank 的 X 偏移量
+	SunCounterOffsetY  = 69 // 相对于 SeedBank 的 Y 偏移量
+	SunCounterWidth    = 130
+	SunCounterHeight   = 60
+	SunCounterFontSize = 28.0 // 阳光数值字体大小（像素）
 
 	// Shovel (铲子) - positioned to the right of seed bank
 	ShovelX      = 620 // To the right of seed bank (bar5.png width=612 + small gap)
@@ -52,6 +54,9 @@ type GameScene struct {
 	sunCounterBG *ebiten.Image // Sun counter background (阳光计数器背景)
 	shovelSlot   *ebiten.Image // Shovel slot background (铲子槽位背景)
 	shovel       *ebiten.Image // Shovel icon (铲子图标)
+
+	// Font Resources
+	sunCounterFont *text.GoTextFace // Font for sun counter display
 
 	// Camera and Animation
 	cameraX            float64 // Camera X position (controls which part of background to show)
@@ -130,6 +135,15 @@ func (s *GameScene) loadResources() {
 		log.Printf("Warning: Failed to load shovel icon: %v", err)
 	} else {
 		s.shovel = shovel
+	}
+
+	// Load font for sun counter
+	font, err := s.resourceManager.LoadFont("assets/fonts/briannetod.ttf", SunCounterFontSize)
+	if err != nil {
+		log.Printf("Warning: Failed to load sun counter font: %v", err)
+		log.Printf("Will use fallback debug text rendering")
+	} else {
+		s.sunCounterFont = font
 	}
 
 	// Note: Sun counter background is drawn procedurally for now
@@ -287,14 +301,40 @@ func (s *GameScene) drawSeedBank(screen *ebiten.Image) {
 // drawSunCounter renders the sun counter value on the seed bank.
 // Note: The sun counter background and gold frame are already part of the bar5.png image,
 // so we don't need to draw them separately. This method displays the sun count number.
+// The text is horizontally centered to accommodate dynamic value lengths (e.g., 50, 150, 9990).
 func (s *GameScene) drawSunCounter(screen *ebiten.Image) {
 	// Get current sun value from game state
 	sunValue := s.gameState.GetSun()
+	sunText := fmt.Sprintf("%d", sunValue)
 
-	// Draw sun count number at the center-right of the sun counter area
-	// Position: X=80 (center-right), Y=40 (vertically centered)
-	// The text will be displayed in the default debug font (white color)
-	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("%d", sunValue), 80, 40)
+	if s.sunCounterFont != nil {
+		// Measure text width for centering
+		textWidth, _ := text.Measure(sunText, s.sunCounterFont, 0)
+
+		// Calculate centered position
+		// Base position is relative to SeedBank
+		centerX := float64(SeedBankX + SunCounterOffsetX)
+		centerY := float64(SeedBankY + SunCounterOffsetY)
+
+		// Adjust X to center the text horizontally
+		sunDisplayX := centerX - textWidth/2
+		sunDisplayY := centerY
+
+		// Use custom font with color
+		op := &text.DrawOptions{}
+		op.GeoM.Translate(sunDisplayX, sunDisplayY)
+
+		// Set text color to black for better visibility on the beige background
+		op.ColorScale.ScaleWithColor(color.RGBA{R: 0, G: 0, B: 0, A: 255})
+
+		text.Draw(screen, sunText, s.sunCounterFont, op)
+	} else {
+		// Fallback: Use debug text if font failed to load
+		// Note: Debug text doesn't support centering easily
+		sunDisplayX := SeedBankX + SunCounterOffsetX
+		sunDisplayY := SeedBankY + SunCounterOffsetY
+		ebitenutil.DebugPrintAt(screen, sunText, sunDisplayX, sunDisplayY)
+	}
 }
 
 // drawShovel renders the shovel slot and icon at the right side of the seed bank.

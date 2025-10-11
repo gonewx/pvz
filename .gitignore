@@ -9,3 +9,5 @@
 
 /pvz-go
 /pvz
+pvz-test
+coverage.out

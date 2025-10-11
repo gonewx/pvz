@@ -44,3 +44,4 @@ func (gs *GameState) SpendSun(amount int) bool {
 func (gs *GameState) GetSun() int {
 	return gs.Sun
 }
+

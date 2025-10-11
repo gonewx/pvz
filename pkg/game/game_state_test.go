@@ -122,3 +122,4 @@ func TestSpendSunZeroSun(t *testing.T) {
 		t.Errorf("Expected sun to remain 0, got %d", gs.Sun)
 	}
 }
+

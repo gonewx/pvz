@@ -15,6 +15,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/audio/mp3"
 	"github.com/hajimehoshi/ebiten/v2/audio/vorbis"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
 // ResourceManager is responsible for centralized management of game resources.
@@ -45,9 +46,10 @@ import (
 //	    log.Printf("Failed to load image: %v", err)
 //	}
 type ResourceManager struct {
-	imageCache   map[string]*ebiten.Image // Cache for loaded images: path -> Image
-	audioCache   map[string]*audio.Player // Cache for loaded audio players: path -> Player
-	audioContext *audio.Context           // Global audio context for audio decoding
+	imageCache    map[string]*ebiten.Image     // Cache for loaded images: path -> Image
+	audioCache    map[string]*audio.Player     // Cache for loaded audio players: path -> Player
+	audioContext  *audio.Context               // Global audio context for audio decoding
+	fontFaceCache map[string]*text.GoTextFace  // Cache for Ebitengine v2 text faces
 }
 
 // NewResourceManager creates and initializes a new ResourceManager instance.
@@ -66,9 +68,10 @@ type ResourceManager struct {
 //	resourceManager := NewResourceManager(audioContext)
 func NewResourceManager(audioContext *audio.Context) *ResourceManager {
 	return &ResourceManager{
-		imageCache:   make(map[string]*ebiten.Image),
-		audioCache:   make(map[string]*audio.Player),
-		audioContext: audioContext,
+		imageCache:    make(map[string]*ebiten.Image),
+		audioCache:    make(map[string]*audio.Player),
+		audioContext:  audioContext,
+		fontFaceCache: make(map[string]*text.GoTextFace),
 	}
 }
 
@@ -253,4 +256,72 @@ func (rm *ResourceManager) LoadAudio(path string) (*audio.Player, error) {
 //	}
 func (rm *ResourceManager) GetAudioPlayer(path string) *audio.Player {
 	return rm.audioCache[path]
+}
+
+// LoadFont loads a TrueType/OpenType font from the specified path and creates a text face with the given size.
+// The font face is cached for future use with a cache key combining path and size.
+// Supported formats: .ttf, .otf
+//
+// Parameters:
+//   - path: The file path to the font resource (e.g., "assets/fonts/briannetod.ttf").
+//   - size: The font size in pixels.
+//
+// Returns:
+//   - A pointer to the text.GoTextFace ready for rendering.
+//   - An error if the file cannot be opened or parsed.
+//
+// Example:
+//
+//	fontFace, err := rm.LoadFont("assets/fonts/briannetod.ttf", 32)
+//	if err != nil {
+//	    log.Printf("Failed to load font: %v", err)
+//	    return err
+//	}
+func (rm *ResourceManager) LoadFont(path string, size float64) (*text.GoTextFace, error) {
+	// Create cache key combining path and size
+	cacheKey := fmt.Sprintf("%s:%.1f", path, size)
+
+	// Check if the font face is already cached
+	if cachedFace, exists := rm.fontFaceCache[cacheKey]; exists {
+		return cachedFace, nil
+	}
+
+	// Read font file
+	fontData, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read font file %s: %w", path, err)
+	}
+
+	// Create GoTextFaceSource from font data
+	source, err := text.NewGoTextFaceSource(bytes.NewReader(fontData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create font source for %s: %w", path, err)
+	}
+
+	// Create GoTextFace with specified size
+	goTextFace := &text.GoTextFace{
+		Source:    source,
+		Size:      size,
+		Direction: text.DirectionLeftToRight,
+	}
+
+	// Store in cache
+	rm.fontFaceCache[cacheKey] = goTextFace
+
+	return goTextFace, nil
+}
+
+// GetFont retrieves a previously loaded font face from the cache.
+// If the font has not been loaded yet, it returns nil.
+// Use LoadFont to load and cache a font before calling this method.
+//
+// Parameters:
+//   - path: The file path of the font resource.
+//   - size: The font size in points.
+//
+// Returns:
+//   - A pointer to the cached text.GoTextFace, or nil if not found in cache.
+func (rm *ResourceManager) GetFont(path string, size float64) *text.GoTextFace {
+	cacheKey := fmt.Sprintf("%s:%.1f", path, size)
+	return rm.fontFaceCache[cacheKey]
 }
