@@ -29,6 +29,11 @@ func (s *RenderSystem) Draw(screen *ebiten.Image) {
 	)
 
 	for _, id := range entities {
+		// 跳过植物卡片实体（它们由 PlantCardRenderSystem 专门渲染）
+		if _, hasPlantCard := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PlantCardComponent{})); hasPlantCard {
+			continue
+		}
+
 		// 获取组件
 		posComp, _ := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PositionComponent{}))
 		spriteComp, _ := s.entityManager.GetComponent(id, reflect.TypeOf(&components.SpriteComponent{}))
@@ -52,7 +57,3 @@ func (s *RenderSystem) Draw(screen *ebiten.Image) {
 		screen.DrawImage(sprite.Image, op)
 	}
 }
-
-
-
-

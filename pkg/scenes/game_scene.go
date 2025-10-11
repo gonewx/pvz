@@ -6,7 +6,9 @@ import (
 	"image/color"
 	"log"
 
+	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/systems"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -28,6 +30,12 @@ const (
 	SunCounterWidth    = 130
 	SunCounterHeight   = 60
 	SunCounterFontSize = 28.0 // 阳光数值字体大小（像素）
+
+	// Plant Cards (植物卡片) - relative to SeedBank position
+	PlantCardStartOffsetX = 92   // 第一张卡片相对于 SeedBank 的 X 偏移量
+	PlantCardOffsetY      = 8    // 卡片相对于 SeedBank 的 Y 偏移量
+	PlantCardSpacing      = 65   // 卡片槽之间的间距（包含卡槽边框，每个卡槽约76px宽）
+	PlantCardScale        = 0.95 // 卡片缩放因子（原始卡片约64x89，缩放后约54x76适配卡槽）
 
 	// Shovel (铲子) - positioned to the right of seed bank
 	ShovelX      = 620 // To the right of seed bank (bar5.png width=612 + small gap)
@@ -75,6 +83,10 @@ type GameScene struct {
 	inputSystem         *systems.InputSystem
 	animationSystem     *systems.AnimationSystem
 	sunCollectionSystem *systems.SunCollectionSystem
+
+	// Story 3.1: Plant Card Systems
+	plantCardSystem       *systems.PlantCardSystem
+	plantCardRenderSystem *systems.PlantCardRenderSystem
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -143,7 +155,42 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 		550.0, // maxTargetY - 草坪下边界
 	)
 
+	// Story 3.1: Initialize plant card systems
+	scene.initPlantCardSystems(rm)
+
 	return scene
+}
+
+// initPlantCardSystems initializes the plant card systems and creates plant card entities.
+// Story 3.1: Plant Card UI and State
+func (s *GameScene) initPlantCardSystems(rm *game.ResourceManager) {
+	// Create plant card entities
+	// 使用相对定位（相对于 SeedBank），与阳光计数器定位方式一致
+	// 这提高了代码可维护性，当 SeedBank 位置改变时，卡片会自动跟随
+
+	// 计算第一张卡片的绝对位置
+	firstCardX := float64(SeedBankX + PlantCardStartOffsetX)
+	cardY := float64(SeedBankY + PlantCardOffsetY)
+
+	// 向日葵卡片（第一张）
+	entities.NewPlantCardEntity(s.entityManager, rm, components.PlantSunflower, firstCardX, cardY)
+
+	// 豌豆射手卡片（第二张）
+	secondCardX := firstCardX + PlantCardSpacing
+	entities.NewPlantCardEntity(s.entityManager, rm, components.PlantPeashooter, secondCardX, cardY)
+
+	// Initialize PlantCardSystem
+	s.plantCardSystem = systems.NewPlantCardSystem(
+		s.entityManager,
+		s.gameState,
+		rm,
+	)
+
+	// Initialize PlantCardRenderSystem
+	s.plantCardRenderSystem = systems.NewPlantCardRenderSystem(
+		s.entityManager,
+		PlantCardScale, // 使用常量定义的缩放因子
+	)
 }
 
 // loadResources loads all UI images required for the game scene.
@@ -218,13 +265,14 @@ func (s *GameScene) Update(deltaTime float64) {
 	}
 
 	// Update all ECS systems in order (order matters for correct game logic)
-	s.inputSystem.Update(deltaTime)         // 1. Process player input (highest priority)
-	s.sunSpawnSystem.Update(deltaTime)      // 2. Generate new suns
-	s.sunMovementSystem.Update(deltaTime)   // 3. Move suns (includes collection animation)
-	s.sunCollectionSystem.Update(deltaTime) // 4. Check if collection is complete
-	s.animationSystem.Update(deltaTime)     // 5. Update animation frames
-	s.lifetimeSystem.Update(deltaTime)      // 6. Check for expired entities
-	s.entityManager.RemoveMarkedEntities()  // 7. Clean up deleted entities (always last)
+	s.plantCardSystem.Update(deltaTime)     // 1. Update plant card states (before input)
+	s.inputSystem.Update(deltaTime)         // 2. Process player input (highest priority)
+	s.sunSpawnSystem.Update(deltaTime)      // 3. Generate new suns
+	s.sunMovementSystem.Update(deltaTime)   // 4. Move suns (includes collection animation)
+	s.sunCollectionSystem.Update(deltaTime) // 5. Check if collection is complete
+	s.animationSystem.Update(deltaTime)     // 6. Update animation frames
+	s.lifetimeSystem.Update(deltaTime)      // 7. Check for expired entities
+	s.entityManager.RemoveMarkedEntities()  // 8. Clean up deleted entities (always last)
 }
 
 // updateIntroAnimation updates the intro camera animation that showcases the entire lawn.
@@ -277,6 +325,7 @@ func (s *GameScene) easeOutQuad(t float64) float64 {
 // 2. UI base layer (seed bank, shovel) - drawn first so suns appear on top
 // 3. Game entities (suns, plants, zombies) - drawn on top of UI
 // 4. UI overlay (sun counter text) - drawn last for best visibility
+// 5. Plant cards (on top of everything)
 func (s *GameScene) Draw(screen *ebiten.Image) {
 	// Layer 1: Draw lawn background
 	s.drawBackground(screen)
@@ -293,6 +342,10 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	// Layer 4: Draw UI overlays (sun counter text)
 	// Drawn last to ensure text is always visible
 	s.drawSunCounter(screen)
+
+	// Layer 5: Draw plant cards (Story 3.1)
+	// Drawn on top of everything for best visibility
+	s.plantCardRenderSystem.Draw(screen)
 }
 
 // drawBackground renders the lawn background.
