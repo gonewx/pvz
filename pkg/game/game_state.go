@@ -45,3 +45,7 @@ func (gs *GameState) GetSun() int {
 	return gs.Sun
 }
 
+
+
+
+

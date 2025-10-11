@@ -6,7 +6,9 @@ import (
 	"image/color"
 	"log"
 
+	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/decker502/pvz/pkg/systems"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
@@ -42,7 +44,7 @@ const (
 
 // GameScene represents the main gameplay screen.
 // This is where the actual Plants vs Zombies gameplay will occur.
-// It manages the game state, UI elements, and will eventually contain the ECS system.
+// It manages the game state, UI elements, and the ECS system.
 type GameScene struct {
 	resourceManager *game.ResourceManager
 	sceneManager    *game.SceneManager
@@ -63,6 +65,13 @@ type GameScene struct {
 	maxCameraX         float64 // Maximum camera X position (rightmost edge of background)
 	isIntroAnimPlaying bool    // Whether the intro animation is currently playing
 	introAnimTimer     float64 // Timer for intro animation
+
+	// ECS Framework and Systems
+	entityManager     *ecs.EntityManager
+	sunSpawnSystem    *systems.SunSpawnSystem
+	sunMovementSystem *systems.SunMovementSystem
+	lifetimeSystem    *systems.LifetimeSystem
+	renderSystem      *systems.RenderSystem
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -89,6 +98,24 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 
 	// Load all UI resources
 	scene.loadResources()
+
+	// Initialize ECS framework
+	scene.entityManager = ecs.NewEntityManager()
+
+	// Initialize systems
+	scene.renderSystem = systems.NewRenderSystem(scene.entityManager)
+	scene.sunMovementSystem = systems.NewSunMovementSystem(scene.entityManager)
+	scene.lifetimeSystem = systems.NewLifetimeSystem(scene.entityManager)
+
+	// Initialize sun spawn system with lawn area parameters
+	scene.sunSpawnSystem = systems.NewSunSpawnSystem(
+		scene.entityManager,
+		rm,
+		250.0, // minX - 草坪左边界
+		900.0, // maxX - 草坪右边界
+		100.0, // minTargetY - 草坪上边界
+		550.0, // maxTargetY - 草坪下边界
+	)
 
 	return scene
 }
@@ -155,25 +182,22 @@ func (s *GameScene) loadResources() {
 //
 // This method handles:
 //   - Intro animation (camera scrolling left → right → center)
-//   - Temporary keyboard input for testing sun system (Story 2.2)
-//   - Future: ECS system updates, input handling, game state management
+//   - ECS system updates (sun spawning, movement, lifetime management)
+//   - Future: Input handling, collision detection, AI behavior
 func (s *GameScene) Update(deltaTime float64) {
 	// Handle intro animation
 	if s.isIntroAnimPlaying {
 		s.updateIntroAnimation(deltaTime)
+		return // Don't update game systems during intro animation
 	}
 
-	// Temporary debug code: Test sun system with keyboard input (Story 2.2)
-	// Press 'A' to add 25 sun, press 'S' to spend 50 sun
-	// TODO: Remove or comment out after Story 2.4 implements real sun collection
-	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		s.gameState.AddSun(25)
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyS) {
-		s.gameState.SpendSun(50)
-	}
+	// Update all ECS systems in order
+	s.sunSpawnSystem.Update(deltaTime)     // Generate new suns
+	s.sunMovementSystem.Update(deltaTime)  // Move falling suns
+	s.lifetimeSystem.Update(deltaTime)     // Check for expired entities
+	s.entityManager.RemoveMarkedEntities() // Clean up deleted entities
 
-	// Future: Update ECS systems, handle game logic, etc.
+	// Future: Input system, collision system, AI system, etc.
 }
 
 // updateIntroAnimation updates the intro camera animation that showcases the entire lawn.
@@ -220,12 +244,15 @@ func (s *GameScene) easeOutQuad(t float64) float64 {
 }
 
 // Draw renders the game scene to the screen.
-// It draws the lawn background and all UI elements in the correct order.
+// It draws the lawn background, all game entities, and UI elements in the correct order.
 func (s *GameScene) Draw(screen *ebiten.Image) {
 	// Draw lawn background
 	s.drawBackground(screen)
 
-	// Draw UI elements
+	// Draw all game entities (suns, plants, zombies, etc.)
+	s.renderSystem.Draw(screen)
+
+	// Draw UI elements on top
 	s.drawSeedBank(screen)
 	s.drawSunCounter(screen)
 	s.drawShovel(screen)
