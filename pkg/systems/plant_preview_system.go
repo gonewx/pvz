@@ -7,17 +7,8 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
-)
-
-// 草坪网格参数
-const (
-	gridStartX  = 250.0 // 网格起始X坐标
-	gridStartY  = 90.0  // 网格起始Y坐标
-	gridColumns = 9     // 网格列数
-	gridRows    = 5     // 网格行数
-	cellWidth   = 80.0  // 每格宽度
-	cellHeight  = 100.0 // 每格高度
 )
 
 // PlantPreviewSystem 更新植物预览的位置
@@ -72,35 +63,35 @@ func (s *PlantPreviewSystem) Update(deltaTime float64) {
 
 // isInGrid 判断坐标是否在草坪网格内
 func (s *PlantPreviewSystem) isInGrid(x, y float64) bool {
-	gridEndX := gridStartX + float64(gridColumns)*cellWidth
-	gridEndY := gridStartY + float64(gridRows)*cellHeight
+	gridEndX := utils.GridStartX + float64(utils.GridColumns)*utils.CellWidth
+	gridEndY := utils.GridStartY + float64(utils.GridRows)*utils.CellHeight
 
-	return x >= gridStartX && x < gridEndX &&
-		y >= gridStartY && y < gridEndY
+	return x >= utils.GridStartX && x < gridEndX &&
+		y >= utils.GridStartY && y < gridEndY
 }
 
 // snapToGridCenter 将坐标对齐到最近的格子中心
 func (s *PlantPreviewSystem) snapToGridCenter(x, y float64) (float64, float64) {
 	// 计算列和行索引
-	col := int(math.Floor((x - gridStartX) / cellWidth))
-	row := int(math.Floor((y - gridStartY) / cellHeight))
+	col := int(math.Floor((x - utils.GridStartX) / utils.CellWidth))
+	row := int(math.Floor((y - utils.GridStartY) / utils.CellHeight))
 
 	// 边界检查（防止越界）
 	if col < 0 {
 		col = 0
-	} else if col >= gridColumns {
-		col = gridColumns - 1
+	} else if col >= utils.GridColumns {
+		col = utils.GridColumns - 1
 	}
 
 	if row < 0 {
 		row = 0
-	} else if row >= gridRows {
-		row = gridRows - 1
+	} else if row >= utils.GridRows {
+		row = utils.GridRows - 1
 	}
 
 	// 计算格子中心坐标
-	centerX := gridStartX + float64(col)*cellWidth + cellWidth/2
-	centerY := gridStartY + float64(row)*cellHeight + cellHeight/2
+	centerX := utils.GridStartX + float64(col)*utils.CellWidth + utils.CellWidth/2
+	centerY := utils.GridStartY + float64(row)*utils.CellHeight + utils.CellHeight/2
 
 	return centerX, centerY
 }

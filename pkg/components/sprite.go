@@ -6,7 +6,3 @@ import "github.com/hajimehoshi/ebiten/v2"
 type SpriteComponent struct {
 	Image *ebiten.Image
 }
-
-
-
-

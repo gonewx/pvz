@@ -14,7 +14,3 @@ type SunComponent struct {
 	State   SunState // 当前状态
 	TargetY float64  // 目标落地Y坐标
 }
-
-
-
-

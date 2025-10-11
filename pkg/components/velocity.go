@@ -4,7 +4,3 @@ package components
 type VelocityComponent struct {
 	VX, VY float64 // X轴和Y轴速度
 }
-
-
-
-

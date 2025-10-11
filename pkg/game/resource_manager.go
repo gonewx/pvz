@@ -46,10 +46,10 @@ import (
 //	    log.Printf("Failed to load image: %v", err)
 //	}
 type ResourceManager struct {
-	imageCache    map[string]*ebiten.Image     // Cache for loaded images: path -> Image
-	audioCache    map[string]*audio.Player     // Cache for loaded audio players: path -> Player
-	audioContext  *audio.Context               // Global audio context for audio decoding
-	fontFaceCache map[string]*text.GoTextFace  // Cache for Ebitengine v2 text faces
+	imageCache    map[string]*ebiten.Image    // Cache for loaded images: path -> Image
+	audioCache    map[string]*audio.Player    // Cache for loaded audio players: path -> Player
+	audioContext  *audio.Context              // Global audio context for audio decoding
+	fontFaceCache map[string]*text.GoTextFace // Cache for Ebitengine v2 text faces
 }
 
 // NewResourceManager creates and initializes a new ResourceManager instance.

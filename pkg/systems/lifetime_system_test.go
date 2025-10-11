@@ -147,7 +147,3 @@ func TestMultipleEntitiesWithDifferentLifetimes(t *testing.T) {
 		t.Error("Entity 2 should not be expired yet")
 	}
 }
-
-
-
-

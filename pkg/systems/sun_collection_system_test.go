@@ -101,11 +101,11 @@ func TestSunCollectionDistanceThreshold(t *testing.T) {
 	threshold := 10.0 // 阈值是10像素
 
 	tests := []struct {
-		name          string
-		sunX          float64
-		sunY          float64
-		shouldArrive  bool
-		description   string
+		name         string
+		sunX         float64
+		sunY         float64
+		shouldArrive bool
+		description  string
 	}{
 		{"正好在阈值边界上", 21.0, 70.0, false, "距离正好10像素,边界上不删除"},
 		{"稍微超出阈值", 21.0, 69.5, false, "距离10.5像素,超出阈值"},

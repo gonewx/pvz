@@ -7,7 +7,3 @@ type LifetimeComponent struct {
 	CurrentLifetime float64 // 当前已存在时间(秒)
 	IsExpired       bool    // 是否已过期
 }
-
-
-
-

@@ -130,7 +130,3 @@ func TestMultipleSuns(t *testing.T) {
 		t.Errorf("Sun 2: Expected Y=110, got Y=%f", pos2.Y)
 	}
 }
-
-
-
-

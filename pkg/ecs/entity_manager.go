@@ -99,7 +99,3 @@ func (em *EntityManager) GetEntitiesWith(componentTypes ...reflect.Type) []Entit
 
 	return result
 }
-
-
-
-

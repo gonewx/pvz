@@ -99,7 +99,3 @@ func TestRenderSystemEmptyScene(t *testing.T) {
 	// Draw 应该不会崩溃
 	system.Draw(screen)
 }
-
-
-
-

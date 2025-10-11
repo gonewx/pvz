@@ -12,3 +12,4 @@
 pvz-test
 coverage.out
 pvz-debug
+coverage_*.out

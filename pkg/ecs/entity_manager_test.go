@@ -185,7 +185,3 @@ func TestDestroyMultipleEntities(t *testing.T) {
 		t.Error("id3 should be removed")
 	}
 }
-
-
-
-

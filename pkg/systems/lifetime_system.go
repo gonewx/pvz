@@ -45,7 +45,3 @@ func (s *LifetimeSystem) Update(deltaTime float64) {
 		}
 	}
 }
-
-
-
-
