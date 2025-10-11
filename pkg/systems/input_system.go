@@ -7,6 +7,7 @@ import (
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -19,19 +20,24 @@ type InputSystem struct {
 	entityManager      *ecs.EntityManager
 	resourceManager    *game.ResourceManager
 	gameState          *game.GameState
-	sunCounterX        float64       // 阳光计数器X坐标（收集动画目标）
-	sunCounterY        float64       // 阳光计数器Y坐标（收集动画目标）
-	collectSoundPlayer *audio.Player // 收集阳光音效播放器
+	sunCounterX        float64         // 阳光计数器X坐标（收集动画目标）
+	sunCounterY        float64         // 阳光计数器Y坐标（收集动画目标）
+	collectSoundPlayer *audio.Player   // 收集阳光音效播放器
+	lawnGridSystem     *LawnGridSystem // 草坪网格管理系统
+	lawnGridEntityID   ecs.EntityID    // 草坪网格实体ID
+	plantSoundPlayer   *audio.Player   // 种植音效播放器
 }
 
 // NewInputSystem 创建一个新的输入系统
-func NewInputSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.GameState, sunCounterX, sunCounterY float64) *InputSystem {
+func NewInputSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.GameState, sunCounterX, sunCounterY float64, lawnGridSystem *LawnGridSystem, lawnGridEntityID ecs.EntityID) *InputSystem {
 	system := &InputSystem{
-		entityManager:   em,
-		resourceManager: rm,
-		gameState:       gs,
-		sunCounterX:     sunCounterX,
-		sunCounterY:     sunCounterY,
+		entityManager:    em,
+		resourceManager:  rm,
+		gameState:        gs,
+		sunCounterX:      sunCounterX,
+		sunCounterY:      sunCounterY,
+		lawnGridSystem:   lawnGridSystem,
+		lawnGridEntityID: lawnGridEntityID,
 	}
 
 	// 加载收集阳光音效（使用 LoadSoundEffect 而非 LoadAudio 以避免循环播放）
@@ -40,6 +46,14 @@ func NewInputSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.Ga
 		log.Printf("Warning: Failed to load sun collect sound: %v", err)
 	} else {
 		system.collectSoundPlayer = player
+	}
+
+	// 加载种植音效
+	plantPlayer, err := rm.LoadSoundEffect("assets/audio/Sound/plant.ogg")
+	if err != nil {
+		log.Printf("Warning: Failed to load plant sound: %v", err)
+	} else {
+		system.plantSoundPlayer = plantPlayer
 	}
 
 	return system
@@ -64,7 +78,13 @@ func (s *InputSystem) Update(deltaTime float64) {
 		// 优先检查植物卡片点击
 		cardHandled := s.handlePlantCardClick(mouseX, mouseY)
 		if cardHandled {
-			return // 已处理卡片点击，不继续处理阳光
+			return // 已处理卡片点击，不继续处理其他点击
+		}
+
+		// 检查是否在种植模式下点击草坪
+		lawnHandled := s.handleLawnClick(mouseX, mouseY)
+		if lawnHandled {
+			return // 已处理草坪种植，不继续处理阳光
 		}
 
 		// 查询所有可点击的阳光实体
@@ -291,4 +311,119 @@ func (s *InputSystem) destroyPlantPreview() {
 
 	// 立即清理标记删除的实体
 	s.entityManager.RemoveMarkedEntities()
+}
+
+// handleLawnClick 处理草坪点击种植逻辑
+// 返回 true 表示处理了点击，false 表示未处理
+func (s *InputSystem) handleLawnClick(mouseX, mouseY int) bool {
+	// 检查当前是否在种植模式
+	isPlanting, plantType := s.gameState.GetPlantingMode()
+	if !isPlanting {
+		return false // 不在种植模式，不处理
+	}
+
+	// 转换鼠标坐标到网格坐标
+	col, row, isValid := utils.MouseToGridCoords(mouseX, mouseY)
+	if !isValid {
+		log.Printf("[InputSystem] 鼠标点击在网格外: (%d, %d)", mouseX, mouseY)
+		return false // 点击在网格外
+	}
+
+	log.Printf("[InputSystem] 草坪点击: col=%d, row=%d", col, row)
+
+	// 检查格子是否已被占用
+	if s.lawnGridSystem.IsOccupied(s.lawnGridEntityID, col, row) {
+		log.Printf("[InputSystem] 格子 (%d, %d) 已被占用，无法种植", col, row)
+		return true // 处理了点击（虽然没有种植），防止继续处理阳光
+	}
+
+	// 获取植物消耗
+	sunCost := s.getPlantCost(plantType)
+
+	// 尝试扣除阳光
+	if !s.gameState.SpendSun(sunCost) {
+		log.Printf("[InputSystem] 阳光不足，需要 %d，当前 %d", sunCost, s.gameState.GetSun())
+		return true // 处理了点击，但阳光不足
+	}
+
+	log.Printf("[InputSystem] 扣除阳光 %d，剩余 %d", sunCost, s.gameState.GetSun())
+
+	// 创建植物实体（需要导入 entities 包）
+	plantID, err := s.createPlantEntity(plantType, col, row)
+	if err != nil {
+		log.Printf("[InputSystem] 创建植物实体失败: %v", err)
+		// 创建失败，返还阳光
+		s.gameState.AddSun(sunCost)
+		return true
+	}
+
+	log.Printf("[InputSystem] 成功创建植物实体 (ID: %d, Type: %v) 在 (%d, %d)", plantID, plantType, col, row)
+
+	// 标记格子为占用
+	err = s.lawnGridSystem.OccupyCell(s.lawnGridEntityID, col, row, plantID)
+	if err != nil {
+		log.Printf("[InputSystem] 标记格子占用失败: %v", err)
+		// 失败时删除植物实体并返还阳光
+		s.entityManager.DestroyEntity(plantID)
+		s.gameState.AddSun(sunCost)
+		return true
+	}
+
+	// 播放种植音效
+	if s.plantSoundPlayer != nil {
+		s.plantSoundPlayer.Rewind()
+		s.plantSoundPlayer.Play()
+		log.Printf("[InputSystem] 播放种植音效")
+	}
+
+	// 触发植物卡片冷却
+	s.triggerPlantCardCooldown(plantType)
+
+	// 删除预览实体
+	s.destroyPlantPreview()
+
+	// 退出种植模式
+	s.gameState.ExitPlantingMode()
+	log.Printf("[InputSystem] 种植完成，退出种植模式")
+
+	return true // 已处理点击
+}
+
+// createPlantEntity 创建植物实体的辅助方法
+// 使用 entities.NewPlantEntity 工厂函数以保持一致性
+func (s *InputSystem) createPlantEntity(plantType components.PlantType, col, row int) (ecs.EntityID, error) {
+	return entities.NewPlantEntity(s.entityManager, s.resourceManager, plantType, col, row)
+}
+
+// getPlantCost 获取植物的阳光消耗
+func (s *InputSystem) getPlantCost(plantType components.PlantType) int {
+	switch plantType {
+	case components.PlantSunflower:
+		return 50
+	case components.PlantPeashooter:
+		return 100
+	default:
+		return 0
+	}
+}
+
+// triggerPlantCardCooldown 触发指定植物类型的卡片进入冷却状态
+func (s *InputSystem) triggerPlantCardCooldown(plantType components.PlantType) {
+	// 查询所有植物卡片实体
+	entities := s.entityManager.GetEntitiesWith(
+		reflect.TypeOf(&components.PlantCardComponent{}),
+	)
+
+	// 找到匹配的卡片并触发冷却
+	for _, entityID := range entities {
+		cardComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PlantCardComponent{}))
+		card := cardComp.(*components.PlantCardComponent)
+
+		if card.PlantType == plantType {
+			// 触发冷却
+			card.CurrentCooldown = card.CooldownTime
+			log.Printf("[InputSystem] 触发植物卡片冷却: PlantType=%v, CooldownTime=%.1f", plantType, card.CooldownTime)
+			break // 只触发第一个匹配的卡片
+		}
+	}
 }

@@ -53,7 +53,12 @@ func TestSunClickStateChange(t *testing.T) {
 	gs := game.GetGameState()
 	initialSun := gs.GetSun()
 
-	system := NewInputSystem(em, rm, gs, 21.0, 80.0)
+	// 创建草坪网格系统和实体（测试用）
+	lawnGridSystem := NewLawnGridSystem(em)
+	lawnGridEntityID := em.CreateEntity()
+	em.AddComponent(lawnGridEntityID, &components.LawnGridComponent{})
+
+	system := NewInputSystem(em, rm, gs, 21.0, 80.0, lawnGridSystem, lawnGridEntityID)
 
 	// 创建已落地的阳光实体
 	id := em.CreateEntity()
@@ -108,7 +113,12 @@ func TestClickFallingSunNoEffect(t *testing.T) {
 	rm := game.NewResourceManager(testAudioContext)
 	gs := game.GetGameState()
 
-	NewInputSystem(em, rm, gs, 21.0, 80.0)
+	// 创建草坪网格系统和实体（测试用）
+	lawnGridSystem := NewLawnGridSystem(em)
+	lawnGridEntityID := em.CreateEntity()
+	em.AddComponent(lawnGridEntityID, &components.LawnGridComponent{})
+
+	NewInputSystem(em, rm, gs, 21.0, 80.0, lawnGridSystem, lawnGridEntityID)
 
 	// 创建正在掉落的阳光实体
 	id := em.CreateEntity()
@@ -148,7 +158,12 @@ func TestClickDisabledSunNoEffect(t *testing.T) {
 	rm := game.NewResourceManager(testAudioContext)
 	gs := game.GetGameState()
 
-	_ = NewInputSystem(em, rm, gs, 21.0, 80.0)
+	// 创建草坪网格系统和实体（测试用）
+	lawnGridSystem := NewLawnGridSystem(em)
+	lawnGridEntityID := em.CreateEntity()
+	em.AddComponent(lawnGridEntityID, &components.LawnGridComponent{})
+
+	_ = NewInputSystem(em, rm, gs, 21.0, 80.0, lawnGridSystem, lawnGridEntityID)
 
 	// 创建已被禁用的阳光实体（已被点击过）
 	id := em.CreateEntity()
@@ -182,7 +197,13 @@ func TestVelocityCalculation(t *testing.T) {
 
 	targetX := 21.0
 	targetY := 80.0
-	system := NewInputSystem(em, rm, gs, targetX, targetY)
+
+	// 创建草坪网格系统和实体（测试用）
+	lawnGridSystem := NewLawnGridSystem(em)
+	lawnGridEntityID := em.CreateEntity()
+	em.AddComponent(lawnGridEntityID, &components.LawnGridComponent{})
+
+	system := NewInputSystem(em, rm, gs, targetX, targetY, lawnGridSystem, lawnGridEntityID)
 
 	// 创建阳光实体
 	id := em.CreateEntity()
@@ -222,5 +243,69 @@ func TestVelocityCalculation(t *testing.T) {
 		if ratio < expectedRatio-0.01 || ratio > expectedRatio+0.01 {
 			t.Errorf("Velocity direction incorrect: ratio=%v, expected=%v", ratio, expectedRatio)
 		}
+	}
+}
+
+// TestGetPlantCost 测试植物阳光消耗计算
+func TestGetPlantCost(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(testAudioContext)
+	gs := game.GetGameState()
+	lawnGridSystem := NewLawnGridSystem(em)
+	lawnGridEntityID := em.CreateEntity()
+	em.AddComponent(lawnGridEntityID, &components.LawnGridComponent{})
+
+	system := NewInputSystem(em, rm, gs, 21.0, 80.0, lawnGridSystem, lawnGridEntityID)
+
+	tests := []struct {
+		name      string
+		plantType components.PlantType
+		wantCost  int
+	}{
+		{"向日葵", components.PlantSunflower, 50},
+		{"豌豆射手", components.PlantPeashooter, 100},
+		{"未知植物", components.PlantType(999), 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cost := system.getPlantCost(tt.plantType)
+			if cost != tt.wantCost {
+				t.Errorf("getPlantCost(%v) = %d, want %d", tt.plantType, cost, tt.wantCost)
+			}
+		})
+	}
+}
+
+// TestTriggerPlantCardCooldown 测试触发卡片冷却
+func TestTriggerPlantCardCooldown(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(testAudioContext)
+	gs := game.GetGameState()
+	lawnGridSystem := NewLawnGridSystem(em)
+	lawnGridEntityID := em.CreateEntity()
+	em.AddComponent(lawnGridEntityID, &components.LawnGridComponent{})
+
+	system := NewInputSystem(em, rm, gs, 21.0, 80.0, lawnGridSystem, lawnGridEntityID)
+
+	// 创建向日葵卡片
+	cardID := em.CreateEntity()
+	em.AddComponent(cardID, &components.PlantCardComponent{
+		PlantType:       components.PlantSunflower,
+		SunCost:         50,
+		CooldownTime:    7.5,
+		CurrentCooldown: 0,
+		IsAvailable:     true,
+	})
+
+	// 触发冷却
+	system.triggerPlantCardCooldown(components.PlantSunflower)
+
+	// 验证冷却已触发
+	cardComp, _ := em.GetComponent(cardID, reflect.TypeOf(&components.PlantCardComponent{}))
+	card := cardComp.(*components.PlantCardComponent)
+
+	if card.CurrentCooldown != 7.5 {
+		t.Errorf("Expected CurrentCooldown=7.5, got %f", card.CurrentCooldown)
 	}
 }

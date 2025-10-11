@@ -11,6 +11,7 @@ import (
 	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/systems"
+	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
@@ -91,6 +92,10 @@ type GameScene struct {
 	// Story 3.2: Plant Preview Systems
 	plantPreviewSystem       *systems.PlantPreviewSystem
 	plantPreviewRenderSystem *systems.PlantPreviewRenderSystem
+
+	// Story 3.3: Lawn Grid System
+	lawnGridSystem   *systems.LawnGridSystem // 草坪网格管理系统
+	lawnGridEntityID ecs.EntityID            // 草坪网格实体ID
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -132,13 +137,21 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	sunCollectionTargetX := float64(SeedBankX + SunCounterOffsetX)
 	sunCollectionTargetY := float64(SeedBankY + SunCounterOffsetY)
 
-	// Initialize input system with sun counter target position (飞向目标)
+	// Story 3.3: Initialize lawn grid system and entity
+	scene.lawnGridSystem = systems.NewLawnGridSystem(scene.entityManager)
+	scene.lawnGridEntityID = scene.entityManager.CreateEntity()
+	scene.entityManager.AddComponent(scene.lawnGridEntityID, &components.LawnGridComponent{})
+	log.Printf("[GameScene] Initialized lawn grid system (Entity ID: %d)", scene.lawnGridEntityID)
+
+	// Initialize input system with sun counter target position and lawn grid system (Story 2.4 + Story 3.3)
 	scene.inputSystem = systems.NewInputSystem(
 		scene.entityManager,
 		rm,
 		scene.gameState,
-		sunCollectionTargetX, // sunCounterX - 阳光计数器X坐标
-		sunCollectionTargetY, // sunCounterY - 阳光计数器Y坐标
+		sunCollectionTargetX,   // sunCounterX - 阳光计数器X坐标
+		sunCollectionTargetY,   // sunCounterY - 阳光计数器Y坐标
+		scene.lawnGridSystem,   // Story 3.3: 草坪网格系统
+		scene.lawnGridEntityID, // Story 3.3: 草坪网格实体ID
 	)
 
 	// Initialize sun collection system with the same target position
@@ -367,6 +380,9 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	// Layer 6: Draw plant preview (Story 3.2)
 	// Drawn on top of everything including plant cards
 	s.plantPreviewRenderSystem.Draw(screen)
+
+	// DEBUG: Draw grid boundaries (Story 3.3 debugging)
+	s.drawGridDebug(screen)
 }
 
 // drawBackground renders the lawn background.
@@ -496,5 +512,37 @@ func (s *GameScene) drawShovel(screen *ebiten.Image) {
 			ShovelX, ShovelY,
 			ShovelWidth, ShovelHeight,
 			color.RGBA{R: 128, G: 128, B: 128, A: 255}) // Gray
+	}
+}
+
+// drawGridDebug 绘制草坪网格边界（调试用）
+// 在开发阶段帮助可视化可种植区域
+func (s *GameScene) drawGridDebug(screen *ebiten.Image) {
+	// 只在种植模式下显示网格
+	if !s.gameState.IsPlantingMode {
+		return
+	}
+
+	// 使用统一的网格参数（从 utils.grid_utils.go）
+	gridStartX := utils.GridStartX
+	gridStartY := utils.GridStartY
+	gridColumns := utils.GridColumns
+	gridRows := utils.GridRows
+	cellWidth := utils.CellWidth
+	cellHeight := utils.CellHeight
+
+	// 绘制网格线
+	gridColor := color.RGBA{R: 255, G: 255, B: 0, A: 128} // 半透明黄色
+
+	// 绘制垂直线
+	for col := 0; col <= gridColumns; col++ {
+		x := gridStartX + float64(col)*cellWidth
+		ebitenutil.DrawLine(screen, x, gridStartY, x, gridStartY+float64(gridRows)*cellHeight, gridColor)
+	}
+
+	// 绘制水平线
+	for row := 0; row <= gridRows; row++ {
+		y := gridStartY + float64(row)*cellHeight
+		ebitenutil.DrawLine(screen, gridStartX, y, gridStartX+float64(gridColumns)*cellWidth, y, gridColor)
 	}
 }

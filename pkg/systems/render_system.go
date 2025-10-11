@@ -52,11 +52,31 @@ func (s *RenderSystem) Draw(screen *ebiten.Image) {
 			continue
 		}
 
+		// 获取图像尺寸
+		bounds := sprite.Image.Bounds()
+		imageWidth := float64(bounds.Dx())
+		imageHeight := float64(bounds.Dy())
+
+		// 检查是否是植物实体（需要中心对齐）
+		_, isPlant := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PlantComponent{}))
+
+		var drawX, drawY float64
+		if isPlant {
+			// 植物实体：图像中心对齐到位置坐标
+			// 这样可以与 PlantPreviewRenderSystem 保持一致
+			drawX = pos.X - imageWidth/2
+			drawY = pos.Y - imageHeight/2
+		} else {
+			// 其他实体（如阳光）：图像左上角对齐到位置坐标
+			drawX = pos.X
+			drawY = pos.Y
+		}
+
 		// 创建绘制选项
 		op := &ebiten.DrawImageOptions{}
 
 		// 设置位置平移
-		op.GeoM.Translate(pos.X, pos.Y)
+		op.GeoM.Translate(drawX, drawY)
 
 		// 绘制到屏幕
 		screen.DrawImage(sprite.Image, op)
