@@ -7,6 +7,7 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // TestSunflowerTimerUpdate 测试向日葵计时器更新逻辑
@@ -643,5 +644,535 @@ func TestZombieDeathAnimationInProgress(t *testing.T) {
 	_, exists := em.GetComponent(zombieID, reflect.TypeOf(&components.PositionComponent{}))
 	if !exists {
 		t.Error("Expected zombie to still exist (death animation not finished)")
+	}
+}
+
+// TestDetectPlantCollision 测试植物碰撞检测
+func TestDetectPlantCollision(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(testAudioContext)
+	system := NewBehaviorSystem(em, rm)
+
+	// 创建植物实体 - 向日葵在 (2, 3)
+	sunflowerID := em.CreateEntity()
+	em.AddComponent(sunflowerID, &components.PlantComponent{
+		PlantType: components.PlantSunflower,
+		GridRow:   2,
+		GridCol:   3,
+	})
+
+	// 创建植物实体 - 豌豆射手在 (1, 5)
+	peashooterID := em.CreateEntity()
+	em.AddComponent(peashooterID, &components.PlantComponent{
+		PlantType: components.PlantPeashooter,
+		GridRow:   1,
+		GridCol:   5,
+	})
+
+	// 测试1: 僵尸与向日葵在同一格子 (2, 3)
+	plantID, hasCollision := system.detectPlantCollision(2, 3)
+	if !hasCollision {
+		t.Error("Expected collision with sunflower at (2, 3)")
+	}
+	if plantID != sunflowerID {
+		t.Errorf("Expected sunflower ID %d, got %d", sunflowerID, plantID)
+	}
+
+	// 测试2: 僵尸与豌豆射手在同一格子 (1, 5)
+	plantID, hasCollision = system.detectPlantCollision(1, 5)
+	if !hasCollision {
+		t.Error("Expected collision with peashooter at (1, 5)")
+	}
+	if plantID != peashooterID {
+		t.Errorf("Expected peashooter ID %d, got %d", peashooterID, plantID)
+	}
+
+	// 测试3: 僵尸在没有植物的格子 (0, 0)
+	_, hasCollision = system.detectPlantCollision(0, 0)
+	if hasCollision {
+		t.Error("Expected no collision at empty cell (0, 0)")
+	}
+
+	// 测试4: 僵尸在不同行但同列 (3, 3) - 不应碰撞
+	_, hasCollision = system.detectPlantCollision(3, 3)
+	if hasCollision {
+		t.Error("Expected no collision at (3, 3) - different row from sunflower")
+	}
+
+	// 测试5: 僵尸在同行但不同列 (2, 4) - 不应碰撞
+	_, hasCollision = system.detectPlantCollision(2, 4)
+	if hasCollision {
+		t.Error("Expected no collision at (2, 4) - different col from sunflower")
+	}
+}
+
+// TestStartEatingPlant 测试僵尸进入啃食状态
+func TestStartEatingPlant(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(testAudioContext)
+	system := NewBehaviorSystem(em, rm)
+
+	// 创建僵尸实体（正常移动状态）
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.PositionComponent{X: 500, Y: 300})
+	em.AddComponent(zombieID, &components.VelocityComponent{VX: -30, VY: 0})
+	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	em.AddComponent(zombieID, &components.AnimationComponent{
+		Frames:       make([]*ebiten.Image, 22), // 走路动画
+		FrameSpeed:   0.1,
+		CurrentFrame: 0,
+		FrameCounter: 0,
+		IsLooping:    true,
+		IsFinished:   false,
+	})
+
+	// 创建植物实体
+	plantID := em.CreateEntity()
+	em.AddComponent(plantID, &components.PlantComponent{
+		PlantType: components.PlantSunflower,
+		GridRow:   2,
+		GridCol:   3,
+	})
+
+	// 调用 startEatingPlant
+	system.startEatingPlant(zombieID, plantID)
+
+	// 验证1: VelocityComponent 被移除
+	_, hasVelocity := em.GetComponent(zombieID, reflect.TypeOf(&components.VelocityComponent{}))
+	if hasVelocity {
+		t.Error("Expected VelocityComponent to be removed")
+	}
+
+	// 验证2: 行为类型切换为 BehaviorZombieEating
+	behaviorComp, _ := em.GetComponent(zombieID, reflect.TypeOf(&components.BehaviorComponent{}))
+	behavior := behaviorComp.(*components.BehaviorComponent)
+	if behavior.Type != components.BehaviorZombieEating {
+		t.Errorf("Expected BehaviorZombieEating, got %v", behavior.Type)
+	}
+
+	// 验证3: 添加了 TimerComponent
+	timerComp, hasTimer := em.GetComponent(zombieID, reflect.TypeOf(&components.TimerComponent{}))
+	if !hasTimer {
+		t.Fatal("Expected TimerComponent to be added")
+	}
+	timer := timerComp.(*components.TimerComponent)
+	if timer.Name != "eating_damage" {
+		t.Errorf("Expected timer name 'eating_damage', got '%s'", timer.Name)
+	}
+	if timer.TargetTime != 1.5 {
+		t.Errorf("Expected TargetTime=1.5, got %f", timer.TargetTime)
+	}
+
+	// 验证4: 动画切换为啃食动画（检查 IsLooping 仍为 true）
+	animComp, _ := em.GetComponent(zombieID, reflect.TypeOf(&components.AnimationComponent{}))
+	anim := animComp.(*components.AnimationComponent)
+	if !anim.IsLooping {
+		t.Error("Expected eating animation to be looping")
+	}
+	if anim.CurrentFrame != 0 {
+		t.Errorf("Expected animation reset to frame 0, got %d", anim.CurrentFrame)
+	}
+}
+
+// TestEatingDamage 测试啃食伤害逻辑
+func TestEatingDamage(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(testAudioContext)
+	system := NewBehaviorSystem(em, rm)
+
+	// 创建僵尸实体（啃食状态）
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.PositionComponent{
+		X: 540.0, // GridWorldStartX(265) + col(3)*CellWidth(80) + 中心偏移 = 265+240+35 = 540
+		Y: 365.0, // GridWorldStartY(90) + row(2)*CellHeight(100) + 中心偏移 = 90+200+75 = 365
+	})
+	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieEating})
+	em.AddComponent(zombieID, &components.TimerComponent{
+		Name:        "eating_damage",
+		TargetTime:  1.5,
+		CurrentTime: 0.0,
+		IsReady:     false,
+	})
+	em.AddComponent(zombieID, &components.AnimationComponent{
+		Frames:       make([]*ebiten.Image, 21),
+		FrameSpeed:   0.1,
+		CurrentFrame: 0,
+		IsLooping:    true,
+	})
+
+	// 创建植物实体（在同一格子 (2, 3)）
+	plantID := em.CreateEntity()
+	em.AddComponent(plantID, &components.PlantComponent{
+		PlantType: components.PlantSunflower,
+		GridRow:   2,
+		GridCol:   3,
+	})
+	em.AddComponent(plantID, &components.HealthComponent{
+		CurrentHealth: 300,
+		MaxHealth:     300,
+	})
+
+	// 第1次更新：0.8秒（计时器未完成）
+	system.handleZombieEatingBehavior(zombieID, 0.8)
+
+	// 验证：植物生命值未减少
+	healthComp, _ := em.GetComponent(plantID, reflect.TypeOf(&components.HealthComponent{}))
+	health := healthComp.(*components.HealthComponent)
+	if health.CurrentHealth != 300 {
+		t.Errorf("Expected health=300 (no damage yet), got %d", health.CurrentHealth)
+	}
+
+	// 第2次更新：再过0.7秒（总共1.5秒，计时器完成）
+	system.handleZombieEatingBehavior(zombieID, 0.7)
+
+	// 验证：植物生命值减少100
+	healthComp, _ = em.GetComponent(plantID, reflect.TypeOf(&components.HealthComponent{}))
+	health = healthComp.(*components.HealthComponent)
+	if health.CurrentHealth != 200 {
+		t.Errorf("Expected health=200 (one damage), got %d", health.CurrentHealth)
+	}
+
+	// 验证：计时器重置
+	timerComp, _ := em.GetComponent(zombieID, reflect.TypeOf(&components.TimerComponent{}))
+	timer := timerComp.(*components.TimerComponent)
+	if timer.CurrentTime != 0.0 {
+		t.Errorf("Expected timer reset to 0, got %f", timer.CurrentTime)
+	}
+	if timer.IsReady {
+		t.Error("Expected timer.IsReady to be false after reset")
+	}
+
+	// 第3次更新：再过1.5秒（第二次伤害）
+	system.handleZombieEatingBehavior(zombieID, 1.5)
+
+	// 验证：植物生命值再减少100
+	healthComp, _ = em.GetComponent(plantID, reflect.TypeOf(&components.HealthComponent{}))
+	health = healthComp.(*components.HealthComponent)
+	if health.CurrentHealth != 100 {
+		t.Errorf("Expected health=100 (two damages), got %d", health.CurrentHealth)
+	}
+}
+
+// TestPlantDeathAndZombieResume 测试植物死亡后僵尸恢复移动
+func TestPlantDeathAndZombieResume(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(testAudioContext)
+	system := NewBehaviorSystem(em, rm)
+
+	// 创建僵尸实体（啃食状态）
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.PositionComponent{
+		X: 540.0,
+		Y: 365.0,
+	})
+	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieEating})
+	em.AddComponent(zombieID, &components.TimerComponent{
+		Name:        "eating_damage",
+		TargetTime:  1.5,
+		CurrentTime: 1.5, // 计时器已完成
+		IsReady:     true,
+	})
+	em.AddComponent(zombieID, &components.AnimationComponent{
+		Frames:       make([]*ebiten.Image, 21),
+		FrameSpeed:   0.1,
+		CurrentFrame: 5,
+		IsLooping:    true,
+	})
+
+	// 创建植物实体（生命值很低，一次伤害就会死）
+	plantID := em.CreateEntity()
+	em.AddComponent(plantID, &components.PlantComponent{
+		PlantType: components.PlantSunflower,
+		GridRow:   2,
+		GridCol:   3,
+	})
+	em.AddComponent(plantID, &components.HealthComponent{
+		CurrentHealth: 50, // 只剩50生命值
+		MaxHealth:     300,
+	})
+
+	// 更新一次（造成100伤害，植物死亡）
+	system.handleZombieEatingBehavior(zombieID, 0.1)
+
+	// 清理标记删除的实体
+	em.RemoveMarkedEntities()
+
+	// 验证1: 植物实体被删除
+	_, plantExists := em.GetComponent(plantID, reflect.TypeOf(&components.PlantComponent{}))
+	if plantExists {
+		t.Error("Expected plant to be destroyed")
+	}
+
+	// 验证2: 僵尸恢复 VelocityComponent
+	velComp, hasVelocity := em.GetComponent(zombieID, reflect.TypeOf(&components.VelocityComponent{}))
+	if !hasVelocity {
+		t.Fatal("Expected VelocityComponent to be restored")
+	}
+	vel := velComp.(*components.VelocityComponent)
+	if vel.VX != -30.0 {
+		t.Errorf("Expected VX=-30.0, got %f", vel.VX)
+	}
+
+	// 验证3: 僵尸行为类型切换回 BehaviorZombieBasic
+	behaviorComp, _ := em.GetComponent(zombieID, reflect.TypeOf(&components.BehaviorComponent{}))
+	behavior := behaviorComp.(*components.BehaviorComponent)
+	if behavior.Type != components.BehaviorZombieBasic {
+		t.Errorf("Expected BehaviorZombieBasic, got %v", behavior.Type)
+	}
+
+	// 验证4: TimerComponent 被移除
+	_, hasTimer := em.GetComponent(zombieID, reflect.TypeOf(&components.TimerComponent{}))
+	if hasTimer {
+		t.Error("Expected TimerComponent to be removed")
+	}
+
+	// 验证5: 动画切换回走路动画（CurrentFrame 重置为0）
+	animComp, _ := em.GetComponent(zombieID, reflect.TypeOf(&components.AnimationComponent{}))
+	anim := animComp.(*components.AnimationComponent)
+	if anim.CurrentFrame != 0 {
+		t.Errorf("Expected animation reset to frame 0, got %d", anim.CurrentFrame)
+	}
+	if !anim.IsLooping {
+		t.Error("Expected walk animation to be looping")
+	}
+}
+
+// TestMultipleZombiesEatingSamePlant 测试多个僵尸同时啃食同一植物
+func TestMultipleZombiesEatingSamePlant(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(testAudioContext)
+	system := NewBehaviorSystem(em, rm)
+
+	// 创建植物实体（在格子 (2, 3)）
+	plantID := em.CreateEntity()
+	em.AddComponent(plantID, &components.PlantComponent{
+		PlantType: components.PlantSunflower,
+		GridRow:   2,
+		GridCol:   3,
+	})
+	em.AddComponent(plantID, &components.HealthComponent{
+		CurrentHealth: 150, // 只能承受1.5次伤害
+		MaxHealth:     300,
+	})
+
+	// 创建僵尸1（啃食状态，计时器刚开始）
+	zombie1ID := em.CreateEntity()
+	em.AddComponent(zombie1ID, &components.PositionComponent{X: 540.0, Y: 365.0})
+	em.AddComponent(zombie1ID, &components.BehaviorComponent{Type: components.BehaviorZombieEating})
+	em.AddComponent(zombie1ID, &components.TimerComponent{
+		Name:        "eating_damage",
+		TargetTime:  1.5,
+		CurrentTime: 0.0, // 刚开始啃食
+		IsReady:     false,
+	})
+	em.AddComponent(zombie1ID, &components.AnimationComponent{
+		Frames:    make([]*ebiten.Image, 21),
+		IsLooping: true,
+	})
+
+	// 创建僵尸2（也在啃食状态，即将完成）
+	zombie2ID := em.CreateEntity()
+	em.AddComponent(zombie2ID, &components.PositionComponent{X: 545.0, Y: 365.0})
+	em.AddComponent(zombie2ID, &components.BehaviorComponent{Type: components.BehaviorZombieEating})
+	em.AddComponent(zombie2ID, &components.TimerComponent{
+		Name:        "eating_damage",
+		TargetTime:  1.5,
+		CurrentTime: 1.4, // 即将完成
+		IsReady:     false,
+	})
+	em.AddComponent(zombie2ID, &components.AnimationComponent{
+		Frames:    make([]*ebiten.Image, 21),
+		IsLooping: true,
+	})
+
+	// 僵尸2更新0.2秒（总1.6秒，造成第一次伤害）
+	system.handleZombieEatingBehavior(zombie2ID, 0.2)
+
+	// 验证：植物生命值减少到50
+	healthComp, _ := em.GetComponent(plantID, reflect.TypeOf(&components.HealthComponent{}))
+	health := healthComp.(*components.HealthComponent)
+	if health.CurrentHealth != 50 {
+		t.Errorf("Expected health=50, got %d", health.CurrentHealth)
+	}
+
+	// 僵尸2再更新1.6秒（计时器重置后再次完成，造成第二次伤害，植物死亡）
+	system.handleZombieEatingBehavior(zombie2ID, 1.6)
+
+	// 清理标记删除的实体（植物被删除）
+	em.RemoveMarkedEntities()
+
+	// 验证1: 植物被删除
+	_, plantExists := em.GetComponent(plantID, reflect.TypeOf(&components.PlantComponent{}))
+	if plantExists {
+		t.Error("Expected plant to be destroyed by zombie2")
+	}
+
+	// 验证2: 僵尸2恢复移动（它杀死了植物）
+	_, hasVel2 := em.GetComponent(zombie2ID, reflect.TypeOf(&components.VelocityComponent{}))
+	if !hasVel2 {
+		t.Error("Expected zombie2 to resume movement")
+	}
+
+	// 僵尸1再次更新（植物已不存在，更新足够长的时间使计时器完成）
+	// 僵尸1初始 CurrentTime=0.0秒，更新1.6秒后达到1.6秒，超过目标时间1.5秒
+	// 应该检测到植物不存在并恢复移动
+	system.handleZombieEatingBehavior(zombie1ID, 1.6) // 总1.6秒，计时器完成
+
+	// 清理可能的实体删除
+	em.RemoveMarkedEntities()
+
+	// 验证3: 僵尸1也恢复移动（检测到植物消失）
+	_, hasVel1 := em.GetComponent(zombie1ID, reflect.TypeOf(&components.VelocityComponent{}))
+	if !hasVel1 {
+		t.Error("Expected zombie1 to resume movement when plant disappeared")
+	}
+
+	// 验证4: 两个僵尸都切换回 BehaviorZombieBasic
+	behaviorComp1, _ := em.GetComponent(zombie1ID, reflect.TypeOf(&components.BehaviorComponent{}))
+	if behaviorComp1.(*components.BehaviorComponent).Type != components.BehaviorZombieBasic {
+		t.Error("Expected zombie1 to return to Basic behavior")
+	}
+
+	behaviorComp2, _ := em.GetComponent(zombie2ID, reflect.TypeOf(&components.BehaviorComponent{}))
+	if behaviorComp2.(*components.BehaviorComponent).Type != components.BehaviorZombieBasic {
+		t.Error("Expected zombie2 to return to Basic behavior")
+	}
+}
+
+// TestZombieEatingWithoutPlant 测试僵尸啃食时植物被其他原因删除
+func TestZombieEatingWithoutPlant(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(testAudioContext)
+	system := NewBehaviorSystem(em, rm)
+
+	// 创建僵尸实体（啃食状态）
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.PositionComponent{X: 540.0, Y: 365.0})
+	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieEating})
+	em.AddComponent(zombieID, &components.TimerComponent{
+		Name:        "eating_damage",
+		TargetTime:  1.5,
+		CurrentTime: 1.5,
+		IsReady:     true,
+	})
+	em.AddComponent(zombieID, &components.AnimationComponent{
+		Frames:    make([]*ebiten.Image, 21),
+		IsLooping: true,
+	})
+
+	// 注意：没有创建植物实体（模拟植物已被删除）
+
+	// 更新僵尸行为（应该检测到植物不存在并恢复移动）
+	system.handleZombieEatingBehavior(zombieID, 0.1)
+
+	// 验证1: 僵尸恢复 VelocityComponent（没有崩溃）
+	_, hasVelocity := em.GetComponent(zombieID, reflect.TypeOf(&components.VelocityComponent{}))
+	if !hasVelocity {
+		t.Error("Expected zombie to resume movement when plant is missing")
+	}
+
+	// 验证2: 僵尸行为切换回 BehaviorZombieBasic
+	behaviorComp, _ := em.GetComponent(zombieID, reflect.TypeOf(&components.BehaviorComponent{}))
+	behavior := behaviorComp.(*components.BehaviorComponent)
+	if behavior.Type != components.BehaviorZombieBasic {
+		t.Errorf("Expected BehaviorZombieBasic, got %v", behavior.Type)
+	}
+
+	// 验证3: TimerComponent 被移除
+	_, hasTimer := em.GetComponent(zombieID, reflect.TypeOf(&components.TimerComponent{}))
+	if hasTimer {
+		t.Error("Expected TimerComponent to be removed")
+	}
+}
+
+// TestZombieGridPositionCalculation 测试僵尸世界坐标转网格坐标
+func TestZombieGridPositionCalculation(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(testAudioContext)
+	system := NewBehaviorSystem(em, rm)
+
+	// GridWorldStartX = 265, GridWorldStartY = 90
+	// CellWidth = 80, CellHeight = 100
+
+	tests := []struct {
+		name        string
+		worldX      float64
+		worldY      float64
+		expectedCol int
+		expectedRow int
+		hasPlant    bool
+	}{
+		{
+			name:        "格子 (0, 0) 中心",
+			worldX:      265 + 40, // GridWorldStartX + CellWidth/2
+			worldY:      90 + 50,  // GridWorldStartY + CellHeight/2
+			expectedCol: 0,
+			expectedRow: 0,
+			hasPlant:    false,
+		},
+		{
+			name:        "格子 (3, 2) 中心",
+			worldX:      265 + 3*80 + 40,
+			worldY:      90 + 2*100 + 50,
+			expectedCol: 3,
+			expectedRow: 2,
+			hasPlant:    false,
+		},
+		{
+			name:        "格子 (8, 4) 中心（最右下角）",
+			worldX:      265 + 8*80 + 40,
+			worldY:      90 + 4*100 + 50,
+			expectedCol: 8,
+			expectedRow: 4,
+			hasPlant:    false,
+		},
+		{
+			name:        "格子 (5, 3) 左边缘",
+			worldX:      265 + 5*80 + 1, // 刚进入格子
+			worldY:      90 + 3*100 + 50,
+			expectedCol: 5,
+			expectedRow: 3,
+			hasPlant:    false,
+		},
+		{
+			name:        "格子 (4, 1) 右边缘",
+			worldX:      265 + 5*80 - 1, // 刚离开格子
+			worldY:      90 + 1*100 + 50,
+			expectedCol: 4,
+			expectedRow: 1,
+			hasPlant:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// 创建植物在特定格子（如果测试需要）
+			if tt.hasPlant {
+				plantID := em.CreateEntity()
+				em.AddComponent(plantID, &components.PlantComponent{
+					PlantType: components.PlantSunflower,
+					GridRow:   tt.expectedRow,
+					GridCol:   tt.expectedCol,
+				})
+			}
+
+			// 计算僵尸所在格子（模拟 handleZombieBasicBehavior 中的逻辑）
+			zombieCol := int((tt.worldX - 265) / 80) // GridWorldStartX=265, CellWidth=80
+			zombieRow := int((tt.worldY - 90) / 100) // GridWorldStartY=90, CellHeight=100
+
+			// 验证计算结果
+			if zombieCol != tt.expectedCol {
+				t.Errorf("Expected col=%d, got %d", tt.expectedCol, zombieCol)
+			}
+			if zombieRow != tt.expectedRow {
+				t.Errorf("Expected row=%d, got %d", tt.expectedRow, zombieRow)
+			}
+
+			// 验证碰撞检测
+			_, hasCollision := system.detectPlantCollision(zombieRow, zombieCol)
+			if hasCollision != tt.hasPlant {
+				t.Errorf("Expected hasCollision=%v, got %v", tt.hasPlant, hasCollision)
+			}
+		})
 	}
 }
