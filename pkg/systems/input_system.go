@@ -170,8 +170,13 @@ func (s *InputSystem) handleSunClick(sunID ecs.EntityID, pos *components.Positio
 	s.entityManager.RemoveComponent(sunID, reflect.TypeOf(&components.LifetimeComponent{}))
 
 	// 5. 计算飞向阳光计数器的速度向量
-	dx := s.sunCounterX - pos.X
-	dy := s.sunCounterY - pos.Y
+	// 注意：sunCounterX/Y 是屏幕坐标，需要转换为世界坐标
+	// 世界坐标 = 屏幕坐标 + cameraX（仅X轴）
+	targetWorldX := s.sunCounterX + s.gameState.CameraX
+	targetWorldY := s.sunCounterY // Y轴不受摄像机影响
+	
+	dx := targetWorldX - pos.X
+	dy := targetWorldY - pos.Y
 	distance := math.Sqrt(dx*dx + dy*dy)
 
 	// 飞行速度: 600像素/秒

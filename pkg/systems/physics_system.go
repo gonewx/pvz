@@ -93,7 +93,8 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 
 		if behavior.Type == components.BehaviorPeaProjectile {
 			bullets = append(bullets, entityID)
-		} else if behavior.Type == components.BehaviorZombieBasic {
+		} else if behavior.Type == components.BehaviorZombieBasic || behavior.Type == components.BehaviorZombieEating {
+			// 包括移动中的僵尸和啃食中的僵尸
 			zombies = append(zombies, entityID)
 		}
 	}

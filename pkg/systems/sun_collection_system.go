@@ -14,9 +14,9 @@ import (
 // 检查正在收集的阳光是否到达目标位置，并在到达时增加阳光数值并删除实体
 type SunCollectionSystem struct {
 	entityManager *ecs.EntityManager
-	gameState     *game.GameState // 游戏状态（用于增加阳光数值）
-	targetX       float64         // 阳光计数器X坐标
-	targetY       float64         // 阳光计数器Y坐标
+	gameState     *game.GameState // 游戏状态（用于增加阳光数值和获取cameraX）
+	targetX       float64         // 阳光计数器X坐标（屏幕坐标）
+	targetY       float64         // 阳光计数器Y坐标（屏幕坐标）
 }
 
 // NewSunCollectionSystem 创建一个新的阳光收集系统
@@ -52,8 +52,13 @@ func (s *SunCollectionSystem) Update(deltaTime float64) {
 		}
 
 		// 计算到目标位置的距离
-		dx := s.targetX - pos.X
-		dy := s.targetY - pos.Y
+		// 注意：targetX/Y 是屏幕坐标，需要转换为世界坐标进行比较
+		// 世界坐标 = 屏幕坐标 + cameraX（仅X轴）
+		targetWorldX := s.targetX + s.gameState.CameraX
+		targetWorldY := s.targetY // Y轴不受摄像机影响
+		
+		dx := targetWorldX - pos.X
+		dy := targetWorldY - pos.Y
 		distance := math.Sqrt(dx*dx + dy*dy)
 
 		// 如果距离小于阈值（10像素），认为已到达
