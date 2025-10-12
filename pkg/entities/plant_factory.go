@@ -190,6 +190,13 @@ func NewWallnutEntity(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.
 		Image: fullHealthFrames[0],
 	})
 
+	// 添加植物组件（用于碰撞检测和网格位置追踪）
+	em.AddComponent(entityID, &components.PlantComponent{
+		PlantType: components.PlantWallnut,
+		GridRow:   row,
+		GridCol:   col,
+	})
+
 	// 添加生命值组件（坚果墙拥有极高的生命值）
 	em.AddComponent(entityID, &components.HealthComponent{
 		CurrentHealth: config.WallnutDefaultHealth, // 4000

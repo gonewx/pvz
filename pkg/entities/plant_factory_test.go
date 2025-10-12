@@ -316,8 +316,23 @@ func TestNewWallnutEntity(t *testing.T) {
 				}
 			}
 
-			// 验证坐标符合网格位置
-			// 坚果墙不使用 LawnGridComponent，而是通过 PositionComponent 存储世界坐标
+			// 验证 PlantComponent（用于碰撞检测）
+			plantComp, ok := em.GetComponent(wallnutID, reflect.TypeOf(&components.PlantComponent{}))
+			if !ok {
+				t.Fatal("Wallnut entity should have PlantComponent")
+			} else {
+				plant := plantComp.(*components.PlantComponent)
+				if plant.PlantType != components.PlantWallnut {
+					t.Errorf("PlantType mismatch: got %v, want %v",
+						plant.PlantType, components.PlantWallnut)
+				}
+				if plant.GridCol != tt.col {
+					t.Errorf("GridCol mismatch: got %d, want %d", plant.GridCol, tt.col)
+				}
+				if plant.GridRow != tt.row {
+					t.Errorf("GridRow mismatch: got %d, want %d", plant.GridRow, tt.row)
+				}
+			}
 
 			// 验证 HealthComponent（关键：坚果墙应有高生命值）
 			healthComp, ok := em.GetComponent(wallnutID, reflect.TypeOf(&components.HealthComponent{}))
