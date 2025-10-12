@@ -749,31 +749,58 @@ func (s *BehaviorSystem) handleWallnutBehavior(entityID ecs.EntityID) {
 	anim := animComp.(*components.AnimationComponent)
 
 	// 根据生命值百分比确定应显示的外观状态
-	var targetFrames []*ebiten.Image
-	var err error
+	// 我们需要追踪当前应该使用的状态，避免每帧重复加载
+	var targetState int // 0=完好, 1=轻伤, 2=重伤
+	var requiredFrameCount int
 
 	if healthPercent > config.WallnutCracked1Threshold {
 		// 完好状态 (> 66%)
-		targetFrames, err = utils.LoadWallnutFullHealthAnimation(s.resourceManager)
+		targetState = 0
+		requiredFrameCount = config.WallnutAnimationFrames // 16帧
 	} else if healthPercent > config.WallnutCracked2Threshold {
 		// 轻伤状态 (33% - 66%)
-		targetFrames, err = utils.LoadWallnutCracked1Animation(s.resourceManager)
+		targetState = 1
+		requiredFrameCount = 11 // 轻伤状态有11帧
 	} else {
 		// 重伤状态 (< 33%)
+		targetState = 2
+		requiredFrameCount = 15 // 重伤状态有15帧
+	}
+
+	// 检查当前动画帧数是否匹配目标状态（用帧数判断状态）
+	// 这样可以避免每帧都重新加载相同的动画
+	if len(anim.Frames) == requiredFrameCount {
+		// 当前已是正确状态，无需切换
+		return
+	}
+
+	// 需要切换状态，加载对应的动画
+	var targetFrames []*ebiten.Image
+	var err error
+
+	switch targetState {
+	case 0:
+		targetFrames, err = utils.LoadWallnutFullHealthAnimation(s.resourceManager)
+		log.Printf("[BehaviorSystem] 坚果墙 %d 切换到完好状态 (HP: %d/%d, %.1f%%)",
+			entityID, health.CurrentHealth, health.MaxHealth, healthPercent*100)
+	case 1:
+		targetFrames, err = utils.LoadWallnutCracked1Animation(s.resourceManager)
+		log.Printf("[BehaviorSystem] 坚果墙 %d 切换到轻伤状态 (HP: %d/%d, %.1f%%)",
+			entityID, health.CurrentHealth, health.MaxHealth, healthPercent*100)
+	case 2:
 		targetFrames, err = utils.LoadWallnutCracked2Animation(s.resourceManager)
+		log.Printf("[BehaviorSystem] 坚果墙 %d 切换到重伤状态 (HP: %d/%d, %.1f%%)",
+			entityID, health.CurrentHealth, health.MaxHealth, healthPercent*100)
 	}
 
 	if err != nil {
 		// 加载动画失败，保持当前动画
+		log.Printf("[BehaviorSystem] 坚果墙 %d 动画状态切换失败: %v", entityID, err)
 		return
 	}
 
-	// 检查是否需要切换动画（避免每帧都重新加载）
-	// 通过比较动画帧数来判断是否为同一组动画
-	if len(anim.Frames) != len(targetFrames) {
-		// 切换到新的动画状态
-		anim.Frames = targetFrames
-		anim.CurrentFrame = 0
-		anim.FrameCounter = 0
-	}
+	// 切换到新的动画状态
+	anim.Frames = targetFrames
+	anim.CurrentFrame = 0
+	anim.FrameCounter = 0
 }
