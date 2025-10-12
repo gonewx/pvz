@@ -272,10 +272,3 @@ func createColoredImage(width, height int, r, g, b, a uint8) *ebiten.Image {
 	// 填充颜色（在实际测试中可能需要）
 	return img
 }
-
-
-
-
-
-
-

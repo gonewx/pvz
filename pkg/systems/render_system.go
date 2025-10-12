@@ -22,7 +22,10 @@ func NewRenderSystem(em *ecs.EntityManager) *RenderSystem {
 
 // Draw 绘制所有拥有位置和精灵组件的实体
 // 渲染顺序：先渲染植物，再渲染阳光，确保阳光显示在植物上方
-func (s *RenderSystem) Draw(screen *ebiten.Image) {
+// 参数:
+//   - screen: 绘制目标屏幕
+//   - cameraX: 摄像机的世界坐标X位置（用于世界坐标到屏幕坐标的转换）
+func (s *RenderSystem) Draw(screen *ebiten.Image, cameraX float64) {
 	// 查询所有拥有 PositionComponent 和 SpriteComponent 的实体
 	entities := s.entityManager.GetEntitiesWith(
 		reflect.TypeOf(&components.PositionComponent{}),
@@ -47,7 +50,7 @@ func (s *RenderSystem) Draw(screen *ebiten.Image) {
 			continue // 跳过非植物实体
 		}
 
-		s.drawEntity(screen, id, true)
+		s.drawEntity(screen, id, true, cameraX)
 	}
 
 	// 第二遍：渲染阳光和其他实体（上层）
@@ -68,12 +71,17 @@ func (s *RenderSystem) Draw(screen *ebiten.Image) {
 			continue // 跳过植物（已经在第一遍渲染了）
 		}
 
-		s.drawEntity(screen, id, false)
+		s.drawEntity(screen, id, false, cameraX)
 	}
 }
 
 // drawEntity 绘制单个实体
-func (s *RenderSystem) drawEntity(screen *ebiten.Image, id ecs.EntityID, isPlant bool) {
+// 参数:
+//   - screen: 绘制目标屏幕
+//   - id: 实体ID
+//   - isPlant: 是否为植物（保留参数，暂未使用）
+//   - cameraX: 摄像机的世界坐标X位置
+func (s *RenderSystem) drawEntity(screen *ebiten.Image, id ecs.EntityID, isPlant bool, cameraX float64) {
 	// 获取组件
 	posComp, _ := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PositionComponent{}))
 	spriteComp, _ := s.entityManager.GetComponent(id, reflect.TypeOf(&components.SpriteComponent{}))
@@ -92,15 +100,25 @@ func (s *RenderSystem) drawEntity(screen *ebiten.Image, id ecs.EntityID, isPlant
 	imageWidth := float64(bounds.Dx())
 	imageHeight := float64(bounds.Dy())
 
+	// 判断实体类型，决定锚点位置
+	// 检查是否有BehaviorComponent（植物、僵尸、子弹都有）
+	_, hasBehavior := s.entityManager.GetComponent(id, reflect.TypeOf(&components.BehaviorComponent{}))
+
+	// 将世界坐标转换为屏幕坐标
+	// screenX = worldX - cameraX (摄像机向右移动时，实体在屏幕上向左移动)
+	screenX := pos.X - cameraX
+	screenY := pos.Y // Y轴不受摄像机水平移动影响
+
 	var drawX, drawY float64
-	if isPlant {
-		// 植物实体：图像中心对齐到位置坐标
-		drawX = pos.X - imageWidth/2
-		drawY = pos.Y - imageHeight/2
+	if hasBehavior {
+		// 游戏单位（植物、僵尸、子弹）：图像中心对齐到位置坐标
+		// 这样确保同一行的所有单位视觉上在同一高度
+		drawX = screenX - imageWidth/2
+		drawY = screenY - imageHeight/2
 	} else {
 		// 其他实体（如阳光）：图像左上角对齐到位置坐标
-		drawX = pos.X
-		drawY = pos.Y
+		drawX = screenX
+		drawY = screenY
 	}
 
 	// 创建绘制选项

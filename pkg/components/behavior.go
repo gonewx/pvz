@@ -7,8 +7,10 @@ type BehaviorType int
 const (
 	// BehaviorSunflower 向日葵行为：定期生产阳光
 	BehaviorSunflower BehaviorType = iota
-	// BehaviorPeashooter 豌豆射手行为：攻击同行僵尸（预留）
+	// BehaviorPeashooter 豌豆射手行为：攻击同行僵尸
 	BehaviorPeashooter
+	// BehaviorPeaProjectile 豌豆子弹行为：向右移动并检测碰撞
+	BehaviorPeaProjectile
 	// BehaviorZombieBasic 普通僵尸行为：从右向左移动并攻击植物
 	BehaviorZombieBasic
 )

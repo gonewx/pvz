@@ -41,7 +41,7 @@ func TestRenderSystemQuery(t *testing.T) {
 
 	// Draw 应该不会崩溃
 	screen := ebiten.NewImage(800, 600)
-	system.Draw(screen)
+	system.Draw(screen, 0.0) // cameraX = 0
 }
 
 func TestRenderSystemWithNilImage(t *testing.T) {
@@ -55,7 +55,7 @@ func TestRenderSystemWithNilImage(t *testing.T) {
 
 	// Draw 应该跳过nil图片而不崩溃
 	screen := ebiten.NewImage(800, 600)
-	system.Draw(screen)
+	system.Draw(screen, 0.0) // cameraX = 0
 
 	// 如果没有panic,测试通过
 }
@@ -86,7 +86,7 @@ func TestRenderSystemMultipleEntities(t *testing.T) {
 
 	// Draw 应该不会崩溃
 	screen := ebiten.NewImage(800, 600)
-	system.Draw(screen)
+	system.Draw(screen, 0.0) // cameraX = 0
 }
 
 func TestRenderSystemEmptyScene(t *testing.T) {
@@ -97,5 +97,5 @@ func TestRenderSystemEmptyScene(t *testing.T) {
 	screen := ebiten.NewImage(800, 600)
 
 	// Draw 应该不会崩溃
-	system.Draw(screen)
+	system.Draw(screen, 0.0) // cameraX = 0
 }

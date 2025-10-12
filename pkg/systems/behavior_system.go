@@ -6,9 +6,11 @@ import (
 	"reflect"
 
 	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/decker502/pvz/pkg/utils"
 )
 
 // BehaviorSystem 处理实体的行为逻辑
@@ -26,10 +28,6 @@ const (
 	SunRandomOffsetRangeX  = 40.0 // 随机水平偏移范围（-20 到 +20）
 	SunRandomOffsetRangeY  = 20.0 // 随机垂直偏移范围（-10 到 +10）
 	LogOutputFrameInterval = 100  // 日志输出间隔（每N帧输出一次）
-
-	// ZombieDeletionBoundary 僵尸删除边界的X坐标阈值
-	// 当僵尸移出屏幕左侧超过此阈值时，将被删除以释放资源
-	ZombieDeletionBoundary = -100.0
 )
 
 // NewBehaviorSystem 创建一个新的行为系统
@@ -60,13 +58,21 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 		reflect.TypeOf(&components.VelocityComponent{}),
 	)
 
+	// 查询所有豌豆子弹实体（拥有 BehaviorComponent, PositionComponent, VelocityComponent）
+	// 注意：子弹和僵尸的组件组合相同，需要通过 BehaviorType 区分
+	projectileEntityList := s.entityManager.GetEntitiesWith(
+		reflect.TypeOf(&components.BehaviorComponent{}),
+		reflect.TypeOf(&components.PositionComponent{}),
+		reflect.TypeOf(&components.VelocityComponent{}),
+	)
+
 	// 日志输出（避免每帧都打印）
-	totalEntities := len(plantEntityList) + len(zombieEntityList)
+	totalEntities := len(plantEntityList) + len(zombieEntityList) + len(projectileEntityList)
 	if totalEntities > 0 {
 		s.logFrameCounter++
 		if s.logFrameCounter%LogOutputFrameInterval == 1 {
-			log.Printf("[BehaviorSystem] 更新 %d 个行为实体 (植物: %d, 僵尸: %d)",
-				totalEntities, len(plantEntityList), len(zombieEntityList))
+			log.Printf("[BehaviorSystem] 更新 %d 个行为实体 (植物: %d, 僵尸: %d, 子弹: %d)",
+				totalEntities, len(plantEntityList), len(zombieEntityList), len(projectileEntityList))
 		}
 	}
 
@@ -80,7 +86,7 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 		case components.BehaviorSunflower:
 			s.handleSunflowerBehavior(entityID, deltaTime)
 		case components.BehaviorPeashooter:
-			// 豌豆射手行为（未来实现）
+			s.handlePeashooterBehavior(entityID, deltaTime, zombieEntityList)
 		default:
 			// 未知行为类型，忽略
 		}
@@ -97,6 +103,20 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 			s.handleZombieBasicBehavior(entityID, deltaTime)
 		default:
 			// 未知僵尸类型，忽略
+		}
+	}
+
+	// 遍历所有子弹实体，根据行为类型分发处理
+	for _, entityID := range projectileEntityList {
+		behaviorComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.BehaviorComponent{}))
+		behavior := behaviorComp.(*components.BehaviorComponent)
+
+		// 根据行为类型分发
+		switch behavior.Type {
+		case components.BehaviorPeaProjectile:
+			s.handlePeaProjectileBehavior(entityID, deltaTime)
+		default:
+			// 忽略非子弹类型（如僵尸）
 		}
 	}
 }
@@ -193,9 +213,109 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 	position.Y += velocity.VY * deltaTime
 
 	// 边界检查：如果僵尸移出屏幕左侧，标记删除
-	// 使用 ZombieDeletionBoundary 提供容错空间，避免僵尸刚移出就被删除
-	if position.X < ZombieDeletionBoundary {
+	// 使用 config.ZombieDeletionBoundary 提供容错空间，避免僵尸刚移出就被删除
+	if position.X < config.ZombieDeletionBoundary {
 		log.Printf("[BehaviorSystem] 僵尸 %d 移出屏幕左侧 (X=%.1f)，标记删除", entityID, position.X)
+		s.entityManager.DestroyEntity(entityID)
+	}
+}
+
+// handlePeashooterBehavior 处理豌豆射手的行为逻辑
+// 豌豆射手会周期性扫描同行僵尸并发射豌豆子弹
+func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTime float64, zombieEntityList []ecs.EntityID) {
+	// 获取计时器组件
+	timerComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.TimerComponent{}))
+	if !ok {
+		return
+	}
+	timer := timerComp.(*components.TimerComponent)
+
+	// 更新计时器
+	timer.CurrentTime += deltaTime
+
+	// 检查计时器是否就绪（达到攻击间隔）
+	if timer.CurrentTime >= timer.TargetTime {
+		// 获取豌豆射手的位置组件
+		positionComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
+		if !ok {
+			return
+		}
+		peashooterPos := positionComp.(*components.PositionComponent)
+
+		// 计算豌豆射手所在的行
+		peashooterRow := utils.GetEntityRow(peashooterPos.Y, config.GridWorldStartY, config.CellHeight)
+
+		// 扫描同行僵尸：查找在豌豆射手正前方（右侧）且在攻击范围内的僵尸
+		hasZombieInLine := false
+		for _, zombieID := range zombieEntityList {
+			zombiePosComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.PositionComponent{}))
+			if !ok {
+				continue
+			}
+			zombiePos := zombiePosComp.(*components.PositionComponent)
+
+			// 计算僵尸所在的行
+			zombieRow := utils.GetEntityRow(zombiePos.Y, config.GridWorldStartY, config.CellHeight)
+
+			// 检查僵尸是否在同一行、在豌豆射手右侧、且在攻击范围内（草坪内）
+			// 使用 config.GridWorldEndX 判断僵尸是否在草坪右边界内
+			if zombieRow == peashooterRow &&
+				zombiePos.X > peashooterPos.X &&
+				zombiePos.X <= config.GridWorldEndX {
+				hasZombieInLine = true
+				// DEBUG: 只在找到目标时输出
+				log.Printf("[BehaviorSystem] 发现目标僵尸 %d: 位置=(%.1f, %.1f), 豌豆射手X=%.1f, 草坪边界=%.1f",
+					zombieID, zombiePos.X, zombiePos.Y, peashooterPos.X, config.GridWorldEndX)
+				break
+			}
+		}
+
+		// 如果有僵尸在同一行，发射子弹
+		if hasZombieInLine {
+			// 计算子弹起始位置：豌豆射手口部位置（世界坐标）
+			bulletStartX := peashooterPos.X + config.PeaBulletOffsetX
+			bulletStartY := peashooterPos.Y + config.PeaBulletOffsetY
+
+			// 创建豌豆子弹实体
+			bulletID, err := entities.NewPeaProjectile(s.entityManager, s.resourceManager, bulletStartX, bulletStartY)
+			if err != nil {
+				log.Printf("[BehaviorSystem] 创建豌豆子弹失败: %v", err)
+			} else {
+				log.Printf("[BehaviorSystem] 豌豆射手 %d 发射子弹 %d，位置: (%.1f, %.1f)",
+					entityID, bulletID, bulletStartX, bulletStartY)
+			}
+
+			// 重置计时器
+			timer.CurrentTime = 0
+		}
+		// 如果没有僵尸，不发射子弹，但计时器继续累加（下次检测时立即发射）
+	}
+}
+
+// handlePeaProjectileBehavior 处理豌豆子弹的移动逻辑
+// 豌豆子弹会以恒定速度向右移动，飞出屏幕后被删除
+func (s *BehaviorSystem) handlePeaProjectileBehavior(entityID ecs.EntityID, deltaTime float64) {
+	// 获取位置组件
+	positionComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
+	if !ok {
+		return
+	}
+	position := positionComp.(*components.PositionComponent)
+
+	// 获取速度组件
+	velocityComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.VelocityComponent{}))
+	if !ok {
+		return
+	}
+	velocity := velocityComp.(*components.VelocityComponent)
+
+	// 更新位置：根据速度和时间增量移动子弹
+	position.X += velocity.VX * deltaTime
+	position.Y += velocity.VY * deltaTime
+
+	// 边界检查：如果子弹飞出屏幕右侧，标记删除
+	if position.X > config.PeaBulletDeletionBoundary {
+		log.Printf("[BehaviorSystem] 豌豆子弹 %d 飞出屏幕右侧 (X=%.1f)，标记删除", entityID, position.X)
 		s.entityManager.DestroyEntity(entityID)
 	}
 }

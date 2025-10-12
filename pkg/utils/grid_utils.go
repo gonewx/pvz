@@ -90,3 +90,23 @@ func GridToScreenCoords(
 
 	return centerX, centerY
 }
+
+// GetEntityRow 根据实体的世界Y坐标计算其所在的行索引
+//
+// 此函数用于判断豌豆射手和僵尸是否在同一行，以决定是否发射子弹
+//
+// 参数:
+//   - worldY: 实体的世界Y坐标（相对于背景图片左上角）
+//   - gridWorldStartY: 网格在背景图片中的起始Y位置（世界坐标）
+//   - cellHeight: 每个格子的高度（像素）
+//
+// 返回:
+//   - row: 行索引 (0-based)
+//
+// 示例:
+//   - 如果 gridWorldStartY=100, cellHeight=80
+//   - worldY=180 → row=1 (第二行)
+//   - worldY=260 → row=2 (第三行)
+func GetEntityRow(worldY, gridWorldStartY, cellHeight float64) int {
+	return int((worldY - gridWorldStartY) / cellHeight)
+}

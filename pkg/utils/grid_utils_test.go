@@ -243,3 +243,104 @@ func TestRoundTripConversion(t *testing.T) {
 		})
 	}
 }
+
+// TestGetEntityRow 测试实体行计算函数
+func TestGetEntityRow(t *testing.T) {
+	tests := []struct {
+		name    string
+		worldY  float64
+		wantRow int
+	}{
+		{
+			name:    "第0行 - 网格起始位置",
+			worldY:  config.GridWorldStartY,
+			wantRow: 0,
+		},
+		{
+			name:    "第0行 - 格子中间",
+			worldY:  config.GridWorldStartY + config.CellHeight/2,
+			wantRow: 0,
+		},
+		{
+			name:    "第1行 - 起始位置",
+			worldY:  config.GridWorldStartY + config.CellHeight,
+			wantRow: 1,
+		},
+		{
+			name:    "第2行 - 中间位置",
+			worldY:  config.GridWorldStartY + 2*config.CellHeight + config.CellHeight/2,
+			wantRow: 2,
+		},
+		{
+			name:    "第4行 - 最后一行起始",
+			worldY:  config.GridWorldStartY + 4*config.CellHeight,
+			wantRow: 4,
+		},
+		{
+			name:    "第3行 - 接近行尾",
+			worldY:  config.GridWorldStartY + 4*config.CellHeight - 1,
+			wantRow: 3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotRow := GetEntityRow(tt.worldY, config.GridWorldStartY, config.CellHeight)
+			if gotRow != tt.wantRow {
+				t.Errorf("GetEntityRow(worldY=%.1f) = %d, want %d",
+					tt.worldY, gotRow, tt.wantRow)
+			}
+		})
+	}
+}
+
+// TestGetEntityRow_SameRowDetection 测试同行检测场景
+// 验证豌豆射手和僵尸是否在同一行的判断逻辑
+func TestGetEntityRow_SameRowDetection(t *testing.T) {
+	// 模拟豌豆射手在第2行
+	peashooterY := config.GridWorldStartY + 2*config.CellHeight + 30.0 // 第2行，偏移30像素
+	peashooterRow := GetEntityRow(peashooterY, config.GridWorldStartY, config.CellHeight)
+
+	tests := []struct {
+		name        string
+		zombieY     float64
+		wantSameRow bool
+	}{
+		{
+			name:        "僵尸在同一行（第2行起始）",
+			zombieY:     config.GridWorldStartY + 2*config.CellHeight,
+			wantSameRow: true,
+		},
+		{
+			name:        "僵尸在同一行（第2行中间）",
+			zombieY:     config.GridWorldStartY + 2*config.CellHeight + 50.0,
+			wantSameRow: true,
+		},
+		{
+			name:        "僵尸在同一行（第2行末尾）",
+			zombieY:     config.GridWorldStartY + 3*config.CellHeight - 1,
+			wantSameRow: true,
+		},
+		{
+			name:        "僵尸在上一行（第1行）",
+			zombieY:     config.GridWorldStartY + 1*config.CellHeight + 50.0,
+			wantSameRow: false,
+		},
+		{
+			name:        "僵尸在下一行（第3行）",
+			zombieY:     config.GridWorldStartY + 3*config.CellHeight + 10.0,
+			wantSameRow: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			zombieRow := GetEntityRow(tt.zombieY, config.GridWorldStartY, config.CellHeight)
+			gotSameRow := (zombieRow == peashooterRow)
+			if gotSameRow != tt.wantSameRow {
+				t.Errorf("Peashooter row=%d, Zombie worldY=%.1f (row=%d), same row=%v, want %v",
+					peashooterRow, tt.zombieY, zombieRow, gotSameRow, tt.wantSameRow)
+			}
+		})
+	}
+}

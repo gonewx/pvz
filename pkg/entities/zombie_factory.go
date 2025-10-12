@@ -10,25 +10,6 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-const (
-	// ZombieVerticalOffset 僵尸在格子中的垂直偏移量
-	// 使僵尸在格子中央偏下的位置，视觉效果更自然
-	ZombieVerticalOffset = 30.0
-
-	// ZombieWalkAnimationFrames 普通僵尸走路动画的总帧数
-	ZombieWalkAnimationFrames = 22
-
-	// ZombieWalkFrameSpeed 僵尸走路动画的帧速率（秒/帧）
-	ZombieWalkFrameSpeed = 0.1
-
-	// ZombieWalkSpeed 普通僵尸的移动速度（像素/秒）
-	// 负值表示从右向左移动
-	ZombieWalkSpeed = -30.0
-
-	// ZombieDefaultHealth 普通僵尸的默认生命值
-	ZombieDefaultHealth = 270
-)
-
 // NewZombieEntity 创建普通僵尸实体
 // 僵尸从屏幕右侧外生成，以恒定速度从右向左移动
 //
@@ -50,12 +31,13 @@ func NewZombieEntity(em *ecs.EntityManager, rm *game.ResourceManager, row int, s
 	}
 
 	// 计算僵尸Y坐标（世界坐标，基于行）
-	// 僵尸应该在格子中央偏下的位置
-	spawnY := config.GridWorldStartY + float64(row)*config.CellHeight + ZombieVerticalOffset
+	// 使用和植物相同的Y坐标计算，确保同一行的实体在同一高度
+	// 使用 config.ZombieVerticalOffset 以便手工调整
+	spawnY := config.GridWorldStartY + float64(row)*config.CellHeight + config.ZombieVerticalOffset
 
 	// 加载僵尸走路动画帧
-	frames := make([]*ebiten.Image, ZombieWalkAnimationFrames)
-	for i := 0; i < ZombieWalkAnimationFrames; i++ {
+	frames := make([]*ebiten.Image, config.ZombieWalkAnimationFrames)
+	for i := 0; i < config.ZombieWalkAnimationFrames; i++ {
 		framePath := fmt.Sprintf("assets/images/Zombies/Zombie/Zombie_%d.png", i+1)
 		frameImage, err := rm.LoadImage(framePath)
 		if err != nil {
@@ -81,7 +63,7 @@ func NewZombieEntity(em *ecs.EntityManager, rm *game.ResourceManager, row int, s
 	// 添加动画组件（走路动画，循环播放）
 	em.AddComponent(entityID, &components.AnimationComponent{
 		Frames:       frames,
-		FrameSpeed:   ZombieWalkFrameSpeed, // 0.1秒/帧，完整动画约2.2秒
+		FrameSpeed:   config.ZombieWalkFrameSpeed, // 0.1秒/帧，完整动画约2.2秒
 		CurrentFrame: 0,
 		FrameCounter: 0,
 		IsLooping:    true,  // 循环播放走路动画
@@ -90,7 +72,7 @@ func NewZombieEntity(em *ecs.EntityManager, rm *game.ResourceManager, row int, s
 
 	// 添加速度组件（从右向左移动）
 	em.AddComponent(entityID, &components.VelocityComponent{
-		VX: ZombieWalkSpeed, // 负值表示向左移动
+		VX: config.ZombieWalkSpeed, // 负值表示向左移动
 		VY: 0.0,
 	})
 
@@ -101,8 +83,8 @@ func NewZombieEntity(em *ecs.EntityManager, rm *game.ResourceManager, row int, s
 
 	// 添加生命值组件（本Story定义但不使用，为Story 4.4准备）
 	em.AddComponent(entityID, &components.HealthComponent{
-		CurrentHealth: ZombieDefaultHealth,
-		MaxHealth:     ZombieDefaultHealth,
+		CurrentHealth: config.ZombieDefaultHealth,
+		MaxHealth:     config.ZombieDefaultHealth,
 	})
 
 	return entityID, nil

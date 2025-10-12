@@ -26,6 +26,11 @@ const (
 
 	// CellHeight 是每个格子的高度（像素）
 	CellHeight = 100.0
+
+	// GridWorldEndX 是草坪网格在背景图片中的结束X坐标（世界坐标）
+	// 计算方式：起始X + 列数 * 格子宽度 = 251 + 9*80 = 971
+	// 用于判断实体是否在草坪范围内（如豌豆射手攻击范围检测）
+	GridWorldEndX = GridWorldStartX + float64(GridColumns)*CellWidth // 971.0
 )
 
 // GetGridWorldBounds 返回草坪网格的世界坐标边界

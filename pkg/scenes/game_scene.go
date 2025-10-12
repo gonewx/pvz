@@ -101,8 +101,13 @@ type GameScene struct {
 	behaviorSystem *systems.BehaviorSystem // 植物行为系统（向日葵生产阳光等）
 
 	// Story 4.1: Test Zombie Spawn (临时测试代码)
+	// 在游戏开始后3秒，在第3行生成一个测试僵尸
 	testZombieTimer   float64 // 测试僵尸生成计时器
 	testZombieSpawned bool    // 是否已生成测试僵尸
+
+	// Story 4.2: Test Peashooter Behavior (临时测试代码)
+	testPeashooterTimer   float64 // 测试豌豆射手种植计时器
+	testPeashooterSpawned bool    // 是否已种植测试豌豆射手
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -313,7 +318,7 @@ func (s *GameScene) Update(deltaTime float64) {
 	// 在游戏开始后3秒，在第3行生成一个测试僵尸
 	if !s.testZombieSpawned {
 		s.testZombieTimer += deltaTime
-		if s.testZombieTimer >= 3.0 {
+		if s.testZombieTimer >= 4.0 { // 改为4秒，让豌豆射手先种植
 			// 计算生成位置：屏幕右侧外约50像素
 			// 背景宽度1400px，游戏开始时摄像机在215px，屏幕宽度800px
 			// 僵尸应该生成在摄像机可见范围外的右侧
@@ -331,12 +336,39 @@ func (s *GameScene) Update(deltaTime float64) {
 		}
 	}
 
+	// Story 4.2: Test peashooter behavior (临时测试代码)
+	// 在游戏开始后3秒，在第3行种植一个豌豆射手
+	if !s.testPeashooterSpawned {
+		s.testPeashooterTimer += deltaTime
+		if s.testPeashooterTimer >= 3.0 {
+			// 在第3行（row=2）第3列（col=2）种植豌豆射手
+			col := 2
+			row := 2
+
+			log.Printf("[GameScene] 种植测试豌豆射手：col=%d, row=%d", col, row)
+			peashooterID, err := entities.NewPlantEntity(
+				s.entityManager,
+				s.resourceManager,
+				s.gameState,
+				components.PlantPeashooter,
+				col,
+				row,
+			)
+			if err != nil {
+				log.Printf("[GameScene] 种植豌豆射手失败: %v", err)
+			} else {
+				log.Printf("[GameScene] 成功种植测试豌豆射手 (ID: %d)", peashooterID)
+			}
+			s.testPeashooterSpawned = true
+		}
+	}
+
 	// Update all ECS systems in order (order matters for correct game logic)
-	s.plantCardSystem.Update(deltaTime)     // 1. Update plant card states (before input)
-	s.inputSystem.Update(deltaTime)         // 2. Process player input (highest priority)
-	s.sunSpawnSystem.Update(deltaTime)      // 3. Generate new suns
-	s.sunMovementSystem.Update(deltaTime)   // 4. Move suns (includes collection animation)
-	s.sunCollectionSystem.Update(deltaTime) // 5. Check if collection is complete
+	s.plantCardSystem.Update(deltaTime)                // 1. Update plant card states (before input)
+	s.inputSystem.Update(deltaTime, s.cameraX)         // 2. Process player input (highest priority, 传递摄像机位置)
+	s.sunSpawnSystem.Update(deltaTime)                 // 3. Generate new suns
+	s.sunMovementSystem.Update(deltaTime)              // 4. Move suns (includes collection animation)
+	s.sunCollectionSystem.Update(deltaTime)            // 5. Check if collection is complete
 	s.behaviorSystem.Update(deltaTime)      // 6. Update plant behaviors (Story 3.4)
 	s.animationSystem.Update(deltaTime)     // 7. Update animation frames
 	s.plantPreviewSystem.Update(deltaTime)  // 8. Update plant preview position (Story 3.2)
@@ -406,7 +438,8 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 
 	// Layer 3: Draw all game entities (suns, plants, zombies, etc.)
 	// This ensures suns appear on top of the seed bank
-	s.renderSystem.Draw(screen)
+	// 传递 cameraX 以正确转换世界坐标到屏幕坐标
+	s.renderSystem.Draw(screen, s.cameraX)
 
 	// Layer 4: Draw UI overlays (sun counter text)
 	// Drawn last to ensure text is always visible

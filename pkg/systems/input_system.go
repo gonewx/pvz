@@ -61,7 +61,10 @@ func NewInputSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.Ga
 }
 
 // Update 处理用户输入
-func (s *InputSystem) Update(deltaTime float64) {
+// 参数:
+//   - deltaTime: 时间增量（秒）
+//   - cameraX: 摄像机的世界坐标X位置（用于屏幕坐标到世界坐标的转换）
+func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 	// 检测鼠标右键取消种植模式
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight) {
 		if s.gameState.IsPlantingMode {
@@ -73,22 +76,30 @@ func (s *InputSystem) Update(deltaTime float64) {
 
 	// 检测鼠标左键是否刚被按下
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
-		mouseX, mouseY := ebiten.CursorPosition()
-		log.Printf("[InputSystem] 鼠标点击: (%d, %d)", mouseX, mouseY)
+		mouseScreenX, mouseScreenY := ebiten.CursorPosition()
 
-		// 优先检查植物卡片点击
-		cardHandled := s.handlePlantCardClick(mouseX, mouseY)
+		// 将鼠标屏幕坐标转换为世界坐标
+		// worldX = screenX + cameraX (摄像机向右移动时，世界坐标增大)
+		mouseWorldX := float64(mouseScreenX) + cameraX
+		mouseWorldY := float64(mouseScreenY) // Y轴不受摄像机水平移动影响
+
+		log.Printf("[InputSystem] 鼠标点击: 屏幕(%d, %d) -> 世界(%.1f, %.1f)",
+			mouseScreenX, mouseScreenY, mouseWorldX, mouseWorldY)
+
+		// 优先检查植物卡片点击（UI元素不受摄像机影响，使用屏幕坐标）
+		cardHandled := s.handlePlantCardClick(mouseScreenX, mouseScreenY)
 		if cardHandled {
 			return // 已处理卡片点击，不继续处理其他点击
 		}
 
 		// 检查是否在种植模式下点击草坪
-		lawnHandled := s.handleLawnClick(mouseX, mouseY)
+		// 注意：handleLawnClick 内部会调用 MouseToGridCoords 进行坐标转换，所以传递屏幕坐标
+		lawnHandled := s.handleLawnClick(mouseScreenX, mouseScreenY)
 		if lawnHandled {
 			return // 已处理草坪种植，不继续处理阳光
 		}
 
-		// 查询所有可点击的阳光实体
+		// 查询所有可点击的阳光实体（使用世界坐标）
 		entities := s.entityManager.GetEntitiesWith(
 			reflect.TypeOf(&components.PositionComponent{}),
 			reflect.TypeOf(&components.ClickableComponent{}),
@@ -121,9 +132,9 @@ func (s *InputSystem) Update(deltaTime float64) {
 				continue
 			}
 
-			// AABB 碰撞检测（点在矩形内）
-			if float64(mouseX) >= pos.X && float64(mouseX) <= pos.X+clickable.Width &&
-				float64(mouseY) >= pos.Y && float64(mouseY) <= pos.Y+clickable.Height {
+			// AABB 碰撞检测（点在矩形内）- 使用世界坐标比较
+			if mouseWorldX >= pos.X && mouseWorldX <= pos.X+clickable.Width &&
+				mouseWorldY >= pos.Y && mouseWorldY <= pos.Y+clickable.Height {
 				// 点击命中！
 				log.Printf("[InputSystem] 点击命中阳光! 位置:(%.1f, %.1f), 状态:%d", pos.X, pos.Y, sun.State)
 				s.handleSunClick(id, pos)
