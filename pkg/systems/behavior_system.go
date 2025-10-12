@@ -627,6 +627,9 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 	// 更新计时器
 	timer.CurrentTime += deltaTime
 
+	log.Printf("[BehaviorSystem] 僵尸 %d 啃食计时器: %.2f/%.2f 秒, IsReady=%v",
+		entityID, timer.CurrentTime, timer.TargetTime, timer.IsReady)
+
 	// 检查计时器是否完成
 	if timer.CurrentTime >= timer.TargetTime {
 		timer.IsReady = true
@@ -669,6 +672,12 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 					s.stopEatingAndResume(entityID)
 					return
 				}
+			} else {
+				// 植物没有 HealthComponent（不应该发生，但作为保护措施）
+				log.Printf("[BehaviorSystem] 警告：植物 %d 没有 HealthComponent，直接删除", plantID)
+				s.entityManager.DestroyEntity(plantID)
+				s.stopEatingAndResume(entityID)
+				return
 			}
 		} else {
 			// 植物不存在（可能被其他僵尸吃掉），恢复移动
