@@ -642,6 +642,28 @@ func (s *BehaviorSystem) stopEatingAndResume(zombieID ecs.EntityID) {
 //   - entityID: 僵尸实体ID
 //   - deltaTime: 帧间隔时间
 func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, deltaTime float64) {
+	// Story 5.3: 检查护甲状态（护甲僵尸即使在啃食也需要检测护甲破坏）
+	armorComp, hasArmor := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ArmorComponent{}))
+	if hasArmor {
+		armor := armorComp.(*components.ArmorComponent)
+		// 如果护甲已破坏，切换为普通僵尸动画
+		if armor.CurrentArmor <= 0 {
+			// 加载普通僵尸啃食动画
+			normalEatFrames := utils.LoadZombieEatAnimation(s.resourceManager)
+			animComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.AnimationComponent{}))
+			if ok {
+				anim := animComp.(*components.AnimationComponent)
+				// 检查是否已经是普通僵尸动画(避免重复切换)
+				if len(anim.Frames) != config.ZombieEatAnimationFrames {
+					anim.Frames = normalEatFrames
+					anim.CurrentFrame = 0
+					anim.FrameCounter = 0
+					log.Printf("[BehaviorSystem] 啃食中的护甲僵尸 %d 护甲耗尽，切换为普通僵尸啃食动画", entityID)
+				}
+			}
+		}
+	}
+
 	// 获取僵尸的 TimerComponent
 	timerComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.TimerComponent{}))
 	if !ok {

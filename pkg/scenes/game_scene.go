@@ -455,40 +455,42 @@ func (s *GameScene) easeOutQuad(t float64) float64 {
 
 // Draw renders the game scene to the screen.
 // It draws the lawn background, all game entities, and UI elements in the correct order.
-// Rendering order (back to front):
-// 1. Background (lawn)
-// 2. UI base layer (seed bank, shovel) - drawn first so suns appear on top
-// 3. Game entities (suns, plants, zombies) - drawn on top of UI
-// 4. UI overlay (sun counter text) - drawn last for best visibility
-// 5. Plant cards (on top of everything)
+// Rendering order (back to front, 符合原版PVZ):
+// 1. Background (lawn) - 草坪背景
+// 2. UI base layer (seed bank, shovel) - UI基础元素
+// 3. Plant cards - 卡片栏（在游戏实体下方）
+// 4. Game entities (plants, zombies, projectiles) - 游戏世界实体
+// 5. UI overlay (sun counter text) - UI文字（始终可见）
+// 6. Plant preview - 植物拖拽预览
+// 7. Suns (阳光) - 最顶层，确保可点击
 func (s *GameScene) Draw(screen *ebiten.Image) {
 	// Layer 1: Draw lawn background
 	s.drawBackground(screen)
 
-	// Layer 2: Draw UI base elements (seed bank and shovel)
-	// These are drawn before entities so suns can fly over them
+	// Layer 2: Draw UI base elements (seed bank, shovel, plant cards)
+	// 按照原版PVZ设计，UI元素在游戏世界实体下方渲染
 	s.drawSeedBank(screen)
 	s.drawShovel(screen)
 
-	// Layer 3: Draw game world entities (plants, zombies, projectiles) - 不包括阳光
-	// Uses the render system to draw game entities, but suns are deferred to Layer 7
+	// Layer 3: Draw plant cards (Story 3.1)
+	// 在植物和僵尸下方渲染，符合原版PVZ设计
+	s.plantCardRenderSystem.Draw(screen)
+
+	// Layer 4: Draw game world entities (plants, zombies, projectiles) - 不包括阳光
+	// 游戏实体在UI卡片上方，这样植物和僵尸可以被看清
 	// 传递 cameraX 以正确转换世界坐标到屏幕坐标
 	s.renderSystem.DrawGameWorld(screen, s.cameraX)
 
-	// Layer 4: Draw UI overlays (sun counter text)
-	// Drawn after game entities to ensure text is always visible
+	// Layer 5: Draw UI overlays (sun counter text)
+	// 文字始终在最上层以确保可读性
 	s.drawSunCounter(screen)
 
-	// Layer 5: Draw plant cards (Story 3.1)
-	// Drawn on top of game entities for best visibility
-	s.plantCardRenderSystem.Draw(screen)
-
 	// Layer 6: Draw plant preview (Story 3.2)
-	// Drawn on top of plant cards to show dragging preview
+	// 拖拽预览在所有内容上方
 	s.plantPreviewRenderSystem.Draw(screen)
 
 	// Layer 7: Draw suns (阳光) - 最顶层
-	// Drawn last to ensure suns are always clickable and visible above all UI elements including cards
+	// 阳光在最顶层以确保始终可点击
 	s.renderSystem.DrawSuns(screen, s.cameraX)
 
 	// DEBUG: Draw grid boundaries (Story 3.3 debugging)
