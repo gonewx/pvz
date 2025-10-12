@@ -81,17 +81,17 @@ const (
 // Audio Configuration (音频配置)
 const (
 	// ZombieHitSoundPath 击中普通僵尸的音效文件路径
-	// 
+	//
 	// 🎵 推荐音效选项：
 	//   - "assets/audio/Sound/tap.ogg"    - ⭐ 推荐：轻快敲击音（适合普通僵尸）
 	//   - "assets/audio/Sound/bleep.mp3"  - 电子音效1（清脆）
 	//   - "assets/audio/Sound/bleep1.mp3" - 电子音效2（略低沉）
-	// 
+	//
 	// 📝 音效用途说明：
 	//   - shieldhit.ogg → 击中铁桶僵尸/路障僵尸的音效（后续实现）
 	//   - chomp.ogg → 僵尸啃食植物的音效
 	//   - groan.ogg → 僵尸的呻吟声
-	// 
+	//
 	// 💡 如何测试不同音效：
 	//   1. 修改下面的路径为其他音效文件
 	//   2. 运行游戏：go run .
@@ -100,18 +100,18 @@ const (
 	ZombieHitSoundPath = "assets/audio/Sound/tap.ogg"
 
 	// PeashooterShootSoundPath 豌豆射手发射子弹的音效文件路径
-	// 
+	//
 	// 🎵 可用音效选项：
 	//   - "" (空字符串)                        - 不播放音效（静音）
 	//   - "assets/audio/Sound/kernelpult2.ogg" - 玉米投手发射音（略重）
 	//   - "assets/audio/Sound/tap.ogg"         - 轻敲音（轻快）
 	//   - "assets/audio/Sound/buttonclick.ogg" - 点击音（清脆）
-	// 
+	//
 	// 📝 说明：
 	//   原版游戏中豌豆射手发射音效非常轻微，几乎听不到
 	//   如果希望保持原版体验，建议设置为空字符串 ""
 	//   如果希望增强反馈感，可以选择轻快的音效
-	// 
+	//
 	// 💡 推荐设置：
 	//   - 静音模式（原版风格）: ""
 	//   - 轻量反馈: "assets/audio/Sound/tap.ogg"
