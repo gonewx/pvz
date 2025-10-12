@@ -204,16 +204,42 @@ func TestSunProductionPosition(t *testing.T) {
 	}
 	position := positionComp.(*components.PositionComponent)
 
-	// 阳光应该在向日葵上方（X相同，Y约小20像素）
-	if position.X != sunflowerX {
-		t.Errorf("Expected sun X=%f, got %f", sunflowerX, position.X)
+	// 阳光应该在向日葵附近（考虑随机偏移）
+	// X 坐标：sunflowerX - 40（居中）± 20（随机）= [340, 380]
+	// Y 坐标：sunflowerY - 80（上方）± 10（随机）= [210, 230]
+	expectedMinX := sunflowerX - 40.0 - 20.0
+	expectedMaxX := sunflowerX - 40.0 + 20.0
+	expectedMinY := sunflowerY - 80.0 - 10.0
+	expectedMaxY := sunflowerY - 80.0 + 10.0
+
+	if position.X < expectedMinX || position.X > expectedMaxX {
+		t.Errorf("Sun X position out of range: expected [%.0f, %.0f], got %.0f",
+			expectedMinX, expectedMaxX, position.X)
 	}
 
-	// 注意：阳光的Y坐标是startY（屏幕顶部外），不是 sunflowerY-20
-	// 检查阳光是否有 VelocityComponent（说明它会下落）
-	_, hasVelocity := em.GetComponent(sunID, reflect.TypeOf(&components.VelocityComponent{}))
-	if !hasVelocity {
-		t.Error("Sun entity should have VelocityComponent to fall")
+	if position.Y < expectedMinY || position.Y > expectedMaxY {
+		t.Errorf("Sun Y position out of range: expected [%.0f, %.0f], got %.0f",
+			expectedMinY, expectedMaxY, position.Y)
+	}
+
+	// 检查阳光状态应该是 Landed（可以立即收集）
+	sunComp, ok := em.GetComponent(sunID, reflect.TypeOf(&components.SunComponent{}))
+	if !ok {
+		t.Fatal("Sun entity should have SunComponent")
+	}
+	sun := sunComp.(*components.SunComponent)
+	if sun.State != components.SunLanded {
+		t.Errorf("Sun should be in Landed state, got %v", sun.State)
+	}
+
+	// 检查阳光速度应该是静止的
+	velComp, ok := em.GetComponent(sunID, reflect.TypeOf(&components.VelocityComponent{}))
+	if !ok {
+		t.Fatal("Sun entity should have VelocityComponent")
+	}
+	vel := velComp.(*components.VelocityComponent)
+	if vel.VX != 0 || vel.VY != 0 {
+		t.Errorf("Sun should be stationary, got velocity (%.1f, %.1f)", vel.VX, vel.VY)
 	}
 }
 

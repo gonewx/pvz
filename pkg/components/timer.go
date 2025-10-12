@@ -6,5 +6,5 @@ type TimerComponent struct {
 	Name        string  // 计时器名称，如 "sun_production"
 	TargetTime  float64 // 目标时间（秒）
 	CurrentTime float64 // 当前已过时间（秒）
-	IsReady     bool    // 计时器是否已完成
+	IsReady     bool    // 计时器是否已完成（保留字段，当前未使用，可用于未来扩展）
 }

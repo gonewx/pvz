@@ -16,7 +16,17 @@ import (
 type BehaviorSystem struct {
 	entityManager   *ecs.EntityManager
 	resourceManager *game.ResourceManager
+	logFrameCounter int // 日志输出计数器（避免全局变量）
 }
+
+// 阳光生产位置偏移常量
+const (
+	SunOffsetCenterX       = 40.0 // 阳光图像居中偏移（阳光约80px宽）
+	SunOffsetBaseY         = 80.0 // 阳光基础向上偏移（向日葵上方）
+	SunRandomOffsetRangeX  = 40.0 // 随机水平偏移范围（-20 到 +20）
+	SunRandomOffsetRangeY  = 20.0 // 随机垂直偏移范围（-10 到 +10）
+	LogOutputFrameInterval = 100  // 日志输出间隔（每N帧输出一次）
+)
 
 // NewBehaviorSystem 创建一个新的行为系统
 // 参数:
@@ -41,9 +51,9 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 
 	// 只在有实体时输出日志（避免每帧都打印）
 	if len(entityList) > 0 {
-		// 每100帧打印一次（约每1.67秒）
-		static_counter++
-		if static_counter%100 == 1 {
+		// 每N帧打印一次（约每1.67秒）
+		s.logFrameCounter++
+		if s.logFrameCounter%LogOutputFrameInterval == 1 {
 			log.Printf("[BehaviorSystem] 更新 %d 个行为实体", len(entityList))
 		}
 	}
@@ -64,8 +74,6 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 		}
 	}
 }
-
-var static_counter int = 0
 
 // handleSunflowerBehavior 处理向日葵的行为逻辑
 // 向日葵会定期生产阳光
@@ -91,12 +99,12 @@ func (s *BehaviorSystem) handleSunflowerBehavior(entityID ecs.EntityID, deltaTim
 		// 注意：阳光图像是左上角对齐，尺寸约80x80
 
 		// 随机水平偏移：-20 到 +20 像素
-		randomOffsetX := (rand.Float64() - 0.5) * 40 // -20 ~ +20
+		randomOffsetX := (rand.Float64() - 0.5) * SunRandomOffsetRangeX // -20 ~ +20
 		// 随机垂直偏移：-10 到 +10 像素
-		randomOffsetY := (rand.Float64() - 0.5) * 20 // -10 ~ +10
+		randomOffsetY := (rand.Float64() - 0.5) * SunRandomOffsetRangeY // -10 ~ +10
 
-		sunStartX := position.X - 40 + randomOffsetX // 向左偏移40像素居中，加上随机偏移
-		sunStartY := position.Y - 80 + randomOffsetY // 向日葵上方约 80 像素，加上随机偏移
+		sunStartX := position.X - SunOffsetCenterX + randomOffsetX // 向左偏移居中，加上随机偏移
+		sunStartY := position.Y - SunOffsetBaseY + randomOffsetY   // 向日葵上方，加上随机偏移
 
 		log.Printf("[BehaviorSystem] 创建阳光实体，位置: (%.0f, %.0f), 随机偏移: (%.1f, %.1f)",
 			sunStartX, sunStartY, randomOffsetX, randomOffsetY)

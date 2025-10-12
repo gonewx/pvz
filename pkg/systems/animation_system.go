@@ -69,11 +69,10 @@ func (s *AnimationSystem) Update(deltaTime float64) {
 					// 循环动画: 重置到第0帧
 					anim.CurrentFrame = 0
 				} else {
-					// 非循环动画: 回到第一帧并标记完成
-					// 注意：向日葵等植物播放完动画后应该回到静止状态（第一帧）
-					anim.CurrentFrame = 0 // 回到第一帧而不是最后一帧
+					// 非循环动画: 停在最后一帧并标记完成
+					anim.CurrentFrame = len(anim.Frames) - 1
 					anim.IsFinished = true
-					log.Printf("[AnimationSystem] 动画播放完成 (实体ID: %d)，回到第一帧", id)
+					log.Printf("[AnimationSystem] 动画播放完成 (实体ID: %d)，停在最后一帧", id)
 				}
 			}
 
