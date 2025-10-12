@@ -66,3 +66,4 @@ func (s *PlantPreviewRenderSystem) Draw(screen *ebiten.Image) {
 		screen.DrawImage(sprite.Image, opts)
 	}
 }
+

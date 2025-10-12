@@ -117,8 +117,8 @@ func TestGridBoundaryCalculation(t *testing.T) {
 	}
 
 	// 验证网格总尺寸
-	expectedWidth := float64(config.GridColumns) * config.CellWidth   // 9 * 80 = 720
-	expectedHeight := float64(config.GridRows) * config.CellHeight    // 5 * 100 = 500
+	expectedWidth := float64(config.GridColumns) * config.CellWidth // 9 * 80 = 720
+	expectedHeight := float64(config.GridRows) * config.CellHeight  // 5 * 100 = 500
 
 	if expectedWidth != 720.0 {
 		t.Errorf("Expected grid width 720.0, got %.1f", expectedWidth)

@@ -24,8 +24,8 @@ func TestMouseToGridCoords(t *testing.T) {
 	}{
 		{
 			name:      "左上角第一个格子",
-			mouseX:    36,  // 屏幕坐标
-			mouseY:    72,  // 屏幕坐标
+			mouseX:    36, // 屏幕坐标
+			mouseY:    72, // 屏幕坐标
 			cameraX:   testCameraX,
 			wantCol:   0,
 			wantRow:   0,
@@ -153,8 +153,8 @@ func TestGridToScreenCoords(t *testing.T) {
 			col:       0,
 			row:       0,
 			cameraX:   testCameraX,
-			wantCentX: 36.0 + 40.0,  // (251 - 215) + CellWidth/2 = 36 + 40
-			wantCentY: 72.0 + 50.0,  // GridWorldStartY + CellHeight/2
+			wantCentX: 36.0 + 40.0, // (251 - 215) + CellWidth/2 = 36 + 40
+			wantCentY: 72.0 + 50.0, // GridWorldStartY + CellHeight/2
 		},
 		{
 			name:      "最后一个格子 (8,4) - 默认摄像机位置",

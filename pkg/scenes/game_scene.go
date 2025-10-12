@@ -96,6 +96,9 @@ type GameScene struct {
 	// Story 3.3: Lawn Grid System
 	lawnGridSystem   *systems.LawnGridSystem // 草坪网格管理系统
 	lawnGridEntityID ecs.EntityID            // 草坪网格实体ID
+
+	// Story 3.4: Behavior System
+	behaviorSystem *systems.BehaviorSystem // 植物行为系统（向日葵生产阳光等）
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -178,6 +181,10 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	// Story 3.2: Initialize plant preview systems
 	scene.plantPreviewSystem = systems.NewPlantPreviewSystem(scene.entityManager, scene.gameState)
 	scene.plantPreviewRenderSystem = systems.NewPlantPreviewRenderSystem(scene.entityManager)
+
+	// Story 3.4: Initialize behavior system (sunflower sun production, etc.)
+	scene.behaviorSystem = systems.NewBehaviorSystem(scene.entityManager, rm)
+	log.Printf("[GameScene] Initialized behavior system for plant behaviors")
 
 	return scene
 }
@@ -304,10 +311,11 @@ func (s *GameScene) Update(deltaTime float64) {
 	s.sunSpawnSystem.Update(deltaTime)      // 3. Generate new suns
 	s.sunMovementSystem.Update(deltaTime)   // 4. Move suns (includes collection animation)
 	s.sunCollectionSystem.Update(deltaTime) // 5. Check if collection is complete
-	s.animationSystem.Update(deltaTime)     // 6. Update animation frames
-	s.plantPreviewSystem.Update(deltaTime)  // 7. Update plant preview position (Story 3.2)
-	s.lifetimeSystem.Update(deltaTime)      // 8. Check for expired entities
-	s.entityManager.RemoveMarkedEntities()  // 9. Clean up deleted entities (always last)
+	s.behaviorSystem.Update(deltaTime)      // 6. Update plant behaviors (Story 3.4)
+	s.animationSystem.Update(deltaTime)     // 7. Update animation frames
+	s.plantPreviewSystem.Update(deltaTime)  // 8. Update plant preview position (Story 3.2)
+	s.lifetimeSystem.Update(deltaTime)      // 9. Check for expired entities
+	s.entityManager.RemoveMarkedEntities()  // 10. Clean up deleted entities (always last)
 }
 
 // updateIntroAnimation updates the intro camera animation that showcases the entire lawn.

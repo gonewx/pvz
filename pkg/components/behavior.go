@@ -1,0 +1,18 @@
+package components
+
+// BehaviorType 定义实体的行为类型
+// 用于 BehaviorSystem 决定如何处理该实体
+type BehaviorType int
+
+const (
+	// BehaviorSunflower 向日葵行为：定期生产阳光
+	BehaviorSunflower BehaviorType = iota
+	// BehaviorPeashooter 豌豆射手行为：攻击同行僵尸（预留）
+	BehaviorPeashooter
+)
+
+// BehaviorComponent 标识实体的行为类型
+// 此组件用于让 BehaviorSystem 识别实体应执行何种行为逻辑
+type BehaviorComponent struct {
+	Type BehaviorType // 行为类型（向日葵、豌豆射手等）
+}

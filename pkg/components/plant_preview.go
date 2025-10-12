@@ -11,3 +11,4 @@ type PlantPreviewComponent struct {
 	// 0.0 表示完全透明，1.0 表示完全不透明
 	Alpha float64
 }
+

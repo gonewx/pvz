@@ -8,6 +8,7 @@ import (
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/utils"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // NewPlantEntity 创建植物实体
@@ -63,7 +64,43 @@ func NewPlantEntity(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.Ga
 		GridCol:   col,
 	})
 
-	// TODO: 未来可以添加 AnimationComponent 支持植物动画
+	// 为向日葵添加特定组件
+	if plantType == components.PlantSunflower {
+		// 添加行为组件
+		em.AddComponent(entityID, &components.BehaviorComponent{
+			Type: components.BehaviorSunflower,
+		})
+
+		// 添加计时器组件（首次生产周期为 7 秒）
+		em.AddComponent(entityID, &components.TimerComponent{
+			Name:        "sun_production",
+			TargetTime:  7.0,
+			CurrentTime: 0,
+			IsReady:     false,
+		})
+
+		// 加载向日葵动画帧（18帧动画）
+		frames := make([]*ebiten.Image, 18)
+		for i := 0; i < 18; i++ {
+			framePath := fmt.Sprintf("assets/images/Plants/SunFlower/SunFlower_%d.png", i+1)
+			frameImage, err := rm.LoadImage(framePath)
+			if err != nil {
+				return 0, fmt.Errorf("failed to load sunflower animation frame %d: %w", i+1, err)
+			}
+			frames[i] = frameImage
+		}
+
+		// 添加动画组件
+		// 向日葵一直播放待机动画（循环）
+		em.AddComponent(entityID, &components.AnimationComponent{
+			Frames:       frames,
+			FrameSpeed:   0.08, // 0.08 秒/帧，完整动画约 1.44 秒
+			CurrentFrame: 0,
+			FrameCounter: 0,
+			IsLooping:    true,  // 循环播放待机动画
+			IsFinished:   false, // 动画一直播放
+		})
+	}
 
 	return entityID, nil
 }

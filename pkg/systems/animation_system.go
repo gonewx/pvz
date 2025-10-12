@@ -1,6 +1,7 @@
 package systems
 
 import (
+	"log"
 	"reflect"
 
 	"github.com/decker502/pvz/pkg/components"
@@ -41,6 +42,11 @@ func (s *AnimationSystem) Update(deltaTime float64) {
 			continue
 		}
 
+		// 调试：检测到动画开始播放
+		if anim.CurrentFrame == 0 && anim.FrameCounter == 0 {
+			log.Printf("[AnimationSystem] 开始播放动画 (实体ID: %d, 帧数: %d, 循环: %v)", id, len(anim.Frames), anim.IsLooping)
+		}
+
 		// 如果没有帧,跳过
 		if len(anim.Frames) == 0 {
 			continue
@@ -63,9 +69,11 @@ func (s *AnimationSystem) Update(deltaTime float64) {
 					// 循环动画: 重置到第0帧
 					anim.CurrentFrame = 0
 				} else {
-					// 非循环动画: 停在最后一帧并标记完成
-					anim.CurrentFrame = len(anim.Frames) - 1
+					// 非循环动画: 回到第一帧并标记完成
+					// 注意：向日葵等植物播放完动画后应该回到静止状态（第一帧）
+					anim.CurrentFrame = 0 // 回到第一帧而不是最后一帧
 					anim.IsFinished = true
+					log.Printf("[AnimationSystem] 动画播放完成 (实体ID: %d)，回到第一帧", id)
 				}
 			}
 
