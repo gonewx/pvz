@@ -58,12 +58,23 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 		reflect.TypeOf(&components.VelocityComponent{}),
 	)
 
+	// 查询所有啃食中的僵尸实体（没有 VelocityComponent，有 TimerComponent）
+	eatingZombieEntityList := s.entityManager.GetEntitiesWith(
+		reflect.TypeOf(&components.BehaviorComponent{}),
+		reflect.TypeOf(&components.PositionComponent{}),
+		reflect.TypeOf(&components.TimerComponent{}),
+	)
+
 	// 查询所有死亡中的僵尸实体（没有 VelocityComponent，只有 BehaviorComponent, PositionComponent, AnimationComponent）
 	dyingZombieEntityList := s.entityManager.GetEntitiesWith(
 		reflect.TypeOf(&components.BehaviorComponent{}),
 		reflect.TypeOf(&components.PositionComponent{}),
 		reflect.TypeOf(&components.AnimationComponent{}),
 	)
+
+	// 合并所有僵尸列表（移动中 + 啃食中），用于豌豆射手检测目标
+	allZombieEntityList := append([]ecs.EntityID{}, zombieEntityList...)
+	allZombieEntityList = append(allZombieEntityList, eatingZombieEntityList...)
 
 	// 查询所有豌豆子弹实体（拥有 BehaviorComponent, PositionComponent, VelocityComponent）
 	// 注意：子弹和僵尸的组件组合相同，需要通过 BehaviorType 区分
@@ -74,12 +85,13 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 	)
 
 	// 日志输出（避免每帧都打印）
-	totalEntities := len(plantEntityList) + len(zombieEntityList) + len(projectileEntityList)
+	totalZombies := len(zombieEntityList) + len(eatingZombieEntityList)
+	totalEntities := len(plantEntityList) + totalZombies + len(projectileEntityList)
 	if totalEntities > 0 {
 		s.logFrameCounter++
 		if s.logFrameCounter%LogOutputFrameInterval == 1 {
-			log.Printf("[BehaviorSystem] 更新 %d 个行为实体 (植物: %d, 僵尸: %d, 子弹: %d)",
-				totalEntities, len(plantEntityList), len(zombieEntityList), len(projectileEntityList))
+			log.Printf("[BehaviorSystem] 更新 %d 个行为实体 (植物: %d, 僵尸: %d [移动:%d 啃食:%d], 子弹: %d)",
+				totalEntities, len(plantEntityList), totalZombies, len(zombieEntityList), len(eatingZombieEntityList), len(projectileEntityList))
 		}
 	}
 
@@ -93,13 +105,17 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 		case components.BehaviorSunflower:
 			s.handleSunflowerBehavior(entityID, deltaTime)
 		case components.BehaviorPeashooter:
-			s.handlePeashooterBehavior(entityID, deltaTime, zombieEntityList)
+			// DEBUG: 检查豌豆射手是否被处理
+			if s.logFrameCounter%60 == 1 {
+				log.Printf("[BehaviorSystem] 处理豌豆射手 %d 攻击逻辑", entityID)
+			}
+			s.handlePeashooterBehavior(entityID, deltaTime, allZombieEntityList)
 		default:
 			// 未知行为类型，忽略
 		}
 	}
 
-	// 遍历所有僵尸实体，根据行为类型分发处理
+	// 遍历所有移动中的僵尸实体，根据行为类型分发处理
 	for _, entityID := range zombieEntityList {
 		behaviorComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.BehaviorComponent{}))
 		behavior := behaviorComp.(*components.BehaviorComponent)
@@ -108,11 +124,19 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 		switch behavior.Type {
 		case components.BehaviorZombieBasic:
 			s.handleZombieBasicBehavior(entityID, deltaTime)
-		case components.BehaviorZombieEating:
-			s.handleZombieEatingBehavior(entityID, deltaTime)
 		default:
 			// 未知僵尸类型，忽略
-			// 注意：BehaviorZombieDying 在单独的 dyingZombieEntityList 中处理
+		}
+	}
+
+	// 遍历所有啃食中的僵尸实体
+	for _, entityID := range eatingZombieEntityList {
+		behaviorComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.BehaviorComponent{}))
+		behavior := behaviorComp.(*components.BehaviorComponent)
+
+		// 只处理啃食状态的僵尸
+		if behavior.Type == components.BehaviorZombieEating {
+			s.handleZombieEatingBehavior(entityID, deltaTime)
 		}
 	}
 
