@@ -99,6 +99,10 @@ type GameScene struct {
 
 	// Story 3.4: Behavior System
 	behaviorSystem *systems.BehaviorSystem // 植物行为系统（向日葵生产阳光等）
+
+	// Story 4.1: Test Zombie Spawn (临时测试代码)
+	testZombieTimer   float64 // 测试僵尸生成计时器
+	testZombieSpawned bool    // 是否已生成测试僵尸
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -304,6 +308,28 @@ func (s *GameScene) Update(deltaTime float64) {
 
 	// 同步摄像机位置到全局状态（供所有系统使用）
 	s.gameState.CameraX = s.cameraX
+
+	// Story 4.1: Test zombie spawn (临时测试代码)
+	// 在游戏开始后3秒，在第3行生成一个测试僵尸
+	if !s.testZombieSpawned {
+		s.testZombieTimer += deltaTime
+		if s.testZombieTimer >= 3.0 {
+			// 计算生成位置：屏幕右侧外约50像素
+			// 背景宽度1400px，游戏开始时摄像机在215px，屏幕宽度800px
+			// 僵尸应该生成在摄像机可见范围外的右侧
+			spawnX := s.cameraX + WindowWidth + 50.0 // 屏幕右侧外50像素
+			row := 2                                 // 第3行（索引从0开始）
+
+			log.Printf("[GameScene] 生成测试僵尸：行=%d, 世界X坐标=%.1f", row, spawnX)
+			zombieID, err := entities.NewZombieEntity(s.entityManager, s.resourceManager, row, spawnX)
+			if err != nil {
+				log.Printf("[GameScene] 生成僵尸失败: %v", err)
+			} else {
+				log.Printf("[GameScene] 成功生成测试僵尸 (ID: %d)", zombieID)
+			}
+			s.testZombieSpawned = true
+		}
+	}
 
 	// Update all ECS systems in order (order matters for correct game logic)
 	s.plantCardSystem.Update(deltaTime)     // 1. Update plant card states (before input)

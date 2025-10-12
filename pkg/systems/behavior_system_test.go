@@ -296,3 +296,150 @@ func TestMultipleSunflowersIndependentTimers(t *testing.T) {
 		t.Errorf("Expected 2 sun entities, got %d", len(sunEntities))
 	}
 }
+
+// TestZombieBasicMovement 测试僵尸正常移动
+func TestZombieBasicMovement(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(testAudioContext)
+	system := NewBehaviorSystem(em, rm)
+
+	// 创建僵尸实体
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.BehaviorComponent{
+		Type: components.BehaviorZombieBasic,
+	})
+	em.AddComponent(zombieID, &components.PositionComponent{
+		X: 1000.0, // 初始位置在屏幕右侧
+		Y: 200.0,
+	})
+	em.AddComponent(zombieID, &components.VelocityComponent{
+		VX: -30.0, // 向左移动
+		VY: 0.0,
+	})
+
+	// 模拟1秒更新
+	system.Update(1.0)
+
+	// 验证僵尸位置更新：X 应该减少 30 像素
+	posComp, _ := em.GetComponent(zombieID, reflect.TypeOf(&components.PositionComponent{}))
+	pos := posComp.(*components.PositionComponent)
+
+	expectedX := 1000.0 - 30.0*1.0 // 970.0
+	if pos.X != expectedX {
+		t.Errorf("Expected X=%.1f, got %.1f", expectedX, pos.X)
+	}
+
+	// 再次更新2秒
+	system.Update(2.0)
+
+	posComp, _ = em.GetComponent(zombieID, reflect.TypeOf(&components.PositionComponent{}))
+	pos = posComp.(*components.PositionComponent)
+
+	expectedX = 970.0 - 30.0*2.0 // 910.0
+	if pos.X != expectedX {
+		t.Errorf("Expected X=%.1f after second update, got %.1f", expectedX, pos.X)
+	}
+}
+
+// TestZombieBoundaryDeletion 测试僵尸移出屏幕后被删除
+func TestZombieBoundaryDeletion(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(testAudioContext)
+	system := NewBehaviorSystem(em, rm)
+
+	// 创建僵尸实体（位置接近屏幕左侧边界）
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.BehaviorComponent{
+		Type: components.BehaviorZombieBasic,
+	})
+	em.AddComponent(zombieID, &components.PositionComponent{
+		X: -50.0, // 接近边界，但还没超出删除阈值（-100）
+		Y: 200.0,
+	})
+	em.AddComponent(zombieID, &components.VelocityComponent{
+		VX: -30.0,
+		VY: 0.0,
+	})
+
+	// 模拟2秒更新（应该移动到 -50 - 60 = -110，超出-100阈值）
+	system.Update(2.0)
+
+	// 清理标记删除的实体
+	em.RemoveMarkedEntities()
+
+	// 验证僵尸实体被删除
+	zombieEntities := em.GetEntitiesWith(
+		reflect.TypeOf(&components.BehaviorComponent{}),
+		reflect.TypeOf(&components.PositionComponent{}),
+		reflect.TypeOf(&components.VelocityComponent{}),
+	)
+
+	// 检查是否还有僵尸实体（应该为0，因为被删除了）
+	hasZombie := false
+	for _, id := range zombieEntities {
+		behaviorComp, _ := em.GetComponent(id, reflect.TypeOf(&components.BehaviorComponent{}))
+		behavior := behaviorComp.(*components.BehaviorComponent)
+		if behavior.Type == components.BehaviorZombieBasic && id == zombieID {
+			hasZombie = true
+			break
+		}
+	}
+
+	if hasZombie {
+		t.Error("Zombie should be deleted after moving past left boundary")
+	}
+}
+
+// TestMultipleZombiesIndependentMovement 测试多个僵尸独立移动
+func TestMultipleZombiesIndependentMovement(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(testAudioContext)
+	system := NewBehaviorSystem(em, rm)
+
+	// 创建第一个僵尸（速度 -30）
+	zombie1 := em.CreateEntity()
+	em.AddComponent(zombie1, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	em.AddComponent(zombie1, &components.PositionComponent{X: 1000.0, Y: 200.0})
+	em.AddComponent(zombie1, &components.VelocityComponent{VX: -30.0, VY: 0.0})
+
+	// 创建第二个僵尸（速度 -40，更快）
+	zombie2 := em.CreateEntity()
+	em.AddComponent(zombie2, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	em.AddComponent(zombie2, &components.PositionComponent{X: 1200.0, Y: 300.0})
+	em.AddComponent(zombie2, &components.VelocityComponent{VX: -40.0, VY: 0.0})
+
+	// 更新1秒
+	system.Update(1.0)
+
+	// 验证第一个僵尸位置
+	pos1Comp, _ := em.GetComponent(zombie1, reflect.TypeOf(&components.PositionComponent{}))
+	pos1 := pos1Comp.(*components.PositionComponent)
+	if pos1.X != 970.0 {
+		t.Errorf("Zombie1 should be at X=970.0, got %.1f", pos1.X)
+	}
+
+	// 验证第二个僵尸位置
+	pos2Comp, _ := em.GetComponent(zombie2, reflect.TypeOf(&components.PositionComponent{}))
+	pos2 := pos2Comp.(*components.PositionComponent)
+	if pos2.X != 1160.0 {
+		t.Errorf("Zombie2 should be at X=1160.0, got %.1f", pos2.X)
+	}
+
+	// 再更新2秒
+	system.Update(2.0)
+
+	// 验证两个僵尸都继续移动
+	pos1Comp, _ = em.GetComponent(zombie1, reflect.TypeOf(&components.PositionComponent{}))
+	pos1 = pos1Comp.(*components.PositionComponent)
+	expectedX1 := 970.0 - 30.0*2.0 // 910.0
+	if pos1.X != expectedX1 {
+		t.Errorf("Zombie1 should be at X=%.1f, got %.1f", expectedX1, pos1.X)
+	}
+
+	pos2Comp, _ = em.GetComponent(zombie2, reflect.TypeOf(&components.PositionComponent{}))
+	pos2 = pos2Comp.(*components.PositionComponent)
+	expectedX2 := 1160.0 - 40.0*2.0 // 1080.0
+	if pos2.X != expectedX2 {
+		t.Errorf("Zombie2 should be at X=%.1f, got %.1f", expectedX2, pos2.X)
+	}
+}

@@ -9,6 +9,8 @@ const (
 	BehaviorSunflower BehaviorType = iota
 	// BehaviorPeashooter 豌豆射手行为：攻击同行僵尸（预留）
 	BehaviorPeashooter
+	// BehaviorZombieBasic 普通僵尸行为：从右向左移动并攻击植物
+	BehaviorZombieBasic
 )
 
 // BehaviorComponent 标识实体的行为类型

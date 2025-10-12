@@ -26,6 +26,10 @@ const (
 	SunRandomOffsetRangeX  = 40.0 // 随机水平偏移范围（-20 到 +20）
 	SunRandomOffsetRangeY  = 20.0 // 随机垂直偏移范围（-10 到 +10）
 	LogOutputFrameInterval = 100  // 日志输出间隔（每N帧输出一次）
+
+	// ZombieDeletionBoundary 僵尸删除边界的X坐标阈值
+	// 当僵尸移出屏幕左侧超过此阈值时，将被删除以释放资源
+	ZombieDeletionBoundary = -100.0
 )
 
 // NewBehaviorSystem 创建一个新的行为系统
@@ -41,25 +45,33 @@ func NewBehaviorSystem(em *ecs.EntityManager, rm *game.ResourceManager) *Behavio
 
 // Update 更新所有拥有行为组件的实体
 func (s *BehaviorSystem) Update(deltaTime float64) {
-	// 查询所有拥有 BehaviorComponent, TimerComponent, PlantComponent, PositionComponent 的实体
-	entityList := s.entityManager.GetEntitiesWith(
+	// 查询所有拥有 BehaviorComponent, TimerComponent, PlantComponent, PositionComponent 的实体（植物）
+	plantEntityList := s.entityManager.GetEntitiesWith(
 		reflect.TypeOf(&components.BehaviorComponent{}),
 		reflect.TypeOf(&components.TimerComponent{}),
 		reflect.TypeOf(&components.PlantComponent{}),
 		reflect.TypeOf(&components.PositionComponent{}),
 	)
 
-	// 只在有实体时输出日志（避免每帧都打印）
-	if len(entityList) > 0 {
-		// 每N帧打印一次（约每1.67秒）
+	// 查询所有拥有 BehaviorComponent, PositionComponent, VelocityComponent 的实体（僵尸）
+	zombieEntityList := s.entityManager.GetEntitiesWith(
+		reflect.TypeOf(&components.BehaviorComponent{}),
+		reflect.TypeOf(&components.PositionComponent{}),
+		reflect.TypeOf(&components.VelocityComponent{}),
+	)
+
+	// 日志输出（避免每帧都打印）
+	totalEntities := len(plantEntityList) + len(zombieEntityList)
+	if totalEntities > 0 {
 		s.logFrameCounter++
 		if s.logFrameCounter%LogOutputFrameInterval == 1 {
-			log.Printf("[BehaviorSystem] 更新 %d 个行为实体", len(entityList))
+			log.Printf("[BehaviorSystem] 更新 %d 个行为实体 (植物: %d, 僵尸: %d)",
+				totalEntities, len(plantEntityList), len(zombieEntityList))
 		}
 	}
 
-	// 遍历所有实体，根据行为类型分发处理
-	for _, entityID := range entityList {
+	// 遍历所有植物实体，根据行为类型分发处理
+	for _, entityID := range plantEntityList {
 		behaviorComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.BehaviorComponent{}))
 		behavior := behaviorComp.(*components.BehaviorComponent)
 
@@ -71,6 +83,20 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 			// 豌豆射手行为（未来实现）
 		default:
 			// 未知行为类型，忽略
+		}
+	}
+
+	// 遍历所有僵尸实体，根据行为类型分发处理
+	for _, entityID := range zombieEntityList {
+		behaviorComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.BehaviorComponent{}))
+		behavior := behaviorComp.(*components.BehaviorComponent)
+
+		// 根据行为类型分发
+		switch behavior.Type {
+		case components.BehaviorZombieBasic:
+			s.handleZombieBasicBehavior(entityID, deltaTime)
+		default:
+			// 未知僵尸类型，忽略
 		}
 	}
 }
@@ -142,5 +168,34 @@ func (s *BehaviorSystem) handleSunflowerBehavior(entityID ecs.EntityID, deltaTim
 		timer.TargetTime = 24.0
 
 		// 注意：向日葵的待机动画一直循环播放，生产阳光时不需要特殊动画
+	}
+}
+
+// handleZombieBasicBehavior 处理普通僵尸的行为逻辑
+// 普通僵尸会以恒定速度从右向左移动
+func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaTime float64) {
+	// 获取位置组件
+	positionComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
+	if !ok {
+		return
+	}
+	position := positionComp.(*components.PositionComponent)
+
+	// 获取速度组件
+	velocityComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.VelocityComponent{}))
+	if !ok {
+		return
+	}
+	velocity := velocityComp.(*components.VelocityComponent)
+
+	// 更新位置：根据速度和时间增量移动僵尸
+	position.X += velocity.VX * deltaTime
+	position.Y += velocity.VY * deltaTime
+
+	// 边界检查：如果僵尸移出屏幕左侧，标记删除
+	// 使用 ZombieDeletionBoundary 提供容错空间，避免僵尸刚移出就被删除
+	if position.X < ZombieDeletionBoundary {
+		log.Printf("[BehaviorSystem] 僵尸 %d 移出屏幕左侧 (X=%.1f)，标记删除", entityID, position.X)
+		s.entityManager.DestroyEntity(entityID)
 	}
 }
