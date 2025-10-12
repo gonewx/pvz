@@ -56,7 +56,7 @@ func (s *SunCollectionSystem) Update(deltaTime float64) {
 		// 世界坐标 = 屏幕坐标 + cameraX（仅X轴）
 		targetWorldX := s.targetX + s.gameState.CameraX
 		targetWorldY := s.targetY // Y轴不受摄像机影响
-		
+
 		dx := targetWorldX - pos.X
 		dy := targetWorldY - pos.Y
 		distance := math.Sqrt(dx*dx + dy*dy)

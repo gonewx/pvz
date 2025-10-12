@@ -174,7 +174,7 @@ func (s *InputSystem) handleSunClick(sunID ecs.EntityID, pos *components.Positio
 	// 世界坐标 = 屏幕坐标 + cameraX（仅X轴）
 	targetWorldX := s.sunCounterX + s.gameState.CameraX
 	targetWorldY := s.sunCounterY // Y轴不受摄像机影响
-	
+
 	dx := targetWorldX - pos.X
 	dy := targetWorldY - pos.Y
 	distance := math.Sqrt(dx*dx + dy*dy)
