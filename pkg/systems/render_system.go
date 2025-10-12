@@ -2,6 +2,7 @@ package systems
 
 import (
 	"reflect"
+	"sort"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
@@ -65,6 +66,8 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 	}
 
 	// 第二遍：渲染僵尸、子弹、特效（中间层）
+	// 需要按Y坐标排序以解决重叠闪烁问题（上方行先渲染，下方行后渲染会遮挡上方）
+	zombiesAndProjectiles := make([]ecs.EntityID, 0)
 	for _, id := range entities {
 		// 跳过植物卡片实体
 		if _, hasPlantCard := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PlantCardComponent{})); hasPlantCard {
@@ -88,6 +91,19 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 			continue
 		}
 
+		zombiesAndProjectiles = append(zombiesAndProjectiles, id)
+	}
+
+	// 按Y坐标排序（从小到大，即从上到下）
+	// 这样上方行的僵尸先绘制，下方行的僵尸后绘制会正确遮挡
+	sort.Slice(zombiesAndProjectiles, func(i, j int) bool {
+		posI, _ := s.entityManager.GetComponent(zombiesAndProjectiles[i], reflect.TypeOf(&components.PositionComponent{}))
+		posJ, _ := s.entityManager.GetComponent(zombiesAndProjectiles[j], reflect.TypeOf(&components.PositionComponent{}))
+		return posI.(*components.PositionComponent).Y < posJ.(*components.PositionComponent).Y
+	})
+
+	// 按排序后的顺序渲染
+	for _, id := range zombiesAndProjectiles {
 		s.drawEntity(screen, id, cameraX)
 	}
 }
