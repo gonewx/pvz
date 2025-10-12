@@ -21,7 +21,8 @@ func NewRenderSystem(em *ecs.EntityManager) *RenderSystem {
 }
 
 // Draw 绘制所有拥有位置和精灵组件的实体
-// 渲染顺序：先渲染植物，再渲染阳光，确保阳光显示在植物上方
+// 渲染顺序（从底到顶）：植物 → 僵尸/子弹 → 阳光
+// 这样确保阳光始终显示在最上层，便于玩家点击收集
 // 参数:
 //   - screen: 绘制目标屏幕
 //   - cameraX: 摄像机的世界坐标X位置（用于世界坐标到屏幕坐标的转换）
@@ -50,10 +51,10 @@ func (s *RenderSystem) Draw(screen *ebiten.Image, cameraX float64) {
 			continue // 跳过非植物实体
 		}
 
-		s.drawEntity(screen, id, true, cameraX)
+		s.drawEntity(screen, id, cameraX)
 	}
 
-	// 第二遍：渲染阳光和其他实体（上层）
+	// 第二遍：渲染僵尸、子弹、特效（中间层）
 	for _, id := range entities {
 		// 跳过植物卡片实体
 		if _, hasPlantCard := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PlantCardComponent{})); hasPlantCard {
@@ -65,13 +66,40 @@ func (s *RenderSystem) Draw(screen *ebiten.Image, cameraX float64) {
 			continue
 		}
 
-		// 只渲染非植物实体（阳光等）
+		// 跳过植物
 		_, isPlant := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PlantComponent{}))
 		if isPlant {
-			continue // 跳过植物（已经在第一遍渲染了）
+			continue
 		}
 
-		s.drawEntity(screen, id, false, cameraX)
+		// 跳过阳光（留到最后渲染）
+		_, isSun := s.entityManager.GetComponent(id, reflect.TypeOf(&components.SunComponent{}))
+		if isSun {
+			continue
+		}
+
+		s.drawEntity(screen, id, cameraX)
+	}
+
+	// 第三遍：渲染阳光（最上层）
+	for _, id := range entities {
+		// 跳过植物卡片实体
+		if _, hasPlantCard := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PlantCardComponent{})); hasPlantCard {
+			continue
+		}
+
+		// 跳过植物预览实体
+		if _, hasPlantPreview := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PlantPreviewComponent{})); hasPlantPreview {
+			continue
+		}
+
+		// 只渲染阳光
+		_, isSun := s.entityManager.GetComponent(id, reflect.TypeOf(&components.SunComponent{}))
+		if !isSun {
+			continue
+		}
+
+		s.drawEntity(screen, id, cameraX)
 	}
 }
 
@@ -79,9 +107,8 @@ func (s *RenderSystem) Draw(screen *ebiten.Image, cameraX float64) {
 // 参数:
 //   - screen: 绘制目标屏幕
 //   - id: 实体ID
-//   - isPlant: 是否为植物（保留参数，暂未使用）
 //   - cameraX: 摄像机的世界坐标X位置
-func (s *RenderSystem) drawEntity(screen *ebiten.Image, id ecs.EntityID, isPlant bool, cameraX float64) {
+func (s *RenderSystem) drawEntity(screen *ebiten.Image, id ecs.EntityID, cameraX float64) {
 	// 获取组件
 	posComp, _ := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PositionComponent{}))
 	spriteComp, _ := s.entityManager.GetComponent(id, reflect.TypeOf(&components.SpriteComponent{}))

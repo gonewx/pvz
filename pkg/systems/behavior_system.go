@@ -105,10 +105,6 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 		case components.BehaviorSunflower:
 			s.handleSunflowerBehavior(entityID, deltaTime)
 		case components.BehaviorPeashooter:
-			// DEBUG: 检查豌豆射手是否被处理
-			if s.logFrameCounter%60 == 1 {
-				log.Printf("[BehaviorSystem] 处理豌豆射手 %d 攻击逻辑", entityID)
-			}
 			s.handlePeashooterBehavior(entityID, deltaTime, allZombieEntityList)
 		default:
 			// 未知行为类型，忽略
@@ -650,9 +646,6 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 
 	// 更新计时器
 	timer.CurrentTime += deltaTime
-
-	log.Printf("[BehaviorSystem] 僵尸 %d 啃食计时器: %.2f/%.2f 秒, IsReady=%v",
-		entityID, timer.CurrentTime, timer.TargetTime, timer.IsReady)
 
 	// 检查计时器是否完成
 	if timer.CurrentTime >= timer.TargetTime {
