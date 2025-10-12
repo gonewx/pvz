@@ -180,3 +180,223 @@ func TestNewZombieEntity_ErrorHandling(t *testing.T) {
 		})
 	}
 }
+
+// TestNewConeheadZombieEntity 测试路障僵尸实体创建
+func TestNewConeheadZombieEntity(t *testing.T) {
+	// 初始化资源管理器和实体管理器
+	rm := game.NewResourceManager(testAudioContext)
+	em := ecs.NewEntityManager()
+
+	tests := []struct {
+		name    string
+		row     int
+		spawnX  float64
+		wantErr bool
+	}{
+		{
+			name:    "创建路障僵尸在第0行",
+			row:     0,
+			spawnX:  1450.0,
+			wantErr: false,
+		},
+		{
+			name:    "创建路障僵尸在第2行",
+			row:     2,
+			spawnX:  1500.0,
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// 创建路障僵尸实体
+			zombieID, err := NewConeheadZombieEntity(em, rm, tt.row, tt.spawnX)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("NewConeheadZombieEntity() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if tt.wantErr {
+				return
+			}
+
+			if zombieID == 0 {
+				t.Fatal("Expected valid entity ID, got 0")
+			}
+
+			// 验证 BehaviorComponent
+			behaviorComp, ok := em.GetComponent(zombieID, reflect.TypeOf(&components.BehaviorComponent{}))
+			if !ok {
+				t.Error("Conehead zombie entity should have BehaviorComponent")
+			} else {
+				behavior := behaviorComp.(*components.BehaviorComponent)
+				if behavior.Type != components.BehaviorZombieConehead {
+					t.Errorf("Expected BehaviorZombieConehead, got %v", behavior.Type)
+				}
+			}
+
+			// 验证 ArmorComponent (关键特性)
+			armorComp, ok := em.GetComponent(zombieID, reflect.TypeOf(&components.ArmorComponent{}))
+			if !ok {
+				t.Error("Conehead zombie entity should have ArmorComponent")
+			} else {
+				armor := armorComp.(*components.ArmorComponent)
+				if armor.CurrentArmor != config.ConeheadZombieArmorHealth {
+					t.Errorf("Expected CurrentArmor %d, got %d", config.ConeheadZombieArmorHealth, armor.CurrentArmor)
+				}
+				if armor.MaxArmor != config.ConeheadZombieArmorHealth {
+					t.Errorf("Expected MaxArmor %d, got %d", config.ConeheadZombieArmorHealth, armor.MaxArmor)
+				}
+			}
+
+			// 验证 HealthComponent (身体生命值)
+			healthComp, ok := em.GetComponent(zombieID, reflect.TypeOf(&components.HealthComponent{}))
+			if !ok {
+				t.Error("Conehead zombie entity should have HealthComponent")
+			} else {
+				health := healthComp.(*components.HealthComponent)
+				if health.CurrentHealth != config.ZombieDefaultHealth {
+					t.Errorf("Expected CurrentHealth %d, got %d", config.ZombieDefaultHealth, health.CurrentHealth)
+				}
+				if health.MaxHealth != config.ZombieDefaultHealth {
+					t.Errorf("Expected MaxHealth %d, got %d", config.ZombieDefaultHealth, health.MaxHealth)
+				}
+			}
+
+			// 验证 AnimationComponent (路障僵尸21帧)
+			animComp, ok := em.GetComponent(zombieID, reflect.TypeOf(&components.AnimationComponent{}))
+			if !ok {
+				t.Error("Conehead zombie entity should have AnimationComponent")
+			} else {
+				anim := animComp.(*components.AnimationComponent)
+				if len(anim.Frames) != config.ConeheadZombieWalkAnimationFrames {
+					t.Errorf("Expected %d animation frames, got %d", config.ConeheadZombieWalkAnimationFrames, len(anim.Frames))
+				}
+			}
+		})
+	}
+}
+
+// TestNewBucketheadZombieEntity 测试铁桶僵尸实体创建
+func TestNewBucketheadZombieEntity(t *testing.T) {
+	// 初始化资源管理器和实体管理器
+	rm := game.NewResourceManager(testAudioContext)
+	em := ecs.NewEntityManager()
+
+	tests := []struct {
+		name    string
+		row     int
+		spawnX  float64
+		wantErr bool
+	}{
+		{
+			name:    "创建铁桶僵尸在第0行",
+			row:     0,
+			spawnX:  1450.0,
+			wantErr: false,
+		},
+		{
+			name:    "创建铁桶僵尸在第4行",
+			row:     4,
+			spawnX:  1500.0,
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// 创建铁桶僵尸实体
+			zombieID, err := NewBucketheadZombieEntity(em, rm, tt.row, tt.spawnX)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("NewBucketheadZombieEntity() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if tt.wantErr {
+				return
+			}
+
+			if zombieID == 0 {
+				t.Fatal("Expected valid entity ID, got 0")
+			}
+
+			// 验证 BehaviorComponent
+			behaviorComp, ok := em.GetComponent(zombieID, reflect.TypeOf(&components.BehaviorComponent{}))
+			if !ok {
+				t.Error("Buckethead zombie entity should have BehaviorComponent")
+			} else {
+				behavior := behaviorComp.(*components.BehaviorComponent)
+				if behavior.Type != components.BehaviorZombieBuckethead {
+					t.Errorf("Expected BehaviorZombieBuckethead, got %v", behavior.Type)
+				}
+			}
+
+			// 验证 ArmorComponent (关键特性)
+			armorComp, ok := em.GetComponent(zombieID, reflect.TypeOf(&components.ArmorComponent{}))
+			if !ok {
+				t.Error("Buckethead zombie entity should have ArmorComponent")
+			} else {
+				armor := armorComp.(*components.ArmorComponent)
+				if armor.CurrentArmor != config.BucketheadZombieArmorHealth {
+					t.Errorf("Expected CurrentArmor %d, got %d", config.BucketheadZombieArmorHealth, armor.CurrentArmor)
+				}
+				if armor.MaxArmor != config.BucketheadZombieArmorHealth {
+					t.Errorf("Expected MaxArmor %d, got %d", config.BucketheadZombieArmorHealth, armor.MaxArmor)
+				}
+			}
+
+			// 验证 HealthComponent (身体生命值)
+			healthComp, ok := em.GetComponent(zombieID, reflect.TypeOf(&components.HealthComponent{}))
+			if !ok {
+				t.Error("Buckethead zombie entity should have HealthComponent")
+			} else {
+				health := healthComp.(*components.HealthComponent)
+				if health.CurrentHealth != config.ZombieDefaultHealth {
+					t.Errorf("Expected CurrentHealth %d, got %d", config.ZombieDefaultHealth, health.CurrentHealth)
+				}
+				if health.MaxHealth != config.ZombieDefaultHealth {
+					t.Errorf("Expected MaxHealth %d, got %d", config.ZombieDefaultHealth, health.MaxHealth)
+				}
+			}
+
+			// 验证 AnimationComponent (铁桶僵尸15帧)
+			animComp, ok := em.GetComponent(zombieID, reflect.TypeOf(&components.AnimationComponent{}))
+			if !ok {
+				t.Error("Buckethead zombie entity should have AnimationComponent")
+			} else {
+				anim := animComp.(*components.AnimationComponent)
+				if len(anim.Frames) != config.BucketheadZombieWalkAnimationFrames {
+					t.Errorf("Expected %d animation frames, got %d", config.BucketheadZombieWalkAnimationFrames, len(anim.Frames))
+				}
+			}
+		})
+	}
+}
+
+// TestConeheadZombieTotalHealth 测试路障僵尸总有效生命值
+func TestConeheadZombieTotalHealth(t *testing.T) {
+	// 路障僵尸总生命值 = 护甲值 + 身体生命值
+	expectedTotal := config.ConeheadZombieArmorHealth + config.ZombieDefaultHealth
+	actualTotal := 370 + 270 // 根据配置
+
+	if actualTotal != 640 {
+		t.Errorf("路障僵尸总生命值应为640，实际为 %d", actualTotal)
+	}
+
+	if expectedTotal != 640 {
+		t.Errorf("配置中路障僵尸总生命值应为640，实际为 %d", expectedTotal)
+	}
+}
+
+// TestBucketheadZombieTotalHealth 测试铁桶僵尸总有效生命值
+func TestBucketheadZombieTotalHealth(t *testing.T) {
+	// 铁桶僵尸总生命值 = 护甲值 + 身体生命值
+	expectedTotal := config.BucketheadZombieArmorHealth + config.ZombieDefaultHealth
+	actualTotal := 1100 + 270 // 根据配置
+
+	if actualTotal != 1370 {
+		t.Errorf("铁桶僵尸总生命值应为1370，实际为 %d", actualTotal)
+	}
+
+	if expectedTotal != 1370 {
+		t.Errorf("配置中铁桶僵尸总生命值应为1370，实际为 %d", expectedTotal)
+	}
+}

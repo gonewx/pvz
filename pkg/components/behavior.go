@@ -23,6 +23,12 @@ const (
 	// 坚果墙拥有极高的生命值(4000)，用于阻挡僵尸前进
 	// 外观状态：完好(>66%) → 轻伤(33-66%) → 重伤(<33%)
 	BehaviorWallnut
+	// BehaviorZombieConehead 路障僵尸行为：带护甲的僵尸，拥有额外的防护层(370护甲值)
+	// 当护甲被完全破坏后，外观切换为普通僵尸，行为转变为 BehaviorZombieBasic
+	BehaviorZombieConehead
+	// BehaviorZombieBuckethead 铁桶僵尸行为：带高强度护甲的僵尸(1100护甲值)
+	// 当护甲被完全破坏后，外观切换为普通僵尸，行为转变为 BehaviorZombieBasic
+	BehaviorZombieBuckethead
 )
 
 // BehaviorComponent 标识实体的行为类型

@@ -123,6 +123,10 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 		switch behavior.Type {
 		case components.BehaviorZombieBasic:
 			s.handleZombieBasicBehavior(entityID, deltaTime)
+		case components.BehaviorZombieConehead:
+			s.handleConeheadZombieBehavior(entityID, deltaTime)
+		case components.BehaviorZombieBuckethead:
+			s.handleBucketheadZombieBehavior(entityID, deltaTime)
 		default:
 			// 未知僵尸类型，忽略
 		}
@@ -803,4 +807,110 @@ func (s *BehaviorSystem) handleWallnutBehavior(entityID ecs.EntityID) {
 	anim.Frames = targetFrames
 	anim.CurrentFrame = 0
 	anim.FrameCounter = 0
+}
+
+// handleConeheadZombieBehavior 处理路障僵尸的行为逻辑
+// 路障僵尸拥有护甲层，护甲耗尽后切换为普通僵尸外观和行为
+func (s *BehaviorSystem) handleConeheadZombieBehavior(entityID ecs.EntityID, deltaTime float64) {
+	// 首先检查护甲状态
+	armorComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ArmorComponent{}))
+	if !ok {
+		// 没有护甲组件（不应该发生），退化为普通僵尸行为
+		log.Printf("[BehaviorSystem] 警告：路障僵尸 %d 缺少 ArmorComponent，转为普通僵尸", entityID)
+		s.handleZombieBasicBehavior(entityID, deltaTime)
+		return
+	}
+
+	armor := armorComp.(*components.ArmorComponent)
+
+	// 如果护甲已破坏，切换为普通僵尸
+	if armor.CurrentArmor <= 0 {
+		// 检查是否已经切换过（避免每帧都触发）
+		behaviorComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.BehaviorComponent{}))
+		if ok {
+			behavior := behaviorComp.(*components.BehaviorComponent)
+			if behavior.Type == components.BehaviorZombieConehead {
+				// 首次护甲破坏，执行切换
+				log.Printf("[BehaviorSystem] 路障僵尸 %d 护甲破坏，切换为普通僵尸", entityID)
+
+				// 1. 改变行为类型为普通僵尸
+				behavior.Type = components.BehaviorZombieBasic
+
+				// 2. 切换动画为普通僵尸走路动画
+				animComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.AnimationComponent{}))
+				if ok {
+					anim := animComp.(*components.AnimationComponent)
+					// 加载普通僵尸走路动画
+					zombieFrames := utils.LoadZombieWalkAnimation(s.resourceManager)
+					anim.Frames = zombieFrames
+					anim.CurrentFrame = 0
+					anim.FrameCounter = 0
+					log.Printf("[BehaviorSystem] 路障僵尸 %d 已切换为普通僵尸动画（%d帧）", entityID, len(zombieFrames))
+				}
+
+				// 3. 移除护甲组件（可选，但保留可能对调试有帮助）
+				// s.entityManager.RemoveComponent(entityID, reflect.TypeOf(&components.ArmorComponent{}))
+			}
+		}
+
+		// 护甲已破坏，继续以普通僵尸行为运作
+		s.handleZombieBasicBehavior(entityID, deltaTime)
+		return
+	}
+
+	// 护甲完好，执行普通僵尸的基本行为（移动、碰撞检测、啃食植物）
+	s.handleZombieBasicBehavior(entityID, deltaTime)
+}
+
+// handleBucketheadZombieBehavior 处理铁桶僵尸的行为逻辑
+// 铁桶僵尸拥有更高的护甲层，护甲耗尽后切换为普通僵尸外观和行为
+func (s *BehaviorSystem) handleBucketheadZombieBehavior(entityID ecs.EntityID, deltaTime float64) {
+	// 首先检查护甲状态
+	armorComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ArmorComponent{}))
+	if !ok {
+		// 没有护甲组件（不应该发生），退化为普通僵尸行为
+		log.Printf("[BehaviorSystem] 警告：铁桶僵尸 %d 缺少 ArmorComponent，转为普通僵尸", entityID)
+		s.handleZombieBasicBehavior(entityID, deltaTime)
+		return
+	}
+
+	armor := armorComp.(*components.ArmorComponent)
+
+	// 如果护甲已破坏，切换为普通僵尸
+	if armor.CurrentArmor <= 0 {
+		// 检查是否已经切换过（避免每帧都触发）
+		behaviorComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.BehaviorComponent{}))
+		if ok {
+			behavior := behaviorComp.(*components.BehaviorComponent)
+			if behavior.Type == components.BehaviorZombieBuckethead {
+				// 首次护甲破坏，执行切换
+				log.Printf("[BehaviorSystem] 铁桶僵尸 %d 护甲破坏，切换为普通僵尸", entityID)
+
+				// 1. 改变行为类型为普通僵尸
+				behavior.Type = components.BehaviorZombieBasic
+
+				// 2. 切换动画为普通僵尸走路动画
+				animComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.AnimationComponent{}))
+				if ok {
+					anim := animComp.(*components.AnimationComponent)
+					// 加载普通僵尸走路动画
+					zombieFrames := utils.LoadZombieWalkAnimation(s.resourceManager)
+					anim.Frames = zombieFrames
+					anim.CurrentFrame = 0
+					anim.FrameCounter = 0
+					log.Printf("[BehaviorSystem] 铁桶僵尸 %d 已切换为普通僵尸动画（%d帧）", entityID, len(zombieFrames))
+				}
+
+				// 3. 移除护甲组件（可选，但保留可能对调试有帮助）
+				// s.entityManager.RemoveComponent(entityID, reflect.TypeOf(&components.ArmorComponent{}))
+			}
+		}
+
+		// 护甲已破坏，继续以普通僵尸行为运作
+		s.handleZombieBasicBehavior(entityID, deltaTime)
+		return
+	}
+
+	// 护甲完好，执行普通僵尸的基本行为（移动、碰撞检测、啃食植物）
+	s.handleZombieBasicBehavior(entityID, deltaTime)
 }

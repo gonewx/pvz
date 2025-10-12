@@ -329,24 +329,42 @@ func (s *GameScene) Update(deltaTime float64) {
 	// 同步摄像机位置到全局状态（供所有系统使用）
 	s.gameState.CameraX = s.cameraX
 
-	// Story 4.1: Test zombie spawn (临时测试代码)
-	// 在游戏开始后3秒，在第3行生成一个测试僵尸
+	// Story 4.1 & 5.3: Test zombie spawn (临时测试代码)
+	// 在游戏开始后4秒，生成多种类型的测试僵尸
 	if !s.testZombieSpawned {
 		s.testZombieTimer += deltaTime
 		if s.testZombieTimer >= 4.0 { // 改为4秒，让豌豆射手先种植
 			// 计算生成位置：屏幕右侧外约50像素
-			// 背景宽度1400px，游戏开始时摄像机在215px，屏幕宽度800px
-			// 僵尸应该生成在摄像机可见范围外的右侧
 			spawnX := s.cameraX + WindowWidth + 50.0 // 屏幕右侧外50像素
-			row := 2                                 // 第3行（索引从0开始）
 
-			log.Printf("[GameScene] 生成测试僵尸：行=%d, 世界X坐标=%.1f", row, spawnX)
-			zombieID, err := entities.NewZombieEntity(s.entityManager, s.resourceManager, row, spawnX)
+			// Story 5.3: 生成三种不同类型的僵尸进行测试
+			// 第1行: 普通僵尸
+			log.Printf("[GameScene] 生成普通僵尸：行=0")
+			zombieID1, err := entities.NewZombieEntity(s.entityManager, s.resourceManager, 0, spawnX)
 			if err != nil {
-				log.Printf("[GameScene] 生成僵尸失败: %v", err)
+				log.Printf("[GameScene] 生成普通僵尸失败: %v", err)
 			} else {
-				log.Printf("[GameScene] 成功生成测试僵尸 (ID: %d)", zombieID)
+				log.Printf("[GameScene] 成功生成普通僵尸 (ID: %d)", zombieID1)
 			}
+
+			// 第2行: 路障僵尸 (Conehead)
+			log.Printf("[GameScene] 生成路障僵尸：行=1")
+			zombieID2, err := entities.NewConeheadZombieEntity(s.entityManager, s.resourceManager, 1, spawnX)
+			if err != nil {
+				log.Printf("[GameScene] 生成路障僵尸失败: %v", err)
+			} else {
+				log.Printf("[GameScene] 成功生成路障僵尸 (ID: %d, 护甲370+生命270=640总HP)", zombieID2)
+			}
+
+			// 第3行: 铁桶僵尸 (Buckethead)
+			log.Printf("[GameScene] 生成铁桶僵尸：行=2")
+			zombieID3, err := entities.NewBucketheadZombieEntity(s.entityManager, s.resourceManager, 2, spawnX)
+			if err != nil {
+				log.Printf("[GameScene] 生成铁桶僵尸失败: %v", err)
+			} else {
+				log.Printf("[GameScene] 成功生成铁桶僵尸 (ID: %d, 护甲1100+生命270=1370总HP)", zombieID3)
+			}
+
 			s.testZombieSpawned = true
 		}
 	}

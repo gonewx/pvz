@@ -39,6 +39,26 @@ const (
 
 	// ZombieDieFrameSpeed 僵尸死亡动画的帧速率（秒/帧）
 	ZombieDieFrameSpeed = 0.1
+
+	// ConeheadZombieArmorHealth 路障僵尸护甲值
+	// 路障僵尸拥有370点护甲，护甲破坏后变为普通僵尸
+	ConeheadZombieArmorHealth = 370
+
+	// ConeheadZombieWalkAnimationFrames 路障僵尸走路动画帧数
+	ConeheadZombieWalkAnimationFrames = 21
+
+	// ConeheadZombieEatAnimationFrames 路障僵尸啃食动画帧数
+	ConeheadZombieEatAnimationFrames = 11
+
+	// BucketheadZombieArmorHealth 铁桶僵尸护甲值
+	// 铁桶僵尸拥有1100点护甲，护甲破坏后变为普通僵尸
+	BucketheadZombieArmorHealth = 1100
+
+	// BucketheadZombieWalkAnimationFrames 铁桶僵尸走路动画帧数
+	BucketheadZombieWalkAnimationFrames = 15
+
+	// BucketheadZombieEatAnimationFrames 铁桶僵尸啃食动画帧数
+	BucketheadZombieEatAnimationFrames = 11
 )
 
 // Projectile Configuration (子弹配置)
@@ -98,6 +118,10 @@ const (
 	//   3. 部署豌豆射手攻击僵尸，听音效是否合适
 	//   4. 选择最不突兀、最符合游戏风格的音效
 	ZombieHitSoundPath = "assets/audio/Sound/tap.ogg"
+
+	// ArmorBreakSoundPath 护甲破坏音效路径
+	// 当路障僵尸或铁桶僵尸的护甲被完全破坏时播放
+	ArmorBreakSoundPath = "assets/audio/Sound/shieldhit.ogg"
 
 	// PeashooterShootSoundPath 豌豆射手发射子弹的音效文件路径
 	//

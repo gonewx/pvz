@@ -93,8 +93,11 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 
 		if behavior.Type == components.BehaviorPeaProjectile {
 			bullets = append(bullets, entityID)
-		} else if behavior.Type == components.BehaviorZombieBasic || behavior.Type == components.BehaviorZombieEating {
-			// 包括移动中的僵尸和啃食中的僵尸
+		} else if behavior.Type == components.BehaviorZombieBasic ||
+			behavior.Type == components.BehaviorZombieEating ||
+			behavior.Type == components.BehaviorZombieConehead ||
+			behavior.Type == components.BehaviorZombieBuckethead {
+			// 包括移动中的僵尸和啃食中的僵尸（普通、路障、铁桶）
 			zombies = append(zombies, entityID)
 		}
 	}
@@ -140,15 +143,36 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 					// 这里为了简化，忽略错误
 				}
 
-				// 2. 播放击中音效（Story 4.4: AC 5）
-				ps.playHitSound()
-
-				// 3. 减少僵尸生命值（Story 4.4: 伤害计算）
-				zombieHealthComp, ok := ps.em.GetComponent(zombieID, reflect.TypeOf(&components.HealthComponent{}))
-				if ok {
-					zombieHealth := zombieHealthComp.(*components.HealthComponent)
-					zombieHealth.CurrentHealth -= config.PeaBulletDamage
-					// 注意：生命值可以降到负数，BehaviorSystem 会检查 <= 0 的情况
+				// 2. 处理护甲伤害（Story 5.3: 优先扣除护甲值）
+				armorComp, hasArmor := ps.em.GetComponent(zombieID, reflect.TypeOf(&components.ArmorComponent{}))
+				if hasArmor {
+					armor := armorComp.(*components.ArmorComponent)
+					if armor.CurrentArmor > 0 {
+						// 有护甲且护甲未破坏，优先扣除护甲
+						armor.CurrentArmor -= config.PeaBulletDamage
+						// 播放击中护甲音效
+						ps.playArmorHitSound()
+						// 注意：护甲可以降到负数，BehaviorSystem 会检查 <= 0 的情况并处理护甲破坏
+					} else {
+						// 护甲已破坏，扣除身体生命值
+						zombieHealthComp, ok := ps.em.GetComponent(zombieID, reflect.TypeOf(&components.HealthComponent{}))
+						if ok {
+							zombieHealth := zombieHealthComp.(*components.HealthComponent)
+							zombieHealth.CurrentHealth -= config.PeaBulletDamage
+						}
+						// 播放击中身体音效
+						ps.playHitSound()
+					}
+				} else {
+					// 3. 没有护甲，直接减少僵尸生命值（Story 4.4: 伤害计算）
+					zombieHealthComp, ok := ps.em.GetComponent(zombieID, reflect.TypeOf(&components.HealthComponent{}))
+					if ok {
+						zombieHealth := zombieHealthComp.(*components.HealthComponent)
+						zombieHealth.CurrentHealth -= config.PeaBulletDamage
+						// 注意：生命值可以降到负数，BehaviorSystem 会检查 <= 0 的情况
+					}
+					// 播放击中身体音效
+					ps.playHitSound()
 				}
 
 				// 4. 标记子弹实体待删除
@@ -179,4 +203,22 @@ func (ps *PhysicsSystem) playHitSound() {
 
 	// 播放音效
 	hitSound.Play()
+}
+
+// playArmorHitSound 播放子弹击中护甲的音效
+// 使用配置文件中定义的音效（config.ArmorBreakSoundPath）
+// 用于路障僵尸和铁桶僵尸受到攻击时
+func (ps *PhysicsSystem) playArmorHitSound() {
+	// 加载击中护甲音效（如果已加载，会返回缓存的播放器）
+	armorSound, err := ps.rm.LoadSoundEffect(config.ArmorBreakSoundPath)
+	if err != nil {
+		// 音效加载失败时不阻止游戏继续运行
+		return
+	}
+
+	// 重置播放器位置到开头（允许快速连续播放）
+	armorSound.Rewind()
+
+	// 播放音效
+	armorSound.Play()
 }

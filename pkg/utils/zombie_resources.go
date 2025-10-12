@@ -79,3 +79,87 @@ func LoadZombieDeathAnimation(rm *game.ResourceManager) ([]*ebiten.Image, error)
 
 	return frames, nil
 }
+
+// LoadConeheadZombieWalkAnimation 加载路障僵尸走路动画帧序列
+// 从 assets/images/Zombies/ConeheadZombie/ConeheadZombie_*.png 加载所有走路动画帧
+// 返回:
+//   - []*ebiten.Image: 动画帧数组
+//   - error: 加载过程中的任何错误
+func LoadConeheadZombieWalkAnimation(rm *game.ResourceManager) ([]*ebiten.Image, error) {
+	frames := make([]*ebiten.Image, config.ConeheadZombieWalkAnimationFrames)
+
+	for i := 0; i < config.ConeheadZombieWalkAnimationFrames; i++ {
+		// 资源路径：assets/images/Zombies/ConeheadZombie/ConeheadZombie_1.png, ..., ConeheadZombie_21.png
+		framePath := fmt.Sprintf("assets/images/Zombies/ConeheadZombie/ConeheadZombie_%d.png", i+1)
+		frameImage, err := rm.LoadImage(framePath)
+		if err != nil {
+			return nil, fmt.Errorf("加载路障僵尸走路动画帧 %d 失败: %w", i+1, err)
+		}
+		frames[i] = frameImage
+	}
+
+	return frames, nil
+}
+
+// LoadConeheadZombieEatAnimation 加载路障僵尸啃食动画帧序列
+// 从 assets/images/Zombies/ConeheadZombie/ConeheadZombieAttack_*.png 加载所有啃食动画帧
+// 返回:
+//   - []*ebiten.Image: 动画帧数组
+//   - error: 加载过程中的任何错误
+func LoadConeheadZombieEatAnimation(rm *game.ResourceManager) ([]*ebiten.Image, error) {
+	frames := make([]*ebiten.Image, config.ConeheadZombieEatAnimationFrames)
+
+	for i := 0; i < config.ConeheadZombieEatAnimationFrames; i++ {
+		// 资源路径：assets/images/Zombies/ConeheadZombie/ConeheadZombieAttack_1.png, ..., ConeheadZombieAttack_11.png
+		framePath := fmt.Sprintf("assets/images/Zombies/ConeheadZombie/ConeheadZombieAttack_%d.png", i+1)
+		frameImage, err := rm.LoadImage(framePath)
+		if err != nil {
+			return nil, fmt.Errorf("加载路障僵尸啃食动画帧 %d 失败: %w", i+1, err)
+		}
+		frames[i] = frameImage
+	}
+
+	return frames, nil
+}
+
+// LoadBucketheadZombieWalkAnimation 加载铁桶僵尸走路动画帧序列
+// 从 assets/images/Zombies/BucketheadZombie/BucketheadZombie_*.png 加载所有走路动画帧
+// 返回:
+//   - []*ebiten.Image: 动画帧数组
+//   - error: 加载过程中的任何错误
+func LoadBucketheadZombieWalkAnimation(rm *game.ResourceManager) ([]*ebiten.Image, error) {
+	frames := make([]*ebiten.Image, config.BucketheadZombieWalkAnimationFrames)
+
+	for i := 0; i < config.BucketheadZombieWalkAnimationFrames; i++ {
+		// 资源路径：assets/images/Zombies/BucketheadZombie/BucketheadZombie_1.png, ..., BucketheadZombie_15.png
+		framePath := fmt.Sprintf("assets/images/Zombies/BucketheadZombie/BucketheadZombie_%d.png", i+1)
+		frameImage, err := rm.LoadImage(framePath)
+		if err != nil {
+			return nil, fmt.Errorf("加载铁桶僵尸走路动画帧 %d 失败: %w", i+1, err)
+		}
+		frames[i] = frameImage
+	}
+
+	return frames, nil
+}
+
+// LoadBucketheadZombieEatAnimation 加载铁桶僵尸啃食动画帧序列
+// 从 assets/images/Zombies/BucketheadZombie/BucketheadZombieAttack_*.png 加载所有啃食动画帧
+// 返回:
+//   - []*ebiten.Image: 动画帧数组
+//   - error: 加载过程中的任何错误
+func LoadBucketheadZombieEatAnimation(rm *game.ResourceManager) ([]*ebiten.Image, error) {
+	frames := make([]*ebiten.Image, config.BucketheadZombieEatAnimationFrames)
+
+	for i := 0; i < config.BucketheadZombieEatAnimationFrames; i++ {
+		// 资源路径：assets/images/Zombies/BucketheadZombie/BucketheadZombieAttack_1.png, ..., BucketheadZombieAttack_11.png
+		framePath := fmt.Sprintf("assets/images/Zombies/BucketheadZombie/BucketheadZombieAttack_%d.png", i+1)
+		frameImage, err := rm.LoadImage(framePath)
+		if err != nil {
+			return nil, fmt.Errorf("加载铁桶僵尸啃食动画帧 %d 失败: %w", i+1, err)
+		}
+		frames[i] = frameImage
+	}
+
+	return frames, nil
+}
