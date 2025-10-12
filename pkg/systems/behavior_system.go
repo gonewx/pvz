@@ -568,14 +568,18 @@ func (s *BehaviorSystem) startEatingPlant(zombieID, plantID ecs.EntityID) {
 	// 1. 移除僵尸的 VelocityComponent（停止移动）
 	s.entityManager.RemoveComponent(zombieID, reflect.TypeOf(&components.VelocityComponent{}))
 
-	// 2. 切换 BehaviorComponent.Type 为 BehaviorZombieEating
+	// 2. Story 5.3: 在切换类型之前，先记住原始僵尸类型（用于选择正确的啃食动画）
 	behaviorComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.BehaviorComponent{}))
-	if ok {
-		behavior := behaviorComp.(*components.BehaviorComponent)
-		behavior.Type = components.BehaviorZombieEating
+	if !ok {
+		return
 	}
+	behavior := behaviorComp.(*components.BehaviorComponent)
+	originalZombieType := behavior.Type // 记住原始类型
 
-	// 3. 添加 TimerComponent 用于伤害间隔
+	// 3. 切换 BehaviorComponent.Type 为 BehaviorZombieEating
+	behavior.Type = components.BehaviorZombieEating
+
+	// 4. 添加 TimerComponent 用于伤害间隔
 	s.entityManager.AddComponent(zombieID, &components.TimerComponent{
 		Name:        "eating_damage",
 		TargetTime:  config.ZombieEatingDamageInterval,
@@ -583,10 +587,24 @@ func (s *BehaviorSystem) startEatingPlant(zombieID, plantID ecs.EntityID) {
 		IsReady:     false,
 	})
 
-	// 4. 加载僵尸啃食动画帧序列
-	eatFrames := utils.LoadZombieEatAnimation(s.resourceManager)
+	// 5. Story 5.3: 根据原始僵尸类型加载对应的啃食动画
+	var eatFrames []*ebiten.Image
 
-	// 5. 替换 AnimationComponent 为啃食动画
+	switch originalZombieType {
+	case components.BehaviorZombieConehead:
+		// 路障僵尸啃食动画
+		eatFrames, _ = utils.LoadConeheadZombieEatAnimation(s.resourceManager)
+		log.Printf("[BehaviorSystem] 路障僵尸 %d 开始啃食，使用路障僵尸啃食动画", zombieID)
+	case components.BehaviorZombieBuckethead:
+		// 铁桶僵尸啃食动画
+		eatFrames, _ = utils.LoadBucketheadZombieEatAnimation(s.resourceManager)
+		log.Printf("[BehaviorSystem] 铁桶僵尸 %d 开始啃食，使用铁桶僵尸啃食动画", zombieID)
+	default:
+		// 普通僵尸或其他类型
+		eatFrames = utils.LoadZombieEatAnimation(s.resourceManager)
+	}
+
+	// 6. 替换 AnimationComponent 为啃食动画
 	animComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.AnimationComponent{}))
 	if ok {
 		anim := animComp.(*components.AnimationComponent)
