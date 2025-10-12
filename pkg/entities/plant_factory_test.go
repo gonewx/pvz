@@ -196,3 +196,55 @@ func TestNewPlantEntity_PositionCalculation(t *testing.T) {
 		})
 	}
 }
+
+// TestPlantHasHealthComponent 测试植物实体包含生命值组件
+func TestPlantHasHealthComponent(t *testing.T) {
+	rm := game.NewResourceManager(testAudioContext)
+	em := ecs.NewEntityManager()
+	gs := game.GetGameState()
+	gs.CameraX = 215
+
+	tests := []struct {
+		name           string
+		plantType      components.PlantType
+		expectedHealth int
+	}{
+		{
+			name:           "向日葵拥有生命值",
+			plantType:      components.PlantSunflower,
+			expectedHealth: config.SunflowerDefaultHealth,
+		},
+		{
+			name:           "豌豆射手拥有生命值",
+			plantType:      components.PlantPeashooter,
+			expectedHealth: config.PeashooterDefaultHealth,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// 创建植物实体
+			plantID, err := NewPlantEntity(em, rm, gs, tt.plantType, 4, 2)
+			if err != nil {
+				t.Fatalf("Failed to create plant: %v", err)
+			}
+
+			// 验证 HealthComponent 存在
+			healthComp, ok := em.GetComponent(plantID, reflect.TypeOf(&components.HealthComponent{}))
+			if !ok {
+				t.Fatal("Plant entity should have HealthComponent")
+			}
+
+			// 验证生命值正确初始化
+			health := healthComp.(*components.HealthComponent)
+			if health.CurrentHealth != tt.expectedHealth {
+				t.Errorf("CurrentHealth mismatch: got %d, want %d",
+					health.CurrentHealth, tt.expectedHealth)
+			}
+			if health.MaxHealth != tt.expectedHealth {
+				t.Errorf("MaxHealth mismatch: got %d, want %d",
+					health.MaxHealth, tt.expectedHealth)
+			}
+		})
+	}
+}

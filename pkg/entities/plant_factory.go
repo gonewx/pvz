@@ -63,6 +63,12 @@ func NewPlantEntity(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.Ga
 
 	// 为向日葵添加特定组件
 	if plantType == components.PlantSunflower {
+		// 添加生命值组件
+		em.AddComponent(entityID, &components.HealthComponent{
+			CurrentHealth: config.SunflowerDefaultHealth,
+			MaxHealth:     config.SunflowerDefaultHealth,
+		})
+
 		// 添加行为组件
 		em.AddComponent(entityID, &components.BehaviorComponent{
 			Type: components.BehaviorSunflower,
@@ -101,6 +107,12 @@ func NewPlantEntity(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.Ga
 
 	// 为豌豆射手添加特定组件
 	if plantType == components.PlantPeashooter {
+		// 添加生命值组件
+		em.AddComponent(entityID, &components.HealthComponent{
+			CurrentHealth: config.PeashooterDefaultHealth,
+			MaxHealth:     config.PeashooterDefaultHealth,
+		})
+
 		// 添加行为组件
 		em.AddComponent(entityID, &components.BehaviorComponent{
 			Type: components.BehaviorPeashooter,

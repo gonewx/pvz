@@ -512,7 +512,7 @@ func TestZombieDeathTrigger(t *testing.T) {
 		VY: 0.0,
 	})
 	em.AddComponent(zombieID, &components.HealthComponent{
-		CurrentHealth: 1,  // 生命值只有 1
+		CurrentHealth: 1, // 生命值只有 1
 		MaxHealth:     270,
 	})
 	// 添加动画组件（用于死亡动画）

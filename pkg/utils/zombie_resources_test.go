@@ -38,4 +38,3 @@ func TestLoadZombieDeathAnimation(t *testing.T) {
 		}
 	}
 }
-

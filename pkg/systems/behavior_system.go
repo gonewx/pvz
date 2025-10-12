@@ -108,6 +108,8 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 		switch behavior.Type {
 		case components.BehaviorZombieBasic:
 			s.handleZombieBasicBehavior(entityID, deltaTime)
+		case components.BehaviorZombieEating:
+			s.handleZombieEatingBehavior(entityID, deltaTime)
 		default:
 			// 未知僵尸类型，忽略
 			// 注意：BehaviorZombieDying 在单独的 dyingZombieEntityList 中处理
@@ -251,6 +253,19 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 		return
 	}
 	position := positionComp.(*components.PositionComponent)
+
+	// Story 5.1: 检测植物碰撞（在移动之前）
+	// 计算僵尸所在格子
+	zombieCol := int((position.X - config.GridWorldStartX) / config.CellWidth)
+	zombieRow := int((position.Y - config.GridWorldStartY) / config.CellHeight)
+
+	// 检测是否与植物在同一格子
+	plantID, hasCollision := s.detectPlantCollision(zombieRow, zombieCol)
+	if hasCollision {
+		// 进入啃食状态
+		s.startEatingPlant(entityID, plantID)
+		return // 跳过移动逻辑
+	}
 
 	// 获取速度组件
 	velocityComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.VelocityComponent{}))
@@ -481,4 +496,204 @@ func (s *BehaviorSystem) playShootSound() {
 
 	// 播放音效
 	shootSound.Play()
+}
+
+// detectPlantCollision 检测僵尸是否与植物发生网格碰撞
+// 参数:
+//   - zombieRow: 僵尸所在行
+//   - zombieCol: 僵尸所在列
+//
+// 返回:
+//   - ecs.EntityID: 植物实体ID（如果碰撞）
+//   - bool: 是否发生碰撞
+func (s *BehaviorSystem) detectPlantCollision(zombieRow, zombieCol int) (ecs.EntityID, bool) {
+	// 查询所有植物实体（拥有 PlantComponent）
+	plantEntityList := s.entityManager.GetEntitiesWith(
+		reflect.TypeOf(&components.PlantComponent{}),
+	)
+
+	// 遍历所有植物，比对网格位置
+	for _, plantID := range plantEntityList {
+		plantComp, ok := s.entityManager.GetComponent(plantID, reflect.TypeOf(&components.PlantComponent{}))
+		if !ok {
+			continue
+		}
+
+		plant := plantComp.(*components.PlantComponent)
+
+		// 检查是否在同一格子
+		if plant.GridRow == zombieRow && plant.GridCol == zombieCol {
+			return plantID, true
+		}
+	}
+
+	// 没有找到植物
+	return 0, false
+}
+
+// startEatingPlant 开始啃食植物
+// 参数:
+//   - zombieID: 僵尸实体ID
+//   - plantID: 植物实体ID
+func (s *BehaviorSystem) startEatingPlant(zombieID, plantID ecs.EntityID) {
+	log.Printf("[BehaviorSystem] 僵尸 %d 开始啃食植物 %d", zombieID, plantID)
+
+	// 1. 移除僵尸的 VelocityComponent（停止移动）
+	s.entityManager.RemoveComponent(zombieID, reflect.TypeOf(&components.VelocityComponent{}))
+
+	// 2. 切换 BehaviorComponent.Type 为 BehaviorZombieEating
+	behaviorComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.BehaviorComponent{}))
+	if ok {
+		behavior := behaviorComp.(*components.BehaviorComponent)
+		behavior.Type = components.BehaviorZombieEating
+	}
+
+	// 3. 添加 TimerComponent 用于伤害间隔
+	s.entityManager.AddComponent(zombieID, &components.TimerComponent{
+		Name:        "eating_damage",
+		TargetTime:  config.ZombieEatingDamageInterval,
+		CurrentTime: 0,
+		IsReady:     false,
+	})
+
+	// 4. 加载僵尸啃食动画帧序列
+	eatFrames := utils.LoadZombieEatAnimation(s.resourceManager)
+
+	// 5. 替换 AnimationComponent 为啃食动画
+	animComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.AnimationComponent{}))
+	if ok {
+		anim := animComp.(*components.AnimationComponent)
+		anim.Frames = eatFrames
+		anim.FrameSpeed = config.ZombieEatFrameSpeed
+		anim.CurrentFrame = 0
+		anim.FrameCounter = 0
+		anim.IsLooping = true
+		anim.IsFinished = false
+	}
+}
+
+// stopEatingAndResume 停止啃食并恢复移动
+// 参数:
+//   - zombieID: 僵尸实体ID
+func (s *BehaviorSystem) stopEatingAndResume(zombieID ecs.EntityID) {
+	log.Printf("[BehaviorSystem] 僵尸 %d 结束啃食，恢复移动", zombieID)
+
+	// 1. 移除 TimerComponent
+	s.entityManager.RemoveComponent(zombieID, reflect.TypeOf(&components.TimerComponent{}))
+
+	// 2. 切换 BehaviorComponent.Type 回 BehaviorZombieBasic
+	behaviorComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.BehaviorComponent{}))
+	if ok {
+		behavior := behaviorComp.(*components.BehaviorComponent)
+		behavior.Type = components.BehaviorZombieBasic
+	}
+
+	// 3. 恢复 VelocityComponent
+	s.entityManager.AddComponent(zombieID, &components.VelocityComponent{
+		VX: config.ZombieWalkSpeed,
+		VY: 0,
+	})
+
+	// 4. 加载僵尸走路动画帧序列
+	walkFrames := utils.LoadZombieWalkAnimation(s.resourceManager)
+
+	// 5. 替换 AnimationComponent 为走路动画
+	animComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.AnimationComponent{}))
+	if ok {
+		anim := animComp.(*components.AnimationComponent)
+		anim.Frames = walkFrames
+		anim.FrameSpeed = config.ZombieWalkFrameSpeed
+		anim.CurrentFrame = 0
+		anim.FrameCounter = 0
+		anim.IsLooping = true
+		anim.IsFinished = false
+	}
+}
+
+// handleZombieEatingBehavior 处理僵尸啃食植物的行为
+// 参数:
+//   - entityID: 僵尸实体ID
+//   - deltaTime: 帧间隔时间
+func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, deltaTime float64) {
+	// 获取僵尸的 TimerComponent
+	timerComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.TimerComponent{}))
+	if !ok {
+		// 没有计时器，恢复移动
+		s.stopEatingAndResume(entityID)
+		return
+	}
+	timer := timerComp.(*components.TimerComponent)
+
+	// 更新计时器
+	timer.CurrentTime += deltaTime
+
+	// 检查计时器是否完成
+	if timer.CurrentTime >= timer.TargetTime {
+		timer.IsReady = true
+	}
+
+	// 如果计时器完成，造成伤害
+	if timer.IsReady {
+		// 获取僵尸当前网格位置
+		posComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
+		if !ok {
+			return
+		}
+		pos := posComp.(*components.PositionComponent)
+
+		// 计算僵尸所在格子
+		zombieCol := int((pos.X - config.GridWorldStartX) / config.CellWidth)
+		zombieRow := int((pos.Y - config.GridWorldStartY) / config.CellHeight)
+
+		// 检测植物
+		plantID, hasPlant := s.detectPlantCollision(zombieRow, zombieCol)
+
+		if hasPlant {
+			// 植物存在，造成伤害
+			plantHealthComp, ok := s.entityManager.GetComponent(plantID, reflect.TypeOf(&components.HealthComponent{}))
+			if ok {
+				plantHealth := plantHealthComp.(*components.HealthComponent)
+				plantHealth.CurrentHealth -= config.ZombieEatingDamage
+
+				log.Printf("[BehaviorSystem] 僵尸 %d 啃食植物 %d，造成 %d 伤害，剩余生命值 %d",
+					entityID, plantID, config.ZombieEatingDamage, plantHealth.CurrentHealth)
+
+				// 播放啃食音效
+				s.playEatingSound()
+
+				// 检查植物是否死亡
+				if plantHealth.CurrentHealth <= 0 {
+					log.Printf("[BehaviorSystem] 植物 %d 被吃掉，删除实体", plantID)
+					s.entityManager.DestroyEntity(plantID)
+					// 恢复僵尸移动
+					s.stopEatingAndResume(entityID)
+					return
+				}
+			}
+		} else {
+			// 植物不存在（可能被其他僵尸吃掉），恢复移动
+			s.stopEatingAndResume(entityID)
+			return
+		}
+
+		// 重置计时器
+		timer.CurrentTime = 0
+		timer.IsReady = false
+	}
+}
+
+// playEatingSound 播放僵尸啃食音效
+func (s *BehaviorSystem) playEatingSound() {
+	// 加载啃食音效
+	eatingSound, err := s.resourceManager.LoadSoundEffect(config.ZombieEatingSoundPath)
+	if err != nil {
+		// 音效加载失败时不阻止游戏继续运行
+		return
+	}
+
+	// 重置播放器位置到开头
+	eatingSound.Rewind()
+
+	// 播放音效
+	eatingSound.Play()
 }

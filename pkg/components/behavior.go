@@ -15,6 +15,8 @@ const (
 	BehaviorPeaBulletHit
 	// BehaviorZombieBasic 普通僵尸行为：从右向左移动并攻击植物
 	BehaviorZombieBasic
+	// BehaviorZombieEating 僵尸啃食植物行为：停止移动，周期性对植物造成伤害
+	BehaviorZombieEating
 	// BehaviorZombieDying 僵尸死亡中：播放死亡动画，动画完成后删除实体
 	BehaviorZombieDying
 )

@@ -371,17 +371,17 @@ func (s *GameScene) Update(deltaTime float64) {
 	}
 
 	// Update all ECS systems in order (order matters for correct game logic)
-	s.plantCardSystem.Update(deltaTime)                // 1. Update plant card states (before input)
-	s.inputSystem.Update(deltaTime, s.cameraX)         // 2. Process player input (highest priority, 传递摄像机位置)
-	s.sunSpawnSystem.Update(deltaTime)                 // 3. Generate new suns
-	s.sunMovementSystem.Update(deltaTime)              // 4. Move suns (includes collection animation)
-	s.sunCollectionSystem.Update(deltaTime)            // 5. Check if collection is complete
-	s.behaviorSystem.Update(deltaTime)                  // 6. Update plant behaviors (Story 3.4)
-	s.physicsSystem.Update(deltaTime)                   // 7. Check collisions (Story 4.3)
-	s.animationSystem.Update(deltaTime)                 // 8. Update animation frames
-	s.plantPreviewSystem.Update(deltaTime)              // 9. Update plant preview position (Story 3.2)
-	s.lifetimeSystem.Update(deltaTime)                  // 10. Check for expired entities
-	s.entityManager.RemoveMarkedEntities()              // 11. Clean up deleted entities (always last)
+	s.plantCardSystem.Update(deltaTime)        // 1. Update plant card states (before input)
+	s.inputSystem.Update(deltaTime, s.cameraX) // 2. Process player input (highest priority, 传递摄像机位置)
+	s.sunSpawnSystem.Update(deltaTime)         // 3. Generate new suns
+	s.sunMovementSystem.Update(deltaTime)      // 4. Move suns (includes collection animation)
+	s.sunCollectionSystem.Update(deltaTime)    // 5. Check if collection is complete
+	s.behaviorSystem.Update(deltaTime)         // 6. Update plant behaviors (Story 3.4)
+	s.physicsSystem.Update(deltaTime)          // 7. Check collisions (Story 4.3)
+	s.animationSystem.Update(deltaTime)        // 8. Update animation frames
+	s.plantPreviewSystem.Update(deltaTime)     // 9. Update plant preview position (Story 3.2)
+	s.lifetimeSystem.Update(deltaTime)         // 10. Check for expired entities
+	s.entityManager.RemoveMarkedEntities()     // 11. Clean up deleted entities (always last)
 }
 
 // updateIntroAnimation updates the intro camera animation that showcases the entire lawn.

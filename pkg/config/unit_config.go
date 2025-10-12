@@ -142,3 +142,34 @@ const (
 	// SunflowerFrameSpeed 向日葵动画帧速率（秒/帧）
 	SunflowerFrameSpeed = 0.08
 )
+
+// Plant Health Configuration (植物生命值配置)
+const (
+	// SunflowerDefaultHealth 向日葵默认生命值
+	// 向日葵较脆弱，生命值较低
+	SunflowerDefaultHealth = 300
+
+	// PeashooterDefaultHealth 豌豆射手默认生命值
+	// 豌豆射手生命值略高于向日葵
+	PeashooterDefaultHealth = 300
+)
+
+// Zombie Eating Configuration (僵尸啃食配置)
+const (
+	// ZombieEatingDamage 僵尸每次啃食造成的伤害
+	ZombieEatingDamage = 100
+
+	// ZombieEatingDamageInterval 僵尸啃食伤害间隔（秒）
+	// 僵尸每 1.5 秒对植物造成一次伤害
+	ZombieEatingDamageInterval = 1.5
+
+	// ZombieEatAnimationFrames 僵尸啃食动画帧数
+	// 需要根据实际资源文件确定
+	ZombieEatAnimationFrames = 21
+
+	// ZombieEatFrameSpeed 僵尸啃食动画帧速率（秒/帧）
+	ZombieEatFrameSpeed = 0.1
+
+	// ZombieEatingSoundPath 僵尸啃食音效路径
+	ZombieEatingSoundPath = "assets/audio/Sound/chomp.ogg"
+)
