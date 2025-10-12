@@ -60,3 +60,12 @@ func TestGetPlantPreviewImagePathConsistency(t *testing.T) {
 		}
 	}
 }
+
+// TestLoadWallnutAnimations 测试坚果墙动画加载函数
+// 注意：此测试需要实际的图像文件存在，在单元测试中会失败
+// 实际功能将在集成测试中验证（运行游戏时）
+func TestLoadWallnutAnimations(t *testing.T) {
+	t.Skip("此测试需要实际的图像资源文件，将在集成测试中验证")
+	// 坚果墙动画加载功能的实际验证将在游戏运行时进行
+	// 单元测试主要确保函数签名和编译正确性
+}

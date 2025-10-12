@@ -18,15 +18,21 @@ func NewPlantCardEntity(em *ecs.EntityManager, rm *game.ResourceManager, plantTy
 	// 根据植物类型设置属性
 	var sunCost int
 	var imagePath string
-	cooldownTime := 7.5 // 所有植物冷却时间为 7.5 秒
+	var cooldownTime float64
 
 	switch plantType {
 	case components.PlantSunflower:
 		sunCost = 50
 		imagePath = "assets/images/Cards/card_sunFlower.png"
+		cooldownTime = 7.5
 	case components.PlantPeashooter:
 		sunCost = 100
 		imagePath = "assets/images/Cards/card_peashooter.png"
+		cooldownTime = 7.5
+	case components.PlantWallnut:
+		sunCost = 50
+		imagePath = "assets/images/Cards/card_wallnut.png"
+		cooldownTime = 30.0 // 坚果墙冷却时间为 30 秒
 	}
 
 	// 加载卡片图像

@@ -248,3 +248,173 @@ func TestPlantHasHealthComponent(t *testing.T) {
 		})
 	}
 }
+
+// TestNewWallnutEntity 测试坚果墙实体创建
+func TestNewWallnutEntity(t *testing.T) {
+	// 初始化资源管理器和实体管理器
+	rm := game.NewResourceManager(testAudioContext)
+	em := ecs.NewEntityManager()
+	gs := game.GetGameState()
+	gs.CameraX = 215
+
+	tests := []struct {
+		name string
+		col  int
+		row  int
+	}{
+		{
+			name: "创建坚果墙 (0,0)",
+			col:  0,
+			row:  0,
+		},
+		{
+			name: "创建坚果墙 (4,2)",
+			col:  4,
+			row:  2,
+		},
+		{
+			name: "创建坚果墙 (8,4)",
+			col:  8,
+			row:  4,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// 创建坚果墙实体
+			wallnutID, err := NewWallnutEntity(em, rm, gs, tt.col, tt.row)
+			if err != nil {
+				t.Fatalf("Failed to create wallnut entity: %v", err)
+			}
+
+			if wallnutID == 0 {
+				t.Fatal("Expected valid entity ID, got 0")
+			}
+
+			// 验证 PositionComponent
+			posComp, ok := em.GetComponent(wallnutID, reflect.TypeOf(&components.PositionComponent{}))
+			if !ok {
+				t.Error("Wallnut entity should have PositionComponent")
+			} else {
+				pos := posComp.(*components.PositionComponent)
+				expectedX := config.GridWorldStartX + float64(tt.col)*config.CellWidth + config.CellWidth/2
+				expectedY := config.GridWorldStartY + float64(tt.row)*config.CellHeight + config.CellHeight/2
+				if pos.X != expectedX || pos.Y != expectedY {
+					t.Errorf("Position mismatch: got (%.1f, %.1f), want (%.1f, %.1f)",
+						pos.X, pos.Y, expectedX, expectedY)
+				}
+			}
+
+			// 验证 SpriteComponent
+			spriteComp, ok := em.GetComponent(wallnutID, reflect.TypeOf(&components.SpriteComponent{}))
+			if !ok {
+				t.Error("Wallnut entity should have SpriteComponent")
+			} else {
+				sprite := spriteComp.(*components.SpriteComponent)
+				if sprite.Image == nil {
+					t.Error("SpriteComponent.Image should not be nil")
+				}
+			}
+
+			// 验证坐标符合网格位置
+			// 坚果墙不使用 LawnGridComponent，而是通过 PositionComponent 存储世界坐标
+
+			// 验证 HealthComponent（关键：坚果墙应有高生命值）
+			healthComp, ok := em.GetComponent(wallnutID, reflect.TypeOf(&components.HealthComponent{}))
+			if !ok {
+				t.Fatal("Wallnut entity should have HealthComponent")
+			} else {
+				health := healthComp.(*components.HealthComponent)
+				if health.CurrentHealth != config.WallnutDefaultHealth {
+					t.Errorf("CurrentHealth mismatch: got %d, want %d",
+						health.CurrentHealth, config.WallnutDefaultHealth)
+				}
+				if health.MaxHealth != config.WallnutDefaultHealth {
+					t.Errorf("MaxHealth mismatch: got %d, want %d",
+						health.MaxHealth, config.WallnutDefaultHealth)
+				}
+				// 验证坚果墙生命值远高于其他植物
+				if health.MaxHealth <= config.SunflowerDefaultHealth || health.MaxHealth <= config.PeashooterDefaultHealth {
+					t.Errorf("Wallnut health (%d) should be much higher than other plants (Sunflower: %d, Peashooter: %d)",
+						health.MaxHealth, config.SunflowerDefaultHealth, config.PeashooterDefaultHealth)
+				}
+			}
+
+			// 验证 BehaviorComponent（行为类型应为 BehaviorWallnut）
+			behaviorComp, ok := em.GetComponent(wallnutID, reflect.TypeOf(&components.BehaviorComponent{}))
+			if !ok {
+				t.Fatal("Wallnut entity should have BehaviorComponent")
+			} else {
+				behavior := behaviorComp.(*components.BehaviorComponent)
+				if behavior.Type != components.BehaviorWallnut {
+					t.Errorf("BehaviorType mismatch: got %v, want %v",
+						behavior.Type, components.BehaviorWallnut)
+				}
+			}
+
+			// 验证 AnimationComponent
+			animComp, ok := em.GetComponent(wallnutID, reflect.TypeOf(&components.AnimationComponent{}))
+			if !ok {
+				t.Fatal("Wallnut entity should have AnimationComponent")
+			} else {
+				anim := animComp.(*components.AnimationComponent)
+				if len(anim.Frames) == 0 {
+					t.Error("AnimationComponent.Frames should not be empty")
+				}
+				if !anim.IsLooping {
+					t.Error("Wallnut animation should loop continuously")
+				}
+			}
+
+			// 验证 CollisionComponent
+			collisionComp, ok := em.GetComponent(wallnutID, reflect.TypeOf(&components.CollisionComponent{}))
+			if !ok {
+				t.Fatal("Wallnut entity should have CollisionComponent")
+			} else {
+				collision := collisionComp.(*components.CollisionComponent)
+				if collision.Width <= 0 || collision.Height <= 0 {
+					t.Errorf("Collision box has invalid size: Width=%f, Height=%f",
+						collision.Width, collision.Height)
+				}
+			}
+		})
+	}
+}
+
+// TestWallnutHealthConfiguration 测试坚果墙生命值配置
+func TestWallnutHealthConfiguration(t *testing.T) {
+	rm := game.NewResourceManager(testAudioContext)
+	em := ecs.NewEntityManager()
+	gs := game.GetGameState()
+	gs.CameraX = 215
+
+	// 创建坚果墙
+	wallnutID, err := NewWallnutEntity(em, rm, gs, 4, 2)
+	if err != nil {
+		t.Fatalf("Failed to create wallnut entity: %v", err)
+	}
+
+	// 获取生命值组件
+	healthComp, ok := em.GetComponent(wallnutID, reflect.TypeOf(&components.HealthComponent{}))
+	if !ok {
+		t.Fatal("Wallnut should have HealthComponent")
+	}
+
+	health := healthComp.(*components.HealthComponent)
+
+	// 验证坚果墙生命值为 4000
+	if health.MaxHealth != 4000 {
+		t.Errorf("Wallnut MaxHealth should be 4000, got %d", health.MaxHealth)
+	}
+
+	if health.CurrentHealth != 4000 {
+		t.Errorf("Wallnut CurrentHealth should start at 4000, got %d", health.CurrentHealth)
+	}
+
+	// 验证坚果墙生命值是向日葵的 13 倍以上
+	sunflowerHealth := config.SunflowerDefaultHealth
+	ratio := float64(health.MaxHealth) / float64(sunflowerHealth)
+	if ratio < 13.0 {
+		t.Errorf("Wallnut health should be at least 13x Sunflower health, got %.1fx", ratio)
+	}
+}

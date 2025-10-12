@@ -413,8 +413,13 @@ func (s *InputSystem) handleLawnClick(mouseX, mouseY int) bool {
 }
 
 // createPlantEntity 创建植物实体的辅助方法
-// 使用 entities.NewPlantEntity 工厂函数以保持一致性
+// 根据植物类型选择合适的工厂函数
 func (s *InputSystem) createPlantEntity(plantType components.PlantType, col, row int) (ecs.EntityID, error) {
+	// 坚果墙使用专用的工厂函数
+	if plantType == components.PlantWallnut {
+		return entities.NewWallnutEntity(s.entityManager, s.resourceManager, s.gameState, col, row)
+	}
+	// 其他植物使用通用工厂函数
 	return entities.NewPlantEntity(s.entityManager, s.resourceManager, s.gameState, plantType, col, row)
 }
 
@@ -425,6 +430,8 @@ func (s *InputSystem) getPlantCost(plantType components.PlantType) int {
 		return 50
 	case components.PlantPeashooter:
 		return 100
+	case components.PlantWallnut:
+		return 50
 	default:
 		return 0
 	}

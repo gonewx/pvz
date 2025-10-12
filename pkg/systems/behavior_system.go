@@ -11,6 +11,7 @@ import (
 	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/utils"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // BehaviorSystem 处理实体的行为逻辑
@@ -106,6 +107,8 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 			s.handleSunflowerBehavior(entityID, deltaTime)
 		case components.BehaviorPeashooter:
 			s.handlePeashooterBehavior(entityID, deltaTime, allZombieEntityList)
+		case components.BehaviorWallnut:
+			s.handleWallnutBehavior(entityID)
 		default:
 			// 未知行为类型，忽略
 		}
@@ -722,4 +725,55 @@ func (s *BehaviorSystem) playEatingSound() {
 
 	// 播放音效
 	eatingSound.Play()
+}
+
+// handleWallnutBehavior 处理坚果墙的行为逻辑
+// 坚果墙没有主动行为（不生产阳光，不攻击），但会根据生命值百分比切换外观状态
+// 外观状态：完好(>66%) → 轻伤(33-66%) → 重伤(<33%)
+func (s *BehaviorSystem) handleWallnutBehavior(entityID ecs.EntityID) {
+	// 获取生命值组件
+	healthComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.HealthComponent{}))
+	if !ok {
+		return
+	}
+	health := healthComp.(*components.HealthComponent)
+
+	// 计算生命值百分比
+	healthPercent := float64(health.CurrentHealth) / float64(health.MaxHealth)
+
+	// 获取动画组件（用于切换外观状态）
+	animComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.AnimationComponent{}))
+	if !ok {
+		return
+	}
+	anim := animComp.(*components.AnimationComponent)
+
+	// 根据生命值百分比确定应显示的外观状态
+	var targetFrames []*ebiten.Image
+	var err error
+
+	if healthPercent > config.WallnutCracked1Threshold {
+		// 完好状态 (> 66%)
+		targetFrames, err = utils.LoadWallnutFullHealthAnimation(s.resourceManager)
+	} else if healthPercent > config.WallnutCracked2Threshold {
+		// 轻伤状态 (33% - 66%)
+		targetFrames, err = utils.LoadWallnutCracked1Animation(s.resourceManager)
+	} else {
+		// 重伤状态 (< 33%)
+		targetFrames, err = utils.LoadWallnutCracked2Animation(s.resourceManager)
+	}
+
+	if err != nil {
+		// 加载动画失败，保持当前动画
+		return
+	}
+
+	// 检查是否需要切换动画（避免每帧都重新加载）
+	// 通过比较动画帧数来判断是否为同一组动画
+	if len(anim.Frames) != len(targetFrames) {
+		// 切换到新的动画状态
+		anim.Frames = targetFrames
+		anim.CurrentFrame = 0
+		anim.FrameCounter = 0
+	}
 }

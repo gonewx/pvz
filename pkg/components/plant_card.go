@@ -8,6 +8,8 @@ const (
 	PlantSunflower PlantType = iota
 	// PlantPeashooter 豌豆射手
 	PlantPeashooter
+	// PlantWallnut 坚果墙
+	PlantWallnut
 )
 
 // PlantCardComponent 表示植物选择卡片的数据

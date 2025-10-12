@@ -231,6 +231,14 @@ func (s *GameScene) initPlantCardSystems(rm *game.ResourceManager) {
 		// 继续执行，游戏在没有卡片的情况下也能运行（用于测试环境）
 	}
 
+	// 坚果墙卡片（第三张）
+	thirdCardX := secondCardX + PlantCardSpacing
+	_, err = entities.NewPlantCardEntity(s.entityManager, rm, components.PlantWallnut, thirdCardX, cardY)
+	if err != nil {
+		log.Printf("Warning: Failed to create wallnut card: %v", err)
+		// 继续执行，游戏在没有卡片的情况下也能运行（用于测试环境）
+	}
+
 	// Initialize PlantCardSystem
 	s.plantCardSystem = systems.NewPlantCardSystem(
 		s.entityManager,

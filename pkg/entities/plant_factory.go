@@ -151,3 +151,72 @@ func NewPlantEntity(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.Ga
 
 	return entityID, nil
 }
+
+// NewWallnutEntity 创建坚果墙实体
+// 坚果墙是一种高生命值的防御植物，没有攻击能力，根据生命值百分比显示不同的外观状态
+//
+// 参数:
+//   - em: 实体管理器
+//   - rm: 资源管理器（用于加载坚果墙图像和动画）
+//   - gs: 游戏状态（用于获取摄像机位置）
+//   - col: 网格列索引 (0-8)
+//   - row: 网格行索引 (0-4)
+//
+// 返回:
+//   - ecs.EntityID: 创建的坚果墙实体ID，如果失败返回 0
+//   - error: 如果创建失败返回错误信息
+func NewWallnutEntity(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.GameState, col, row int) (ecs.EntityID, error) {
+	// 计算格子中心坐标（使用世界坐标系统）
+	worldCenterX := config.GridWorldStartX + float64(col)*config.CellWidth + config.CellWidth/2
+	worldCenterY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+
+	// 加载坚果墙完好状态动画帧（初始状态）
+	fullHealthFrames, err := utils.LoadWallnutFullHealthAnimation(rm)
+	if err != nil {
+		return 0, fmt.Errorf("failed to load wallnut full health animation: %w", err)
+	}
+
+	// 创建实体
+	entityID := em.CreateEntity()
+
+	// 添加位置组件（使用世界坐标）
+	em.AddComponent(entityID, &components.PositionComponent{
+		X: worldCenterX,
+		Y: worldCenterY,
+	})
+
+	// 添加精灵组件（使用完好状态的第一帧）
+	em.AddComponent(entityID, &components.SpriteComponent{
+		Image: fullHealthFrames[0],
+	})
+
+	// 添加生命值组件（坚果墙拥有极高的生命值）
+	em.AddComponent(entityID, &components.HealthComponent{
+		CurrentHealth: config.WallnutDefaultHealth, // 4000
+		MaxHealth:     config.WallnutDefaultHealth,
+	})
+
+	// 添加行为组件（坚果墙行为）
+	em.AddComponent(entityID, &components.BehaviorComponent{
+		Type: components.BehaviorWallnut,
+	})
+
+	// 添加动画组件（初始为完好状态动画，循环播放）
+	em.AddComponent(entityID, &components.AnimationComponent{
+		Frames:       fullHealthFrames,
+		FrameSpeed:   config.WallnutFrameSpeed, // 0.1 秒/帧
+		CurrentFrame: 0,
+		FrameCounter: 0,
+		IsLooping:    true,  // 循环播放待机动画
+		IsFinished:   false, // 动画一直播放
+	})
+
+	// 添加碰撞组件（用于僵尸碰撞检测）
+	// 坚果墙的碰撞盒与普通植物类似
+	em.AddComponent(entityID, &components.CollisionComponent{
+		Width:  config.CellWidth * 0.8,  // 碰撞盒宽度略小于格子宽度
+		Height: config.CellHeight * 0.8, // 碰撞盒高度略小于格子高度
+	})
+
+	return entityID, nil
+}

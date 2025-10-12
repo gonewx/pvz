@@ -141,6 +141,27 @@ const (
 
 	// SunflowerFrameSpeed 向日葵动画帧速率（秒/帧）
 	SunflowerFrameSpeed = 0.08
+
+	// WallnutAnimationFrames 坚果墙动画帧数
+	// 坚果墙的完好、轻伤、重伤状态都使用16帧动画
+	WallnutAnimationFrames = 16
+
+	// WallnutFrameSpeed 坚果墙动画帧速率（秒/帧）
+	WallnutFrameSpeed = 0.1
+
+	// WallnutCost 坚果墙的阳光消耗
+	WallnutCost = 50
+
+	// WallnutRechargeTime 坚果墙的冷却时间（秒）
+	WallnutRechargeTime = 30.0
+
+	// WallnutCracked1Threshold 坚果墙轻伤状态生命值阈值（百分比）
+	// 当生命值 <= 66% 时，坚果墙进入轻伤状态（出现第一级裂痕）
+	WallnutCracked1Threshold = 0.66
+
+	// WallnutCracked2Threshold 坚果墙重伤状态生命值阈值（百分比）
+	// 当生命值 <= 33% 时，坚果墙进入重伤状态（出现第二级裂痕）
+	WallnutCracked2Threshold = 0.33
 )
 
 // Plant Health Configuration (植物生命值配置)
@@ -152,6 +173,10 @@ const (
 	// PeashooterDefaultHealth 豌豆射手默认生命值
 	// 豌豆射手生命值略高于向日葵
 	PeashooterDefaultHealth = 300
+
+	// WallnutDefaultHealth 坚果墙默认生命值
+	// 坚果墙作为防御植物，拥有远高于其他植物的生命值
+	WallnutDefaultHealth = 4000
 )
 
 // Zombie Eating Configuration (僵尸啃食配置)
