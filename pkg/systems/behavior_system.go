@@ -44,10 +44,10 @@ func NewBehaviorSystem(em *ecs.EntityManager, rm *game.ResourceManager) *Behavio
 
 // Update 更新所有拥有行为组件的实体
 func (s *BehaviorSystem) Update(deltaTime float64) {
-	// 查询所有拥有 BehaviorComponent, TimerComponent, PlantComponent, PositionComponent 的实体（植物）
+	// 查询所有拥有 BehaviorComponent, PlantComponent, PositionComponent 的实体（所有植物）
+	// 注意：不要求 TimerComponent，因为坚果墙等防御植物不需要计时器
 	plantEntityList := s.entityManager.GetEntitiesWith(
 		reflect.TypeOf(&components.BehaviorComponent{}),
-		reflect.TypeOf(&components.TimerComponent{}),
 		reflect.TypeOf(&components.PlantComponent{}),
 		reflect.TypeOf(&components.PositionComponent{}),
 	)
