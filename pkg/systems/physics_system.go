@@ -128,31 +128,53 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 			}
 			zombieCol := zombieColComp.(*components.CollisionComponent)
 
-			// 执行AABB碰撞检测
-			if ps.checkAABBCollision(bulletPos, bulletCol, zombiePos, zombieCol) {
-				// 碰撞发生！
-				// 1. 创建击中效果实体（在子弹位置）
-				_, err := entities.NewPeaBulletHitEffect(ps.em, ps.rm, bulletPos.X, bulletPos.Y)
-				if err != nil {
-					// 如果创建击中效果失败，记录错误但继续处理碰撞
-					// 在实际项目中可以使用日志系统记录错误
-					// 这里为了简化，忽略错误
-				}
-
-				// 2. 减少僵尸生命值（Story 4.4: 伤害计算）
-				zombieHealthComp, ok := ps.em.GetComponent(zombieID, reflect.TypeOf(&components.HealthComponent{}))
-				if ok {
-					zombieHealth := zombieHealthComp.(*components.HealthComponent)
-					zombieHealth.CurrentHealth -= config.PeaBulletDamage
-					// 注意：生命值可以降到负数，BehaviorSystem 会检查 <= 0 的情况
-				}
-
-				// 3. 标记子弹实体待删除
-				ps.em.DestroyEntity(bulletID)
-
-				// 4. 一个子弹只能击中一个僵尸，跳出内层循环
-				break
+		// 执行AABB碰撞检测
+		if ps.checkAABBCollision(bulletPos, bulletCol, zombiePos, zombieCol) {
+			// 碰撞发生！
+			// 1. 创建击中效果实体（在子弹位置）
+			_, err := entities.NewPeaBulletHitEffect(ps.em, ps.rm, bulletPos.X, bulletPos.Y)
+			if err != nil {
+				// 如果创建击中效果失败，记录错误但继续处理碰撞
+				// 在实际项目中可以使用日志系统记录错误
+				// 这里为了简化，忽略错误
 			}
+
+			// 2. 播放击中音效（Story 4.4: AC 5）
+			ps.playHitSound()
+
+			// 3. 减少僵尸生命值（Story 4.4: 伤害计算）
+			zombieHealthComp, ok := ps.em.GetComponent(zombieID, reflect.TypeOf(&components.HealthComponent{}))
+			if ok {
+				zombieHealth := zombieHealthComp.(*components.HealthComponent)
+				zombieHealth.CurrentHealth -= config.PeaBulletDamage
+				// 注意：生命值可以降到负数，BehaviorSystem 会检查 <= 0 的情况
+			}
+
+			// 4. 标记子弹实体待删除
+			ps.em.DestroyEntity(bulletID)
+
+			// 5. 一个子弹只能击中一个僵尸，跳出内层循环
+			break
+		}
 		}
 	}
+}
+
+// playHitSound 播放子弹击中僵尸的音效
+// 使用 shieldhit.ogg 作为击中音效，该音效在游戏中用于击打声音
+// 注意：音效每次都会重新开始播放，不会等待上一次播放结束
+func (ps *PhysicsSystem) playHitSound() {
+	// 加载击中音效（如果已加载，会返回缓存的播放器）
+	hitSound, err := ps.rm.LoadSoundEffect("assets/audio/Sound/shieldhit.ogg")
+	if err != nil {
+		// 音效加载失败时不阻止游戏继续运行
+		// 在实际项目中可以使用日志系统记录错误
+		return
+	}
+
+	// 重置播放器位置到开头（允许快速连续播放）
+	hitSound.Rewind()
+
+	// 播放音效
+	hitSound.Play()
 }

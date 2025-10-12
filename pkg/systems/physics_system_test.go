@@ -394,3 +394,70 @@ func TestPhysicsSystem_MultipleHits(t *testing.T) {
 		t.Errorf("After 3rd hit: expected health=210, got %d", health.CurrentHealth)
 	}
 }
+
+// TestPhysicsSystem_HitSoundPlays 测试击中音效播放（Story 4.4: AC 5）
+func TestPhysicsSystem_HitSoundPlays(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(testAudioContext)
+	ps := NewPhysicsSystem(em, rm)
+
+	// 创建豌豆子弹实体
+	bulletID := em.CreateEntity()
+	em.AddComponent(bulletID, &components.BehaviorComponent{
+		Type: components.BehaviorPeaProjectile,
+	})
+	em.AddComponent(bulletID, &components.PositionComponent{
+		X: 400,
+		Y: 250,
+	})
+	em.AddComponent(bulletID, &components.CollisionComponent{
+		Width:  config.PeaBulletWidth,
+		Height: config.PeaBulletHeight,
+	})
+
+	// 创建僵尸实体（与子弹位置重叠）
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.BehaviorComponent{
+		Type: components.BehaviorZombieBasic,
+	})
+	em.AddComponent(zombieID, &components.PositionComponent{
+		X: 410,
+		Y: 250,
+	})
+	em.AddComponent(zombieID, &components.CollisionComponent{
+		Width:  config.ZombieCollisionWidth,
+		Height: config.ZombieCollisionHeight,
+	})
+	em.AddComponent(zombieID, &components.HealthComponent{
+		CurrentHealth: 270,
+		MaxHealth:     270,
+	})
+
+	// 执行物理更新（会触发音效播放）
+	// 注意：在测试环境中，音频资源可能不存在
+	// playHitSound 方法会优雅地处理加载失败的情况
+	ps.Update(0.016)
+
+	// 验证：音效播放不会阻止正常的碰撞处理
+	// 僵尸生命值应该正常减少
+	healthComp, ok := em.GetComponent(zombieID, reflect.TypeOf(&components.HealthComponent{}))
+	if !ok {
+		t.Fatal("Expected zombie to have HealthComponent")
+	}
+	health := healthComp.(*components.HealthComponent)
+	expectedHealth := 270 - config.PeaBulletDamage
+	if health.CurrentHealth != expectedHealth {
+		t.Errorf("Expected zombie health=%d after hit with sound, got %d", expectedHealth, health.CurrentHealth)
+	}
+
+	// 验证：子弹被删除（碰撞正常处理）
+	em.RemoveMarkedEntities()
+	_, bulletExists := em.GetComponent(bulletID, reflect.TypeOf(&components.PositionComponent{}))
+	if bulletExists {
+		t.Error("Expected bullet to be destroyed after collision with sound")
+	}
+
+	// 注意：由于测试环境中音频文件可能不存在，
+	// 我们主要验证音效播放不会影响游戏逻辑的正确执行
+	// 实际音频播放需要在真实游戏环境中手动验证
+}
