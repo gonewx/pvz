@@ -15,6 +15,8 @@ const (
 	BehaviorPeaBulletHit
 	// BehaviorZombieBasic 普通僵尸行为：从右向左移动并攻击植物
 	BehaviorZombieBasic
+	// BehaviorZombieDying 僵尸死亡中：播放死亡动画，动画完成后删除实体
+	BehaviorZombieDying
 )
 
 // BehaviorComponent 标识实体的行为类型

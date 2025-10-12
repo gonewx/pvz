@@ -4,6 +4,7 @@ import (
 	"reflect"
 
 	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
@@ -138,11 +139,18 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 					// 这里为了简化，忽略错误
 				}
 
-				// 2. 标记子弹实体待删除
+				// 2. 减少僵尸生命值（Story 4.4: 伤害计算）
+				zombieHealthComp, ok := ps.em.GetComponent(zombieID, reflect.TypeOf(&components.HealthComponent{}))
+				if ok {
+					zombieHealth := zombieHealthComp.(*components.HealthComponent)
+					zombieHealth.CurrentHealth -= config.PeaBulletDamage
+					// 注意：生命值可以降到负数，BehaviorSystem 会检查 <= 0 的情况
+				}
+
+				// 3. 标记子弹实体待删除
 				ps.em.DestroyEntity(bulletID)
 
-				// 3. 一个子弹只能击中一个僵尸，跳出内层循环
-				// （注意：不减少僵尸生命值，伤害逻辑在 Story 4.4 中实现）
+				// 4. 一个子弹只能击中一个僵尸，跳出内层循环
 				break
 			}
 		}

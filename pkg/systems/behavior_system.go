@@ -51,11 +51,18 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 		reflect.TypeOf(&components.PositionComponent{}),
 	)
 
-	// 查询所有拥有 BehaviorComponent, PositionComponent, VelocityComponent 的实体（僵尸）
+	// 查询所有拥有 BehaviorComponent, PositionComponent, VelocityComponent 的实体（移动中的僵尸）
 	zombieEntityList := s.entityManager.GetEntitiesWith(
 		reflect.TypeOf(&components.BehaviorComponent{}),
 		reflect.TypeOf(&components.PositionComponent{}),
 		reflect.TypeOf(&components.VelocityComponent{}),
+	)
+
+	// 查询所有死亡中的僵尸实体（没有 VelocityComponent，只有 BehaviorComponent, PositionComponent, AnimationComponent）
+	dyingZombieEntityList := s.entityManager.GetEntitiesWith(
+		reflect.TypeOf(&components.BehaviorComponent{}),
+		reflect.TypeOf(&components.PositionComponent{}),
+		reflect.TypeOf(&components.AnimationComponent{}),
 	)
 
 	// 查询所有豌豆子弹实体（拥有 BehaviorComponent, PositionComponent, VelocityComponent）
@@ -103,6 +110,7 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 			s.handleZombieBasicBehavior(entityID, deltaTime)
 		default:
 			// 未知僵尸类型，忽略
+			// 注意：BehaviorZombieDying 在单独的 dyingZombieEntityList 中处理
 		}
 	}
 
@@ -117,6 +125,20 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 			s.handlePeaProjectileBehavior(entityID, deltaTime)
 		default:
 			// 忽略非子弹类型（如僵尸）
+		}
+	}
+
+	// 遍历所有死亡中的僵尸实体（处理死亡动画完成后的删除）
+	for _, entityID := range dyingZombieEntityList {
+		behaviorComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.BehaviorComponent{}))
+		if !ok {
+			continue
+		}
+		behavior := behaviorComp.(*components.BehaviorComponent)
+
+		// 只处理死亡中的僵尸
+		if behavior.Type == components.BehaviorZombieDying {
+			s.handleZombieDyingBehavior(entityID)
 		}
 	}
 
@@ -211,6 +233,18 @@ func (s *BehaviorSystem) handleSunflowerBehavior(entityID ecs.EntityID, deltaTim
 // handleZombieBasicBehavior 处理普通僵尸的行为逻辑
 // 普通僵尸会以恒定速度从右向左移动
 func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaTime float64) {
+	// 检查生命值（Story 4.4: 僵尸死亡逻辑）
+	healthComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.HealthComponent{}))
+	if ok {
+		health := healthComp.(*components.HealthComponent)
+		if health.CurrentHealth <= 0 {
+			// 生命值 <= 0，触发死亡状态转换
+			log.Printf("[BehaviorSystem] 僵尸 %d 生命值 <= 0 (HP=%d)，触发死亡", entityID, health.CurrentHealth)
+			s.triggerZombieDeath(entityID)
+			return // 跳过正常移动逻辑
+		}
+	}
+
 	// 获取位置组件
 	positionComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
 	if !ok {
@@ -235,6 +269,50 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 		log.Printf("[BehaviorSystem] 僵尸 %d 移出屏幕左侧 (X=%.1f)，标记删除", entityID, position.X)
 		s.entityManager.DestroyEntity(entityID)
 	}
+}
+
+// triggerZombieDeath 触发僵尸死亡状态转换
+// 当僵尸生命值 <= 0 时调用，将僵尸从正常行为状态切换到死亡动画播放状态
+func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
+	// 1. 切换行为类型为 BehaviorZombieDying
+	behaviorComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.BehaviorComponent{}))
+	if !ok {
+		log.Printf("[BehaviorSystem] 僵尸 %d 缺少 BehaviorComponent，无法触发死亡", entityID)
+		return
+	}
+	behavior := behaviorComp.(*components.BehaviorComponent)
+	behavior.Type = components.BehaviorZombieDying
+	log.Printf("[BehaviorSystem] 僵尸 %d 行为切换为 BehaviorZombieDying", entityID)
+
+	// 2. 移除 VelocityComponent（停止移动）
+	s.entityManager.RemoveComponent(entityID, reflect.TypeOf(&components.VelocityComponent{}))
+	log.Printf("[BehaviorSystem] 僵尸 %d 移除速度组件，停止移动", entityID)
+
+	// 3. 加载死亡动画帧
+	deathFrames, err := utils.LoadZombieDeathAnimation(s.resourceManager)
+	if err != nil {
+		log.Printf("[BehaviorSystem] 加载僵尸死亡动画失败: %v，使用占位动画", err)
+		// 错误处理：如果死亡动画加载失败，直接删除僵尸
+		s.entityManager.DestroyEntity(entityID)
+		return
+	}
+
+	// 4. 替换 AnimationComponent 的动画帧
+	animComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.AnimationComponent{}))
+	if !ok {
+		log.Printf("[BehaviorSystem] 僵尸 %d 缺少 AnimationComponent，无法播放死亡动画", entityID)
+		s.entityManager.DestroyEntity(entityID)
+		return
+	}
+	anim := animComp.(*components.AnimationComponent)
+	anim.Frames = deathFrames
+	anim.IsLooping = false // 死亡动画不循环
+	anim.IsFinished = false
+	anim.CurrentFrame = 0
+	anim.FrameCounter = 0
+	anim.FrameSpeed = config.ZombieDieFrameSpeed
+
+	log.Printf("[BehaviorSystem] 僵尸 %d 死亡动画已设置 (帧数=%d, 帧速率=%.2f)", entityID, len(deathFrames), config.ZombieDieFrameSpeed)
 }
 
 // handlePeashooterBehavior 处理豌豆射手的行为逻辑
@@ -353,6 +431,26 @@ func (s *BehaviorSystem) handleHitEffectBehavior(entityID ecs.EntityID, deltaTim
 	// 检查计时器是否完成（超时）
 	if timer.CurrentTime >= timer.TargetTime {
 		// 击中效果生命周期结束，标记删除
+		s.entityManager.DestroyEntity(entityID)
+	}
+}
+
+// handleZombieDyingBehavior 处理僵尸死亡动画播放
+// 当死亡动画完成后，删除僵尸实体
+func (s *BehaviorSystem) handleZombieDyingBehavior(entityID ecs.EntityID) {
+	// 获取动画组件
+	animComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.AnimationComponent{}))
+	if !ok {
+		// 如果没有动画组件，直接删除僵尸
+		log.Printf("[BehaviorSystem] 死亡中的僵尸 %d 缺少 AnimationComponent，直接删除", entityID)
+		s.entityManager.DestroyEntity(entityID)
+		return
+	}
+	anim := animComp.(*components.AnimationComponent)
+
+	// 检查死亡动画是否完成
+	if anim.IsFinished {
+		log.Printf("[BehaviorSystem] 僵尸 %d 死亡动画完成，删除实体", entityID)
 		s.entityManager.DestroyEntity(entityID)
 	}
 }

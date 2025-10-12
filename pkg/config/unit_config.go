@@ -33,6 +33,12 @@ const (
 	// ZombieDeletionBoundary 僵尸删除边界（世界坐标X）
 	// 僵尸移出此边界后将被删除
 	ZombieDeletionBoundary = -100.0
+
+	// ZombieDieAnimationFrames 普通僵尸死亡动画的总帧数
+	ZombieDieAnimationFrames = 10
+
+	// ZombieDieFrameSpeed 僵尸死亡动画的帧速率（秒/帧）
+	ZombieDieFrameSpeed = 0.1
 )
 
 // Projectile Configuration (子弹配置)

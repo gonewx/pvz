@@ -252,3 +252,145 @@ func TestPhysicsSystem_NoCollision(t *testing.T) {
 		t.Error("Expected zombie to still exist when no collision")
 	}
 }
+
+// TestPhysicsSystem_BulletDamagesZombie 测试子弹击中僵尸时生命值正确减少
+func TestPhysicsSystem_BulletDamagesZombie(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(testAudioContext)
+	ps := NewPhysicsSystem(em, rm)
+
+	// 创建豌豆子弹实体
+	bulletID := em.CreateEntity()
+	em.AddComponent(bulletID, &components.BehaviorComponent{
+		Type: components.BehaviorPeaProjectile,
+	})
+	em.AddComponent(bulletID, &components.PositionComponent{
+		X: 400,
+		Y: 250,
+	})
+	em.AddComponent(bulletID, &components.CollisionComponent{
+		Width:  config.PeaBulletWidth,
+		Height: config.PeaBulletHeight,
+	})
+
+	// 创建僵尸实体（与子弹位置重叠，会发生碰撞）
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.BehaviorComponent{
+		Type: components.BehaviorZombieBasic,
+	})
+	em.AddComponent(zombieID, &components.PositionComponent{
+		X: 410, // 与子弹重叠
+		Y: 250,
+	})
+	em.AddComponent(zombieID, &components.CollisionComponent{
+		Width:  config.ZombieCollisionWidth,
+		Height: config.ZombieCollisionHeight,
+	})
+	em.AddComponent(zombieID, &components.HealthComponent{
+		CurrentHealth: 270,
+		MaxHealth:     270,
+	})
+
+	// 执行物理更新（会检测碰撞并减少生命值）
+	ps.Update(0.016)
+
+	// 验证：僵尸生命值减少了 PeaBulletDamage (20)
+	healthComp, ok := em.GetComponent(zombieID, reflect.TypeOf(&components.HealthComponent{}))
+	if !ok {
+		t.Fatal("Expected zombie to have HealthComponent")
+	}
+	health := healthComp.(*components.HealthComponent)
+	expectedHealth := 270 - config.PeaBulletDamage
+	if health.CurrentHealth != expectedHealth {
+		t.Errorf("Expected zombie health=%d, got %d", expectedHealth, health.CurrentHealth)
+	}
+
+	// 验证：子弹被删除
+	em.RemoveMarkedEntities()
+	_, bulletExists := em.GetComponent(bulletID, reflect.TypeOf(&components.PositionComponent{}))
+	if bulletExists {
+		t.Error("Expected bullet to be destroyed after collision")
+	}
+}
+
+// TestPhysicsSystem_MultipleHits 测试多次击中累计伤害
+func TestPhysicsSystem_MultipleHits(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(testAudioContext)
+	ps := NewPhysicsSystem(em, rm)
+
+	// 创建僵尸实体
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.BehaviorComponent{
+		Type: components.BehaviorZombieBasic,
+	})
+	em.AddComponent(zombieID, &components.PositionComponent{
+		X: 410,
+		Y: 250,
+	})
+	em.AddComponent(zombieID, &components.CollisionComponent{
+		Width:  config.ZombieCollisionWidth,
+		Height: config.ZombieCollisionHeight,
+	})
+	em.AddComponent(zombieID, &components.HealthComponent{
+		CurrentHealth: 270,
+		MaxHealth:     270,
+	})
+
+	// 第一次击中
+	bullet1 := em.CreateEntity()
+	em.AddComponent(bullet1, &components.BehaviorComponent{Type: components.BehaviorPeaProjectile})
+	em.AddComponent(bullet1, &components.PositionComponent{X: 400, Y: 250})
+	em.AddComponent(bullet1, &components.CollisionComponent{
+		Width:  config.PeaBulletWidth,
+		Height: config.PeaBulletHeight,
+	})
+
+	ps.Update(0.016)
+	em.RemoveMarkedEntities()
+
+	// 验证第一次伤害
+	healthComp, _ := em.GetComponent(zombieID, reflect.TypeOf(&components.HealthComponent{}))
+	health := healthComp.(*components.HealthComponent)
+	if health.CurrentHealth != 250 {
+		t.Errorf("After 1st hit: expected health=250, got %d", health.CurrentHealth)
+	}
+
+	// 第二次击中
+	bullet2 := em.CreateEntity()
+	em.AddComponent(bullet2, &components.BehaviorComponent{Type: components.BehaviorPeaProjectile})
+	em.AddComponent(bullet2, &components.PositionComponent{X: 400, Y: 250})
+	em.AddComponent(bullet2, &components.CollisionComponent{
+		Width:  config.PeaBulletWidth,
+		Height: config.PeaBulletHeight,
+	})
+
+	ps.Update(0.016)
+	em.RemoveMarkedEntities()
+
+	// 验证第二次伤害（累计）
+	healthComp, _ = em.GetComponent(zombieID, reflect.TypeOf(&components.HealthComponent{}))
+	health = healthComp.(*components.HealthComponent)
+	if health.CurrentHealth != 230 {
+		t.Errorf("After 2nd hit: expected health=230, got %d", health.CurrentHealth)
+	}
+
+	// 第三次击中
+	bullet3 := em.CreateEntity()
+	em.AddComponent(bullet3, &components.BehaviorComponent{Type: components.BehaviorPeaProjectile})
+	em.AddComponent(bullet3, &components.PositionComponent{X: 400, Y: 250})
+	em.AddComponent(bullet3, &components.CollisionComponent{
+		Width:  config.PeaBulletWidth,
+		Height: config.PeaBulletHeight,
+	})
+
+	ps.Update(0.016)
+	em.RemoveMarkedEntities()
+
+	// 验证第三次伤害（累计）
+	healthComp, _ = em.GetComponent(zombieID, reflect.TypeOf(&components.HealthComponent{}))
+	health = healthComp.(*components.HealthComponent)
+	if health.CurrentHealth != 210 {
+		t.Errorf("After 3rd hit: expected health=210, got %d", health.CurrentHealth)
+	}
+}
