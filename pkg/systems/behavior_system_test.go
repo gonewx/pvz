@@ -443,3 +443,51 @@ func TestMultipleZombiesIndependentMovement(t *testing.T) {
 		t.Errorf("Zombie2 should be at X=%.1f, got %.1f", expectedX2, pos2.X)
 	}
 }
+
+// TestHitEffectExpiration 测试击中效果计时器超时后被删除
+func TestHitEffectExpiration(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(testAudioContext)
+	system := NewBehaviorSystem(em, rm)
+
+	// 创建击中效果实体
+	hitEffectID := em.CreateEntity()
+	em.AddComponent(hitEffectID, &components.BehaviorComponent{
+		Type: components.BehaviorPeaBulletHit,
+	})
+	em.AddComponent(hitEffectID, &components.PositionComponent{
+		X: 400,
+		Y: 250,
+	})
+	em.AddComponent(hitEffectID, &components.TimerComponent{
+		Name:        "hit_effect_duration",
+		CurrentTime: 0.0,
+		TargetTime:  0.2, // 0.2秒后应该被删除
+		IsReady:     false,
+	})
+
+	// 第一次更新：0.1秒（未超时）
+	system.Update(0.1)
+
+	// 击中效果应该还存在
+	timerComp, ok := em.GetComponent(hitEffectID, reflect.TypeOf(&components.TimerComponent{}))
+	if !ok {
+		t.Fatal("Expected hit effect to still exist after 0.1s")
+	}
+	timer := timerComp.(*components.TimerComponent)
+	if timer.CurrentTime != 0.1 {
+		t.Errorf("Expected timer CurrentTime=0.1, got %.2f", timer.CurrentTime)
+	}
+
+	// 第二次更新：再0.15秒（总共0.25秒，超过0.2秒阈值）
+	system.Update(0.15)
+
+	// 击中效果应该被标记删除
+	em.RemoveMarkedEntities()
+
+	// 验证击中效果已被删除
+	_, exists := em.GetComponent(hitEffectID, reflect.TypeOf(&components.TimerComponent{}))
+	if exists {
+		t.Error("Expected hit effect to be destroyed after timeout (0.25s > 0.2s)")
+	}
+}

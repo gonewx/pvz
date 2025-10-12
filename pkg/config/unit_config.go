@@ -24,6 +24,12 @@ const (
 	// ZombieDefaultHealth 普通僵尸的默认生命值
 	ZombieDefaultHealth = 270
 
+	// ZombieCollisionWidth 普通僵尸碰撞盒宽度（像素）
+	ZombieCollisionWidth = 40.0
+
+	// ZombieCollisionHeight 普通僵尸碰撞盒高度（像素）
+	ZombieCollisionHeight = 115.0
+
 	// ZombieDeletionBoundary 僵尸删除边界（世界坐标X）
 	// 僵尸移出此边界后将被删除
 	ZombieDeletionBoundary = -100.0
@@ -57,6 +63,13 @@ const (
 	// PeaBulletDeletionBoundary 子弹删除边界（屏幕坐标X）
 	// 子弹移出此边界后将被删除
 	PeaBulletDeletionBoundary = 1500.0
+)
+
+// Effect Configuration (效果配置)
+const (
+	// HitEffectDuration 击中效果显示时长（秒）
+	// 击中效果显示短暂时间后自动消失
+	HitEffectDuration = 0.2
 )
 
 // Plant Configuration (植物配置)

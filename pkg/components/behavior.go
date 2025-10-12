@@ -11,6 +11,8 @@ const (
 	BehaviorPeashooter
 	// BehaviorPeaProjectile 豌豆子弹行为：向右移动并检测碰撞
 	BehaviorPeaProjectile
+	// BehaviorPeaBulletHit 豌豆子弹击中效果：显示击中水花动画，短暂显示后消失
+	BehaviorPeaBulletHit
 	// BehaviorZombieBasic 普通僵尸行为：从右向左移动并攻击植物
 	BehaviorZombieBasic
 )

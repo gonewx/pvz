@@ -119,6 +119,23 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 			// 忽略非子弹类型（如僵尸）
 		}
 	}
+
+	// 查询所有击中效果实体（拥有 BehaviorComponent 和 TimerComponent）
+	hitEffectEntityList := s.entityManager.GetEntitiesWith(
+		reflect.TypeOf(&components.BehaviorComponent{}),
+		reflect.TypeOf(&components.TimerComponent{}),
+	)
+
+	// 遍历所有击中效果实体，管理其生命周期
+	for _, entityID := range hitEffectEntityList {
+		behaviorComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.BehaviorComponent{}))
+		behavior := behaviorComp.(*components.BehaviorComponent)
+
+		// 只处理击中效果类型
+		if behavior.Type == components.BehaviorPeaBulletHit {
+			s.handleHitEffectBehavior(entityID, deltaTime)
+		}
+	}
 }
 
 // handleSunflowerBehavior 处理向日葵的行为逻辑
@@ -316,6 +333,26 @@ func (s *BehaviorSystem) handlePeaProjectileBehavior(entityID ecs.EntityID, delt
 	// 边界检查：如果子弹飞出屏幕右侧，标记删除
 	if position.X > config.PeaBulletDeletionBoundary {
 		log.Printf("[BehaviorSystem] 豌豆子弹 %d 飞出屏幕右侧 (X=%.1f)，标记删除", entityID, position.X)
+		s.entityManager.DestroyEntity(entityID)
+	}
+}
+
+// handleHitEffectBehavior 处理击中效果的生命周期
+// 击中效果会在显示一段时间后自动消失
+func (s *BehaviorSystem) handleHitEffectBehavior(entityID ecs.EntityID, deltaTime float64) {
+	// 获取计时器组件
+	timerComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.TimerComponent{}))
+	if !ok {
+		return
+	}
+	timer := timerComp.(*components.TimerComponent)
+
+	// 更新计时器
+	timer.CurrentTime += deltaTime
+
+	// 检查计时器是否完成（超时）
+	if timer.CurrentTime >= timer.TargetTime {
+		// 击中效果生命周期结束，标记删除
 		s.entityManager.DestroyEntity(entityID)
 	}
 }

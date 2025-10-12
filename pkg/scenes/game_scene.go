@@ -100,6 +100,9 @@ type GameScene struct {
 	// Story 3.4: Behavior System
 	behaviorSystem *systems.BehaviorSystem // 植物行为系统（向日葵生产阳光等）
 
+	// Story 4.3: Physics System
+	physicsSystem *systems.PhysicsSystem // 物理系统（碰撞检测）
+
 	// Story 4.1: Test Zombie Spawn (临时测试代码)
 	// 在游戏开始后3秒，在第3行生成一个测试僵尸
 	testZombieTimer   float64 // 测试僵尸生成计时器
@@ -194,6 +197,10 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	// Story 3.4: Initialize behavior system (sunflower sun production, etc.)
 	scene.behaviorSystem = systems.NewBehaviorSystem(scene.entityManager, rm)
 	log.Printf("[GameScene] Initialized behavior system for plant behaviors")
+
+	// Story 4.3: Initialize physics system (collision detection)
+	scene.physicsSystem = systems.NewPhysicsSystem(scene.entityManager, rm)
+	log.Printf("[GameScene] Initialized physics system for collision detection")
 
 	return scene
 }
@@ -369,11 +376,12 @@ func (s *GameScene) Update(deltaTime float64) {
 	s.sunSpawnSystem.Update(deltaTime)                 // 3. Generate new suns
 	s.sunMovementSystem.Update(deltaTime)              // 4. Move suns (includes collection animation)
 	s.sunCollectionSystem.Update(deltaTime)            // 5. Check if collection is complete
-	s.behaviorSystem.Update(deltaTime)      // 6. Update plant behaviors (Story 3.4)
-	s.animationSystem.Update(deltaTime)     // 7. Update animation frames
-	s.plantPreviewSystem.Update(deltaTime)  // 8. Update plant preview position (Story 3.2)
-	s.lifetimeSystem.Update(deltaTime)      // 9. Check for expired entities
-	s.entityManager.RemoveMarkedEntities()  // 10. Clean up deleted entities (always last)
+	s.behaviorSystem.Update(deltaTime)                  // 6. Update plant behaviors (Story 3.4)
+	s.physicsSystem.Update(deltaTime)                   // 7. Check collisions (Story 4.3)
+	s.animationSystem.Update(deltaTime)                 // 8. Update animation frames
+	s.plantPreviewSystem.Update(deltaTime)              // 9. Update plant preview position (Story 3.2)
+	s.lifetimeSystem.Update(deltaTime)                  // 10. Check for expired entities
+	s.entityManager.RemoveMarkedEntities()              // 11. Clean up deleted entities (always last)
 }
 
 // updateIntroAnimation updates the intro camera animation that showcases the entire lawn.

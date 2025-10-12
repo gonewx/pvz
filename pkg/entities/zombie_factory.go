@@ -87,5 +87,11 @@ func NewZombieEntity(em *ecs.EntityManager, rm *game.ResourceManager, row int, s
 		MaxHealth:     config.ZombieDefaultHealth,
 	})
 
+	// 添加碰撞组件（用于检测子弹碰撞）
+	em.AddComponent(entityID, &components.CollisionComponent{
+		Width:  config.ZombieCollisionWidth,
+		Height: config.ZombieCollisionHeight,
+	})
+
 	return entityID, nil
 }
