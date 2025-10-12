@@ -20,13 +20,23 @@ func NewRenderSystem(em *ecs.EntityManager) *RenderSystem {
 	}
 }
 
-// Draw 绘制所有拥有位置和精灵组件的实体
+// Draw 绘制所有拥有位置和精灵组件的实体（包括阳光）
 // 渲染顺序（从底到顶）：植物 → 僵尸/子弹 → 阳光
-// 这样确保阳光始终显示在最上层，便于玩家点击收集
+// 注意：此方法包含阳光渲染，如果需要在UI层之后渲染阳光，请使用 DrawGameWorld + DrawSuns
 // 参数:
 //   - screen: 绘制目标屏幕
 //   - cameraX: 摄像机的世界坐标X位置（用于世界坐标到屏幕坐标的转换）
 func (s *RenderSystem) Draw(screen *ebiten.Image, cameraX float64) {
+	s.DrawGameWorld(screen, cameraX)
+	s.DrawSuns(screen, cameraX)
+}
+
+// DrawGameWorld 绘制游戏世界实体（植物、僵尸、子弹），不包括阳光
+// 用于需要在阳光和UI之间插入其他渲染层的场景
+// 参数:
+//   - screen: 绘制目标屏幕
+//   - cameraX: 摄像机的世界坐标X位置
+func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 	// 查询所有拥有 PositionComponent 和 SpriteComponent 的实体
 	entities := s.entityManager.GetEntitiesWith(
 		reflect.TypeOf(&components.PositionComponent{}),
@@ -72,7 +82,7 @@ func (s *RenderSystem) Draw(screen *ebiten.Image, cameraX float64) {
 			continue
 		}
 
-		// 跳过阳光（留到最后渲染）
+		// 跳过阳光（由 DrawSuns 方法单独渲染）
 		_, isSun := s.entityManager.GetComponent(id, reflect.TypeOf(&components.SunComponent{}))
 		if isSun {
 			continue
@@ -80,8 +90,21 @@ func (s *RenderSystem) Draw(screen *ebiten.Image, cameraX float64) {
 
 		s.drawEntity(screen, id, cameraX)
 	}
+}
 
-	// 第三遍：渲染阳光（最上层）
+// DrawSuns 单独渲染阳光（最顶层）
+// 用于确保阳光显示在所有UI元素（包括植物卡片）之上，便于玩家点击收集
+// 参数:
+//   - screen: 绘制目标屏幕
+//   - cameraX: 摄像机的世界坐标X位置
+func (s *RenderSystem) DrawSuns(screen *ebiten.Image, cameraX float64) {
+	// 查询所有拥有 PositionComponent 和 SpriteComponent 的实体
+	entities := s.entityManager.GetEntitiesWith(
+		reflect.TypeOf(&components.PositionComponent{}),
+		reflect.TypeOf(&components.SpriteComponent{}),
+	)
+
+	// 只渲染阳光
 	for _, id := range entities {
 		// 跳过植物卡片实体
 		if _, hasPlantCard := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PlantCardComponent{})); hasPlantCard {

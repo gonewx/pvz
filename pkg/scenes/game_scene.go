@@ -444,22 +444,26 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	s.drawSeedBank(screen)
 	s.drawShovel(screen)
 
-	// Layer 3: Draw all game entities (suns, plants, zombies, etc.)
-	// This ensures suns appear on top of the seed bank
+	// Layer 3: Draw game world entities (plants, zombies, projectiles) - 不包括阳光
+	// Uses the render system to draw game entities, but suns are deferred to Layer 7
 	// 传递 cameraX 以正确转换世界坐标到屏幕坐标
-	s.renderSystem.Draw(screen, s.cameraX)
+	s.renderSystem.DrawGameWorld(screen, s.cameraX)
 
 	// Layer 4: Draw UI overlays (sun counter text)
-	// Drawn last to ensure text is always visible
+	// Drawn after game entities to ensure text is always visible
 	s.drawSunCounter(screen)
 
 	// Layer 5: Draw plant cards (Story 3.1)
-	// Drawn on top of everything for best visibility
+	// Drawn on top of game entities for best visibility
 	s.plantCardRenderSystem.Draw(screen)
 
 	// Layer 6: Draw plant preview (Story 3.2)
-	// Drawn on top of everything including plant cards
+	// Drawn on top of plant cards to show dragging preview
 	s.plantPreviewRenderSystem.Draw(screen)
+
+	// Layer 7: Draw suns (阳光) - 最顶层
+	// Drawn last to ensure suns are always clickable and visible above all UI elements including cards
+	s.renderSystem.DrawSuns(screen, s.cameraX)
 
 	// DEBUG: Draw grid boundaries (Story 3.3 debugging)
 	s.drawGridDebug(screen)
