@@ -98,6 +98,25 @@ const (
 	//   3. 部署豌豆射手攻击僵尸，听音效是否合适
 	//   4. 选择最不突兀、最符合游戏风格的音效
 	ZombieHitSoundPath = "assets/audio/Sound/tap.ogg"
+
+	// PeashooterShootSoundPath 豌豆射手发射子弹的音效文件路径
+	// 
+	// 🎵 可用音效选项：
+	//   - "" (空字符串)                        - 不播放音效（静音）
+	//   - "assets/audio/Sound/kernelpult2.ogg" - 玉米投手发射音（略重）
+	//   - "assets/audio/Sound/tap.ogg"         - 轻敲音（轻快）
+	//   - "assets/audio/Sound/buttonclick.ogg" - 点击音（清脆）
+	// 
+	// 📝 说明：
+	//   原版游戏中豌豆射手发射音效非常轻微，几乎听不到
+	//   如果希望保持原版体验，建议设置为空字符串 ""
+	//   如果希望增强反馈感，可以选择轻快的音效
+	// 
+	// 💡 推荐设置：
+	//   - 静音模式（原版风格）: ""
+	//   - 轻量反馈: "assets/audio/Sound/tap.ogg"
+	//   - 明显反馈: "assets/audio/Sound/buttonclick.ogg"
+	PeashooterShootSoundPath = "" // 默认：不播放（保持原版风格）
 )
 
 // Plant Configuration (植物配置)

@@ -371,6 +371,9 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 			bulletStartX := peashooterPos.X + config.PeaBulletOffsetX
 			bulletStartY := peashooterPos.Y + config.PeaBulletOffsetY
 
+			// 播放发射音效（如果配置了音效路径）
+			s.playShootSound()
+
 			// 创建豌豆子弹实体
 			bulletID, err := entities.NewPeaProjectile(s.entityManager, s.resourceManager, bulletStartX, bulletStartY)
 			if err != nil {
@@ -453,4 +456,29 @@ func (s *BehaviorSystem) handleZombieDyingBehavior(entityID ecs.EntityID) {
 		log.Printf("[BehaviorSystem] 僵尸 %d 死亡动画完成，删除实体", entityID)
 		s.entityManager.DestroyEntity(entityID)
 	}
+}
+
+// playShootSound 播放豌豆射手发射子弹的音效
+// 使用配置文件中定义的音效（config.PeashooterShootSoundPath）
+// 如果配置为空字符串，则不播放音效（静音模式）
+func (s *BehaviorSystem) playShootSound() {
+	// 如果配置为空字符串，不播放音效（保持原版静音风格）
+	if config.PeashooterShootSoundPath == "" {
+		return
+	}
+
+	// 加载发射音效（如果已加载，会返回缓存的播放器）
+	// 音效路径在 pkg/config/unit_config.go 中配置，可根据需要切换测试
+	shootSound, err := s.resourceManager.LoadSoundEffect(config.PeashooterShootSoundPath)
+	if err != nil {
+		// 音效加载失败时不阻止游戏继续运行
+		// 在实际项目中可以使用日志系统记录错误
+		return
+	}
+
+	// 重置播放器位置到开头（允许快速连续播放）
+	shootSound.Rewind()
+
+	// 播放音效
+	shootSound.Play()
 }
