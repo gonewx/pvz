@@ -10,6 +10,10 @@ type GameState struct {
 	// Story 3.2: 种植模式状态
 	IsPlantingMode    bool                 // 是否处于种植模式
 	SelectedPlantType components.PlantType // 当前选择的植物类型
+
+	// 摄像机位置（世界坐标系统）
+	CameraX float64 // 摄像机X位置，用于世界坐标和屏幕坐标转换
+
 	// 未来可扩展：Level, Wave, Score 等
 }
 

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/utils"
@@ -19,6 +20,8 @@ func TestNewPlantEntity(t *testing.T) {
 	// 初始化资源管理器和实体管理器
 	rm := game.NewResourceManager(testAudioContext)
 	em := ecs.NewEntityManager()
+	gs := game.GetGameState()
+	gs.CameraX = 215 // 设置为游戏默认摄像机位置
 
 	tests := []struct {
 		name      string
@@ -49,7 +52,7 @@ func TestNewPlantEntity(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// 创建植物实体
-			plantID, err := NewPlantEntity(em, rm, tt.plantType, tt.col, tt.row)
+			plantID, err := NewPlantEntity(em, rm, gs, tt.plantType, tt.col, tt.row)
 			if err != nil {
 				t.Fatalf("Failed to create plant entity: %v", err)
 			}
@@ -64,7 +67,12 @@ func TestNewPlantEntity(t *testing.T) {
 				t.Error("Plant entity should have PositionComponent")
 			} else {
 				pos := posComp.(*components.PositionComponent)
-				expectedX, expectedY := utils.GridToScreenCoords(tt.col, tt.row)
+				expectedX, expectedY := utils.GridToScreenCoords(
+					tt.col, tt.row,
+					gs.CameraX,
+					config.GridWorldStartX, config.GridWorldStartY,
+					config.CellWidth, config.CellHeight,
+				)
 				if pos.X != expectedX || pos.Y != expectedY {
 					t.Errorf("Position mismatch: got (%.1f, %.1f), want (%.1f, %.1f)",
 						pos.X, pos.Y, expectedX, expectedY)
@@ -106,6 +114,8 @@ func TestNewPlantEntity(t *testing.T) {
 func TestNewPlantEntity_AllPlantTypes(t *testing.T) {
 	rm := game.NewResourceManager(testAudioContext)
 	em := ecs.NewEntityManager()
+	gs := game.GetGameState()
+	gs.CameraX = 215 // 设置为游戏默认摄像机位置
 
 	plantTypes := []struct {
 		name      string
@@ -117,7 +127,7 @@ func TestNewPlantEntity_AllPlantTypes(t *testing.T) {
 
 	for _, pt := range plantTypes {
 		t.Run(pt.name, func(t *testing.T) {
-			plantID, err := NewPlantEntity(em, rm, pt.plantType, 4, 2)
+			plantID, err := NewPlantEntity(em, rm, gs, pt.plantType, 4, 2)
 			if err != nil {
 				t.Fatalf("Failed to create plant of type %s: %v", pt.name, err)
 			}
@@ -144,6 +154,8 @@ func TestNewPlantEntity_AllPlantTypes(t *testing.T) {
 func TestNewPlantEntity_PositionCalculation(t *testing.T) {
 	rm := game.NewResourceManager(testAudioContext)
 	em := ecs.NewEntityManager()
+	gs := game.GetGameState()
+	gs.CameraX = 215 // 设置为游戏默认摄像机位置
 
 	// 测试网格的所有四个角
 	corners := []struct {
@@ -159,7 +171,7 @@ func TestNewPlantEntity_PositionCalculation(t *testing.T) {
 
 	for _, corner := range corners {
 		t.Run(corner.name, func(t *testing.T) {
-			plantID, err := NewPlantEntity(em, rm, components.PlantSunflower, corner.col, corner.row)
+			plantID, err := NewPlantEntity(em, rm, gs, components.PlantSunflower, corner.col, corner.row)
 			if err != nil {
 				t.Fatalf("Failed to create plant at %s: %v", corner.name, err)
 			}
@@ -170,7 +182,12 @@ func TestNewPlantEntity_PositionCalculation(t *testing.T) {
 			}
 
 			pos := posComp.(*components.PositionComponent)
-			expectedX, expectedY := utils.GridToScreenCoords(corner.col, corner.row)
+			expectedX, expectedY := utils.GridToScreenCoords(
+				corner.col, corner.row,
+				gs.CameraX,
+				config.GridWorldStartX, config.GridWorldStartY,
+				config.CellWidth, config.CellHeight,
+			)
 
 			if pos.X != expectedX || pos.Y != expectedY {
 				t.Errorf("%s position incorrect: got (%.1f, %.1f), want (%.1f, %.1f)",

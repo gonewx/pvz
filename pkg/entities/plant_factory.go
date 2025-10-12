@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/utils"
@@ -15,6 +16,7 @@ import (
 // 参数:
 //   - em: 实体管理器
 //   - rm: 资源管理器（用于加载植物图像）
+//   - gs: 游戏状态（用于获取摄像机位置）
 //   - plantType: 植物类型（向日葵、豌豆射手等）
 //   - col: 网格列索引 (0-8)
 //   - row: 网格行索引 (0-4)
@@ -22,9 +24,14 @@ import (
 // 返回:
 //   - ecs.EntityID: 创建的植物实体ID，如果失败返回 0
 //   - error: 如果创建失败返回错误信息
-func NewPlantEntity(em *ecs.EntityManager, rm *game.ResourceManager, plantType components.PlantType, col, row int) (ecs.EntityID, error) {
-	// 计算格子中心坐标
-	centerX, centerY := utils.GridToScreenCoords(col, row)
+func NewPlantEntity(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.GameState, plantType components.PlantType, col, row int) (ecs.EntityID, error) {
+	// 计算格子中心坐标（使用世界坐标系统）
+	centerX, centerY := utils.GridToScreenCoords(
+		col, row,
+		gs.CameraX,
+		config.GridWorldStartX, config.GridWorldStartY,
+		config.CellWidth, config.CellHeight,
+	)
 
 	// 获取植物图像路径
 	imagePath := utils.GetPlantImagePath(plantType)

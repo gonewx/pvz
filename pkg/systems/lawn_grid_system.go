@@ -5,8 +5,8 @@ import (
 	"reflect"
 
 	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/utils"
 )
 
 // LawnGridSystem 管理草坪网格的占用状态
@@ -108,5 +108,5 @@ func (s *LawnGridSystem) ReleaseCell(gridEntity ecs.EntityID, col, row int) erro
 
 // isValidGridPosition 检查网格位置是否有效
 func (s *LawnGridSystem) isValidGridPosition(col, row int) bool {
-	return col >= 0 && col < utils.GridColumns && row >= 0 && row < utils.GridRows
+	return col >= 0 && col < config.GridColumns && row >= 0 && row < config.GridRows
 }

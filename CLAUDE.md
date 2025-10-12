@@ -273,6 +273,37 @@ go test -v ./pkg/systems
 5. DamageSystem 处理事件,减少僵尸生命值
 6. BehaviorSystem 检测生命值<=0,标记僵尸待删除
 
+## 坐标系统使用指南
+
+### 世界坐标 vs 屏幕坐标
+
+本项目使用**世界坐标系统**：
+- **世界坐标**：相对于背景图片左上角（固定）
+- **屏幕坐标**：相对于游戏窗口左上角（随摄像机移动）
+- **转换公式**：`worldX = screenX + cameraX`
+
+### 何时使用哪种坐标？
+
+| 场景 | 使用坐标类型 | 示例 |
+|------|------------|------|
+| 组件存储位置 | 世界坐标 | `PositionComponent.X/Y` |
+| 网格定义 | 世界坐标 | `config.GridWorldStartX` |
+| 鼠标输入 | 屏幕坐标 | `ebiten.CursorPosition()` |
+| 渲染绘制 | 屏幕坐标 | `screen.DrawImage()` |
+
+### 坐标转换工具
+
+使用 `pkg/utils/grid_utils.go` 中的函数：
+```go
+// 鼠标 → 网格
+col, row, valid := utils.MouseToGridCoords(mouseX, mouseY, gs.CameraX, ...)
+
+// 网格 → 屏幕
+screenX, screenY := utils.GridToScreenCoords(col, row, gs.CameraX, ...)
+```
+
+**详细设计参见：** `docs/architecture/coordinate-system.md`
+
 ## 数据驱动设计
 
 ### 关卡配置示例 (data/levels/level_1-1.yaml)

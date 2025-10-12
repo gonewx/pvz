@@ -7,11 +7,11 @@ import (
 	"log"
 
 	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/systems"
-	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
@@ -48,7 +48,7 @@ const (
 	// The background image is wider than the window, we show only a portion
 	IntroAnimDuration = 3.0 // Duration of intro animation in seconds
 	CameraScrollSpeed = 100 // Pixels per second for intro animation
-	GameCameraX       = 220 // Final camera X position for gameplay (centered on lawn)
+	GameCameraX       = 215 // Final camera X position for gameplay (centered on lawn)
 )
 
 // GameScene represents the main gameplay screen.
@@ -290,8 +290,13 @@ func (s *GameScene) Update(deltaTime float64) {
 	// Handle intro animation
 	if s.isIntroAnimPlaying {
 		s.updateIntroAnimation(deltaTime)
+		// 同步摄像机位置到全局状态（即使在动画期间也保持同步）
+		s.gameState.CameraX = s.cameraX
 		return // Don't update game systems during intro animation
 	}
+
+	// 同步摄像机位置到全局状态（供所有系统使用）
+	s.gameState.CameraX = s.cameraX
 
 	// Update all ECS systems in order (order matters for correct game logic)
 	s.plantCardSystem.Update(deltaTime)     // 1. Update plant card states (before input)
@@ -523,26 +528,31 @@ func (s *GameScene) drawGridDebug(screen *ebiten.Image) {
 		return
 	}
 
-	// 使用统一的网格参数（从 utils.grid_utils.go）
-	gridStartX := utils.GridStartX
-	gridStartY := utils.GridStartY
-	gridColumns := utils.GridColumns
-	gridRows := utils.GridRows
-	cellWidth := utils.CellWidth
-	cellHeight := utils.CellHeight
+	// 使用统一的网格参数（从 config.layout_config.go）
+	// 注意：这里使用的是世界坐标，需要转换为屏幕坐标
+	gridWorldStartX := config.GridWorldStartX
+	gridWorldStartY := config.GridWorldStartY
+	gridColumns := config.GridColumns
+	gridRows := config.GridRows
+	cellWidth := config.CellWidth
+	cellHeight := config.CellHeight
+
+	// 将网格世界坐标转换为屏幕坐标
+	gridScreenStartX := gridWorldStartX - s.cameraX
+	gridScreenStartY := gridWorldStartY
 
 	// 绘制网格线
 	gridColor := color.RGBA{R: 255, G: 255, B: 0, A: 128} // 半透明黄色
 
 	// 绘制垂直线
 	for col := 0; col <= gridColumns; col++ {
-		x := gridStartX + float64(col)*cellWidth
-		ebitenutil.DrawLine(screen, x, gridStartY, x, gridStartY+float64(gridRows)*cellHeight, gridColor)
+		x := gridScreenStartX + float64(col)*cellWidth
+		ebitenutil.DrawLine(screen, x, gridScreenStartY, x, gridScreenStartY+float64(gridRows)*cellHeight, gridColor)
 	}
 
 	// 绘制水平线
 	for row := 0; row <= gridRows; row++ {
-		y := gridStartY + float64(row)*cellHeight
-		ebitenutil.DrawLine(screen, gridStartX, y, gridStartX+float64(gridColumns)*cellWidth, y, gridColor)
+		y := gridScreenStartY + float64(row)*cellHeight
+		ebitenutil.DrawLine(screen, gridScreenStartX, y, gridScreenStartX+float64(gridColumns)*cellWidth, y, gridColor)
 	}
 }

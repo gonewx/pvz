@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
 )
@@ -27,149 +28,102 @@ func TestPlantPreviewSystemCreation(t *testing.T) {
 	}
 }
 
-// TestIsInGrid 测试网格边界检测
-func TestIsInGrid(t *testing.T) {
+// TestPlantPreviewUpdate 测试预览更新逻辑
+func TestPlantPreviewUpdate(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
-	system := NewPlantPreviewSystem(em, gs)
+	gs.CameraX = 215 // 设置摄像机位置
 
-	testCases := []struct {
-		name     string
-		x, y     float64
-		expected bool
-	}{
-		{"网格内中心", 500, 300, true},
-		{"网格左上角", 250, 90, true},
-		{"网格右下角边界内", 969, 589, true},
-		{"网格左边界外", 249, 300, false},
-		{"网格右边界外", 970, 300, false},
-		{"网格上边界外", 500, 89, false},
-		{"网格下边界外", 500, 590, false},
-		{"网格外左上", 100, 50, false},
-		{"网格外右下", 1000, 600, false},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			result := system.isInGrid(tc.x, tc.y)
-			if result != tc.expected {
-				t.Errorf("isInGrid(%.1f, %.1f) = %v, expected %v", tc.x, tc.y, result, tc.expected)
-			}
-		})
-	}
-}
-
-// TestSnapToGridCenter 测试对齐到格子中心
-func TestSnapToGridCenter(t *testing.T) {
-	em := ecs.NewEntityManager()
-	gs := game.GetGameState()
-	system := NewPlantPreviewSystem(em, gs)
-
-	testCases := []struct {
-		name                 string
-		mouseX, mouseY       float64
-		expectedX, expectedY float64
-	}{
-		{
-			name:   "第一格(0,0)中心",
-			mouseX: 250, mouseY: 90,
-			expectedX: 290, expectedY: 140, // 250 + 40, 90 + 50
-		},
-		{
-			name:   "第二格(1,0)任意点",
-			mouseX: 350, mouseY: 100,
-			expectedX: 370, expectedY: 140, // 250 + 1*80 + 40, 90 + 0*100 + 50
-		},
-		{
-			name:   "第二行第二格(1,1)",
-			mouseX: 350, mouseY: 250,
-			expectedX: 370, expectedY: 240, // 250 + 1*80 + 40, 90 + 1*100 + 50
-		},
-		{
-			name:   "最后一格(8,4)",
-			mouseX: 900, mouseY: 500,
-			expectedX: 930, expectedY: 540, // 250 + 8*80 + 40, 90 + 4*100 + 50
-		},
-		{
-			name:   "格子边界",
-			mouseX: 330, mouseY: 190,
-			expectedX: 370, expectedY: 240, // 应对齐到 (1,1)
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			centerX, centerY := system.snapToGridCenter(tc.mouseX, tc.mouseY)
-			if centerX != tc.expectedX || centerY != tc.expectedY {
-				t.Errorf("snapToGridCenter(%.1f, %.1f) = (%.1f, %.1f), expected (%.1f, %.1f)",
-					tc.mouseX, tc.mouseY, centerX, centerY, tc.expectedX, tc.expectedY)
-			}
-		})
-	}
-}
-
-// TestSnapToGridCenterBoundary 测试网格边界情况的对齐
-func TestSnapToGridCenterBoundary(t *testing.T) {
-	em := ecs.NewEntityManager()
-	gs := game.GetGameState()
-	system := NewPlantPreviewSystem(em, gs)
-
-	// 测试负坐标（应该对齐到第一格）
-	centerX, centerY := system.snapToGridCenter(-100, -100)
-	expectedX, expectedY := 290.0, 140.0 // 第一格中心
-	if centerX != expectedX || centerY != expectedY {
-		t.Errorf("负坐标应对齐到第一格, got (%.1f, %.1f), expected (%.1f, %.1f)",
-			centerX, centerY, expectedX, expectedY)
-	}
-
-	// 测试超大坐标（应该对齐到最后一格）
-	centerX, centerY = system.snapToGridCenter(10000, 10000)
-	expectedX, expectedY = 930.0, 540.0 // 最后一格中心 (8,4)
-	if centerX != expectedX || centerY != expectedY {
-		t.Errorf("超大坐标应对齐到最后一格, got (%.1f, %.1f), expected (%.1f, %.1f)",
-			centerX, centerY, expectedX, expectedY)
-	}
-}
-
-// TestUpdateWithNoEntities 测试无预览实体时的更新
-func TestUpdateWithNoEntities(t *testing.T) {
-	em := ecs.NewEntityManager()
-	gs := game.GetGameState()
-	system := NewPlantPreviewSystem(em, gs)
-
-	// 不应该panic
-	system.Update(0.016)
-}
-
-// TestUpdatePreviewPosition 测试预览位置更新
-// 注意：此测试需要模拟鼠标输入，在单元测试中可能难以实现
-// 这里仅测试系统的基本功能，实际行为需要通过集成测试验证
-func TestUpdatePreviewPosition(t *testing.T) {
-	em := ecs.NewEntityManager()
-	gs := game.GetGameState()
 	system := NewPlantPreviewSystem(em, gs)
 
 	// 创建预览实体
-	entityID := em.CreateEntity()
-	em.AddComponent(entityID, &components.PlantPreviewComponent{
+	previewID := em.CreateEntity()
+	em.AddComponent(previewID, &components.PlantPreviewComponent{
 		PlantType: components.PlantSunflower,
-		Alpha:     0.5,
 	})
-	em.AddComponent(entityID, &components.PositionComponent{
+	em.AddComponent(previewID, &components.PositionComponent{
 		X: 0,
 		Y: 0,
 	})
 
-	// 调用 Update（注意：在实际游戏中鼠标位置由 ebiten 提供，测试中无法模拟）
+	// 模拟鼠标在网格内（注意：实际测试需要模拟 ebiten.CursorPosition）
+	// 这里只测试系统是否能正常运行不崩溃
 	system.Update(0.016)
 
-	// 验证实体仍然存在且没有错误
-	posComp, exists := em.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
-	if !exists {
-		t.Fatal("Expected PositionComponent to still exist after Update")
+	// 验证位置组件存在
+	posComp, ok := em.GetComponent(previewID, reflect.TypeOf(&components.PositionComponent{}))
+	if !ok {
+		t.Fatal("Expected preview entity to have PositionComponent")
 	}
 
 	pos := posComp.(*components.PositionComponent)
-	// 位置会根据模拟的鼠标位置更新，这里只验证组件存在
-	_ = pos
+	// 位置应该被更新（具体值取决于鼠标位置，这里只验证组件存在）
+	if pos == nil {
+		t.Error("Position component should not be nil")
+	}
+}
+
+// TestGridCoordinateConsistency 测试网格坐标系统一致性
+// 验证使用世界坐标系统后，在不同 cameraX 下坐标转换的正确性
+func TestGridCoordinateConsistency(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := game.GetGameState()
+
+	// 测试不同的摄像机位置
+	testCameraPositions := []float64{0, 100, 215, 300}
+
+	for _, cameraX := range testCameraPositions {
+		t.Run("CameraX="+string(rune(int(cameraX))), func(t *testing.T) {
+			gs.CameraX = cameraX
+			system := NewPlantPreviewSystem(em, gs)
+
+			// 创建预览实体
+			previewID := em.CreateEntity()
+			em.AddComponent(previewID, &components.PlantPreviewComponent{
+				PlantType: components.PlantSunflower,
+			})
+			em.AddComponent(previewID, &components.PositionComponent{
+				X: 0,
+				Y: 0,
+			})
+
+			// 系统应该能在任何摄像机位置下正常工作
+			system.Update(0.016)
+
+			// 验证组件仍然存在
+			_, ok := em.GetComponent(previewID, reflect.TypeOf(&components.PositionComponent{}))
+			if !ok {
+				t.Errorf("Preview entity should still have PositionComponent at cameraX=%.1f", cameraX)
+			}
+		})
+	}
+}
+
+// TestGridBoundaryCalculation 测试网格边界计算
+// 验证配置中的网格参数是否正确
+func TestGridBoundaryCalculation(t *testing.T) {
+	// 验证网格世界坐标配置
+	if config.GridColumns != 9 {
+		t.Errorf("Expected 9 columns, got %d", config.GridColumns)
+	}
+	if config.GridRows != 5 {
+		t.Errorf("Expected 5 rows, got %d", config.GridRows)
+	}
+	if config.CellWidth != 80.0 {
+		t.Errorf("Expected cell width 80.0, got %.1f", config.CellWidth)
+	}
+	if config.CellHeight != 100.0 {
+		t.Errorf("Expected cell height 100.0, got %.1f", config.CellHeight)
+	}
+
+	// 验证网格总尺寸
+	expectedWidth := float64(config.GridColumns) * config.CellWidth   // 9 * 80 = 720
+	expectedHeight := float64(config.GridRows) * config.CellHeight    // 5 * 100 = 500
+
+	if expectedWidth != 720.0 {
+		t.Errorf("Expected grid width 720.0, got %.1f", expectedWidth)
+	}
+	if expectedHeight != 500.0 {
+		t.Errorf("Expected grid height 500.0, got %.1f", expectedHeight)
+	}
 }

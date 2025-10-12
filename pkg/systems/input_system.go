@@ -6,6 +6,7 @@ import (
 	"reflect"
 
 	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
@@ -322,8 +323,14 @@ func (s *InputSystem) handleLawnClick(mouseX, mouseY int) bool {
 		return false // 不在种植模式，不处理
 	}
 
-	// 转换鼠标坐标到网格坐标
-	col, row, isValid := utils.MouseToGridCoords(mouseX, mouseY)
+	// 转换鼠标坐标到网格坐标（使用世界坐标系统）
+	col, row, isValid := utils.MouseToGridCoords(
+		mouseX, mouseY,
+		s.gameState.CameraX,
+		config.GridWorldStartX, config.GridWorldStartY,
+		config.GridColumns, config.GridRows,
+		config.CellWidth, config.CellHeight,
+	)
 	if !isValid {
 		log.Printf("[InputSystem] 鼠标点击在网格外: (%d, %d)", mouseX, mouseY)
 		return false // 点击在网格外
@@ -392,7 +399,7 @@ func (s *InputSystem) handleLawnClick(mouseX, mouseY int) bool {
 // createPlantEntity 创建植物实体的辅助方法
 // 使用 entities.NewPlantEntity 工厂函数以保持一致性
 func (s *InputSystem) createPlantEntity(plantType components.PlantType, col, row int) (ecs.EntityID, error) {
-	return entities.NewPlantEntity(s.entityManager, s.resourceManager, plantType, col, row)
+	return entities.NewPlantEntity(s.entityManager, s.resourceManager, s.gameState, plantType, col, row)
 }
 
 // getPlantCost 获取植物的阳光消耗

@@ -1,65 +1,92 @@
 package utils
 
-// 草坪网格参数常量
-// 这些常量定义了游戏草坪的网格布局,用于植物种植系统
-const (
-	GridStartX  = 250.0 // 网格起始X坐标
-	GridStartY  = 90.0  // 网格起始Y坐标
-	GridColumns = 9     // 网格列数
-	GridRows    = 5     // 网格行数
-	CellWidth   = 80.0  // 每格宽度
-	CellHeight  = 100.0 // 每格高度
-)
+// 草坪网格坐标转换工具函数
+// 本文件提供通用的网格坐标系统转换函数
+// 使用世界坐标系统：所有坐标相对于背景图片左上角，不随摄像机移动而变化
+//
+// 坐标系统说明：
+//   - 世界坐标：相对于背景图片左上角的绝对坐标（固定）
+//   - 屏幕坐标：相对于游戏窗口左上角的坐标（随摄像机移动）
+//   - 转换公式：worldX = screenX + cameraX
+//              screenX = worldX - cameraX
 
 // MouseToGridCoords 将鼠标屏幕坐标转换为草坪网格坐标
+//
 // 参数:
-//   - mouseX, mouseY: 鼠标的屏幕坐标
+//   - mouseX, mouseY: 鼠标的屏幕坐标（相对于游戏窗口左上角）
+//   - cameraX: 当前摄像机的X位置（世界坐标偏移量）
+//   - gridWorldStartX, gridWorldStartY: 网格在背景图片中的起始位置（世界坐标）
+//   - columns, rows: 网格的列数和行数
+//   - cellWidth, cellHeight: 每个格子的宽度和高度（像素）
 //
 // 返回:
-//   - col: 列索引 (0-8)
-//   - row: 行索引 (0-4)
+//   - col: 列索引 (0 到 columns-1)
+//   - row: 行索引 (0 到 rows-1)
 //   - isValid: 是否在有效网格范围内
-func MouseToGridCoords(mouseX, mouseY int) (col, row int, isValid bool) {
-	x := float64(mouseX)
-	y := float64(mouseY)
+func MouseToGridCoords(
+	mouseX, mouseY int,
+	cameraX float64,
+	gridWorldStartX, gridWorldStartY float64,
+	columns, rows int,
+	cellWidth, cellHeight float64,
+) (col, row int, isValid bool) {
+	// 将鼠标屏幕坐标转换为世界坐标
+	worldX := float64(mouseX) + cameraX
+	worldY := float64(mouseY)
+
+	// 计算网格的世界坐标边界
+	gridEndX := gridWorldStartX + float64(columns)*cellWidth
+	gridEndY := gridWorldStartY + float64(rows)*cellHeight
 
 	// 检查是否在网格范围内
-	gridEndX := GridStartX + float64(GridColumns)*CellWidth
-	gridEndY := GridStartY + float64(GridRows)*CellHeight
-
-	if x < GridStartX || x >= gridEndX || y < GridStartY || y >= gridEndY {
+	if worldX < gridWorldStartX || worldX >= gridEndX || worldY < gridWorldStartY || worldY >= gridEndY {
 		return 0, 0, false
 	}
 
 	// 计算列和行索引
-	col = int((x - GridStartX) / CellWidth)
-	row = int((y - GridStartY) / CellHeight)
+	col = int((worldX - gridWorldStartX) / cellWidth)
+	row = int((worldY - gridWorldStartY) / cellHeight)
 
 	// 边界检查（防止浮点数计算误差导致的越界）
 	if col < 0 {
 		col = 0
-	} else if col >= GridColumns {
-		col = GridColumns - 1
+	} else if col >= columns {
+		col = columns - 1
 	}
 
 	if row < 0 {
 		row = 0
-	} else if row >= GridRows {
-		row = GridRows - 1
+	} else if row >= rows {
+		row = rows - 1
 	}
 
 	return col, row, true
 }
 
 // GridToScreenCoords 将草坪网格坐标转换为屏幕中心坐标
+//
 // 参数:
-//   - col: 列索引 (0-8)
-//   - row: 行索引 (0-4)
+//   - col: 列索引 (0 到 columns-1)
+//   - row: 行索引 (0 到 rows-1)
+//   - cameraX: 当前摄像机的X位置（世界坐标偏移量）
+//   - gridWorldStartX, gridWorldStartY: 网格在背景图片中的起始位置（世界坐标）
+//   - cellWidth, cellHeight: 每个格子的宽度和高度（像素）
 //
 // 返回:
 //   - centerX, centerY: 格子中心的屏幕坐标
-func GridToScreenCoords(col, row int) (centerX, centerY float64) {
-	centerX = GridStartX + float64(col)*CellWidth + CellWidth/2
-	centerY = GridStartY + float64(row)*CellHeight + CellHeight/2
+func GridToScreenCoords(
+	col, row int,
+	cameraX float64,
+	gridWorldStartX, gridWorldStartY float64,
+	cellWidth, cellHeight float64,
+) (centerX, centerY float64) {
+	// 先计算格子中心的世界坐标
+	worldCenterX := gridWorldStartX + float64(col)*cellWidth + cellWidth/2
+	worldCenterY := gridWorldStartY + float64(row)*cellHeight + cellHeight/2
+
+	// 转换为屏幕坐标
+	centerX = worldCenterX - cameraX
+	centerY = worldCenterY
+
 	return centerX, centerY
 }
