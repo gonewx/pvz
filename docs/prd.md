@@ -14,6 +14,7 @@
 | Date | Version | Description | Author |
 | :--- | :--- | :--- | :--- |
 | 2025-10-10 | 1.0 | Initial draft creation from Project Brief. | John (PM) |
+| 2025-10-13 | 1.1 | Added Epic 6: Animation System Migration - Reanim. | Sarah (PO) |
 
 ## **2. Requirements (需求)**
 
@@ -110,6 +111,8 @@
     *   **目标:** 在游戏中引入基础的僵尸（普通僵尸），实现僵尸的移动、植物的自动攻击（豌豆射手）以及子弹与僵尸的碰撞和伤害计算。
 *   **Epic 5: 游戏流程与高级单位 (Game Flow & Advanced Units)**
     *   **目标:** 实现完整的关卡流程控制（僵尸波次、进度条），并引入更复杂的单位（坚果墙、樱桃炸弹、路障/铁桶僵尸）来完成MVP的全部核心玩法。
+*   **Epic 6: 动画系统迁移 - 原版 Reanim 骨骼动画系统 (Animation System Migration - Reanim)**
+    *   **目标:** 将简单帧动画系统直接替换为原版 PVZ 的 Reanim 骨骼动画系统，实现 100% 还原原版动画效果，支持部件变换和复杂动画表现。
 
 ## **Epic 1: 游戏基础框架与主循环 (Game Foundation & Main Loop)**
 **史诗目标:** 搭建整个Go+Ebitengine项目的基本结构，创建一个可以运行的空窗口，并实现游戏的核心状态管理和主菜单。这是所有后续功能的基础。
@@ -395,9 +398,56 @@
 1.  游戏会从一个外部配置文件（例如 `level-1-1.json`）加载关卡数据。
 2.  关卡数据定义了僵尸出现的波次、每一波的僵尸类型和数量。
 3.  游戏界面右下角会有一个关卡进度条，显示当前波次和总波次。
-4.  在最后一波僵尸到来之前，屏幕上会出现“A huge wave of zombies is approaching”的提示。
+4.  在最后一波僵尸到来之前，屏幕上会出现"A huge wave of zombies is approaching"的提示。
 5.  当玩家消灭所有波次的僵尸后，游戏会暂停，并显示胜利界面。
 6.  如果任何一个僵尸走到了屏幕最左端，游戏会立即暂停，并显示失败界面。
+
+## **Epic 6: 动画系统迁移 - 原版 Reanim 骨骼动画系统 (Animation System Migration - Reanim)**
+**史诗目标:** 将当前基于简单帧数组的动画系统直接替换为原版 PVZ 的 Reanim 骨骼动画系统，实现 100% 还原原版动画效果，支持部件变换和复杂动画表现。
+
+**背景:** 现有的简单帧数组动画系统无法实现原版 PVZ 的精细动画效果。项目已准备好原版 Reanim 资源（`assets/reanim/*.reanim` 和部件图片），并有参考实现可供借鉴。本 Epic 采用直接替换策略，不考虑向后兼容性，以简化实现。
+
+---
+**Story 6.1: Reanim 基础设施（解析器和资源加载）**
+> **As a** 开发者,
+> **I want** to parse Reanim XML files and load sprite parts,
+> **so that** I can use original PVZ animation data.
+
+**Acceptance Criteria:**
+1.  实现 `ReanimXML`, `Track`, `Frame` 数据结构（对应原版格式）。
+2.  实现 XML 解析器 `internal/reanim/parser.go`。
+3.  解析器能成功解析至少 3 个 Reanim 文件（PeaShooter, Sunflower, Wallnut）。
+4.  实现资源加载器扩展，支持按 Reanim 定义加载部件图片。
+5.  单元测试覆盖率 ≥ 80%。
+6.  与参考实现 `test_animation_viewer.go` 的数据结构对比验证。
+
+---
+**Story 6.2: ReanimComponent 和 ReanimSystem（核心动画逻辑）**
+> **As a** 开发者,
+> **I want** to replace the old animation system with Reanim system,
+> **so that** entities can use complex skeletal animations.
+
+**Acceptance Criteria:**
+1.  **删除** `pkg/components/animation.go` 和 `pkg/systems/animation_system.go`（旧动画系统）。
+2.  **创建** `pkg/components/reanim_component.go`（新组件，包含部件图片映射和动画状态）。
+3.  **创建** `pkg/systems/reanim_system.go`（新系统，实现动画播放逻辑）。
+4.  实现帧推进、循环、FPS 控制逻辑。
+5.  实现帧缓存机制（处理空帧继承，原版特性）。
+6.  单元测试覆盖率 ≥ 80%。
+
+---
+**Story 6.3: 渲染系统改造和实体迁移**
+> **As a** 开发者,
+> **I want** to update the render system and all entities to use Reanim,
+> **so that** the game displays animations with original PVZ quality.
+
+**Acceptance Criteria:**
+1.  **修改** `pkg/systems/render_system.go`，删除旧渲染逻辑，实现 Reanim 部件渲染。
+2.  支持部件变换：位置（X, Y）、缩放（ScaleX, ScaleY）、倾斜（SkewX, SkewY）。
+3.  **更新** 所有实体工厂函数（豌豆射手、向日葵、坚果墙、僵尸等）使用 `ReanimComponent`。
+4.  游戏可正常启动，显示主菜单和游戏场景。
+5.  关卡 1-1 可正常运行，所有动画流畅播放（60 FPS）。
+6.  动画效果与参考实现 `test_animation_viewer` 一致。
 
 ## **6. Checklist Results Report (清单检查结果报告)**
 

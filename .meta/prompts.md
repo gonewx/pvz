@@ -14,3 +14,7 @@
 ## 5.3
 
 - 还有2个问题，卡片会渲染在植物和僵尸上面。坚果墙一放，帽子僵尸帽子就会消失，是被攻击了吗？
+
+## aniamtion migration
+
+/mnt/disk0/project/game/pvz/ck/pvzwine_reverse 这个项目是对原版游戏资源数据的研究与解析， 请结合测试程序，将我们之前实现的基于动画帧的动画系统，改为使用和原版游戏同样的动画系统。 解析后的资源已经放在 assets/reanim， assets/reanim/images。
