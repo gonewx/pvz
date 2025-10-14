@@ -112,10 +112,10 @@ func TestRenderReanimEntity_MissingComponents(t *testing.T) {
 	screen := ebiten.NewImage(800, 600)
 
 	tests := []struct {
-		name           string
-		hasPosition    bool
-		hasReanim      bool
-		expectNoPanic  bool
+		name          string
+		hasPosition   bool
+		hasReanim     bool
+		expectNoPanic bool
 	}{
 		{
 			name:          "Missing PositionComponent",
@@ -657,10 +657,10 @@ func TestRenderReanimEntity_CameraOffset(t *testing.T) {
 	y := 0.0
 	frameNum := 0
 	reanimComp := &components.ReanimComponent{
-		CurrentAnim:    "anim_idle",
-		CurrentFrame:   0,
-		CenterOffsetX:  25.0, // Center offset
-		CenterOffsetY:  25.0,
+		CurrentAnim:   "anim_idle",
+		CurrentFrame:  0,
+		CenterOffsetX: 25.0, // Center offset
+		CenterOffsetY: 25.0,
 		AnimTracks: []reanim.Track{
 			{Name: "track1"},
 		},

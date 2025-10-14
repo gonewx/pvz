@@ -367,7 +367,7 @@ func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) err
 	reanimComp.CurrentFrame = 0
 	reanimComp.FrameCounter = 0
 	reanimComp.CurrentAnim = animName
-	reanimComp.IsLooping = true // Default: animations loop
+	reanimComp.IsLooping = true   // Default: animations loop
 	reanimComp.IsFinished = false // Reset finished flag
 
 	// Build visibility array

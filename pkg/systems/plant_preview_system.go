@@ -13,8 +13,9 @@ import (
 
 // PlantPreviewSystem 更新植物预览的位置
 // 为实现双图像预览（光标处不透明 + 格子处半透明），系统会计算并存储两个位置：
-//   1. 鼠标光标位置（mouseWorldX, mouseWorldY）- 用于渲染不透明图像
-//   2. 网格对齐位置（gridAlignedWorldX, gridAlignedWorldY）- 用于渲染半透明预览图像
+//  1. 鼠标光标位置（mouseWorldX, mouseWorldY）- 用于渲染不透明图像
+//  2. 网格对齐位置（gridAlignedWorldX, gridAlignedWorldY）- 用于渲染半透明预览图像
+//
 // 注意：所有位置都使用世界坐标系统
 type PlantPreviewSystem struct {
 	entityManager *ecs.EntityManager
@@ -42,8 +43,8 @@ func NewPlantPreviewSystem(em *ecs.EntityManager, gs *game.GameState) *PlantPrev
 
 // Update 更新预览实体的位置
 // 计算两个位置供渲染使用（都是世界坐标）：
-//   1. 鼠标光标位置（直接跟随鼠标）
-//   2. 网格对齐位置（对齐到格子中心）
+//  1. 鼠标光标位置（直接跟随鼠标）
+//  2. 网格对齐位置（对齐到格子中心）
 func (s *PlantPreviewSystem) Update(deltaTime float64) {
 	// 查询所有拥有 PlantPreviewComponent 和 PositionComponent 的实体
 	entities := s.entityManager.GetEntitiesWith(

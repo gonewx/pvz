@@ -305,4 +305,3 @@ func TestDrawWithCameraOffset(t *testing.T) {
 		renderSystem.Draw(screen, cameraX)
 	}
 }
-

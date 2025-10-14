@@ -15,12 +15,12 @@ import (
 // PlantCardRenderSystem 负责渲染植物卡片
 // Story 6.3: 多层渲染架构 - 背景 + 植物图标 + 阳光数字 + 效果遮罩
 type PlantCardRenderSystem struct {
-	entityManager      *ecs.EntityManager
-	cardScale          float64          // 卡片背景缩放因子
-	plantIconScale     float64          // 植物图标缩放因子（可配置）
-	plantIconOffsetY   float64          // 植物图标垂直偏移（距离顶部的像素，可配置）
-	sunTextOffsetY     float64          // 阳光数字垂直偏移（距离底部的像素，可配置）
-	sunFont            *text.GoTextFace // 阳光数字字体（可选，如果未提供则使用调试文本）
+	entityManager    *ecs.EntityManager
+	cardScale        float64          // 卡片背景缩放因子
+	plantIconScale   float64          // 植物图标缩放因子（可配置）
+	plantIconOffsetY float64          // 植物图标垂直偏移（距离顶部的像素，可配置）
+	sunTextOffsetY   float64          // 阳光数字垂直偏移（距离底部的像素，可配置）
+	sunFont          *text.GoTextFace // 阳光数字字体（可选，如果未提供则使用调试文本）
 }
 
 // NewPlantCardRenderSystem 创建一个新的 PlantCardRenderSystem 实例

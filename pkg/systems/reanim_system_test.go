@@ -104,9 +104,9 @@ func TestReanimSystem_Update_Loop(t *testing.T) {
 			FPS: 12,
 		},
 		CurrentAnim:       "anim_idle",
-		CurrentFrame:      9,  // One frame before the end
-		FrameCounter:      4,  // Ready to advance on next update (frameSkip=5)
-		VisibleFrameCount: 10, // Total 10 frames (0-9)
+		CurrentFrame:      9,    // One frame before the end
+		FrameCounter:      4,    // Ready to advance on next update (frameSkip=5)
+		VisibleFrameCount: 10,   // Total 10 frames (0-9)
 		IsLooping:         true, // Enable looping for this test
 	}
 	em.AddComponent(entity, reanimComp)

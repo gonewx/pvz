@@ -4,13 +4,14 @@ package game
 // It defines the structure of assets/config/resources.yaml.
 //
 // Structure:
-//   version: "1.0"
-//   base_path: assets
-//   groups:
-//     group_name:
-//       images: [...]
-//       sounds: [...]
-//       fonts: [...]
+//
+//	version: "1.0"
+//	base_path: assets
+//	groups:
+//	  group_name:
+//	    images: [...]
+//	    sounds: [...]
+//	    fonts: [...]
 type ResourceConfig struct {
 	Version  string                   `yaml:"version"`   // Configuration file version
 	BasePath string                   `yaml:"base_path"` // Base path for all resources (e.g., "assets")
@@ -21,10 +22,11 @@ type ResourceConfig struct {
 // Each group contains lists of images, sounds, and fonts.
 //
 // Example from resources.yaml:
-//   init:
-//     images:
-//       - id: IMAGE_BLANK
-//         path: properties/blank
+//
+//	init:
+//	  images:
+//	    - id: IMAGE_BLANK
+//	      path: properties/blank
 type ResourceGroup struct {
 	Images []ImageResource `yaml:"images"` // List of image resources in this group
 	Sounds []SoundResource `yaml:"sounds"` // List of sound resources in this group
@@ -42,20 +44,21 @@ type ResourceGroup struct {
 //   - Attrs: Additional attributes like alphagrid (optional)
 //
 // Examples:
-//   Simple image:
-//     - id: IMAGE_BLANK
-//       path: properties/blank
 //
-//   Sprite sheet:
-//     - id: IMAGE_REANIM_SEEDS
-//       path: reanim/seeds.png
-//       cols: 9
+//	Simple image:
+//	  - id: IMAGE_BLANK
+//	    path: properties/blank
 //
-//   With attributes:
-//     - id: IMAGE_ZOMBIE_NOTE1
-//       path: images/ZombieNoteBlack1.png
-//       attrs:
-//         alphagrid: ZombieNote1
+//	Sprite sheet:
+//	  - id: IMAGE_REANIM_SEEDS
+//	    path: reanim/seeds.png
+//	    cols: 9
+//
+//	With attributes:
+//	  - id: IMAGE_ZOMBIE_NOTE1
+//	    path: images/ZombieNoteBlack1.png
+//	    attrs:
+//	      alphagrid: ZombieNote1
 type ImageResource struct {
 	ID    string                 `yaml:"id"`              // Resource ID (unique identifier)
 	Path  string                 `yaml:"path"`            // Relative file path from base_path

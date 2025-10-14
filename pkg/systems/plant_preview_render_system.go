@@ -12,8 +12,8 @@ import (
 
 // PlantPreviewRenderSystem 渲染植物预览的双图像（使用 Reanim）
 // 渲染两个独立的植物图像：
-//   1. 鼠标光标处的不透明图像（Alpha=1.0）
-//   2. 网格格子中心的半透明预览图像（Alpha=0.5，仅当鼠标在网格内时）
+//  1. 鼠标光标处的不透明图像（Alpha=1.0）
+//  2. 网格格子中心的半透明预览图像（Alpha=0.5，仅当鼠标在网格内时）
 type PlantPreviewRenderSystem struct {
 	entityManager      *ecs.EntityManager
 	plantPreviewSystem *PlantPreviewSystem // 用于获取两个渲染位置
@@ -31,9 +31,10 @@ func NewPlantPreviewRenderSystem(em *ecs.EntityManager, pps *PlantPreviewSystem)
 // 参数:
 //   - screen: 目标渲染画布
 //   - cameraX: 摄像机的世界坐标X位置（用于世界坐标到屏幕坐标的转换）
+//
 // 渲染逻辑：
-//   1. 在鼠标光标位置渲染不透明图像（Alpha=1.0）
-//   2. 在网格格子中心渲染半透明预览图像（Alpha=0.5，仅当鼠标在网格内时）
+//  1. 在鼠标光标位置渲染不透明图像（Alpha=1.0）
+//  2. 在网格格子中心渲染半透明预览图像（Alpha=0.5，仅当鼠标在网格内时）
 func (s *PlantPreviewRenderSystem) Draw(screen *ebiten.Image, cameraX float64) {
 	// 查询所有拥有 PlantPreviewComponent, PositionComponent, ReanimComponent 的实体
 	entities := s.entityManager.GetEntitiesWith(

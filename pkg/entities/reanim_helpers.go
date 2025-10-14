@@ -58,7 +58,7 @@ func createSimpleReanimComponent(image *ebiten.Image, imageName string) *compone
 	}
 
 	reanimXML := &reanim.ReanimXML{
-		FPS: 12,
+		FPS:    12,
 		Tracks: []reanim.Track{track},
 	}
 
