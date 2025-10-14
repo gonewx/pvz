@@ -903,70 +903,46 @@ func (s *BehaviorSystem) handleWallnutBehavior(entityID ecs.EntityID) {
 	// 计算生命值百分比
 	healthPercent := float64(health.CurrentHealth) / float64(health.MaxHealth)
 
-	// TODO(Story 6.3): 迁移到 ReanimComponent
-	// 获取动画组件（用于切换外观状态）
-	// animComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.AnimationComponent{}))
-	// if !ok {
-	// 	return
-	// }
-	// anim := animComp.(*components.AnimationComponent)
+	// Story 6.3: 使用 ReanimComponent 实现外观状态切换
+	// 根据生命值百分比动态替换 PartImages 中的身体图片
+	reanimComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{}))
+	if !ok {
+		return
+	}
+	reanim := reanimComp.(*components.ReanimComponent)
 
-	// 根据生命值百分比确定应显示的外观状态
-	// 我们需要追踪当前应该使用的状态，避免每帧重复加载
-	// var targetState int // 0=完好, 1=轻伤, 2=重伤
-	// var requiredFrameCount int
+	// 确定应显示的身体图片路径
+	var targetBodyImagePath string
+	if healthPercent > config.WallnutCracked1Threshold {
+		// 完好状态 (> 66%)
+		targetBodyImagePath = "assets/reanim/wallnut_body.png"
+	} else if healthPercent > config.WallnutCracked2Threshold {
+		// 轻伤状态 (33% - 66%)
+		targetBodyImagePath = "assets/reanim/wallnut_cracked1.png"
+	} else {
+		// 重伤状态 (< 33%)
+		targetBodyImagePath = "assets/reanim/wallnut_cracked2.png"
+	}
 
-	// if healthPercent > config.WallnutCracked1Threshold {
-	// 	// 完好状态 (> 66%)
-	// 	targetState = 0
-	// 	requiredFrameCount = config.WallnutAnimationFrames // 16帧
-	// } else if healthPercent > config.WallnutCracked2Threshold {
-	// 	// 轻伤状态 (33% - 66%)
-	// 	targetState = 1
-	// 	requiredFrameCount = 11 // 轻伤状态有11帧
-	// } else {
-	// 	// 重伤状态 (< 33%)
-	// 	targetState = 2
-	// 	requiredFrameCount = 15 // 重伤状态有15帧
-	// }
+	// 检查是否需要切换图片（避免每帧重复加载）
+	currentBodyImage, exists := reanim.PartImages["IMAGE_REANIM_WALLNUT_BODY"]
+	if !exists {
+		return
+	}
 
-	// 检查当前动画帧数是否匹配目标状态（用帧数判断状态）
-	// 这样可以避免每帧都重新加载相同的动画
-	// if len(anim.Frames) == requiredFrameCount {
-	// 	// 当前已是正确状态，无需切换
-	// 	return
-	// }
+	// 加载目标图片
+	targetBodyImage, err := s.resourceManager.LoadImage(targetBodyImagePath)
+	if err != nil {
+		log.Printf("[BehaviorSystem] 警告：无法加载坚果墙图片 %s: %v", targetBodyImagePath, err)
+		return
+	}
 
-	// 需要切换状态，加载对应的动画
-	// var targetFrames []*ebiten.Image
-	// var err error
-
-	// switch targetState {
-	// case 0:
-	// 	targetFrames, err = utils.LoadWallnutFullHealthAnimation(s.resourceManager)
-	// 	log.Printf("[BehaviorSystem] 坚果墙 %d 切换到完好状态 (HP: %d/%d, %.1f%%)",
-	// 		entityID, health.CurrentHealth, health.MaxHealth, healthPercent*100)
-	// case 1:
-	// 	targetFrames, err = utils.LoadWallnutCracked1Animation(s.resourceManager)
-	// 	log.Printf("[BehaviorSystem] 坚果墙 %d 切换到轻伤状态 (HP: %d/%d, %.1f%%)",
-	// 		entityID, health.CurrentHealth, health.MaxHealth, healthPercent*100)
-	// case 2:
-	// 	targetFrames, err = utils.LoadWallnutCracked2Animation(s.resourceManager)
-	// 	log.Printf("[BehaviorSystem] 坚果墙 %d 切换到重伤状态 (HP: %d/%d, %.1f%%)",
-	// 		entityID, health.CurrentHealth, health.MaxHealth, healthPercent*100)
-	// }
-
-	// if err != nil {
-	// 	// 加载动画失败，保持当前动画
-	// 	log.Printf("[BehaviorSystem] 坚果墙 %d 动画状态切换失败: %v", entityID, err)
-	// 	return
-	// }
-
-	// 切换到新的动画状态
-	// anim.Frames = targetFrames
-	// anim.CurrentFrame = 0
-	// anim.FrameCounter = 0
-	_ = healthPercent // 临时避免未使用警告
+	// 如果图片不同，则替换
+	if currentBodyImage != targetBodyImage {
+		reanim.PartImages["IMAGE_REANIM_WALLNUT_BODY"] = targetBodyImage
+		log.Printf("[BehaviorSystem] 坚果墙 %d 切换外观: HP=%d/%d (%.1f%%), 图片=%s",
+			entityID, health.CurrentHealth, health.MaxHealth, healthPercent*100, targetBodyImagePath)
+	}
 }
 
 // handleConeheadZombieBehavior 处理路障僵尸的行为逻辑

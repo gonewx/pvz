@@ -425,6 +425,9 @@ func (s *ReanimSystem) PlayAnimationNoLoop(entityID ecs.EntityID, animName strin
 // calculateCenterOffset calculates the offset needed to center the animation visually.
 // It computes the bounding box of all visible parts in the first logical frame (frame 0),
 // then calculates the center of that bounding box as the offset.
+//
+// IMPORTANT: This function now considers the actual image dimensions when calculating
+// the bounding box, ensuring that the entire visual area of each part is included.
 func (s *ReanimSystem) calculateCenterOffset(comp *components.ReanimComponent) {
 	// Find the first visible frame (physical frame index)
 	physicalIndex := -1
@@ -447,6 +450,7 @@ func (s *ReanimSystem) calculateCenterOffset(comp *components.ReanimComponent) {
 	}
 
 	// Calculate bounding box of all visible parts in the first frame
+	// IMPORTANT: We now include the actual image dimensions, not just the position points
 	minX, maxX := 9999.0, -9999.0
 	minY, maxY := 9999.0, -9999.0
 	hasVisibleParts := false
@@ -485,18 +489,58 @@ func (s *ReanimSystem) calculateCenterOffset(comp *components.ReanimComponent) {
 			y = *frame.Y
 		}
 
-		// Update bounding box
-		if x < minX {
-			minX = x
+		// Get part scale (default to 1.0)
+		scaleX, scaleY := 1.0, 1.0
+		if frame.ScaleX != nil {
+			scaleX = *frame.ScaleX
 		}
-		if x > maxX {
-			maxX = x
+		if frame.ScaleY != nil {
+			scaleY = *frame.ScaleY
 		}
-		if y < minY {
-			minY = y
+
+		// Get image dimensions
+		img, exists := comp.PartImages[frame.ImagePath]
+		if !exists || img == nil {
+			// If image not found, fall back to position-only calculation
+			if x < minX {
+				minX = x
+			}
+			if x > maxX {
+				maxX = x
+			}
+			if y < minY {
+				minY = y
+			}
+			if y > maxY {
+				maxY = y
+			}
+			hasVisibleParts = true
+			continue
 		}
-		if y > maxY {
-			maxY = y
+
+		// Calculate actual bounding box including image dimensions
+		bounds := img.Bounds()
+		imgWidth := float64(bounds.Dx()) * scaleX
+		imgHeight := float64(bounds.Dy()) * scaleY
+
+		// The part's bounding box extends from (x, y) to (x + width, y + height)
+		partMinX := x
+		partMaxX := x + imgWidth
+		partMinY := y
+		partMaxY := y + imgHeight
+
+		// Update overall bounding box
+		if partMinX < minX {
+			minX = partMinX
+		}
+		if partMaxX > maxX {
+			maxX = partMaxX
+		}
+		if partMinY < minY {
+			minY = partMinY
+		}
+		if partMaxY > maxY {
+			maxY = partMaxY
 		}
 		hasVisibleParts = true
 	}

@@ -200,7 +200,7 @@ const (
 
 	// WallnutDefaultHealth 坚果墙默认生命值
 	// 坚果墙作为防御植物，拥有远高于其他植物的生命值
-	WallnutDefaultHealth = 4000 // 原版游戏数值，是向日葵的13倍
+	WallnutDefaultHealth = 800 // 原版游戏数值，是向日葵的13倍
 )
 
 // Zombie Eating Configuration (僵尸啃食配置)

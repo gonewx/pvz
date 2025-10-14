@@ -2,12 +2,12 @@ package entities
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
-	"github.com/decker502/pvz/pkg/utils"
 )
 
 // ReanimSystemInterface 定义 ReanimSystem 的接口，用于工厂函数依赖注入
@@ -39,14 +39,10 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 	worldCenterX := config.GridWorldStartX + float64(col)*config.CellWidth + config.CellWidth/2
 	worldCenterY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
 
-	// 获取植物图像路径
-	imagePath := utils.GetPlantImagePath(plantType)
-
-	// 加载植物图像
-	plantImage, err := rm.LoadImage(imagePath)
-	if err != nil {
-		return 0, fmt.Errorf("failed to load plant image %s: %w", imagePath, err)
-	}
+	// Story 6.3: Reanim 迁移完成
+	// 注意：旧版代码使用 SpriteComponent 和 GetPlantImagePath()
+	// 现在所有植物都使用 ReanimComponent，不再需要加载 sprite 图片
+	// SpriteComponent 已被移除，植物渲染完全由 ReanimComponent 处理
 
 	// 创建实体
 	entityID := em.CreateEntity()
@@ -55,11 +51,6 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 	em.AddComponent(entityID, &components.PositionComponent{
 		X: worldCenterX,
 		Y: worldCenterY,
-	})
-
-	// 添加精灵组件
-	em.AddComponent(entityID, &components.SpriteComponent{
-		Image: plantImage,
 	})
 
 	// 添加植物组件
@@ -109,6 +100,7 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 		if err := rs.PlayAnimation(entityID, "anim_idle"); err != nil {
 			return 0, fmt.Errorf("failed to play SunFlower idle animation: %w", err)
 		}
+		log.Printf("[PlantFactory] 向日葵 %d: 成功添加 ReanimComponent 并初始化动画", entityID)
 	}
 
 	// 为豌豆射手添加特定组件
@@ -152,6 +144,7 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 		if err := rs.PlayAnimation(entityID, "anim_full_idle"); err != nil {
 			return 0, fmt.Errorf("failed to play PeaShooter idle animation: %w", err)
 		}
+		log.Printf("[PlantFactory] 豌豆射手 %d: 成功添加 ReanimComponent 并初始化动画", entityID)
 	}
 
 	return entityID, nil
@@ -194,17 +187,6 @@ func NewWallnutEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameSta
 	if reanimXML == nil || partImages == nil {
 		return 0, fmt.Errorf("failed to load Wallnut Reanim resources")
 	}
-
-	// 添加精灵组件（使用占位图像作为后备）
-	// TODO (TD-6.3-6): 未来可以完全移除 SpriteComponent，仅使用 ReanimComponent
-	placeholderImage, err := rm.LoadImage("assets/images/Plants/WallNut/WallNut_1.png")
-	if err != nil {
-		// 如果无法加载占位图像（如测试环境），使用空图像
-		placeholderImage, _ = rm.LoadImage("placeholder") // Mock 会返回测试图像
-	}
-	em.AddComponent(entityID, &components.SpriteComponent{
-		Image: placeholderImage,
-	})
 
 	// 添加植物组件（用于碰撞检测和网格位置追踪）
 	em.AddComponent(entityID, &components.PlantComponent{

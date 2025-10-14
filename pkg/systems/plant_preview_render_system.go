@@ -1,6 +1,8 @@
 package systems
 
 import (
+	"log"
+	"math"
 	"reflect"
 
 	"github.com/decker502/pvz/pkg/components"
@@ -8,7 +10,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// PlantPreviewRenderSystem 渲染植物预览的半透明图像
+// PlantPreviewRenderSystem 渲染植物预览的半透明图像（使用 Reanim）
 type PlantPreviewRenderSystem struct {
 	entityManager *ecs.EntityManager
 }
@@ -21,48 +23,168 @@ func NewPlantPreviewRenderSystem(em *ecs.EntityManager) *PlantPreviewRenderSyste
 }
 
 // Draw 渲染所有植物预览实体
-func (s *PlantPreviewRenderSystem) Draw(screen *ebiten.Image) {
-	// 查询所有拥有 PlantPreviewComponent, PositionComponent, SpriteComponent 的实体
+// 参数:
+//   - screen: 目标渲染画布
+//   - cameraX: 摄像机的世界坐标X位置（用于世界坐标到屏幕坐标的转换）
+func (s *PlantPreviewRenderSystem) Draw(screen *ebiten.Image, cameraX float64) {
+	// 查询所有拥有 PlantPreviewComponent, PositionComponent, ReanimComponent 的实体
 	entities := s.entityManager.GetEntitiesWith(
 		reflect.TypeOf(&components.PlantPreviewComponent{}),
 		reflect.TypeOf(&components.PositionComponent{}),
-		reflect.TypeOf(&components.SpriteComponent{}),
+		reflect.TypeOf(&components.ReanimComponent{}),
 	)
 
 	for _, entityID := range entities {
 		// 获取组件
 		previewComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PlantPreviewComponent{}))
 		posComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
-		spriteComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.SpriteComponent{}))
+		reanimComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{}))
 
 		preview := previewComp.(*components.PlantPreviewComponent)
 		pos := posComp.(*components.PositionComponent)
-		sprite := spriteComp.(*components.SpriteComponent)
+		reanimData := reanimComp.(*components.ReanimComponent)
 
-		// 如果没有图像，跳过
-		if sprite.Image == nil {
+		// 渲染 Reanim 动画（半透明）
+		s.drawReanimPreview(screen, reanimData, pos, preview.Alpha, cameraX, entityID)
+	}
+}
+
+// drawReanimPreview 渲染单个 Reanim 预览（半透明）
+func (s *PlantPreviewRenderSystem) drawReanimPreview(screen *ebiten.Image, reanim *components.ReanimComponent, pos *components.PositionComponent, alpha float64, cameraX float64, entityID ecs.EntityID) {
+	if reanim.Reanim == nil || reanim.CurrentAnim == "" {
+		return
+	}
+
+	// 将逻辑帧映射到物理帧索引
+	physicalIndex := s.findPhysicalFrameIndex(reanim, reanim.CurrentFrame)
+	if physicalIndex < 0 {
+		return
+	}
+
+	// 将世界坐标转换为屏幕坐标，并应用 Reanim 的中心偏移
+	screenX := pos.X - cameraX - reanim.CenterOffsetX
+	screenY := pos.Y - reanim.CenterOffsetY
+
+	// 调试：输出预览位置信息（每60帧输出一次，避免刷屏）
+	if reanim.CurrentFrame%60 == 0 {
+		log.Printf("[PlantPreviewRender] 预览 %d: 世界坐标(%.1f, %.1f), 屏幕坐标(%.1f, %.1f), CenterOffset(%.1f, %.1f)",
+			entityID, pos.X, pos.Y, screenX, screenY, reanim.CenterOffsetX, reanim.CenterOffsetY)
+	}
+
+	// 按 AnimTracks 顺序渲染部件（保证 Z-order 正确）
+	for _, track := range reanim.AnimTracks {
+		// 如果设置了 VisibleTracks，只渲染白名单中的轨道
+		if reanim.VisibleTracks != nil && len(reanim.VisibleTracks) > 0 {
+			if !reanim.VisibleTracks[track.Name] {
+				continue
+			}
+		}
+
+		mergedFrames, ok := reanim.MergedTracks[track.Name]
+		if !ok || physicalIndex >= len(mergedFrames) {
 			continue
 		}
 
-		// 获取图像尺寸
-		bounds := sprite.Image.Bounds()
-		imageWidth := float64(bounds.Dx())
-		imageHeight := float64(bounds.Dy())
+		mergedFrame := mergedFrames[physicalIndex]
 
-		// 计算绘制位置（图像中心对齐到位置坐标）
-		drawX := pos.X - imageWidth/2
-		drawY := pos.Y - imageHeight/2
+		// 跳过隐藏的帧
+		if mergedFrame.FrameNum != nil && *mergedFrame.FrameNum == -1 {
+			continue
+		}
 
-		// 创建绘制选项
-		opts := &ebiten.DrawImageOptions{}
+		// 跳过没有图片的帧
+		if mergedFrame.ImagePath == "" {
+			continue
+		}
 
-		// 设置位移
-		opts.GeoM.Translate(drawX, drawY)
+		// 使用 IMAGE 引用查找图片
+		img, exists := reanim.PartImages[mergedFrame.ImagePath]
+		if !exists || img == nil {
+			continue
+		}
 
-		// 设置透明度
-		opts.ColorScale.ScaleAlpha(float32(preview.Alpha))
+		// 获取图片尺寸
+		bounds := img.Bounds()
+		w := bounds.Dx()
+		h := bounds.Dy()
+		fw := float64(w)
+		fh := float64(h)
 
-		// 绘制图像
-		screen.DrawImage(sprite.Image, opts)
+		// 获取变换参数
+		scaleX := 1.0
+		scaleY := 1.0
+		if mergedFrame.ScaleX != nil {
+			scaleX = *mergedFrame.ScaleX
+		}
+		if mergedFrame.ScaleY != nil {
+			scaleY = *mergedFrame.ScaleY
+		}
+
+		kx := 0.0
+		ky := 0.0
+		if mergedFrame.SkewX != nil {
+			kx = *mergedFrame.SkewX
+		}
+		if mergedFrame.SkewY != nil {
+			ky = *mergedFrame.SkewY
+		}
+
+		// 构建变换矩阵
+		a := math.Cos(kx*math.Pi/180.0) * scaleX
+		b := math.Sin(kx*math.Pi/180.0) * scaleX
+		c := -math.Sin(ky*math.Pi/180.0) * scaleY
+		d := math.Cos(ky*math.Pi/180.0) * scaleY
+
+		// 平移分量
+		tx := 0.0
+		ty := 0.0
+		if mergedFrame.X != nil {
+			tx = *mergedFrame.X
+		}
+		if mergedFrame.Y != nil {
+			ty = *mergedFrame.Y
+		}
+		tx += screenX
+		ty += screenY
+
+		// 应用变换矩阵到图片的四个角
+		x0 := tx
+		y0 := ty
+		x1 := a*fw + tx
+		y1 := b*fw + ty
+		x2 := c*fh + tx
+		y2 := d*fh + ty
+		x3 := a*fw + c*fh + tx
+		y3 := b*fw + d*fh + ty
+
+		// 构建顶点数组（两个三角形组成矩形）
+		// 重要：应用半透明 alpha 值
+		alphaF := float32(alpha)
+		vs := []ebiten.Vertex{
+			{DstX: float32(x0), DstY: float32(y0), SrcX: 0, SrcY: 0, ColorR: alphaF, ColorG: alphaF, ColorB: alphaF, ColorA: alphaF},
+			{DstX: float32(x1), DstY: float32(y1), SrcX: float32(w), SrcY: 0, ColorR: alphaF, ColorG: alphaF, ColorB: alphaF, ColorA: alphaF},
+			{DstX: float32(x2), DstY: float32(y2), SrcX: 0, SrcY: float32(h), ColorR: alphaF, ColorG: alphaF, ColorB: alphaF, ColorA: alphaF},
+			{DstX: float32(x3), DstY: float32(y3), SrcX: float32(w), SrcY: float32(h), ColorR: alphaF, ColorG: alphaF, ColorB: alphaF, ColorA: alphaF},
+		}
+		is := []uint16{0, 1, 2, 1, 3, 2}
+		screen.DrawTriangles(vs, is, img, nil)
 	}
+}
+
+// findPhysicalFrameIndex 查找当前逻辑帧对应的物理帧索引
+func (s *PlantPreviewRenderSystem) findPhysicalFrameIndex(comp *components.ReanimComponent, logicalFrame int) int {
+	if logicalFrame < 0 || logicalFrame >= len(comp.AnimVisibles) {
+		return -1
+	}
+
+	visibleCount := 0
+	for i, visible := range comp.AnimVisibles {
+		if visible == 0 {
+			if visibleCount == logicalFrame {
+				return i
+			}
+			visibleCount++
+		}
+	}
+	return -1
 }

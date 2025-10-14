@@ -29,7 +29,9 @@ func NewPeaProjectile(em *ecs.EntityManager, rm ResourceLoader, startX, startY f
 	}
 
 	// 加载豌豆子弹图像
-	peaImage, err := rm.LoadImage("assets/images/Effect/PeaBullet.png")
+	// 注意：使用 firepea.png 作为临时方案，因为原始的 PeaBullet.png 已删除
+	// TODO: 考虑为豌豆子弹创建专用图片或使用粒子效果
+	peaImage, err := rm.LoadImage("assets/reanim/firepea.png")
 	if err != nil {
 		return 0, fmt.Errorf("failed to load pea projectile image: %w", err)
 	}
@@ -43,10 +45,9 @@ func NewPeaProjectile(em *ecs.EntityManager, rm ResourceLoader, startX, startY f
 		Y: startY,
 	})
 
-	// 添加精灵组件
-	em.AddComponent(entityID, &components.SpriteComponent{
-		Image: peaImage,
-	})
+	// Story 6.3: 使用 ReanimComponent 替代 SpriteComponent
+	// 为单图片实体创建简单的 Reanim 包装
+	em.AddComponent(entityID, createSimpleReanimComponent(peaImage, "pea"))
 
 	// 添加速度组件（向右移动）
 	em.AddComponent(entityID, &components.VelocityComponent{

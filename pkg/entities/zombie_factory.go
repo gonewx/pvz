@@ -52,17 +52,6 @@ func NewZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs ReanimSystemIn
 		return 0, fmt.Errorf("failed to load Zombie Reanim resources")
 	}
 
-	// 添加精灵组件（使用占位图像作为后备）
-	// TODO (TD-6.3-6): 未来可以完全移除 SpriteComponent，仅使用 ReanimComponent
-	placeholderImage, err := rm.LoadImage("assets/images/Zombies/Zombie/Zombie_1.png")
-	if err != nil {
-		// 如果无法加载占位图像（如测试环境），使用空图像
-		placeholderImage, _ = rm.LoadImage("placeholder") // Mock 会返回测试图像
-	}
-	em.AddComponent(entityID, &components.SpriteComponent{
-		Image: placeholderImage,
-	})
-
 	// 添加 ReanimComponent
 	// 普通僵尸：使用白名单方式，只显示基础身体部件和右手（anim_innerarm）
 	em.AddComponent(entityID, &components.ReanimComponent{
@@ -178,17 +167,6 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs Reanim
 	if reanimXML == nil || partImages == nil {
 		return 0, fmt.Errorf("failed to load Zombie Reanim resources for Conehead")
 	}
-
-	// 添加精灵组件（使用占位图像作为后备）
-	// TODO (TD-6.3-6): 未来可以完全移除 SpriteComponent，仅使用 ReanimComponent
-	placeholderImage, err := rm.LoadImage("assets/images/Zombies/ConeheadZombie/ConeheadZombie_1.png")
-	if err != nil {
-		// 如果无法加载占位图像（如测试环境），使用空图像
-		placeholderImage, _ = rm.LoadImage("placeholder") // Mock 会返回测试图像
-	}
-	em.AddComponent(entityID, &components.SpriteComponent{
-		Image: placeholderImage,
-	})
 
 	// 添加 ReanimComponent
 	// 路障僵尸：基础部件 + 路障
@@ -315,17 +293,6 @@ func NewBucketheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs Rean
 	if reanimXML == nil || partImages == nil {
 		return 0, fmt.Errorf("failed to load Zombie Reanim resources for Buckethead")
 	}
-
-	// 添加精灵组件（使用占位图像作为后备）
-	// TODO (TD-6.3-6): 未来可以完全移除 SpriteComponent，仅使用 ReanimComponent
-	placeholderImage, err := rm.LoadImage("assets/images/Zombies/BucketheadZombie/BucketheadZombie_1.png")
-	if err != nil {
-		// 如果无法加载占位图像（如测试环境），使用空图像
-		placeholderImage, _ = rm.LoadImage("placeholder") // Mock 会返回测试图像
-	}
-	em.AddComponent(entityID, &components.SpriteComponent{
-		Image: placeholderImage,
-	})
 
 	// 添加 ReanimComponent
 	// 铁桶僵尸：基础部件 + 铁桶

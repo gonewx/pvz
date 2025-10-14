@@ -18,8 +18,8 @@ func NewSunEntity(manager *ecs.EntityManager, rm *game.ResourceManager, startX, 
 	// 创建实体
 	id := manager.CreateEntity()
 
-	// 加载阳光图片资源 (使用第一帧动画)
-	sunImage, err := rm.LoadImage("assets/images/Effect/Sun/Sun_1.png")
+	// 加载阳光图片资源 (使用 reanim 目录的阳光图片)
+	sunImage, err := rm.LoadImage("assets/reanim/sun1.png")
 	if err != nil {
 		// 如果加载失败,尝试使用GIF
 		sunImage, _ = rm.LoadImage("assets/images/interface/Sun.gif")
@@ -31,10 +31,9 @@ func NewSunEntity(manager *ecs.EntityManager, rm *game.ResourceManager, startX, 
 		Y: -50, // 屏幕顶部外
 	})
 
-	// 添加精灵组件
-	manager.AddComponent(id, &components.SpriteComponent{
-		Image: sunImage,
-	})
+	// Story 6.3: 使用 ReanimComponent 替代 SpriteComponent
+	// 为单图片实体创建简单的 Reanim 包装
+	manager.AddComponent(id, createSimpleReanimComponent(sunImage, "sun"))
 
 	// 添加速度组件 (原版掉落速度: 60像素/秒)
 	manager.AddComponent(id, &components.VelocityComponent{

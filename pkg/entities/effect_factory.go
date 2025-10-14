@@ -30,7 +30,9 @@ func NewPeaBulletHitEffect(em *ecs.EntityManager, rm ResourceLoader, x, y float6
 	}
 
 	// 加载击中效果图像
-	hitImage, err := rm.LoadImage("assets/images/Effect/PeaBulletHit.png")
+	// 注意：使用 firepea_spark.png 作为临时方案，因为原始的 PeaBulletHit.png 已删除
+	// TODO: 考虑为击中效果创建专用图片或使用粒子效果
+	hitImage, err := rm.LoadImage("assets/reanim/firepea_spark.png")
 	if err != nil {
 		return 0, fmt.Errorf("failed to load hit effect image: %w", err)
 	}
@@ -44,10 +46,9 @@ func NewPeaBulletHitEffect(em *ecs.EntityManager, rm ResourceLoader, x, y float6
 		Y: y,
 	})
 
-	// 添加精灵组件（击中效果图像）
-	em.AddComponent(entityID, &components.SpriteComponent{
-		Image: hitImage,
-	})
+	// Story 6.3: 使用 ReanimComponent 替代 SpriteComponent
+	// 为单图片实体创建简单的 Reanim 包装
+	em.AddComponent(entityID, createSimpleReanimComponent(hitImage, "hit_effect"))
 
 	// 添加行为组件（标识为击中效果）
 	em.AddComponent(entityID, &components.BehaviorComponent{
@@ -96,10 +97,9 @@ func NewFallingPartEffect(em *ecs.EntityManager, partImage *ebiten.Image, x, y, 
 		Y: y,
 	})
 
-	// 添加精灵组件（部件图片）
-	em.AddComponent(entityID, &components.SpriteComponent{
-		Image: partImage,
-	})
+	// Story 6.3: 使用 ReanimComponent 替代 SpriteComponent
+	// 为单图片实体创建简单的 Reanim 包装
+	em.AddComponent(entityID, createSimpleReanimComponent(partImage, "falling_part"))
 
 	// 添加速度组件（抛物线运动）
 	em.AddComponent(entityID, &components.VelocityComponent{

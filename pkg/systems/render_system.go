@@ -42,10 +42,11 @@ func (s *RenderSystem) Draw(screen *ebiten.Image, cameraX float64) {
 //   - screen: 绘制目标屏幕
 //   - cameraX: 摄像机的世界坐标X位置
 func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
-	// 查询所有拥有 PositionComponent 和 SpriteComponent 的实体
+	// Story 6.3: 所有实体都使用 ReanimComponent 渲染
+	// 查询拥有 PositionComponent 和 ReanimComponent 的实体
 	entities := s.entityManager.GetEntitiesWith(
 		reflect.TypeOf(&components.PositionComponent{}),
-		reflect.TypeOf(&components.SpriteComponent{}),
+		reflect.TypeOf(&components.ReanimComponent{}),
 	)
 
 	// 第一遍：渲染植物（底层）
@@ -118,10 +119,11 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 //   - screen: 绘制目标屏幕
 //   - cameraX: 摄像机的世界坐标X位置
 func (s *RenderSystem) DrawSuns(screen *ebiten.Image, cameraX float64) {
-	// 查询所有拥有 PositionComponent 和 SpriteComponent 的实体
+	// Story 6.3: 所有实体都使用 ReanimComponent 渲染
+	// 查询拥有 PositionComponent 和 ReanimComponent 的实体
 	entities := s.entityManager.GetEntitiesWith(
 		reflect.TypeOf(&components.PositionComponent{}),
-		reflect.TypeOf(&components.SpriteComponent{}),
+		reflect.TypeOf(&components.ReanimComponent{}),
 	)
 
 	// 只渲染阳光
@@ -152,61 +154,15 @@ func (s *RenderSystem) DrawSuns(screen *ebiten.Image, cameraX float64) {
 //   - id: 实体ID
 //   - cameraX: 摄像机的世界坐标X位置
 func (s *RenderSystem) drawEntity(screen *ebiten.Image, id ecs.EntityID, cameraX float64) {
-	// Story 6.3: 优先使用 ReanimComponent，如果没有则使用 SpriteComponent
+	// Story 6.3: 所有实体都使用 ReanimComponent 渲染
 	_, hasReanimComp := s.entityManager.GetComponent(id, reflect.TypeOf(&components.ReanimComponent{}))
 	if hasReanimComp {
 		s.renderReanimEntity(screen, id, cameraX)
 		return
 	}
 
-	// 回退到传统的 SpriteComponent 渲染
-	// 获取组件
-	posComp, _ := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PositionComponent{}))
-	spriteComp, _ := s.entityManager.GetComponent(id, reflect.TypeOf(&components.SpriteComponent{}))
-
-	// 类型断言
-	pos := posComp.(*components.PositionComponent)
-	sprite := spriteComp.(*components.SpriteComponent)
-
-	// 如果没有图片,跳过
-	if sprite.Image == nil {
-		return
-	}
-
-	// 获取图像尺寸
-	bounds := sprite.Image.Bounds()
-	imageWidth := float64(bounds.Dx())
-	imageHeight := float64(bounds.Dy())
-
-	// 判断实体类型，决定锚点位置
-	// 检查是否有BehaviorComponent（植物、僵尸、子弹都有）
-	_, hasBehavior := s.entityManager.GetComponent(id, reflect.TypeOf(&components.BehaviorComponent{}))
-
-	// 将世界坐标转换为屏幕坐标
-	// screenX = worldX - cameraX (摄像机向右移动时，实体在屏幕上向左移动)
-	screenX := pos.X - cameraX
-	screenY := pos.Y // Y轴不受摄像机水平移动影响
-
-	var drawX, drawY float64
-	if hasBehavior {
-		// 游戏单位（植物、僵尸、子弹）：图像中心对齐到位置坐标
-		// 这样确保同一行的所有单位视觉上在同一高度
-		drawX = screenX - imageWidth/2
-		drawY = screenY - imageHeight/2
-	} else {
-		// 其他实体（如阳光）：图像左上角对齐到位置坐标
-		drawX = screenX
-		drawY = screenY
-	}
-
-	// 创建绘制选项
-	op := &ebiten.DrawImageOptions{}
-
-	// 设置位置平移
-	op.GeoM.Translate(drawX, drawY)
-
-	// 绘制到屏幕
-	screen.DrawImage(sprite.Image, op)
+	// 如果没有 ReanimComponent，记录警告（不应该出现这种情况）
+	log.Printf("[RenderSystem] 警告: 实体 %d 没有 ReanimComponent，无法渲染", id)
 }
 
 // getFloat 辅助函数：安全获取 float 指针的值
@@ -279,7 +235,14 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 	}
 
 	// 将世界坐标转换为屏幕坐标，并应用 Reanim 的中心偏移
-	// 偏移量是根据动画的边界框自动计算的，使得视觉中心与实体位置对齐
+	//
+	// 坐标系统说明：
+	// - PositionComponent(X,Y) 表示格子中心的世界坐标
+	// - Reanim 的部件坐标以"原点"为基准，部件图片锚点在左上角
+	// - CenterOffset 将绘制原点从 Position 向左上平移，使视觉中心对齐到 Position
+	//
+	// 例如：豌豆射手的 CenterOffset = (39, 47.7)
+	//      渲染时原点 = Position - (39, 47.7)，使得植物视觉上居中显示
 	screenX := pos.X - cameraX - reanim.CenterOffsetX
 	screenY := pos.Y - reanim.CenterOffsetY
 

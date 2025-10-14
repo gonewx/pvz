@@ -68,6 +68,11 @@ func NewInputSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.Ga
 //   - deltaTime: 时间增量（秒）
 //   - cameraX: 摄像机的世界坐标X位置（用于屏幕坐标到世界坐标的转换）
 func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
+	// 如果在种植模式，更新植物预览位置（跟随鼠标）
+	if s.gameState.IsPlantingMode {
+		s.updatePlantPreviewPosition(cameraX)
+	}
+
 	// 检测鼠标右键取消种植模式
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight) {
 		if s.gameState.IsPlantingMode {
@@ -90,7 +95,7 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 			mouseScreenX, mouseScreenY, mouseWorldX, mouseWorldY)
 
 		// 优先检查植物卡片点击（UI元素不受摄像机影响，使用屏幕坐标）
-		cardHandled := s.handlePlantCardClick(mouseScreenX, mouseScreenY)
+		cardHandled := s.handlePlantCardClick(mouseScreenX, mouseScreenY, cameraX)
 		if cardHandled {
 			return // 已处理卡片点击，不继续处理其他点击
 		}
@@ -208,7 +213,7 @@ func (s *InputSystem) handleSunClick(sunID ecs.EntityID, pos *components.Positio
 
 // handlePlantCardClick 处理植物卡片点击逻辑
 // 返回 true 表示处理了点击，false 表示未处理
-func (s *InputSystem) handlePlantCardClick(mouseX, mouseY int) bool {
+func (s *InputSystem) handlePlantCardClick(mouseX, mouseY int, cameraX float64) bool {
 	// 查询所有植物卡片实体
 	entities := s.entityManager.GetEntitiesWith(
 		reflect.TypeOf(&components.PlantCardComponent{}),
@@ -261,10 +266,10 @@ func (s *InputSystem) handlePlantCardClick(mouseX, mouseY int) bool {
 				log.Printf("[InputSystem] 进入种植模式: PlantType=%v", card.PlantType)
 				s.gameState.EnterPlantingMode(card.PlantType)
 
-				// 创建植物预览实体
-				// 注意：需要导入 entities 包
-				mouseXf, mouseYf := float64(mouseX), float64(mouseY)
-				s.createPlantPreview(card.PlantType, mouseXf, mouseYf)
+				// 创建植物预览实体（转换为世界坐标）
+				mouseWorldX := float64(mouseX) + cameraX
+				mouseWorldY := float64(mouseY)
+				s.createPlantPreview(card.PlantType, mouseWorldX, mouseWorldY)
 
 				// 可选：设置卡片状态为 Clicked（视觉反馈）
 				ui.State = components.UIClicked
@@ -277,18 +282,31 @@ func (s *InputSystem) handlePlantCardClick(mouseX, mouseY int) bool {
 	return false // 未处理任何卡片点击
 }
 
-// createPlantPreview 创建植物预览实体
+// createPlantPreview 创建植物预览实体（使用 Reanim）
 func (s *InputSystem) createPlantPreview(plantType components.PlantType, x, y float64) {
 	// 先删除现有预览
 	s.destroyPlantPreview()
 
-	// 获取植物预览图像路径
-	imagePath := utils.GetPlantPreviewImagePath(plantType)
+	// 获取植物对应的 Reanim 资源名称
+	var reanimName string
+	switch plantType {
+	case components.PlantSunflower:
+		reanimName = "SunFlower"
+	case components.PlantPeashooter:
+		reanimName = "PeaShooter"
+	case components.PlantWallnut:
+		reanimName = "Wallnut"
+	default:
+		log.Printf("[InputSystem] Unknown plant type for preview: %v", plantType)
+		return
+	}
 
-	// 加载植物图像
-	plantImage, err := s.resourceManager.LoadImage(imagePath)
-	if err != nil {
-		log.Printf("[InputSystem] Failed to load plant preview image %s: %v", imagePath, err)
+	// 从 ResourceManager 获取 Reanim 数据和部件图片
+	reanimXML := s.resourceManager.GetReanimXML(reanimName)
+	partImages := s.resourceManager.GetReanimPartImages(reanimName)
+
+	if reanimXML == nil || partImages == nil {
+		log.Printf("[InputSystem] Failed to load Reanim resources for preview: %s", reanimName)
 		return
 	}
 
@@ -301,9 +319,10 @@ func (s *InputSystem) createPlantPreview(plantType components.PlantType, x, y fl
 		Y: y,
 	})
 
-	// 添加精灵组件
-	s.entityManager.AddComponent(entityID, &components.SpriteComponent{
-		Image: plantImage,
+	// 添加 ReanimComponent
+	s.entityManager.AddComponent(entityID, &components.ReanimComponent{
+		Reanim:     reanimXML,
+		PartImages: partImages,
 	})
 
 	// 添加植物预览组件
@@ -312,8 +331,21 @@ func (s *InputSystem) createPlantPreview(plantType components.PlantType, x, y fl
 		Alpha:     0.5, // 半透明效果
 	})
 
-	log.Printf("[InputSystem] Created plant preview (ID: %d, Type: %v) at (%.1f, %.1f)",
-		entityID, plantType, x, y)
+	// 初始化动画
+	var animName string
+	if plantType == components.PlantPeashooter {
+		animName = "anim_full_idle" // 豌豆射手使用完整待机动画
+	} else {
+		animName = "anim_idle"
+	}
+
+	if err := s.reanimSystem.PlayAnimation(entityID, animName); err != nil {
+		log.Printf("[InputSystem] Failed to play preview animation: %v", err)
+		// 不删除实体，让它以静态方式显示
+	}
+
+	log.Printf("[InputSystem] Created plant preview (ID: %d, Type: %v, Reanim: %s) at (%.1f, %.1f)",
+		entityID, plantType, reanimName, x, y)
 }
 
 // destroyPlantPreview 删除所有植物预览实体
@@ -331,6 +363,38 @@ func (s *InputSystem) destroyPlantPreview() {
 
 	// 立即清理标记删除的实体
 	s.entityManager.RemoveMarkedEntities()
+}
+
+// updatePlantPreviewPosition 更新植物预览位置（跟随鼠标）
+func (s *InputSystem) updatePlantPreviewPosition(cameraX float64) {
+	// 获取鼠标当前屏幕坐标
+	mouseScreenX, mouseScreenY := ebiten.CursorPosition()
+
+	// 转换为世界坐标
+	mouseWorldX := float64(mouseScreenX) + cameraX
+	mouseWorldY := float64(mouseScreenY)
+
+	// 调试：打印坐标转换信息（仅在有预览实体时）
+	entities := s.entityManager.GetEntitiesWith(
+		reflect.TypeOf(&components.PlantPreviewComponent{}),
+		reflect.TypeOf(&components.PositionComponent{}),
+	)
+
+	if len(entities) > 0 {
+		log.Printf("[InputSystem] updatePreview: 屏幕(%d, %d) + cameraX(%.1f) = 世界(%.1f, %.1f)",
+			mouseScreenX, mouseScreenY, cameraX, mouseWorldX, mouseWorldY)
+	}
+
+	// 更新每个预览实体的位置
+	for _, entityID := range entities {
+		posComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
+		if !ok {
+			continue
+		}
+		pos := posComp.(*components.PositionComponent)
+		pos.X = mouseWorldX
+		pos.Y = mouseWorldY
+	}
 }
 
 // handleLawnClick 处理草坪点击种植逻辑

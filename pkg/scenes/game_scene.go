@@ -431,8 +431,10 @@ func (s *GameScene) Update(deltaTime float64) {
 	s.behaviorSystem.Update(deltaTime)         // 6. Update plant behaviors (Story 3.4)
 	s.physicsSystem.Update(deltaTime)          // 7. Check collisions (Story 4.3)
 	// Story 6.3: Reanim 动画系统（替代旧的 AnimationSystem）
-	s.reanimSystem.Update(deltaTime)       // 8. Update Reanim animation frames
-	s.plantPreviewSystem.Update(deltaTime) // 9. Update plant preview position (Story 3.2)
+	s.reanimSystem.Update(deltaTime) // 8. Update Reanim animation frames
+	// 注意：PlantPreviewSystem 已禁用，因为 InputSystem.updatePlantPreviewPosition 已经处理预览位置更新
+	// 原 PlantPreviewSystem 使用屏幕坐标，与 InputSystem 的世界坐标冲突
+	// s.plantPreviewSystem.Update(deltaTime) // 9. Update plant preview position (DISABLED)
 	s.lifetimeSystem.Update(deltaTime)     // 10. Check for expired entities
 	s.entityManager.RemoveMarkedEntities() // 11. Clean up deleted entities (always last)
 }
@@ -514,7 +516,7 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 
 	// Layer 6: Draw plant preview (Story 3.2)
 	// 拖拽预览在所有内容上方
-	s.plantPreviewRenderSystem.Draw(screen)
+	s.plantPreviewRenderSystem.Draw(screen, s.cameraX)
 
 	// Layer 7: Draw suns (阳光) - 最顶层
 	// 阳光在最顶层以确保始终可点击
