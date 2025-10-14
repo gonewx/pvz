@@ -7,8 +7,8 @@
 - `assets/images`：UI与场景静态贴图资源。包括主界面、商店、冒险选择、关卡背景（`background*.jpg`）、按钮组件（`button_*`）、图标（如 `Brain.png`、`CarKeys.png`）、种子包与卡片（`SeedPacket_*`、`seeds.png`）等。文件格式多为 `.png`、`.jpg`，被 `properties/resources.xml` 中的 `<Image>` 清单引用。
 - `assets/effect/reanim`：对应实体的动画轨迹、关键帧与图层引用，运行时加载 `assets/reanim` 下的 PNG 切片作为骨骼/部件贴图进行组合。
 - `assets/reanim`：Reanim 动画所用的分层图像切片。每个植物、僵尸或 UI 动效的骨骼动画由大量命名的图层 PNG 组成（如 `cactus_*`, `cattail_*`, `CrazyDave_*`）。
-- `assets/effect/particles`：粒子系统的配置，指定粒子的发射器、轨迹与贴图（引用 `assets/particles` 中的 PNG）。
-- `assets/particles`：粒子系统用的贴图素材（效果精灵）。如爆炸、烟雾、火花、雨滴、泡泡、星星等（例如 `DoomShroom_Explosion_*`, `PoolSparkly.png`, `SnowPea_*`）。与编译后的粒子配置 `compiled/particles/*.xml.compiled` 一起使用。
+- `assets/effect/particles`：粒子系统的配置，指定粒子的发射器、轨迹与贴图（引用 `assets/particles` 中的 PNG）
+- `assets/particles`：粒子系统用的贴图素材（效果精灵）。如爆炸、烟雾、火花、雨滴、泡泡、星星等（例如 `DoomShroom_Explosion_*`, `PoolSparkly.png`, `SnowPea_*`）
 - `assets/sounds`：音频资源（`.ogg`、少量 `.au`）。包含交互提示音、技能音效、环境音与音乐（如 `readysetplant.ogg`, `ZombiesOnYourLawn.ogg`）。
 - `assets/data`：位图字体的位图或字形图片（如 `_BrianneTod*`, `DwarvenTodcraft*`, `_HouseofTerror*`）以及小型 UI 辅助图片。与 `eata/` 中的同名 `.txt` 字体度量文件配合使用。
 - `assets/properties`：资源清单与配置。主要是 `resources.xml`，将 `images/`、`sounds/`、`data/`、`reanim/` 等目录中的文件声明为可加载资源，定义 ID、默认路径前缀与部分属性（如行列、a8r8g8b8 格式等）。
