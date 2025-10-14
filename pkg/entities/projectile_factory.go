@@ -6,7 +6,6 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/game"
 )
 
 // NewPeaProjectile 创建豌豆子弹实体
@@ -21,7 +20,7 @@ import (
 // 返回:
 //   - ecs.EntityID: 创建的子弹实体ID，如果失败返回 0
 //   - error: 如果创建失败返回错误信息
-func NewPeaProjectile(em *ecs.EntityManager, rm *game.ResourceManager, startX, startY float64) (ecs.EntityID, error) {
+func NewPeaProjectile(em *ecs.EntityManager, rm ResourceLoader, startX, startY float64) (ecs.EntityID, error) {
 	if em == nil {
 		return 0, fmt.Errorf("entity manager cannot be nil")
 	}

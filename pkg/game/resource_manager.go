@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/decker502/pvz/internal/reanim"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/audio/mp3"
@@ -46,10 +47,12 @@ import (
 //	    log.Printf("Failed to load image: %v", err)
 //	}
 type ResourceManager struct {
-	imageCache    map[string]*ebiten.Image    // Cache for loaded images: path -> Image
-	audioCache    map[string]*audio.Player    // Cache for loaded audio players: path -> Player
-	audioContext  *audio.Context              // Global audio context for audio decoding
-	fontFaceCache map[string]*text.GoTextFace // Cache for Ebitengine v2 text faces
+	imageCache       map[string]*ebiten.Image            // Cache for loaded images: path -> Image
+	audioCache       map[string]*audio.Player            // Cache for loaded audio players: path -> Player
+	audioContext     *audio.Context                      // Global audio context for audio decoding
+	fontFaceCache    map[string]*text.GoTextFace         // Cache for Ebitengine v2 text faces
+	reanimXMLCache   map[string]*reanim.ReanimXML        // Cache for parsed Reanim XML data: unit name -> ReanimXML
+	reanimImageCache map[string]map[string]*ebiten.Image // Cache for Reanim part images: unit name -> (image ref -> Image)
 }
 
 // NewResourceManager creates and initializes a new ResourceManager instance.
@@ -68,10 +71,12 @@ type ResourceManager struct {
 //	resourceManager := NewResourceManager(audioContext)
 func NewResourceManager(audioContext *audio.Context) *ResourceManager {
 	return &ResourceManager{
-		imageCache:    make(map[string]*ebiten.Image),
-		audioCache:    make(map[string]*audio.Player),
-		audioContext:  audioContext,
-		fontFaceCache: make(map[string]*text.GoTextFace),
+		imageCache:       make(map[string]*ebiten.Image),
+		audioCache:       make(map[string]*audio.Player),
+		audioContext:     audioContext,
+		fontFaceCache:    make(map[string]*text.GoTextFace),
+		reanimXMLCache:   make(map[string]*reanim.ReanimXML),
+		reanimImageCache: make(map[string]map[string]*ebiten.Image),
 	}
 }
 
@@ -401,4 +406,175 @@ func (rm *ResourceManager) LoadFont(path string, size float64) (*text.GoTextFace
 func (rm *ResourceManager) GetFont(path string, size float64) *text.GoTextFace {
 	cacheKey := fmt.Sprintf("%s:%.1f", path, size)
 	return rm.fontFaceCache[cacheKey]
+}
+
+// LoadReanimResources loads all Reanim resources (XML and part images) for the game.
+// This method should be called once during game initialization.
+//
+// Returns:
+//   - An error if any resource fails to load.
+func (rm *ResourceManager) LoadReanimResources() error {
+	// 加载植物 Reanim 资源
+	// 注意：文件名使用 PascalCase（与实际文件名匹配）
+	plants := []string{"PeaShooter", "SunFlower", "Wallnut"}
+	for _, plantName := range plants {
+		if err := rm.loadPlantReanim(plantName); err != nil {
+			return fmt.Errorf("failed to load %s reanim: %w", plantName, err)
+		}
+	}
+
+	// 加载僵尸 Reanim 资源
+	// 注意：路障和铁桶僵尸使用基础僵尸的动画
+	zombies := []string{"Zombie"}
+	for _, zombieName := range zombies {
+		if err := rm.loadZombieReanim(zombieName); err != nil {
+			return fmt.Errorf("failed to load %s reanim: %w", zombieName, err)
+		}
+	}
+
+	return nil
+}
+
+// loadPlantReanim loads Reanim resources for a specific plant.
+// Parameters:
+//   - name: The plant name (e.g., "peashooter", "sunflower")
+//
+// Returns:
+//   - An error if loading fails.
+func (rm *ResourceManager) loadPlantReanim(name string) error {
+	// 1. 解析 .reanim 文件
+	reanimPath := fmt.Sprintf("assets/reanim/%s.reanim", name)
+	reanimXML, err := reanim.ParseReanimFile(reanimPath)
+	if err != nil {
+		return fmt.Errorf("failed to parse reanim file: %w", err)
+	}
+
+	// 2. 加载部件图片
+	partImages, err := rm.loadReanimPartImages(name, reanimXML, "Plants")
+	if err != nil {
+		return fmt.Errorf("failed to load part images: %w", err)
+	}
+
+	// 3. 存储到缓存
+	rm.reanimXMLCache[name] = reanimXML
+	rm.reanimImageCache[name] = partImages
+
+	return nil
+}
+
+// loadZombieReanim loads Reanim resources for a specific zombie.
+// Parameters:
+//   - name: The zombie name (e.g., "zombie")
+//
+// Returns:
+//   - An error if loading fails.
+func (rm *ResourceManager) loadZombieReanim(name string) error {
+	// 1. 解析 .reanim 文件
+	reanimPath := fmt.Sprintf("assets/reanim/%s.reanim", name)
+	reanimXML, err := reanim.ParseReanimFile(reanimPath)
+	if err != nil {
+		return fmt.Errorf("failed to parse reanim file: %w", err)
+	}
+
+	// 2. 加载部件图片
+	partImages, err := rm.loadReanimPartImages(name, reanimXML, "Zombies")
+	if err != nil {
+		return fmt.Errorf("failed to load part images: %w", err)
+	}
+
+	// 3. 存储到缓存
+	rm.reanimXMLCache[name] = reanimXML
+	rm.reanimImageCache[name] = partImages
+
+	return nil
+}
+
+// GetReanimXML retrieves the parsed Reanim XML data for a specific unit.
+// Parameters:
+//   - unitName: The unit name (e.g., "peashooter", "zombie")
+//
+// Returns:
+//   - A pointer to the ReanimXML, or nil if not found in cache.
+func (rm *ResourceManager) GetReanimXML(unitName string) *reanim.ReanimXML {
+	return rm.reanimXMLCache[unitName]
+}
+
+// GetReanimPartImages retrieves the part images for a specific unit.
+// Parameters:
+//   - unitName: The unit name (e.g., "peashooter", "zombie")
+//
+// Returns:
+//   - A map of image reference names to images, or nil if not found in cache.
+func (rm *ResourceManager) GetReanimPartImages(unitName string) map[string]*ebiten.Image {
+	return rm.reanimImageCache[unitName]
+}
+
+// loadReanimPartImages loads all part images for a Reanim animation.
+// Parameters:
+//   - unitName: The unit name (e.g., "peashooter", "zombie")
+//   - reanimXML: The parsed Reanim XML data
+//   - category: The image category ("Plants" or "Zombies")
+//
+// Returns:
+//   - A map of image reference names to images
+//   - An error if any image fails to load
+func (rm *ResourceManager) loadReanimPartImages(unitName string, reanimXML *reanim.ReanimXML, category string) (map[string]*ebiten.Image, error) {
+	partImages := make(map[string]*ebiten.Image)
+
+	// 收集所有需要的图片引用
+	imageRefs := make(map[string]bool)
+	for _, track := range reanimXML.Tracks {
+		for _, frame := range track.Frames {
+			if frame.ImagePath != "" {
+				imageRefs[frame.ImagePath] = true
+			}
+		}
+	}
+
+	// 加载每个图片
+	for imageRef := range imageRefs {
+		// 构建图片路径
+		// 例如：IMAGE_REANIM_PEASHOOTER_HEAD -> assets/images/Plants/Peashooter/Peashooter_head.png
+		imagePath := rm.buildReanimImagePath(unitName, imageRef, category)
+
+		// 加载图片
+		img, err := rm.LoadImage(imagePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load image %s: %w", imagePath, err)
+		}
+
+		partImages[imageRef] = img
+	}
+
+	return partImages, nil
+}
+
+// buildReanimImagePath builds the file path for a Reanim part image.
+// Parameters:
+//   - unitName: The unit name (e.g., "PeaShooter", "Zombie") - currently unused
+//   - imageRef: The image reference name (e.g., "IMAGE_REANIM_PEASHOOTER_HEAD")
+//   - category: The image category ("Plants" or "Zombies") - currently unused as all images are in assets/reanim/images
+//
+// Returns:
+//   - The constructed file path
+func (rm *ResourceManager) buildReanimImagePath(unitName, imageRef, category string) string {
+	// Reanim 部件图片都在 assets/reanim/images/ 目录下
+	// 文件名格式：{unitname_lowercase}_{partname}.png
+	// 例如：peashooter_head.png, zombie_arm.png
+	//
+	// 注意：图片引用中包含了实际的单位名称，不一定与当前加载的单位相同
+	// 例如：SunFlower 的 reanim 可能引用 IMAGE_REANIM_PEASHOOTER_BACKLEAF
+
+	// 从 imageRef 中提取完整的文件名
+	// 例如：IMAGE_REANIM_PEASHOOTER_HEAD -> peashooter_head
+	imageRefUpper := strings.ToUpper(imageRef)
+
+	// 移除 IMAGE_REANIM_ 前缀（如果存在）
+	imageRefUpper = strings.TrimPrefix(imageRefUpper, "IMAGE_REANIM_")
+
+	// 转换为小写并替换下划线为文件名格式
+	fileName := strings.ToLower(imageRefUpper)
+
+	// 构建路径：assets/reanim/images/peashooter_head.png
+	return fmt.Sprintf("assets/reanim/images/%s.png", fileName)
 }

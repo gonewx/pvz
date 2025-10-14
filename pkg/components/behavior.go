@@ -29,10 +29,26 @@ const (
 	// BehaviorZombieBuckethead 铁桶僵尸行为：带高强度护甲的僵尸(1100护甲值)
 	// 当护甲被完全破坏后，外观切换为普通僵尸，行为转变为 BehaviorZombieBasic
 	BehaviorZombieBuckethead
+	// BehaviorFallingPart 掉落部件效果：僵尸手臂或头部掉落的动画效果
+	// 部件以抛物线轨迹飞出，一段时间后消失
+	BehaviorFallingPart
+)
+
+// ZombieAnimState 定义僵尸的动画状态
+type ZombieAnimState int
+
+const (
+	// ZombieAnimWalking 行走状态
+	ZombieAnimWalking ZombieAnimState = iota
+	// ZombieAnimEating 啃食/攻击状态
+	ZombieAnimEating
+	// ZombieAnimDying 死亡状态
+	ZombieAnimDying
 )
 
 // BehaviorComponent 标识实体的行为类型
 // 此组件用于让 BehaviorSystem 识别实体应执行何种行为逻辑
 type BehaviorComponent struct {
-	Type BehaviorType // 行为类型（向日葵、豌豆射手等）
+	Type            BehaviorType    // 行为类型（向日葵、豌豆射手等）
+	ZombieAnimState ZombieAnimState // 僵尸当前动画状态（仅用于僵尸）
 }

@@ -7,13 +7,12 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/game"
 )
 
 // TestNewZombieEntity 测试僵尸实体创建
 func TestNewZombieEntity(t *testing.T) {
 	// 初始化资源管理器和实体管理器
-	rm := game.NewResourceManager(testAudioContext)
+	rm := newMockResourceManager()
 	em := ecs.NewEntityManager()
 
 	tests := []struct {
@@ -42,10 +41,12 @@ func TestNewZombieEntity(t *testing.T) {
 		},
 	}
 
+	mockRS := &mockReanimSystem{em: em}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// 创建僵尸实体
-			zombieID, err := NewZombieEntity(em, rm, tt.row, tt.spawnX)
+			zombieID, err := NewZombieEntity(em, rm, mockRS, tt.row, tt.spawnX)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("NewZombieEntity() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -64,7 +65,7 @@ func TestNewZombieEntity(t *testing.T) {
 				t.Error("Zombie entity should have PositionComponent")
 			} else {
 				pos := posComp.(*components.PositionComponent)
-				expectedY := config.GridWorldStartY + float64(tt.row)*config.CellHeight + 30.0
+				expectedY := config.GridWorldStartY + float64(tt.row)*config.CellHeight + config.ZombieVerticalOffset
 				if pos.X != tt.spawnX {
 					t.Errorf("Position X mismatch: got %.1f, want %.1f", pos.X, tt.spawnX)
 				}
@@ -84,20 +85,20 @@ func TestNewZombieEntity(t *testing.T) {
 				}
 			}
 
-			// 验证 AnimationComponent
-			animComp, ok := em.GetComponent(zombieID, reflect.TypeOf(&components.AnimationComponent{}))
+			// Story 6.3: 验证 ReanimComponent（替代 AnimationComponent）
+			reanimComp, ok := em.GetComponent(zombieID, reflect.TypeOf(&components.ReanimComponent{}))
 			if !ok {
-				t.Error("Zombie entity should have AnimationComponent")
+				t.Error("Zombie entity should have ReanimComponent")
 			} else {
-				anim := animComp.(*components.AnimationComponent)
-				if len(anim.Frames) != 22 {
-					t.Errorf("Expected 22 animation frames, got %d", len(anim.Frames))
+				reanim := reanimComp.(*components.ReanimComponent)
+				if reanim.Reanim == nil {
+					t.Error("ReanimComponent.Reanim should not be nil")
 				}
-				if anim.FrameSpeed != 0.1 {
-					t.Errorf("Expected FrameSpeed 0.1, got %.2f", anim.FrameSpeed)
+				if reanim.PartImages == nil {
+					t.Error("ReanimComponent.PartImages should not be nil")
 				}
-				if !anim.IsLooping {
-					t.Error("Zombie animation should loop")
+				if reanim.CurrentAnim == "" {
+					t.Error("ReanimComponent.CurrentAnim should not be empty")
 				}
 			}
 
@@ -145,13 +146,13 @@ func TestNewZombieEntity(t *testing.T) {
 
 // TestNewZombieEntity_ErrorHandling 测试错误处理
 func TestNewZombieEntity_ErrorHandling(t *testing.T) {
-	rm := game.NewResourceManager(testAudioContext)
+	rm := newMockResourceManager()
 	em := ecs.NewEntityManager()
 
 	tests := []struct {
 		name    string
 		em      *ecs.EntityManager
-		rm      *game.ResourceManager
+		rm      ResourceLoader
 		wantErr bool
 	}{
 		{
@@ -168,9 +169,11 @@ func TestNewZombieEntity_ErrorHandling(t *testing.T) {
 		},
 	}
 
+	mockRS := &mockReanimSystem{em: em}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			zombieID, err := NewZombieEntity(tt.em, tt.rm, 0, 1450.0)
+			zombieID, err := NewZombieEntity(tt.em, tt.rm, mockRS, 0, 1450.0)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewZombieEntity() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -184,7 +187,7 @@ func TestNewZombieEntity_ErrorHandling(t *testing.T) {
 // TestNewConeheadZombieEntity 测试路障僵尸实体创建
 func TestNewConeheadZombieEntity(t *testing.T) {
 	// 初始化资源管理器和实体管理器
-	rm := game.NewResourceManager(testAudioContext)
+	rm := newMockResourceManager()
 	em := ecs.NewEntityManager()
 
 	tests := []struct {
@@ -207,10 +210,12 @@ func TestNewConeheadZombieEntity(t *testing.T) {
 		},
 	}
 
+	mockRS := &mockReanimSystem{em: em}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// 创建路障僵尸实体
-			zombieID, err := NewConeheadZombieEntity(em, rm, tt.row, tt.spawnX)
+			zombieID, err := NewConeheadZombieEntity(em, rm, mockRS, tt.row, tt.spawnX)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("NewConeheadZombieEntity() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -262,14 +267,17 @@ func TestNewConeheadZombieEntity(t *testing.T) {
 				}
 			}
 
-			// 验证 AnimationComponent (路障僵尸21帧)
-			animComp, ok := em.GetComponent(zombieID, reflect.TypeOf(&components.AnimationComponent{}))
+			// Story 6.3: 验证 ReanimComponent
+			reanimComp, ok := em.GetComponent(zombieID, reflect.TypeOf(&components.ReanimComponent{}))
 			if !ok {
-				t.Error("Conehead zombie entity should have AnimationComponent")
+				t.Error("Conehead zombie entity should have ReanimComponent")
 			} else {
-				anim := animComp.(*components.AnimationComponent)
-				if len(anim.Frames) != config.ConeheadZombieWalkAnimationFrames {
-					t.Errorf("Expected %d animation frames, got %d", config.ConeheadZombieWalkAnimationFrames, len(anim.Frames))
+				reanim := reanimComp.(*components.ReanimComponent)
+				if reanim.Reanim == nil {
+					t.Error("ReanimComponent.Reanim should not be nil")
+				}
+				if reanim.PartImages == nil {
+					t.Error("ReanimComponent.PartImages should not be nil")
 				}
 			}
 		})
@@ -279,7 +287,7 @@ func TestNewConeheadZombieEntity(t *testing.T) {
 // TestNewBucketheadZombieEntity 测试铁桶僵尸实体创建
 func TestNewBucketheadZombieEntity(t *testing.T) {
 	// 初始化资源管理器和实体管理器
-	rm := game.NewResourceManager(testAudioContext)
+	rm := newMockResourceManager()
 	em := ecs.NewEntityManager()
 
 	tests := []struct {
@@ -302,10 +310,12 @@ func TestNewBucketheadZombieEntity(t *testing.T) {
 		},
 	}
 
+	mockRS := &mockReanimSystem{em: em}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// 创建铁桶僵尸实体
-			zombieID, err := NewBucketheadZombieEntity(em, rm, tt.row, tt.spawnX)
+			zombieID, err := NewBucketheadZombieEntity(em, rm, mockRS, tt.row, tt.spawnX)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("NewBucketheadZombieEntity() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -357,14 +367,17 @@ func TestNewBucketheadZombieEntity(t *testing.T) {
 				}
 			}
 
-			// 验证 AnimationComponent (铁桶僵尸15帧)
-			animComp, ok := em.GetComponent(zombieID, reflect.TypeOf(&components.AnimationComponent{}))
+			// Story 6.3: 验证 ReanimComponent
+			reanimComp, ok := em.GetComponent(zombieID, reflect.TypeOf(&components.ReanimComponent{}))
 			if !ok {
-				t.Error("Buckethead zombie entity should have AnimationComponent")
+				t.Error("Buckethead zombie entity should have ReanimComponent")
 			} else {
-				anim := animComp.(*components.AnimationComponent)
-				if len(anim.Frames) != config.BucketheadZombieWalkAnimationFrames {
-					t.Errorf("Expected %d animation frames, got %d", config.BucketheadZombieWalkAnimationFrames, len(anim.Frames))
+				reanim := reanimComp.(*components.ReanimComponent)
+				if reanim.Reanim == nil {
+					t.Error("ReanimComponent.Reanim should not be nil")
+				}
+				if reanim.PartImages == nil {
+					t.Error("ReanimComponent.PartImages should not be nil")
 				}
 			}
 		})

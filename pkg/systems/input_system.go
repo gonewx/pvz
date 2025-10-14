@@ -21,20 +21,23 @@ type InputSystem struct {
 	entityManager      *ecs.EntityManager
 	resourceManager    *game.ResourceManager
 	gameState          *game.GameState
-	sunCounterX        float64         // 阳光计数器X坐标（收集动画目标）
-	sunCounterY        float64         // 阳光计数器Y坐标（收集动画目标）
-	collectSoundPlayer *audio.Player   // 收集阳光音效播放器
-	lawnGridSystem     *LawnGridSystem // 草坪网格管理系统
-	lawnGridEntityID   ecs.EntityID    // 草坪网格实体ID
-	plantSoundPlayer   *audio.Player   // 种植音效播放器
+	reanimSystem       entities.ReanimSystemInterface // Story 6.3: Reanim 系统（用于初始化植物动画）
+	sunCounterX        float64                        // 阳光计数器X坐标（收集动画目标）
+	sunCounterY        float64                        // 阳光计数器Y坐标（收集动画目标）
+	collectSoundPlayer *audio.Player                  // 收集阳光音效播放器
+	lawnGridSystem     *LawnGridSystem                // 草坪网格管理系统
+	lawnGridEntityID   ecs.EntityID                   // 草坪网格实体ID
+	plantSoundPlayer   *audio.Player                  // 种植音效播放器
 }
 
 // NewInputSystem 创建一个新的输入系统
-func NewInputSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.GameState, sunCounterX, sunCounterY float64, lawnGridSystem *LawnGridSystem, lawnGridEntityID ecs.EntityID) *InputSystem {
+// Story 6.3: 添加 reanimSystem 参数用于初始化植物动画
+func NewInputSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.GameState, rs entities.ReanimSystemInterface, sunCounterX, sunCounterY float64, lawnGridSystem *LawnGridSystem, lawnGridEntityID ecs.EntityID) *InputSystem {
 	system := &InputSystem{
 		entityManager:    em,
 		resourceManager:  rm,
 		gameState:        gs,
+		reanimSystem:     rs,
 		sunCounterX:      sunCounterX,
 		sunCounterY:      sunCounterY,
 		lawnGridSystem:   lawnGridSystem,
@@ -405,6 +408,9 @@ func (s *InputSystem) handleLawnClick(mouseX, mouseY int) bool {
 	// 删除预览实体
 	s.destroyPlantPreview()
 
+	// 重置植物卡片的选择状态
+	s.resetPlantCardSelection(plantType)
+
 	// 退出种植模式
 	s.gameState.ExitPlantingMode()
 	log.Printf("[InputSystem] 种植完成，退出种植模式")
@@ -415,12 +421,13 @@ func (s *InputSystem) handleLawnClick(mouseX, mouseY int) bool {
 // createPlantEntity 创建植物实体的辅助方法
 // 根据植物类型选择合适的工厂函数
 func (s *InputSystem) createPlantEntity(plantType components.PlantType, col, row int) (ecs.EntityID, error) {
+	// Story 6.3: 传递 reanimSystem 给工厂函数以初始化动画
 	// 坚果墙使用专用的工厂函数
 	if plantType == components.PlantWallnut {
-		return entities.NewWallnutEntity(s.entityManager, s.resourceManager, s.gameState, col, row)
+		return entities.NewWallnutEntity(s.entityManager, s.resourceManager, s.gameState, s.reanimSystem, col, row)
 	}
 	// 其他植物使用通用工厂函数
-	return entities.NewPlantEntity(s.entityManager, s.resourceManager, s.gameState, plantType, col, row)
+	return entities.NewPlantEntity(s.entityManager, s.resourceManager, s.gameState, s.reanimSystem, plantType, col, row)
 }
 
 // getPlantCost 获取植物的阳光消耗
@@ -454,6 +461,31 @@ func (s *InputSystem) triggerPlantCardCooldown(plantType components.PlantType) {
 			card.CurrentCooldown = card.CooldownTime
 			log.Printf("[InputSystem] 触发植物卡片冷却: PlantType=%v, CooldownTime=%.1f", plantType, card.CooldownTime)
 			break // 只触发第一个匹配的卡片
+		}
+	}
+}
+
+// resetPlantCardSelection 重置指定植物类型的卡片选择状态
+func (s *InputSystem) resetPlantCardSelection(plantType components.PlantType) {
+	// 查询所有植物卡片实体
+	entities := s.entityManager.GetEntitiesWith(
+		reflect.TypeOf(&components.PlantCardComponent{}),
+		reflect.TypeOf(&components.UIComponent{}),
+	)
+
+	// 找到匹配的卡片并重置UI状态
+	for _, entityID := range entities {
+		cardComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PlantCardComponent{}))
+		uiComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.UIComponent{}))
+
+		card := cardComp.(*components.PlantCardComponent)
+		ui := uiComp.(*components.UIComponent)
+
+		if card.PlantType == plantType {
+			// 重置为正常状态
+			ui.State = components.UINormal
+			log.Printf("[InputSystem] 重置植物卡片选择状态: PlantType=%v", plantType)
+			break // 只重置第一个匹配的卡片
 		}
 	}
 }

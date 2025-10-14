@@ -11,7 +11,6 @@ import (
 	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/utils"
-	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // BehaviorSystem 处理实体的行为逻辑
@@ -19,7 +18,8 @@ import (
 type BehaviorSystem struct {
 	entityManager   *ecs.EntityManager
 	resourceManager *game.ResourceManager
-	logFrameCounter int // 日志输出计数器（避免全局变量）
+	reanimSystem    *ReanimSystem // Story 6.3: 用于切换僵尸动画状态
+	logFrameCounter int           // 日志输出计数器（避免全局变量）
 }
 
 // 阳光生产位置偏移常量
@@ -35,10 +35,12 @@ const (
 // 参数:
 //   - em: EntityManager 实例
 //   - rm: ResourceManager 实例
-func NewBehaviorSystem(em *ecs.EntityManager, rm *game.ResourceManager) *BehaviorSystem {
+//   - rs: ReanimSystem 实例 (Story 6.3: 用于切换僵尸动画)
+func NewBehaviorSystem(em *ecs.EntityManager, rm *game.ResourceManager, rs *ReanimSystem) *BehaviorSystem {
 	return &BehaviorSystem{
 		entityManager:   em,
 		resourceManager: rm,
+		reanimSystem:    rs,
 	}
 }
 
@@ -66,12 +68,26 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 		reflect.TypeOf(&components.TimerComponent{}),
 	)
 
-	// 查询所有死亡中的僵尸实体（没有 VelocityComponent，只有 BehaviorComponent, PositionComponent, AnimationComponent）
+	// 查询所有死亡中的僵尸实体（拥有 BehaviorComponent 但没有 VelocityComponent）
+	// 死亡状态的僵尸在 triggerZombieDeath() 中会移除 VelocityComponent
 	dyingZombieEntityList := s.entityManager.GetEntitiesWith(
 		reflect.TypeOf(&components.BehaviorComponent{}),
 		reflect.TypeOf(&components.PositionComponent{}),
-		reflect.TypeOf(&components.AnimationComponent{}),
+		reflect.TypeOf(&components.ReanimComponent{}),
 	)
+	// 过滤出真正处于死亡状态的僵尸（BehaviorType == BehaviorZombieDying）
+	var filteredDyingZombies []ecs.EntityID
+	for _, entityID := range dyingZombieEntityList {
+		behaviorComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.BehaviorComponent{}))
+		if !ok {
+			continue
+		}
+		behavior := behaviorComp.(*components.BehaviorComponent)
+		if behavior.Type == components.BehaviorZombieDying {
+			filteredDyingZombies = append(filteredDyingZombies, entityID)
+		}
+	}
+	dyingZombieEntityList = filteredDyingZombies
 
 	// 合并所有僵尸列表（移动中 + 啃食中），用于豌豆射手检测目标
 	allZombieEntityList := append([]ecs.EntityID{}, zombieEntityList...)
@@ -266,6 +282,10 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 	healthComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.HealthComponent{}))
 	if ok {
 		health := healthComp.(*components.HealthComponent)
+
+		// 更新僵尸的受伤状态（掉手臂、掉头）
+		s.updateZombieDamageState(entityID, health)
+
 		if health.CurrentHealth <= 0 {
 			// 生命值 <= 0，触发死亡状态转换
 			log.Printf("[BehaviorSystem] 僵尸 %d 生命值 <= 0 (HP=%d)，触发死亡", entityID, health.CurrentHealth)
@@ -326,35 +346,28 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 	behavior.Type = components.BehaviorZombieDying
 	log.Printf("[BehaviorSystem] 僵尸 %d 行为切换为 BehaviorZombieDying", entityID)
 
-	// 2. 移除 VelocityComponent（停止移动）
+	// 2. 使用 ReanimSystem 通用接口隐藏 "head" 部件组（头掉落效果）
+	// 部件组映射在实体创建时配置（zombie_factory.go），BehaviorSystem 不需要知道具体轨道名
+	if err := s.reanimSystem.HidePartGroup(entityID, "head"); err != nil {
+		log.Printf("[BehaviorSystem] 警告：僵尸 %d 隐藏头部失败: %v", entityID, err)
+	} else {
+		log.Printf("[BehaviorSystem] 僵尸 %d 头部掉落", entityID)
+	}
+
+	// 3. 移除 VelocityComponent（停止移动）
 	s.entityManager.RemoveComponent(entityID, reflect.TypeOf(&components.VelocityComponent{}))
 	log.Printf("[BehaviorSystem] 僵尸 %d 移除速度组件，停止移动", entityID)
 
-	// 3. 加载死亡动画帧
-	deathFrames, err := utils.LoadZombieDeathAnimation(s.resourceManager)
-	if err != nil {
-		log.Printf("[BehaviorSystem] 加载僵尸死亡动画失败: %v，使用占位动画", err)
-		// 错误处理：如果死亡动画加载失败，直接删除僵尸
+	// 4. 使用 ReanimSystem 播放死亡动画（不循环）
+	// 尝试播放 anim_death 动画（从Zombie.reanim）
+	if err := s.reanimSystem.PlayAnimationNoLoop(entityID, "anim_death"); err != nil {
+		log.Printf("[BehaviorSystem] 僵尸 %d 播放死亡动画失败: %v，直接删除", entityID, err)
+		// 错误处理：如果死亡动画播放失败，直接删除僵尸
 		s.entityManager.DestroyEntity(entityID)
 		return
 	}
 
-	// 4. 替换 AnimationComponent 的动画帧
-	animComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.AnimationComponent{}))
-	if !ok {
-		log.Printf("[BehaviorSystem] 僵尸 %d 缺少 AnimationComponent，无法播放死亡动画", entityID)
-		s.entityManager.DestroyEntity(entityID)
-		return
-	}
-	anim := animComp.(*components.AnimationComponent)
-	anim.Frames = deathFrames
-	anim.IsLooping = false // 死亡动画不循环
-	anim.IsFinished = false
-	anim.CurrentFrame = 0
-	anim.FrameCounter = 0
-	anim.FrameSpeed = config.ZombieDieFrameSpeed
-
-	log.Printf("[BehaviorSystem] 僵尸 %d 死亡动画已设置 (帧数=%d, 帧速率=%.2f)", entityID, len(deathFrames), config.ZombieDieFrameSpeed)
+	log.Printf("[BehaviorSystem] 僵尸 %d 死亡动画已开始播放 (anim_death, 不循环)", entityID)
 }
 
 // handlePeashooterBehavior 处理豌豆射手的行为逻辑
@@ -483,20 +496,50 @@ func (s *BehaviorSystem) handleHitEffectBehavior(entityID ecs.EntityID, deltaTim
 // handleZombieDyingBehavior 处理僵尸死亡动画播放
 // 当死亡动画完成后，删除僵尸实体
 func (s *BehaviorSystem) handleZombieDyingBehavior(entityID ecs.EntityID) {
-	// 获取动画组件
-	animComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.AnimationComponent{}))
+	// 获取 ReanimComponent
+	reanimComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{}))
 	if !ok {
-		// 如果没有动画组件，直接删除僵尸
-		log.Printf("[BehaviorSystem] 死亡中的僵尸 %d 缺少 AnimationComponent，直接删除", entityID)
+		// 如果没有 ReanimComponent，直接删除僵尸
+		log.Printf("[BehaviorSystem] 死亡中的僵尸 %d 缺少 ReanimComponent，直接删除", entityID)
 		s.entityManager.DestroyEntity(entityID)
 		return
 	}
-	anim := animComp.(*components.AnimationComponent)
+	reanim := reanimComp.(*components.ReanimComponent)
 
 	// 检查死亡动画是否完成
-	if anim.IsFinished {
-		log.Printf("[BehaviorSystem] 僵尸 %d 死亡动画完成，删除实体", entityID)
+	// 使用 IsFinished 标志来判断非循环动画是否已完成
+	if reanim.IsFinished {
+		log.Printf("[BehaviorSystem] 僵尸 %d 死亡动画完成 (frame %d/%d)，删除实体",
+			entityID, reanim.CurrentFrame, reanim.VisibleFrameCount)
 		s.entityManager.DestroyEntity(entityID)
+	} else {
+		// 调试日志：定期输出动画状态（每10帧输出一次）
+		if reanim.CurrentFrame%10 == 0 {
+			log.Printf("[BehaviorSystem] 僵尸 %d 死亡动画进行中: Frame=%d/%d, IsLooping=%v, IsFinished=%v",
+				entityID, reanim.CurrentFrame, reanim.VisibleFrameCount, reanim.IsLooping, reanim.IsFinished)
+		}
+	}
+}
+
+// updateZombieDamageState 根据生命值更新僵尸的受伤状态
+// 僵尸有三个受伤阶段：
+// 1. 健康（HP > 90）：完整外观
+// 2. 掉手臂（HP <= 90 且 HP > 0）：隐藏外侧手臂
+// 3. 掉头（HP <= 0）：无头状态（在 triggerZombieDeath 中处理）
+func (s *BehaviorSystem) updateZombieDamageState(entityID ecs.EntityID, health *components.HealthComponent) {
+	// 生命值阈值：90（33%，根据原版游戏数据）
+	const armLostThreshold = 90
+
+	// 检查是否应该掉手臂（生命值 <= 90）
+	if health.CurrentHealth <= armLostThreshold {
+		// 使用 ReanimSystem 通用接口隐藏 "arm" 部件组
+		// 部件组映射在实体创建时配置（zombie_factory.go），BehaviorSystem 不需要知道具体轨道名
+		if err := s.reanimSystem.HidePartGroup(entityID, "arm"); err != nil {
+			// 如果实体没有配置 PartGroups（非僵尸实体），静默忽略
+			return
+		}
+		log.Printf("[BehaviorSystem] 僵尸 %d 手臂掉落 (HP=%d/%d)",
+			entityID, health.CurrentHealth, health.MaxHealth)
 	}
 }
 
@@ -558,6 +601,50 @@ func (s *BehaviorSystem) detectPlantCollision(zombieRow, zombieCol int) (ecs.Ent
 	return 0, false
 }
 
+// changeZombieAnimation 切换僵尸动画状态
+// 参数:
+//   - zombieID: 僵尸实体ID
+//   - newState: 新的动画状态
+func (s *BehaviorSystem) changeZombieAnimation(zombieID ecs.EntityID, newState components.ZombieAnimState) {
+	// 获取行为组件
+	behaviorComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.BehaviorComponent{}))
+	if !ok {
+		return
+	}
+	behavior := behaviorComp.(*components.BehaviorComponent)
+
+	// 如果状态没有变化，不需要切换动画
+	if behavior.ZombieAnimState == newState {
+		return
+	}
+
+	// 更新状态
+	behavior.ZombieAnimState = newState
+
+	// 根据状态切换动画
+	var animName string
+	switch newState {
+	case components.ZombieAnimWalking:
+		animName = "anim_walk"
+	case components.ZombieAnimEating:
+		animName = "anim_eat"
+	case components.ZombieAnimDying:
+		animName = "anim_death"
+	default:
+		return
+	}
+
+	// 使用 ReanimSystem 播放新动画
+	if s.reanimSystem != nil {
+		err := s.reanimSystem.PlayAnimation(zombieID, animName)
+		if err != nil {
+			log.Printf("[BehaviorSystem] 僵尸 %d 切换动画失败: %v", zombieID, err)
+		} else {
+			log.Printf("[BehaviorSystem] 僵尸 %d 切换动画: %s", zombieID, animName)
+		}
+	}
+}
+
 // startEatingPlant 开始啃食植物
 // 参数:
 //   - zombieID: 僵尸实体ID
@@ -579,6 +666,9 @@ func (s *BehaviorSystem) startEatingPlant(zombieID, plantID ecs.EntityID) {
 	// 3. 切换 BehaviorComponent.Type 为 BehaviorZombieEating
 	behavior.Type = components.BehaviorZombieEating
 
+	// Story 6.3: 切换僵尸动画为啃食状态
+	s.changeZombieAnimation(zombieID, components.ZombieAnimEating)
+
 	// 4. 添加 TimerComponent 用于伤害间隔
 	s.entityManager.AddComponent(zombieID, &components.TimerComponent{
 		Name:        "eating_damage",
@@ -587,34 +677,39 @@ func (s *BehaviorSystem) startEatingPlant(zombieID, plantID ecs.EntityID) {
 		IsReady:     false,
 	})
 
+	// TODO(Story 6.3): 迁移到 ReanimComponent
 	// 5. Story 5.3: 根据原始僵尸类型加载对应的啃食动画
-	var eatFrames []*ebiten.Image
+	// var eatFrames []*ebiten.Image
 
-	switch originalZombieType {
-	case components.BehaviorZombieConehead:
-		// 路障僵尸啃食动画
-		eatFrames, _ = utils.LoadConeheadZombieEatAnimation(s.resourceManager)
-		log.Printf("[BehaviorSystem] 路障僵尸 %d 开始啃食，使用路障僵尸啃食动画", zombieID)
-	case components.BehaviorZombieBuckethead:
-		// 铁桶僵尸啃食动画
-		eatFrames, _ = utils.LoadBucketheadZombieEatAnimation(s.resourceManager)
-		log.Printf("[BehaviorSystem] 铁桶僵尸 %d 开始啃食，使用铁桶僵尸啃食动画", zombieID)
-	default:
-		// 普通僵尸或其他类型
-		eatFrames = utils.LoadZombieEatAnimation(s.resourceManager)
-	}
+	_ = originalZombieType // 临时避免未使用警告
+	/*
+		switch originalZombieType {
+		case components.BehaviorZombieConehead:
+			// 路障僵尸啃食动画
+			eatFrames, _ = utils.LoadConeheadZombieEatAnimation(s.resourceManager)
+			log.Printf("[BehaviorSystem] 路障僵尸 %d 开始啃食，使用路障僵尸啃食动画", zombieID)
+		case components.BehaviorZombieBuckethead:
+			// 铁桶僵尸啃食动画
+			eatFrames, _ = utils.LoadBucketheadZombieEatAnimation(s.resourceManager)
+			log.Printf("[BehaviorSystem] 铁桶僵尸 %d 开始啃食，使用铁桶僵尸啃食动画", zombieID)
+		default:
+			// 普通僵尸或其他类型
+			eatFrames = utils.LoadZombieEatAnimation(s.resourceManager)
+		}
 
-	// 6. 替换 AnimationComponent 为啃食动画
-	animComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.AnimationComponent{}))
-	if ok {
-		anim := animComp.(*components.AnimationComponent)
-		anim.Frames = eatFrames
-		anim.FrameSpeed = config.ZombieEatFrameSpeed
-		anim.CurrentFrame = 0
-		anim.FrameCounter = 0
-		anim.IsLooping = true
-		anim.IsFinished = false
-	}
+		// TODO(Story 6.3): 迁移到 ReanimComponent
+		// 6. 替换 AnimationComponent 为啃食动画
+		// animComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.AnimationComponent{}))
+		// if ok {
+		// 	anim := animComp.(*components.AnimationComponent)
+		// 	anim.Frames = eatFrames
+		// 	anim.FrameSpeed = config.ZombieEatFrameSpeed
+		// 	anim.CurrentFrame = 0
+		// 	anim.FrameCounter = 0
+		// 	anim.IsLooping = true
+		// 	anim.IsFinished = false
+		// }
+	*/
 }
 
 // stopEatingAndResume 停止啃食并恢复移动
@@ -633,26 +728,31 @@ func (s *BehaviorSystem) stopEatingAndResume(zombieID ecs.EntityID) {
 		behavior.Type = components.BehaviorZombieBasic
 	}
 
+	// Story 6.3: 切换僵尸动画回行走状态
+	s.changeZombieAnimation(zombieID, components.ZombieAnimWalking)
+
 	// 3. 恢复 VelocityComponent
 	s.entityManager.AddComponent(zombieID, &components.VelocityComponent{
 		VX: config.ZombieWalkSpeed,
 		VY: 0,
 	})
 
+	// TODO(Story 6.3): 迁移到 ReanimComponent
 	// 4. 加载僵尸走路动画帧序列
-	walkFrames := utils.LoadZombieWalkAnimation(s.resourceManager)
+	// walkFrames := utils.LoadZombieWalkAnimation(s.resourceManager)
 
+	// TODO(Story 6.3): 迁移到 ReanimComponent
 	// 5. 替换 AnimationComponent 为走路动画
-	animComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.AnimationComponent{}))
-	if ok {
-		anim := animComp.(*components.AnimationComponent)
-		anim.Frames = walkFrames
-		anim.FrameSpeed = config.ZombieWalkFrameSpeed
-		anim.CurrentFrame = 0
-		anim.FrameCounter = 0
-		anim.IsLooping = true
-		anim.IsFinished = false
-	}
+	// animComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.AnimationComponent{}))
+	// if ok {
+	// 	anim := animComp.(*components.AnimationComponent)
+	// 	anim.Frames = walkFrames
+	// 	anim.FrameSpeed = config.ZombieWalkFrameSpeed
+	// 	anim.CurrentFrame = 0
+	// 	anim.FrameCounter = 0
+	// 	anim.IsLooping = true
+	// 	anim.IsFinished = false
+	// }
 }
 
 // handleZombieEatingBehavior 处理僵尸啃食植物的行为
@@ -660,26 +760,44 @@ func (s *BehaviorSystem) stopEatingAndResume(zombieID ecs.EntityID) {
 //   - entityID: 僵尸实体ID
 //   - deltaTime: 帧间隔时间
 func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, deltaTime float64) {
+	// 检查生命值并更新受伤状态（掉手臂、掉头）
+	healthComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.HealthComponent{}))
+	if ok {
+		health := healthComp.(*components.HealthComponent)
+
+		// 更新僵尸的受伤状态（掉手臂）
+		s.updateZombieDamageState(entityID, health)
+
+		// 检查生命值是否归零（即使在啃食状态也要检查）
+		if health.CurrentHealth <= 0 {
+			log.Printf("[BehaviorSystem] 啃食中的僵尸 %d 生命值 <= 0 (HP=%d)，触发死亡", entityID, health.CurrentHealth)
+			s.triggerZombieDeath(entityID)
+			return
+		}
+	}
+
 	// Story 5.3: 检查护甲状态（护甲僵尸即使在啃食也需要检测护甲破坏）
 	armorComp, hasArmor := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ArmorComponent{}))
 	if hasArmor {
 		armor := armorComp.(*components.ArmorComponent)
+		// TODO(Story 6.3): 迁移到 ReanimComponent
 		// 如果护甲已破坏，切换为普通僵尸动画
-		if armor.CurrentArmor <= 0 {
-			// 加载普通僵尸啃食动画
-			normalEatFrames := utils.LoadZombieEatAnimation(s.resourceManager)
-			animComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.AnimationComponent{}))
-			if ok {
-				anim := animComp.(*components.AnimationComponent)
-				// 检查是否已经是普通僵尸动画(避免重复切换)
-				if len(anim.Frames) != config.ZombieEatAnimationFrames {
-					anim.Frames = normalEatFrames
-					anim.CurrentFrame = 0
-					anim.FrameCounter = 0
-					log.Printf("[BehaviorSystem] 啃食中的护甲僵尸 %d 护甲耗尽，切换为普通僵尸啃食动画", entityID)
-				}
-			}
-		}
+		// if armor.CurrentArmor <= 0 {
+		// 	// 加载普通僵尸啃食动画
+		// 	normalEatFrames := utils.LoadZombieEatAnimation(s.resourceManager)
+		// 	animComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.AnimationComponent{}))
+		// 	if ok {
+		// 		anim := animComp.(*components.AnimationComponent)
+		// 		// 检查是否已经是普通僵尸动画(避免重复切换)
+		// 		if len(anim.Frames) != config.ZombieEatAnimationFrames {
+		// 			anim.Frames = normalEatFrames
+		// 			anim.CurrentFrame = 0
+		// 			anim.FrameCounter = 0
+		// 			log.Printf("[BehaviorSystem] 啃食中的护甲僵尸 %d 护甲耗尽，切换为普通僵尸啃食动画", entityID)
+		// 		}
+		// 	}
+		// }
+		_ = armor // 临时避免未使用警告
 	}
 
 	// 获取僵尸的 TimerComponent
@@ -785,68 +903,70 @@ func (s *BehaviorSystem) handleWallnutBehavior(entityID ecs.EntityID) {
 	// 计算生命值百分比
 	healthPercent := float64(health.CurrentHealth) / float64(health.MaxHealth)
 
+	// TODO(Story 6.3): 迁移到 ReanimComponent
 	// 获取动画组件（用于切换外观状态）
-	animComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.AnimationComponent{}))
-	if !ok {
-		return
-	}
-	anim := animComp.(*components.AnimationComponent)
+	// animComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.AnimationComponent{}))
+	// if !ok {
+	// 	return
+	// }
+	// anim := animComp.(*components.AnimationComponent)
 
 	// 根据生命值百分比确定应显示的外观状态
 	// 我们需要追踪当前应该使用的状态，避免每帧重复加载
-	var targetState int // 0=完好, 1=轻伤, 2=重伤
-	var requiredFrameCount int
+	// var targetState int // 0=完好, 1=轻伤, 2=重伤
+	// var requiredFrameCount int
 
-	if healthPercent > config.WallnutCracked1Threshold {
-		// 完好状态 (> 66%)
-		targetState = 0
-		requiredFrameCount = config.WallnutAnimationFrames // 16帧
-	} else if healthPercent > config.WallnutCracked2Threshold {
-		// 轻伤状态 (33% - 66%)
-		targetState = 1
-		requiredFrameCount = 11 // 轻伤状态有11帧
-	} else {
-		// 重伤状态 (< 33%)
-		targetState = 2
-		requiredFrameCount = 15 // 重伤状态有15帧
-	}
+	// if healthPercent > config.WallnutCracked1Threshold {
+	// 	// 完好状态 (> 66%)
+	// 	targetState = 0
+	// 	requiredFrameCount = config.WallnutAnimationFrames // 16帧
+	// } else if healthPercent > config.WallnutCracked2Threshold {
+	// 	// 轻伤状态 (33% - 66%)
+	// 	targetState = 1
+	// 	requiredFrameCount = 11 // 轻伤状态有11帧
+	// } else {
+	// 	// 重伤状态 (< 33%)
+	// 	targetState = 2
+	// 	requiredFrameCount = 15 // 重伤状态有15帧
+	// }
 
 	// 检查当前动画帧数是否匹配目标状态（用帧数判断状态）
 	// 这样可以避免每帧都重新加载相同的动画
-	if len(anim.Frames) == requiredFrameCount {
-		// 当前已是正确状态，无需切换
-		return
-	}
+	// if len(anim.Frames) == requiredFrameCount {
+	// 	// 当前已是正确状态，无需切换
+	// 	return
+	// }
 
 	// 需要切换状态，加载对应的动画
-	var targetFrames []*ebiten.Image
-	var err error
+	// var targetFrames []*ebiten.Image
+	// var err error
 
-	switch targetState {
-	case 0:
-		targetFrames, err = utils.LoadWallnutFullHealthAnimation(s.resourceManager)
-		log.Printf("[BehaviorSystem] 坚果墙 %d 切换到完好状态 (HP: %d/%d, %.1f%%)",
-			entityID, health.CurrentHealth, health.MaxHealth, healthPercent*100)
-	case 1:
-		targetFrames, err = utils.LoadWallnutCracked1Animation(s.resourceManager)
-		log.Printf("[BehaviorSystem] 坚果墙 %d 切换到轻伤状态 (HP: %d/%d, %.1f%%)",
-			entityID, health.CurrentHealth, health.MaxHealth, healthPercent*100)
-	case 2:
-		targetFrames, err = utils.LoadWallnutCracked2Animation(s.resourceManager)
-		log.Printf("[BehaviorSystem] 坚果墙 %d 切换到重伤状态 (HP: %d/%d, %.1f%%)",
-			entityID, health.CurrentHealth, health.MaxHealth, healthPercent*100)
-	}
+	// switch targetState {
+	// case 0:
+	// 	targetFrames, err = utils.LoadWallnutFullHealthAnimation(s.resourceManager)
+	// 	log.Printf("[BehaviorSystem] 坚果墙 %d 切换到完好状态 (HP: %d/%d, %.1f%%)",
+	// 		entityID, health.CurrentHealth, health.MaxHealth, healthPercent*100)
+	// case 1:
+	// 	targetFrames, err = utils.LoadWallnutCracked1Animation(s.resourceManager)
+	// 	log.Printf("[BehaviorSystem] 坚果墙 %d 切换到轻伤状态 (HP: %d/%d, %.1f%%)",
+	// 		entityID, health.CurrentHealth, health.MaxHealth, healthPercent*100)
+	// case 2:
+	// 	targetFrames, err = utils.LoadWallnutCracked2Animation(s.resourceManager)
+	// 	log.Printf("[BehaviorSystem] 坚果墙 %d 切换到重伤状态 (HP: %d/%d, %.1f%%)",
+	// 		entityID, health.CurrentHealth, health.MaxHealth, healthPercent*100)
+	// }
 
-	if err != nil {
-		// 加载动画失败，保持当前动画
-		log.Printf("[BehaviorSystem] 坚果墙 %d 动画状态切换失败: %v", entityID, err)
-		return
-	}
+	// if err != nil {
+	// 	// 加载动画失败，保持当前动画
+	// 	log.Printf("[BehaviorSystem] 坚果墙 %d 动画状态切换失败: %v", entityID, err)
+	// 	return
+	// }
 
 	// 切换到新的动画状态
-	anim.Frames = targetFrames
-	anim.CurrentFrame = 0
-	anim.FrameCounter = 0
+	// anim.Frames = targetFrames
+	// anim.CurrentFrame = 0
+	// anim.FrameCounter = 0
+	_ = healthPercent // 临时避免未使用警告
 }
 
 // handleConeheadZombieBehavior 处理路障僵尸的行为逻辑
@@ -876,16 +996,14 @@ func (s *BehaviorSystem) handleConeheadZombieBehavior(entityID ecs.EntityID, del
 				// 1. 改变行为类型为普通僵尸
 				behavior.Type = components.BehaviorZombieBasic
 
-				// 2. 切换动画为普通僵尸走路动画
-				animComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.AnimationComponent{}))
+				// 2. Story 6.3: 从可见轨道列表中移除路障
+				reanimComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{}))
 				if ok {
-					anim := animComp.(*components.AnimationComponent)
-					// 加载普通僵尸走路动画
-					zombieFrames := utils.LoadZombieWalkAnimation(s.resourceManager)
-					anim.Frames = zombieFrames
-					anim.CurrentFrame = 0
-					anim.FrameCounter = 0
-					log.Printf("[BehaviorSystem] 路障僵尸 %d 已切换为普通僵尸动画（%d帧）", entityID, len(zombieFrames))
+					reanim := reanimComp.(*components.ReanimComponent)
+					if reanim.VisibleTracks != nil {
+						delete(reanim.VisibleTracks, "anim_cone") // 移除路障
+						log.Printf("[BehaviorSystem] 路障僵尸 %d 移除 anim_cone 轨道", entityID)
+					}
 				}
 
 				// 3. 移除护甲组件（可选，但保留可能对调试有帮助）
@@ -929,16 +1047,14 @@ func (s *BehaviorSystem) handleBucketheadZombieBehavior(entityID ecs.EntityID, d
 				// 1. 改变行为类型为普通僵尸
 				behavior.Type = components.BehaviorZombieBasic
 
-				// 2. 切换动画为普通僵尸走路动画
-				animComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.AnimationComponent{}))
+				// 2. Story 6.3: 从可见轨道列表中移除铁桶
+				reanimComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{}))
 				if ok {
-					anim := animComp.(*components.AnimationComponent)
-					// 加载普通僵尸走路动画
-					zombieFrames := utils.LoadZombieWalkAnimation(s.resourceManager)
-					anim.Frames = zombieFrames
-					anim.CurrentFrame = 0
-					anim.FrameCounter = 0
-					log.Printf("[BehaviorSystem] 铁桶僵尸 %d 已切换为普通僵尸动画（%d帧）", entityID, len(zombieFrames))
+					reanim := reanimComp.(*components.ReanimComponent)
+					if reanim.VisibleTracks != nil {
+						delete(reanim.VisibleTracks, "anim_bucket") // 移除铁桶
+						log.Printf("[BehaviorSystem] 铁桶僵尸 %d 移除 anim_bucket 轨道", entityID)
+					}
 				}
 
 				// 3. 移除护甲组件（可选，但保留可能对调试有帮助）

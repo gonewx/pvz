@@ -8,16 +8,23 @@ import (
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/utils"
-	"github.com/hajimehoshi/ebiten/v2"
 )
+
+// ReanimSystemInterface 定义 ReanimSystem 的接口，用于工厂函数依赖注入
+// 这样可以避免循环依赖，同时方便测试
+type ReanimSystemInterface interface {
+	PlayAnimation(entityID ecs.EntityID, animName string) error
+	PlayAnimationNoLoop(entityID ecs.EntityID, animName string) error
+}
 
 // NewPlantEntity 创建植物实体
 // 根据植物类型和网格位置创建一个完整的植物实体，包含位置、图像和植物组件
 //
 // 参数:
 //   - em: 实体管理器
-//   - rm: 资源管理器（用于加载植物图像）
+//   - rm: 资源管理器（用于加载植物图像和 Reanim 资源）
 //   - gs: 游戏状态（用于获取摄像机位置）
+//   - rs: Reanim 系统（用于初始化动画）
 //   - plantType: 植物类型（向日葵、豌豆射手等）
 //   - col: 网格列索引 (0-8)
 //   - row: 网格行索引 (0-4)
@@ -25,9 +32,10 @@ import (
 // 返回:
 //   - ecs.EntityID: 创建的植物实体ID，如果失败返回 0
 //   - error: 如果创建失败返回错误信息
-func NewPlantEntity(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.GameState, plantType components.PlantType, col, row int) (ecs.EntityID, error) {
-	// 计算格子中心坐标（使用世界坐标系统）
-	// 注意：PositionComponent 存储世界坐标，不受摄像机影响
+func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState, rs ReanimSystemInterface, plantType components.PlantType, col, row int) (ecs.EntityID, error) {
+	// 计算植物原点坐标（使用世界坐标系统）
+	// Reanim 坐标系统：部件坐标从原点开始绘制
+	// 中心偏移会由 ReanimSystem 自动计算并在渲染时应用
 	worldCenterX := config.GridWorldStartX + float64(col)*config.CellWidth + config.CellWidth/2
 	worldCenterY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
 
@@ -82,27 +90,25 @@ func NewPlantEntity(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.Ga
 			IsReady:     false,
 		})
 
-		// 加载向日葵动画帧（18帧动画）
-		frames := make([]*ebiten.Image, 18)
-		for i := 0; i < 18; i++ {
-			framePath := fmt.Sprintf("assets/images/Plants/SunFlower/SunFlower_%d.png", i+1)
-			frameImage, err := rm.LoadImage(framePath)
-			if err != nil {
-				return 0, fmt.Errorf("failed to load sunflower animation frame %d: %w", i+1, err)
-			}
-			frames[i] = frameImage
+		// Story 6.3: 使用 ReanimComponent 替代 AnimationComponent
+		// 从 ResourceManager 获取向日葵的 Reanim 数据和部件图片
+		reanimXML := rm.GetReanimXML("SunFlower")
+		partImages := rm.GetReanimPartImages("SunFlower")
+
+		if reanimXML == nil || partImages == nil {
+			return 0, fmt.Errorf("failed to load SunFlower Reanim resources")
 		}
 
-		// 添加动画组件
-		// 向日葵一直播放待机动画（循环）
-		em.AddComponent(entityID, &components.AnimationComponent{
-			Frames:       frames,
-			FrameSpeed:   0.08, // 0.08 秒/帧，完整动画约 1.44 秒
-			CurrentFrame: 0,
-			FrameCounter: 0,
-			IsLooping:    true,  // 循环播放待机动画
-			IsFinished:   false, // 动画一直播放
+		// 添加 ReanimComponent
+		em.AddComponent(entityID, &components.ReanimComponent{
+			Reanim:     reanimXML,
+			PartImages: partImages,
 		})
+
+		// 使用 ReanimSystem 初始化动画（播放待机动画）
+		if err := rs.PlayAnimation(entityID, "anim_idle"); err != nil {
+			return 0, fmt.Errorf("failed to play SunFlower idle animation: %w", err)
+		}
 	}
 
 	// 为豌豆射手添加特定组件
@@ -126,27 +132,26 @@ func NewPlantEntity(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.Ga
 			IsReady:     false,
 		})
 
-		// 加载豌豆射手动画帧（13帧动画）
-		frames := make([]*ebiten.Image, 13)
-		for i := 0; i < 13; i++ {
-			framePath := fmt.Sprintf("assets/images/Plants/Peashooter/Peashooter_%d.png", i+1)
-			frameImage, err := rm.LoadImage(framePath)
-			if err != nil {
-				return 0, fmt.Errorf("failed to load peashooter animation frame %d: %w", i+1, err)
-			}
-			frames[i] = frameImage
+		// Story 6.3: 使用 ReanimComponent 替代 AnimationComponent
+		// 从 ResourceManager 获取豌豆射手的 Reanim 数据和部件图片
+		reanimXML := rm.GetReanimXML("PeaShooter")
+		partImages := rm.GetReanimPartImages("PeaShooter")
+
+		if reanimXML == nil || partImages == nil {
+			return 0, fmt.Errorf("failed to load PeaShooter Reanim resources")
 		}
 
-		// 添加动画组件
-		// 豌豆射手持续循环播放动画（无论是否在攻击）
-		em.AddComponent(entityID, &components.AnimationComponent{
-			Frames:       frames,
-			FrameSpeed:   0.08, // 0.08 秒/帧，完整动画约 1.04 秒
-			CurrentFrame: 0,
-			FrameCounter: 0,
-			IsLooping:    true,  // 循环播放动画
-			IsFinished:   false, // 动画一直播放
+		// 添加 ReanimComponent
+		em.AddComponent(entityID, &components.ReanimComponent{
+			Reanim:     reanimXML,
+			PartImages: partImages,
 		})
+
+		// 使用 ReanimSystem 初始化动画（播放完整待机动画，包括头部）
+		// 注意：豌豆射手的 anim_idle 只显示茎和叶子，anim_full_idle 才显示完整植物
+		if err := rs.PlayAnimation(entityID, "anim_full_idle"); err != nil {
+			return 0, fmt.Errorf("failed to play PeaShooter idle animation: %w", err)
+		}
 	}
 
 	return entityID, nil
@@ -157,24 +162,19 @@ func NewPlantEntity(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.Ga
 //
 // 参数:
 //   - em: 实体管理器
-//   - rm: 资源管理器（用于加载坚果墙图像和动画）
+//   - rm: 资源管理器（用于加载坚果墙图像和 Reanim 资源）
 //   - gs: 游戏状态（用于获取摄像机位置）
+//   - rs: Reanim 系统（用于初始化动画）
 //   - col: 网格列索引 (0-8)
 //   - row: 网格行索引 (0-4)
 //
 // 返回:
 //   - ecs.EntityID: 创建的坚果墙实体ID，如果失败返回 0
 //   - error: 如果创建失败返回错误信息
-func NewWallnutEntity(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.GameState, col, row int) (ecs.EntityID, error) {
+func NewWallnutEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState, rs ReanimSystemInterface, col, row int) (ecs.EntityID, error) {
 	// 计算格子中心坐标（使用世界坐标系统）
 	worldCenterX := config.GridWorldStartX + float64(col)*config.CellWidth + config.CellWidth/2
 	worldCenterY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
-
-	// 加载坚果墙完好状态动画帧（初始状态）
-	fullHealthFrames, err := utils.LoadWallnutFullHealthAnimation(rm)
-	if err != nil {
-		return 0, fmt.Errorf("failed to load wallnut full health animation: %w", err)
-	}
 
 	// 创建实体
 	entityID := em.CreateEntity()
@@ -185,9 +185,25 @@ func NewWallnutEntity(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.
 		Y: worldCenterY,
 	})
 
-	// 添加精灵组件（使用完好状态的第一帧）
+	// Story 6.3: 使用 ReanimComponent 替代 AnimationComponent
+	// 从 ResourceManager 获取坚果墙的 Reanim 数据和部件图片
+	// 注意：ResourceManager 加载时使用 "Wallnut"（与文件名匹配）
+	reanimXML := rm.GetReanimXML("Wallnut")
+	partImages := rm.GetReanimPartImages("Wallnut")
+
+	if reanimXML == nil || partImages == nil {
+		return 0, fmt.Errorf("failed to load Wallnut Reanim resources")
+	}
+
+	// 添加精灵组件（使用占位图像作为后备）
+	// TODO (TD-6.3-6): 未来可以完全移除 SpriteComponent，仅使用 ReanimComponent
+	placeholderImage, err := rm.LoadImage("assets/images/Plants/WallNut/WallNut_1.png")
+	if err != nil {
+		// 如果无法加载占位图像（如测试环境），使用空图像
+		placeholderImage, _ = rm.LoadImage("placeholder") // Mock 会返回测试图像
+	}
 	em.AddComponent(entityID, &components.SpriteComponent{
-		Image: fullHealthFrames[0],
+		Image: placeholderImage,
 	})
 
 	// 添加植物组件（用于碰撞检测和网格位置追踪）
@@ -208,15 +224,16 @@ func NewWallnutEntity(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.
 		Type: components.BehaviorWallnut,
 	})
 
-	// 添加动画组件（初始为完好状态动画，循环播放）
-	em.AddComponent(entityID, &components.AnimationComponent{
-		Frames:       fullHealthFrames,
-		FrameSpeed:   config.WallnutFrameSpeed, // 0.1 秒/帧
-		CurrentFrame: 0,
-		FrameCounter: 0,
-		IsLooping:    true,  // 循环播放待机动画
-		IsFinished:   false, // 动画一直播放
+	// 添加 ReanimComponent
+	em.AddComponent(entityID, &components.ReanimComponent{
+		Reanim:     reanimXML,
+		PartImages: partImages,
 	})
+
+	// 使用 ReanimSystem 初始化动画（播放完好状态的待机动画）
+	if err := rs.PlayAnimation(entityID, "anim_idle"); err != nil {
+		return 0, fmt.Errorf("failed to play WallNut idle animation: %w", err)
+	}
 
 	// 添加碰撞组件（用于僵尸碰撞检测）
 	// 坚果墙的碰撞盒与普通植物类似

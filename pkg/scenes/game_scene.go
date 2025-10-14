@@ -76,13 +76,14 @@ type GameScene struct {
 	introAnimTimer     float64 // Timer for intro animation
 
 	// ECS Framework and Systems
-	entityManager       *ecs.EntityManager
-	sunSpawnSystem      *systems.SunSpawnSystem
-	sunMovementSystem   *systems.SunMovementSystem
-	lifetimeSystem      *systems.LifetimeSystem
-	renderSystem        *systems.RenderSystem
-	inputSystem         *systems.InputSystem
-	animationSystem     *systems.AnimationSystem
+	entityManager     *ecs.EntityManager
+	sunSpawnSystem    *systems.SunSpawnSystem
+	sunMovementSystem *systems.SunMovementSystem
+	lifetimeSystem    *systems.LifetimeSystem
+	renderSystem      *systems.RenderSystem
+	inputSystem       *systems.InputSystem
+	// Story 6.3: Reanim 动画系统（替代旧的 AnimationSystem）
+	reanimSystem        *systems.ReanimSystem
 	sunCollectionSystem *systems.SunCollectionSystem
 
 	// Story 3.1: Plant Card Systems
@@ -138,6 +139,20 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	// Load all UI resources
 	scene.loadResources()
 
+	// Story 6.3: Load all Reanim resources (XML and part images)
+	// CRITICAL: Reanim resources are required for all entity animations.
+	// If loading fails in production, log fatal error.
+	// In test environments without assets, this will fail gracefully.
+	if err := rm.LoadReanimResources(); err != nil {
+		log.Printf("[GameScene] FATAL: Failed to load Reanim resources: %v", err)
+		log.Printf("[GameScene] Game cannot function properly without animation resources")
+		// Note: In production with real assets, this indicates a critical setup error.
+		// The game will likely crash later when trying to access nil Reanim data.
+		// In test environments, tests may pass if they don't use Reanim features.
+	} else {
+		log.Printf("[GameScene] Successfully loaded all Reanim resources")
+	}
+
 	// Initialize ECS framework
 	scene.entityManager = ecs.NewEntityManager()
 
@@ -145,7 +160,8 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	scene.renderSystem = systems.NewRenderSystem(scene.entityManager)
 	scene.sunMovementSystem = systems.NewSunMovementSystem(scene.entityManager)
 	scene.lifetimeSystem = systems.NewLifetimeSystem(scene.entityManager)
-	scene.animationSystem = systems.NewAnimationSystem(scene.entityManager)
+	// TODO(Story 6.3): 迁移到 ReanimSystem
+	// scene.animationSystem = systems.NewAnimationSystem(scene.entityManager)
 
 	// Calculate sun collection target position from sun counter UI position
 	// This ensures the suns fly to the exact center of the sun counter display
@@ -158,11 +174,17 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	scene.entityManager.AddComponent(scene.lawnGridEntityID, &components.LawnGridComponent{})
 	log.Printf("[GameScene] Initialized lawn grid system (Entity ID: %d)", scene.lawnGridEntityID)
 
+	// Story 6.3: Initialize Reanim system (must be before InputSystem)
+	scene.reanimSystem = systems.NewReanimSystem(scene.entityManager)
+	log.Printf("[GameScene] Initialized Reanim system")
+
 	// Initialize input system with sun counter target position and lawn grid system (Story 2.4 + Story 3.3)
+	// Story 6.3: Pass reanimSystem to InputSystem for plant animation initialization
 	scene.inputSystem = systems.NewInputSystem(
 		scene.entityManager,
 		rm,
 		scene.gameState,
+		scene.reanimSystem,     // Story 6.3: Reanim 系统
 		sunCollectionTargetX,   // sunCounterX - 阳光计数器X坐标
 		sunCollectionTargetY,   // sunCounterY - 阳光计数器Y坐标
 		scene.lawnGridSystem,   // Story 3.3: 草坪网格系统
@@ -195,7 +217,8 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	scene.plantPreviewRenderSystem = systems.NewPlantPreviewRenderSystem(scene.entityManager)
 
 	// Story 3.4: Initialize behavior system (sunflower sun production, etc.)
-	scene.behaviorSystem = systems.NewBehaviorSystem(scene.entityManager, rm)
+	// Story 6.3: Pass ReanimSystem for zombie animation state changes
+	scene.behaviorSystem = systems.NewBehaviorSystem(scene.entityManager, rm, scene.reanimSystem)
 	log.Printf("[GameScene] Initialized behavior system for plant behaviors")
 
 	// Story 4.3: Initialize physics system (collision detection)
@@ -338,9 +361,10 @@ func (s *GameScene) Update(deltaTime float64) {
 			spawnX := s.cameraX + WindowWidth + 50.0 // 屏幕右侧外50像素
 
 			// Story 5.3: 生成三种不同类型的僵尸进行测试
+			// Story 6.3: 传递 reanimSystem 给僵尸工厂函数
 			// 第1行: 普通僵尸
 			log.Printf("[GameScene] 生成普通僵尸：行=0")
-			zombieID1, err := entities.NewZombieEntity(s.entityManager, s.resourceManager, 0, spawnX)
+			zombieID1, err := entities.NewZombieEntity(s.entityManager, s.resourceManager, s.reanimSystem, 0, spawnX)
 			if err != nil {
 				log.Printf("[GameScene] 生成普通僵尸失败: %v", err)
 			} else {
@@ -349,7 +373,7 @@ func (s *GameScene) Update(deltaTime float64) {
 
 			// 第2行: 路障僵尸 (Conehead)
 			log.Printf("[GameScene] 生成路障僵尸：行=1")
-			zombieID2, err := entities.NewConeheadZombieEntity(s.entityManager, s.resourceManager, 1, spawnX)
+			zombieID2, err := entities.NewConeheadZombieEntity(s.entityManager, s.resourceManager, s.reanimSystem, 1, spawnX)
 			if err != nil {
 				log.Printf("[GameScene] 生成路障僵尸失败: %v", err)
 			} else {
@@ -358,7 +382,7 @@ func (s *GameScene) Update(deltaTime float64) {
 
 			// 第3行: 铁桶僵尸 (Buckethead)
 			log.Printf("[GameScene] 生成铁桶僵尸：行=2")
-			zombieID3, err := entities.NewBucketheadZombieEntity(s.entityManager, s.resourceManager, 2, spawnX)
+			zombieID3, err := entities.NewBucketheadZombieEntity(s.entityManager, s.resourceManager, s.reanimSystem, 2, spawnX)
 			if err != nil {
 				log.Printf("[GameScene] 生成铁桶僵尸失败: %v", err)
 			} else {
@@ -379,10 +403,12 @@ func (s *GameScene) Update(deltaTime float64) {
 			row := 2
 
 			log.Printf("[GameScene] 种植测试豌豆射手：col=%d, row=%d", col, row)
+			// Story 6.3: 传递 reanimSystem 给工厂函数
 			peashooterID, err := entities.NewPlantEntity(
 				s.entityManager,
 				s.resourceManager,
 				s.gameState,
+				s.reanimSystem,
 				components.PlantPeashooter,
 				col,
 				row,
@@ -404,10 +430,11 @@ func (s *GameScene) Update(deltaTime float64) {
 	s.sunCollectionSystem.Update(deltaTime)    // 5. Check if collection is complete
 	s.behaviorSystem.Update(deltaTime)         // 6. Update plant behaviors (Story 3.4)
 	s.physicsSystem.Update(deltaTime)          // 7. Check collisions (Story 4.3)
-	s.animationSystem.Update(deltaTime)        // 8. Update animation frames
-	s.plantPreviewSystem.Update(deltaTime)     // 9. Update plant preview position (Story 3.2)
-	s.lifetimeSystem.Update(deltaTime)         // 10. Check for expired entities
-	s.entityManager.RemoveMarkedEntities()     // 11. Clean up deleted entities (always last)
+	// Story 6.3: Reanim 动画系统（替代旧的 AnimationSystem）
+	s.reanimSystem.Update(deltaTime)       // 8. Update Reanim animation frames
+	s.plantPreviewSystem.Update(deltaTime) // 9. Update plant preview position (Story 3.2)
+	s.lifetimeSystem.Update(deltaTime)     // 10. Check for expired entities
+	s.entityManager.RemoveMarkedEntities() // 11. Clean up deleted entities (always last)
 }
 
 // updateIntroAnimation updates the intro camera animation that showcases the entire lawn.

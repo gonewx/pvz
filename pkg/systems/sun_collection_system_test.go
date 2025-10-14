@@ -13,6 +13,7 @@ import (
 func TestSunCollectionArrival(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
+	gs.CameraX = 0 // 重置 CameraX 确保测试一致性
 	targetX := 21.0
 	targetY := 80.0
 	system := NewSunCollectionSystem(em, gs, targetX, targetY)
@@ -54,6 +55,7 @@ func TestSunCollectionArrival(t *testing.T) {
 func TestSunCollectionNotYetArrived(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
+	gs.CameraX = 0 // 重置 CameraX 确保测试一致性
 	targetX := 21.0
 	targetY := 80.0
 	system := NewSunCollectionSystem(em, gs, targetX, targetY)
@@ -122,6 +124,7 @@ func TestSunCollectionDistanceThreshold(t *testing.T) {
 			// 创建新的EntityManager以隔离测试
 			emTest := ecs.NewEntityManager()
 			gsTest := game.GetGameState()
+			gsTest.CameraX = 0 // 重置 CameraX 确保测试一致性
 			systemTest := NewSunCollectionSystem(emTest, gsTest, targetX, targetY)
 
 			id := emTest.CreateEntity()
@@ -157,6 +160,7 @@ func TestSunCollectionDistanceThreshold(t *testing.T) {
 func TestSunCollectionOnlyCollectingState(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
+	gs.CameraX = 0 // 重置 CameraX 确保测试一致性
 	targetX := 21.0
 	targetY := 80.0
 	system := NewSunCollectionSystem(em, gs, targetX, targetY)
@@ -192,6 +196,7 @@ func TestSunCollectionOnlyCollectingState(t *testing.T) {
 func TestSunCollectionMultipleSuns(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
+	gs.CameraX = 0 // 重置 CameraX 确保测试一致性
 	targetX := 21.0
 	targetY := 80.0
 	system := NewSunCollectionSystem(em, gs, targetX, targetY)

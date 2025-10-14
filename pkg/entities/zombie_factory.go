@@ -6,9 +6,6 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/game"
-	"github.com/decker502/pvz/pkg/utils"
-	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // NewZombieEntity 创建普通僵尸实体
@@ -16,14 +13,15 @@ import (
 //
 // 参数:
 //   - em: 实体管理器
-//   - rm: 资源管理器（用于加载僵尸动画帧）
+//   - rm: 资源管理器（用于加载僵尸 Reanim 资源）
+//   - rs: Reanim 系统（用于初始化动画）
 //   - row: 生成行索引 (0-4)
 //   - spawnX: 生成的世界坐标X位置（通常在屏幕右侧外）
 //
 // 返回:
 //   - ecs.EntityID: 创建的僵尸实体ID，如果失败返回 0
 //   - error: 如果创建失败返回错误信息
-func NewZombieEntity(em *ecs.EntityManager, rm *game.ResourceManager, row int, spawnX float64) (ecs.EntityID, error) {
+func NewZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs ReanimSystemInterface, row int, spawnX float64) (ecs.EntityID, error) {
 	if em == nil {
 		return 0, fmt.Errorf("entity manager cannot be nil")
 	}
@@ -36,17 +34,6 @@ func NewZombieEntity(em *ecs.EntityManager, rm *game.ResourceManager, row int, s
 	// 使用 config.ZombieVerticalOffset 以便手工调整
 	spawnY := config.GridWorldStartY + float64(row)*config.CellHeight + config.ZombieVerticalOffset
 
-	// 加载僵尸走路动画帧
-	frames := make([]*ebiten.Image, config.ZombieWalkAnimationFrames)
-	for i := 0; i < config.ZombieWalkAnimationFrames; i++ {
-		framePath := fmt.Sprintf("assets/images/Zombies/Zombie/Zombie_%d.png", i+1)
-		frameImage, err := rm.LoadImage(framePath)
-		if err != nil {
-			return 0, fmt.Errorf("failed to load zombie animation frame %d: %w", i+1, err)
-		}
-		frames[i] = frameImage
-	}
-
 	// 创建实体
 	entityID := em.CreateEntity()
 
@@ -56,20 +43,71 @@ func NewZombieEntity(em *ecs.EntityManager, rm *game.ResourceManager, row int, s
 		Y: spawnY,
 	})
 
-	// 添加精灵组件（初始化为第一帧）
+	// Story 6.3: 使用 ReanimComponent 替代 AnimationComponent
+	// 从 ResourceManager 获取普通僵尸的 Reanim 数据和部件图片
+	reanimXML := rm.GetReanimXML("Zombie")
+	partImages := rm.GetReanimPartImages("Zombie")
+
+	if reanimXML == nil || partImages == nil {
+		return 0, fmt.Errorf("failed to load Zombie Reanim resources")
+	}
+
+	// 添加精灵组件（使用占位图像作为后备）
+	// TODO (TD-6.3-6): 未来可以完全移除 SpriteComponent，仅使用 ReanimComponent
+	placeholderImage, err := rm.LoadImage("assets/images/Zombies/Zombie/Zombie_1.png")
+	if err != nil {
+		// 如果无法加载占位图像（如测试环境），使用空图像
+		placeholderImage, _ = rm.LoadImage("placeholder") // Mock 会返回测试图像
+	}
 	em.AddComponent(entityID, &components.SpriteComponent{
-		Image: frames[0],
+		Image: placeholderImage,
 	})
 
-	// 添加动画组件（走路动画，循环播放）
-	em.AddComponent(entityID, &components.AnimationComponent{
-		Frames:       frames,
-		FrameSpeed:   config.ZombieWalkFrameSpeed, // 0.1秒/帧，完整动画约2.2秒
-		CurrentFrame: 0,
-		FrameCounter: 0,
-		IsLooping:    true,  // 循环播放走路动画
-		IsFinished:   false, // 动画一直播放
+	// 添加 ReanimComponent
+	// 普通僵尸：使用白名单方式，只显示基础身体部件和右手（anim_innerarm）
+	em.AddComponent(entityID, &components.ReanimComponent{
+		Reanim:     reanimXML,
+		PartImages: partImages,
+		VisibleTracks: map[string]bool{
+			// 基础身体部件
+			"Zombie_body":           true,
+			"Zombie_neck":           true,
+			"Zombie_outerarm_upper": true,
+			"Zombie_outerarm_lower": true,
+			"Zombie_outerarm_hand":  true,
+			"Zombie_outerleg_upper": true,
+			"Zombie_outerleg_lower": true,
+			"Zombie_outerleg_foot":  true,
+			"Zombie_innerleg_upper": true,
+			"Zombie_innerleg_lower": true,
+			"Zombie_innerleg_foot":  true,
+			// 头部
+			"anim_head1": true, // 头部
+			"anim_head2": true, // 下巴
+			// 右手（内侧手臂）
+			"anim_innerarm1": true, // 内侧手臂上部
+			"anim_innerarm2": true, // 内侧手臂下部
+			"anim_innerarm3": true, // 内侧手
+		},
+		// Story 6.3: 部件组配置（数据驱动，业务系统通过语义接口操作）
+		// 这样 BehaviorSystem 只需要调用 HidePartGroup("arm") 而不需要知道具体轨道名
+		PartGroups: map[string][]string{
+			"arm": { // 左手（外侧手臂）- 受伤时会掉落
+				"Zombie_outerarm_hand",
+				"Zombie_outerarm_upper",
+				"Zombie_outerarm_lower",
+			},
+			"head": { // 头部 - 死亡时会掉落
+				"anim_head1",
+				"anim_head2",
+			},
+		},
 	})
+
+	// 使用 ReanimSystem 初始化动画（播放走路动画）
+	if err := rs.PlayAnimation(entityID, "anim_walk"); err != nil {
+		return 0, fmt.Errorf("failed to play Zombie walk animation: %w", err)
+	}
 
 	// 添加速度组件（从右向左移动）
 	em.AddComponent(entityID, &components.VelocityComponent{
@@ -79,7 +117,8 @@ func NewZombieEntity(em *ecs.EntityManager, rm *game.ResourceManager, row int, s
 
 	// 添加行为组件（标识为普通僵尸）
 	em.AddComponent(entityID, &components.BehaviorComponent{
-		Type: components.BehaviorZombieBasic,
+		Type:            components.BehaviorZombieBasic,
+		ZombieAnimState: components.ZombieAnimWalking,
 	})
 
 	// 添加生命值组件（本Story定义但不使用，为Story 4.4准备）
@@ -102,14 +141,15 @@ func NewZombieEntity(em *ecs.EntityManager, rm *game.ResourceManager, row int, s
 //
 // 参数:
 //   - em: 实体管理器
-//   - rm: 资源管理器（用于加载僵尸动画帧）
+//   - rm: 资源管理器（用于加载僵尸 Reanim 资源）
+//   - rs: Reanim 系统（用于初始化动画）
 //   - row: 生成行索引 (0-4)
 //   - spawnX: 生成的世界坐标X位置（通常在屏幕右侧外）
 //
 // 返回:
 //   - ecs.EntityID: 创建的路障僵尸实体ID，如果失败返回 0
 //   - error: 如果创建失败返回错误信息
-func NewConeheadZombieEntity(em *ecs.EntityManager, rm *game.ResourceManager, row int, spawnX float64) (ecs.EntityID, error) {
+func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs ReanimSystemInterface, row int, spawnX float64) (ecs.EntityID, error) {
 	if em == nil {
 		return 0, fmt.Errorf("entity manager cannot be nil")
 	}
@@ -120,12 +160,6 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm *game.ResourceManager, ro
 	// 计算僵尸Y坐标（世界坐标，基于行）
 	spawnY := config.GridWorldStartY + float64(row)*config.CellHeight + config.ZombieVerticalOffset
 
-	// 加载路障僵尸走路动画帧
-	frames, err := utils.LoadConeheadZombieWalkAnimation(rm)
-	if err != nil {
-		return 0, fmt.Errorf("failed to load conehead zombie walk animation: %w", err)
-	}
-
 	// 创建实体
 	entityID := em.CreateEntity()
 
@@ -135,20 +169,76 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm *game.ResourceManager, ro
 		Y: spawnY,
 	})
 
-	// 添加精灵组件（初始化为第一帧）
+	// Story 6.3: 使用 ReanimComponent 替代 AnimationComponent
+	// 从 ResourceManager 获取僵尸的 Reanim 数据和部件图片
+	// 注意：路障僵尸使用基础僵尸的动画
+	reanimXML := rm.GetReanimXML("Zombie")
+	partImages := rm.GetReanimPartImages("Zombie")
+
+	if reanimXML == nil || partImages == nil {
+		return 0, fmt.Errorf("failed to load Zombie Reanim resources for Conehead")
+	}
+
+	// 添加精灵组件（使用占位图像作为后备）
+	// TODO (TD-6.3-6): 未来可以完全移除 SpriteComponent，仅使用 ReanimComponent
+	placeholderImage, err := rm.LoadImage("assets/images/Zombies/ConeheadZombie/ConeheadZombie_1.png")
+	if err != nil {
+		// 如果无法加载占位图像（如测试环境），使用空图像
+		placeholderImage, _ = rm.LoadImage("placeholder") // Mock 会返回测试图像
+	}
 	em.AddComponent(entityID, &components.SpriteComponent{
-		Image: frames[0],
+		Image: placeholderImage,
 	})
 
-	// 添加动画组件（走路动画，循环播放）
-	em.AddComponent(entityID, &components.AnimationComponent{
-		Frames:       frames,
-		FrameSpeed:   config.ZombieWalkFrameSpeed, // 0.1秒/帧
-		CurrentFrame: 0,
-		FrameCounter: 0,
-		IsLooping:    true,  // 循环播放走路动画
-		IsFinished:   false, // 动画一直播放
+	// 添加 ReanimComponent
+	// 路障僵尸：基础部件 + 路障
+	em.AddComponent(entityID, &components.ReanimComponent{
+		Reanim:     reanimXML,
+		PartImages: partImages,
+		VisibleTracks: map[string]bool{
+			// 基础身体部件
+			"Zombie_body":           true,
+			"Zombie_neck":           true,
+			"Zombie_outerarm_upper": true,
+			"Zombie_outerarm_lower": true,
+			"Zombie_outerarm_hand":  true,
+			"Zombie_outerleg_upper": true,
+			"Zombie_outerleg_lower": true,
+			"Zombie_outerleg_foot":  true,
+			"Zombie_innerleg_upper": true,
+			"Zombie_innerleg_lower": true,
+			"Zombie_innerleg_foot":  true,
+			// 头部
+			"anim_head1": true, // 头部
+			"anim_head2": true, // 下巴
+			// 右手（内侧手臂）
+			"anim_innerarm1": true,
+			"anim_innerarm2": true,
+			"anim_innerarm3": true,
+			// 路障
+			"anim_cone": true,
+		},
+		// Story 6.3: 部件组配置（数据驱动）
+		PartGroups: map[string][]string{
+			"arm": { // 左手（外侧手臂）
+				"Zombie_outerarm_hand",
+				"Zombie_outerarm_upper",
+				"Zombie_outerarm_lower",
+			},
+			"head": { // 头部
+				"anim_head1",
+				"anim_head2",
+			},
+			"armor": { // 护甲（路障）
+				"anim_cone",
+			},
+		},
 	})
+
+	// 使用 ReanimSystem 初始化动画（播放走路动画）
+	if err := rs.PlayAnimation(entityID, "anim_walk"); err != nil {
+		return 0, fmt.Errorf("failed to play ZombieConeHead walk animation: %w", err)
+	}
 
 	// 添加速度组件（从右向左移动）
 	em.AddComponent(entityID, &components.VelocityComponent{
@@ -156,9 +246,10 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm *game.ResourceManager, ro
 		VY: 0.0,
 	})
 
-	// 添加行为组件（标识为路障僵尸）
+	// 添加行为组件（标识为路障僵尸，初始状态为行走）
 	em.AddComponent(entityID, &components.BehaviorComponent{
-		Type: components.BehaviorZombieConehead,
+		Type:            components.BehaviorZombieConehead,
+		ZombieAnimState: components.ZombieAnimWalking,
 	})
 
 	// 添加护甲组件（路障僵尸的关键特性）
@@ -187,14 +278,15 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm *game.ResourceManager, ro
 //
 // 参数:
 //   - em: 实体管理器
-//   - rm: 资源管理器（用于加载僵尸动画帧）
+//   - rm: 资源管理器（用于加载僵尸 Reanim 资源）
+//   - rs: Reanim 系统（用于初始化动画）
 //   - row: 生成行索引 (0-4)
 //   - spawnX: 生成的世界坐标X位置（通常在屏幕右侧外）
 //
 // 返回:
 //   - ecs.EntityID: 创建的铁桶僵尸实体ID，如果失败返回 0
 //   - error: 如果创建失败返回错误信息
-func NewBucketheadZombieEntity(em *ecs.EntityManager, rm *game.ResourceManager, row int, spawnX float64) (ecs.EntityID, error) {
+func NewBucketheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs ReanimSystemInterface, row int, spawnX float64) (ecs.EntityID, error) {
 	if em == nil {
 		return 0, fmt.Errorf("entity manager cannot be nil")
 	}
@@ -205,12 +297,6 @@ func NewBucketheadZombieEntity(em *ecs.EntityManager, rm *game.ResourceManager, 
 	// 计算僵尸Y坐标（世界坐标，基于行）
 	spawnY := config.GridWorldStartY + float64(row)*config.CellHeight + config.ZombieVerticalOffset
 
-	// 加载铁桶僵尸走路动画帧
-	frames, err := utils.LoadBucketheadZombieWalkAnimation(rm)
-	if err != nil {
-		return 0, fmt.Errorf("failed to load buckethead zombie walk animation: %w", err)
-	}
-
 	// 创建实体
 	entityID := em.CreateEntity()
 
@@ -220,20 +306,76 @@ func NewBucketheadZombieEntity(em *ecs.EntityManager, rm *game.ResourceManager, 
 		Y: spawnY,
 	})
 
-	// 添加精灵组件（初始化为第一帧）
+	// Story 6.3: 使用 ReanimComponent 替代 AnimationComponent
+	// 从 ResourceManager 获取僵尸的 Reanim 数据和部件图片
+	// 注意：铁桶僵尸使用基础僵尸的动画
+	reanimXML := rm.GetReanimXML("Zombie")
+	partImages := rm.GetReanimPartImages("Zombie")
+
+	if reanimXML == nil || partImages == nil {
+		return 0, fmt.Errorf("failed to load Zombie Reanim resources for Buckethead")
+	}
+
+	// 添加精灵组件（使用占位图像作为后备）
+	// TODO (TD-6.3-6): 未来可以完全移除 SpriteComponent，仅使用 ReanimComponent
+	placeholderImage, err := rm.LoadImage("assets/images/Zombies/BucketheadZombie/BucketheadZombie_1.png")
+	if err != nil {
+		// 如果无法加载占位图像（如测试环境），使用空图像
+		placeholderImage, _ = rm.LoadImage("placeholder") // Mock 会返回测试图像
+	}
 	em.AddComponent(entityID, &components.SpriteComponent{
-		Image: frames[0],
+		Image: placeholderImage,
 	})
 
-	// 添加动画组件（走路动画，循环播放）
-	em.AddComponent(entityID, &components.AnimationComponent{
-		Frames:       frames,
-		FrameSpeed:   config.ZombieWalkFrameSpeed, // 0.1秒/帧
-		CurrentFrame: 0,
-		FrameCounter: 0,
-		IsLooping:    true,  // 循环播放走路动画
-		IsFinished:   false, // 动画一直播放
+	// 添加 ReanimComponent
+	// 铁桶僵尸：基础部件 + 铁桶
+	em.AddComponent(entityID, &components.ReanimComponent{
+		Reanim:     reanimXML,
+		PartImages: partImages,
+		VisibleTracks: map[string]bool{
+			// 基础身体部件
+			"Zombie_body":           true,
+			"Zombie_neck":           true,
+			"Zombie_outerarm_upper": true,
+			"Zombie_outerarm_lower": true,
+			"Zombie_outerarm_hand":  true,
+			"Zombie_outerleg_upper": true,
+			"Zombie_outerleg_lower": true,
+			"Zombie_outerleg_foot":  true,
+			"Zombie_innerleg_upper": true,
+			"Zombie_innerleg_lower": true,
+			"Zombie_innerleg_foot":  true,
+			// 头部
+			"anim_head1": true, // 头部
+			"anim_head2": true, // 下巴
+			// 右手（内侧手臂）
+			"anim_innerarm1": true,
+			"anim_innerarm2": true,
+			"anim_innerarm3": true,
+			// 铁桶
+			"anim_bucket": true,
+		},
+		// Story 6.3: 部件组配置（数据驱动）
+		PartGroups: map[string][]string{
+			"arm": { // 左手（外侧手臂）
+				"Zombie_outerarm_hand",
+				"Zombie_outerarm_upper",
+				"Zombie_outerarm_lower",
+			},
+			"head": { // 头部
+				"anim_head1",
+				"anim_head2",
+			},
+			"armor": { // 护甲（铁桶）
+				"anim_bucket",
+			},
+		},
 	})
+
+	// 使用 ReanimSystem 初始化动画（播放走路动画）
+	if err := rs.PlayAnimation(entityID, "anim_walk"); err != nil {
+		return 0, fmt.Errorf("failed to play ZombieBucketHead walk animation: %w", err)
+	}
 
 	// 添加速度组件（从右向左移动）
 	em.AddComponent(entityID, &components.VelocityComponent{
@@ -241,9 +383,10 @@ func NewBucketheadZombieEntity(em *ecs.EntityManager, rm *game.ResourceManager, 
 		VY: 0.0,
 	})
 
-	// 添加行为组件（标识为铁桶僵尸）
+	// 添加行为组件（标识为铁桶僵尸，初始状态为行走）
 	em.AddComponent(entityID, &components.BehaviorComponent{
-		Type: components.BehaviorZombieBuckethead,
+		Type:            components.BehaviorZombieBuckethead,
+		ZombieAnimState: components.ZombieAnimWalking,
 	})
 
 	// 添加护甲组件（铁桶僵尸的关键特性）

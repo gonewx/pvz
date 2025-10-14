@@ -7,13 +7,12 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/game"
 )
 
 // TestNewPeaProjectile 测试豌豆子弹实体创建
 func TestNewPeaProjectile(t *testing.T) {
 	// 初始化资源管理器和实体管理器（使用共享的 testAudioContext）
-	rm := game.NewResourceManager(testAudioContext)
+	rm := newMockResourceManager()
 	em := ecs.NewEntityManager()
 
 	tests := []struct {
@@ -127,13 +126,13 @@ func TestNewPeaProjectile(t *testing.T) {
 
 // TestNewPeaProjectile_NilParams 测试 nil 参数错误处理
 func TestNewPeaProjectile_NilParams(t *testing.T) {
-	rm := game.NewResourceManager(testAudioContext)
+	rm := newMockResourceManager()
 	em := ecs.NewEntityManager()
 
 	tests := []struct {
 		name    string
 		em      *ecs.EntityManager
-		rm      *game.ResourceManager
+		rm      ResourceLoader
 		wantErr bool
 	}{
 		{

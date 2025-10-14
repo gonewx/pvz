@@ -58,7 +58,7 @@ func TestSunClickStateChange(t *testing.T) {
 	lawnGridEntityID := em.CreateEntity()
 	em.AddComponent(lawnGridEntityID, &components.LawnGridComponent{})
 
-	system := NewInputSystem(em, rm, gs, 21.0, 80.0, lawnGridSystem, lawnGridEntityID)
+	system := NewInputSystem(em, rm, gs, nil, 21.0, 80.0, lawnGridSystem, lawnGridEntityID)
 
 	// 创建已落地的阳光实体
 	id := em.CreateEntity()
@@ -118,7 +118,7 @@ func TestClickFallingSunNoEffect(t *testing.T) {
 	lawnGridEntityID := em.CreateEntity()
 	em.AddComponent(lawnGridEntityID, &components.LawnGridComponent{})
 
-	NewInputSystem(em, rm, gs, 21.0, 80.0, lawnGridSystem, lawnGridEntityID)
+	NewInputSystem(em, rm, gs, nil, 21.0, 80.0, lawnGridSystem, lawnGridEntityID)
 
 	// 创建正在掉落的阳光实体
 	id := em.CreateEntity()
@@ -163,7 +163,7 @@ func TestClickDisabledSunNoEffect(t *testing.T) {
 	lawnGridEntityID := em.CreateEntity()
 	em.AddComponent(lawnGridEntityID, &components.LawnGridComponent{})
 
-	_ = NewInputSystem(em, rm, gs, 21.0, 80.0, lawnGridSystem, lawnGridEntityID)
+	_ = NewInputSystem(em, rm, gs, nil, 21.0, 80.0, lawnGridSystem, lawnGridEntityID)
 
 	// 创建已被禁用的阳光实体（已被点击过）
 	id := em.CreateEntity()
@@ -203,7 +203,7 @@ func TestVelocityCalculation(t *testing.T) {
 	lawnGridEntityID := em.CreateEntity()
 	em.AddComponent(lawnGridEntityID, &components.LawnGridComponent{})
 
-	system := NewInputSystem(em, rm, gs, targetX, targetY, lawnGridSystem, lawnGridEntityID)
+	system := NewInputSystem(em, rm, gs, nil, targetX, targetY, lawnGridSystem, lawnGridEntityID)
 
 	// 创建阳光实体
 	id := em.CreateEntity()
@@ -255,7 +255,7 @@ func TestGetPlantCost(t *testing.T) {
 	lawnGridEntityID := em.CreateEntity()
 	em.AddComponent(lawnGridEntityID, &components.LawnGridComponent{})
 
-	system := NewInputSystem(em, rm, gs, 21.0, 80.0, lawnGridSystem, lawnGridEntityID)
+	system := NewInputSystem(em, rm, gs, nil, 21.0, 80.0, lawnGridSystem, lawnGridEntityID)
 
 	tests := []struct {
 		name      string
@@ -286,7 +286,7 @@ func TestTriggerPlantCardCooldown(t *testing.T) {
 	lawnGridEntityID := em.CreateEntity()
 	em.AddComponent(lawnGridEntityID, &components.LawnGridComponent{})
 
-	system := NewInputSystem(em, rm, gs, 21.0, 80.0, lawnGridSystem, lawnGridEntityID)
+	system := NewInputSystem(em, rm, gs, nil, 21.0, 80.0, lawnGridSystem, lawnGridEntityID)
 
 	// 创建向日葵卡片
 	cardID := em.CreateEntity()

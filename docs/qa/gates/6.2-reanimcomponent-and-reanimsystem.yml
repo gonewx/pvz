@@ -1,0 +1,148 @@
+schema: 1
+story: '6.2'
+story_title: 'ReanimComponent 和 ReanimSystem（核心动画逻辑）'
+gate: FAIL
+status_reason: '新系统实现质量优秀（测试覆盖率89.4%），但删除旧系统导致项目无法编译，迁移工作未完成。'
+reviewer: 'Quinn (Test Architect)'
+updated: '2025-10-13T10:30:00Z'
+
+top_issues:
+  - id: 'BUILD-001'
+    severity: high
+    finding: '项目无法编译 - 多个文件引用已删除的 AnimationComponent 和 AnimationSystem'
+    suggested_action: '修复所有编译错误：更新 plant_factory.go (3处), zombie_factory.go (3处), game_scene.go (2处) 及相关测试文件'
+    suggested_owner: 'dev'
+  
+  - id: 'SCOPE-001'
+    severity: high
+    finding: 'Story 范围不完整 - 删除旧系统但未完成迁移工作'
+    suggested_action: '决定迁移策略：(A)临时保留旧系统逐步迁移 (B)立即迁移所有实体 (C)创建适配器层'
+    suggested_owner: 'dev'
+  
+  - id: 'DOC-001'
+    severity: medium
+    finding: 'File List 未包含所有受影响的文件'
+    suggested_action: '更新 File List，添加所有引用旧系统的文件'
+    suggested_owner: 'dev'
+
+waiver: { active: false }
+
+quality_score: 40
+# 计算: 100 - (20 × 2 高严重性) - (10 × 1 中严重性) = 50
+# 但由于无法编译，额外扣 10 分 = 40
+
+expires: '2025-10-27T10:30:00Z' # 2 weeks from review
+
+evidence:
+  tests_reviewed: 11
+  # TestReanimSystem_Update_FrameAdvance
+  # TestReanimSystem_Update_Loop  
+  # TestReanimSystem_Update_FPSControl
+  # TestReanimSystem_Update_SkipNoReanimData
+  # TestReanimSystem_Update_SkipNoAnimation
+  # TestReanimSystem_PlayAnimation_Success
+  # TestReanimSystem_PlayAnimation_VisiblesArray (3 sub-tests)
+  # TestReanimSystem_PlayAnimation_Errors (3 sub-tests)
+  # TestReanimSystem_FrameInheritance
+  # TestReanimSystem_FrameInheritance_IndependentPointers
+  # TestReanimSystem_FrameInheritance_AccumulateState
+  
+  risks_identified: 3
+  # RISK-001: 编译失败阻塞所有开发
+  # RISK-002: 迁移策略不明确可能导致重复工作
+  # RISK-003: 性能优化点（buildMergedTracks 缓存）
+  
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6]
+    # AC 1-2: 文件删除已完成
+    # AC 3: ReanimComponent 创建正确
+    # AC 4: ReanimSystem 实现正确
+    # AC 5: 单元测试通过
+    # AC 6: 覆盖率 89.4%
+    ac_gaps: []
+    # 所有 AC 技术上已覆盖，但集成失败
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: '动画系统不涉及安全敏感操作（无用户输入、数据持久化、网络通信、权限控制）'
+  
+  performance:
+    status: CONCERNS
+    notes: '设计良好（帧继承预计算、独立指针、整数计数器），但存在优化点：buildMergedTracks 无缓存、Update 遍历所有实体'
+  
+  reliability:
+    status: FAIL
+    notes: '项目无法编译，无法验证可靠性。新系统本身错误处理完善，但集成失败导致整体不可用'
+  
+  maintainability:
+    status: FAIL
+    notes: '代码质量优秀（清晰结构、完整注释、89.4%覆盖率），但无法编译导致无法维护。需要修复集成问题'
+
+recommendations:
+  immediate:
+    - action: '修复编译错误 - 更新所有引用旧 AnimationComponent 的代码'
+      refs: 
+        - 'pkg/entities/plant_factory.go'
+        - 'pkg/entities/zombie_factory.go'
+        - 'pkg/scenes/game_scene.go'
+        - 'pkg/entities/plant_factory_test.go'
+        - 'pkg/entities/zombie_factory_test.go'
+    
+    - action: '决定并实施迁移策略'
+      refs: ['docs/stories/6.2.story.md']
+    
+    - action: '更新 File List 包含所有受影响文件'
+      refs: ['docs/stories/6.2.story.md']
+  
+  future:
+    - action: '考虑为 buildMergedTracks 添加缓存机制（如果同一动画频繁切换）'
+      refs: ['pkg/systems/reanim_system.go']
+    
+    - action: '考虑添加集成测试验证 ReanimSystem 与 EntityManager 的交互'
+      refs: ['pkg/systems/reanim_system_test.go']
+    
+    - action: '考虑添加性能测试验证大量实体（100+）时的帧率'
+      refs: ['pkg/systems/reanim_system_test.go']
+    
+    - action: '未来优化：空间分区或活跃实体列表以减少 Update 遍历开销'
+      refs: ['pkg/systems/reanim_system.go']
+
+# 测试覆盖率详情
+test_coverage:
+  reanim_system_go: 89.4%
+  # 优秀的覆盖率，超过 80% 目标
+  # 包含帧推进、循环、FPS控制、帧继承、错误处理等所有关键路径
+
+# 代码质量指标
+code_quality:
+  naming_conventions: PASS
+  zero_coupling: PASS
+  data_behavior_separation: PASS
+  error_handling: PASS
+  documentation: PASS
+  test_design: PASS
+
+# 教育性总结
+lessons_learned:
+  good_practices:
+    - '新系统技术实现非常出色'
+    - '测试设计全面，使用表驱动测试模式'
+    - '代码质量符合所有编码标准'
+    - 'GoDoc 注释详尽，代码自文档化'
+    - '帧继承机制实现正确，独立指针避免共享'
+  
+  areas_for_improvement:
+    - 'Story 范围应包括"迁移现有使用者"或明确标记为"第一阶段"'
+    - '删除旧代码前应先确保无引用或有迁移计划'
+    - 'AC 应包括"项目编译通过"作为基本验收标准'
+  
+  suggested_story_breakdown:
+    - 'Story 6.2.1: 创建新系统（当前完成部分）'
+    - 'Story 6.2.2: 迁移现有实体到新系统'
+    - 'Story 6.2.3: 删除旧系统（确保无引用后）'
+
+
+
+
+

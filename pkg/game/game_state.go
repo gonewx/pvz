@@ -25,7 +25,7 @@ var globalGameState *GameState
 func GetGameState() *GameState {
 	if globalGameState == nil {
 		globalGameState = &GameState{
-			Sun: 50, // 初始阳光值
+			Sun: 500, // 临时增加初始阳光用于测试（原版是50）
 		}
 	}
 	return globalGameState

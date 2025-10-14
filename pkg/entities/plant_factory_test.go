@@ -8,17 +8,12 @@ import (
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
-	"github.com/decker502/pvz/pkg/utils"
-	"github.com/hajimehoshi/ebiten/v2/audio"
 )
-
-// 包级别的共享 audio context（避免重复创建）
-var testAudioContext = audio.NewContext(48000)
 
 // TestNewPlantEntity 测试植物实体创建
 func TestNewPlantEntity(t *testing.T) {
 	// 初始化资源管理器和实体管理器
-	rm := game.NewResourceManager(testAudioContext)
+	rm := newMockResourceManager()
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
 	gs.CameraX = 215 // 设置为游戏默认摄像机位置
@@ -49,10 +44,13 @@ func TestNewPlantEntity(t *testing.T) {
 		},
 	}
 
+	// 创建 mock ReanimSystem
+	mockRS := &mockReanimSystem{em: em}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// 创建植物实体
-			plantID, err := NewPlantEntity(em, rm, gs, tt.plantType, tt.col, tt.row)
+			plantID, err := NewPlantEntity(em, rm, gs, mockRS, tt.plantType, tt.col, tt.row)
 			if err != nil {
 				t.Fatalf("Failed to create plant entity: %v", err)
 			}
@@ -67,12 +65,9 @@ func TestNewPlantEntity(t *testing.T) {
 				t.Error("Plant entity should have PositionComponent")
 			} else {
 				pos := posComp.(*components.PositionComponent)
-				expectedX, expectedY := utils.GridToScreenCoords(
-					tt.col, tt.row,
-					gs.CameraX,
-					config.GridWorldStartX, config.GridWorldStartY,
-					config.CellWidth, config.CellHeight,
-				)
+				// Story 6.3: 实体位置使用世界坐标（不受摄像机影响）
+				expectedX := config.GridWorldStartX + float64(tt.col)*config.CellWidth + config.CellWidth/2
+				expectedY := config.GridWorldStartY + float64(tt.row)*config.CellHeight + config.CellHeight/2
 				if pos.X != expectedX || pos.Y != expectedY {
 					t.Errorf("Position mismatch: got (%.1f, %.1f), want (%.1f, %.1f)",
 						pos.X, pos.Y, expectedX, expectedY)
@@ -112,10 +107,11 @@ func TestNewPlantEntity(t *testing.T) {
 
 // TestNewPlantEntity_AllPlantTypes 测试所有植物类型
 func TestNewPlantEntity_AllPlantTypes(t *testing.T) {
-	rm := game.NewResourceManager(testAudioContext)
+	rm := newMockResourceManager()
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
 	gs.CameraX = 215 // 设置为游戏默认摄像机位置
+	mockRS := &mockReanimSystem{em: em}
 
 	plantTypes := []struct {
 		name      string
@@ -127,7 +123,7 @@ func TestNewPlantEntity_AllPlantTypes(t *testing.T) {
 
 	for _, pt := range plantTypes {
 		t.Run(pt.name, func(t *testing.T) {
-			plantID, err := NewPlantEntity(em, rm, gs, pt.plantType, 4, 2)
+			plantID, err := NewPlantEntity(em, rm, gs, mockRS, pt.plantType, 4, 2)
 			if err != nil {
 				t.Fatalf("Failed to create plant of type %s: %v", pt.name, err)
 			}
@@ -152,10 +148,11 @@ func TestNewPlantEntity_AllPlantTypes(t *testing.T) {
 
 // TestNewPlantEntity_PositionCalculation 测试位置计算的准确性
 func TestNewPlantEntity_PositionCalculation(t *testing.T) {
-	rm := game.NewResourceManager(testAudioContext)
+	rm := newMockResourceManager()
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
 	gs.CameraX = 215 // 设置为游戏默认摄像机位置
+	mockRS := &mockReanimSystem{em: em}
 
 	// 测试网格的所有四个角
 	corners := []struct {
@@ -171,7 +168,7 @@ func TestNewPlantEntity_PositionCalculation(t *testing.T) {
 
 	for _, corner := range corners {
 		t.Run(corner.name, func(t *testing.T) {
-			plantID, err := NewPlantEntity(em, rm, gs, components.PlantSunflower, corner.col, corner.row)
+			plantID, err := NewPlantEntity(em, rm, gs, mockRS, components.PlantSunflower, corner.col, corner.row)
 			if err != nil {
 				t.Fatalf("Failed to create plant at %s: %v", corner.name, err)
 			}
@@ -182,12 +179,9 @@ func TestNewPlantEntity_PositionCalculation(t *testing.T) {
 			}
 
 			pos := posComp.(*components.PositionComponent)
-			expectedX, expectedY := utils.GridToScreenCoords(
-				corner.col, corner.row,
-				gs.CameraX,
-				config.GridWorldStartX, config.GridWorldStartY,
-				config.CellWidth, config.CellHeight,
-			)
+			// Story 6.3: 实体位置使用世界坐标（不受摄像机影响）
+			expectedX := config.GridWorldStartX + float64(corner.col)*config.CellWidth + config.CellWidth/2
+			expectedY := config.GridWorldStartY + float64(corner.row)*config.CellHeight + config.CellHeight/2
 
 			if pos.X != expectedX || pos.Y != expectedY {
 				t.Errorf("%s position incorrect: got (%.1f, %.1f), want (%.1f, %.1f)",
@@ -199,10 +193,11 @@ func TestNewPlantEntity_PositionCalculation(t *testing.T) {
 
 // TestPlantHasHealthComponent 测试植物实体包含生命值组件
 func TestPlantHasHealthComponent(t *testing.T) {
-	rm := game.NewResourceManager(testAudioContext)
+	rm := newMockResourceManager()
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
 	gs.CameraX = 215
+	mockRS := &mockReanimSystem{em: em}
 
 	tests := []struct {
 		name           string
@@ -224,7 +219,7 @@ func TestPlantHasHealthComponent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// 创建植物实体
-			plantID, err := NewPlantEntity(em, rm, gs, tt.plantType, 4, 2)
+			plantID, err := NewPlantEntity(em, rm, gs, mockRS, tt.plantType, 4, 2)
 			if err != nil {
 				t.Fatalf("Failed to create plant: %v", err)
 			}
@@ -252,10 +247,11 @@ func TestPlantHasHealthComponent(t *testing.T) {
 // TestNewWallnutEntity 测试坚果墙实体创建
 func TestNewWallnutEntity(t *testing.T) {
 	// 初始化资源管理器和实体管理器
-	rm := game.NewResourceManager(testAudioContext)
+	rm := newMockResourceManager()
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
 	gs.CameraX = 215
+	mockRS := &mockReanimSystem{em: em}
 
 	tests := []struct {
 		name string
@@ -282,7 +278,7 @@ func TestNewWallnutEntity(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// 创建坚果墙实体
-			wallnutID, err := NewWallnutEntity(em, rm, gs, tt.col, tt.row)
+			wallnutID, err := NewWallnutEntity(em, rm, gs, mockRS, tt.col, tt.row)
 			if err != nil {
 				t.Fatalf("Failed to create wallnut entity: %v", err)
 			}
@@ -367,17 +363,17 @@ func TestNewWallnutEntity(t *testing.T) {
 				}
 			}
 
-			// 验证 AnimationComponent
-			animComp, ok := em.GetComponent(wallnutID, reflect.TypeOf(&components.AnimationComponent{}))
+			// Story 6.3: 验证 ReanimComponent（替代 AnimationComponent）
+			reanimComp, ok := em.GetComponent(wallnutID, reflect.TypeOf(&components.ReanimComponent{}))
 			if !ok {
-				t.Fatal("Wallnut entity should have AnimationComponent")
+				t.Fatal("Wallnut entity should have ReanimComponent")
 			} else {
-				anim := animComp.(*components.AnimationComponent)
-				if len(anim.Frames) == 0 {
-					t.Error("AnimationComponent.Frames should not be empty")
+				reanim := reanimComp.(*components.ReanimComponent)
+				if reanim.Reanim == nil {
+					t.Error("ReanimComponent.Reanim should not be nil")
 				}
-				if !anim.IsLooping {
-					t.Error("Wallnut animation should loop continuously")
+				if reanim.PartImages == nil {
+					t.Error("ReanimComponent.PartImages should not be nil")
 				}
 			}
 
@@ -398,13 +394,14 @@ func TestNewWallnutEntity(t *testing.T) {
 
 // TestWallnutHealthConfiguration 测试坚果墙生命值配置
 func TestWallnutHealthConfiguration(t *testing.T) {
-	rm := game.NewResourceManager(testAudioContext)
+	rm := newMockResourceManager()
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
 	gs.CameraX = 215
+	mockRS := &mockReanimSystem{em: em}
 
 	// 创建坚果墙
-	wallnutID, err := NewWallnutEntity(em, rm, gs, 4, 2)
+	wallnutID, err := NewWallnutEntity(em, rm, gs, mockRS, 4, 2)
 	if err != nil {
 		t.Fatalf("Failed to create wallnut entity: %v", err)
 	}
