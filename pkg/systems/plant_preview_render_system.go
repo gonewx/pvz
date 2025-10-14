@@ -10,22 +10,30 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// PlantPreviewRenderSystem 渲染植物预览的半透明图像（使用 Reanim）
+// PlantPreviewRenderSystem 渲染植物预览的双图像（使用 Reanim）
+// 渲染两个独立的植物图像：
+//   1. 鼠标光标处的不透明图像（Alpha=1.0）
+//   2. 网格格子中心的半透明预览图像（Alpha=0.5，仅当鼠标在网格内时）
 type PlantPreviewRenderSystem struct {
-	entityManager *ecs.EntityManager
+	entityManager      *ecs.EntityManager
+	plantPreviewSystem *PlantPreviewSystem // 用于获取两个渲染位置
 }
 
 // NewPlantPreviewRenderSystem 创建植物预览渲染系统
-func NewPlantPreviewRenderSystem(em *ecs.EntityManager) *PlantPreviewRenderSystem {
+func NewPlantPreviewRenderSystem(em *ecs.EntityManager, pps *PlantPreviewSystem) *PlantPreviewRenderSystem {
 	return &PlantPreviewRenderSystem{
-		entityManager: em,
+		entityManager:      em,
+		plantPreviewSystem: pps,
 	}
 }
 
-// Draw 渲染所有植物预览实体
+// Draw 渲染所有植物预览实体（双图像渲染）
 // 参数:
 //   - screen: 目标渲染画布
 //   - cameraX: 摄像机的世界坐标X位置（用于世界坐标到屏幕坐标的转换）
+// 渲染逻辑：
+//   1. 在鼠标光标位置渲染不透明图像（Alpha=1.0）
+//   2. 在网格格子中心渲染半透明预览图像（Alpha=0.5，仅当鼠标在网格内时）
 func (s *PlantPreviewRenderSystem) Draw(screen *ebiten.Image, cameraX float64) {
 	// 查询所有拥有 PlantPreviewComponent, PositionComponent, ReanimComponent 的实体
 	entities := s.entityManager.GetEntitiesWith(
@@ -34,18 +42,23 @@ func (s *PlantPreviewRenderSystem) Draw(screen *ebiten.Image, cameraX float64) {
 		reflect.TypeOf(&components.ReanimComponent{}),
 	)
 
+	// 获取两个渲染位置
+	mouseX, mouseY, gridX, gridY, isInGrid := s.plantPreviewSystem.GetPreviewPositions()
+
 	for _, entityID := range entities {
 		// 获取组件
-		previewComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PlantPreviewComponent{}))
-		posComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
 		reanimComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{}))
-
-		preview := previewComp.(*components.PlantPreviewComponent)
-		pos := posComp.(*components.PositionComponent)
 		reanimData := reanimComp.(*components.ReanimComponent)
 
-		// 渲染 Reanim 动画（半透明）
-		s.drawReanimPreview(screen, reanimData, pos, preview.Alpha, cameraX, entityID)
+		// 1️⃣ 渲染鼠标光标处的不透明图像（Alpha=1.0）
+		tempPosForCursor := &components.PositionComponent{X: mouseX, Y: mouseY}
+		s.drawReanimPreview(screen, reanimData, tempPosForCursor, 1.0, cameraX, entityID)
+
+		// 2️⃣ 如果在网格内，渲染格子中心的半透明预览图像（Alpha=0.5）
+		if isInGrid {
+			tempPosForGrid := &components.PositionComponent{X: gridX, Y: gridY}
+			s.drawReanimPreview(screen, reanimData, tempPosForGrid, 0.5, cameraX, entityID)
+		}
 	}
 }
 

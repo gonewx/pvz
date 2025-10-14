@@ -68,10 +68,7 @@ func NewInputSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.Ga
 //   - deltaTime: 时间增量（秒）
 //   - cameraX: 摄像机的世界坐标X位置（用于屏幕坐标到世界坐标的转换）
 func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
-	// 如果在种植模式，更新植物预览位置（跟随鼠标）
-	if s.gameState.IsPlantingMode {
-		s.updatePlantPreviewPosition(cameraX)
-	}
+	// 注意：植物预览位置现在由 PlantPreviewSystem 统一管理，无需在这里更新
 
 	// 检测鼠标右键取消种植模式
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight) {
@@ -363,38 +360,6 @@ func (s *InputSystem) destroyPlantPreview() {
 
 	// 立即清理标记删除的实体
 	s.entityManager.RemoveMarkedEntities()
-}
-
-// updatePlantPreviewPosition 更新植物预览位置（跟随鼠标）
-func (s *InputSystem) updatePlantPreviewPosition(cameraX float64) {
-	// 获取鼠标当前屏幕坐标
-	mouseScreenX, mouseScreenY := ebiten.CursorPosition()
-
-	// 转换为世界坐标
-	mouseWorldX := float64(mouseScreenX) + cameraX
-	mouseWorldY := float64(mouseScreenY)
-
-	// 调试：打印坐标转换信息（仅在有预览实体时）
-	entities := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.PlantPreviewComponent{}),
-		reflect.TypeOf(&components.PositionComponent{}),
-	)
-
-	if len(entities) > 0 {
-		log.Printf("[InputSystem] updatePreview: 屏幕(%d, %d) + cameraX(%.1f) = 世界(%.1f, %.1f)",
-			mouseScreenX, mouseScreenY, cameraX, mouseWorldX, mouseWorldY)
-	}
-
-	// 更新每个预览实体的位置
-	for _, entityID := range entities {
-		posComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
-		if !ok {
-			continue
-		}
-		pos := posComp.(*components.PositionComponent)
-		pos.X = mouseWorldX
-		pos.Y = mouseWorldY
-	}
 }
 
 // handleLawnClick 处理草坪点击种植逻辑

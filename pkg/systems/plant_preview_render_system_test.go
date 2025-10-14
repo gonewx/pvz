@@ -6,38 +6,48 @@ import (
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/game"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // TestPlantPreviewRenderSystemCreation 测试渲染系统创建
 func TestPlantPreviewRenderSystemCreation(t *testing.T) {
 	em := ecs.NewEntityManager()
-	system := NewPlantPreviewRenderSystem(em)
+	gs := game.GetGameState()
+	previewSystem := NewPlantPreviewSystem(em, gs)
+	renderSystem := NewPlantPreviewRenderSystem(em, previewSystem)
 
-	if system == nil {
+	if renderSystem == nil {
 		t.Fatal("Expected NewPlantPreviewRenderSystem to return non-nil")
 	}
-	if system.entityManager != em {
+	if renderSystem.entityManager != em {
 		t.Error("Expected entityManager to be set")
+	}
+	if renderSystem.plantPreviewSystem != previewSystem {
+		t.Error("Expected plantPreviewSystem to be set")
 	}
 }
 
 // TestDrawWithNoEntities 测试无预览实体时的绘制
 func TestDrawWithNoEntities(t *testing.T) {
 	em := ecs.NewEntityManager()
-	system := NewPlantPreviewRenderSystem(em)
+	gs := game.GetGameState()
+	previewSystem := NewPlantPreviewSystem(em, gs)
+	renderSystem := NewPlantPreviewRenderSystem(em, previewSystem)
 
 	// 创建测试屏幕
 	screen := ebiten.NewImage(800, 600)
 
 	// 不应该panic
-	system.Draw(screen, 0.0)
+	renderSystem.Draw(screen, 0.0)
 }
 
 // TestDrawPreviewEntity 测试绘制预览实体（使用ReanimComponent）
 func TestDrawPreviewEntity(t *testing.T) {
 	em := ecs.NewEntityManager()
-	system := NewPlantPreviewRenderSystem(em)
+	gs := game.GetGameState()
+	previewSystem := NewPlantPreviewSystem(em, gs)
+	renderSystem := NewPlantPreviewRenderSystem(em, previewSystem)
 
 	// 创建测试图像
 	testImage := ebiten.NewImage(64, 80)
@@ -61,13 +71,15 @@ func TestDrawPreviewEntity(t *testing.T) {
 	screen := ebiten.NewImage(800, 600)
 
 	// 不应该panic
-	system.Draw(screen, 0.0)
+	renderSystem.Draw(screen, 0.0)
 }
 
 // TestDrawWithNilImage 测试图像为nil时的处理
 func TestDrawWithNilImage(t *testing.T) {
 	em := ecs.NewEntityManager()
-	system := NewPlantPreviewRenderSystem(em)
+	gs := game.GetGameState()
+	previewSystem := NewPlantPreviewSystem(em, gs)
+	renderSystem := NewPlantPreviewRenderSystem(em, previewSystem)
 
 	// 创建预览实体，但没有 ReanimComponent
 	entityID := em.CreateEntity()
@@ -84,13 +96,15 @@ func TestDrawWithNilImage(t *testing.T) {
 	screen := ebiten.NewImage(800, 600)
 
 	// 不应该panic，应该跳过此实体
-	system.Draw(screen, 0.0)
+	renderSystem.Draw(screen, 0.0)
 }
 
 // TestAlphaBlending 测试透明度应用
 func TestAlphaBlending(t *testing.T) {
 	em := ecs.NewEntityManager()
-	system := NewPlantPreviewRenderSystem(em)
+	gs := game.GetGameState()
+	previewSystem := NewPlantPreviewSystem(em, gs)
+	renderSystem := NewPlantPreviewRenderSystem(em, previewSystem)
 
 	testCases := []struct {
 		name  string
@@ -124,7 +138,7 @@ func TestAlphaBlending(t *testing.T) {
 			screen := ebiten.NewImage(800, 600)
 
 			// 不应该panic
-			system.Draw(screen, 0.0)
+			renderSystem.Draw(screen, 0.0)
 
 			// 清理实体以便下一个测试
 			em.DestroyEntity(entityID)
@@ -136,7 +150,9 @@ func TestAlphaBlending(t *testing.T) {
 // TestImageCentering 测试图像居中渲染
 func TestImageCentering(t *testing.T) {
 	em := ecs.NewEntityManager()
-	system := NewPlantPreviewRenderSystem(em)
+	gs := game.GetGameState()
+	previewSystem := NewPlantPreviewSystem(em, gs)
+	renderSystem := NewPlantPreviewRenderSystem(em, previewSystem)
 
 	// 创建测试图像（64x80）
 	testImage := ebiten.NewImage(64, 80)
@@ -158,13 +174,15 @@ func TestImageCentering(t *testing.T) {
 	screen := ebiten.NewImage(800, 600)
 
 	// 绘制（不应该panic）
-	system.Draw(screen, 0.0)
+	renderSystem.Draw(screen, 0.0)
 }
 
 // TestMultiplePreviewEntities 测试多个预览实体的绘制
 func TestMultiplePreviewEntities(t *testing.T) {
 	em := ecs.NewEntityManager()
-	system := NewPlantPreviewRenderSystem(em)
+	gs := game.GetGameState()
+	previewSystem := NewPlantPreviewSystem(em, gs)
+	renderSystem := NewPlantPreviewRenderSystem(em, previewSystem)
 
 	// 创建多个预览实体
 	for i := 0; i < 3; i++ {
@@ -187,7 +205,7 @@ func TestMultiplePreviewEntities(t *testing.T) {
 	screen := ebiten.NewImage(800, 600)
 
 	// 绘制所有实体（不应该panic）
-	system.Draw(screen, 0.0)
+	renderSystem.Draw(screen, 0.0)
 
 	// 验证所有实体都存在
 	entities := em.GetEntitiesWith(
@@ -201,7 +219,9 @@ func TestMultiplePreviewEntities(t *testing.T) {
 // TestDrawWithDifferentImageSizes 测试不同尺寸图像的居中绘制
 func TestDrawWithDifferentImageSizes(t *testing.T) {
 	em := ecs.NewEntityManager()
-	system := NewPlantPreviewRenderSystem(em)
+	gs := game.GetGameState()
+	previewSystem := NewPlantPreviewSystem(em, gs)
+	renderSystem := NewPlantPreviewRenderSystem(em, previewSystem)
 
 	testCases := []struct {
 		name   string
@@ -235,7 +255,7 @@ func TestDrawWithDifferentImageSizes(t *testing.T) {
 			screen := ebiten.NewImage(800, 600)
 
 			// 不应该panic
-			system.Draw(screen, 0.0)
+			renderSystem.Draw(screen, 0.0)
 
 			// 验证图像尺寸
 			bounds := testImage.Bounds()
@@ -254,7 +274,9 @@ func TestDrawWithDifferentImageSizes(t *testing.T) {
 // TestDrawWithCameraOffset 测试摄像机偏移的处理
 func TestDrawWithCameraOffset(t *testing.T) {
 	em := ecs.NewEntityManager()
-	system := NewPlantPreviewRenderSystem(em)
+	gs := game.GetGameState()
+	previewSystem := NewPlantPreviewSystem(em, gs)
+	renderSystem := NewPlantPreviewRenderSystem(em, previewSystem)
 
 	// 创建测试图像
 	testImage := ebiten.NewImage(64, 80)
@@ -280,7 +302,7 @@ func TestDrawWithCameraOffset(t *testing.T) {
 
 	for _, cameraX := range testCameraOffsets {
 		// 不应该panic
-		system.Draw(screen, cameraX)
+		renderSystem.Draw(screen, cameraX)
 	}
 }
 

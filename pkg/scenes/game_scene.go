@@ -213,8 +213,9 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	scene.initPlantCardSystems(rm)
 
 	// Story 3.2: Initialize plant preview systems
+	// PlantPreviewRenderSystem 需要引用 PlantPreviewSystem 来获取两个渲染位置
 	scene.plantPreviewSystem = systems.NewPlantPreviewSystem(scene.entityManager, scene.gameState)
-	scene.plantPreviewRenderSystem = systems.NewPlantPreviewRenderSystem(scene.entityManager)
+	scene.plantPreviewRenderSystem = systems.NewPlantPreviewRenderSystem(scene.entityManager, scene.plantPreviewSystem)
 
 	// Story 3.4: Initialize behavior system (sunflower sun production, etc.)
 	// Story 6.3: Pass ReanimSystem for zombie animation state changes
@@ -431,12 +432,11 @@ func (s *GameScene) Update(deltaTime float64) {
 	s.behaviorSystem.Update(deltaTime)         // 6. Update plant behaviors (Story 3.4)
 	s.physicsSystem.Update(deltaTime)          // 7. Check collisions (Story 4.3)
 	// Story 6.3: Reanim 动画系统（替代旧的 AnimationSystem）
-	s.reanimSystem.Update(deltaTime) // 8. Update Reanim animation frames
-	// 注意：PlantPreviewSystem 已禁用，因为 InputSystem.updatePlantPreviewPosition 已经处理预览位置更新
-	// 原 PlantPreviewSystem 使用屏幕坐标，与 InputSystem 的世界坐标冲突
-	// s.plantPreviewSystem.Update(deltaTime) // 9. Update plant preview position (DISABLED)
-	s.lifetimeSystem.Update(deltaTime)     // 10. Check for expired entities
-	s.entityManager.RemoveMarkedEntities() // 11. Clean up deleted entities (always last)
+	s.reanimSystem.Update(deltaTime)           // 8. Update Reanim animation frames
+	// Story 3.2: 植物预览系统 - 更新预览位置（双图像支持）
+	s.plantPreviewSystem.Update(deltaTime)     // 9. Update plant preview position (dual-image support)
+	s.lifetimeSystem.Update(deltaTime)         // 10. Check for expired entities
+	s.entityManager.RemoveMarkedEntities()     // 11. Clean up deleted entities (always last)
 }
 
 // updateIntroAnimation updates the intro camera animation that showcases the entire lawn.
