@@ -11,7 +11,31 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// RenderSystem 管理所有实体的渲染
+// RenderSystem 管理游戏世界实体的渲染
+//
+// 职责范围：
+//   - 游戏世界实体：植物、僵尸、子弹、阳光、特效等
+//   - 所有这些实体使用 ReanimComponent 进行渲染
+//   - 支持复杂的多部件骨骼动画和变换效果
+//
+// 不包括：
+//   - UI 元素（植物卡片、按钮等）由专门的渲染系统处理
+//   - PlantCardRenderSystem: 处理植物卡片
+//   - PlantPreviewRenderSystem: 处理植物预览（虽然预览也使用 ReanimComponent）
+//
+// 组件策略（Story 6.3）：
+//   - 游戏世界实体 → ReanimComponent（支持复杂动画）
+//   - UI 元素 → SpriteComponent（简单高效）
+//   - 详见：CLAUDE.md#组件使用策略
+//
+// 架构决策：
+//   - 分离游戏逻辑渲染和 UI 渲染，保持关注点分离
+//   - ReanimComponent 提供统一的动画渲染管线
+//   - 单图片实体（如阳光、子弹）使用 createSimpleReanimComponent 包装
+//
+// 相关文档：
+//   - CLAUDE.md#组件使用策略
+//   - docs/stories/6.3.story.md
 type RenderSystem struct {
 	entityManager *ecs.EntityManager
 	debugPrinted  map[ecs.EntityID]bool // 记录已打印调试信息的实体

@@ -141,6 +141,81 @@ pvz/
 - `VelocityComponent`: 移动速度(用于子弹、僵尸移动)
 - `CollisionComponent`: 碰撞检测的边界框
 
+## 组件使用策略（重要）
+
+### Story 6.3 迁移范围澄清
+
+**常见误解**：
+- ❌ "Story 6.3 要替代所有 SpriteComponent"
+- ✅ "Story 6.3 只迁移游戏世界实体到 ReanimComponent"
+
+**实际架构**：
+```
+游戏世界实体             UI 元素
+    ↓                       ↓
+ReanimComponent      SpriteComponent
+    ↓                       ↓
+RenderSystem       PlantCardRenderSystem
+```
+
+### ReanimComponent vs SpriteComponent 使用规则
+
+#### 何时使用 ReanimComponent？
+- ✅ **游戏世界实体**：植物、僵尸、子弹、阳光、特效
+- ✅ **需要复杂动画**：多部件、骨骼动画、变换效果
+- ✅ **特点**：支持多部件渲染、骨骼变换、帧继承
+
+#### 何时使用 SpriteComponent？
+- ✅ **UI 元素**：植物卡片、按钮、菜单
+- ✅ **静态图片**：背景、装饰元素
+- ✅ **特点**：简单高效，适合不需要复杂动画的元素
+
+### 为什么 UI 元素不使用 ReanimComponent？
+
+1. ✅ **性能优化**：UI 不需要复杂的多部件动画系统
+2. ✅ **关注点分离**：UI 渲染逻辑与游戏逻辑分离
+3. ✅ **简单性**：SpriteComponent 更适合静态/简单动画的 UI
+4. ✅ **专门的渲染系统**：UI 有特殊需求（如冷却遮罩、缩放）
+
+### 实体组件映射表
+
+| 实体类型 | 组件类型 | 渲染系统 | 说明 |
+|---------|---------|---------|------|
+| 🌱 植物 | ReanimComponent | RenderSystem | 完整动画系统 |
+| 🧟 僵尸 | ReanimComponent | RenderSystem | 完整动画系统 |
+| ☀️ 阳光 | ReanimComponent | RenderSystem | 简化包装（单图片） |
+| 🟢 子弹 | ReanimComponent | RenderSystem | 简化包装（单图片） |
+| 💥 特效 | ReanimComponent | RenderSystem | 简化包装（单图片） |
+| 👻 植物预览 | ReanimComponent | PlantPreviewRenderSystem | 完整动画（双图像渲染） |
+| 🎴 植物卡片 | SpriteComponent | PlantCardRenderSystem | UI 元素 |
+
+### 判断规则
+
+**快速判断流程**：
+```
+问：这是游戏玩法实体（植物/僵尸/子弹）吗？
+└─ 是 → 使用 ReanimComponent
+
+问：这是 UI 元素（卡片/按钮/预览）吗？
+└─ 是 → 检查是否需要动画
+    └─ 需要动画（植物预览）→ ReanimComponent
+    └─ 不需要动画（卡片）→ SpriteComponent
+
+有疑问？检查实体是否有 UIComponent 或 PlantCardComponent
+```
+
+### 辅助函数
+
+- `createSimpleReanimComponent(image, name)`: 将单图片包装为 ReanimComponent
+  - 用于：阳光、子弹、简单特效
+  - 目的：保持渲染管线一致性，避免混合两种渲染路径
+
+### 相关文档
+
+- **架构决策记录**：`docs/architecture/adr/001-component-strategy.md`（如有）
+- **Story 6.3 详细说明**：`docs/stories/6.3.story.md`
+- **渲染系统文档**：`pkg/systems/render_system.go`（文件头部注释）
+
 ## 编码规范
 
 ### 命名约定

@@ -45,8 +45,9 @@ func NewPeaProjectile(em *ecs.EntityManager, rm ResourceLoader, startX, startY f
 		Y: startY,
 	})
 
-	// Story 6.3: 使用 ReanimComponent 替代 SpriteComponent
-	// 为单图片实体创建简单的 Reanim 包装
+	// Story 6.3: 游戏世界实体统一使用 ReanimComponent 渲染
+	// 为单图片实体创建简化的 Reanim 包装（无动画轨道）
+	// 注意：UI 元素（植物卡片）仍使用 SpriteComponent，由专门的渲染系统处理
 	em.AddComponent(entityID, createSimpleReanimComponent(peaImage, "pea"))
 
 	// 添加速度组件（向右移动）
