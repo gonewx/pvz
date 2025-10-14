@@ -17,6 +17,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/audio/mp3"
 	"github.com/hajimehoshi/ebiten/v2/audio/vorbis"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
+	"gopkg.in/yaml.v3"
 )
 
 // ResourceManager is responsible for centralized management of game resources.
@@ -53,6 +54,10 @@ type ResourceManager struct {
 	fontFaceCache    map[string]*text.GoTextFace         // Cache for Ebitengine v2 text faces
 	reanimXMLCache   map[string]*reanim.ReanimXML        // Cache for parsed Reanim XML data: unit name -> ReanimXML
 	reanimImageCache map[string]map[string]*ebiten.Image // Cache for Reanim part images: unit name -> (image ref -> Image)
+
+	// YAML resource configuration
+	config       *ResourceConfig       // Parsed YAML configuration
+	resourceMap  map[string]string     // Resource ID -> file path mapping for quick lookup
 }
 
 // NewResourceManager creates and initializes a new ResourceManager instance.
@@ -77,6 +82,7 @@ func NewResourceManager(audioContext *audio.Context) *ResourceManager {
 		fontFaceCache:    make(map[string]*text.GoTextFace),
 		reanimXMLCache:   make(map[string]*reanim.ReanimXML),
 		reanimImageCache: make(map[string]map[string]*ebiten.Image),
+		resourceMap:      make(map[string]string),
 	}
 }
 
@@ -577,4 +583,214 @@ func (rm *ResourceManager) buildReanimImagePath(unitName, imageRef, category str
 
 	// 构建路径：assets/reanim/peashooter_head.png
 	return fmt.Sprintf("assets/reanim/%s.png", fileName)
+}
+
+// LoadResourceConfig loads the resource configuration from a YAML file.
+// This method should be called once during game initialization, before loading any resources.
+//
+// The configuration file defines resource groups and their contents, allowing resources
+// to be loaded by ID instead of hard-coded paths.
+//
+// Parameters:
+//   - configPath: Path to the YAML configuration file (e.g., "assets/config/resources.yaml")
+//
+// Returns:
+//   - An error if the file cannot be opened or parsed
+//
+// Example:
+//   rm := NewResourceManager(audioContext)
+//   if err := rm.LoadResourceConfig("assets/config/resources.yaml"); err != nil {
+//       log.Fatal("Failed to load resource config:", err)
+//   }
+func (rm *ResourceManager) LoadResourceConfig(configPath string) error {
+	// Read the YAML file
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to read resource config %s: %w", configPath, err)
+	}
+
+	// Parse YAML into ResourceConfig struct
+	var config ResourceConfig
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return fmt.Errorf("failed to parse resource config %s: %w", configPath, err)
+	}
+
+	// Store the parsed configuration
+	rm.config = &config
+
+	// Build resource ID -> path mapping for quick lookup
+	rm.buildResourceMap()
+
+	return nil
+}
+
+// buildResourceMap constructs a mapping from resource IDs to full file paths.
+// This allows fast lookup when loading resources by ID.
+//
+// The mapping combines the base path with each resource's relative path.
+// For example:
+//   IMAGE_BLANK -> assets/properties/blank.png
+//   SOUND_BUTTONCLICK -> assets/sounds/buttonclick.ogg
+func (rm *ResourceManager) buildResourceMap() {
+	if rm.config == nil {
+		return
+	}
+
+	// Clear existing mapping
+	rm.resourceMap = make(map[string]string)
+
+	// Iterate through all resource groups
+	for _, group := range rm.config.Groups {
+		// Process images in this group
+		for _, img := range group.Images {
+			// Build full path: basePath + relativePath
+			fullPath := buildFullPath(rm.config.BasePath, img.Path)
+
+			// Add file extension if not present
+			if filepath.Ext(fullPath) == "" {
+				fullPath += ".png" // Default to PNG for images
+			}
+
+			rm.resourceMap[img.ID] = fullPath
+		}
+
+		// Process sounds in this group
+		for _, sound := range group.Sounds {
+			fullPath := buildFullPath(rm.config.BasePath, sound.Path)
+
+			// Add file extension if not present
+			if filepath.Ext(fullPath) == "" {
+				fullPath += ".ogg" // Default to OGG for sounds
+			}
+
+			rm.resourceMap[sound.ID] = fullPath
+		}
+
+		// Process fonts in this group
+		for _, font := range group.Fonts {
+			fullPath := buildFullPath(rm.config.BasePath, font.Path)
+			rm.resourceMap[font.ID] = fullPath
+		}
+	}
+}
+
+// LoadImageByID loads an image resource using its resource ID.
+// The resource ID must be defined in the YAML configuration file.
+//
+// This method first looks up the file path associated with the ID,
+// then loads the image using the standard LoadImage method.
+//
+// Parameters:
+//   - resourceID: The resource ID (e.g., "IMAGE_BLANK", "IMAGE_REANIM_SEEDS")
+//
+// Returns:
+//   - A pointer to the loaded ebiten.Image
+//   - An error if the ID is not found or the image cannot be loaded
+//
+// Example:
+//   img, err := rm.LoadImageByID("IMAGE_BACKGROUND1")
+//   if err != nil {
+//       log.Printf("Failed to load image: %v", err)
+//   }
+func (rm *ResourceManager) LoadImageByID(resourceID string) (*ebiten.Image, error) {
+	// Check if resource config is loaded
+	if rm.config == nil {
+		return nil, fmt.Errorf("resource config not loaded - call LoadResourceConfig first")
+	}
+
+	// Look up the file path for this resource ID
+	filePath, exists := rm.resourceMap[resourceID]
+	if !exists {
+		return nil, fmt.Errorf("resource ID not found: %s", resourceID)
+	}
+
+	// Load the image using the resolved path
+	return rm.LoadImage(filePath)
+}
+
+// GetImageByID retrieves a previously loaded image using its resource ID.
+// If the image has not been loaded yet, it returns nil.
+//
+// Parameters:
+//   - resourceID: The resource ID (e.g., "IMAGE_BLANK")
+//
+// Returns:
+//   - A pointer to the cached ebiten.Image, or nil if not found
+//
+// Example:
+//   img := rm.GetImageByID("IMAGE_BACKGROUND1")
+//   if img == nil {
+//       // Image not loaded yet
+//   }
+func (rm *ResourceManager) GetImageByID(resourceID string) *ebiten.Image {
+	if rm.config == nil {
+		return nil
+	}
+
+	// Look up the file path
+	filePath, exists := rm.resourceMap[resourceID]
+	if !exists {
+		return nil
+	}
+
+	// Get from cache
+	return rm.GetImage(filePath)
+}
+
+// LoadResourceGroup loads all resources in a specified group.
+// Resource groups are defined in the YAML configuration file.
+//
+// This is useful for batch-loading related resources, such as:
+//   - "init" - Initial resources needed at startup
+//   - "loadingimages" - Resources for the loading screen
+//   - "delayload_background1" - Resources for a specific level
+//
+// Parameters:
+//   - groupName: The name of the resource group (e.g., "init", "loadingimages")
+//
+// Returns:
+//   - An error if the group is not found or any resource fails to load
+//
+// Example:
+//   // Load all initial resources at game startup
+//   if err := rm.LoadResourceGroup("init"); err != nil {
+//       log.Fatal("Failed to load init resources:", err)
+//   }
+func (rm *ResourceManager) LoadResourceGroup(groupName string) error {
+	// Check if resource config is loaded
+	if rm.config == nil {
+		return fmt.Errorf("resource config not loaded - call LoadResourceConfig first")
+	}
+
+	// Find the resource group
+	group, exists := rm.config.Groups[groupName]
+	if !exists {
+		return fmt.Errorf("resource group not found: %s", groupName)
+	}
+
+	// Load all images in the group
+	for _, img := range group.Images {
+		if _, err := rm.LoadImageByID(img.ID); err != nil {
+			return fmt.Errorf("failed to load image %s in group %s: %w", img.ID, groupName, err)
+		}
+	}
+
+	// Load all sounds in the group
+	for _, sound := range group.Sounds {
+		// Look up the file path
+		filePath, exists := rm.resourceMap[sound.ID]
+		if !exists {
+			return fmt.Errorf("sound resource ID not found: %s", sound.ID)
+		}
+
+		// Load the sound effect (use LoadSoundEffect for non-looping sounds)
+		if _, err := rm.LoadSoundEffect(filePath); err != nil {
+			return fmt.Errorf("failed to load sound %s in group %s: %w", sound.ID, groupName, err)
+		}
+	}
+
+	// Fonts are not loaded here as they require a size parameter
+	// They should be loaded individually using LoadFont when needed
+
+	return nil
 }

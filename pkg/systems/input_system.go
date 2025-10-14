@@ -45,7 +45,8 @@ func NewInputSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.Ga
 	}
 
 	// 加载收集阳光音效（使用 LoadSoundEffect 而非 LoadAudio 以避免循环播放）
-	player, err := rm.LoadSoundEffect("assets/audio/Sound/points.ogg")
+	// Note: Using hardcoded path as sound resource ID loading not yet implemented
+	player, err := rm.LoadSoundEffect("assets/sounds/points.ogg")
 	if err != nil {
 		log.Printf("Warning: Failed to load sun collect sound: %v", err)
 	} else {
@@ -53,7 +54,8 @@ func NewInputSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.Ga
 	}
 
 	// 加载种植音效
-	plantPlayer, err := rm.LoadSoundEffect("assets/audio/Sound/plant.ogg")
+	// Note: Using hardcoded path as sound resource ID loading not yet implemented
+	plantPlayer, err := rm.LoadSoundEffect("assets/sounds/plant.ogg")
 	if err != nil {
 		log.Printf("Warning: Failed to load plant sound: %v", err)
 	} else {

@@ -770,3 +770,36 @@ func (s *ReanimSystem) GetPartGroupImage(entityID ecs.EntityID, groupName string
 
 	return nil, fmt.Errorf("no image found for part group '%s' in entity %d", groupName, entityID)
 }
+
+// RenderToTexture 将指定实体的 Reanim 渲染到目标纹理（离屏渲染）
+// 用于生成植物卡片的预览图标
+//
+// 实现说明：
+// 为了避免重复复杂的渲染逻辑，这个方法会临时创建一个 RenderSystem
+// 并调用其 renderReanimEntity 方法渲染到目标纹理
+//
+// Parameters:
+//   - entityID: the ID of the entity to render
+//   - target: the target texture to render to (should be pre-created with appropriate size)
+//
+// Returns:
+//   - error: if the entity doesn't have required components or rendering fails
+func (s *ReanimSystem) RenderToTexture(entityID ecs.EntityID, target *ebiten.Image) error {
+	// 验证实体拥有必要的组件
+	_, hasPos := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
+	_, hasReanim := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{}))
+
+	if !hasPos || !hasReanim {
+		return fmt.Errorf("entity %d missing required components for rendering", entityID)
+	}
+
+	// 创建临时的 RenderSystem 实例进行渲染
+	// 注意：RenderSystem 不需要复杂初始化，只需要 EntityManager
+	tempRenderSystem := NewRenderSystem(s.entityManager)
+
+	// 渲染到目标纹理
+	// cameraX = 0 因为我们渲染的是一个孤立的图标，不需要考虑摄像机
+	tempRenderSystem.renderReanimEntity(target, entityID, 0)
+
+	return nil
+}

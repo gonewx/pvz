@@ -47,7 +47,7 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	}
 
 	// Load background image
-	img, err := rm.LoadImage("assets/images/interface/MainMenu.png")
+	img, err := rm.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_BG")
 	if err != nil {
 		log.Printf("Warning: Failed to load main menu background: %v", err)
 		log.Printf("The game will use a fallback solid color background")
@@ -56,8 +56,9 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 		scene.backgroundImage = img
 	}
 
-	// Load background music
-	player, err := rm.LoadAudio("assets/audio/Music/mainmenubgm.mp3")
+	// Load background music (using titlescreen music from loaderbar group)
+	// Note: Need to ensure loaderbar group is loaded before this
+	player, err := rm.LoadSoundEffect("assets/sounds/titlescreen.ogg")
 	if err != nil {
 		log.Printf("Warning: Failed to load main menu music: %v", err)
 		// Continue without music
@@ -177,21 +178,21 @@ func (m *MainMenuScene) Draw(screen *ebiten.Image) {
 
 // initButtons initializes the menu buttons with their positions, images, and click handlers.
 func (m *MainMenuScene) initButtons() {
-	// Load button images
-	adventureNormal, err := m.resourceManager.LoadImage("assets/images/game_menu/Adventure_0.png")
+	// Load button images using resource IDs
+	adventureNormal, err := m.resourceManager.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_BUTTON")
 	if err != nil {
 		log.Printf("Warning: Failed to load adventure button normal image: %v", err)
 		adventureNormal = nil
 	}
 
-	adventureHover, err := m.resourceManager.LoadImage("assets/images/game_menu/Adventure_1.png")
+	adventureHover, err := m.resourceManager.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_HIGHLIGHT")
 	if err != nil {
 		log.Printf("Warning: Failed to load adventure button hover image: %v", err)
 		adventureHover = nil
 	}
 
 	// For exit button, we'll use a simple button image
-	exitNormal, err := m.resourceManager.LoadImage("assets/images/interface/button.png")
+	exitNormal, err := m.resourceManager.LoadImageByID("IMAGE_REANIM_BUTTON_MIDDLE")
 	if err != nil {
 		log.Printf("Warning: Failed to load exit button image: %v", err)
 		exitNormal = nil

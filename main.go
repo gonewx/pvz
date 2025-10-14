@@ -44,6 +44,13 @@ func main() {
 	// Create resource manager
 	resourceManager := game.NewResourceManager(audioContext)
 
+	// Load resource configuration from YAML
+	log.Println("Loading resource configuration...")
+	if err := resourceManager.LoadResourceConfig("assets/config/resources.yaml"); err != nil {
+		log.Fatal("Failed to load resource config:", err)
+	}
+	log.Println("Resource configuration loaded successfully")
+
 	// Create scene manager
 	sceneManager := game.NewSceneManager()
 

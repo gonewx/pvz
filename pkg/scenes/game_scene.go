@@ -20,23 +20,29 @@ import (
 const (
 	// UI Layout Constants - positions and sizes for UI elements
 	// Seed Bank (植物选择栏)
-	SeedBankX      = 0
+	SeedBankX      = 10
 	SeedBankY      = 0
 	SeedBankWidth  = 500
 	SeedBankHeight = 87
 
 	// Sun Counter (阳光计数器) - relative to SeedBank position
-	SunCounterOffsetX  = 45 // 相对于 SeedBank 的 X 偏移量
-	SunCounterOffsetY  = 69 // 相对于 SeedBank 的 Y 偏移量
+	SunCounterOffsetX  = 40 // 相对于 SeedBank 的 X 偏移量
+	SunCounterOffsetY  = 63 // 相对于 SeedBank 的 Y 偏移量
 	SunCounterWidth    = 130
 	SunCounterHeight   = 60
-	SunCounterFontSize = 28.0 // 阳光数值字体大小（像素）
+	SunCounterFontSize = 18.0 // 阳光数值字体大小（像素）
 
 	// Plant Cards (植物卡片) - relative to SeedBank position
-	PlantCardStartOffsetX = 92   // 第一张卡片相对于 SeedBank 的 X 偏移量
+	PlantCardStartOffsetX = 84   // 第一张卡片相对于 SeedBank 的 X 偏移量
 	PlantCardOffsetY      = 8    // 卡片相对于 SeedBank 的 Y 偏移量
-	PlantCardSpacing      = 65   // 卡片槽之间的间距（包含卡槽边框，每个卡槽约76px宽）
-	PlantCardScale        = 0.95 // 卡片缩放因子（原始卡片约64x89，缩放后约54x76适配卡槽）
+	PlantCardSpacing      = 60   // 卡片槽之间的间距（包含卡槽边框，每个卡槽约76px宽）
+	PlantCardScale        = 0.50 // 卡片背景缩放因子（实际图片100x140，缩放后54x76适配卡槽）
+	PlantCardFontSize     = 15.0 // 卡片阳光数字字体大小（像素）
+
+	// Plant Card Icon (卡片上的植物图标) - Story 6.3 可配置参数
+	PlantIconScale   = 0.55 // 植物图标缩放因子（原始80x90，可调整此值来改变图标大小）
+	PlantIconOffsetY = 5.0  // 植物图标距离卡片顶部的偏移（像素，可调整垂直位置）
+	SunTextOffsetY   = 16.0 // 阳光数字距离卡片底部的偏移（像素，可调整文本位置）
 
 	// Shovel (铲子) - positioned to the right of seed bank
 	ShovelX      = 620 // To the right of seed bank (bar5.png width=612 + small gap)
@@ -48,7 +54,7 @@ const (
 	// The background image is wider than the window, we show only a portion
 	IntroAnimDuration = 3.0 // Duration of intro animation in seconds
 	CameraScrollSpeed = 100 // Pixels per second for intro animation
-	GameCameraX       = 215 // Final camera X position for gameplay (centered on lawn)
+	GameCameraX       = 220 // Final camera X position for gameplay (centered on lawn)
 )
 
 // GameScene represents the main gameplay screen.
@@ -68,6 +74,7 @@ type GameScene struct {
 
 	// Font Resources
 	sunCounterFont *text.GoTextFace // Font for sun counter display
+	plantCardFont  *text.GoTextFace // Font for plant card sun cost display
 
 	// Camera and Animation
 	cameraX            float64 // Camera X position (controls which part of background to show)
@@ -241,7 +248,7 @@ func (s *GameScene) initPlantCardSystems(rm *game.ResourceManager) {
 	cardY := float64(SeedBankY + PlantCardOffsetY)
 
 	// 向日葵卡片（第一张）
-	_, err := entities.NewPlantCardEntity(s.entityManager, rm, components.PlantSunflower, firstCardX, cardY)
+	_, err := entities.NewPlantCardEntity(s.entityManager, rm, s.reanimSystem, components.PlantSunflower, firstCardX, cardY, PlantCardScale)
 	if err != nil {
 		log.Printf("Warning: Failed to create sunflower card: %v", err)
 		// 继续执行，游戏在没有卡片的情况下也能运行（用于测试环境）
@@ -249,7 +256,7 @@ func (s *GameScene) initPlantCardSystems(rm *game.ResourceManager) {
 
 	// 豌豆射手卡片（第二张）
 	secondCardX := firstCardX + PlantCardSpacing
-	_, err = entities.NewPlantCardEntity(s.entityManager, rm, components.PlantPeashooter, secondCardX, cardY)
+	_, err = entities.NewPlantCardEntity(s.entityManager, rm, s.reanimSystem, components.PlantPeashooter, secondCardX, cardY, PlantCardScale)
 	if err != nil {
 		log.Printf("Warning: Failed to create peashooter card: %v", err)
 		// 继续执行，游戏在没有卡片的情况下也能运行（用于测试环境）
@@ -257,7 +264,7 @@ func (s *GameScene) initPlantCardSystems(rm *game.ResourceManager) {
 
 	// 坚果墙卡片（第三张）
 	thirdCardX := secondCardX + PlantCardSpacing
-	_, err = entities.NewPlantCardEntity(s.entityManager, rm, components.PlantWallnut, thirdCardX, cardY)
+	_, err = entities.NewPlantCardEntity(s.entityManager, rm, s.reanimSystem, components.PlantWallnut, thirdCardX, cardY, PlantCardScale)
 	if err != nil {
 		log.Printf("Warning: Failed to create wallnut card: %v", err)
 		// 继续执行，游戏在没有卡片的情况下也能运行（用于测试环境）
@@ -270,10 +277,14 @@ func (s *GameScene) initPlantCardSystems(rm *game.ResourceManager) {
 		rm,
 	)
 
-	// Initialize PlantCardRenderSystem
+	// Initialize PlantCardRenderSystem (Story 6.3: 可配置的多层渲染)
 	s.plantCardRenderSystem = systems.NewPlantCardRenderSystem(
 		s.entityManager,
-		PlantCardScale, // 使用常量定义的缩放因子
+		PlantCardScale,   // 卡片背景缩放因子 (0.50)
+		PlantIconScale,   // 植物图标缩放因子 (0.55, 可调整)
+		PlantIconOffsetY, // 植物图标距离顶部的偏移 (5.0 像素, 可调整)
+		SunTextOffsetY,   // 阳光数字距离底部的偏移 (18.0 像素, 可调整)
+		s.plantCardFont,  // 阳光数字字体（黑色渲染）
 	)
 }
 
@@ -282,7 +293,7 @@ func (s *GameScene) initPlantCardSystems(rm *game.ResourceManager) {
 // The Draw method will use fallback rendering for missing resources.
 func (s *GameScene) loadResources() {
 	// Load lawn background
-	bg, err := s.resourceManager.LoadImage("assets/images/Background/background1.jpg")
+	bg, err := s.resourceManager.LoadImageByID("IMAGE_BACKGROUND1")
 	if err != nil {
 		log.Printf("Warning: Failed to load lawn background: %v", err)
 		log.Printf("Will use fallback solid color background")
@@ -297,7 +308,7 @@ func (s *GameScene) loadResources() {
 	}
 
 	// Load seed bank (植物选择栏背景)
-	seedBank, err := s.resourceManager.LoadImage("assets/images/interface/bar5.png")
+	seedBank, err := s.resourceManager.LoadImageByID("IMAGE_REANIM_SEEDBANK")
 	if err != nil {
 		log.Printf("Warning: Failed to load seed bank image: %v", err)
 		log.Printf("Will use fallback rendering for seed bank")
@@ -306,7 +317,7 @@ func (s *GameScene) loadResources() {
 	}
 
 	// Load shovel slot background
-	shovelSlot, err := s.resourceManager.LoadImage("assets/images/interface/shovelSlot.png")
+	shovelSlot, err := s.resourceManager.LoadImageByID("IMAGE_REANIM_SHOVELBANK")
 	if err != nil {
 		log.Printf("Warning: Failed to load shovel slot: %v", err)
 	} else {
@@ -314,7 +325,7 @@ func (s *GameScene) loadResources() {
 	}
 
 	// Load shovel icon
-	shovel, err := s.resourceManager.LoadImage("assets/images/interface/shovel2.png")
+	shovel, err := s.resourceManager.LoadImageByID("IMAGE_REANIM_SHOVEL")
 	if err != nil {
 		log.Printf("Warning: Failed to load shovel icon: %v", err)
 	} else {
@@ -322,12 +333,21 @@ func (s *GameScene) loadResources() {
 	}
 
 	// Load font for sun counter
-	font, err := s.resourceManager.LoadFont("assets/fonts/briannetod.ttf", SunCounterFontSize)
+	font, err := s.resourceManager.LoadFont("assets/fonts/SimHei.ttf", SunCounterFontSize)
 	if err != nil {
 		log.Printf("Warning: Failed to load sun counter font: %v", err)
 		log.Printf("Will use fallback debug text rendering")
 	} else {
 		s.sunCounterFont = font
+	}
+
+	// Load font for plant card sun cost
+	cardFont, err := s.resourceManager.LoadFont("assets/fonts/SimHei.ttf", PlantCardFontSize)
+	if err != nil {
+		log.Printf("Warning: Failed to load plant card font: %v", err)
+		log.Printf("Will use fallback debug text rendering for card cost")
+	} else {
+		s.plantCardFont = cardFont
 	}
 
 	// Note: Sun counter background is drawn procedurally for now
@@ -432,11 +452,11 @@ func (s *GameScene) Update(deltaTime float64) {
 	s.behaviorSystem.Update(deltaTime)         // 6. Update plant behaviors (Story 3.4)
 	s.physicsSystem.Update(deltaTime)          // 7. Check collisions (Story 4.3)
 	// Story 6.3: Reanim 动画系统（替代旧的 AnimationSystem）
-	s.reanimSystem.Update(deltaTime)           // 8. Update Reanim animation frames
+	s.reanimSystem.Update(deltaTime) // 8. Update Reanim animation frames
 	// Story 3.2: 植物预览系统 - 更新预览位置（双图像支持）
-	s.plantPreviewSystem.Update(deltaTime)     // 9. Update plant preview position (dual-image support)
-	s.lifetimeSystem.Update(deltaTime)         // 10. Check for expired entities
-	s.entityManager.RemoveMarkedEntities()     // 11. Clean up deleted entities (always last)
+	s.plantPreviewSystem.Update(deltaTime) // 9. Update plant preview position (dual-image support)
+	s.lifetimeSystem.Update(deltaTime)     // 10. Check for expired entities
+	s.entityManager.RemoveMarkedEntities() // 11. Clean up deleted entities (always last)
 }
 
 // updateIntroAnimation updates the intro camera animation that showcases the entire lawn.

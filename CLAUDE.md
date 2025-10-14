@@ -420,14 +420,268 @@ peashooter:
 
 ## 资源管理
 
-### 资源加载
-- 游戏启动时一次性加载所有资源到内存
-- ResourceManager 提供统一的资源访问接口
-- 资源加载失败应有清晰的错误日志,不应直接崩溃
+### 概述
 
-### 雪碧图处理
-- 大型精灵图在加载时切割成独立帧
-- 存储在 ResourceManager 中供动画系统使用
+项目使用统一的 `ResourceManager` 进行资源加载和缓存管理。从 2025年10月开始，资源系统已升级为**基于 YAML 配置的动态资源管理**，支持通过资源 ID 加载资源，提高了可维护性和可扩展性。
+
+### 资源配置文件
+
+**配置文件路径:** `assets/config/resources.yaml`
+
+资源配置文件定义了所有游戏资源及其 ID 映射关系。资源按照**资源组（Resource Groups）**组织，可以批量加载。
+
+**配置结构示例：**
+```yaml
+version: "1.0"
+base_path: assets
+groups:
+  init:
+    images:
+      - id: IMAGE_BLANK
+        path: properties/blank.png
+      - id: IMAGE_POPCAP_LOGO
+        path: properties/PopCap_Logo.jpg
+  loadingimages:
+    images:
+      - id: IMAGE_REANIM_SEEDS
+        path: reanim/seeds.png
+        cols: 9  # 精灵图列数
+    sounds:
+      - id: SOUND_BUTTONCLICK
+        path: sounds/buttonclick.ogg
+```
+
+### 资源管理 API
+
+#### 1. 初始化和配置加载
+
+```go
+// 在 main.go 中初始化
+audioContext := audio.NewContext(48000)
+rm := game.NewResourceManager(audioContext)
+
+// 加载资源配置（必须在加载任何资源前调用）
+if err := rm.LoadResourceConfig("assets/config/resources.yaml"); err != nil {
+    log.Fatal("Failed to load resource config:", err)
+}
+```
+
+#### 2. 通过资源 ID 加载资源（推荐）
+
+```go
+// 加载图片 - 通过资源 ID
+img, err := rm.LoadImageByID("IMAGE_BACKGROUND1")
+if err != nil {
+    log.Printf("Failed to load image: %v", err)
+}
+
+// 获取已加载的图片
+img = rm.GetImageByID("IMAGE_BACKGROUND1")
+```
+
+#### 3. 批量加载资源组
+
+```go
+// 加载整个资源组
+if err := rm.LoadResourceGroup("init"); err != nil {
+    log.Fatal("Failed to load init resources:", err)
+}
+
+// 加载游戏场景所需资源
+if err := rm.LoadResourceGroup("loadingimages"); err != nil {
+    log.Fatal("Failed to load game resources:", err)
+}
+```
+
+#### 4. 传统路径方式加载（向后兼容）
+
+```go
+// 旧方式：通过硬编码路径加载（仍然支持，但不推荐新代码使用）
+img, err := rm.LoadImage("assets/images/background1.jpg")
+```
+
+### 资源类型
+
+#### 图片资源
+- **简单图片**: 单张图片文件
+  ```yaml
+  - id: IMAGE_BACKGROUND1
+    path: images/background1.jpg
+  ```
+
+- **精灵图（Sprite Sheet）**: 包含多个子图像的图集
+  ```yaml
+  - id: IMAGE_REANIM_SEEDS
+    path: reanim/seeds.png
+    cols: 9  # 9列
+    rows: 1  # 1行（可选，默认为1）
+  ```
+
+#### 音频资源
+- **背景音乐**: 自动循环播放
+  ```go
+  player, err := rm.LoadAudio("assets/audio/Music/mainmenubgm.mp3")
+  player.Play() // 无限循环
+  ```
+
+- **音效**: 单次播放
+  ```go
+  player, err := rm.LoadSoundEffect("assets/audio/Sound/points.ogg")
+  player.Play() // 播放一次
+  ```
+
+#### Reanim 动画资源
+- 自动加载 Reanim XML 和部件图片
+  ```go
+  if err := rm.LoadReanimResources(); err != nil {
+      log.Fatal(err)
+  }
+
+  // 获取 Reanim 数据
+  reanimXML := rm.GetReanimXML("PeaShooter")
+  partImages := rm.GetReanimPartImages("PeaShooter")
+  ```
+
+### 资源命名规范
+
+#### 资源 ID 命名
+- **图片**: `IMAGE_<NAME>` (例如: `IMAGE_BACKGROUND1`, `IMAGE_BLANK`)
+- **Reanim图片**: `IMAGE_REANIM_<NAME>` (例如: `IMAGE_REANIM_SEEDS`)
+- **音效**: `SOUND_<NAME>` (例如: `SOUND_BUTTONCLICK`)
+- **音乐**: `MUSIC_<NAME>` (例如: `MUSIC_MAINMENU`)
+- **字体**: `FONT_<NAME>` (例如: `FONT_HOUSEOFTERROR28`)
+
+#### 文件路径规范
+- 路径相对于 `base_path` (默认为 `assets`)
+- 可以省略文件扩展名（系统会自动添加）
+  - 图片默认 `.png`
+  - 音效默认 `.ogg`
+
+### 最佳实践
+
+1. **优先使用资源 ID**: 新代码应使用 `LoadImageByID()` 而不是硬编码路径
+   ```go
+   // 推荐 ✅
+   img, err := rm.LoadImageByID("IMAGE_BACKGROUND1")
+
+   // 不推荐 ❌
+   img, err := rm.LoadImage("assets/images/background1.jpg")
+   ```
+
+2. **批量加载**: 在场景切换时使用 `LoadResourceGroup()` 批量加载
+   ```go
+   // 进入游戏场景时
+   if err := rm.LoadResourceGroup("delayload_background1"); err != nil {
+       return err
+   }
+   ```
+
+3. **资源复用**: ResourceManager 自动缓存，同一资源不会重复加载
+   ```go
+   img1, _ := rm.LoadImageByID("IMAGE_BACKGROUND1") // 从文件加载
+   img2 := rm.GetImageByID("IMAGE_BACKGROUND1")     // 从缓存获取（更快）
+   // img1 和 img2 指向同一对象
+   ```
+
+4. **错误处理**: 始终检查资源加载错误
+   ```go
+   img, err := rm.LoadImageByID("IMAGE_BACKGROUND1")
+   if err != nil {
+       return fmt.Errorf("failed to load background: %w", err)
+   }
+   ```
+
+### 添加新资源
+
+#### 步骤 1: 将资源文件放到正确的目录
+```bash
+# 图片
+assets/images/your_image.png
+
+# Reanim 部件
+assets/reanim/your_part.png
+
+# 音效
+assets/sounds/your_sound.ogg
+```
+
+#### 步骤 2: 在 `assets/config/resources.yaml` 中添加定义
+```yaml
+groups:
+  your_group:
+    images:
+      - id: IMAGE_YOUR_IMAGE
+        path: images/your_image.png
+    sounds:
+      - id: SOUND_YOUR_SOUND
+        path: sounds/your_sound.ogg
+```
+
+#### 步骤 3: 在代码中使用
+```go
+// 单独加载
+img, err := rm.LoadImageByID("IMAGE_YOUR_IMAGE")
+
+// 或批量加载整组
+rm.LoadResourceGroup("your_group")
+```
+
+### 资源加载时序
+
+```
+游戏启动
+  ↓
+创建 ResourceManager
+  ↓
+LoadResourceConfig("assets/config/resources.yaml")  ← 必须第一步
+  ↓
+LoadResourceGroup("init")                            ← 加载初始资源
+  ↓
+场景切换时 LoadResourceGroup("specific_scene")      ← 按需加载
+  ↓
+使用 GetImageByID/GetAudioPlayer 获取缓存资源       ← 快速访问
+```
+
+### 迁移指南（从旧系统到新系统）
+
+**旧代码（硬编码路径）:**
+```go
+img, err := rm.LoadImage("assets/images/background1.jpg")
+```
+
+**新代码（资源 ID）:**
+```go
+img, err := rm.LoadImageByID("IMAGE_BACKGROUND1")
+```
+
+**迁移清单：**
+- [ ] 在 `resources.yaml` 中为资源定义 ID
+- [ ] 将 `LoadImage(path)` 替换为 `LoadImageByID(id)`
+- [ ] 将 `GetImage(path)` 替换为 `GetImageByID(id)`
+- [ ] 测试验证资源能正常加载
+
+### 故障排查
+
+**问题 1: "resource config not loaded"**
+- **原因**: 未调用 `LoadResourceConfig()`
+- **解决**: 在 `main.go` 中确保在加载任何资源前调用此方法
+
+**问题 2: "resource ID not found: IMAGE_XXX"**
+- **原因**: 资源 ID 未在 `resources.yaml` 中定义
+- **解决**: 检查配置文件，添加缺失的资源定义
+
+**问题 3: "failed to open image file"**
+- **原因**: 文件路径错误或文件不存在
+- **解决**: 验证 `path` 相对于 `base_path` 的路径正确性
+
+### 资源缓存策略
+
+- **图片**: 加载一次，永久缓存（直到程序退出）
+- **音频**: 加载一次，永久缓存
+- **字体**: 按 `(path, size)` 组合缓存
+- **Reanim**: XML 和部件图片分别缓存
+
+**注意**: 缓存使用标准 Go map，非线程安全。当前单线程游戏循环无需考虑同步。
 
 ## 故障排查
 

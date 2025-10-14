@@ -8,6 +8,7 @@ import (
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // ReanimSystemInterface 定义 ReanimSystem 的接口，用于工厂函数依赖注入
@@ -15,6 +16,8 @@ import (
 type ReanimSystemInterface interface {
 	PlayAnimation(entityID ecs.EntityID, animName string) error
 	PlayAnimationNoLoop(entityID ecs.EntityID, animName string) error
+	// RenderToTexture 将指定实体的 Reanim 渲染到目标纹理（离屏渲染）
+	RenderToTexture(entityID ecs.EntityID, target *ebiten.Image) error
 }
 
 // NewPlantEntity 创建植物实体

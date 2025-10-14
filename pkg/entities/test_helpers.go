@@ -45,6 +45,12 @@ func (m *mockReanimSystem) PlayAnimationNoLoop(entityID ecs.EntityID, animName s
 	return nil
 }
 
+func (m *mockReanimSystem) RenderToTexture(entityID ecs.EntityID, target *ebiten.Image) error {
+	// Mock implementation - 用于植物卡片图标离屏渲染
+	// 在测试中，我们不需要真正渲染，只需返回 nil 表示成功
+	return nil
+}
+
 // ResourceLoader 定义测试中需要的资源加载接口
 // 这允许我们在测试中使用 mock 实现，而在生产代码中使用真实的 ResourceManager
 type ResourceLoader interface {
