@@ -9,7 +9,7 @@ import (
 
 // TestParseReanimFile_Success tests successful parsing of PeaShooter.reanim
 func TestParseReanimFile_Success(t *testing.T) {
-	path := "../../assets/reanim/PeaShooter.reanim"
+	path := "../../assets/effect/reanim/PeaShooter.reanim"
 
 	reanim, err := ParseReanimFile(path)
 	if err != nil {
@@ -107,7 +107,7 @@ func TestParseReanimFile_Errors(t *testing.T) {
 	}{
 		{
 			name:        "File not found",
-			path:        "../../assets/reanim/NonExistent.reanim",
+			path:        "../../assets/effect/reanim/NonExistent.reanim",
 			expectError: "failed to read reanim file",
 		},
 		{
@@ -160,7 +160,7 @@ func TestParseReanimFile_Errors(t *testing.T) {
 
 // TestParseReanimFile_FrameData tests that frame data is correctly parsed
 func TestParseReanimFile_FrameData(t *testing.T) {
-	path := "../../assets/reanim/PeaShooter.reanim"
+	path := "../../assets/effect/reanim/PeaShooter.reanim"
 
 	reanim, err := ParseReanimFile(path)
 	if err != nil {
@@ -206,7 +206,7 @@ func TestParseReanimFile_FrameData(t *testing.T) {
 // as the reference implementation from test_animation_viewer.go
 func TestCompareWithReference(t *testing.T) {
 	// Parse PeaShooter.reanim using our implementation
-	path := "../../assets/reanim/PeaShooter.reanim"
+	path := "../../assets/effect/reanim/PeaShooter.reanim"
 	reanim, err := ParseReanimFile(path)
 	if err != nil {
 		t.Fatalf("Failed to parse PeaShooter.reanim: %v", err)

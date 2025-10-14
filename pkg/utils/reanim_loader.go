@@ -16,7 +16,7 @@ import (
 //
 // Parameters:
 //   - reanim: The parsed Reanim animation data
-//   - imagesPath: Path to the directory containing part images, e.g., "assets/reanim/images/"
+//   - imagesPath: Path to the directory containing part images, e.g., "assets/reanim/"
 //
 // Returns:
 //   - map[string]*ebiten.Image: Map of image reference names to loaded images
@@ -28,8 +28,8 @@ import (
 //
 // Example:
 //
-//	reanim, _ := reanim.ParseReanimFile("assets/reanim/PeaShooter.reanim")
-//	images, err := LoadReanimImages(reanim, "assets/reanim/images/")
+//	reanim, _ := reanim.ParseReanimFile("assets/effect/reanim/PeaShooter.reanim")
+//	images, err := LoadReanimImages(reanim, "assets/reanim/")
 //	if err != nil {
 //	    log.Fatalf("Failed to load images: %v", err)
 //	}

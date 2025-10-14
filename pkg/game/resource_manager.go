@@ -443,7 +443,7 @@ func (rm *ResourceManager) LoadReanimResources() error {
 //   - An error if loading fails.
 func (rm *ResourceManager) loadPlantReanim(name string) error {
 	// 1. 解析 .reanim 文件
-	reanimPath := fmt.Sprintf("assets/reanim/%s.reanim", name)
+	reanimPath := fmt.Sprintf("assets/effect/reanim/%s.reanim", name)
 	reanimXML, err := reanim.ParseReanimFile(reanimPath)
 	if err != nil {
 		return fmt.Errorf("failed to parse reanim file: %w", err)
@@ -470,7 +470,7 @@ func (rm *ResourceManager) loadPlantReanim(name string) error {
 //   - An error if loading fails.
 func (rm *ResourceManager) loadZombieReanim(name string) error {
 	// 1. 解析 .reanim 文件
-	reanimPath := fmt.Sprintf("assets/reanim/%s.reanim", name)
+	reanimPath := fmt.Sprintf("assets/effect/reanim/%s.reanim", name)
 	reanimXML, err := reanim.ParseReanimFile(reanimPath)
 	if err != nil {
 		return fmt.Errorf("failed to parse reanim file: %w", err)
@@ -553,12 +553,12 @@ func (rm *ResourceManager) loadReanimPartImages(unitName string, reanimXML *rean
 // Parameters:
 //   - unitName: The unit name (e.g., "PeaShooter", "Zombie") - currently unused
 //   - imageRef: The image reference name (e.g., "IMAGE_REANIM_PEASHOOTER_HEAD")
-//   - category: The image category ("Plants" or "Zombies") - currently unused as all images are in assets/reanim/images
+//   - category: The image category ("Plants" or "Zombies") - currently unused as all images are in assets/effect/reanim/images
 //
 // Returns:
 //   - The constructed file path
 func (rm *ResourceManager) buildReanimImagePath(unitName, imageRef, category string) string {
-	// Reanim 部件图片都在 assets/reanim/images/ 目录下
+	// Reanim 部件图片都在 assets/reanim/ 目录下
 	// 文件名格式：{unitname_lowercase}_{partname}.png
 	// 例如：peashooter_head.png, zombie_arm.png
 	//
@@ -575,6 +575,6 @@ func (rm *ResourceManager) buildReanimImagePath(unitName, imageRef, category str
 	// 转换为小写并替换下划线为文件名格式
 	fileName := strings.ToLower(imageRefUpper)
 
-	// 构建路径：assets/reanim/images/peashooter_head.png
-	return fmt.Sprintf("assets/reanim/images/%s.png", fileName)
+	// 构建路径：assets/reanim/peashooter_head.png
+	return fmt.Sprintf("assets/reanim/%s.png", fileName)
 }

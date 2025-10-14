@@ -5,8 +5,8 @@
 ## 顶层结构
 
 - `assets/images`：UI与场景静态贴图资源。包括主界面、商店、冒险选择、关卡背景（`background*.jpg`）、按钮组件（`button_*`）、图标（如 `Brain.png`、`CarKeys.png`）、种子包与卡片（`SeedPacket_*`、`seeds.png`）等。文件格式多为 `.png`、`.jpg`，被 `properties/resources.xml` 中的 `<Image>` 清单引用。
-- `assets/reanim`：对应实体的动画轨迹、关键帧与图层引用，运行时加载 `assets/reanim/images` 下的 PNG 切片作为骨骼/部件贴图进行组合。
-- `assets/reanim/images`：Reanim 动画所用的分层图像切片。每个植物、僵尸或 UI 动效的骨骼动画由大量命名的图层 PNG 组成（如 `cactus_*`, `cattail_*`, `CrazyDave_*`）。
+- `assets/reanim`：对应实体的动画轨迹、关键帧与图层引用，运行时加载 `assets/effect/reanim/images` 下的 PNG 切片作为骨骼/部件贴图进行组合。
+- `assets/effect/reanim/images`：Reanim 动画所用的分层图像切片。每个植物、僵尸或 UI 动效的骨骼动画由大量命名的图层 PNG 组成（如 `cactus_*`, `cattail_*`, `CrazyDave_*`）。
 - `assets/particles`：粒子系统的配置，指定粒子的发射器、轨迹与贴图（引用 `assets/particles/images/` 中的 PNG）。
 - `assets/particles/images`：粒子系统用的贴图素材（效果精灵）。如爆炸、烟雾、火花、雨滴、泡泡、星星等（例如 `DoomShroom_Explosion_*`, `PoolSparkly.png`, `SnowPea_*`）。与编译后的粒子配置 `compiled/particles/*.xml.compiled` 一起使用。
 - `assets/sounds`：音频资源（`.ogg`、少量 `.au`）。包含交互提示音、技能音效、环境音与音乐（如 `readysetplant.ogg`, `ZombiesOnYourLawn.ogg`）。

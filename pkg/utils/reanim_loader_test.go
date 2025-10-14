@@ -100,13 +100,13 @@ func TestCollectImageReferences(t *testing.T) {
 // TestLoadReanimImages_Success tests successful image loading
 func TestLoadReanimImages_Success(t *testing.T) {
 	// Parse a real reanim file
-	reanimData, err := reanim.ParseReanimFile("../../assets/reanim/PeaShooter.reanim")
+	reanimData, err := reanim.ParseReanimFile("../../assets/effect/reanim/PeaShooter.reanim")
 	if err != nil {
 		t.Fatalf("Failed to parse PeaShooter.reanim: %v", err)
 	}
 
 	// Load images
-	images, err := LoadReanimImages(reanimData, "../../assets/reanim/images/")
+	images, err := LoadReanimImages(reanimData, "../../assets/reanim/")
 	if err != nil {
 		t.Fatalf("Failed to load images: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestLoadReanimImages_Deduplication(t *testing.T) {
 		},
 	}
 
-	images, err := LoadReanimImages(reanimData, "../../assets/reanim/images/")
+	images, err := LoadReanimImages(reanimData, "../../assets/reanim/")
 	if err != nil {
 		t.Fatalf("Failed to load images: %v", err)
 	}
@@ -179,7 +179,7 @@ func TestLoadReanimImages_Errors(t *testing.T) {
 		{
 			name:        "Nil reanim data",
 			reanimData:  nil,
-			imagesPath:  "../../assets/reanim/images/",
+			imagesPath:  "../../assets/reanim/",
 			expectError: true,
 		},
 		{
@@ -195,7 +195,7 @@ func TestLoadReanimImages_Errors(t *testing.T) {
 					},
 				},
 			},
-			imagesPath:  "../../assets/reanim/images/",
+			imagesPath:  "../../assets/reanim/",
 			expectError: true,
 		},
 		{
@@ -252,7 +252,7 @@ func TestLoadReanimImages_EmptyReferences(t *testing.T) {
 		},
 	}
 
-	images, err := LoadReanimImages(reanimData, "../../assets/reanim/images/")
+	images, err := LoadReanimImages(reanimData, "../../assets/reanim/")
 	if err != nil {
 		t.Fatalf("Failed to load images: %v", err)
 	}

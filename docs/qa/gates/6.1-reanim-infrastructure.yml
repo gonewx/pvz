@@ -73,7 +73,7 @@ recommendations:
       refs: ["internal/reanim/parser.go", "pkg/utils/reanim_loader.go"]
       priority: low
     - action: "可验证更多Reanim文件的解析（目前测试3个，资源库有90+个）"
-      refs: ["assets/reanim/"]
+      refs: ["assets/effect/reanim/"]
       priority: low
 
 # Code quality highlights

@@ -11,7 +11,7 @@ import (
 // the content with a <reanim> root element before parsing.
 //
 // Parameters:
-//   - path: Path to the Reanim file, e.g., "assets/reanim/PeaShooter.reanim"
+//   - path: Path to the Reanim file, e.g., "assets/effect/reanim/PeaShooter.reanim"
 //
 // Returns:
 //   - *ReanimXML: The parsed animation data
@@ -19,7 +19,7 @@ import (
 //
 // Example:
 //
-//	reanim, err := ParseReanimFile("assets/reanim/PeaShooter.reanim")
+//	reanim, err := ParseReanimFile("assets/effect/reanim/PeaShooter.reanim")
 //	if err != nil {
 //	    log.Fatalf("Failed to parse reanim: %v", err)
 //	}

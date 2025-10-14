@@ -17,4 +17,4 @@
 
 ## aniamtion migration
 
-/mnt/disk0/project/game/pvz/ck/pvzwine_reverse 这个项目是对原版游戏资源数据的研究与解析， 请结合测试程序，将我们之前实现的基于动画帧的动画系统，改为使用和原版游戏同样的动画系统。 解析后的资源已经放在 assets/reanim， assets/reanim/images。
+/mnt/disk0/project/game/pvz/ck/pvzwine_reverse 这个项目是对原版游戏资源数据的研究与解析， 请结合测试程序，将我们之前实现的基于动画帧的动画系统，改为使用和原版游戏同样的动画系统。 解析后的资源已经放在 assets/reanim， assets/effect/reanim/images。
