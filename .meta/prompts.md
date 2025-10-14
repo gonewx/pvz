@@ -26,7 +26,7 @@
 
 ## 粒子效果
 
-现在要全面支持粒子效果， 例如：僵尸的手臂掉落、头掉落的效果等等，请全面分析粒子系统的配置格式，优雅的实现粒子系统
+现在要全面支持粒子效果， 例如：僵尸的手臂掉落、头掉落的效果等等，请全面分析粒子系统的配置格式，优雅的实现粒子系统。实现方案要优先使用Ebitengine 引擎，有必要的话先使用 `mcp__deepwiki` 工具的`ask_question`方法，查阅最新的文档，以找到最正确的方法
 
 - `assets/effect/particles`：粒子系统的配置，指定粒子的发射器、轨迹与贴图（引用 `assets/particles` 中的 PNG）
 - `assets/particles`：粒子系统用的贴图素材（效果精灵）。如爆炸、烟雾、火花、雨滴、泡泡、星星等（例如 `DoomShroom_Explosion_*`, `PoolSparkly.png`, `SnowPea_*`）

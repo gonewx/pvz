@@ -15,6 +15,7 @@
 | :--- | :--- | :--- | :--- |
 | 2025-10-10 | 1.0 | Initial draft creation from Project Brief. | John (PM) |
 | 2025-10-13 | 1.1 | Added Epic 6: Animation System Migration - Reanim. | Sarah (PO) |
+| 2025-10-15 | 1.2 | Added Epic 7: Particle Effect System - Brownfield Enhancement. | Sarah (PO) |
 
 ## **2. Requirements (需求)**
 
@@ -113,6 +114,8 @@
     *   **目标:** 实现完整的关卡流程控制（僵尸波次、进度条），并引入更复杂的单位（坚果墙、樱桃炸弹、路障/铁桶僵尸）来完成MVP的全部核心玩法。
 *   **Epic 6: 动画系统迁移 - 原版 Reanim 骨骼动画系统 (Animation System Migration - Reanim)**
     *   **目标:** 将简单帧动画系统直接替换为原版 PVZ 的 Reanim 骨骼动画系统，实现 100% 还原原版动画效果，支持部件变换和复杂动画表现。
+*   **Epic 7: 粒子特效系统 (Particle Effect System) - Brownfield Enhancement**
+    *   **目标:** 实现完整的粒子特效系统，支持原版PVZ的所有视觉特效（僵尸肢体掉落、爆炸、溅射等），通过解析XML配置和高性能批量渲染技术，为游戏提供丰富的视觉反馈。
 
 ## **Epic 1: 游戏基础框架与主循环 (Game Foundation & Main Loop)**
 **史诗目标:** 搭建整个Go+Ebitengine项目的基本结构，创建一个可以运行的空窗口，并实现游戏的核心状态管理和主菜单。这是所有后续功能的基础。

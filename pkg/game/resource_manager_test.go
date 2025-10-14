@@ -251,3 +251,140 @@ func TestGetAudioPlayer(t *testing.T) {
 		t.Error("GetAudioPlayer should return nil for non-loaded audio")
 	}
 }
+
+// TestLoadParticleConfig_Success tests successful particle configuration loading.
+func TestLoadParticleConfig_Success(t *testing.T) {
+	rm := NewResourceManager(testAudioContext)
+
+	// Test: Load a real particle configuration file
+	config, err := rm.LoadParticleConfig("../../assets/effect/particles/BlastMark")
+	if err != nil {
+		t.Fatalf("LoadParticleConfig failed: %v", err)
+	}
+
+	if config == nil {
+		t.Fatal("LoadParticleConfig returned nil config")
+	}
+
+	// Verify the configuration has at least one emitter
+	if len(config.Emitters) == 0 {
+		t.Error("Configuration has no emitters")
+	}
+
+	// BlastMark.xml should have exactly 1 emitter
+	if len(config.Emitters) != 1 {
+		t.Errorf("Expected 1 emitter, got %d", len(config.Emitters))
+	}
+}
+
+// TestLoadParticleConfig_Caching tests that particle configurations are cached properly.
+func TestLoadParticleConfig_Caching(t *testing.T) {
+	rm := NewResourceManager(testAudioContext)
+
+	configName := "../../assets/effect/particles/BlastMark"
+
+	// Load the same configuration twice
+	config1, err1 := rm.LoadParticleConfig(configName)
+	if err1 != nil {
+		t.Fatalf("First LoadParticleConfig failed: %v", err1)
+	}
+
+	config2, err2 := rm.LoadParticleConfig(configName)
+	if err2 != nil {
+		t.Fatalf("Second LoadParticleConfig failed: %v", err2)
+	}
+
+	// Verify they are the same instance (cached)
+	if config1 != config2 {
+		t.Error("Configurations are not cached - different instances returned")
+	}
+}
+
+// TestLoadParticleConfig_FileNotFound tests error handling when file doesn't exist.
+func TestLoadParticleConfig_FileNotFound(t *testing.T) {
+	rm := NewResourceManager(testAudioContext)
+
+	// Test: Try to load a non-existent configuration
+	_, err := rm.LoadParticleConfig("NonExistentParticle")
+	if err == nil {
+		t.Error("Expected error for non-existent particle config, got nil")
+	}
+}
+
+// TestGetParticleConfig tests retrieving particle configurations from cache.
+func TestGetParticleConfig(t *testing.T) {
+	rm := NewResourceManager(testAudioContext)
+
+	configName := "../../assets/effect/particles/BlastMark"
+
+	// Test: Get config before loading - should be nil
+	config := rm.GetParticleConfig(configName)
+	if config != nil {
+		t.Error("GetParticleConfig should return nil for non-loaded config")
+	}
+
+	// Load the configuration
+	loadedConfig, err := rm.LoadParticleConfig(configName)
+	if err != nil {
+		t.Fatalf("LoadParticleConfig failed: %v", err)
+	}
+
+	// Test: Get config after loading - should return the same instance
+	cachedConfig := rm.GetParticleConfig(configName)
+	if cachedConfig == nil {
+		t.Error("GetParticleConfig returned nil for loaded config")
+	}
+
+	if cachedConfig != loadedConfig {
+		t.Error("GetParticleConfig returned different instance than LoadParticleConfig")
+	}
+}
+
+// TestLoadImage_ParticleTexture tests loading particle texture images.
+func TestLoadImage_ParticleTexture(t *testing.T) {
+	rm := NewResourceManager(testAudioContext)
+
+	// Test: Load an actual particle texture
+	img, err := rm.LoadImage("../../assets/particles/BlastMark.png")
+	if err != nil {
+		t.Fatalf("Failed to load particle texture: %v", err)
+	}
+
+	if img == nil {
+		t.Fatal("LoadImage returned nil for particle texture")
+	}
+
+	// Verify the image has non-zero dimensions
+	bounds := img.Bounds()
+	if bounds.Dx() == 0 || bounds.Dy() == 0 {
+		t.Errorf("Particle texture has invalid dimensions: %dx%d", bounds.Dx(), bounds.Dy())
+	}
+}
+
+// TestLoadParticleConfig_MultipleEmitters tests loading a configuration with multiple emitters.
+func TestLoadParticleConfig_MultipleEmitters(t *testing.T) {
+	rm := NewResourceManager(testAudioContext)
+
+	// Test: Load Award.xml which has 13 emitters
+	config, err := rm.LoadParticleConfig("../../assets/effect/particles/Award")
+	if err != nil {
+		t.Fatalf("LoadParticleConfig failed for Award: %v", err)
+	}
+
+	// Award.xml should have 13 emitters
+	expectedEmitters := 13
+	if len(config.Emitters) != expectedEmitters {
+		t.Errorf("Expected %d emitters in Award.xml, got %d", expectedEmitters, len(config.Emitters))
+	}
+
+	// Verify at least one emitter has expected properties
+	if len(config.Emitters) > 0 {
+		firstEmitter := config.Emitters[0]
+		if firstEmitter.Name == "" {
+			t.Error("First emitter should have a name")
+		}
+		if firstEmitter.Image == "" {
+			t.Error("First emitter should have an image reference")
+		}
+	}
+}

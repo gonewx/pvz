@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/decker502/pvz/internal/particle"
 	"github.com/decker502/pvz/internal/reanim"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
@@ -48,12 +49,13 @@ import (
 //	    log.Printf("Failed to load image: %v", err)
 //	}
 type ResourceManager struct {
-	imageCache       map[string]*ebiten.Image            // Cache for loaded images: path -> Image
-	audioCache       map[string]*audio.Player            // Cache for loaded audio players: path -> Player
-	audioContext     *audio.Context                      // Global audio context for audio decoding
-	fontFaceCache    map[string]*text.GoTextFace         // Cache for Ebitengine v2 text faces
-	reanimXMLCache   map[string]*reanim.ReanimXML        // Cache for parsed Reanim XML data: unit name -> ReanimXML
-	reanimImageCache map[string]map[string]*ebiten.Image // Cache for Reanim part images: unit name -> (image ref -> Image)
+	imageCache          map[string]*ebiten.Image            // Cache for loaded images: path -> Image
+	audioCache          map[string]*audio.Player            // Cache for loaded audio players: path -> Player
+	audioContext        *audio.Context                      // Global audio context for audio decoding
+	fontFaceCache       map[string]*text.GoTextFace         // Cache for Ebitengine v2 text faces
+	reanimXMLCache      map[string]*reanim.ReanimXML        // Cache for parsed Reanim XML data: unit name -> ReanimXML
+	reanimImageCache    map[string]map[string]*ebiten.Image // Cache for Reanim part images: unit name -> (image ref -> Image)
+	particleConfigCache map[string]*particle.ParticleConfig // Cache for parsed particle configurations: config name -> ParticleConfig
 
 	// YAML resource configuration
 	config      *ResourceConfig   // Parsed YAML configuration
@@ -76,13 +78,14 @@ type ResourceManager struct {
 //	resourceManager := NewResourceManager(audioContext)
 func NewResourceManager(audioContext *audio.Context) *ResourceManager {
 	return &ResourceManager{
-		imageCache:       make(map[string]*ebiten.Image),
-		audioCache:       make(map[string]*audio.Player),
-		audioContext:     audioContext,
-		fontFaceCache:    make(map[string]*text.GoTextFace),
-		reanimXMLCache:   make(map[string]*reanim.ReanimXML),
-		reanimImageCache: make(map[string]map[string]*ebiten.Image),
-		resourceMap:      make(map[string]string),
+		imageCache:          make(map[string]*ebiten.Image),
+		audioCache:          make(map[string]*audio.Player),
+		audioContext:        audioContext,
+		fontFaceCache:       make(map[string]*text.GoTextFace),
+		reanimXMLCache:      make(map[string]*reanim.ReanimXML),
+		reanimImageCache:    make(map[string]map[string]*ebiten.Image),
+		particleConfigCache: make(map[string]*particle.ParticleConfig),
+		resourceMap:         make(map[string]string),
 	}
 }
 
@@ -798,4 +801,69 @@ func (rm *ResourceManager) LoadResourceGroup(groupName string) error {
 	// They should be loaded individually using LoadFont when needed
 
 	return nil
+}
+
+// LoadParticleConfig loads a particle configuration file from the particles directory and caches it.
+// If the configuration has already been loaded, it returns the cached version.
+//
+// Parameters:
+//   - name: The particle configuration name. Can be either:
+//   - A simple name (e.g., "Award", "BossExplosion") - will be loaded from assets/effect/particles/
+//   - A path with directory separators (e.g., "path/to/config") - will be used as-is
+//
+// Returns:
+//   - A pointer to the loaded ParticleConfig
+//   - An error if the file cannot be loaded or parsed
+//
+// Example usage:
+//
+//	config, err := rm.LoadParticleConfig("Award")
+//	if err != nil {
+//	    log.Printf("Failed to load particle config: %v", err)
+//	}
+//	fmt.Printf("Loaded %d emitters\n", len(config.Emitters))
+func (rm *ResourceManager) LoadParticleConfig(name string) (*particle.ParticleConfig, error) {
+	// Check cache first
+	if config, exists := rm.particleConfigCache[name]; exists {
+		return config, nil
+	}
+
+	// Construct file path
+	var path string
+	if filepath.Dir(name) != "." {
+		// Name contains path separators, use as-is
+		path = name + ".xml"
+	} else {
+		// Simple name, add default prefix
+		path = filepath.Join("assets/effect/particles", name+".xml")
+	}
+
+	// Parse the configuration
+	config, err := particle.ParseParticleXML(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load particle config %s: %w", name, err)
+	}
+
+	// Cache and return
+	rm.particleConfigCache[name] = config
+	return config, nil
+}
+
+// GetParticleConfig retrieves a cached particle configuration by name.
+// Returns nil if the configuration has not been loaded yet.
+//
+// Parameters:
+//   - name: The particle configuration name (e.g., "Award", "BossExplosion")
+//
+// Returns:
+//   - A pointer to the ParticleConfig, or nil if not found in cache
+//
+// Example usage:
+//
+//	config := rm.GetParticleConfig("Award")
+//	if config == nil {
+//	    log.Println("Config not loaded yet")
+//	}
+func (rm *ResourceManager) GetParticleConfig(name string) *particle.ParticleConfig {
+	return rm.particleConfigCache[name]
 }
