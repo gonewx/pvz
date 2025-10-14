@@ -18,8 +18,9 @@ import (
 type BehaviorSystem struct {
 	entityManager   *ecs.EntityManager
 	resourceManager *game.ResourceManager
-	reanimSystem    *ReanimSystem // Story 6.3: 用于切换僵尸动画状态
-	logFrameCounter int           // 日志输出计数器（避免全局变量）
+	reanimSystem    *ReanimSystem   // Story 6.3: 用于切换僵尸动画状态
+	gameState       *game.GameState // Story 5.5: 用于僵尸死亡计数
+	logFrameCounter int             // 日志输出计数器（避免全局变量）
 }
 
 // 阳光生产位置偏移常量
@@ -36,11 +37,13 @@ const (
 //   - em: EntityManager 实例
 //   - rm: ResourceManager 实例
 //   - rs: ReanimSystem 实例 (Story 6.3: 用于切换僵尸动画)
-func NewBehaviorSystem(em *ecs.EntityManager, rm *game.ResourceManager, rs *ReanimSystem) *BehaviorSystem {
+//   - gs: GameState 实例 (Story 5.5: 用于僵尸死亡计数)
+func NewBehaviorSystem(em *ecs.EntityManager, rm *game.ResourceManager, rs *ReanimSystem, gs *game.GameState) *BehaviorSystem {
 	return &BehaviorSystem{
 		entityManager:   em,
 		resourceManager: rm,
 		reanimSystem:    rs,
+		gameState:       gs,
 	}
 }
 
@@ -503,6 +506,8 @@ func (s *BehaviorSystem) handleZombieDyingBehavior(entityID ecs.EntityID) {
 	if !ok {
 		// 如果没有 ReanimComponent，直接删除僵尸
 		log.Printf("[BehaviorSystem] 死亡中的僵尸 %d 缺少 ReanimComponent，直接删除", entityID)
+		// Story 5.5: 僵尸死亡，增加计数
+		s.gameState.IncrementZombiesKilled()
 		s.entityManager.DestroyEntity(entityID)
 		return
 	}
@@ -513,6 +518,8 @@ func (s *BehaviorSystem) handleZombieDyingBehavior(entityID ecs.EntityID) {
 	if reanim.IsFinished {
 		log.Printf("[BehaviorSystem] 僵尸 %d 死亡动画完成 (frame %d/%d)，删除实体",
 			entityID, reanim.CurrentFrame, reanim.VisibleFrameCount)
+		// Story 5.5: 僵尸死亡，增加计数
+		s.gameState.IncrementZombiesKilled()
 		s.entityManager.DestroyEntity(entityID)
 	} else {
 		// 调试日志：定期输出动画状态（每10帧输出一次）

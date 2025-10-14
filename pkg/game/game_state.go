@@ -1,6 +1,9 @@
 package game
 
-import "github.com/decker502/pvz/pkg/components"
+import (
+	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
+)
 
 // GameState 存储全局游戏状态
 // 这是一个单例，用于管理跨场景和跨系统的全局状态数据
@@ -14,7 +17,16 @@ type GameState struct {
 	// 摄像机位置（世界坐标系统）
 	CameraX float64 // 摄像机X位置，用于世界坐标和屏幕坐标转换
 
-	// 未来可扩展：Level, Wave, Score 等
+	// Story 5.5: 关卡流程状态
+	CurrentLevel        *config.LevelConfig // 当前关卡配置
+	LevelTime           float64             // 关卡已进行时间（秒）
+	CurrentWaveIndex    int                 // 当前波次索引（0表示第一波）
+	SpawnedWaves        []bool              // 每一波是否已生成（用于避免重复生成）
+	TotalZombiesSpawned int                 // 已生成的僵尸总数
+	ZombiesKilled       int                 // 已消灭的僵尸数量
+	IsLevelComplete     bool                // 关卡是否完成
+	IsGameOver          bool                // 游戏是否结束（胜利或失败）
+	GameResult          string              // 游戏结果："win", "lose", "" (进行中)
 }
 
 // 全局单例实例（这是架构规范允许的唯一全局变量）
@@ -72,4 +84,111 @@ func (gs *GameState) ExitPlantingMode() {
 // 返回是否处于种植模式以及选择的植物类型
 func (gs *GameState) GetPlantingMode() (bool, components.PlantType) {
 	return gs.IsPlantingMode, gs.SelectedPlantType
+}
+
+// LoadLevel 加载关卡配置
+// 初始化关卡状态，重置所有关卡相关的计数器和标志
+func (gs *GameState) LoadLevel(levelConfig *config.LevelConfig) {
+	gs.CurrentLevel = levelConfig
+	gs.LevelTime = 0
+	gs.CurrentWaveIndex = 0
+	gs.SpawnedWaves = make([]bool, len(levelConfig.Waves))
+	gs.TotalZombiesSpawned = 0
+	gs.ZombiesKilled = 0
+	gs.IsLevelComplete = false
+	gs.IsGameOver = false
+	gs.GameResult = ""
+}
+
+// UpdateLevelTime 更新关卡时间
+// 在每一帧中调用，累加经过的时间
+func (gs *GameState) UpdateLevelTime(deltaTime float64) {
+	gs.LevelTime += deltaTime
+}
+
+// GetCurrentWave 获取当前应该生成的波次索引
+// 根据关卡时间判断应该触发哪一波
+// 返回 -1 表示没有到达任何波次的时间
+func (gs *GameState) GetCurrentWave() int {
+	if gs.CurrentLevel == nil {
+		return -1
+	}
+
+	for i, wave := range gs.CurrentLevel.Waves {
+		if gs.LevelTime >= wave.Time && !gs.SpawnedWaves[i] {
+			return i
+		}
+	}
+	return -1
+}
+
+// MarkWaveSpawned 标记波次已生成
+// 用于防止同一波次被重复生成
+func (gs *GameState) MarkWaveSpawned(waveIndex int) {
+	if waveIndex >= 0 && waveIndex < len(gs.SpawnedWaves) {
+		gs.SpawnedWaves[waveIndex] = true
+		gs.CurrentWaveIndex = waveIndex + 1
+	}
+}
+
+// IsWaveSpawned 检查波次是否已生成
+// 返回 true 表示该波次已经生成过
+func (gs *GameState) IsWaveSpawned(waveIndex int) bool {
+	if waveIndex < 0 || waveIndex >= len(gs.SpawnedWaves) {
+		return false
+	}
+	return gs.SpawnedWaves[waveIndex]
+}
+
+// IncrementZombiesSpawned 增加已生成僵尸计数
+// 在僵尸生成时调用
+func (gs *GameState) IncrementZombiesSpawned(count int) {
+	gs.TotalZombiesSpawned += count
+}
+
+// IncrementZombiesKilled 增加已消灭僵尸计数
+// 在僵尸死亡时调用
+func (gs *GameState) IncrementZombiesKilled() {
+	gs.ZombiesKilled++
+}
+
+// CheckVictory 检查是否达成胜利条件
+// 胜利条件：所有波次已生成 且 所有僵尸已消灭
+// 返回 true 表示玩家获胜
+func (gs *GameState) CheckVictory() bool {
+	if gs.CurrentLevel == nil {
+		return false
+	}
+
+	// 检查所有波次是否已生成
+	allWavesSpawned := true
+	for _, spawned := range gs.SpawnedWaves {
+		if !spawned {
+			allWavesSpawned = false
+			break
+		}
+	}
+
+	// 胜利条件：所有波次已生成 且 已消灭的僵尸数量等于已生成的僵尸总数
+	return allWavesSpawned && gs.ZombiesKilled >= gs.TotalZombiesSpawned && gs.TotalZombiesSpawned > 0
+}
+
+// SetGameResult 设置游戏结果
+// result: "win" 表示胜利, "lose" 表示失败
+// 同时会设置 IsGameOver 和 IsLevelComplete 标志
+func (gs *GameState) SetGameResult(result string) {
+	gs.GameResult = result
+	gs.IsGameOver = true
+	if result == "win" {
+		gs.IsLevelComplete = true
+	}
+}
+
+// GetLevelProgress 获取关卡进度信息
+// 返回当前波次（从1开始）和总波次数
+func (gs *GameState) GetLevelProgress() (currentWave int, totalWaves int) {
+	if gs.CurrentLevel == nil {
+		return 0, 0
+	}
+	return gs.CurrentWaveIndex, len(gs.CurrentLevel.Waves)
 }

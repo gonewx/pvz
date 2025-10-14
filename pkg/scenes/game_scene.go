@@ -111,14 +111,9 @@ type GameScene struct {
 	// Story 4.3: Physics System
 	physicsSystem *systems.PhysicsSystem // 物理系统（碰撞检测）
 
-	// Story 4.1: Test Zombie Spawn (临时测试代码)
-	// 在游戏开始后3秒，在第3行生成一个测试僵尸
-	testZombieTimer   float64 // 测试僵尸生成计时器
-	testZombieSpawned bool    // 是否已生成测试僵尸
-
-	// Story 4.2: Test Peashooter Behavior (临时测试代码)
-	testPeashooterTimer   float64 // 测试豌豆射手种植计时器
-	testPeashooterSpawned bool    // 是否已种植测试豌豆射手
+	// Story 5.5: Level Management Systems
+	levelSystem     *systems.LevelSystem     // 关卡管理系统
+	waveSpawnSystem *systems.WaveSpawnSystem // 波次生成系统
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -226,12 +221,32 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 
 	// Story 3.4: Initialize behavior system (sunflower sun production, etc.)
 	// Story 6.3: Pass ReanimSystem for zombie animation state changes
-	scene.behaviorSystem = systems.NewBehaviorSystem(scene.entityManager, rm, scene.reanimSystem)
+	// Story 5.5: Pass GameState for zombie death counting
+	scene.behaviorSystem = systems.NewBehaviorSystem(scene.entityManager, rm, scene.reanimSystem, scene.gameState)
 	log.Printf("[GameScene] Initialized behavior system for plant behaviors")
 
 	// Story 4.3: Initialize physics system (collision detection)
 	scene.physicsSystem = systems.NewPhysicsSystem(scene.entityManager, rm)
 	log.Printf("[GameScene] Initialized physics system for collision detection")
+
+	// Story 5.5: Initialize level management systems
+	// 1. Create WaveSpawnSystem (LevelSystem depends on it)
+	scene.waveSpawnSystem = systems.NewWaveSpawnSystem(scene.entityManager, rm, scene.reanimSystem)
+	log.Printf("[GameScene] Initialized wave spawn system")
+
+	// 2. Create LevelSystem
+	scene.levelSystem = systems.NewLevelSystem(scene.entityManager, scene.gameState, scene.waveSpawnSystem)
+	log.Printf("[GameScene] Initialized level system")
+
+	// 3. Load level configuration
+	levelConfig, err := config.LoadLevelConfig("data/levels/level-1-1.yaml")
+	if err != nil {
+		log.Printf("[GameScene] FATAL: Failed to load level config: %v", err)
+		log.Printf("[GameScene] Game cannot start without level configuration")
+	} else {
+		scene.gameState.LoadLevel(levelConfig)
+		log.Printf("[GameScene] Loaded level: %s (%d waves)", levelConfig.Name, len(levelConfig.Waves))
+	}
 
 	return scene
 }
@@ -381,77 +396,16 @@ func (s *GameScene) Update(deltaTime float64) {
 	// 同步摄像机位置到全局状态（供所有系统使用）
 	s.gameState.CameraX = s.cameraX
 
-	// Story 4.1 & 5.3: Test zombie spawn (临时测试代码)
-	// 在游戏开始后4秒，生成多种类型的测试僵尸
-	if !s.testZombieSpawned {
-		s.testZombieTimer += deltaTime
-		if s.testZombieTimer >= 4.0 { // 改为4秒，让豌豆射手先种植
-			// 计算生成位置：屏幕右侧外约50像素
-			spawnX := s.cameraX + WindowWidth + 50.0 // 屏幕右侧外50像素
-
-			// Story 5.3: 生成三种不同类型的僵尸进行测试
-			// Story 6.3: 传递 reanimSystem 给僵尸工厂函数
-			// 第1行: 普通僵尸
-			log.Printf("[GameScene] 生成普通僵尸：行=0")
-			zombieID1, err := entities.NewZombieEntity(s.entityManager, s.resourceManager, s.reanimSystem, 0, spawnX)
-			if err != nil {
-				log.Printf("[GameScene] 生成普通僵尸失败: %v", err)
-			} else {
-				log.Printf("[GameScene] 成功生成普通僵尸 (ID: %d)", zombieID1)
-			}
-
-			// 第2行: 路障僵尸 (Conehead)
-			log.Printf("[GameScene] 生成路障僵尸：行=1")
-			zombieID2, err := entities.NewConeheadZombieEntity(s.entityManager, s.resourceManager, s.reanimSystem, 1, spawnX)
-			if err != nil {
-				log.Printf("[GameScene] 生成路障僵尸失败: %v", err)
-			} else {
-				log.Printf("[GameScene] 成功生成路障僵尸 (ID: %d, 护甲370+生命270=640总HP)", zombieID2)
-			}
-
-			// 第3行: 铁桶僵尸 (Buckethead)
-			log.Printf("[GameScene] 生成铁桶僵尸：行=2")
-			zombieID3, err := entities.NewBucketheadZombieEntity(s.entityManager, s.resourceManager, s.reanimSystem, 2, spawnX)
-			if err != nil {
-				log.Printf("[GameScene] 生成铁桶僵尸失败: %v", err)
-			} else {
-				log.Printf("[GameScene] 成功生成铁桶僵尸 (ID: %d, 护甲1100+生命270=1370总HP)", zombieID3)
-			}
-
-			s.testZombieSpawned = true
-		}
-	}
-
-	// Story 4.2: Test peashooter behavior (临时测试代码)
-	// 在游戏开始后3秒，在第3行种植一个豌豆射手
-	if !s.testPeashooterSpawned {
-		s.testPeashooterTimer += deltaTime
-		if s.testPeashooterTimer >= 3.0 {
-			// 在第3行（row=2）第3列（col=2）种植豌豆射手
-			col := 2
-			row := 2
-
-			log.Printf("[GameScene] 种植测试豌豆射手：col=%d, row=%d", col, row)
-			// Story 6.3: 传递 reanimSystem 给工厂函数
-			peashooterID, err := entities.NewPlantEntity(
-				s.entityManager,
-				s.resourceManager,
-				s.gameState,
-				s.reanimSystem,
-				components.PlantPeashooter,
-				col,
-				row,
-			)
-			if err != nil {
-				log.Printf("[GameScene] 种植豌豆射手失败: %v", err)
-			} else {
-				log.Printf("[GameScene] 成功种植测试豌豆射手 (ID: %d)", peashooterID)
-			}
-			s.testPeashooterSpawned = true
-		}
+	// Story 5.5: Check if game is over (win or lose)
+	// If game is over, stop updating game systems but allow rendering
+	if s.gameState.IsGameOver {
+		// 游戏结束时不更新游戏系统，只保留渲染
+		// 这样玩家可以看到最终的游戏状态（僵尸位置、植物状态等）
+		return
 	}
 
 	// Update all ECS systems in order (order matters for correct game logic)
+	s.levelSystem.Update(deltaTime)            // 0. Update level system (Story 5.5: wave spawning, victory/defeat)
 	s.plantCardSystem.Update(deltaTime)        // 1. Update plant card states (before input)
 	s.inputSystem.Update(deltaTime, s.cameraX) // 2. Process player input (highest priority, 传递摄像机位置)
 	s.sunSpawnSystem.Update(deltaTime)         // 3. Generate new suns
@@ -549,6 +503,18 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	// Layer 7: Draw suns (阳光) - 最顶层
 	// 阳光在最顶层以确保始终可点击
 	s.renderSystem.DrawSuns(screen, s.cameraX)
+
+	// Layer 8: Draw level progress UI (Story 5.5)
+	// 进度条显示当前波次进度
+	s.drawLevelProgress(screen)
+
+	// Layer 9: Draw last wave warning (Story 5.5)
+	// 最后一波提示（如果需要显示）
+	s.drawLastWaveWarning(screen)
+
+	// Layer 10: Draw game result overlay (Story 5.5)
+	// 胜利/失败界面（如果游戏结束）
+	s.drawGameResultOverlay(screen)
 
 	// DEBUG: Draw grid boundaries (Story 3.3 debugging)
 	s.drawGridDebug(screen)
@@ -719,4 +685,169 @@ func (s *GameScene) drawGridDebug(screen *ebiten.Image) {
 		y := gridScreenStartY + float64(row)*cellHeight
 		ebitenutil.DrawLine(screen, gridScreenStartX, y, gridScreenStartX+float64(gridColumns)*cellWidth, y, gridColor)
 	}
+}
+
+// drawLevelProgress renders the level progress indicator (Story 5.5)
+// Displays current wave number and total waves in the bottom-right corner
+// Format: "Wave X/Y"
+func (s *GameScene) drawLevelProgress(screen *ebiten.Image) {
+	// 只在关卡加载后显示进度
+	if s.gameState.CurrentLevel == nil {
+		return
+	}
+
+	// 获取当前波次和总波次
+	currentWave, totalWaves := s.gameState.GetLevelProgress()
+
+	// 如果还没有生成任何波次，显示"Wave 0/Y"
+	// 当第一波生成后，显示"Wave 1/Y"，以此类推
+	progressText := fmt.Sprintf("Wave %d/%d", currentWave, totalWaves)
+
+	// 计算文本位置（屏幕右下角）
+	// 使用阳光计数器字体（复用已有字体资源）
+	if s.sunCounterFont == nil {
+		return // 字体未加载时不渲染
+	}
+
+	// 测量文本宽度以便右对齐
+	textWidth := text.Advance(progressText, s.sunCounterFont)
+
+	// 位置：右下角，留10像素边距
+	x := float64(WindowWidth) - textWidth - 10
+	y := float64(WindowHeight) - 30.0 // 距离底部30像素
+
+	// 绘制半透明黑色背景（提高可读性）
+	bgPadding := 5.0
+	ebitenutil.DrawRect(screen,
+		x-bgPadding,
+		y-float64(s.sunCounterFont.Metrics().HAscent)-bgPadding,
+		textWidth+bgPadding*2,
+		float64(s.sunCounterFont.Metrics().HAscent+s.sunCounterFont.Metrics().HDescent)+bgPadding*2,
+		color.RGBA{R: 0, G: 0, B: 0, A: 150})
+
+	// 绘制文本（白色）
+	textOp := &text.DrawOptions{}
+	textOp.GeoM.Translate(x, y)
+	textOp.ColorScale.ScaleWithColor(color.White)
+	text.Draw(screen, progressText, s.sunCounterFont, textOp)
+}
+
+// drawLastWaveWarning renders the "A huge wave of zombies is approaching!" warning (Story 5.5)
+// Only displays when the last wave is about to start (controlled by LevelSystem)
+func (s *GameScene) drawLastWaveWarning(screen *ebiten.Image) {
+	// 检查是否需要显示最后一波提示
+	// 这里通过检查时间和波次状态来决定是否显示
+	if s.gameState.CurrentLevel == nil {
+		return
+	}
+
+	totalWaves := len(s.gameState.CurrentLevel.Waves)
+	if totalWaves == 0 {
+		return
+	}
+
+	// 获取最后一波的时间
+	lastWaveTime := s.gameState.CurrentLevel.Waves[totalWaves-1].Time
+	warningTime := lastWaveTime - systems.LastWaveWarningTime
+
+	// 检查是否在提示时间窗口内（提示显示5秒）
+	if s.gameState.LevelTime >= warningTime &&
+		s.gameState.LevelTime < lastWaveTime &&
+		!s.gameState.IsWaveSpawned(totalWaves-1) {
+
+		// 绘制警告文本（屏幕中央上方）
+		warningText := "A huge wave of zombies is approaching!"
+
+		if s.sunCounterFont == nil {
+			return
+		}
+
+		// 测量文本宽度以便居中
+		textWidth := text.Advance(warningText, s.sunCounterFont)
+
+		// 位置：屏幕中央上方
+		x := (float64(WindowWidth) - textWidth) / 2.0
+		y := 150.0
+
+		// 绘制半透明红色背景
+		bgPadding := 10.0
+		ebitenutil.DrawRect(screen,
+			x-bgPadding,
+			y-float64(s.sunCounterFont.Metrics().HAscent)-bgPadding,
+			textWidth+bgPadding*2,
+			float64(s.sunCounterFont.Metrics().HAscent+s.sunCounterFont.Metrics().HDescent)+bgPadding*2,
+			color.RGBA{R: 139, G: 0, B: 0, A: 200}) // 深红色背景
+
+		// 绘制文本（黄色，更醒目）
+		textOp := &text.DrawOptions{}
+		textOp.GeoM.Translate(x, y)
+		textOp.ColorScale.ScaleWithColor(color.RGBA{R: 255, G: 255, B: 0, A: 255}) // 黄色
+		text.Draw(screen, warningText, s.sunCounterFont, textOp)
+	}
+}
+
+// drawGameResultOverlay renders the victory or defeat overlay (Story 5.5)
+// Displays when the game ends (IsGameOver = true)
+func (s *GameScene) drawGameResultOverlay(screen *ebiten.Image) {
+	// 只在游戏结束时显示
+	if !s.gameState.IsGameOver {
+		return
+	}
+
+	// 根据游戏结果选择显示内容
+	var overlayColor color.Color
+	var resultText string
+
+	switch s.gameState.GameResult {
+	case "win":
+		// 胜利：半透明黑色背景，绿色文本
+		overlayColor = color.RGBA{R: 0, G: 0, B: 0, A: 150}
+		resultText = "YOU WIN!"
+	case "lose":
+		// 失败：半透明红色背景，白色文本
+		overlayColor = color.RGBA{R: 100, G: 0, B: 0, A: 180}
+		resultText = "THE ZOMBIES ATE YOUR BRAINS!"
+	default:
+		return // 游戏结果未知，不显示任何内容
+	}
+
+	// 绘制全屏半透明遮罩
+	ebitenutil.DrawRect(screen, 0, 0, float64(WindowWidth), float64(WindowHeight), overlayColor)
+
+	// 绘制结果文本（屏幕中央）
+	if s.sunCounterFont == nil {
+		return
+	}
+
+	// 测量文本宽度以便居中
+	textWidth := text.Advance(resultText, s.sunCounterFont)
+
+	// 位置：屏幕中央
+	x := (float64(WindowWidth) - textWidth) / 2.0
+	y := float64(WindowHeight) / 2.0
+
+	// 根据游戏结果选择文本颜色
+	var textColor color.Color
+	if s.gameState.GameResult == "win" {
+		textColor = color.RGBA{R: 0, G: 255, B: 0, A: 255} // 绿色
+	} else {
+		textColor = color.White
+	}
+
+	// 绘制文本
+	textOp := &text.DrawOptions{}
+	textOp.GeoM.Translate(x, y)
+	textOp.ColorScale.ScaleWithColor(textColor)
+	text.Draw(screen, resultText, s.sunCounterFont, textOp)
+
+	// 绘制提示文字（"按ESC返回主菜单"等）
+	hintText := "Press ESC to return to main menu"
+	hintTextWidth := text.Advance(hintText, s.sunCounterFont)
+	hintX := (float64(WindowWidth) - hintTextWidth) / 2.0
+	hintY := y + 40.0
+
+	hintOp := &text.DrawOptions{}
+	hintOp.GeoM.Translate(hintX, hintY)
+	hintOp.ColorScale.ScaleWithColor(color.RGBA{R: 200, G: 200, B: 200, A: 255}) // 浅灰色
+	text.Draw(screen, hintText, s.sunCounterFont, hintOp)
 }
