@@ -1,4 +1,4 @@
-package entities
+package systems
 
 import (
 	"github.com/decker502/pvz/internal/reanim"
@@ -6,12 +6,11 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// createSimpleReanimComponent 为单图片实体创建简单的 ReanimComponent
-// 这个辅助函数将单张图片包装成一个简单的单帧 Reanim 动画
-// 所有简单实体（阳光、子弹、特效等）都使用这个函数创建 ReanimComponent
-func createSimpleReanimComponent(image *ebiten.Image, imageName string) *components.ReanimComponent {
-	// 处理 nil 图片的情况
+// createTestReanimComponent 创建测试用的 ReanimComponent
+// 这是一个测试辅助函数，被多个测试文件共享使用
+func createTestReanimComponent(image *ebiten.Image, imageName string) *components.ReanimComponent {
 	if image == nil {
+		// Return a minimal ReanimComponent with no images
 		return &components.ReanimComponent{
 			Reanim:            &reanim.ReanimXML{FPS: 12},
 			PartImages:        map[string]*ebiten.Image{},
@@ -33,8 +32,6 @@ func createSimpleReanimComponent(image *ebiten.Image, imageName string) *compone
 	imageWidth := float64(bounds.Dx())
 	imageHeight := float64(bounds.Dy())
 
-	// 创建一个简单的单帧 Reanim
-	// 使用中心对齐锚点
 	centerX := imageWidth / 2
 	centerY := imageHeight / 2
 
@@ -58,7 +55,7 @@ func createSimpleReanimComponent(image *ebiten.Image, imageName string) *compone
 	}
 
 	reanimXML := &reanim.ReanimXML{
-		FPS: 12,
+		FPS:    12,
 		Tracks: []reanim.Track{track},
 	}
 

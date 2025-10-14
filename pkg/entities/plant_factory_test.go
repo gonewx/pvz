@@ -74,14 +74,17 @@ func TestNewPlantEntity(t *testing.T) {
 				}
 			}
 
-			// 验证 SpriteComponent
-			spriteComp, ok := em.GetComponent(plantID, reflect.TypeOf(&components.SpriteComponent{}))
+			// 验证 ReanimComponent
+			reanimComp, ok := em.GetComponent(plantID, reflect.TypeOf(&components.ReanimComponent{}))
 			if !ok {
-				t.Error("Plant entity should have SpriteComponent")
+				t.Error("Plant entity should have ReanimComponent")
 			} else {
-				sprite := spriteComp.(*components.SpriteComponent)
-				if sprite.Image == nil {
-					t.Error("SpriteComponent.Image should not be nil")
+				reanim := reanimComp.(*components.ReanimComponent)
+				if reanim.Reanim == nil {
+					t.Error("ReanimComponent.Reanim should not be nil")
+				}
+				if reanim.PartImages == nil {
+					t.Error("ReanimComponent.PartImages should not be nil")
 				}
 			}
 
@@ -301,14 +304,17 @@ func TestNewWallnutEntity(t *testing.T) {
 				}
 			}
 
-			// 验证 SpriteComponent
-			spriteComp, ok := em.GetComponent(wallnutID, reflect.TypeOf(&components.SpriteComponent{}))
+			// 验证 ReanimComponent
+			reanimComp, ok := em.GetComponent(wallnutID, reflect.TypeOf(&components.ReanimComponent{}))
 			if !ok {
-				t.Error("Wallnut entity should have SpriteComponent")
+				t.Error("Wallnut entity should have ReanimComponent")
 			} else {
-				sprite := spriteComp.(*components.SpriteComponent)
-				if sprite.Image == nil {
-					t.Error("SpriteComponent.Image should not be nil")
+				reanim := reanimComp.(*components.ReanimComponent)
+				if reanim.Reanim == nil {
+					t.Error("ReanimComponent.Reanim should not be nil")
+				}
+				if reanim.PartImages == nil {
+					t.Error("ReanimComponent.PartImages should not be nil")
 				}
 			}
 
@@ -360,20 +366,6 @@ func TestNewWallnutEntity(t *testing.T) {
 				if behavior.Type != components.BehaviorWallnut {
 					t.Errorf("BehaviorType mismatch: got %v, want %v",
 						behavior.Type, components.BehaviorWallnut)
-				}
-			}
-
-			// Story 6.3: 验证 ReanimComponent（替代 AnimationComponent）
-			reanimComp, ok := em.GetComponent(wallnutID, reflect.TypeOf(&components.ReanimComponent{}))
-			if !ok {
-				t.Fatal("Wallnut entity should have ReanimComponent")
-			} else {
-				reanim := reanimComp.(*components.ReanimComponent)
-				if reanim.Reanim == nil {
-					t.Error("ReanimComponent.Reanim should not be nil")
-				}
-				if reanim.PartImages == nil {
-					t.Error("ReanimComponent.PartImages should not be nil")
 				}
 			}
 

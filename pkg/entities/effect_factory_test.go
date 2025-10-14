@@ -71,14 +71,14 @@ func TestNewPeaBulletHitEffect(t *testing.T) {
 				}
 			}
 
-			// 验证 SpriteComponent
-			spriteComp, ok := em.GetComponent(effectID, reflect.TypeOf(&components.SpriteComponent{}))
+			// 验证 ReanimComponent
+			reanimComp, ok := em.GetComponent(effectID, reflect.TypeOf(&components.ReanimComponent{}))
 			if !ok {
-				t.Error("Hit effect entity should have SpriteComponent")
+				t.Error("Hit effect entity should have ReanimComponent")
 			} else {
-				sprite := spriteComp.(*components.SpriteComponent)
-				if sprite.Image == nil {
-					t.Error("Hit effect sprite image should not be nil")
+				reanim := reanimComp.(*components.ReanimComponent)
+				if reanim.PartImages == nil {
+					t.Error("Hit effect ReanimComponent PartImages should not be nil")
 				}
 			}
 

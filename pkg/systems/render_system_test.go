@@ -17,10 +17,10 @@ func TestRenderSystemQuery(t *testing.T) {
 	// 创建测试图像
 	testImage := ebiten.NewImage(10, 10)
 
-	// 创建拥有位置和精灵组件的实体
+	// 创建拥有位置和 Reanim 组件的实体
 	id1 := em.CreateEntity()
 	em.AddComponent(id1, &components.PositionComponent{X: 100, Y: 200})
-	em.AddComponent(id1, &components.SpriteComponent{Image: testImage})
+	em.AddComponent(id1, createTestReanimComponent(testImage, "test"))
 
 	// 创建只有位置组件的实体(不应被渲染)
 	id2 := em.CreateEntity()
@@ -29,7 +29,7 @@ func TestRenderSystemQuery(t *testing.T) {
 	// 验证系统能正确查询
 	entities := em.GetEntitiesWith(
 		reflect.TypeOf(&components.PositionComponent{}),
-		reflect.TypeOf(&components.SpriteComponent{}),
+		reflect.TypeOf(&components.ReanimComponent{}),
 	)
 
 	if len(entities) != 1 {
@@ -49,10 +49,10 @@ func TestRenderSystemWithNilImage(t *testing.T) {
 	em := ecs.NewEntityManager()
 	system := NewRenderSystem(em)
 
-	// 创建有位置但图片为nil的实体
+	// 创建有位置但图片为nil的实体 (使用 ReanimComponent 但 PartImages 为 nil)
 	id := em.CreateEntity()
 	em.AddComponent(id, &components.PositionComponent{X: 100, Y: 200})
-	em.AddComponent(id, &components.SpriteComponent{Image: nil})
+	em.AddComponent(id, createTestReanimComponent(nil, "test"))
 
 	// Draw 应该跳过nil图片而不崩溃
 	screen := ebiten.NewImage(800, 600)
@@ -72,13 +72,13 @@ func TestRenderSystemMultipleEntities(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		id := em.CreateEntity()
 		em.AddComponent(id, &components.PositionComponent{X: float64(i * 100), Y: 100})
-		em.AddComponent(id, &components.SpriteComponent{Image: testImage})
+		em.AddComponent(id, createTestReanimComponent(testImage, "test"))
 	}
 
 	// 验证查询结果
 	entities := em.GetEntitiesWith(
 		reflect.TypeOf(&components.PositionComponent{}),
-		reflect.TypeOf(&components.SpriteComponent{}),
+		reflect.TypeOf(&components.ReanimComponent{}),
 	)
 
 	if len(entities) != 5 {
@@ -193,7 +193,6 @@ func TestRenderReanimEntity_EmptyAnimation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			entity := em.CreateEntity()
 			em.AddComponent(entity, &components.PositionComponent{X: 100, Y: 200})
-			em.AddComponent(entity, &components.SpriteComponent{}) // Required for DrawGameWorld query
 
 			reanimComp := &components.ReanimComponent{
 				CurrentAnim: tt.currentAnim,
@@ -220,7 +219,6 @@ func TestRenderReanimEntity_InvalidPhysicalFrame(t *testing.T) {
 
 	entity := em.CreateEntity()
 	em.AddComponent(entity, &components.PositionComponent{X: 100, Y: 200})
-	em.AddComponent(entity, &components.SpriteComponent{}) // Required for DrawGameWorld query
 
 	// ReanimComponent with CurrentFrame beyond valid range
 	reanimComp := &components.ReanimComponent{
@@ -244,7 +242,6 @@ func TestRenderReanimEntity_VisibleTracksWhitelist(t *testing.T) {
 
 	entity := em.CreateEntity()
 	em.AddComponent(entity, &components.PositionComponent{X: 100, Y: 200})
-	em.AddComponent(entity, &components.SpriteComponent{}) // Required for DrawGameWorld query
 
 	// Create a small test image
 	testImage := ebiten.NewImage(10, 10)
@@ -292,7 +289,6 @@ func TestRenderReanimEntity_HiddenTracksBlacklist(t *testing.T) {
 
 	entity := em.CreateEntity()
 	em.AddComponent(entity, &components.PositionComponent{X: 100, Y: 200})
-	em.AddComponent(entity, &components.SpriteComponent{}) // Required for DrawGameWorld query
 
 	testImage := ebiten.NewImage(10, 10)
 
@@ -338,7 +334,6 @@ func TestRenderReanimEntity_MissingMergedFrames(t *testing.T) {
 
 	entity := em.CreateEntity()
 	em.AddComponent(entity, &components.PositionComponent{X: 100, Y: 200})
-	em.AddComponent(entity, &components.SpriteComponent{}) // Required for DrawGameWorld query
 
 	reanimComp := &components.ReanimComponent{
 		CurrentAnim:  "anim_idle",
@@ -365,7 +360,6 @@ func TestRenderReanimEntity_FrameOutOfBounds(t *testing.T) {
 
 	entity := em.CreateEntity()
 	em.AddComponent(entity, &components.PositionComponent{X: 100, Y: 200})
-	em.AddComponent(entity, &components.SpriteComponent{}) // Required for DrawGameWorld query
 
 	x := 10.0
 	y := 20.0
@@ -405,7 +399,6 @@ func TestRenderReanimEntity_HiddenFrame(t *testing.T) {
 
 	entity := em.CreateEntity()
 	em.AddComponent(entity, &components.PositionComponent{X: 100, Y: 200})
-	em.AddComponent(entity, &components.SpriteComponent{}) // Required for DrawGameWorld query
 
 	x := 10.0
 	y := 20.0
@@ -441,7 +434,6 @@ func TestRenderReanimEntity_EmptyImagePath(t *testing.T) {
 
 	entity := em.CreateEntity()
 	em.AddComponent(entity, &components.PositionComponent{X: 100, Y: 200})
-	em.AddComponent(entity, &components.SpriteComponent{}) // Required for DrawGameWorld query
 
 	x := 10.0
 	y := 20.0
@@ -474,7 +466,6 @@ func TestRenderReanimEntity_MissingPartImage(t *testing.T) {
 
 	entity := em.CreateEntity()
 	em.AddComponent(entity, &components.PositionComponent{X: 100, Y: 200})
-	em.AddComponent(entity, &components.SpriteComponent{}) // Required for DrawGameWorld query
 
 	x := 10.0
 	y := 20.0
@@ -510,7 +501,6 @@ func TestRenderReanimEntity_NilPartImage(t *testing.T) {
 
 	entity := em.CreateEntity()
 	em.AddComponent(entity, &components.PositionComponent{X: 100, Y: 200})
-	em.AddComponent(entity, &components.SpriteComponent{}) // Required for DrawGameWorld query
 
 	x := 10.0
 	y := 20.0
@@ -546,7 +536,6 @@ func TestRenderReanimEntity_TransformCalculation(t *testing.T) {
 
 	entity := em.CreateEntity()
 	em.AddComponent(entity, &components.PositionComponent{X: 400, Y: 300})
-	em.AddComponent(entity, &components.SpriteComponent{}) // Required for DrawGameWorld query
 
 	testImage := ebiten.NewImage(100, 100)
 
@@ -661,7 +650,6 @@ func TestRenderReanimEntity_CameraOffset(t *testing.T) {
 
 	entity := em.CreateEntity()
 	em.AddComponent(entity, &components.PositionComponent{X: 500, Y: 300})
-	em.AddComponent(entity, &components.SpriteComponent{}) // Required for DrawGameWorld query
 
 	testImage := ebiten.NewImage(50, 50)
 
@@ -713,7 +701,6 @@ func TestRenderReanimEntity_MultipleEntities(t *testing.T) {
 			X: float64(100 + i*100),
 			Y: 300,
 		})
-		em.AddComponent(entity, &components.SpriteComponent{}) // Required for DrawGameWorld query
 
 		x := 0.0
 		y := 0.0

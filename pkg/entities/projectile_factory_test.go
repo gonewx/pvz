@@ -71,14 +71,14 @@ func TestNewPeaProjectile(t *testing.T) {
 				}
 			}
 
-			// 验证 SpriteComponent
-			spriteComp, ok := em.GetComponent(projectileID, reflect.TypeOf(&components.SpriteComponent{}))
+			// 验证 ReanimComponent
+			reanimComp, ok := em.GetComponent(projectileID, reflect.TypeOf(&components.ReanimComponent{}))
 			if !ok {
-				t.Error("Projectile entity should have SpriteComponent")
+				t.Error("Projectile entity should have ReanimComponent")
 			} else {
-				sprite := spriteComp.(*components.SpriteComponent)
-				if sprite.Image == nil {
-					t.Error("Projectile sprite image should not be nil")
+				reanim := reanimComp.(*components.ReanimComponent)
+				if reanim.PartImages == nil {
+					t.Error("Projectile ReanimComponent PartImages should not be nil")
 				}
 			}
 

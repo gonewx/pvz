@@ -74,18 +74,7 @@ func TestNewZombieEntity(t *testing.T) {
 				}
 			}
 
-			// 验证 SpriteComponent
-			spriteComp, ok := em.GetComponent(zombieID, reflect.TypeOf(&components.SpriteComponent{}))
-			if !ok {
-				t.Error("Zombie entity should have SpriteComponent")
-			} else {
-				sprite := spriteComp.(*components.SpriteComponent)
-				if sprite.Image == nil {
-					t.Error("SpriteComponent Image should not be nil")
-				}
-			}
-
-			// Story 6.3: 验证 ReanimComponent（替代 AnimationComponent）
+			// 验证 ReanimComponent（替代 SpriteComponent + AnimationComponent）
 			reanimComp, ok := em.GetComponent(zombieID, reflect.TypeOf(&components.ReanimComponent{}))
 			if !ok {
 				t.Error("Zombie entity should have ReanimComponent")

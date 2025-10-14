@@ -1,7 +1,6 @@
 package systems
 
 import (
-	"image"
 	"reflect"
 	"testing"
 
@@ -32,16 +31,19 @@ func TestDrawWithNoEntities(t *testing.T) {
 	screen := ebiten.NewImage(800, 600)
 
 	// 不应该panic
-	system.Draw(screen)
+	system.Draw(screen, 0.0)
 }
 
-// TestDrawPreviewEntity 测试绘制预览实体
+// TestDrawPreviewEntity 测试绘制预览实体（使用ReanimComponent）
 func TestDrawPreviewEntity(t *testing.T) {
 	em := ecs.NewEntityManager()
 	system := NewPlantPreviewRenderSystem(em)
 
 	// 创建测试图像
 	testImage := ebiten.NewImage(64, 80)
+
+	// 创建简单的 Reanim 组件
+	reanimComp := createTestReanimComponent(testImage, "test_preview")
 
 	// 创建预览实体
 	entityID := em.CreateEntity()
@@ -53,18 +55,13 @@ func TestDrawPreviewEntity(t *testing.T) {
 		X: 400,
 		Y: 300,
 	})
-	em.AddComponent(entityID, &components.SpriteComponent{
-		Image: testImage,
-	})
+	em.AddComponent(entityID, reanimComp)
 
 	// 创建测试屏幕
 	screen := ebiten.NewImage(800, 600)
 
 	// 不应该panic
-	system.Draw(screen)
-
-	// 验证屏幕不为空（已经绘制了内容）
-	// 注意：实际的绘制验证需要像素级检查，这里只是确保没有错误
+	system.Draw(screen, 0.0)
 }
 
 // TestDrawWithNilImage 测试图像为nil时的处理
@@ -72,7 +69,7 @@ func TestDrawWithNilImage(t *testing.T) {
 	em := ecs.NewEntityManager()
 	system := NewPlantPreviewRenderSystem(em)
 
-	// 创建预览实体，但图像为nil
+	// 创建预览实体，但没有 ReanimComponent
 	entityID := em.CreateEntity()
 	em.AddComponent(entityID, &components.PlantPreviewComponent{
 		PlantType: components.PlantSunflower,
@@ -82,15 +79,12 @@ func TestDrawWithNilImage(t *testing.T) {
 		X: 400,
 		Y: 300,
 	})
-	em.AddComponent(entityID, &components.SpriteComponent{
-		Image: nil, // 空图像
-	})
 
 	// 创建测试屏幕
 	screen := ebiten.NewImage(800, 600)
 
 	// 不应该panic，应该跳过此实体
-	system.Draw(screen)
+	system.Draw(screen, 0.0)
 }
 
 // TestAlphaBlending 测试透明度应用
@@ -112,6 +106,7 @@ func TestAlphaBlending(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// 创建测试图像
 			testImage := ebiten.NewImage(64, 80)
+			reanimComp := createTestReanimComponent(testImage, "test_alpha")
 
 			// 创建预览实体
 			entityID := em.CreateEntity()
@@ -123,15 +118,13 @@ func TestAlphaBlending(t *testing.T) {
 				X: 400,
 				Y: 300,
 			})
-			em.AddComponent(entityID, &components.SpriteComponent{
-				Image: testImage,
-			})
+			em.AddComponent(entityID, reanimComp)
 
 			// 创建测试屏幕
 			screen := ebiten.NewImage(800, 600)
 
 			// 不应该panic
-			system.Draw(screen)
+			system.Draw(screen, 0.0)
 
 			// 清理实体以便下一个测试
 			em.DestroyEntity(entityID)
@@ -147,6 +140,7 @@ func TestImageCentering(t *testing.T) {
 
 	// 创建测试图像（64x80）
 	testImage := ebiten.NewImage(64, 80)
+	reanimComp := createTestReanimComponent(testImage, "test_center")
 
 	// 创建预览实体，位置设置为 (400, 300)
 	entityID := em.CreateEntity()
@@ -158,19 +152,13 @@ func TestImageCentering(t *testing.T) {
 		X: 400,
 		Y: 300,
 	})
-	em.AddComponent(entityID, &components.SpriteComponent{
-		Image: testImage,
-	})
+	em.AddComponent(entityID, reanimComp)
 
 	// 创建测试屏幕
 	screen := ebiten.NewImage(800, 600)
 
 	// 绘制（不应该panic）
-	system.Draw(screen)
-
-	// 验证绘制位置计算正确
-	// 预期绘制位置: drawX = 400 - 64/2 = 368, drawY = 300 - 80/2 = 260
-	// 实际的位置验证需要更复杂的测试，这里只确保没有错误
+	system.Draw(screen, 0.0)
 }
 
 // TestMultiplePreviewEntities 测试多个预览实体的绘制
@@ -181,6 +169,8 @@ func TestMultiplePreviewEntities(t *testing.T) {
 	// 创建多个预览实体
 	for i := 0; i < 3; i++ {
 		testImage := ebiten.NewImage(64, 80)
+		reanimComp := createTestReanimComponent(testImage, "test_multi")
+
 		entityID := em.CreateEntity()
 		em.AddComponent(entityID, &components.PlantPreviewComponent{
 			PlantType: components.PlantSunflower,
@@ -190,16 +180,14 @@ func TestMultiplePreviewEntities(t *testing.T) {
 			X: float64(200 + i*100),
 			Y: 300,
 		})
-		em.AddComponent(entityID, &components.SpriteComponent{
-			Image: testImage,
-		})
+		em.AddComponent(entityID, reanimComp)
 	}
 
 	// 创建测试屏幕
 	screen := ebiten.NewImage(800, 600)
 
 	// 绘制所有实体（不应该panic）
-	system.Draw(screen)
+	system.Draw(screen, 0.0)
 
 	// 验证所有实体都存在
 	entities := em.GetEntitiesWith(
@@ -229,6 +217,7 @@ func TestDrawWithDifferentImageSizes(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// 创建指定尺寸的测试图像
 			testImage := ebiten.NewImage(tc.width, tc.height)
+			reanimComp := createTestReanimComponent(testImage, "test_sizes")
 
 			// 创建预览实体
 			entityID := em.CreateEntity()
@@ -240,15 +229,13 @@ func TestDrawWithDifferentImageSizes(t *testing.T) {
 				X: 400,
 				Y: 300,
 			})
-			em.AddComponent(entityID, &components.SpriteComponent{
-				Image: testImage,
-			})
+			em.AddComponent(entityID, reanimComp)
 
 			// 创建测试屏幕
 			screen := ebiten.NewImage(800, 600)
 
 			// 不应该panic
-			system.Draw(screen)
+			system.Draw(screen, 0.0)
 
 			// 验证图像尺寸
 			bounds := testImage.Bounds()
@@ -264,11 +251,36 @@ func TestDrawWithDifferentImageSizes(t *testing.T) {
 	}
 }
 
-// 辅助函数：创建指定颜色的测试图像
-func createColoredImage(width, height int, r, g, b, a uint8) *ebiten.Image {
-	img := ebiten.NewImageFromImage(
-		image.NewRGBA(image.Rect(0, 0, width, height)),
-	)
-	// 填充颜色（在实际测试中可能需要）
-	return img
+// TestDrawWithCameraOffset 测试摄像机偏移的处理
+func TestDrawWithCameraOffset(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewPlantPreviewRenderSystem(em)
+
+	// 创建测试图像
+	testImage := ebiten.NewImage(64, 80)
+	reanimComp := createTestReanimComponent(testImage, "test_camera")
+
+	// 创建预览实体
+	entityID := em.CreateEntity()
+	em.AddComponent(entityID, &components.PlantPreviewComponent{
+		PlantType: components.PlantSunflower,
+		Alpha:     0.5,
+	})
+	em.AddComponent(entityID, &components.PositionComponent{
+		X: 400,
+		Y: 300,
+	})
+	em.AddComponent(entityID, reanimComp)
+
+	// 创建测试屏幕
+	screen := ebiten.NewImage(800, 600)
+
+	// 测试不同的摄像机偏移
+	testCameraOffsets := []float64{0.0, 100.0, -50.0, 200.0}
+
+	for _, cameraX := range testCameraOffsets {
+		// 不应该panic
+		system.Draw(screen, cameraX)
+	}
 }
+
