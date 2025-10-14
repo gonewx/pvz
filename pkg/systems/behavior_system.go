@@ -125,6 +125,8 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 			s.handlePeashooterBehavior(entityID, deltaTime, allZombieEntityList)
 		case components.BehaviorWallnut:
 			s.handleWallnutBehavior(entityID)
+		case components.BehaviorCherryBomb:
+			s.handleCherryBombBehavior(entityID, deltaTime)
 		default:
 			// 未知行为类型，忽略
 		}
@@ -514,10 +516,10 @@ func (s *BehaviorSystem) handleZombieDyingBehavior(entityID ecs.EntityID) {
 		s.entityManager.DestroyEntity(entityID)
 	} else {
 		// 调试日志：定期输出动画状态（每10帧输出一次）
-		if reanim.CurrentFrame%10 == 0 {
-			log.Printf("[BehaviorSystem] 僵尸 %d 死亡动画进行中: Frame=%d/%d, IsLooping=%v, IsFinished=%v",
-				entityID, reanim.CurrentFrame, reanim.VisibleFrameCount, reanim.IsLooping, reanim.IsFinished)
-		}
+		// if reanim.CurrentFrame%10 == 0 {
+		// 	log.Printf("[BehaviorSystem] 僵尸 %d 死亡动画进行中: Frame=%d/%d, IsLooping=%v, IsFinished=%v",
+		// 		entityID, reanim.CurrentFrame, reanim.VisibleFrameCount, reanim.IsLooping, reanim.IsFinished)
+		// }
 	}
 }
 
@@ -538,8 +540,8 @@ func (s *BehaviorSystem) updateZombieDamageState(entityID ecs.EntityID, health *
 			// 如果实体没有配置 PartGroups（非僵尸实体），静默忽略
 			return
 		}
-		log.Printf("[BehaviorSystem] 僵尸 %d 手臂掉落 (HP=%d/%d)",
-			entityID, health.CurrentHealth, health.MaxHealth)
+		// log.Printf("[BehaviorSystem] 僵尸 %d 手臂掉落 (HP=%d/%d)",
+		// entityID, health.CurrentHealth, health.MaxHealth)
 	}
 }
 
@@ -1045,4 +1047,170 @@ func (s *BehaviorSystem) handleBucketheadZombieBehavior(entityID ecs.EntityID, d
 
 	// 护甲完好，执行普通僵尸的基本行为（移动、碰撞检测、啃食植物）
 	s.handleZombieBasicBehavior(entityID, deltaTime)
+}
+
+// handleCherryBombBehavior 处理樱桃炸弹的行为逻辑
+// 樱桃炸弹种植后开始引信倒计时（1.5秒），倒计时结束后触发爆炸
+func (s *BehaviorSystem) handleCherryBombBehavior(entityID ecs.EntityID, deltaTime float64) {
+	// 获取计时器组件
+	timerComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.TimerComponent{}))
+	if !ok {
+		return
+	}
+	timer := timerComp.(*components.TimerComponent)
+
+	// 检查引信计时器状态
+	if !timer.IsReady {
+		// 继续计时
+		timer.CurrentTime += deltaTime
+		if timer.CurrentTime >= timer.TargetTime {
+			timer.IsReady = true
+			log.Printf("[BehaviorSystem] 樱桃炸弹 %d: 引信计时完成，准备爆炸", entityID)
+		}
+		return
+	}
+
+	// 计时器已完成，触发爆炸
+	s.triggerCherryBombExplosion(entityID)
+}
+
+// triggerCherryBombExplosion 触发樱桃炸弹爆炸
+// 对以自身为中心的3x3范围内的所有僵尸造成1800点伤害，播放音效，删除樱桃炸弹实体
+func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
+	log.Printf("[BehaviorSystem] 樱桃炸弹 %d: 开始爆炸！", entityID)
+
+	// 获取樱桃炸弹的位置和网格信息
+	plantComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PlantComponent{}))
+	if !ok {
+		log.Printf("[BehaviorSystem] 警告：樱桃炸弹 %d 缺少 PlantComponent，无法确定爆炸位置", entityID)
+		return
+	}
+	plant := plantComp.(*components.PlantComponent)
+
+	// 计算3x3爆炸范围的格子坐标
+	// 范围：[centerCol - 1, centerCol + 1] × [centerRow - 1, centerRow + 1]
+	centerCol := plant.GridCol
+	centerRow := plant.GridRow
+	minCol := centerCol - config.CherryBombRangeRadius
+	maxCol := centerCol + config.CherryBombRangeRadius
+	minRow := centerRow - config.CherryBombRangeRadius
+	maxRow := centerRow + config.CherryBombRangeRadius
+
+	// 边界检查：确保范围在草坪内
+	if minCol < 0 {
+		minCol = 0
+	}
+	if maxCol > 8 {
+		maxCol = 8
+	}
+	if minRow < 0 {
+		minRow = 0
+	}
+	if maxRow > 4 {
+		maxRow = 4
+	}
+
+	log.Printf("[BehaviorSystem] 樱桃炸弹爆炸范围: 列[%d-%d], 行[%d-%d]", minCol, maxCol, minRow, maxRow)
+
+	// 查询所有僵尸实体（移动中和啃食中的僵尸）
+	allZombies := s.entityManager.GetEntitiesWith(
+		reflect.TypeOf(&components.BehaviorComponent{}),
+		reflect.TypeOf(&components.PositionComponent{}),
+	)
+
+	// 统计受影响的僵尸数量
+	affectedZombies := 0
+
+	// 对每个僵尸检查是否在爆炸范围内
+	for _, zombieID := range allZombies {
+		// 获取僵尸的行为组件，确认是僵尸类型
+		behaviorComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.BehaviorComponent{}))
+		if !ok {
+			continue
+		}
+		behavior := behaviorComp.(*components.BehaviorComponent)
+
+		// 只处理僵尸类型的实体
+		if behavior.Type != components.BehaviorZombieBasic &&
+			behavior.Type != components.BehaviorZombieEating &&
+			behavior.Type != components.BehaviorZombieConehead &&
+			behavior.Type != components.BehaviorZombieBuckethead &&
+			behavior.Type != components.BehaviorZombieDying {
+			continue
+		}
+
+		// 获取僵尸的位置组件
+		posComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.PositionComponent{}))
+		if !ok {
+			continue
+		}
+		pos := posComp.(*components.PositionComponent)
+
+		// 根据僵尸位置计算所在格子
+		zombieCol, zombieRow, valid := utils.WorldToGridCoords(pos.X, pos.Y)
+		if !valid {
+			continue
+		}
+
+		// 检查僵尸是否在爆炸范围内
+		if zombieCol >= minCol && zombieCol <= maxCol && zombieRow >= minRow && zombieRow <= maxRow {
+			affectedZombies++
+			log.Printf("[BehaviorSystem] 僵尸 %d 在爆炸范围内（格子[%d,%d]），应用伤害", zombieID, zombieCol, zombieRow)
+
+			// 应用伤害：先扣护甲，护甲不足或无护甲则扣生命值
+			damage := config.CherryBombDamage
+
+			// 检查是否有护甲组件
+			armorComp, hasArmor := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.ArmorComponent{}))
+			if hasArmor {
+				armor := armorComp.(*components.ArmorComponent)
+				if armor.CurrentArmor > 0 {
+					// 护甲优先扣除
+					armorDamage := damage
+					if armorDamage > armor.CurrentArmor {
+						armorDamage = armor.CurrentArmor
+					}
+					armor.CurrentArmor -= armorDamage
+					damage -= armorDamage
+					log.Printf("[BehaviorSystem] 僵尸 %d 护甲受损：-%d，剩余护甲：%d，剩余伤害：%d",
+						zombieID, armorDamage, armor.CurrentArmor, damage)
+				}
+			}
+
+			// 如果还有剩余伤害，扣除生命值
+			if damage > 0 {
+				healthComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.HealthComponent{}))
+				if ok {
+					health := healthComp.(*components.HealthComponent)
+					originalHealth := health.CurrentHealth
+					health.CurrentHealth -= damage
+					if health.CurrentHealth < 0 {
+						health.CurrentHealth = 0
+					}
+					log.Printf("[BehaviorSystem] 僵尸 %d 生命值受损：%d -> %d（伤害：%d）",
+						zombieID, originalHealth, health.CurrentHealth, damage)
+				}
+			}
+		}
+	}
+
+	log.Printf("[BehaviorSystem] 樱桃炸弹爆炸影响了 %d 个僵尸", affectedZombies)
+
+	// 播放爆炸音效
+	if config.CherryBombExplodeSoundPath != "" {
+		soundPlayer, err := s.resourceManager.LoadSoundEffect(config.CherryBombExplodeSoundPath)
+		if err != nil {
+			log.Printf("[BehaviorSystem] 警告：加载樱桃炸弹爆炸音效失败: %v", err)
+		} else {
+			soundPlayer.Rewind()
+			soundPlayer.Play()
+			log.Printf("[BehaviorSystem] 播放樱桃炸弹爆炸音效")
+		}
+	}
+
+	// TODO: 创建爆炸视觉特效（Task 6，可选）
+
+	// 删除樱桃炸弹实体
+	s.entityManager.DestroyEntity(entityID)
+	log.Printf("[BehaviorSystem] 樱桃炸弹 %d 已删除", entityID)
 }

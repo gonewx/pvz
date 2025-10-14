@@ -2,6 +2,8 @@
 
 This file provides guidance and memory for Codex CLI.
 
+用简体中文回复
+
 <!-- BEGIN: BMAD-AGENTS -->
 # BMAD-METHOD Agents and Tasks
 

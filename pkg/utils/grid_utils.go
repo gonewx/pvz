@@ -110,3 +110,39 @@ func GridToScreenCoords(
 func GetEntityRow(worldY, gridWorldStartY, cellHeight float64) int {
 	return int((worldY - gridWorldStartY) / cellHeight)
 }
+
+// WorldToGridCoords 将世界坐标转换为草坪网格坐标
+//
+// 参数:
+//   - worldX, worldY: 世界坐标（相对于背景图片左上角）
+//
+// 返回:
+//   - col: 列索引 (0-8)
+//   - row: 行索引 (0-4)
+//   - isValid: 是否在有效网格范围内
+//
+// 注意：此函数使用 pkg/config 中定义的网格配置常量
+func WorldToGridCoords(worldX, worldY float64) (col, row int, isValid bool) {
+	// 使用全局网格配置（从 config 包导入）
+	// 为了避免循环依赖，我们需要确保 config 包不依赖 utils 包
+	// 这个函数将在下一步修复，现在先使用常量值
+	const (
+		GridWorldStartX = 251.0
+		GridWorldStartY = 81.0
+		CellWidth       = 80.0
+		CellHeight      = 100.0
+		GridColumns     = 9
+		GridRows        = 5
+	)
+
+	// 计算列和行索引
+	col = int((worldX - GridWorldStartX) / CellWidth)
+	row = int((worldY - GridWorldStartY) / CellHeight)
+
+	// 边界检查
+	if col < 0 || col >= GridColumns || row < 0 || row >= GridRows {
+		return col, row, false
+	}
+
+	return col, row, true
+}

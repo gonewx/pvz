@@ -229,3 +229,82 @@ func NewWallnutEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameSta
 
 	return entityID, nil
 }
+
+// NewCherryBombEntity 创建樱桃炸弹实体
+// 樱桃炸弹是一种高成本的一次性爆炸植物，种植后经过引信时间（1.5秒）后爆炸，
+// 对以自身为中心的3x3范围内的所有僵尸造成1800点伤害（足以秒杀所有僵尸）
+//
+// 参数:
+//   - em: 实体管理器
+//   - rm: 资源管理器（用于加载樱桃炸弹图像和 Reanim 资源）
+//   - gs: 游戏状态（用于获取摄像机位置）
+//   - rs: Reanim 系统（用于初始化动画）
+//   - col: 网格列索引 (0-8)
+//   - row: 网格行索引 (0-4)
+//
+// 返回:
+//   - ecs.EntityID: 创建的樱桃炸弹实体ID，如果失败返回 0
+//   - error: 如果创建失败返回错误信息
+func NewCherryBombEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState, rs ReanimSystemInterface, col, row int) (ecs.EntityID, error) {
+	// 计算格子中心坐标（使用世界坐标系统）
+	worldCenterX := config.GridWorldStartX + float64(col)*config.CellWidth + config.CellWidth/2
+	worldCenterY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+
+	// 创建实体
+	entityID := em.CreateEntity()
+
+	// 添加位置组件（使用世界坐标）
+	em.AddComponent(entityID, &components.PositionComponent{
+		X: worldCenterX,
+		Y: worldCenterY,
+	})
+
+	// 从 ResourceManager 获取樱桃炸弹的 Reanim 数据和部件图片
+	reanimXML := rm.GetReanimXML("CherryBomb")
+	partImages := rm.GetReanimPartImages("CherryBomb")
+
+	if reanimXML == nil || partImages == nil {
+		return 0, fmt.Errorf("failed to load CherryBomb Reanim resources")
+	}
+
+	// 添加 ReanimComponent
+	em.AddComponent(entityID, &components.ReanimComponent{
+		Reanim:     reanimXML,
+		PartImages: partImages,
+	})
+
+	// 使用 ReanimSystem 初始化动画（播放引信待机动画）
+	if err := rs.PlayAnimation(entityID, "anim_idle"); err != nil {
+		return 0, fmt.Errorf("failed to play CherryBomb idle animation: %w", err)
+	}
+	log.Printf("[PlantFactory] 樱桃炸弹 %d: 成功添加 ReanimComponent 并初始化引信动画", entityID)
+
+	// 添加植物组件（用于碰撞检测和网格位置追踪）
+	em.AddComponent(entityID, &components.PlantComponent{
+		PlantType: components.PlantCherryBomb,
+		GridRow:   row,
+		GridCol:   col,
+	})
+
+	// 添加行为组件（樱桃炸弹行为）
+	em.AddComponent(entityID, &components.BehaviorComponent{
+		Type: components.BehaviorCherryBomb,
+	})
+
+	// 添加引信计时器组件（1.5秒后爆炸）
+	em.AddComponent(entityID, &components.TimerComponent{
+		Name:        "fuse_timer",
+		TargetTime:  config.CherryBombFuseTime, // 1.5秒
+		CurrentTime: 0,
+		IsReady:     false,
+	})
+
+	// 添加碰撞组件（用于后续爆炸范围检测）
+	// 碰撞盒大小与格子大小一致
+	em.AddComponent(entityID, &components.CollisionComponent{
+		Width:  config.CellWidth,
+		Height: config.CellHeight,
+	})
+
+	return entityID, nil
+}

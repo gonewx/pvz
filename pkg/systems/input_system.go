@@ -295,6 +295,8 @@ func (s *InputSystem) createPlantPreview(plantType components.PlantType, x, y fl
 		reanimName = "PeaShooter"
 	case components.PlantWallnut:
 		reanimName = "Wallnut"
+	case components.PlantCherryBomb:
+		reanimName = "CherryBomb"
 	default:
 		log.Printf("[InputSystem] Unknown plant type for preview: %v", plantType)
 		return
@@ -453,9 +455,12 @@ func (s *InputSystem) handleLawnClick(mouseX, mouseY int) bool {
 // 根据植物类型选择合适的工厂函数
 func (s *InputSystem) createPlantEntity(plantType components.PlantType, col, row int) (ecs.EntityID, error) {
 	// Story 6.3: 传递 reanimSystem 给工厂函数以初始化动画
-	// 坚果墙使用专用的工厂函数
+	// 坚果墙和樱桃炸弹使用专用的工厂函数
 	if plantType == components.PlantWallnut {
 		return entities.NewWallnutEntity(s.entityManager, s.resourceManager, s.gameState, s.reanimSystem, col, row)
+	}
+	if plantType == components.PlantCherryBomb {
+		return entities.NewCherryBombEntity(s.entityManager, s.resourceManager, s.gameState, s.reanimSystem, col, row)
 	}
 	// 其他植物使用通用工厂函数
 	return entities.NewPlantEntity(s.entityManager, s.resourceManager, s.gameState, s.reanimSystem, plantType, col, row)
@@ -465,11 +470,13 @@ func (s *InputSystem) createPlantEntity(plantType components.PlantType, col, row
 func (s *InputSystem) getPlantCost(plantType components.PlantType) int {
 	switch plantType {
 	case components.PlantSunflower:
-		return 50
+		return config.SunflowerSunCost // 50
 	case components.PlantPeashooter:
-		return 100
+		return config.PeashooterSunCost // 100
 	case components.PlantWallnut:
-		return 50
+		return config.WallnutCost // 50
+	case components.PlantCherryBomb:
+		return config.CherryBombSunCost // 150
 	default:
 		return 0
 	}

@@ -5,25 +5,13 @@
 ## 顶层结构
 
 - `assets/images`：UI与场景静态贴图资源。包括主界面、商店、冒险选择、关卡背景（`background*.jpg`）、按钮组件（`button_*`）、图标（如 `Brain.png`、`CarKeys.png`）、种子包与卡片（`SeedPacket_*`、`seeds.png`）等。文件格式多为 `.png`、`.jpg`，被 `properties/resources.xml` 中的 `<Image>` 清单引用。
-- `assets/reanim`：对应实体的动画轨迹、关键帧与图层引用，运行时加载 `assets/effect/reanim/images` 下的 PNG 切片作为骨骼/部件贴图进行组合。
-- `assets/effect/reanim/images`：Reanim 动画所用的分层图像切片。每个植物、僵尸或 UI 动效的骨骼动画由大量命名的图层 PNG 组成（如 `cactus_*`, `cattail_*`, `CrazyDave_*`）。
-- `assets/particles`：粒子系统的配置，指定粒子的发射器、轨迹与贴图（引用 `assets/particles/images/` 中的 PNG）。
-- `assets/particles/images`：粒子系统用的贴图素材（效果精灵）。如爆炸、烟雾、火花、雨滴、泡泡、星星等（例如 `DoomShroom_Explosion_*`, `PoolSparkly.png`, `SnowPea_*`）。与编译后的粒子配置 `compiled/particles/*.xml.compiled` 一起使用。
+- `assets/effect/reanim`：对应实体的动画轨迹、关键帧与图层引用，运行时加载 `assets/reanim` 下的 PNG 切片作为骨骼/部件贴图进行组合。
+- `assets/reanim`：Reanim 动画所用的分层图像切片。每个植物、僵尸或 UI 动效的骨骼动画由大量命名的图层 PNG 组成（如 `cactus_*`, `cattail_*`, `CrazyDave_*`）。
+- `assets/effect/particles`：粒子系统的配置，指定粒子的发射器、轨迹与贴图（引用 `assets/particles` 中的 PNG）。
+- `assets/particles`：粒子系统用的贴图素材（效果精灵）。如爆炸、烟雾、火花、雨滴、泡泡、星星等（例如 `DoomShroom_Explosion_*`, `PoolSparkly.png`, `SnowPea_*`）。与编译后的粒子配置 `compiled/particles/*.xml.compiled` 一起使用。
 - `assets/sounds`：音频资源（`.ogg`、少量 `.au`）。包含交互提示音、技能音效、环境音与音乐（如 `readysetplant.ogg`, `ZombiesOnYourLawn.ogg`）。
 - `assets/data`：位图字体的位图或字形图片（如 `_BrianneTod*`, `DwarvenTodcraft*`, `_HouseofTerror*`）以及小型 UI 辅助图片。与 `eata/` 中的同名 `.txt` 字体度量文件配合使用。
 - `assets/properties`：资源清单与配置。主要是 `resources.xml`，将 `images/`、`sounds/`、`data/`、`reanim/` 等目录中的文件声明为可加载资源，定义 ID、默认路径前缀与部分属性（如行列、a8r8g8b8 格式等）。
-
-## 显示异常命名的镜像目录
-
-以下目录看似拼写错误，但与标准目录形成一组“镜像”，通常包含同类型资源的另一套或文本版定义，用于字体度量、特定 UI 变体或本地化文本：
-
-- `assets/eata`（对应 `data`）：字体度量与排版文件（`.txt`），与 `data/` 中的位图字形图片成对出现。如 `HouseofTerror16.txt`、`DwarvenTodcraft18.txt`，在 `resources.xml` 中以 `<Font>` 引用。
-- `assets/jmages`（对应 `images`）：额外的图片素材或某些屏幕的变体（如 `PvZ_Logo.jpg/.png`、选择器界面各按钮与高亮资源）。与 `images/`同类，用于 UI。
-- `assets/qarticles`（对应 `particles`）：某些效果的精灵图替代或分类（如 `ExplosionPowie.png`, `Doom.png`, `Sproing.png`）。与粒子配置关联。
-- `assets/qroperties`（对应 `properties`）：文本资源，如 `LawnStrings.txt`（草坪/关卡/提示等界面的字符串）。用于本地化或 UI 文本显示。
-- `assets/seanim`（对应 `reanim`）：某些界面或片段的静态或成组素材（如 `FinalWave.png`、选择器界面按钮与高亮、`ZombiesWon.jpg`）。可与动画/切片共同构成 UI 动效。
-
-备注：上述“镜像”目录命名可能源自解包或转换流程中的映射/占位，内容与标准目录类型一一对应，便于分离或校验。
 
 ## 资源清单示例与关系
 

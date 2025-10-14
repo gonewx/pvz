@@ -270,6 +270,14 @@ func (s *GameScene) initPlantCardSystems(rm *game.ResourceManager) {
 		// 继续执行，游戏在没有卡片的情况下也能运行（用于测试环境）
 	}
 
+	// 樱桃炸弹卡片（第四张）Story 5.4
+	fourthCardX := thirdCardX + PlantCardSpacing
+	_, err = entities.NewPlantCardEntity(s.entityManager, rm, s.reanimSystem, components.PlantCherryBomb, fourthCardX, cardY, PlantCardScale)
+	if err != nil {
+		log.Printf("Warning: Failed to create cherry bomb card: %v", err)
+		// 继续执行，游戏在没有卡片的情况下也能运行（用于测试环境）
+	}
+
 	// Initialize PlantCardSystem
 	s.plantCardSystem = systems.NewPlantCardSystem(
 		s.entityManager,

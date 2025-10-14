@@ -56,8 +56,8 @@ type ResourceManager struct {
 	reanimImageCache map[string]map[string]*ebiten.Image // Cache for Reanim part images: unit name -> (image ref -> Image)
 
 	// YAML resource configuration
-	config       *ResourceConfig       // Parsed YAML configuration
-	resourceMap  map[string]string     // Resource ID -> file path mapping for quick lookup
+	config      *ResourceConfig   // Parsed YAML configuration
+	resourceMap map[string]string // Resource ID -> file path mapping for quick lookup
 }
 
 // NewResourceManager creates and initializes a new ResourceManager instance.
@@ -422,7 +422,7 @@ func (rm *ResourceManager) GetFont(path string, size float64) *text.GoTextFace {
 func (rm *ResourceManager) LoadReanimResources() error {
 	// 加载植物 Reanim 资源
 	// 注意：文件名使用 PascalCase（与实际文件名匹配）
-	plants := []string{"PeaShooter", "SunFlower", "Wallnut"}
+	plants := []string{"PeaShooter", "SunFlower", "Wallnut", "CherryBomb"}
 	for _, plantName := range plants {
 		if err := rm.loadPlantReanim(plantName); err != nil {
 			return fmt.Errorf("failed to load %s reanim: %w", plantName, err)
@@ -598,10 +598,11 @@ func (rm *ResourceManager) buildReanimImagePath(unitName, imageRef, category str
 //   - An error if the file cannot be opened or parsed
 //
 // Example:
-//   rm := NewResourceManager(audioContext)
-//   if err := rm.LoadResourceConfig("assets/config/resources.yaml"); err != nil {
-//       log.Fatal("Failed to load resource config:", err)
-//   }
+//
+//	rm := NewResourceManager(audioContext)
+//	if err := rm.LoadResourceConfig("assets/config/resources.yaml"); err != nil {
+//	    log.Fatal("Failed to load resource config:", err)
+//	}
 func (rm *ResourceManager) LoadResourceConfig(configPath string) error {
 	// Read the YAML file
 	data, err := os.ReadFile(configPath)
@@ -629,8 +630,9 @@ func (rm *ResourceManager) LoadResourceConfig(configPath string) error {
 //
 // The mapping combines the base path with each resource's relative path.
 // For example:
-//   IMAGE_BLANK -> assets/properties/blank.png
-//   SOUND_BUTTONCLICK -> assets/sounds/buttonclick.ogg
+//
+//	IMAGE_BLANK -> assets/properties/blank.png
+//	SOUND_BUTTONCLICK -> assets/sounds/buttonclick.ogg
 func (rm *ResourceManager) buildResourceMap() {
 	if rm.config == nil {
 		return
@@ -688,10 +690,11 @@ func (rm *ResourceManager) buildResourceMap() {
 //   - An error if the ID is not found or the image cannot be loaded
 //
 // Example:
-//   img, err := rm.LoadImageByID("IMAGE_BACKGROUND1")
-//   if err != nil {
-//       log.Printf("Failed to load image: %v", err)
-//   }
+//
+//	img, err := rm.LoadImageByID("IMAGE_BACKGROUND1")
+//	if err != nil {
+//	    log.Printf("Failed to load image: %v", err)
+//	}
 func (rm *ResourceManager) LoadImageByID(resourceID string) (*ebiten.Image, error) {
 	// Check if resource config is loaded
 	if rm.config == nil {
@@ -718,10 +721,11 @@ func (rm *ResourceManager) LoadImageByID(resourceID string) (*ebiten.Image, erro
 //   - A pointer to the cached ebiten.Image, or nil if not found
 //
 // Example:
-//   img := rm.GetImageByID("IMAGE_BACKGROUND1")
-//   if img == nil {
-//       // Image not loaded yet
-//   }
+//
+//	img := rm.GetImageByID("IMAGE_BACKGROUND1")
+//	if img == nil {
+//	    // Image not loaded yet
+//	}
 func (rm *ResourceManager) GetImageByID(resourceID string) *ebiten.Image {
 	if rm.config == nil {
 		return nil
@@ -752,10 +756,11 @@ func (rm *ResourceManager) GetImageByID(resourceID string) *ebiten.Image {
 //   - An error if the group is not found or any resource fails to load
 //
 // Example:
-//   // Load all initial resources at game startup
-//   if err := rm.LoadResourceGroup("init"); err != nil {
-//       log.Fatal("Failed to load init resources:", err)
-//   }
+//
+//	// Load all initial resources at game startup
+//	if err := rm.LoadResourceGroup("init"); err != nil {
+//	    log.Fatal("Failed to load init resources:", err)
+//	}
 func (rm *ResourceManager) LoadResourceGroup(groupName string) error {
 	// Check if resource config is loaded
 	if rm.config == nil {

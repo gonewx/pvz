@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -32,17 +33,21 @@ func NewPlantCardEntity(em *ecs.EntityManager, rm *game.ResourceManager, rs Rean
 
 	switch plantType {
 	case components.PlantSunflower:
-		sunCost = 50
+		sunCost = config.SunflowerSunCost // 50
 		reanimName = "SunFlower"
-		cooldownTime = 7.5
+		cooldownTime = config.SunflowerRechargeTime // 7.5
 	case components.PlantPeashooter:
-		sunCost = 100
+		sunCost = config.PeashooterSunCost // 100
 		reanimName = "PeaShooter"
-		cooldownTime = 7.5
+		cooldownTime = config.PeashooterRechargeTime // 7.5
 	case components.PlantWallnut:
-		sunCost = 50
+		sunCost = config.WallnutCost // 50
 		reanimName = "Wallnut"
-		cooldownTime = 30.0
+		cooldownTime = config.WallnutRechargeTime // 30.0
+	case components.PlantCherryBomb:
+		sunCost = config.CherryBombSunCost // 150
+		reanimName = "CherryBomb"
+		cooldownTime = config.CherryBombCooldown // 50.0
 	default:
 		em.DestroyEntity(entity)
 		em.RemoveMarkedEntities()

@@ -12,6 +12,8 @@ const (
 	PlantPeashooter
 	// PlantWallnut 坚果墙
 	PlantWallnut
+	// PlantCherryBomb 樱桃炸弹
+	PlantCherryBomb
 )
 
 // PlantCardComponent 表示植物选择卡片的数据

@@ -145,14 +145,12 @@ const (
 
 // Plant Configuration (植物配置)
 const (
-	// PeashooterAttackCooldown 豌豆射手攻击冷却时间（秒）
-	PeashooterAttackCooldown = 1.4
+	// Sunflower (向日葵)
+	// SunflowerSunCost 向日葵的阳光消耗
+	SunflowerSunCost = 50
 
-	// PeashooterAnimationFrames 豌豆射手动画帧数
-	PeashooterAnimationFrames = 13
-
-	// PeashooterFrameSpeed 豌豆射手动画帧速率（秒/帧）
-	PeashooterFrameSpeed = 0.08
+	// SunflowerRechargeTime 向日葵的冷却时间（秒）
+	SunflowerRechargeTime = 7.5
 
 	// SunflowerProductionCooldown 向日葵阳光生产冷却时间（秒）
 	SunflowerProductionCooldown = 24.0
@@ -166,6 +164,23 @@ const (
 	// SunflowerFrameSpeed 向日葵动画帧速率（秒/帧）
 	SunflowerFrameSpeed = 0.08
 
+	// Peashooter (豌豆射手)
+	// PeashooterSunCost 豌豆射手的阳光消耗
+	PeashooterSunCost = 100
+
+	// PeashooterRechargeTime 豌豆射手的冷却时间（秒）
+	PeashooterRechargeTime = 7.5
+
+	// PeashooterAttackCooldown 豌豆射手攻击冷却时间（秒）
+	PeashooterAttackCooldown = 1.4
+
+	// PeashooterAnimationFrames 豌豆射手动画帧数
+	PeashooterAnimationFrames = 13
+
+	// PeashooterFrameSpeed 豌豆射手动画帧速率（秒/帧）
+	PeashooterFrameSpeed = 0.08
+
+	// Wallnut (坚果墙)
 	// WallnutAnimationFrames 坚果墙动画帧数
 	// 坚果墙的完好、轻伤、重伤状态都使用16帧动画
 	WallnutAnimationFrames = 16
@@ -200,7 +215,7 @@ const (
 
 	// WallnutDefaultHealth 坚果墙默认生命值
 	// 坚果墙作为防御植物，拥有远高于其他植物的生命值
-	WallnutDefaultHealth = 800 // 原版游戏数值，是向日葵的13倍
+	WallnutDefaultHealth = 4000 // 原版游戏数值，是向日葵的13倍
 )
 
 // Zombie Eating Configuration (僵尸啃食配置)
@@ -221,4 +236,29 @@ const (
 
 	// ZombieEatingSoundPath 僵尸啃食音效路径
 	ZombieEatingSoundPath = "assets/audio/Sound/chomp.ogg"
+)
+
+// Cherry Bomb Configuration (樱桃炸弹配置)
+const (
+	// CherryBombSunCost 樱桃炸弹的阳光消耗
+	// 樱桃炸弹是高成本的一次性爆炸植物
+	CherryBombSunCost = 150
+
+	// CherryBombFuseTime 樱桃炸弹引信时间（秒）
+	// 种植后到爆炸的延迟时间
+	CherryBombFuseTime = 1.5
+
+	// CherryBombDamage 樱桃炸弹爆炸伤害
+	// 1800点伤害足以秒杀所有僵尸（包括铁桶僵尸1370总生命值）
+	CherryBombDamage = 1800
+
+	// CherryBombRangeRadius 樱桃炸弹爆炸范围半径（格子数）
+	// 1表示3x3范围（中心格子±1格）
+	CherryBombRangeRadius = 1
+
+	// CherryBombCooldown 樱桃炸弹的冷却时间（秒）
+	CherryBombCooldown = 50.0
+
+	// CherryBombExplodeSoundPath 樱桃炸弹爆炸音效路径
+	CherryBombExplodeSoundPath = "assets/audio/Sound/cherrybomb.ogg"
 )

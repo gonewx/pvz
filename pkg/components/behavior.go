@@ -32,6 +32,10 @@ const (
 	// BehaviorFallingPart 掉落部件效果：僵尸手臂或头部掉落的动画效果
 	// 部件以抛物线轨迹飞出，一段时间后消失
 	BehaviorFallingPart
+	// BehaviorCherryBomb 樱桃炸弹行为：种植后进入引信倒计时，倒计时结束后爆炸
+	// 爆炸对以自身为中心的3x3范围内的所有僵尸造成1800点伤害（足以秒杀所有僵尸）
+	// 爆炸后樱桃炸弹实体被移除
+	BehaviorCherryBomb
 )
 
 // ZombieAnimState 定义僵尸的动画状态

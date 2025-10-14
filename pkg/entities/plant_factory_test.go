@@ -422,3 +422,208 @@ func TestWallnutHealthConfiguration(t *testing.T) {
 		t.Errorf("Wallnut health should be at least 13x Sunflower health, got %.1fx", ratio)
 	}
 }
+
+// TestNewCherryBombEntity 测试樱桃炸弹实体创建
+func TestNewCherryBombEntity(t *testing.T) {
+	// 初始化资源管理器和实体管理器
+	rm := newMockResourceManager()
+	em := ecs.NewEntityManager()
+	gs := game.GetGameState()
+	gs.CameraX = 215
+	mockRS := &mockReanimSystem{em: em}
+
+	tests := []struct {
+		name string
+		col  int
+		row  int
+	}{
+		{
+			name: "创建樱桃炸弹 (0,0)",
+			col:  0,
+			row:  0,
+		},
+		{
+			name: "创建樱桃炸弹 (4,2)",
+			col:  4,
+			row:  2,
+		},
+		{
+			name: "创建樱桃炸弹 (8,4)",
+			col:  8,
+			row:  4,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// 创建樱桃炸弹实体
+			cherryBombID, err := NewCherryBombEntity(em, rm, gs, mockRS, tt.col, tt.row)
+			if err != nil {
+				t.Fatalf("Failed to create cherry bomb entity: %v", err)
+			}
+
+			if cherryBombID == 0 {
+				t.Fatal("Expected valid entity ID, got 0")
+			}
+
+			// 验证 PositionComponent
+			posComp, ok := em.GetComponent(cherryBombID, reflect.TypeOf(&components.PositionComponent{}))
+			if !ok {
+				t.Error("Cherry bomb entity should have PositionComponent")
+			} else {
+				pos := posComp.(*components.PositionComponent)
+				expectedX := config.GridWorldStartX + float64(tt.col)*config.CellWidth + config.CellWidth/2
+				expectedY := config.GridWorldStartY + float64(tt.row)*config.CellHeight + config.CellHeight/2
+				if pos.X != expectedX || pos.Y != expectedY {
+					t.Errorf("Position mismatch: got (%.1f, %.1f), want (%.1f, %.1f)",
+						pos.X, pos.Y, expectedX, expectedY)
+				}
+			}
+
+			// 验证 ReanimComponent
+			reanimComp, ok := em.GetComponent(cherryBombID, reflect.TypeOf(&components.ReanimComponent{}))
+			if !ok {
+				t.Error("Cherry bomb entity should have ReanimComponent")
+			} else {
+				reanim := reanimComp.(*components.ReanimComponent)
+				if reanim.Reanim == nil {
+					t.Error("ReanimComponent.Reanim should not be nil")
+				}
+				if reanim.PartImages == nil {
+					t.Error("ReanimComponent.PartImages should not be nil")
+				}
+				// 验证初始动画设置为 anim_idle（引信动画）
+				if reanim.CurrentAnim != "anim_idle" {
+					t.Errorf("CurrentAnim should be 'anim_idle', got '%s'", reanim.CurrentAnim)
+				}
+			}
+
+			// 验证 PlantComponent
+			plantComp, ok := em.GetComponent(cherryBombID, reflect.TypeOf(&components.PlantComponent{}))
+			if !ok {
+				t.Fatal("Cherry bomb entity should have PlantComponent")
+			} else {
+				plant := plantComp.(*components.PlantComponent)
+				if plant.PlantType != components.PlantCherryBomb {
+					t.Errorf("PlantType mismatch: got %v, want %v",
+						plant.PlantType, components.PlantCherryBomb)
+				}
+				if plant.GridCol != tt.col {
+					t.Errorf("GridCol mismatch: got %d, want %d", plant.GridCol, tt.col)
+				}
+				if plant.GridRow != tt.row {
+					t.Errorf("GridRow mismatch: got %d, want %d", plant.GridRow, tt.row)
+				}
+			}
+
+			// 验证 BehaviorComponent
+			behaviorComp, ok := em.GetComponent(cherryBombID, reflect.TypeOf(&components.BehaviorComponent{}))
+			if !ok {
+				t.Fatal("Cherry bomb entity should have BehaviorComponent")
+			} else {
+				behavior := behaviorComp.(*components.BehaviorComponent)
+				if behavior.Type != components.BehaviorCherryBomb {
+					t.Errorf("BehaviorType mismatch: got %v, want %v",
+						behavior.Type, components.BehaviorCherryBomb)
+				}
+			}
+
+			// 验证 TimerComponent（引信计时器）
+			timerComp, ok := em.GetComponent(cherryBombID, reflect.TypeOf(&components.TimerComponent{}))
+			if !ok {
+				t.Fatal("Cherry bomb entity should have TimerComponent")
+			} else {
+				timer := timerComp.(*components.TimerComponent)
+				if timer.Name != "fuse_timer" {
+					t.Errorf("Timer name should be 'fuse_timer', got '%s'", timer.Name)
+				}
+				if timer.TargetTime != config.CherryBombFuseTime {
+					t.Errorf("Timer TargetTime should be %.1f, got %.1f",
+						config.CherryBombFuseTime, timer.TargetTime)
+				}
+				if timer.CurrentTime != 0 {
+					t.Errorf("Timer CurrentTime should start at 0, got %.1f", timer.CurrentTime)
+				}
+				if timer.IsReady {
+					t.Error("Timer IsReady should start as false")
+				}
+			}
+
+			// 验证 CollisionComponent
+			collisionComp, ok := em.GetComponent(cherryBombID, reflect.TypeOf(&components.CollisionComponent{}))
+			if !ok {
+				t.Fatal("Cherry bomb entity should have CollisionComponent")
+			} else {
+				collision := collisionComp.(*components.CollisionComponent)
+				if collision.Width != config.CellWidth {
+					t.Errorf("Collision Width should be %.1f, got %.1f",
+						config.CellWidth, collision.Width)
+				}
+				if collision.Height != config.CellHeight {
+					t.Errorf("Collision Height should be %.1f, got %.1f",
+						config.CellHeight, collision.Height)
+				}
+			}
+		})
+	}
+}
+
+// TestCherryBombConfiguration 测试樱桃炸弹配置常量
+func TestCherryBombConfiguration(t *testing.T) {
+	tests := []struct {
+		name     string
+		constant interface{}
+		expected interface{}
+	}{
+		{
+			name:     "阳光消耗应为150",
+			constant: config.CherryBombSunCost,
+			expected: 150,
+		},
+		{
+			name:     "引信时间应为1.5秒",
+			constant: config.CherryBombFuseTime,
+			expected: 1.5,
+		},
+		{
+			name:     "爆炸伤害应为1800",
+			constant: config.CherryBombDamage,
+			expected: 1800,
+		},
+		{
+			name:     "爆炸范围半径应为1（3x3格子）",
+			constant: config.CherryBombRangeRadius,
+			expected: 1,
+		},
+		{
+			name:     "冷却时间应为50秒",
+			constant: config.CherryBombCooldown,
+			expected: 50.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.constant != tt.expected {
+				t.Errorf("Configuration mismatch: got %v, want %v", tt.constant, tt.expected)
+			}
+		})
+	}
+
+	// 验证爆炸音效路径不为空
+	t.Run("爆炸音效路径应已配置", func(t *testing.T) {
+		if config.CherryBombExplodeSoundPath == "" {
+			t.Error("CherryBombExplodeSoundPath should not be empty")
+		}
+	})
+
+	// 验证爆炸伤害足以秒杀所有MVP范围内的僵尸
+	t.Run("爆炸伤害应足以秒杀铁桶僵尸", func(t *testing.T) {
+		// 铁桶僵尸：270生命值 + 1100护甲 = 1370总生命值
+		bucketheadTotalHealth := config.ZombieDefaultHealth + config.BucketheadZombieArmorHealth
+		if config.CherryBombDamage < bucketheadTotalHealth {
+			t.Errorf("Cherry bomb damage (%d) should be >= buckethead total health (%d)",
+				config.CherryBombDamage, bucketheadTotalHealth)
+		}
+	})
+}
