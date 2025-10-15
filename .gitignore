@@ -16,3 +16,4 @@ coverage_*.out
 pvz-game
 
 /assets
+/.meta/whitepaper.md

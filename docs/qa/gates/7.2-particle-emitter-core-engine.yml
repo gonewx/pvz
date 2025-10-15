@@ -1,0 +1,80 @@
+# Quality Gate Decision: Story 7.2 - 粒子发射器核心引擎
+schema: 1
+story: "7.2"
+story_title: "粒子发射器核心引擎"
+gate: CONCERNS
+status_reason: "实现质量优秀，测试覆盖率91-92%超标，但发现两处性能优化机会（非阻塞）"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-10-15T08:30:00Z"
+
+waiver: { active: false }
+
+top_issues:
+  - id: "PERF-001"
+    severity: medium
+    finding: "applyFields函数中每帧重复ParseValue和RandomInRange调用（对于静态力场值）"
+    suggested_action: "将静态力场值在粒子生成时解析并缓存，避免重复计算"
+    suggested_owner: dev
+  - id: "CODE-001"
+    severity: low
+    finding: "particle_system.go:99 存在魔法数字 10（安全检查阈值）"
+    suggested_action: "定义为常量 MaxSpawnTimeAhead = 10.0，提高可维护性"
+    suggested_owner: dev
+
+quality_score: 80
+expires: "2025-10-29T00:00:00Z"
+
+evidence:
+  tests_reviewed: 23
+  risks_identified: 2
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "游戏引擎代码，无安全敏感操作，无用户输入处理"
+  performance:
+    status: CONCERNS
+    notes: "发现两处性能优化机会：(1) applyFields重复解析 (2) 可考虑对象池（未来优化）"
+  reliability:
+    status: PASS
+    notes: "良好的错误处理和边界情况覆盖，nil检查完整"
+  maintainability:
+    status: PASS
+    notes: "优秀的代码组织和注释，清晰的函数分离，遵循ECS原则"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "优化applyFields性能：在粒子生成时预解析静态力场值"
+      refs: ["pkg/systems/particle_system.go:320-369"]
+    - action: "考虑实现粒子对象池以减少GC压力（Story 7.5建议）"
+      refs: ["pkg/systems/particle_system.go"]
+    - action: "将魔法数字提取为常量"
+      refs: ["pkg/systems/particle_system.go:99"]
+
+test_coverage_summary:
+  internal_particle: "91.1%"
+  particle_system_go: "~92%"
+  total_test_cases: 23
+  test_files:
+    - "internal/particle/value_parser_test.go (10 test functions)"
+    - "pkg/systems/particle_system_test.go (13 test functions)"
+
+architecture_compliance:
+  ecs_principles: PASS
+  zero_coupling: PASS
+  data_behavior_separation: PASS
+  coding_standards: PASS
+  naming_conventions: PASS
+  error_handling: PASS
+  godoc_comments: PASS
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 1, low: 1 }
+  recommendations:
+    must_fix: []
+    monitor:
+      - "监控粒子系统性能，如出现帧率下降考虑实施对象池"
