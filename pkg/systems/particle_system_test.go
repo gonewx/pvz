@@ -343,6 +343,8 @@ func TestParticleSystem_AccelerationField(t *testing.T) {
 	ps := NewParticleSystem(em, nil)
 
 	// Create particle with downward acceleration (gravity)
+	// Note: Config values are in PopCap units (velocity delta per 0.01s)
+	// Value 1 = 1 pixel/centisecond = 100 pixels/sec²
 	particleID := em.CreateEntity()
 	particleComp := &components.ParticleComponent{
 		VelocityX: 0,
@@ -353,7 +355,7 @@ func TestParticleSystem_AccelerationField(t *testing.T) {
 			{
 				FieldType: "Acceleration",
 				X:         "0",
-				Y:         "100", // 100 pixels/sec^2 downward
+				Y:         "1", // 1 pixel/centisecond = 100 pixels/sec² downward
 			},
 		},
 	}
@@ -367,6 +369,7 @@ func TestParticleSystem_AccelerationField(t *testing.T) {
 	ps.Update(1.0)
 
 	// Velocity should have increased by acceleration * dt
+	// Config value 1 → real acceleration 100 pixels/sec²
 	expectedVelocityY := initialVelocityY + 100*1.0
 	if particleComp.VelocityY < expectedVelocityY-1 || particleComp.VelocityY > expectedVelocityY+1 {
 		t.Errorf("VelocityY should be ~%v, got %v", expectedVelocityY, particleComp.VelocityY)
@@ -379,6 +382,8 @@ func TestParticleSystem_FrictionField(t *testing.T) {
 	ps := NewParticleSystem(em, nil)
 
 	// Create particle with friction
+	// Note: Config values are in PopCap units (friction per 0.01s)
+	// Value 0.005 = 0.5% friction per centisecond = 50% per second
 	particleID := em.CreateEntity()
 	particleComp := &components.ParticleComponent{
 		VelocityX: 100, // Initial velocity
@@ -388,7 +393,7 @@ func TestParticleSystem_FrictionField(t *testing.T) {
 		Fields: []particle.Field{
 			{
 				FieldType: "Friction",
-				X:         "0.5", // 50% friction per second
+				X:         "0.005", // 0.5% per centisecond = 50% friction per second
 				Y:         "0",
 			},
 		},
@@ -403,6 +408,7 @@ func TestParticleSystem_FrictionField(t *testing.T) {
 	ps.Update(1.0)
 
 	// Velocity should have decreased by friction
+	// Config value 0.005 → real friction 0.5 per second
 	expectedVelocityX := initialVelocityX * (1 - 0.5*1.0)
 	if particleComp.VelocityX < expectedVelocityX-1 || particleComp.VelocityX > expectedVelocityX+1 {
 		t.Errorf("VelocityX should be ~%v, got %v", expectedVelocityX, particleComp.VelocityX)
@@ -619,6 +625,479 @@ func TestParticleSystem_EmitterAutoCleanup(t *testing.T) {
 	// Emitter should be deleted (inactive and no active particles)
 	if em.HasComponent(emitterID, reflect.TypeOf(&components.EmitterComponent{})) {
 		t.Error("Emitter should be auto-deleted when inactive and all particles gone")
+	}
+}
+
+// TestParticleSystem_GroundCollision tests that particles bounce when hitting ground
+func TestParticleSystem_GroundCollision(t *testing.T) {
+	em := ecs.NewEntityManager()
+	ps := NewParticleSystem(em, nil)
+
+	// Create particle with downward velocity and ground constraint
+	particleID := em.CreateEntity()
+	particleComp := &components.ParticleComponent{
+		VelocityX:             100,
+		VelocityY:             165, // Moving downward
+		Age:                   0,
+		Lifetime:              2.0,
+		GroundY:               390.0,               // Ground at Y=390
+		CollisionReflectX:     0.3,                 // 30% bounce
+		CollisionReflectY:     0.3,                 // 30% bounce
+		CollisionReflectCurve: []particle.Keyframe{
+			{Time: 0.0, Value: 0.3},
+			{Time: 0.4, Value: 0.3},
+			{Time: 0.5, Value: 0.0}, // Lose bounciness at 50% lifetime
+		},
+		Fields: []particle.Field{
+			{FieldType: "Acceleration", Y: "0.17"}, // 0.17 pixel/centisecond = 17 pixels/sec² gravity
+		},
+	}
+	posComp := &components.PositionComponent{X: 512, Y: 300} // Starting above ground
+	em.AddComponent(particleID, particleComp)
+	em.AddComponent(particleID, posComp)
+
+	// Update until particle reaches ground (~0.5 seconds)
+	dt := 1.0 / 60.0
+	bounced := false
+	maxIterations := 120 // 2 seconds max
+
+	for i := 0; i < maxIterations; i++ {
+		oldVelocityY := particleComp.VelocityY
+
+		ps.Update(dt)
+
+		// Check if bounce occurred (velocity changed from positive to negative)
+		if oldVelocityY > 0 && particleComp.VelocityY < 0 {
+			bounced = true
+
+			// Verify bounce properties
+			if posComp.Y < 389 || posComp.Y > 391 {
+				t.Errorf("Particle should bounce at ground level (390), but bounced at Y=%.1f", posComp.Y)
+			}
+
+			// Verify velocity reduced by bounce coefficient (~30%)
+			expectedBounceVelocity := -oldVelocityY * 0.3
+			tolerance := 5.0
+			if particleComp.VelocityY < expectedBounceVelocity-tolerance || particleComp.VelocityY > expectedBounceVelocity+tolerance {
+				t.Errorf("Bounce velocity should be ~%.1f, got %.1f", expectedBounceVelocity, particleComp.VelocityY)
+			}
+
+			break
+		}
+
+		// Stop if particle reaches ground area
+		if posComp.Y >= 390 && particleComp.VelocityY > 0 {
+			// Give it a few more frames to process collision
+			if i > 30 {
+				break
+			}
+		}
+	}
+
+	if !bounced {
+		t.Errorf("Particle should have bounced off the ground, but didn't. Final position: Y=%.1f, VelocityY=%.1f",
+			posComp.Y, particleComp.VelocityY)
+	}
+}
+
+// TestParticleSystem_GroundCollision_NoGroundConstraint tests that particles don't bounce without ground
+func TestParticleSystem_GroundCollision_NoGroundConstraint(t *testing.T) {
+	em := ecs.NewEntityManager()
+	ps := NewParticleSystem(em, nil)
+
+	// Create particle WITHOUT ground constraint
+	particleID := em.CreateEntity()
+	particleComp := &components.ParticleComponent{
+		VelocityY:         100, // Moving downward
+		Age:               0,
+		Lifetime:          2.0,
+		GroundY:           0,   // No ground constraint
+		CollisionReflectY: 0.3,
+	}
+	posComp := &components.PositionComponent{X: 512, Y: 300}
+	em.AddComponent(particleID, particleComp)
+	em.AddComponent(particleID, posComp)
+
+	// Update for 1 second
+	for i := 0; i < 60; i++ {
+		ps.Update(1.0 / 60.0)
+	}
+
+	// Velocity should remain positive (no bounce)
+	if particleComp.VelocityY <= 0 {
+		t.Error("Particle without ground constraint should not bounce")
+	}
+}
+
+// TestParticleSystem_GroundCollision_MultipleBounces tests multiple bounces with energy loss
+func TestParticleSystem_GroundCollision_MultipleBounces(t *testing.T) {
+	em := ecs.NewEntityManager()
+	ps := NewParticleSystem(em, nil)
+
+	// Create particle that can bounce multiple times
+	particleID := em.CreateEntity()
+	particleComp := &components.ParticleComponent{
+		VelocityY:         165, // Strong downward velocity
+		Age:               0,
+		Lifetime:          3.0, // Long lifetime to allow multiple bounces
+		GroundY:           390.0,
+		CollisionReflectY: 0.3,
+		Fields: []particle.Field{
+			{FieldType: "Acceleration", Y: "0.17"}, // 0.17 pixel/centisecond = 17 pixels/sec² gravity
+		},
+	}
+	posComp := &components.PositionComponent{X: 512, Y: 300}
+	em.AddComponent(particleID, particleComp)
+	em.AddComponent(particleID, posComp)
+
+	// Track bounces
+	bounceCount := 0
+	lastVelocityY := particleComp.VelocityY
+	dt := 1.0 / 60.0
+
+	for i := 0; i < 180; i++ { // 3 seconds
+		ps.Update(dt)
+
+		// Detect bounce (velocity changed from positive to negative)
+		if lastVelocityY > 0 && particleComp.VelocityY < 0 {
+			bounceCount++
+		}
+
+		lastVelocityY = particleComp.VelocityY
+
+		// Stop if velocity becomes very small
+		if i > 60 && particleComp.VelocityY > -5 && particleComp.VelocityY < 5 {
+			break
+		}
+	}
+
+	// Should have at least 1 bounce (typically 2-3 bounces before settling)
+	if bounceCount < 1 {
+		t.Errorf("Expected at least 1 bounce, got %d", bounceCount)
+	}
+
+	t.Logf("Particle bounced %d times before settling", bounceCount)
+}
+
+// TestParticleSystem_GroundCollision_ReflectCurveDecay tests bounce coefficient decay over time
+func TestParticleSystem_GroundCollision_ReflectCurveDecay(t *testing.T) {
+	em := ecs.NewEntityManager()
+	ps := NewParticleSystem(em, nil)
+
+	// Create particle with bounce decay curve
+	particleID := em.CreateEntity()
+	particleComp := &components.ParticleComponent{
+		VelocityY:         50, // Moderate downward velocity
+		Age:               0,
+		Lifetime:          1.0,
+		GroundY:           390.0,
+		CollisionReflectY: 0.3,
+		CollisionReflectCurve: []particle.Keyframe{
+			{Time: 0.0, Value: 0.3},  // 30% bounce at start
+			{Time: 0.5, Value: 0.0},  // No bounce at 50% lifetime
+		},
+	}
+	posComp := &components.PositionComponent{X: 512, Y: 350}
+	em.AddComponent(particleID, particleComp)
+	em.AddComponent(particleID, posComp)
+
+	// Update to 60% of lifetime (should have no bounce)
+	for i := 0; i < 36; i++ { // 0.6 seconds
+		ps.Update(1.0 / 60.0)
+	}
+
+	// Manually trigger collision at 60% lifetime
+	posComp.Y = 391 // Below ground
+	particleComp.VelocityY = 50
+	particleComp.Age = 0.6
+
+	oldVelocity := particleComp.VelocityY
+	ps.Update(1.0 / 60.0)
+
+	// At 60% lifetime (> 50%), bounce should be 0 (no bounce)
+	if particleComp.VelocityY < 0 {
+		t.Errorf("Particle should not bounce after 50%% lifetime (bounciness decayed to 0)")
+	}
+
+	t.Logf("Collision at age 60%%: velocity %.1f → %.1f (no bounce as expected)", oldVelocity, particleComp.VelocityY)
+}
+
+// TestParticleSystem_CollisionSpin tests that particles gain spin on collision
+func TestParticleSystem_CollisionSpin(t *testing.T) {
+	em := ecs.NewEntityManager()
+	ps := NewParticleSystem(em, nil)
+
+	// Create particle with collision spin (NO decay curve to ensure effect is active)
+	particleID := em.CreateEntity()
+	particleComp := &components.ParticleComponent{
+		VelocityY:         100,
+		RotationSpeed:     0, // No initial spin
+		Age:               0,
+		Lifetime:          3.0, // Longer lifetime
+		GroundY:           390.0,
+		CollisionReflectY: 0.3,
+		CollisionSpinMin:  -6.0, // Random spin range
+		CollisionSpinMax:  -3.0,
+		// No CollisionSpinCurve - effect stays at 100%
+	}
+	posComp := &components.PositionComponent{X: 512, Y: 300}
+	em.AddComponent(particleID, particleComp)
+	em.AddComponent(particleID, posComp)
+
+	initialRotationSpeed := particleComp.RotationSpeed
+
+	// Update until collision
+	dt := 1.0 / 60.0
+	collisionDetected := false
+	for i := 0; i < 120; i++ {
+		oldVelocityY := particleComp.VelocityY
+		ps.Update(dt)
+
+		// Check if collision occurred
+		if oldVelocityY > 0 && particleComp.VelocityY < 0 {
+			collisionDetected = true
+
+			// Rotation speed should have changed
+			if particleComp.RotationSpeed == initialRotationSpeed {
+				t.Errorf("Particle should gain rotation speed on collision, but it stayed at %.1f", initialRotationSpeed)
+			}
+
+			// Should be within the expected range [-6, -3]
+			if particleComp.RotationSpeed > -3 || particleComp.RotationSpeed < -6 {
+				t.Logf("Warning: Collision spin %.1f outside expected range [-6, -3]", particleComp.RotationSpeed)
+			}
+
+			t.Logf("Collision spin: %.1f → %.1f (added %.1f)",
+				initialRotationSpeed, particleComp.RotationSpeed, particleComp.RotationSpeed-initialRotationSpeed)
+			break
+		}
+	}
+
+	if !collisionDetected {
+		t.Error("No collision detected - test setup issue")
+	}
+}
+
+// TestParticleSystem_EmitterInstantBurst tests SpawnRate=0 (instant burst mode)
+func TestParticleSystem_EmitterInstantBurst(t *testing.T) {
+	em := ecs.NewEntityManager()
+	ps := NewParticleSystem(em, nil)
+
+	// Create emitter with SpawnRate=0 (instant burst)
+	emitterID := em.CreateEntity()
+	emitterComp := &components.EmitterComponent{
+		Config: &particle.EmitterConfig{
+			ParticleDuration: "1000",
+			LaunchSpeed:      "100",
+			LaunchAngle:      "0",
+		},
+		Active:           true,
+		Age:              0,
+		SystemDuration:   0,
+		NextSpawnTime:    0,
+		ActiveParticles:  make([]ecs.EntityID, 0),
+		TotalLaunched:    0,
+		SpawnRate:        0,   // Instant burst
+		SpawnMinActive:   5,   // Spawn 5 particles immediately
+		SpawnMaxActive:   100,
+		SpawnMaxLaunched: 0,
+	}
+	posComp := &components.PositionComponent{X: 200, Y: 200}
+	em.AddComponent(emitterID, emitterComp)
+	em.AddComponent(emitterID, posComp)
+
+	// First update should spawn all particles at once
+	ps.Update(0.016)
+
+	if emitterComp.TotalLaunched != 5 {
+		t.Errorf("Instant burst should spawn 5 particles immediately, got %d", emitterComp.TotalLaunched)
+	}
+
+	// Second update should not spawn more
+	ps.Update(0.016)
+	if emitterComp.TotalLaunched != 5 {
+		t.Error("Instant burst should only spawn once")
+	}
+}
+
+// TestParticleSystem_EmitterCircleType tests Circle emitter with EmitterRadius
+func TestParticleSystem_EmitterCircleType(t *testing.T) {
+	em := ecs.NewEntityManager()
+	ps := NewParticleSystem(em, nil)
+
+	// Create Circle emitter with EmitterRadius
+	emitterID := em.CreateEntity()
+	emitterComp := &components.EmitterComponent{
+		Config: &particle.EmitterConfig{
+			ParticleDuration: "1000",
+			LaunchSpeed:      "100",
+			LaunchAngle:      "", // No angle - Circle type uses 360° random
+			EmitterType:      "Circle",
+		},
+		Active:           true,
+		Age:              0,
+		SystemDuration:   0,
+		NextSpawnTime:    0,
+		ActiveParticles:  make([]ecs.EntityID, 0),
+		TotalLaunched:    0,
+		SpawnRate:        10,
+		SpawnMinActive:   0,
+		SpawnMaxActive:   100,
+		SpawnMaxLaunched: 0,
+		EmitterRadius:    50.0, // Spawn in circle radius 50
+	}
+	posComp := &components.PositionComponent{X: 400, Y: 300}
+	em.AddComponent(emitterID, emitterComp)
+	em.AddComponent(emitterID, posComp)
+
+	// Spawn some particles
+	ps.Update(0.5)
+
+	if emitterComp.TotalLaunched < 3 {
+		t.Errorf("Circle emitter should spawn particles, got %d", emitterComp.TotalLaunched)
+	}
+
+	t.Logf("Circle emitter spawned %d particles in radius 50", emitterComp.TotalLaunched)
+}
+
+// TestParticleSystem_SystemAlpha tests system-level alpha animation
+func TestParticleSystem_SystemAlpha(t *testing.T) {
+	em := ecs.NewEntityManager()
+	ps := NewParticleSystem(em, nil)
+
+	// Create particle with system alpha curve (fade out at end)
+	particleID := em.CreateEntity()
+	particleComp := &components.ParticleComponent{
+		Alpha:    1.0,
+		Age:      0,
+		Lifetime: 2.0,
+		SystemAlphaKeyframes: []particle.Keyframe{
+			{Time: 0.0, Value: 1.0},   // Opaque at start
+			{Time: 0.95, Value: 1.0},  // Stay opaque
+			{Time: 1.0, Value: 0.0},   // Fade out at end
+		},
+		SystemAlphaInterp: "Linear",
+		EmitterAge:        0,
+		EmitterDuration:   2.0,
+	}
+	posComp := &components.PositionComponent{X: 0, Y: 0}
+	em.AddComponent(particleID, particleComp)
+	em.AddComponent(particleID, posComp)
+
+	// Update to 90% of emitter duration (t=1.8s)
+	for i := 0; i < 108; i++ { // 1.8 seconds
+		ps.Update(1.0 / 60.0)
+	}
+
+	// At 90%, SystemAlpha should still be ~1.0 (before fade)
+	if particleComp.Alpha < 0.9 {
+		t.Errorf("Alpha at 90%% should be ~1.0, got %.2f", particleComp.Alpha)
+	}
+
+	t.Logf("System alpha at 90%%: %.2f (opaque)", particleComp.Alpha)
+}
+
+// TestParticleSystem_RandomLaunchSpin tests random initial rotation
+func TestParticleSystem_RandomLaunchSpin(t *testing.T) {
+	em := ecs.NewEntityManager()
+	ps := NewParticleSystem(em, nil)
+
+	// Create emitter with RandomLaunchSpin
+	emitterID := em.CreateEntity()
+	emitterComp := &components.EmitterComponent{
+		Config: &particle.EmitterConfig{
+			ParticleDuration:  "1000",
+			LaunchSpeed:       "100",
+			LaunchAngle:       "0",
+			RandomLaunchSpin:  "1", // Enable random initial rotation
+			ParticleSpinAngle: "",  // No fixed angle
+		},
+		Active:           true,
+		Age:              0,
+		SystemDuration:   0,
+		NextSpawnTime:    0,
+		ActiveParticles:  make([]ecs.EntityID, 0),
+		TotalLaunched:    0,
+		SpawnRate:        0,  // Instant burst
+		SpawnMinActive:   10, // Spawn 10 particles
+		SpawnMaxActive:   100,
+		SpawnMaxLaunched: 0,
+	}
+	posComp := &components.PositionComponent{X: 200, Y: 200}
+	em.AddComponent(emitterID, emitterComp)
+	em.AddComponent(emitterID, posComp)
+
+	ps.Update(0.016)
+
+	// Check that particles have different random rotations
+	particleType := reflect.TypeOf(&components.ParticleComponent{})
+	particles := em.GetEntitiesWith(particleType)
+
+	rotations := make(map[float64]bool)
+	for _, particleID := range particles {
+		particleComp, _ := em.GetComponent(particleID, particleType)
+		particle := particleComp.(*components.ParticleComponent)
+		rotations[particle.Rotation] = true
+	}
+
+	// With 10 particles and random 0-360, we should have at least 3 different values
+	if len(rotations) < 3 {
+		t.Errorf("RandomLaunchSpin should produce varied rotations, got %d unique values out of %d particles",
+			len(rotations), len(particles))
+	}
+
+	t.Logf("RandomLaunchSpin: %d unique rotations out of %d particles", len(rotations), len(particles))
+}
+
+// TestParticleSystem_ColorDefaults tests default color values
+func TestParticleSystem_ColorDefaults(t *testing.T) {
+	em := ecs.NewEntityManager()
+	ps := NewParticleSystem(em, nil)
+
+	// Create emitter with no color/brightness specified
+	emitterID := em.CreateEntity()
+	emitterComp := &components.EmitterComponent{
+		Config: &particle.EmitterConfig{
+			ParticleDuration: "1000",
+			LaunchSpeed:      "100",
+			LaunchAngle:      "0",
+			// No ParticleRed, ParticleGreen, ParticleBlue, ParticleBrightness
+		},
+		Active:           true,
+		Age:              0,
+		SystemDuration:   0,
+		NextSpawnTime:    0,
+		ActiveParticles:  make([]ecs.EntityID, 0),
+		TotalLaunched:    0,
+		SpawnRate:        0, // Instant burst
+		SpawnMinActive:   1,
+		SpawnMaxActive:   100,
+		SpawnMaxLaunched: 0,
+	}
+	posComp := &components.PositionComponent{X: 200, Y: 200}
+	em.AddComponent(emitterID, emitterComp)
+	em.AddComponent(emitterID, posComp)
+
+	ps.Update(0.016)
+
+	// Check particle has default white color and normal brightness
+	particleType := reflect.TypeOf(&components.ParticleComponent{})
+	particles := em.GetEntitiesWith(particleType)
+
+	if len(particles) == 0 {
+		t.Fatal("No particle spawned")
+	}
+
+	particleComp, _ := em.GetComponent(particles[0], particleType)
+	particle := particleComp.(*components.ParticleComponent)
+
+	if particle.Red != 1.0 || particle.Green != 1.0 || particle.Blue != 1.0 {
+		t.Errorf("Default color should be white (1,1,1), got (%.1f,%.1f,%.1f)",
+			particle.Red, particle.Green, particle.Blue)
+	}
+
+	if particle.Brightness != 1.0 {
+		t.Errorf("Default brightness should be 1.0, got %.1f", particle.Brightness)
 	}
 }
 

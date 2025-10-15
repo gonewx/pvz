@@ -240,6 +240,11 @@ func (ps *ParticleSystem) updateParticles(dt float64) {
 					reflectY = reflect
 				}
 
+				// DEBUG: 碰撞弹跳日志
+				oldVelocityY := particle.VelocityY
+				log.Printf("[碰撞] Age=%.2fs, Y=%.1f, 旧速度=%.1f, 反弹系数=%.2f",
+					particle.Age, position.Y, oldVelocityY, reflectY)
+
 				// 反弹：速度反向并乘以反弹系数
 				particle.VelocityY = -particle.VelocityY * reflectY
 				particle.VelocityX = particle.VelocityX * reflectX
@@ -486,6 +491,9 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 		}
 	}
 
+	// DEBUG: 粒子创建日志
+	log.Printf("[DEBUG] 创建粒子: spawnY=%.1f, groundY=%.1f, velocityY=%.1f", spawnY, groundY, velocityY)
+
 	// Create ParticleComponent
 	particleComp := &components.ParticleComponent{
 		VelocityX:     velocityX,
@@ -585,10 +593,17 @@ func (ps *ParticleSystem) applyInterpolation(p *components.ParticleComponent) {
 
 // applyFields applies force field effects to a particle.
 // Supports Acceleration and Friction field types.
+//
+// Unit conversion note: Original PvZ uses a fixed time step of 0.01 seconds (100 FPS).
+// Field values in XML are velocity/friction deltas per time step, not true accelerations.
+// We need to convert them by dividing by the original time step (0.01) to get per-second rates.
 func (ps *ParticleSystem) applyFields(p *components.ParticleComponent, dt float64) {
 	if p.Lifetime <= 0 {
 		return
 	}
+
+	// PopCap's original fixed physics time step (centiseconds)
+	const OriginalTimeStep = 0.01 // 1 centisecond = 0.01 seconds
 
 	// Calculate normalized time (0-1) for time-based fields
 	t := p.Age / p.Lifetime
@@ -613,6 +628,11 @@ func (ps *ParticleSystem) applyFields(p *components.ParticleComponent, dt float6
 				ay = particlePkg.RandomInRange(yMin, yMax)
 			}
 
+			// Unit conversion: Config values are "velocity delta per 0.01s"
+			// Convert to true acceleration (pixels/second²)
+			ax = ax / OriginalTimeStep // pixels/centisecond → pixels/second²
+			ay = ay / OriginalTimeStep
+
 			// Apply acceleration to velocity
 			p.VelocityX += ax * dt
 			p.VelocityY += ay * dt
@@ -634,6 +654,11 @@ func (ps *ParticleSystem) applyFields(p *components.ParticleComponent, dt float6
 			} else {
 				frictionY = particlePkg.RandomInRange(yMin, yMax)
 			}
+
+			// Unit conversion: Config values are "velocity decay per 0.01s"
+			// Convert to per-second friction coefficient
+			frictionX = frictionX / OriginalTimeStep
+			frictionY = frictionY / OriginalTimeStep
 
 			// Apply friction (velocity decay)
 			p.VelocityX *= (1 - frictionX*dt)
