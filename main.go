@@ -1,7 +1,11 @@
 package main
 
 import (
+	"flag"
+	"fmt"
+	"io"
 	"log"
+	"os"
 
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/scenes"
@@ -38,18 +42,32 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 }
 
 func main() {
+	// Flags
+	verboseFlag := flag.Bool("verbose", false, "Enable verbose logging (default off)")
+	flag.Parse()
+
 	// Initialize audio context with 48000 Hz sample rate
 	audioContext := audio.NewContext(48000)
 
 	// Create resource manager
 	resourceManager := game.NewResourceManager(audioContext)
 
-	// Load resource configuration from YAML
-	log.Println("Loading resource configuration...")
-	if err := resourceManager.LoadResourceConfig("assets/config/resources.yaml"); err != nil {
-		log.Fatal("Failed to load resource config:", err)
+	// Quiet logs by default unless --verbose
+	if !*verboseFlag {
+		// 丢弃所有 log.Printf 输出；仅使用下方 fmt.Fprintln 输出关键错误
+		log.SetOutput(io.Discard)
+		log.SetFlags(0)
 	}
-	log.Println("Resource configuration loaded successfully")
+
+	// Load resource configuration from YAML
+	if err := resourceManager.LoadResourceConfig("assets/config/resources.yaml"); err != nil {
+		if *verboseFlag {
+			log.Printf("Failed to load resource config: %v", err)
+		} else {
+			fmt.Fprintln(os.Stderr, "资源配置加载失败（使用 --verbose 查看详细日志）")
+		}
+		os.Exit(1)
+	}
 
 	// Create scene manager
 	sceneManager := game.NewSceneManager()
@@ -70,6 +88,11 @@ func main() {
 	// Start the game loop
 	// This will call Update() and Draw() repeatedly until the window is closed
 	if err := ebiten.RunGame(gameInstance); err != nil {
-		log.Fatal(err)
+		if *verboseFlag {
+			log.Printf("RunGame error: %v", err)
+		} else {
+			fmt.Fprintln(os.Stderr, "程序运行异常（使用 --verbose 查看详细日志）")
+		}
+		os.Exit(1)
 	}
 }

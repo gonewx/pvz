@@ -252,7 +252,8 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	}
 
 	// Story 7.2: Initialize particle system
-	scene.particleSystem = systems.NewParticleSystem(scene.entityManager)
+	// Story 7.4: Added ResourceManager parameter for loading particle images
+	scene.particleSystem = systems.NewParticleSystem(scene.entityManager, scene.resourceManager)
 	log.Printf("[GameScene] Initialized particle system for visual effects")
 
 	return scene
@@ -421,8 +422,8 @@ func (s *GameScene) Update(deltaTime float64) {
 	s.behaviorSystem.Update(deltaTime)         // 6. Update plant behaviors (Story 3.4)
 	s.physicsSystem.Update(deltaTime)          // 7. Check collisions (Story 4.3)
 	// Story 6.3: Reanim 动画系统（替代旧的 AnimationSystem）
-	s.reanimSystem.Update(deltaTime)      // 8. Update Reanim animation frames
-	s.particleSystem.Update(deltaTime)    // 9. Update particle effects (Story 7.2)
+	s.reanimSystem.Update(deltaTime)   // 8. Update Reanim animation frames
+	s.particleSystem.Update(deltaTime) // 9. Update particle effects (Story 7.2)
 	// Story 3.2: 植物预览系统 - 更新预览位置（双图像支持）
 	s.plantPreviewSystem.Update(deltaTime) // 10. Update plant preview position (dual-image support)
 	s.lifetimeSystem.Update(deltaTime)     // 11. Check for expired entities
@@ -528,6 +529,9 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	// Layer 11: Draw game result overlay (Story 5.5)
 	// 胜利/失败界面（如果游戏结束）
 	s.drawGameResultOverlay(screen)
+
+	// DEBUG: Draw particle test instructions (Story 7.4 debugging)
+	s.drawParticleTestInstructions(screen)
 
 	// DEBUG: Draw grid boundaries (Story 3.3 debugging)
 	s.drawGridDebug(screen)
@@ -660,6 +664,36 @@ func (s *GameScene) drawShovel(screen *ebiten.Image) {
 			ShovelX, ShovelY,
 			ShovelWidth, ShovelHeight,
 			color.RGBA{R: 128, G: 128, B: 128, A: 255}) // Gray
+	}
+}
+
+// drawParticleTestInstructions 绘制粒子效果测试说明（调试用）
+// Story 7.4: 方便测试粒子效果，无需通过攻击触发
+func (s *GameScene) drawParticleTestInstructions(screen *ebiten.Image) {
+	// 只在非游戏结束状态下显示
+	if s.gameState.IsGameOver {
+		return
+	}
+
+	// 测试说明（屏幕左下角）
+	instructions := []string{
+		"[粒子测试] P=豌豆溅射 | B=爆炸 | A=奖励光效",
+	}
+
+	// 绘制半透明背景
+	y := float64(WindowHeight - 25)
+	bgPadding := 5.0
+	ebitenutil.DrawRect(screen,
+		10-bgPadding,
+		y-bgPadding,
+		300,
+		20,
+		color.RGBA{R: 0, G: 0, B: 0, A: 120})
+
+	// 绘制文本
+	for i, line := range instructions {
+		yPos := int(y) + i*15
+		ebitenutil.DebugPrintAt(screen, line, 10, yPos)
 	}
 }
 

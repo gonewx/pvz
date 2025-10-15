@@ -1,6 +1,7 @@
 package systems
 
 import (
+	"log"
 	"reflect"
 
 	"github.com/decker502/pvz/pkg/components"
@@ -141,6 +142,40 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 					// 如果创建击中效果失败，记录错误但继续处理碰撞
 					// 在实际项目中可以使用日志系统记录错误
 					// 这里为了简化，忽略错误
+				}
+
+				// Story 7.4: 触发豌豆击中溅射粒子效果
+				// 获取子弹的 BehaviorComponent 以确定子弹类型
+				bulletBehaviorComp, ok := ps.em.GetComponent(bulletID, reflect.TypeOf(&components.BehaviorComponent{}))
+				if ok {
+					bulletBehavior := bulletBehaviorComp.(*components.BehaviorComponent)
+
+					// 根据子弹类型选择粒子效果
+					var particleEffectName string
+					if bulletBehavior.Type == components.BehaviorPeaProjectile {
+						particleEffectName = "PeaSplat" // 豌豆溅射效果
+					}
+					// TODO: 添加卷心菜子弹类型判断（当实现卷心菜投手后）
+					// else if bulletBehavior.Type == components.BehaviorCabbageProjectile {
+					//     particleEffectName = "CabbageSplat"
+					// }
+
+					// 触发粒子效果
+					if particleEffectName != "" {
+						_, err := entities.CreateParticleEffect(
+							ps.em,
+							ps.rm,
+							particleEffectName,
+							bulletPos.X, bulletPos.Y,
+						)
+						if err != nil {
+							log.Printf("[PhysicsSystem] 警告：创建击中粒子效果失败: %v", err)
+							// 不阻塞游戏逻辑，游戏继续运行
+						} else {
+							log.Printf("[PhysicsSystem] 子弹 %d 击中僵尸 %d，触发粒子效果 '%s'，位置: (%.1f, %.1f)",
+								bulletID, zombieID, particleEffectName, bulletPos.X, bulletPos.Y)
+						}
+					}
 				}
 
 				// 2. 处理护甲伤害（Story 5.3: 优先扣除护甲值）

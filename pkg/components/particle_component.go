@@ -55,10 +55,27 @@ type ParticleComponent struct {
 	SpinInterpolation  string // Interpolation mode for spin
 
 	// Rendering properties
-	Image    *ebiten.Image // Particle texture/sprite image
-	Additive bool          // Use additive blending when rendering
+	Image       *ebiten.Image // Particle texture/sprite image (full sprite sheet or single frame)
+	ImageFrames int           // Number of frames in the sprite sheet (1 = single image, >1 = sprite sheet)
+	FrameNum    int           // Current frame number (0-based index, used for sprite sheets)
+	Additive    bool          // Use additive blending when rendering
 
 	// Force fields (力场效果)
 	// Copied from emitter config at spawn time for performance
 	Fields []particle.Field // Force fields affecting this particle
+
+	// Collision properties (Story 7.5: ZombieHead 弹跳效果)
+	CollisionReflectX     float64             // X轴反弹系数（速度乘数）
+	CollisionReflectY     float64             // Y轴反弹系数（速度乘数）
+	CollisionReflectCurve []particle.Keyframe // 反弹系数随时间变化曲线
+	CollisionSpinMin      float64             // 碰撞时增加的旋转速度范围（最小值）
+	CollisionSpinMax      float64             // 碰撞时增加的旋转速度范围（最大值）
+	CollisionSpinCurve    []particle.Keyframe // 碰撞旋转效果随时间变化曲线
+	GroundY               float64             // 地面约束Y坐标（0表示无地面）
+
+	// System-level properties (Story 7.5: 系统级透明度)
+	SystemAlphaKeyframes []particle.Keyframe // 系统级透明度关键帧（基于发射器年龄）
+	SystemAlphaInterp    string              // 插值模式
+	EmitterAge           float64             // 发射器年龄（用于计算 SystemAlpha）
+	EmitterDuration      float64             // 发射器持续时间（用于归一化 SystemAlpha）
 }

@@ -460,15 +460,23 @@ func (s *RenderSystem) DrawParticles(screen *ebiten.Image, cameraX float64) {
 		return
 	}
 
+	// DEBUG: 粒子数量日志（每帧打印会刷屏，已注释）
+	// log.Printf("[RenderSystem] DrawParticles: 找到 %d 个粒子实体", len(entities))
+
 	// 按图片和混合模式分组粒子（用于批量渲染）
-	// key: 图片指针 + 混合模式标志
+	// 以 (image 指针, 混合模式) 作为批次键，避免不同贴图被错误混用
 	type renderBatch struct {
 		image    *ebiten.Image
 		additive bool
 		entities []ecs.EntityID
 	}
 
-	batches := make(map[string]*renderBatch)
+	type batchKey struct {
+		img      *ebiten.Image
+		additive bool
+	}
+
+	batches := make(map[batchKey]*renderBatch)
 
 	for _, id := range entities {
 		particleComp, hasParticle := s.entityManager.GetComponent(id, reflect.TypeOf(&components.ParticleComponent{}))
@@ -481,99 +489,92 @@ func (s *RenderSystem) DrawParticles(screen *ebiten.Image, cameraX float64) {
 			continue
 		}
 
-		// 使用图片地址和混合模式作为批次键
-		// 注意：这里简化实现，直接用 additive 标志区分
-		// 实际生产环境可能需要更复杂的批次键
-		batchKey := ""
-		if particle.Additive {
-			batchKey = "additive_"
-		} else {
-			batchKey = "normal_"
-		}
-		// 添加图片指针作为键的一部分（简化为字符串）
-		// 注意：在Go中，map的key不能是指针类型，所以我们需要其他方式
-		// 这里我们按混合模式分组，同一混合模式的所有粒子一起渲染
-		// 更优化的实现应该按 (image, blendMode) 分组
-
-		batch, exists := batches[batchKey]
+		key := batchKey{img: particle.Image, additive: particle.Additive}
+		batch, exists := batches[key]
 		if !exists {
 			batch = &renderBatch{
 				image:    particle.Image,
 				additive: particle.Additive,
 				entities: make([]ecs.EntityID, 0),
 			}
-			batches[batchKey] = batch
+			batches[key] = batch
 		}
 		batch.entities = append(batch.entities, id)
 	}
 
-	// 渲染批次顺序：先渲染 Normal 混合模式，再渲染 Additive 混合模式
-	// 这样可以确保发光效果（Additive）显示在普通粒子之上
-	for _, batchKey := range []string{"normal_", "additive_"} {
-		batch, exists := batches[batchKey]
-		if !exists {
-			continue
-		}
-
-		// 重置顶点数组（保留容量，避免内存分配）
-		s.particleVertices = s.particleVertices[:0]
-		s.particleIndices = s.particleIndices[:0]
-
-		// 为批次中的每个粒子生成顶点
-		for _, id := range batch.entities {
-			posComp, hasPos := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PositionComponent{}))
-			particleComp, hasParticle := s.entityManager.GetComponent(id, reflect.TypeOf(&components.ParticleComponent{}))
-
-			if !hasPos || !hasParticle {
+	// 渲染顺序：先 Normal 后 Additive，保证发光效果叠加在上
+	// 需要遍历 map 两次以维持顺序
+	renderBatches := func(targetAdditive bool) {
+		for _, batch := range batches {
+			if batch.additive != targetAdditive {
 				continue
 			}
 
-			pos := posComp.(*components.PositionComponent)
-			particle := particleComp.(*components.ParticleComponent)
+			// 重置顶点数组（保留容量，避免内存分配）
+			s.particleVertices = s.particleVertices[:0]
+			s.particleIndices = s.particleIndices[:0]
 
-			// 生成粒子的顶点（4 个顶点，用索引构建 2 个三角形）
-			vertices := s.buildParticleVertices(particle, pos, cameraX)
-			if len(vertices) != 4 {
+			// 为批次中的每个粒子生成顶点
+			for _, id := range batch.entities {
+				posComp, hasPos := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PositionComponent{}))
+				particleComp, hasParticle := s.entityManager.GetComponent(id, reflect.TypeOf(&components.ParticleComponent{}))
+
+				if !hasPos || !hasParticle {
+					continue
+				}
+
+				pos := posComp.(*components.PositionComponent)
+				particle := particleComp.(*components.ParticleComponent)
+
+				// 生成粒子的顶点（4 个顶点，用索引构建 2 个三角形）
+				vertices := s.buildParticleVertices(particle, pos, cameraX)
+				if len(vertices) != 4 {
+					continue
+				}
+
+				// 添加顶点到批次数组
+				baseIndex := uint16(len(s.particleVertices))
+				s.particleVertices = append(s.particleVertices, vertices...)
+
+				// 添加索引（两个三角形）
+				s.particleIndices = append(s.particleIndices,
+					baseIndex+0, baseIndex+1, baseIndex+2, // 第一个三角形
+					baseIndex+1, baseIndex+3, baseIndex+2, // 第二个三角形
+				)
+			}
+
+			// 如果没有顶点，跳过渲染
+			if len(s.particleVertices) == 0 {
 				continue
 			}
 
-			// 添加顶点到批次数组
-			baseIndex := uint16(len(s.particleVertices))
-			s.particleVertices = append(s.particleVertices, vertices...)
+			// 配置绘制选项（混合模式）
+			op := &ebiten.DrawTrianglesOptions{}
 
-			// 添加索引（两个三角形）
-			s.particleIndices = append(s.particleIndices,
-				baseIndex+0, baseIndex+1, baseIndex+2, // 第一个三角形
-				baseIndex+1, baseIndex+3, baseIndex+2, // 第二个三角形
-			)
-		}
+			// Story 7.4 修复：设置 AntiAlias 为 true 以获得更平滑的渲染
+			op.AntiAlias = true
 
-		// 如果没有顶点，跳过渲染
-		if len(s.particleVertices) == 0 {
-			continue
-		}
-
-		// 配置绘制选项（混合模式）
-		op := &ebiten.DrawTrianglesOptions{}
-
-		if batch.additive {
-			// 加法混合模式（用于发光效果，如爆炸、火焰）
-			op.Blend = ebiten.Blend{
-				BlendFactorSourceRGB:        ebiten.BlendFactorOne,
-				BlendFactorDestinationRGB:   ebiten.BlendFactorOne,
-				BlendOperationRGB:           ebiten.BlendOperationAdd,
-				BlendFactorSourceAlpha:      ebiten.BlendFactorOne,
-				BlendFactorDestinationAlpha: ebiten.BlendFactorOne,
-				BlendOperationAlpha:         ebiten.BlendOperationAdd,
+			if batch.additive {
+				// 加法混合模式（用于发光效果，如爆炸、火焰）
+				op.Blend = ebiten.Blend{
+					BlendFactorSourceRGB:        ebiten.BlendFactorOne,
+					BlendFactorDestinationRGB:   ebiten.BlendFactorOne,
+					BlendOperationRGB:           ebiten.BlendOperationAdd,
+					BlendFactorSourceAlpha:      ebiten.BlendFactorOne,
+					BlendFactorDestinationAlpha: ebiten.BlendFactorOne,
+					BlendOperationAlpha:         ebiten.BlendOperationAdd,
+				}
 			}
-		}
-		// 如果 additive == false，使用默认混合模式（普通 Alpha 混合）
+			// 如果 additive == false，使用默认混合模式（普通 Alpha 混合）
 
-		// 批量绘制所有粒子
-		// 注意：这里简化实现，所有相同混合模式的粒子使用第一个粒子的图片
-		// 实际上应该按 (image, blendMode) 更细粒度分组
-		screen.DrawTriangles(s.particleVertices, s.particleIndices, batch.image, op)
+			// 批量绘制所有粒子（同一批次共享同一贴图）
+			screen.DrawTriangles(s.particleVertices, s.particleIndices, batch.image, op)
+		}
 	}
+
+	// 先绘制 Normal，再绘制 Additive
+	renderBatches(false)
+	renderBatches(true)
 }
 
 // buildParticleVertices 为单个粒子生成顶点数组
@@ -590,6 +591,11 @@ func (s *RenderSystem) DrawParticles(screen *ebiten.Image, cameraX float64) {
 // - 粒子图片锚点在中心（与植物、僵尸一致，参见 CLAUDE.md）
 // - 因此四个角相对于中心点计算：(-w/2, -h/2) 到 (w/2, h/2)
 //
+// 精灵图处理（Story 7.4 修复）：
+// - 如果 ImageFrames > 1，使用 SubImage() 提取单个帧
+// - 帧排列方式：水平排列（从左到右）
+// - 例如：96x24 图片，4 帧 = 每帧 24x24
+//
 // 参数:
 //   - particle: 粒子组件（包含旋转、缩放、颜色等属性）
 //   - pos: 位置组件（世界坐标）
@@ -599,13 +605,48 @@ func (s *RenderSystem) DrawParticles(screen *ebiten.Image, cameraX float64) {
 //   - 4 个顶点（左上、右上、左下、右下），用于通过索引数组构建 2 个三角形
 func (s *RenderSystem) buildParticleVertices(particle *components.ParticleComponent, pos *components.PositionComponent, cameraX float64) []ebiten.Vertex {
 	if particle.Image == nil {
+		// Story 7.4 调试：记录图片为 nil 的情况
+		log.Printf("[RenderSystem] 警告：粒子图片为 nil，跳过渲染（位置=%.1f,%.1f, Alpha=%.2f）", pos.X, pos.Y, particle.Alpha)
 		return nil
 	}
 
 	// 获取图片尺寸
-	bounds := particle.Image.Bounds()
-	w := float64(bounds.Dx())
-	h := float64(bounds.Dy())
+	fullBounds := particle.Image.Bounds()
+	fullWidth := fullBounds.Dx()
+	fullHeight := fullBounds.Dy()
+
+	// 计算粒子尺寸和纹理坐标
+	var w, h float64
+	var srcX0, srcY0, srcX1, srcY1 float32
+
+	if particle.ImageFrames > 1 {
+		// 多帧精灵图：水平排列
+		frameWidth := fullWidth / particle.ImageFrames
+		frameHeight := fullHeight
+
+		// 计算纹理坐标（相对于原始图片）
+		frameX := particle.FrameNum * frameWidth
+		srcX0 = float32(fullBounds.Min.X + frameX)
+		srcY0 = float32(fullBounds.Min.Y)
+		srcX1 = float32(fullBounds.Min.X + frameX + frameWidth)
+		srcY1 = float32(fullBounds.Min.Y + frameHeight)
+
+		w = float64(frameWidth)
+		h = float64(frameHeight)
+
+		// DEBUG: 多帧精灵图日志（每个粒子每帧都打印会刷屏，已禁用）
+		// log.Printf("[RenderSystem] 多帧精灵图: 总尺寸=%dx%d, 帧数=%d, 当前帧=%d, 纹理坐标=(%.0f,%.0f)-(%.0f,%.0f), 帧尺寸=%.0fx%.0f",
+		// 	fullWidth, fullHeight, particle.ImageFrames, particle.FrameNum, srcX0, srcY0, srcX1, srcY1, w, h)
+	} else {
+		// 单帧图片：使用整个图片
+		srcX0 = float32(fullBounds.Min.X)
+		srcY0 = float32(fullBounds.Min.Y)
+		srcX1 = float32(fullBounds.Max.X)
+		srcY1 = float32(fullBounds.Max.Y)
+
+		w = float64(fullWidth)
+		h = float64(fullHeight)
+	}
 
 	// 粒子矩形的四个角（未变换，中心对齐）
 	// 左上、右上、左下、右下
@@ -649,11 +690,16 @@ func (s *RenderSystem) buildParticleVertices(particle *components.ParticleCompon
 	colorB := float32(particle.Blue * particle.Brightness)
 	colorA := float32(particle.Alpha)
 
-	// 纹理坐标（图片的四个角）
-	srcX0, srcY0 := float32(bounds.Min.X), float32(bounds.Min.Y)
-	srcX1, srcY1 := float32(bounds.Max.X), float32(bounds.Max.Y)
+	// DEBUG: 粒子渲染调试日志（每个新粒子都打印会刷屏，已禁用）
+	// Story 7.4: 如需调试，可以临时启用此日志查看粒子渲染参数
+	// if particle.Age < 0.1 {
+	// 	log.Printf("[RenderSystem] 新粒子渲染: 位置=(%.0f,%.0f) 屏幕位置=(%.0f,%.0f) 尺寸=%.1fx%.1f Scale=%.2f Alpha=%.2f 颜色RGB=(%.2f,%.2f,%.2f)",
+	// 		pos.X, pos.Y, pos.X-cameraX, pos.Y,
+	// 		w, h, particle.Scale, particle.Alpha,
+	// 		particle.Red, particle.Green, particle.Blue)
+	// }
 
-	// 构建顶点数组（6 个顶点，2 个三角形）
+	// 构建顶点数组（4 个顶点，用于 2 个三角形）
 	// 三角形 1: 左上、右上、左下
 	// 三角形 2: 右上、右下、左下
 	vertices := []ebiten.Vertex{

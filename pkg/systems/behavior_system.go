@@ -340,6 +340,7 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 
 // triggerZombieDeath 触发僵尸死亡状态转换
 // 当僵尸生命值 <= 0 时调用，将僵尸从正常行为状态切换到死亡动画播放状态
+// Story 7.4: 添加僵尸死亡粒子效果触发（手臂掉落、头部掉落）
 func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 	// 1. 切换行为类型为 BehaviorZombieDying
 	behaviorComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.BehaviorComponent{}))
@@ -350,6 +351,42 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 	behavior := behaviorComp.(*components.BehaviorComponent)
 	behavior.Type = components.BehaviorZombieDying
 	log.Printf("[BehaviorSystem] 僵尸 %d 行为切换为 BehaviorZombieDying", entityID)
+
+	// Story 7.4: 获取僵尸位置，用于触发粒子效果
+	positionComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
+	if !ok {
+		log.Printf("[BehaviorSystem] 警告：僵尸 %d 缺少 PositionComponent，无法触发粒子效果", entityID)
+	} else {
+		position := positionComp.(*components.PositionComponent)
+
+		// Story 7.4: 触发僵尸手臂掉落粒子效果
+		_, err := entities.CreateParticleEffect(
+			s.entityManager,
+			s.resourceManager,
+			"MoweredZombieArm", // 粒子效果名称（不带.xml后缀）
+			position.X, position.Y,
+		)
+		if err != nil {
+			log.Printf("[BehaviorSystem] 警告：创建僵尸手臂掉落粒子效果失败: %v", err)
+			// 不阻塞游戏逻辑，游戏继续运行
+		} else {
+			log.Printf("[BehaviorSystem] 僵尸 %d 触发手臂掉落粒子效果，位置: (%.1f, %.1f)", entityID, position.X, position.Y)
+		}
+
+		// Story 7.4: 触发僵尸头部掉落粒子效果
+		_, err = entities.CreateParticleEffect(
+			s.entityManager,
+			s.resourceManager,
+			"MoweredZombieHead", // 粒子效果名称（不带.xml后缀）
+			position.X, position.Y,
+		)
+		if err != nil {
+			log.Printf("[BehaviorSystem] 警告：创建僵尸头部掉落粒子效果失败: %v", err)
+			// 不阻塞游戏逻辑，游戏继续运行
+		} else {
+			log.Printf("[BehaviorSystem] 僵尸 %d 触发头部掉落粒子效果，位置: (%.1f, %.1f)", entityID, position.X, position.Y)
+		}
+	}
 
 	// 2. 使用 ReanimSystem 通用接口隐藏 "head" 部件组（头掉落效果）
 	// 部件组映射在实体创建时配置（zombie_factory.go），BehaviorSystem 不需要知道具体轨道名
@@ -1215,7 +1252,28 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 		}
 	}
 
-	// TODO: 创建爆炸视觉特效（Task 6，可选）
+	// Story 7.4: 创建爆炸粒子效果
+	// 获取樱桃炸弹的世界坐标
+	positionComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
+	if ok {
+		position := positionComp.(*components.PositionComponent)
+
+		// 触发爆炸粒子效果
+		_, err := entities.CreateParticleEffect(
+			s.entityManager,
+			s.resourceManager,
+			"BossExplosion", // 粒子效果名称（不带.xml后缀）
+			position.X, position.Y,
+		)
+		if err != nil {
+			log.Printf("[BehaviorSystem] 警告：创建樱桃炸弹爆炸粒子效果失败: %v", err)
+			// 不阻塞游戏逻辑，游戏继续运行
+		} else {
+			log.Printf("[BehaviorSystem] 樱桃炸弹 %d 触发爆炸粒子效果，位置: (%.1f, %.1f)", entityID, position.X, position.Y)
+		}
+	} else {
+		log.Printf("[BehaviorSystem] 警告：樱桃炸弹 %d 缺少 PositionComponent，无法触发爆炸粒子效果", entityID)
+	}
 
 	// 删除樱桃炸弹实体
 	s.entityManager.DestroyEntity(entityID)

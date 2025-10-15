@@ -15,5 +15,9 @@ pvz-debug
 coverage_*.out
 pvz-game
 
-/assets
+# /assets
+# !/assets/config/
+
 /.meta/whitepaper.md
+
+/bin

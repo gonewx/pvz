@@ -51,4 +51,8 @@ type EmitterComponent struct {
 	EmitterBoxX   float64 // Horizontal spawn area size (random position within box)
 	EmitterBoxY   float64 // Vertical spawn area size
 	EmitterRadius float64 // Circular spawn radius (alternative to box)
+
+	// System-level properties (Story 7.5: ZombieHead 系统透明度)
+	SystemAlphaKeyframes []particle.Keyframe // 系统级透明度关键帧（影响所有粒子）
+	SystemAlphaInterp    string              // 插值模式
 }

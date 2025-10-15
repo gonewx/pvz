@@ -12,7 +12,7 @@ import (
 // TestParticleSystem_ParticleLifecycle tests that particles age and are destroyed when expired
 func TestParticleSystem_ParticleLifecycle(t *testing.T) {
 	em := ecs.NewEntityManager()
-	ps := NewParticleSystem(em)
+	ps := NewParticleSystem(em, nil)
 
 	// Create test particle with 1 second lifetime
 	particleID := em.CreateEntity()
@@ -44,7 +44,7 @@ func TestParticleSystem_ParticleLifecycle(t *testing.T) {
 // TestParticleSystem_EmitterSpawnsParticles tests that emitters spawn particles at the correct rate
 func TestParticleSystem_EmitterSpawnsParticles(t *testing.T) {
 	em := ecs.NewEntityManager()
-	ps := NewParticleSystem(em)
+	ps := NewParticleSystem(em, nil)
 
 	// Create test emitter with SpawnRate = 10 particles/second
 	emitterID := em.CreateEntity()
@@ -81,7 +81,7 @@ func TestParticleSystem_EmitterSpawnsParticles(t *testing.T) {
 // TestParticleSystem_EmitterMaxActive tests that emitter respects max active particle limit
 func TestParticleSystem_EmitterMaxActive(t *testing.T) {
 	em := ecs.NewEntityManager()
-	ps := NewParticleSystem(em)
+	ps := NewParticleSystem(em, nil)
 
 	// Create emitter with low MaxActive limit
 	emitterID := em.CreateEntity()
@@ -117,7 +117,7 @@ func TestParticleSystem_EmitterMaxActive(t *testing.T) {
 // TestParticleSystem_EmitterMaxLaunched tests that emitter respects max launched limit
 func TestParticleSystem_EmitterMaxLaunched(t *testing.T) {
 	em := ecs.NewEntityManager()
-	ps := NewParticleSystem(em)
+	ps := NewParticleSystem(em, nil)
 
 	// Create emitter with low MaxLaunched limit
 	emitterID := em.CreateEntity()
@@ -153,7 +153,7 @@ func TestParticleSystem_EmitterMaxLaunched(t *testing.T) {
 // TestParticleSystem_EmitterSystemDuration tests that emitter stops after system duration
 func TestParticleSystem_EmitterSystemDuration(t *testing.T) {
 	em := ecs.NewEntityManager()
-	ps := NewParticleSystem(em)
+	ps := NewParticleSystem(em, nil)
 
 	// Create emitter with 1 second duration
 	emitterID := em.CreateEntity()
@@ -193,7 +193,7 @@ func TestParticleSystem_EmitterSystemDuration(t *testing.T) {
 // TestParticleSystem_ParticleVelocity tests that particles move according to velocity
 func TestParticleSystem_ParticleVelocity(t *testing.T) {
 	em := ecs.NewEntityManager()
-	ps := NewParticleSystem(em)
+	ps := NewParticleSystem(em, nil)
 
 	// Create particle with velocity
 	particleID := em.CreateEntity()
@@ -222,7 +222,7 @@ func TestParticleSystem_ParticleVelocity(t *testing.T) {
 // TestParticleSystem_ParticleRotation tests that particles rotate
 func TestParticleSystem_ParticleRotation(t *testing.T) {
 	em := ecs.NewEntityManager()
-	ps := NewParticleSystem(em)
+	ps := NewParticleSystem(em, nil)
 
 	// Create particle with rotation speed
 	particleID := em.CreateEntity()
@@ -248,7 +248,7 @@ func TestParticleSystem_ParticleRotation(t *testing.T) {
 // TestParticleSystem_AlphaInterpolation tests alpha keyframe animation
 func TestParticleSystem_AlphaInterpolation(t *testing.T) {
 	em := ecs.NewEntityManager()
-	ps := NewParticleSystem(em)
+	ps := NewParticleSystem(em, nil)
 
 	// Create particle with alpha keyframes (fade in/out)
 	particleID := em.CreateEntity()
@@ -283,7 +283,7 @@ func TestParticleSystem_AlphaInterpolation(t *testing.T) {
 // TestParticleSystem_ScaleInterpolation tests scale keyframe animation
 func TestParticleSystem_ScaleInterpolation(t *testing.T) {
 	em := ecs.NewEntityManager()
-	ps := NewParticleSystem(em)
+	ps := NewParticleSystem(em, nil)
 
 	// Create particle with scale keyframes (grow and shrink)
 	particleID := em.CreateEntity()
@@ -312,7 +312,7 @@ func TestParticleSystem_ScaleInterpolation(t *testing.T) {
 // TestParticleSystem_SpinInterpolation tests spin keyframe animation
 func TestParticleSystem_SpinInterpolation(t *testing.T) {
 	em := ecs.NewEntityManager()
-	ps := NewParticleSystem(em)
+	ps := NewParticleSystem(em, nil)
 
 	// Create particle with spin keyframes
 	particleID := em.CreateEntity()
@@ -340,7 +340,7 @@ func TestParticleSystem_SpinInterpolation(t *testing.T) {
 // TestParticleSystem_AccelerationField tests acceleration force field
 func TestParticleSystem_AccelerationField(t *testing.T) {
 	em := ecs.NewEntityManager()
-	ps := NewParticleSystem(em)
+	ps := NewParticleSystem(em, nil)
 
 	// Create particle with downward acceleration (gravity)
 	particleID := em.CreateEntity()
@@ -376,7 +376,7 @@ func TestParticleSystem_AccelerationField(t *testing.T) {
 // TestParticleSystem_FrictionField tests friction force field
 func TestParticleSystem_FrictionField(t *testing.T) {
 	em := ecs.NewEntityManager()
-	ps := NewParticleSystem(em)
+	ps := NewParticleSystem(em, nil)
 
 	// Create particle with friction
 	particleID := em.CreateEntity()
@@ -412,7 +412,7 @@ func TestParticleSystem_FrictionField(t *testing.T) {
 // TestParticleSystem_EdgeCases tests edge cases and error handling
 func TestParticleSystem_EdgeCases(t *testing.T) {
 	em := ecs.NewEntityManager()
-	ps := NewParticleSystem(em)
+	ps := NewParticleSystem(em, nil)
 
 	t.Run("Particle with zero lifetime", func(t *testing.T) {
 		particleID := em.CreateEntity()
@@ -492,3 +492,133 @@ func TestParticleSystem_EdgeCases(t *testing.T) {
 		}
 	})
 }
+
+// TestParticleSystem_NoMemoryLeak tests that emitters and particles are properly cleaned up
+// Story 7.4: Verify no memory leak when triggering 100 particle effects
+func TestParticleSystem_NoMemoryLeak(t *testing.T) {
+	em := ecs.NewEntityManager()
+	ps := NewParticleSystem(em, nil)
+
+	// Create 100 emitters with short-lived particles
+	createdEmitters := make([]ecs.EntityID, 0, 100)
+	for i := 0; i < 100; i++ {
+		emitterID := em.CreateEntity()
+		createdEmitters = append(createdEmitters, emitterID)
+		emitterComp := &components.EmitterComponent{
+			Config: &particle.EmitterConfig{
+				ParticleDuration: "100", // 0.1 second (short lifetime)
+				LaunchSpeed:      "100",
+				LaunchAngle:      "0",
+			},
+			Active:           true,
+			Age:              0,
+			SystemDuration:   0.2, // Stop after 0.2 seconds
+			NextSpawnTime:    0,
+			ActiveParticles:  make([]ecs.EntityID, 0),
+			TotalLaunched:    0,
+			SpawnRate:        10,   // 10 particles/second
+			SpawnMaxActive:   100,  // Allow many active
+			SpawnMaxLaunched: 5,    // Only spawn 5 particles total per emitter
+		}
+		posComp := &components.PositionComponent{X: 100, Y: 100}
+		em.AddComponent(emitterID, emitterComp)
+		em.AddComponent(emitterID, posComp)
+	}
+
+	// Verify all emitters were created
+	emitterType := reflect.TypeOf(&components.EmitterComponent{})
+	initialEmitterCount := len(em.GetEntitiesWith(emitterType))
+	if initialEmitterCount != 100 {
+		t.Errorf("Expected 100 emitters after creation, got %d", initialEmitterCount)
+	}
+
+	// Update for 0.5 seconds (spawn particles and let emitters finish)
+	for i := 0; i < 50; i++ {
+		ps.Update(0.01)
+		em.RemoveMarkedEntities() // Clean up marked entities
+	}
+
+	// Update for another 1 second to let all particles expire
+	for i := 0; i < 100; i++ {
+		ps.Update(0.01)
+		em.RemoveMarkedEntities() // Clean up marked entities
+	}
+
+	// Verify all emitters and particles have been cleaned up
+	// Check for remaining particle entities
+	particleEntities := em.GetEntitiesWith(reflect.TypeOf(&components.ParticleComponent{}))
+	if len(particleEntities) > 0 {
+		t.Errorf("Memory leak detected: found %d remaining particle entities (should be 0)", len(particleEntities))
+	}
+
+	// Check for remaining emitter entities
+	emitterEntities := em.GetEntitiesWith(reflect.TypeOf(&components.EmitterComponent{}))
+	if len(emitterEntities) > 0 {
+		t.Errorf("Memory leak detected: found %d remaining emitter entities (should be 0)", len(emitterEntities))
+	}
+
+	// Additional verification: check that all created emitters no longer have EmitterComponent
+	remainingCount := 0
+	for _, emitterID := range createdEmitters {
+		if em.HasComponent(emitterID, emitterType) {
+			remainingCount++
+		}
+	}
+	if remainingCount > 0 {
+		t.Errorf("Memory leak detected: %d out of 100 emitters were not cleaned up", remainingCount)
+	}
+}
+
+// TestParticleSystem_EmitterAutoCleanup tests that emitters are automatically deleted when finished
+// Story 7.4: Verify emitter cleanup when inactive and all particles gone
+func TestParticleSystem_EmitterAutoCleanup(t *testing.T) {
+	em := ecs.NewEntityManager()
+	ps := NewParticleSystem(em, nil)
+
+	// Create emitter that will become inactive
+	emitterID := em.CreateEntity()
+	emitterComp := &components.EmitterComponent{
+		Config: &particle.EmitterConfig{
+			ParticleDuration: "100", // 0.1 second
+			LaunchSpeed:      "100",
+			LaunchAngle:      "0",
+		},
+		Active:           true,
+		Age:              0,
+		SystemDuration:   0.2, // Stop after 0.2 seconds
+		NextSpawnTime:    0,
+		ActiveParticles:  make([]ecs.EntityID, 0),
+		TotalLaunched:    0,
+		SpawnRate:        10,
+		SpawnMaxActive:   100,
+		SpawnMaxLaunched: 3, // Only spawn 3 particles
+	}
+	posComp := &components.PositionComponent{X: 100, Y: 100}
+	em.AddComponent(emitterID, emitterComp)
+	em.AddComponent(emitterID, posComp)
+
+	// Update for 0.3 seconds (emitter should become inactive)
+	ps.Update(0.3)
+	if emitterComp.Active {
+		t.Error("Emitter should be inactive after SystemDuration")
+	}
+
+	// Emitter should still exist (has active particles)
+	if !em.HasComponent(emitterID, reflect.TypeOf(&components.EmitterComponent{})) {
+		t.Error("Emitter should still exist while particles are active")
+	}
+
+	// Update for another 1 second (all particles should expire)
+	ps.Update(1.0)
+	em.RemoveMarkedEntities()
+
+	// Update once more to trigger emitter cleanup
+	ps.Update(0.01)
+	em.RemoveMarkedEntities()
+
+	// Emitter should be deleted (inactive and no active particles)
+	if em.HasComponent(emitterID, reflect.TypeOf(&components.EmitterComponent{})) {
+		t.Error("Emitter should be auto-deleted when inactive and all particles gone")
+	}
+}
+

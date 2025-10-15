@@ -1,7 +1,6 @@
 package systems
 
 import (
-	"log"
 	"math"
 	"reflect"
 
@@ -80,15 +79,15 @@ func (s *PlantPreviewRenderSystem) drawReanimPreview(screen *ebiten.Image, reani
 	screenY := pos.Y - reanim.CenterOffsetY
 
 	// 调试：输出预览位置信息（每60帧输出一次，避免刷屏）
-	if reanim.CurrentFrame%60 == 0 {
-		log.Printf("[PlantPreviewRender] 预览 %d: 世界坐标(%.1f, %.1f), 屏幕坐标(%.1f, %.1f), CenterOffset(%.1f, %.1f)",
-			entityID, pos.X, pos.Y, screenX, screenY, reanim.CenterOffsetX, reanim.CenterOffsetY)
-	}
+	// if reanim.CurrentFrame%60 == 0 {
+	// 	log.Printf("[PlantPreviewRender] 预览 %d: 世界坐标(%.1f, %.1f), 屏幕坐标(%.1f, %.1f), CenterOffset(%.1f, %.1f)",
+	// 		entityID, pos.X, pos.Y, screenX, screenY, reanim.CenterOffsetX, reanim.CenterOffsetY)
+	// }
 
 	// 按 AnimTracks 顺序渲染部件（保证 Z-order 正确）
 	for _, track := range reanim.AnimTracks {
 		// 如果设置了 VisibleTracks，只渲染白名单中的轨道
-		if reanim.VisibleTracks != nil && len(reanim.VisibleTracks) > 0 {
+		if len(reanim.VisibleTracks) > 0 {
 			if !reanim.VisibleTracks[track.Name] {
 				continue
 			}

@@ -72,6 +72,48 @@ func NewInputSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.Ga
 func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 	// 注意：植物预览位置现在由 PlantPreviewSystem 统一管理，无需在这里更新
 
+	// DEBUG: 按 P 键在鼠标位置生成 PeaSplat 粒子效果（测试用）
+	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
+		mouseScreenX, mouseScreenY := ebiten.CursorPosition()
+		mouseWorldX := float64(mouseScreenX) + cameraX
+		mouseWorldY := float64(mouseScreenY)
+
+		_, err := entities.CreateParticleEffect(s.entityManager, s.resourceManager, "PeaSplat", mouseWorldX, mouseWorldY)
+		if err != nil {
+			log.Printf("[InputSystem] DEBUG: 生成粒子效果失败: %v", err)
+		} else {
+			log.Printf("[InputSystem] DEBUG: 在位置 (%.1f, %.1f) 生成 PeaSplat 粒子效果", mouseWorldX, mouseWorldY)
+		}
+	}
+
+	// DEBUG: 按 B 键在鼠标位置生成 BossExplosion 粒子效果（测试用）
+	if inpututil.IsKeyJustPressed(ebiten.KeyB) {
+		mouseScreenX, mouseScreenY := ebiten.CursorPosition()
+		mouseWorldX := float64(mouseScreenX) + cameraX
+		mouseWorldY := float64(mouseScreenY)
+
+		_, err := entities.CreateParticleEffect(s.entityManager, s.resourceManager, "BossExplosion", mouseWorldX, mouseWorldY)
+		if err != nil {
+			log.Printf("[InputSystem] DEBUG: 生成粒子效果失败: %v", err)
+		} else {
+			log.Printf("[InputSystem] DEBUG: 在位置 (%.1f, %.1f) 生成 BossExplosion 粒子效果", mouseWorldX, mouseWorldY)
+		}
+	}
+
+	// DEBUG: 按 A 键在鼠标位置生成 Award 粒子效果（测试用）
+	if inpututil.IsKeyJustPressed(ebiten.KeyA) {
+		mouseScreenX, mouseScreenY := ebiten.CursorPosition()
+		mouseWorldX := float64(mouseScreenX) + cameraX
+		mouseWorldY := float64(mouseScreenY)
+
+		_, err := entities.CreateParticleEffect(s.entityManager, s.resourceManager, "Award", mouseWorldX, mouseWorldY)
+		if err != nil {
+			log.Printf("[InputSystem] DEBUG: 生成粒子效果失败: %v", err)
+		} else {
+			log.Printf("[InputSystem] DEBUG: 在位置 (%.1f, %.1f) 生成 Award 粒子效果", mouseWorldX, mouseWorldY)
+		}
+	}
+
 	// 检测鼠标右键取消种植模式
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight) {
 		if s.gameState.IsPlantingMode {
@@ -90,8 +132,9 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 		mouseWorldX := float64(mouseScreenX) + cameraX
 		mouseWorldY := float64(mouseScreenY) // Y轴不受摄像机水平移动影响
 
-		log.Printf("[InputSystem] 鼠标点击: 屏幕(%d, %d) -> 世界(%.1f, %.1f)",
-			mouseScreenX, mouseScreenY, mouseWorldX, mouseWorldY)
+		// DEBUG: 鼠标点击日志（每次点击都打印会刷屏，已禁用）
+		// log.Printf("[InputSystem] 鼠标点击: 屏幕(%d, %d) -> 世界(%.1f, %.1f)",
+		// 	mouseScreenX, mouseScreenY, mouseWorldX, mouseWorldY)
 
 		// 优先检查植物卡片点击（UI元素不受摄像机影响，使用屏幕坐标）
 		cardHandled := s.handlePlantCardClick(mouseScreenX, mouseScreenY, cameraX)
@@ -113,7 +156,8 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 			reflect.TypeOf(&components.SunComponent{}),
 		)
 
-		log.Printf("[InputSystem] 找到 %d 个阳光实体", len(entities))
+		// DEBUG: 阳光实体数量日志（每次点击都打印会刷屏，已禁用）
+		// log.Printf("[InputSystem] 找到 %d 个阳光实体", len(entities))
 
 		// 从后向前遍历，确保点击最上层的阳光（假设后面的实体渲染在上层）
 		for i := len(entities) - 1; i >= 0; i-- {
@@ -221,7 +265,8 @@ func (s *InputSystem) handlePlantCardClick(mouseX, mouseY int, cameraX float64) 
 		reflect.TypeOf(&components.UIComponent{}),
 	)
 
-	log.Printf("[InputSystem] 检查植物卡片点击: 鼠标(%d, %d), 找到 %d 个卡片", mouseX, mouseY, len(entities))
+	// DEBUG: 卡片点击检查日志（每次点击都打印会刷屏，已禁用）
+	// log.Printf("[InputSystem] 检查植物卡片点击: 鼠标(%d, %d), 找到 %d 个卡片", mouseX, mouseY, len(entities))
 
 	// 遍历卡片实体，检测点击
 	for _, entityID := range entities {
@@ -384,11 +429,13 @@ func (s *InputSystem) handleLawnClick(mouseX, mouseY int) bool {
 		config.CellWidth, config.CellHeight,
 	)
 	if !isValid {
-		log.Printf("[InputSystem] 鼠标点击在网格外: (%d, %d)", mouseX, mouseY)
+		// DEBUG: 网格外点击日志（已禁用避免刷屏）
+		// log.Printf("[InputSystem] 鼠标点击在网格外: (%d, %d)", mouseX, mouseY)
 		return false // 点击在网格外
 	}
 
-	log.Printf("[InputSystem] 草坪点击: col=%d, row=%d", col, row)
+	// DEBUG: 草坪点击日志（只在种植时保留，已优化）
+	// log.Printf("[InputSystem] 草坪点击: col=%d, row=%d", col, row)
 
 	// 检查格子是否已被占用
 	if s.lawnGridSystem.IsOccupied(s.lawnGridEntityID, col, row) {

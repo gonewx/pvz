@@ -7,6 +7,7 @@ import (
 	_ "image/jpeg" // Register JPEG decoder
 	_ "image/png"  // Register PNG decoder
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -779,7 +780,9 @@ func (rm *ResourceManager) LoadResourceGroup(groupName string) error {
 	// Load all images in the group
 	for _, img := range group.Images {
 		if _, err := rm.LoadImageByID(img.ID); err != nil {
-			return fmt.Errorf("failed to load image %s in group %s: %w", img.ID, groupName, err)
+			// 记录警告但继续加载其他资源（粒子查看器模式）
+			log.Printf("Warning: Failed to load image %s in group %s: %v (skipping)", img.ID, groupName, err)
+			continue
 		}
 	}
 
@@ -788,12 +791,14 @@ func (rm *ResourceManager) LoadResourceGroup(groupName string) error {
 		// Look up the file path
 		filePath, exists := rm.resourceMap[sound.ID]
 		if !exists {
-			return fmt.Errorf("sound resource ID not found: %s", sound.ID)
+			log.Printf("Warning: Sound resource ID not found: %s (skipping)", sound.ID)
+			continue
 		}
 
 		// Load the sound effect (use LoadSoundEffect for non-looping sounds)
 		if _, err := rm.LoadSoundEffect(filePath); err != nil {
-			return fmt.Errorf("failed to load sound %s in group %s: %w", sound.ID, groupName, err)
+			log.Printf("Warning: Failed to load sound %s in group %s: %v (skipping)", sound.ID, groupName, err)
+			continue
 		}
 	}
 
