@@ -492,7 +492,8 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 	}
 
 	// DEBUG: 粒子创建日志
-	log.Printf("[DEBUG] 创建粒子: spawnY=%.1f, groundY=%.1f, velocityY=%.1f", spawnY, groundY, velocityY)
+	log.Printf("[DEBUG] 创建粒子: pos=(%.1f,%.1f), velocity=(%.1f,%.1f), angle=%.1f°, speed=%.1f, groundY=%.1f",
+		spawnX, spawnY, velocityX, velocityY, angle, speed, groundY)
 
 	// Create ParticleComponent
 	particleComp := &components.ParticleComponent{
