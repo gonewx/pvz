@@ -97,8 +97,12 @@ SceneManager (场景管理器)
     ├── BehaviorSystem (行为系统)
     ├── PhysicsSystem (物理系统)
     ├── AnimationSystem (动画系统)
+    ├── ParticleSystem (粒子系统 - Story 7.2)
     ├── UISystem (UI系统)
     └── RenderSystem (渲染系统)
+        ├── DrawGameWorld() - 植物、僵尸、子弹
+        ├── DrawParticles() - 粒子效果 (Story 7.3)
+        └── DrawSuns() - 阳光
 ```
 
 ### 目录结构规范
@@ -140,6 +144,8 @@ pvz/
 - `UIComponent`: 标记UI元素及其状态
 - `VelocityComponent`: 移动速度(用于子弹、僵尸移动)
 - `CollisionComponent`: 碰撞检测的边界框
+- `ParticleComponent`: 粒子效果数据(位置、速度、颜色、生命周期等) - Story 7.2
+- `EmitterComponent`: 粒子发射器配置(生成规则、限制、力场等) - Story 7.2
 
 ## 组件使用策略（重要）
 
@@ -186,6 +192,7 @@ RenderSystem       PlantCardRenderSystem
 | ☀️ 阳光 | ReanimComponent | RenderSystem | 简化包装（单图片） |
 | 🟢 子弹 | ReanimComponent | RenderSystem | 简化包装（单图片） |
 | 💥 特效 | ReanimComponent | RenderSystem | 简化包装（单图片） |
+| ✨ 粒子 | ParticleComponent | RenderSystem.DrawParticles() | 高性能批量渲染 (Story 7.3) |
 | 👻 植物预览 | ReanimComponent | PlantPreviewRenderSystem | 完整动画（双图像渲染） |
 | 🎴 植物卡片 | SpriteComponent | PlantCardRenderSystem | UI 元素 |
 
@@ -378,6 +385,126 @@ screenX, screenY := utils.GridToScreenCoords(col, row, gs.CameraX, ...)
 ```
 
 **详细设计参见：** `docs/architecture/coordinate-system.md`
+
+## 粒子系统使用指南
+
+### 概述
+
+粒子系统 (Story 7.2 + 7.3) 提供高性能的视觉特效渲染，用于爆炸、溅射、光效等游戏效果。
+
+**架构组成：**
+- **ParticleComponent** (Story 7.2): 单个粒子的数据（位置、速度、颜色、生命周期）
+- **EmitterComponent** (Story 7.2): 粒子发射器配置（生成规则、限制、力场）
+- **ParticleSystem** (Story 7.2): 更新粒子生命周期、动画插值
+- **RenderSystem.DrawParticles()** (Story 7.3): 高性能批量渲染
+
+### 性能特性
+
+**Story 7.3 性能测试结果：**
+- ✅ 1000 粒子渲染：**0.22ms** (目标 <3ms，超出 14 倍)
+- ✅ 顶点数组复用：预分配 4000 顶点，6000 索引
+- ✅ 批量渲染：按混合模式分组，减少 DrawTriangles 调用
+- ✅ 测试覆盖率：buildParticleVertices 100%, DrawParticles 89.1%
+
+### 创建粒子效果
+
+```go
+// 使用 ParticleFactory 创建粒子效果
+effectID := entities.CreateParticleEffect(
+    entityManager,
+    x, y,                    // 位置
+    particleConfig,          // 粒子配置 (从 XML 加载)
+    resourceManager,         // 资源管理器
+)
+```
+
+**粒子配置来源：**
+- `assets/reanim/particles/` 目录下的 XML 文件 (如 `Award.xml`, `Splash.xml`)
+- 配置包含：发射规则、粒子属性、动画曲线、力场效果
+
+### 渲染特性
+
+**支持的粒子属性：**
+- **位置 & 运动**: X, Y, VelocityX, VelocityY
+- **变换**: Rotation, Scale
+- **颜色**: Red, Green, Blue, Alpha, Brightness
+- **混合模式**: Additive（加法混合）vs Normal（普通混合）
+
+**混合模式说明：**
+| 混合模式 | 效果 | 使用场景 |
+|---------|------|---------|
+| Normal (Alpha Blending) | 半透明叠加 | 烟雾、灰尘 |
+| Additive Blending | 发光叠加（重叠更亮） | 爆炸、火焰、光效 |
+
+**渲染层级：**
+```
+GameScene.Draw() 渲染顺序：
+  1. 背景
+  2. 游戏世界（植物、僵尸、子弹）
+  3. UI（植物卡片）
+  4. 粒子效果 ← 在 UI 之上，阳光之下
+  5. 植物预览
+  6. 阳光（最顶层）
+```
+
+### 粒子生命周期
+
+```
+创建粒子
+  ↓
+ParticleSystem.Update()
+  ├── 更新年龄 (Age += deltaTime)
+  ├── 插值动画 (Alpha, Scale, Spin)
+  ├── 应用力场 (加速度、摩擦力)
+  └── 检查生命周期 (Age > Lifetime → 删除)
+  ↓
+RenderSystem.DrawParticles()
+  ├── 查询所有粒子实体
+  ├── 按混合模式分组
+  ├── 生成顶点（变换、颜色）
+  └── 批量渲染
+```
+
+### 技术细节
+
+**顶点生成流程：**
+1. 计算粒子矩形四角（中心对齐）
+2. 应用旋转变换（旋转矩阵）
+3. 应用缩放变换
+4. 平移到世界位置
+5. 转换为屏幕坐标（减去 cameraX）
+6. 设置顶点颜色（RGB * Brightness, Alpha）
+
+**批量渲染优化：**
+- 按混合模式分组（先 Normal，再 Additive）
+- 同一批次合并为一次 DrawTriangles 调用
+- 顶点数组每帧重置而非重新分配
+
+### 使用示例
+
+```go
+// 在僵尸死亡时创建爆炸粒子效果
+if zombie.Health <= 0 {
+    // 加载粒子配置
+    config := resourceManager.GetParticleConfig("Explosion")
+
+    // 创建粒子效果实体
+    effectID := entities.CreateParticleEffect(
+        entityManager,
+        zombie.X, zombie.Y,  // 僵尸位置
+        config,
+        resourceManager,
+    )
+
+    // 粒子系统会自动管理生命周期
+    // 渲染系统会自动渲染粒子
+}
+```
+
+**参考文档：**
+- Story 7.2: `docs/stories/7.2.story.md` (粒子系统核心)
+- Story 7.3: `docs/stories/7.3.story.md` (粒子渲染)
+- 测试文件: `pkg/systems/render_system_particle_test.go`
 
 ## 数据驱动设计
 

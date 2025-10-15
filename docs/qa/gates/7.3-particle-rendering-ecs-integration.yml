@@ -1,0 +1,99 @@
+# Quality Gate Decision: Story 7.3 - 粒子渲染系统与ECS集成
+schema: 1
+story: "7.3"
+story_title: "粒子渲染系统与ECS集成"
+gate: CONCERNS
+status_reason: "实现质量优秀，性能超标14倍，测试覆盖率89-100%，但发现批量渲染简化实现可能导致多图片粒子渲染错误（非阻塞）"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-10-15T09:20:00Z"
+
+waiver: { active: false }
+
+top_issues:
+  - id: "CODE-001"
+    severity: high
+    finding: "批量渲染实现简化：只按混合模式分组，所有同一批次粒子使用第一个粒子的图片（render_system.go:485-496, 573-575）"
+    suggested_action: "实现按(图片指针, 混合模式)复合键分组，避免多图片粒子渲染错误。可使用fmt.Sprintf('%p_%v', image, additive)作为批次键"
+    suggested_owner: dev
+  - id: "PERF-001"
+    severity: medium
+    finding: "buildParticleVertices函数每次创建临时[]ebiten.Vertex切片，导致高频内存分配（462KB/op, 1038 allocs/op）"
+    suggested_action: "重构buildParticleVertices直接追加到s.particleVertices，避免临时数组，或改为接收顶点数组参数"
+    suggested_owner: dev
+  - id: "TEST-001"
+    severity: low
+    finding: "AC6（视觉验证：粒子效果与原版PVZ一致）缺少自动化测试或手动验证记录"
+    suggested_action: "在实际游戏场景中测试粒子效果（爆炸、溅射），并记录截图或视频验证"
+    suggested_owner: dev
+
+quality_score: 75
+expires: "2025-10-29T00:00:00Z"
+
+evidence:
+  tests_reviewed: 13
+  risks_identified: 3
+  trace:
+    ac_covered: [1, 2, 4, 5]  # AC3已确认不需要，AC6需手动验证
+    ac_gaps: [6]  # AC6缺少视觉验证记录
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "游戏渲染代码，无安全敏感操作，无用户输入处理"
+  performance:
+    status: CONCERNS
+    notes: "渲染时间0.21ms远超目标<3ms（14倍），但存在高频内存分配（462KB/op, 1038 allocs/op）影响长期性能和GC压力"
+  reliability:
+    status: PASS
+    notes: "良好的nil检查和边界情况处理，空粒子列表快速返回"
+  maintainability:
+    status: PASS
+    notes: "优秀的代码组织和注释，清晰的渲染流程文档，遵循ECS原则"
+
+risk_summary:
+  totals: { critical: 0, high: 1, medium: 1, low: 1 }
+  recommendations:
+    must_fix: []
+    monitor:
+      - "监控实际游戏中粒子效果正确性，特别是使用多种粒子图片的场景"
+      - "监控长时间运行的内存使用和GC频率，必要时实施对象池（Story 7.5建议）"
+
+recommendations:
+  immediate:
+    - action: "在下次遇到多图片粒子效果前，修复批量渲染分组逻辑"
+      refs: ["pkg/systems/render_system.go:471-508", "pkg/systems/render_system.go:573-575"]
+  future:
+    - action: "优化buildParticleVertices避免临时数组分配"
+      refs: ["pkg/systems/render_system.go:600-708"]
+    - action: "考虑实现粒子对象池以减少GC压力（当粒子数>5000时）"
+      refs: ["pkg/systems/particle_system.go", "pkg/systems/render_system.go"]
+    - action: "实现更细粒度的批量渲染：按(image, blendMode)复合键分组"
+      refs: ["pkg/systems/render_system.go:464-508"]
+
+test_coverage_summary:
+  buildParticleVertices: "100.0%"
+  DrawParticles: "89.1%"
+  total_test_cases: 13
+  test_files:
+    - "pkg/systems/render_system_particle_test.go (13 test functions + 3 benchmarks)"
+
+performance_benchmarks:
+  BenchmarkDrawParticles100: "22,403 ns/op (0.022ms)"
+  BenchmarkDrawParticles1000: "214,623 ns/op (0.21ms) ← 目标<3ms, 超标14倍 ✅"
+  BenchmarkBuildParticleVertices: "46.87 ns/op"
+  memory_allocation: "462,329 B/op, 1,038 allocs/op ⚠️"
+
+architecture_compliance:
+  ecs_principles: PASS
+  zero_coupling: PASS  # RenderSystem仅通过EntityManager查询组件
+  data_behavior_separation: PASS  # ParticleComponent纯数据，渲染逻辑在System
+  coding_standards: PASS  # gofmt格式正确，命名规范遵循
+  naming_conventions: PASS
+  error_handling: PASS  # nil检查完整
+  godoc_comments: PASS  # 每个方法都有详细GoDoc
+
+context_from_story_7_2:
+  previous_gate: CONCERNS
+  previous_issues:
+    - "applyFields函数重复解析静态力场值（未在Story 7.3修复）"
+  continuity_note: "Story 7.2的性能优化建议（对象池）在Story 7.3中保留，等待Story 7.5实施"

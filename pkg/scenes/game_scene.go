@@ -504,23 +504,28 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	// 文字始终在最上层以确保可读性
 	s.drawSunCounter(screen)
 
-	// Layer 6: Draw plant preview (Story 3.2)
+	// Layer 6: Draw particle effects (Story 7.3)
+	// 粒子效果在UI和游戏世界之间，提供视觉特效（爆炸、溅射等）
+	// 粒子应该覆盖植物卡片和游戏实体，但在植物预览和阳光之下
+	s.renderSystem.DrawParticles(screen, s.cameraX)
+
+	// Layer 7: Draw plant preview (Story 3.2)
 	// 拖拽预览在所有内容上方
 	s.plantPreviewRenderSystem.Draw(screen, s.cameraX)
 
-	// Layer 7: Draw suns (阳光) - 最顶层
+	// Layer 8: Draw suns (阳光) - 最顶层
 	// 阳光在最顶层以确保始终可点击
 	s.renderSystem.DrawSuns(screen, s.cameraX)
 
-	// Layer 8: Draw level progress UI (Story 5.5)
+	// Layer 9: Draw level progress UI (Story 5.5)
 	// 进度条显示当前波次进度
 	s.drawLevelProgress(screen)
 
-	// Layer 9: Draw last wave warning (Story 5.5)
+	// Layer 10: Draw last wave warning (Story 5.5)
 	// 最后一波提示（如果需要显示）
 	s.drawLastWaveWarning(screen)
 
-	// Layer 10: Draw game result overlay (Story 5.5)
+	// Layer 11: Draw game result overlay (Story 5.5)
 	// 胜利/失败界面（如果游戏结束）
 	s.drawGameResultOverlay(screen)
 

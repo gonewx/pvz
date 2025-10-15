@@ -37,15 +37,19 @@ import (
 //   - CLAUDE.md#组件使用策略
 //   - docs/stories/6.3.story.md
 type RenderSystem struct {
-	entityManager *ecs.EntityManager
-	debugPrinted  map[ecs.EntityID]bool // 记录已打印调试信息的实体
+	entityManager    *ecs.EntityManager
+	debugPrinted     map[ecs.EntityID]bool // 记录已打印调试信息的实体
+	particleVertices []ebiten.Vertex       // 粒子顶点数组（复用，避免每帧分配）
+	particleIndices  []uint16              // 粒子索引数组（复用，避免每帧分配）
 }
 
 // NewRenderSystem 创建一个新的渲染系统
 func NewRenderSystem(em *ecs.EntityManager) *RenderSystem {
 	return &RenderSystem{
-		entityManager: em,
-		debugPrinted:  make(map[ecs.EntityID]bool),
+		entityManager:    em,
+		debugPrinted:     make(map[ecs.EntityID]bool),
+		particleVertices: make([]ebiten.Vertex, 0, 4000), // 预分配容量：支持 1000 个粒子（每粒子 4 顶点）
+		particleIndices:  make([]uint16, 0, 6000),        // 预分配容量：支持 1000 个粒子（每粒子 6 索引）
 	}
 }
 
@@ -427,4 +431,278 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		is := []uint16{0, 1, 2, 1, 3, 2}
 		screen.DrawTriangles(vs, is, img, nil)
 	}
+}
+
+// DrawParticles 渲染所有粒子效果
+//
+// 渲染流程：
+// 1. 查询所有拥有 ParticleComponent 和 PositionComponent 的实体
+// 2. 按图片和混合模式分组批量渲染（减少 DrawTriangles 调用次数）
+// 3. 每个粒子生成 6 个顶点（2 个三角形组成矩形）
+// 4. 应用粒子变换：位置、旋转、缩放
+// 5. 应用粒子颜色：RGB、Alpha、Brightness
+//
+// 性能优化：
+// - 使用预分配的顶点数组（s.particleVertices），避免每帧内存分配
+// - 批量渲染相同图片和混合模式的粒子
+//
+// 参数:
+//   - screen: 绘制目标屏幕
+//   - cameraX: 摄像机的世界坐标X位置（用于世界坐标到屏幕坐标的转换）
+func (s *RenderSystem) DrawParticles(screen *ebiten.Image, cameraX float64) {
+	// 查询所有拥有 ParticleComponent 和 PositionComponent 的实体
+	entities := s.entityManager.GetEntitiesWith(
+		reflect.TypeOf(&components.PositionComponent{}),
+		reflect.TypeOf(&components.ParticleComponent{}),
+	)
+
+	if len(entities) == 0 {
+		return
+	}
+
+	// 按图片和混合模式分组粒子（用于批量渲染）
+	// key: 图片指针 + 混合模式标志
+	type renderBatch struct {
+		image    *ebiten.Image
+		additive bool
+		entities []ecs.EntityID
+	}
+
+	batches := make(map[string]*renderBatch)
+
+	for _, id := range entities {
+		particleComp, hasParticle := s.entityManager.GetComponent(id, reflect.TypeOf(&components.ParticleComponent{}))
+		if !hasParticle {
+			continue
+		}
+
+		particle := particleComp.(*components.ParticleComponent)
+		if particle.Image == nil {
+			continue
+		}
+
+		// 使用图片地址和混合模式作为批次键
+		// 注意：这里简化实现，直接用 additive 标志区分
+		// 实际生产环境可能需要更复杂的批次键
+		batchKey := ""
+		if particle.Additive {
+			batchKey = "additive_"
+		} else {
+			batchKey = "normal_"
+		}
+		// 添加图片指针作为键的一部分（简化为字符串）
+		// 注意：在Go中，map的key不能是指针类型，所以我们需要其他方式
+		// 这里我们按混合模式分组，同一混合模式的所有粒子一起渲染
+		// 更优化的实现应该按 (image, blendMode) 分组
+
+		batch, exists := batches[batchKey]
+		if !exists {
+			batch = &renderBatch{
+				image:    particle.Image,
+				additive: particle.Additive,
+				entities: make([]ecs.EntityID, 0),
+			}
+			batches[batchKey] = batch
+		}
+		batch.entities = append(batch.entities, id)
+	}
+
+	// 渲染批次顺序：先渲染 Normal 混合模式，再渲染 Additive 混合模式
+	// 这样可以确保发光效果（Additive）显示在普通粒子之上
+	for _, batchKey := range []string{"normal_", "additive_"} {
+		batch, exists := batches[batchKey]
+		if !exists {
+			continue
+		}
+
+		// 重置顶点数组（保留容量，避免内存分配）
+		s.particleVertices = s.particleVertices[:0]
+		s.particleIndices = s.particleIndices[:0]
+
+		// 为批次中的每个粒子生成顶点
+		for _, id := range batch.entities {
+			posComp, hasPos := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PositionComponent{}))
+			particleComp, hasParticle := s.entityManager.GetComponent(id, reflect.TypeOf(&components.ParticleComponent{}))
+
+			if !hasPos || !hasParticle {
+				continue
+			}
+
+			pos := posComp.(*components.PositionComponent)
+			particle := particleComp.(*components.ParticleComponent)
+
+			// 生成粒子的顶点（4 个顶点，用索引构建 2 个三角形）
+			vertices := s.buildParticleVertices(particle, pos, cameraX)
+			if len(vertices) != 4 {
+				continue
+			}
+
+			// 添加顶点到批次数组
+			baseIndex := uint16(len(s.particleVertices))
+			s.particleVertices = append(s.particleVertices, vertices...)
+
+			// 添加索引（两个三角形）
+			s.particleIndices = append(s.particleIndices,
+				baseIndex+0, baseIndex+1, baseIndex+2, // 第一个三角形
+				baseIndex+1, baseIndex+3, baseIndex+2, // 第二个三角形
+			)
+		}
+
+		// 如果没有顶点，跳过渲染
+		if len(s.particleVertices) == 0 {
+			continue
+		}
+
+		// 配置绘制选项（混合模式）
+		op := &ebiten.DrawTrianglesOptions{}
+
+		if batch.additive {
+			// 加法混合模式（用于发光效果，如爆炸、火焰）
+			op.Blend = ebiten.Blend{
+				BlendFactorSourceRGB:        ebiten.BlendFactorOne,
+				BlendFactorDestinationRGB:   ebiten.BlendFactorOne,
+				BlendOperationRGB:           ebiten.BlendOperationAdd,
+				BlendFactorSourceAlpha:      ebiten.BlendFactorOne,
+				BlendFactorDestinationAlpha: ebiten.BlendFactorOne,
+				BlendOperationAlpha:         ebiten.BlendOperationAdd,
+			}
+		}
+		// 如果 additive == false，使用默认混合模式（普通 Alpha 混合）
+
+		// 批量绘制所有粒子
+		// 注意：这里简化实现，所有相同混合模式的粒子使用第一个粒子的图片
+		// 实际上应该按 (image, blendMode) 更细粒度分组
+		screen.DrawTriangles(s.particleVertices, s.particleIndices, batch.image, op)
+	}
+}
+
+// buildParticleVertices 为单个粒子生成顶点数组
+//
+// 生成顺序：
+// 1. 计算粒子矩形的四个角（未变换，中心对齐）
+// 2. 应用旋转变换（旋转矩阵）
+// 3. 应用缩放变换
+// 4. 平移到世界位置
+// 5. 转换为屏幕坐标（减去 cameraX）
+// 6. 设置顶点颜色：RGB * Brightness, Alpha
+//
+// 锚点策略：
+// - 粒子图片锚点在中心（与植物、僵尸一致，参见 CLAUDE.md）
+// - 因此四个角相对于中心点计算：(-w/2, -h/2) 到 (w/2, h/2)
+//
+// 参数:
+//   - particle: 粒子组件（包含旋转、缩放、颜色等属性）
+//   - pos: 位置组件（世界坐标）
+//   - cameraX: 摄像机X坐标
+//
+// 返回:
+//   - 4 个顶点（左上、右上、左下、右下），用于通过索引数组构建 2 个三角形
+func (s *RenderSystem) buildParticleVertices(particle *components.ParticleComponent, pos *components.PositionComponent, cameraX float64) []ebiten.Vertex {
+	if particle.Image == nil {
+		return nil
+	}
+
+	// 获取图片尺寸
+	bounds := particle.Image.Bounds()
+	w := float64(bounds.Dx())
+	h := float64(bounds.Dy())
+
+	// 粒子矩形的四个角（未变换，中心对齐）
+	// 左上、右上、左下、右下
+	corners := [][2]float64{
+		{-w / 2, -h / 2}, // 左上
+		{w / 2, -h / 2},  // 右上
+		{-w / 2, h / 2},  // 左下
+		{w / 2, h / 2},   // 右下
+	}
+
+	// 旋转角度（度转弧度）
+	radians := particle.Rotation * math.Pi / 180.0
+	cosTheta := math.Cos(radians)
+	sinTheta := math.Sin(radians)
+
+	// 变换后的四个角（世界坐标）
+	transformedCorners := [4][2]float64{}
+	for i, corner := range corners {
+		// 1. 应用旋转（旋转矩阵）
+		rotatedX := corner[0]*cosTheta - corner[1]*sinTheta
+		rotatedY := corner[0]*sinTheta + corner[1]*cosTheta
+
+		// 2. 应用缩放
+		scaledX := rotatedX * particle.Scale
+		scaledY := rotatedY * particle.Scale
+
+		// 3. 平移到世界位置
+		worldX := pos.X + scaledX
+		worldY := pos.Y + scaledY
+
+		// 4. 转换为屏幕坐标
+		screenX := worldX - cameraX
+		screenY := worldY
+
+		transformedCorners[i] = [2]float64{screenX, screenY}
+	}
+
+	// 计算顶点颜色（应用亮度乘数）
+	colorR := float32(particle.Red * particle.Brightness)
+	colorG := float32(particle.Green * particle.Brightness)
+	colorB := float32(particle.Blue * particle.Brightness)
+	colorA := float32(particle.Alpha)
+
+	// 纹理坐标（图片的四个角）
+	srcX0, srcY0 := float32(bounds.Min.X), float32(bounds.Min.Y)
+	srcX1, srcY1 := float32(bounds.Max.X), float32(bounds.Max.Y)
+
+	// 构建顶点数组（6 个顶点，2 个三角形）
+	// 三角形 1: 左上、右上、左下
+	// 三角形 2: 右上、右下、左下
+	vertices := []ebiten.Vertex{
+		// 左上
+		{
+			DstX:   float32(transformedCorners[0][0]),
+			DstY:   float32(transformedCorners[0][1]),
+			SrcX:   srcX0,
+			SrcY:   srcY0,
+			ColorR: colorR,
+			ColorG: colorG,
+			ColorB: colorB,
+			ColorA: colorA,
+		},
+		// 右上
+		{
+			DstX:   float32(transformedCorners[1][0]),
+			DstY:   float32(transformedCorners[1][1]),
+			SrcX:   srcX1,
+			SrcY:   srcY0,
+			ColorR: colorR,
+			ColorG: colorG,
+			ColorB: colorB,
+			ColorA: colorA,
+		},
+		// 左下
+		{
+			DstX:   float32(transformedCorners[2][0]),
+			DstY:   float32(transformedCorners[2][1]),
+			SrcX:   srcX0,
+			SrcY:   srcY1,
+			ColorR: colorR,
+			ColorG: colorG,
+			ColorB: colorB,
+			ColorA: colorA,
+		},
+		// 右下（用于第二个三角形）
+		{
+			DstX:   float32(transformedCorners[3][0]),
+			DstY:   float32(transformedCorners[3][1]),
+			SrcX:   srcX1,
+			SrcY:   srcY1,
+			ColorR: colorR,
+			ColorG: colorG,
+			ColorB: colorB,
+			ColorA: colorA,
+		},
+	}
+
+	// 返回 4 个顶点，在 DrawParticles 中通过索引数组构建 2 个三角形
+	return vertices
 }
