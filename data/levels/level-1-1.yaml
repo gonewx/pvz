@@ -1,71 +1,33 @@
 id: "1-1"
 name: "前院白天 1-1"
 description: "教学关卡：学习基本的植物种植和僵尸防御"
+
+# Story 8.1: 关卡配置增强
+openingType: "tutorial"       # 教学关卡（无开场动画）
+enabledLanes: [3]             # 只启用第3行（中间行）
+availablePlants:              # 只有豌豆射手
+  - "peashooter"
+skipOpening: true             # 跳过开场（教学关卡直接进入）
+
+# 波次配置：1波，2-3只普通僵尸
 waves:
-  # 第一波：10秒，单个基础僵尸（第3行）
+  # 第一波（也是唯一一波）：10秒，第一只僵尸
   - time: 10
     zombies:
-      - type: basic
+      - type: "basic"
         lane: 3
         count: 1
 
-  # 第二波：30秒，3个基础僵尸（分布在第1、2、5行）
+  # 第二只僵尸：30秒
   - time: 30
     zombies:
-      - type: basic
-        lane: 1
-        count: 2
-      - type: basic
-        lane: 5
+      - type: "basic"
+        lane: 3
         count: 1
 
-  # 第三波：50秒，4个僵尸（3个基础+1个路障）
+  # 第三只僵尸（最后一只）：50秒
   - time: 50
     zombies:
-      - type: basic
-        lane: 2
-        count: 2
-      - type: conehead
-        lane: 4
-        count: 1
-      - type: basic
+      - type: "basic"
         lane: 3
-        count: 1
-
-  # 第四波：70秒，5个僵尸（4个基础+1个路障）
-  - time: 70
-    zombies:
-      - type: basic
-        lane: 1
-        count: 1
-      - type: basic
-        lane: 2
-        count: 1
-      - type: basic
-        lane: 4
-        count: 1
-      - type: conehead
-        lane: 5
-        count: 1
-      - type: basic
-        lane: 3
-        count: 1
-
-  # 第五波（最后一波）：90秒，大波僵尸（每行至少1个）
-  - time: 90
-    zombies:
-      - type: basic
-        lane: 1
-        count: 1
-      - type: basic
-        lane: 2
-        count: 1
-      - type: conehead
-        lane: 3
-        count: 1
-      - type: basic
-        lane: 4
-        count: 1
-      - type: conehead
-        lane: 5
         count: 1

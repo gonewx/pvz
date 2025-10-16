@@ -30,7 +30,7 @@ const (
 type WaveSpawnSystem struct {
 	entityManager   *ecs.EntityManager
 	resourceManager *game.ResourceManager
-	reanimSystem    *ReanimSystem      // 用于初始化僵尸动画
+	reanimSystem    *ReanimSystem       // 用于初始化僵尸动画
 	levelConfig     *config.LevelConfig // Story 8.1: 关卡配置（用于验证行数限制）
 }
 

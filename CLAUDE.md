@@ -649,6 +649,101 @@ go test -v ./pkg/systems
 ### 添加新僵尸类型
 流程与添加新植物类似,关注点在僵尸特定的行为逻辑(移动、啃食)。
 
+### 配置关卡行数限制 (Story 8.1)
+
+1. **编辑关卡配置文件** (data/levels/level-X-X.yaml):
+   ```yaml
+   id: "1-1"
+   name: "前院白天 1-1"
+   enabledLanes: [3]  # 只启用第3行（中间行）
+   ```
+
+2. **系统自动处理**:
+   - `LawnGridSystem` 自动读取 `enabledLanes` 配置
+   - 禁用的行不响应点击（不显示植物预览）
+   - `WaveSpawnSystem` 只在启用的行中生成僵尸
+   - 配置验证：僵尸配置的 `lane` 必须在 `enabledLanes` 中
+
+3. **常见配置**:
+   - 教学关卡（1-1）：`[3]` - 只有中间行
+   - 早期关卡（1-2, 1-3）：`[2, 3, 4]` - 中间3行
+   - 标准关卡：`[1, 2, 3, 4, 5]` - 全部5行（默认值）
+
+### 配置可用植物列表 (Story 8.1)
+
+1. **编辑关卡配置文件**:
+   ```yaml
+   id: "1-2"
+   name: "前院白天 1-2"
+   availablePlants:
+     - "peashooter"
+     - "sunflower"
+   ```
+
+2. **植物解锁系统** (`PlantUnlockManager`):
+   - 管理玩家已解锁的植物
+   - 默认解锁：`["peashooter", "sunflower", "cherrybomb", "wallnut"]`
+   - 最终可选植物 = `availablePlants` ∩ `已解锁植物`
+
+3. **解锁新植物**:
+   ```go
+   // 在关卡完成时解锁新植物
+   gs := game.GetGameState()
+   unlockManager := gs.GetPlantUnlockManager()
+   unlockManager.UnlockPlant("snowpea")
+   ```
+
+4. **查询植物状态**:
+   ```go
+   // 检查植物是否已解锁
+   if unlockManager.IsUnlocked("chomper") {
+       // 植物可用
+   }
+
+   // 获取所有已解锁植物
+   unlockedPlants := unlockManager.GetUnlockedPlants()
+   ```
+
+### 植物选择系统 (Story 8.1)
+
+**注意**: 选卡界面 UI 将在后续 Story 中实现，当前仅提供核心逻辑。
+
+1. **创建选择实体**:
+   ```go
+   // 在选卡场景中创建
+   selectionEntity := em.CreateEntity()
+   ecs.AddComponent(em, selectionEntity, &components.PlantSelectionComponent{
+       SelectedPlants: []string{},
+       MaxSlots:       6,  // 最多选择6个植物
+       IsConfirmed:    false,
+   })
+   ```
+
+2. **使用 PlantSelectionSystem**:
+   ```go
+   selectionSystem := systems.NewPlantSelectionSystem(em)
+
+   // 选择植物
+   err := selectionSystem.SelectPlant(selectionEntity, "peashooter")
+
+   // 取消选择
+   err := selectionSystem.DeselectPlant(selectionEntity, "sunflower")
+
+   // 确认选择
+   selectedPlants, err := selectionSystem.ConfirmSelection(selectionEntity)
+   if err == nil {
+       // 将选择保存到 GameState
+       gs.SetSelectedPlants(selectedPlants)
+   }
+   ```
+
+3. **在游戏场景中使用**:
+   ```go
+   // 获取玩家选择的植物
+   selectedPlants := gs.GetSelectedPlants()
+   // 只显示选中的植物卡片
+   ```
+
 ## 关键工作流程
 
 ### 玩家收集阳光
@@ -818,23 +913,115 @@ if zombie.Health <= 0 {
 
 ## 数据驱动设计
 
-### 关卡配置示例 (data/levels/level_1-1.yaml)
+### 关卡配置增强 (Story 8.1)
+
+关卡配置系统已扩展，支持更多游戏玩法配置选项。
+
+#### 关卡配置字段说明
+
 ```yaml
-level:
-  id: "1-1"
-  name: "前院白天 1-1"
-  waves:
-    - time: 10
-      zombies:
-        - type: basic
-          lane: 3
-          count: 1
-    - time: 30
-      zombies:
-        - type: basic
-          lane: 1
-          count: 2
-  # ...
+id: "1-1"
+name: "前院白天 1-1"
+description: "教学关卡：学习基本的植物种植和僵尸防御"
+
+# Story 8.1: 新增配置字段
+openingType: "tutorial"       # 开场类型："tutorial", "standard", "special"
+enabledLanes: [3]             # 启用的行列表（1-5），如 [3] 表示只有第3行
+availablePlants:              # 可用植物ID列表
+  - "peashooter"
+skipOpening: true             # 是否跳过开场动画（调试用）
+tutorialSteps: []             # 教学步骤（Story 8.2 使用）
+specialRules: ""              # 特殊规则："bowling", "conveyor"（Story 8.5/8.7 使用）
+
+# 波次配置
+waves:
+  - time: 10
+    zombies:
+      - type: "basic"
+        lane: 3
+        count: 1
+```
+
+#### 字段详解
+
+**openingType** - 控制关卡开场动画类型
+- `"tutorial"`: 教学关卡（如 1-1），无开场动画，直接进入
+- `"standard"`: 标准关卡，播放镜头右移预告僵尸动画
+- `"special"`: 特殊关卡（如 1-5, 1-10），显示特殊标题卡
+- 默认值：`"standard"`
+
+**enabledLanes** - 启用的草坪行数
+- 例如：`[3]` 表示只启用第3行（1-1 教学关卡）
+- 例如：`[2, 3, 4]` 表示只启用中间3行（1-2, 1-3 关卡）
+- 默认值：`[1, 2, 3, 4, 5]`（所有行）
+- 用途：限制关卡场地，增加难度变化
+
+**availablePlants** - 本关可用的植物ID列表
+- 用于选卡界面显示可选植物
+- 与 `PlantUnlockManager` 的交集为最终可选植物
+- 例如：`["peashooter", "sunflower"]`
+- 默认值：`[]`（空列表，表示所有已解锁植物）
+
+**skipOpening** - 调试开关
+- `true`: 跳过开场动画直接进入游戏
+- `false`: 播放开场动画
+- 默认值：`false`
+
+**tutorialSteps** - 教学步骤配置（Story 8.2 使用）
+```yaml
+tutorialSteps:
+  - trigger: "gameStart"
+    text: "天空中会掉落阳光,点击收集它们!"
+    action: "waitForSunCollect"
+```
+
+**specialRules** - 特殊规则类型（Story 8.5/8.7 使用）
+- `"bowling"`: 坚果保龄球模式
+- `"conveyor"`: 传送带模式
+- 默认值：`""`（标准模式）
+
+#### 向后兼容性
+
+所有新字段都是**可选的**，旧版配置文件（无新字段）仍能正常加载：
+- 缺失的字段会自动应用默认值
+- 不需要修改现有配置文件
+
+### 关卡配置示例
+
+#### 示例 1: 教学关卡（1-1）
+```yaml
+id: "1-1"
+name: "前院白天 1-1"
+description: "教学关卡：学习基本的植物种植和僵尸防御"
+openingType: "tutorial"
+enabledLanes: [3]             # 只有第3行
+availablePlants: ["peashooter"]
+skipOpening: true
+waves:
+  - time: 10
+    zombies:
+      - type: "basic"
+        lane: 3
+        count: 1
+```
+
+#### 示例 2: 标准关卡（1-2）
+```yaml
+id: "1-2"
+name: "前院白天 1-2"
+description: "学习种植向日葵收集阳光"
+openingType: "standard"
+enabledLanes: [2, 3, 4]       # 中间3行
+availablePlants:
+  - "peashooter"
+  - "sunflower"
+skipOpening: false
+waves:
+  - time: 20
+    zombies:
+      - type: "basic"
+        lane: 3
+        count: 1
 ```
 
 ### 单位属性示例 (data/units/plants.yaml)
