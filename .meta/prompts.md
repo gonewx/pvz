@@ -35,3 +35,7 @@
 assets/effect/particles/ZombieHead.xml 从实际运行 cmd/particles/main.go 看,僵尸头没有在地面弹跳的效果
 
 -  僵尸头粒子效果和原版的表现不一样, 掉落速度慢,头滚动少,很快就消失了，没看到反弹地面的效果.是不是我们对配置文件的字段含义理解有误?或实现有误? .meta/particles/ZombieHead.md  assets/effect/particles/ZombieHead.xml  cmd/particles/main.go
+
+## 8
+
+- 现在项目的基础功能全部实现，需要根据 @.meta/whitepaper.md 的说明一步步实现关卡， 注意说明文档是大模型生成的，有可能不准确，有和你对游戏理解不一致的地方，明确提出，和我沟通确认。
