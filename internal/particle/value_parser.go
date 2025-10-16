@@ -129,15 +129,22 @@ func ParseValue(s string) (min, max float64, keyframes []Keyframe, interpolation
 		}
 	}
 
-	// Check for range format: "[min max]"
+	// Check for range format: "[min max]" or "[value]"
 	if strings.HasPrefix(s, "[") && strings.HasSuffix(s, "]") {
 		rangeStr := strings.TrimPrefix(s, "[")
 		rangeStr = strings.TrimSuffix(rangeStr, "]")
 		parts := strings.Fields(rangeStr)
 		if len(parts) == 2 {
+			// 范围格式: "[min max]"
 			min, _ = strconv.ParseFloat(parts[0], 64)
 			max, _ = strconv.ParseFloat(parts[1], 64)
 			return min, max, nil, ""
+		} else if len(parts) == 1 {
+			// 单值格式: "[value]" - 作为固定值处理
+			val, err := strconv.ParseFloat(parts[0], 64)
+			if err == nil {
+				return val, val, nil, ""
+			}
 		}
 		// Fallback if parsing fails
 		return 0, 0, nil, ""

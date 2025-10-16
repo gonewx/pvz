@@ -299,6 +299,13 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 	durationMin, durationMax, _, _ := particlePkg.ParseValue(config.ParticleDuration)
 	lifetime := particlePkg.RandomInRange(durationMin, durationMax) / 100.0 // centiseconds to seconds
 
+	// 如果 ParticleDuration 未配置（为 0），使用 SystemDuration 作为默认值
+	// 这样粒子至少能存活到发射器结束，避免生命周期为 0 导致粒子立即销毁
+	if lifetime == 0 && emitter.SystemDuration > 0 {
+		lifetime = emitter.SystemDuration
+		log.Printf("[ParticleSystem] 警告：ParticleDuration 未配置，使用 SystemDuration 作为默认值: %.2fs", lifetime)
+	}
+
 	// Launch speed and angle
 	speedMin, speedMax, _, _ := particlePkg.ParseValue(config.LaunchSpeed)
 	angleMin, angleMax, _, _ := particlePkg.ParseValue(config.LaunchAngle)
@@ -553,8 +560,8 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 	emitter.ActiveParticles = append(emitter.ActiveParticles, particleID)
 
 	// DEBUG: 粒子创建日志（每个粒子创建时打印会刷屏，已禁用）
-	// log.Printf("[ParticleSystem] 粒子创建完成: ID=%d, 位置=(%.1f, %.1f), 生命周期=%.2fs, Image=%v, 颜色=(%.2f,%.2f,%.2f), 亮度=%.2f",
-	// 	particleID, spawnX, spawnY, lifetime, particleImage != nil, red, green, blue, brightness)
+	// log.Printf("[ParticleSystem] 粒子创建完成: ID=%d, 位置=(%.1f, %.1f), 生命周期=%.2fs, Image=%v, Alpha=%.2f, Scale=%.2f, 颜色=(%.2f,%.2f,%.2f), 亮度=%.2f",
+	// 	particleID, spawnX, spawnY, lifetime, particleImage != nil, initialAlpha, initialScale, red, green, blue, brightness)
 }
 
 // applyInterpolation updates particle properties based on keyframe animations.

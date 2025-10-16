@@ -1,6 +1,7 @@
 package systems
 
 import (
+	"math"
 	"reflect"
 	"testing"
 
@@ -1101,3 +1102,74 @@ func TestParticleSystem_ColorDefaults(t *testing.T) {
 	}
 }
 
+// TestParticleSystem_MissingParticleDuration tests that particles with missing
+// ParticleDuration field use SystemDuration as fallback (Bug fix for ZombieNewspaper)
+func TestParticleSystem_MissingParticleDuration(t *testing.T) {
+	em := ecs.NewEntityManager()
+	ps := NewParticleSystem(em, nil)
+
+	// Create emitter with SystemDuration but NO ParticleDuration
+	emitterID := em.CreateEntity()
+	emitterPos := &components.PositionComponent{X: 100, Y: 100}
+	emitterComp := &components.EmitterComponent{
+		Config: &particle.EmitterConfig{
+			Name:         "TestEmitter",
+			// ParticleDuration: "",  // 故意省略，模拟 ZombieNewspaper.xml
+			SystemDuration: "40", // 0.4 秒
+			LaunchSpeed:    "200",
+			LaunchAngle:    "[120 180]",
+			Image:          "IMAGE_TEST",
+		},
+		Active:         true,
+		SystemDuration: 0.4, // 0.4 秒
+		SpawnMinActive: 1,
+		NextSpawnTime:  0,
+	}
+	em.AddComponent(emitterID, emitterPos)
+	em.AddComponent(emitterID, emitterComp)
+
+	// Spawn a particle (should use SystemDuration as fallback)
+	ps.Update(0.016) // 触发粒子生成
+
+	// Find the particle entity (查找除了发射器之外创建的粒子实体)
+	var particleID ecs.EntityID
+	var particleComp *components.ParticleComponent
+
+	// 遍历所有实体，查找粒子
+	particleType := reflect.TypeOf(&components.ParticleComponent{})
+	emitterType := reflect.TypeOf(&components.EmitterComponent{})
+
+	for id := ecs.EntityID(1); id <= ecs.EntityID(10); id++ {
+		// 检查实体是否存在且有 ParticleComponent
+		if !em.HasComponent(id, particleType) {
+			continue
+		}
+		// 如果有 EmitterComponent，这是发射器，跳过
+		if em.HasComponent(id, emitterType) {
+			continue
+		}
+		// 找到真正的粒子实体
+		comp, exists := em.GetComponent(id, particleType)
+		if exists {
+			particleID = id
+			particleComp = comp.(*components.ParticleComponent)
+			break
+		}
+	}
+
+	if particleID == 0 {
+		t.Fatal("No particle was created")
+	}
+
+	// 粒子应该使用 SystemDuration (0.4s) 作为 Lifetime
+	expectedLifetime := 0.4
+	if math.Abs(particleComp.Lifetime-expectedLifetime) > 0.001 {
+		t.Errorf("Particle lifetime = %.3f, want %.3f (should use SystemDuration as fallback)",
+			particleComp.Lifetime, expectedLifetime)
+	}
+
+	// 验证粒子不会立即过期
+	if particleComp.Age >= particleComp.Lifetime {
+		t.Errorf("Particle expired immediately: Age=%.3f, Lifetime=%.3f", particleComp.Age, particleComp.Lifetime)
+	}
+}

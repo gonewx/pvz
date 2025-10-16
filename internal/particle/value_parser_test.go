@@ -52,6 +52,10 @@ func TestParseValue_Range(t *testing.T) {
 		{"Integer range", "[10 20]", 10, 20, false},
 		{"Negative range", "[-5 -2]", -5, -2, false},
 		{"Mixed range", "[-1.5 2.5]", -1.5, 2.5, false},
+		// Bug修复：单值方括号格式（PeaSplatBits 使用 "[150]" 定义固定速度）
+		{"Single value in brackets", "[150]", 150, 150, false},
+		{"Single float in brackets", "[3.14]", 3.14, 3.14, false},
+		{"Single negative in brackets", "[-100]", -100, -100, false},
 	}
 
 	for _, tt := range tests {
