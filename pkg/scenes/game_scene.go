@@ -176,11 +176,18 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	sunCollectionTargetX := float64(SeedBankX + SunCounterOffsetX)
 	sunCollectionTargetY := float64(SeedBankY + SunCounterOffsetY)
 
-	// Story 3.3: Initialize lawn grid system and entity
-	scene.lawnGridSystem = systems.NewLawnGridSystem(scene.entityManager)
+	// Story 3.3 & 8.1: Initialize lawn grid system and entity with enabled lanes
+	var enabledLanes []int
+	if scene.gameState.CurrentLevel != nil {
+		enabledLanes = scene.gameState.CurrentLevel.EnabledLanes
+	}
+	if len(enabledLanes) == 0 {
+		enabledLanes = []int{1, 2, 3, 4, 5} // 默认所有行启用
+	}
+	scene.lawnGridSystem = systems.NewLawnGridSystem(scene.entityManager, enabledLanes)
 	scene.lawnGridEntityID = scene.entityManager.CreateEntity()
 	scene.entityManager.AddComponent(scene.lawnGridEntityID, &components.LawnGridComponent{})
-	log.Printf("[GameScene] Initialized lawn grid system (Entity ID: %d)", scene.lawnGridEntityID)
+	log.Printf("[GameScene] Initialized lawn grid system (Entity ID: %d) with enabled lanes: %v", scene.lawnGridEntityID, enabledLanes)
 
 	// Story 6.3: Initialize Reanim system (must be before InputSystem)
 	scene.reanimSystem = systems.NewReanimSystem(scene.entityManager)
@@ -237,7 +244,7 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 
 	// Story 5.5: Initialize level management systems
 	// 1. Create WaveSpawnSystem (LevelSystem depends on it)
-	scene.waveSpawnSystem = systems.NewWaveSpawnSystem(scene.entityManager, rm, scene.reanimSystem)
+	scene.waveSpawnSystem = systems.NewWaveSpawnSystem(scene.entityManager, rm, scene.reanimSystem, scene.gameState.CurrentLevel)
 	log.Printf("[GameScene] Initialized wave spawn system")
 
 	// 2. Create LevelSystem

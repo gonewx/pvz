@@ -27,6 +27,10 @@ type GameState struct {
 	IsLevelComplete     bool                // 关卡是否完成
 	IsGameOver          bool                // 游戏是否结束（胜利或失败）
 	GameResult          string              // 游戏结果："win", "lose", "" (进行中)
+
+	// Story 8.1: 植物解锁和选卡状态
+	plantUnlockManager *PlantUnlockManager // 植物解锁管理器
+	SelectedPlants     []string            // 选卡界面选中的植物列表（传递给 GameScene）
 }
 
 // 全局单例实例（这是架构规范允许的唯一全局变量）
@@ -37,7 +41,9 @@ var globalGameState *GameState
 func GetGameState() *GameState {
 	if globalGameState == nil {
 		globalGameState = &GameState{
-			Sun: 500, // 临时增加初始阳光用于测试（原版是50）
+			Sun:                500, // 临时增加初始阳光用于测试（原版是50）
+			plantUnlockManager: NewPlantUnlockManager(),
+			SelectedPlants:     []string{},
 		}
 	}
 	return globalGameState
@@ -191,4 +197,32 @@ func (gs *GameState) GetLevelProgress() (currentWave int, totalWaves int) {
 		return 0, 0
 	}
 	return gs.CurrentWaveIndex, len(gs.CurrentLevel.Waves)
+}
+
+// GetPlantUnlockManager 获取植物解锁管理器
+// 返回全局植物解锁管理器实例
+//
+// 返回:
+//   - *PlantUnlockManager: 植物解锁管理器实例
+func (gs *GameState) GetPlantUnlockManager() *PlantUnlockManager {
+	return gs.plantUnlockManager
+}
+
+// SetSelectedPlants 设置选卡界面选中的植物列表
+// 在选卡界面确认选择后调用，将选中植物保存到 GameState
+//
+// 参数:
+//   - plants: 选中的植物ID列表
+func (gs *GameState) SetSelectedPlants(plants []string) {
+	gs.SelectedPlants = make([]string, len(plants))
+	copy(gs.SelectedPlants, plants)
+}
+
+// GetSelectedPlants 获取选卡界面选中的植物列表
+// 在 GameScene 初始化时调用，获取玩家选择的植物
+//
+// 返回:
+//   - []string: 选中的植物ID列表
+func (gs *GameState) GetSelectedPlants() []string {
+	return gs.SelectedPlants
 }

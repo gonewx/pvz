@@ -81,12 +81,11 @@ func (s *PlantSelectionSystem) SelectPlant(plantID string) error {
 		return fmt.Errorf("selection slots are full (max %d)", selectionComp.MaxSlots)
 	}
 
-	// TODO(Story 8.1): 实现 GameState.GetPlantUnlockManager() 方法
 	// 检查植物是否已解锁
-	// unlockManager := s.gameState.GetPlantUnlockManager()
-	// if unlockManager != nil && !unlockManager.IsUnlocked(plantID) {
-	// 	return fmt.Errorf("plant %s is not unlocked", plantID)
-	// }
+	unlockManager := s.gameState.GetPlantUnlockManager()
+	if unlockManager != nil && !unlockManager.IsUnlocked(plantID) {
+		return fmt.Errorf("plant %s is not unlocked", plantID)
+	}
 
 	// 添加到选择列表
 	selectionComp.SelectedPlants = append(selectionComp.SelectedPlants, plantID)
@@ -159,10 +158,8 @@ func (s *PlantSelectionSystem) ConfirmSelection() error {
 	// 设置确认标志
 	selectionComp.IsConfirmed = true
 
-	// TODO(Story 8.1): 实现 GameState.SelectedPlants 字段
 	// 将选中植物保存到 GameState（供 GameScene 使用）
-	// s.gameState.SelectedPlants = make([]string, len(selectionComp.SelectedPlants))
-	// copy(s.gameState.SelectedPlants, selectionComp.SelectedPlants)
+	s.gameState.SetSelectedPlants(selectionComp.SelectedPlants)
 
 	return nil
 }

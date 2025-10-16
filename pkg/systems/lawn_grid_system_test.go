@@ -10,7 +10,7 @@ import (
 // TestIsOccupied 测试占用检测功能
 func TestIsOccupied(t *testing.T) {
 	em := ecs.NewEntityManager()
-	system := NewLawnGridSystem(em)
+	system := NewLawnGridSystem(em, nil)
 
 	// 创建草坪网格实体
 	gridEntity := em.CreateEntity()
@@ -39,7 +39,7 @@ func TestIsOccupied(t *testing.T) {
 // TestOccupyCell 测试标记格子占用
 func TestOccupyCell(t *testing.T) {
 	em := ecs.NewEntityManager()
-	system := NewLawnGridSystem(em)
+	system := NewLawnGridSystem(em, nil)
 
 	// 创建草坪网格实体
 	gridEntity := em.CreateEntity()
@@ -76,7 +76,7 @@ func TestOccupyCell(t *testing.T) {
 // TestReleaseCell 测试释放格子
 func TestReleaseCell(t *testing.T) {
 	em := ecs.NewEntityManager()
-	system := NewLawnGridSystem(em)
+	system := NewLawnGridSystem(em, nil)
 
 	// 创建草坪网格实体
 	gridEntity := em.CreateEntity()
@@ -115,7 +115,7 @@ func TestReleaseCell(t *testing.T) {
 // TestBoundaryChecks 测试边界检查
 func TestBoundaryChecks(t *testing.T) {
 	em := ecs.NewEntityManager()
-	system := NewLawnGridSystem(em)
+	system := NewLawnGridSystem(em, nil)
 
 	// 创建草坪网格实体
 	gridEntity := em.CreateEntity()
@@ -161,7 +161,7 @@ func TestBoundaryChecks(t *testing.T) {
 // TestValidBoundaries 测试有效边界值
 func TestValidBoundaries(t *testing.T) {
 	em := ecs.NewEntityManager()
-	system := NewLawnGridSystem(em)
+	system := NewLawnGridSystem(em, nil)
 
 	// 创建草坪网格实体
 	gridEntity := em.CreateEntity()
@@ -199,7 +199,7 @@ func TestValidBoundaries(t *testing.T) {
 // TestMultipleOccupations 测试多个格子的占用
 func TestMultipleOccupations(t *testing.T) {
 	em := ecs.NewEntityManager()
-	system := NewLawnGridSystem(em)
+	system := NewLawnGridSystem(em, nil)
 
 	// 创建草坪网格实体
 	gridEntity := em.CreateEntity()
@@ -245,6 +245,124 @@ func TestMultipleOccupations(t *testing.T) {
 	for _, pos := range positions {
 		if system.IsOccupied(gridEntity, pos.col, pos.row) {
 			t.Errorf("Cell (%d, %d) should be unoccupied after release", pos.col, pos.row)
+		}
+	}
+}
+
+// TestIsLaneEnabled 测试行启用/禁用功能 (Story 8.1)
+func TestIsLaneEnabled(t *testing.T) {
+	em := ecs.NewEntityManager()
+
+	tests := []struct {
+		name         string
+		enabledLanes []int
+		testLane     int
+		expected     bool
+	}{
+		{
+			name:         "默认所有行启用 - 测试第1行",
+			enabledLanes: nil,
+			testLane:     1,
+			expected:     true,
+		},
+		{
+			name:         "默认所有行启用 - 测试第5行",
+			enabledLanes: nil,
+			testLane:     5,
+			expected:     true,
+		},
+		{
+			name:         "只启用第3行 - 测试第3行",
+			enabledLanes: []int{3},
+			testLane:     3,
+			expected:     true,
+		},
+		{
+			name:         "只启用第3行 - 测试第1行（禁用）",
+			enabledLanes: []int{3},
+			testLane:     1,
+			expected:     false,
+		},
+		{
+			name:         "启用前3行 - 测试第2行",
+			enabledLanes: []int{1, 2, 3},
+			testLane:     2,
+			expected:     true,
+		},
+		{
+			name:         "启用前3行 - 测试第4行（禁用）",
+			enabledLanes: []int{1, 2, 3},
+			testLane:     4,
+			expected:     false,
+		},
+		{
+			name:         "启用前3行 - 测试第5行（禁用）",
+			enabledLanes: []int{1, 2, 3},
+			testLane:     5,
+			expected:     false,
+		},
+		{
+			name:         "不连续的行 - 测试启用的行",
+			enabledLanes: []int{1, 3, 5},
+			testLane:     3,
+			expected:     true,
+		},
+		{
+			name:         "不连续的行 - 测试禁用的行",
+			enabledLanes: []int{1, 3, 5},
+			testLane:     2,
+			expected:     false,
+		},
+		{
+			name:         "边界测试 - 第0行（无效）",
+			enabledLanes: []int{1, 2, 3},
+			testLane:     0,
+			expected:     false,
+		},
+		{
+			name:         "边界测试 - 第6行（无效）",
+			enabledLanes: []int{1, 2, 3},
+			testLane:     6,
+			expected:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			system := NewLawnGridSystem(em, tt.enabledLanes)
+			result := system.IsLaneEnabled(tt.testLane)
+
+			if result != tt.expected {
+				t.Errorf("IsLaneEnabled(%d) = %v, want %v (enabledLanes: %v)",
+					tt.testLane, result, tt.expected, system.EnabledLanes)
+			}
+		})
+	}
+}
+
+// TestLawnGridSystemWithEnabledLanes 测试带行数限制的草坪网格系统 (Story 8.1)
+func TestLawnGridSystemWithEnabledLanes(t *testing.T) {
+	em := ecs.NewEntityManager()
+
+	// 只启用前3行
+	system := NewLawnGridSystem(em, []int{1, 2, 3})
+
+	// 验证 EnabledLanes 字段正确设置
+	if len(system.EnabledLanes) != 3 {
+		t.Errorf("Expected 3 enabled lanes, got %d", len(system.EnabledLanes))
+	}
+
+	// 验证第1-3行启用
+	for lane := 1; lane <= 3; lane++ {
+		if !system.IsLaneEnabled(lane) {
+			t.Errorf("Lane %d should be enabled", lane)
+		}
+	}
+
+	// 验证第4-5行禁用
+	for lane := 4; lane <= 5; lane++ {
+		if system.IsLaneEnabled(lane) {
+			t.Errorf("Lane %d should be disabled", lane)
 		}
 	}
 }

@@ -54,7 +54,7 @@ func TestSunClickStateChange(t *testing.T) {
 	initialSun := gs.GetSun()
 
 	// 创建草坪网格系统和实体（测试用）
-	lawnGridSystem := NewLawnGridSystem(em)
+	lawnGridSystem := NewLawnGridSystem(em, nil)
 	lawnGridEntityID := em.CreateEntity()
 	em.AddComponent(lawnGridEntityID, &components.LawnGridComponent{})
 
@@ -114,7 +114,7 @@ func TestClickFallingSunNoEffect(t *testing.T) {
 	gs := game.GetGameState()
 
 	// 创建草坪网格系统和实体（测试用）
-	lawnGridSystem := NewLawnGridSystem(em)
+	lawnGridSystem := NewLawnGridSystem(em, nil)
 	lawnGridEntityID := em.CreateEntity()
 	em.AddComponent(lawnGridEntityID, &components.LawnGridComponent{})
 
@@ -159,7 +159,7 @@ func TestClickDisabledSunNoEffect(t *testing.T) {
 	gs := game.GetGameState()
 
 	// 创建草坪网格系统和实体（测试用）
-	lawnGridSystem := NewLawnGridSystem(em)
+	lawnGridSystem := NewLawnGridSystem(em, nil)
 	lawnGridEntityID := em.CreateEntity()
 	em.AddComponent(lawnGridEntityID, &components.LawnGridComponent{})
 
@@ -199,7 +199,7 @@ func TestVelocityCalculation(t *testing.T) {
 	targetY := 80.0
 
 	// 创建草坪网格系统和实体（测试用）
-	lawnGridSystem := NewLawnGridSystem(em)
+	lawnGridSystem := NewLawnGridSystem(em, nil)
 	lawnGridEntityID := em.CreateEntity()
 	em.AddComponent(lawnGridEntityID, &components.LawnGridComponent{})
 
@@ -251,7 +251,7 @@ func TestGetPlantCost(t *testing.T) {
 	em := ecs.NewEntityManager()
 	rm := game.NewResourceManager(testAudioContext)
 	gs := game.GetGameState()
-	lawnGridSystem := NewLawnGridSystem(em)
+	lawnGridSystem := NewLawnGridSystem(em, nil)
 	lawnGridEntityID := em.CreateEntity()
 	em.AddComponent(lawnGridEntityID, &components.LawnGridComponent{})
 
@@ -282,7 +282,7 @@ func TestTriggerPlantCardCooldown(t *testing.T) {
 	em := ecs.NewEntityManager()
 	rm := game.NewResourceManager(testAudioContext)
 	gs := game.GetGameState()
-	lawnGridSystem := NewLawnGridSystem(em)
+	lawnGridSystem := NewLawnGridSystem(em, nil)
 	lawnGridEntityID := em.CreateEntity()
 	em.AddComponent(lawnGridEntityID, &components.LawnGridComponent{})
 

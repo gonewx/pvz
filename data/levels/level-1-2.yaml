@@ -1,0 +1,59 @@
+id: "1-2"
+name: "前院白天 1-2"
+description: "学习种植向日葵收集阳光"
+
+# Story 8.1: 新增关卡配置字段
+openingType: "standard"       # 标准开场动画
+enabledLanes: [1, 2, 3]       # 只启用前3行
+availablePlants:              # 可用植物列表
+  - "peashooter"
+  - "sunflower"
+skipOpening: false            # 不跳过开场
+
+# 波次配置
+waves:
+  - time: 20
+    zombies:
+      - type: "basic"
+        lane: 2
+        count: 1
+
+  - time: 40
+    zombies:
+      - type: "basic"
+        lane: 1
+        count: 1
+      - type: "basic"
+        lane: 3
+        count: 1
+
+  - time: 60
+    zombies:
+      - type: "basic"
+        lane: 2
+        count: 2
+
+  - time: 80
+    zombies:
+      - type: "basic"
+        lane: 1
+        count: 1
+      - type: "basic"
+        lane: 2
+        count: 1
+      - type: "basic"
+        lane: 3
+        count: 1
+
+  - time: 100
+    zombies:
+      - type: "basic"
+        lane: 1
+        count: 1
+      - type: "basic"
+        lane: 3
+        count: 1
+      - type: "conehead"
+        lane: 2
+        count: 1
+

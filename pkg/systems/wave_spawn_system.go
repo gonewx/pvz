@@ -21,6 +21,7 @@ const (
 //   - 根据 WaveConfig 生成僵尸实体
 //   - 支持批量生成
 //   - 处理不同僵尸类型的工厂调用
+//   - Story 8.1: 验证僵尸生成行是否在 EnabledLanes 中
 //
 // 架构说明：
 //   - 作为 LevelSystem 的依赖，由 LevelSystem 调用
@@ -29,7 +30,8 @@ const (
 type WaveSpawnSystem struct {
 	entityManager   *ecs.EntityManager
 	resourceManager *game.ResourceManager
-	reanimSystem    *ReanimSystem // 用于初始化僵尸动画
+	reanimSystem    *ReanimSystem      // 用于初始化僵尸动画
+	levelConfig     *config.LevelConfig // Story 8.1: 关卡配置（用于验证行数限制）
 }
 
 // NewWaveSpawnSystem 创建波次生成系统
@@ -39,11 +41,13 @@ type WaveSpawnSystem struct {
 //	em - 实体管理器
 //	rm - 资源管理器
 //	rs - Reanim系统（用于初始化僵尸动画）
-func NewWaveSpawnSystem(em *ecs.EntityManager, rm *game.ResourceManager, rs *ReanimSystem) *WaveSpawnSystem {
+//	lc - 关卡配置（Story 8.1: 用于验证行数限制）
+func NewWaveSpawnSystem(em *ecs.EntityManager, rm *game.ResourceManager, rs *ReanimSystem, lc *config.LevelConfig) *WaveSpawnSystem {
 	return &WaveSpawnSystem{
 		entityManager:   em,
 		resourceManager: rm,
 		reanimSystem:    rs,
+		levelConfig:     lc,
 	}
 }
 
@@ -91,6 +95,12 @@ func (s *WaveSpawnSystem) SpawnWave(waveConfig config.WaveConfig) int {
 //
 //	生成的僵尸实体ID，如果失败返回 0
 func (s *WaveSpawnSystem) spawnZombie(zombieType string, lane int) ecs.EntityID {
+	// Story 8.1: 验证行是否在 EnabledLanes 中
+	if !s.validateLaneConfig(lane) {
+		log.Printf("[WaveSpawnSystem] WARNING: Lane %d is not enabled in level config, skipping zombie spawn", lane)
+		return 0
+	}
+
 	// 将行号从1-5转换为数组索引0-4
 	row := lane - 1
 	if row < 0 || row > 4 {
@@ -152,4 +162,34 @@ func (s *WaveSpawnSystem) getZombieSpawnX() float64 {
 	// 当前版本返回固定坐标
 	// 未来可以添加随机偏移：ZombieSpawnX + rand.Float64() * 50
 	return ZombieSpawnX
+}
+
+// validateLaneConfig 验证行是否在关卡配置的 EnabledLanes 中 (Story 8.1)
+//
+// 参数：
+//
+//	lane - 行号（1-5，1-based）
+//
+// 返回：
+//
+//	true 表示行已启用或无限制，false 表示行被禁用
+func (s *WaveSpawnSystem) validateLaneConfig(lane int) bool {
+	// 如果没有关卡配置，默认允许所有行
+	if s.levelConfig == nil {
+		return true
+	}
+
+	// 如果 EnabledLanes 为空，默认允许所有行
+	if len(s.levelConfig.EnabledLanes) == 0 {
+		return true
+	}
+
+	// 检查 lane 是否在 EnabledLanes 列表中
+	for _, enabledLane := range s.levelConfig.EnabledLanes {
+		if enabledLane == lane {
+			return true
+		}
+	}
+
+	return false
 }

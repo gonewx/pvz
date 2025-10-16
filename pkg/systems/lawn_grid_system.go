@@ -10,14 +10,28 @@ import (
 
 // LawnGridSystem 管理草坪网格的占用状态
 // 负责跟踪哪些格子已被植物占用，并提供查询和更新方法
+// Story 8.1: 支持行数限制，禁用特定行
 type LawnGridSystem struct {
 	entityManager *ecs.EntityManager
+	EnabledLanes  []int // 启用的行列表（1-based），如 [1,2,3] 表示前3行可用
 }
 
 // NewLawnGridSystem 创建草坪网格系统
-func NewLawnGridSystem(em *ecs.EntityManager) *LawnGridSystem {
+// 参数:
+//   - em: EntityManager 实例
+//   - enabledLanes: 启用的行列表（1-based），如 [1,2,3]。如果为空或 nil，默认所有5行启用
+//
+// 返回:
+//   - *LawnGridSystem: 草坪网格系统实例
+func NewLawnGridSystem(em *ecs.EntityManager, enabledLanes []int) *LawnGridSystem {
+	// 如果未指定启用的行，默认所有行启用
+	if len(enabledLanes) == 0 {
+		enabledLanes = []int{1, 2, 3, 4, 5}
+	}
+
 	return &LawnGridSystem{
 		entityManager: em,
+		EnabledLanes:  enabledLanes,
 	}
 }
 
@@ -103,4 +117,25 @@ func (s *LawnGridSystem) ReleaseCell(gridEntity ecs.EntityID, col, row int) erro
 // isValidGridPosition 检查网格位置是否有效
 func (s *LawnGridSystem) isValidGridPosition(col, row int) bool {
 	return col >= 0 && col < config.GridColumns && row >= 0 && row < config.GridRows
+}
+
+// IsLaneEnabled 检查指定行是否启用（Story 8.1）
+// 参数:
+//   - lane: 行索引（1-based），如 1 表示第一行
+//
+// 返回:
+//   - bool: true 表示该行已启用，false 表示该行被禁用
+func (s *LawnGridSystem) IsLaneEnabled(lane int) bool {
+	// 如果未设置 EnabledLanes，默认所有行启用
+	if len(s.EnabledLanes) == 0 {
+		return lane >= 1 && lane <= config.GridRows
+	}
+
+	// 检查行是否在启用列表中
+	for _, enabledLane := range s.EnabledLanes {
+		if enabledLane == lane {
+			return true
+		}
+	}
+	return false
 }
