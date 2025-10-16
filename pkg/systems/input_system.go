@@ -114,6 +114,20 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 		}
 	}
 
+	// DEBUG: 按 Z 键在鼠标位置生成 ZombieHead 粒子效果（测试用）
+	if inpututil.IsKeyJustPressed(ebiten.KeyZ) {
+		mouseScreenX, mouseScreenY := ebiten.CursorPosition()
+		mouseWorldX := float64(mouseScreenX) + cameraX
+		mouseWorldY := float64(mouseScreenY)
+
+		_, err := entities.CreateParticleEffect(s.entityManager, s.resourceManager, "ZombieHead", mouseWorldX, mouseWorldY)
+		if err != nil {
+			log.Printf("[InputSystem] DEBUG: 生成粒子效果失败: %v", err)
+		} else {
+			log.Printf("[InputSystem] DEBUG: 在位置 (%.1f, %.1f) 生成 ZombieHead 粒子效果", mouseWorldX, mouseWorldY)
+		}
+	}
+
 	// 检测鼠标右键取消种植模式
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight) {
 		if s.gameState.IsPlantingMode {

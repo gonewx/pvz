@@ -105,13 +105,13 @@ func NewParticleViewerGame() (*ParticleViewerGame, error) {
 	}
 
 	// Load only init group (minimal resources)
-	if err := rm.LoadResourceGroup("init"); err != nil {
-		log.Printf("Warning: Failed to load init group: %v (continuing anyway)", err)
+	if err := rm.LoadResourceGroup("Init"); err != nil {
+		log.Printf("Warning: Failed to load Init group: %v (continuing anyway)", err)
 	}
 
-	// Load loadingimages group for particle textures
-	if err := rm.LoadResourceGroup("loadingimages"); err != nil {
-		log.Printf("Warning: Failed to load loadingimages group: %v", err)
+	// Load LoadingImages group for particle textures
+	if err := rm.LoadResourceGroup("LoadingImages"); err != nil {
+		log.Printf("Warning: Failed to load LoadingImages group: %v", err)
 	}
 
 	// Note: Particle images are now preloaded from loadingimages group

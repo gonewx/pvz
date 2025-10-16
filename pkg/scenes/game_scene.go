@@ -135,9 +135,12 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 		resourceManager: rm,
 		sceneManager:    sm,
 		gameState:       game.GetGameState(), // Get global game state singleton
+		// DEBUG: Skip intro animation for faster testing
 		// Initialize camera at the leftmost position for intro animation
-		cameraX:            0,
-		isIntroAnimPlaying: true,
+		// cameraX:            0,
+		// isIntroAnimPlaying: true,
+		cameraX:            GameCameraX, // 直接设置为游戏镜头位置，跳过开场动画
+		isIntroAnimPlaying: false,       // 禁用开场动画
 		introAnimTimer:     0,
 	}
 
@@ -677,7 +680,7 @@ func (s *GameScene) drawParticleTestInstructions(screen *ebiten.Image) {
 
 	// 测试说明（屏幕左下角）
 	instructions := []string{
-		"[粒子测试] P=豌豆溅射 | B=爆炸 | A=奖励光效",
+		"[粒子测试] P=豌豆溅射 | B=爆炸 | A=奖励光效 | Z=僵尸头",
 	}
 
 	// 绘制半透明背景
