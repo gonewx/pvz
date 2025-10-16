@@ -2,7 +2,6 @@ package systems
 
 import (
 	"log"
-	"reflect"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
@@ -75,22 +74,22 @@ func (ps *PhysicsSystem) checkAABBCollision(
 //   - deltaTime: 自上一帧以来经过的时间（秒），本系统暂不使用
 func (ps *PhysicsSystem) Update(deltaTime float64) {
 	// 查询所有拥有必要组件的实体（子弹和僵尸都需要这些组件）
-	allEntities := ps.em.GetEntitiesWith(
-		reflect.TypeOf(&components.BehaviorComponent{}),
-		reflect.TypeOf(&components.PositionComponent{}),
-		reflect.TypeOf(&components.CollisionComponent{}),
-	)
+	allEntities := ecs.GetEntitiesWith3[
+		*components.BehaviorComponent,
+		*components.PositionComponent,
+		*components.CollisionComponent,
+	](ps.em)
 
 	// 分离子弹和僵尸
 	bullets := make([]ecs.EntityID, 0)
 	zombies := make([]ecs.EntityID, 0)
 
 	for _, entityID := range allEntities {
-		behaviorComp, ok := ps.em.GetComponent(entityID, reflect.TypeOf(&components.BehaviorComponent{}))
+		behavior, ok := ecs.GetComponent[*components.BehaviorComponent](ps.em, entityID)
 		if !ok {
 			continue
 		}
-		behavior := behaviorComp.(*components.BehaviorComponent)
+		// 泛型 API 已提供类型安全
 
 		if behavior.Type == components.BehaviorPeaProjectile {
 			bullets = append(bullets, entityID)
@@ -106,32 +105,30 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 	// 嵌套遍历检测碰撞
 	for _, bulletID := range bullets {
 		// 获取子弹的位置和碰撞组件
-		bulletPosComp, ok := ps.em.GetComponent(bulletID, reflect.TypeOf(&components.PositionComponent{}))
+		bulletPos, ok := ecs.GetComponent[*components.PositionComponent](ps.em, bulletID)
 		if !ok {
 			continue
 		}
-		bulletPos := bulletPosComp.(*components.PositionComponent)
+		// 泛型 API 已提供类型安全
 
-		bulletColComp, ok := ps.em.GetComponent(bulletID, reflect.TypeOf(&components.CollisionComponent{}))
+		bulletCol, ok := ecs.GetComponent[*components.CollisionComponent](ps.em, bulletID)
 		if !ok {
 			continue
 		}
-		bulletCol := bulletColComp.(*components.CollisionComponent)
+		// 泛型 API 已提供类型安全
 
 		// 检查子弹与所有僵尸的碰撞
 		for _, zombieID := range zombies {
 			// 获取僵尸的位置和碰撞组件
-			zombiePosComp, ok := ps.em.GetComponent(zombieID, reflect.TypeOf(&components.PositionComponent{}))
+			zombiePos, ok := ecs.GetComponent[*components.PositionComponent](ps.em, zombieID)
 			if !ok {
 				continue
 			}
-			zombiePos := zombiePosComp.(*components.PositionComponent)
 
-			zombieColComp, ok := ps.em.GetComponent(zombieID, reflect.TypeOf(&components.CollisionComponent{}))
+			zombieCol, ok := ecs.GetComponent[*components.CollisionComponent](ps.em, zombieID)
 			if !ok {
 				continue
 			}
-			zombieCol := zombieColComp.(*components.CollisionComponent)
 
 			// 执行AABB碰撞检测
 			if ps.checkAABBCollision(bulletPos, bulletCol, zombiePos, zombieCol) {
@@ -146,9 +143,8 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 
 				// Story 7.4: 触发豌豆击中溅射粒子效果
 				// 获取子弹的 BehaviorComponent 以确定子弹类型
-				bulletBehaviorComp, ok := ps.em.GetComponent(bulletID, reflect.TypeOf(&components.BehaviorComponent{}))
+				bulletBehavior, ok := ecs.GetComponent[*components.BehaviorComponent](ps.em, bulletID)
 				if ok {
-					bulletBehavior := bulletBehaviorComp.(*components.BehaviorComponent)
 
 					// 根据子弹类型选择粒子效果
 					var particleEffectName string
@@ -179,9 +175,8 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 				}
 
 				// 2. 处理护甲伤害（Story 5.3: 优先扣除护甲值）
-				armorComp, hasArmor := ps.em.GetComponent(zombieID, reflect.TypeOf(&components.ArmorComponent{}))
+				armor, hasArmor := ecs.GetComponent[*components.ArmorComponent](ps.em, zombieID)
 				if hasArmor {
-					armor := armorComp.(*components.ArmorComponent)
 					if armor.CurrentArmor > 0 {
 						// 有护甲且护甲未破坏，优先扣除护甲
 						armor.CurrentArmor -= config.PeaBulletDamage
@@ -190,9 +185,8 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 						// 注意：护甲可以降到负数，BehaviorSystem 会检查 <= 0 的情况并处理护甲破坏
 					} else {
 						// 护甲已破坏，扣除身体生命值
-						zombieHealthComp, ok := ps.em.GetComponent(zombieID, reflect.TypeOf(&components.HealthComponent{}))
+						zombieHealth, ok := ecs.GetComponent[*components.HealthComponent](ps.em, zombieID)
 						if ok {
-							zombieHealth := zombieHealthComp.(*components.HealthComponent)
 							zombieHealth.CurrentHealth -= config.PeaBulletDamage
 						}
 						// 播放击中身体音效
@@ -200,9 +194,8 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 					}
 				} else {
 					// 3. 没有护甲，直接减少僵尸生命值（Story 4.4: 伤害计算）
-					zombieHealthComp, ok := ps.em.GetComponent(zombieID, reflect.TypeOf(&components.HealthComponent{}))
+					zombieHealth, ok := ecs.GetComponent[*components.HealthComponent](ps.em, zombieID)
 					if ok {
-						zombieHealth := zombieHealthComp.(*components.HealthComponent)
 						zombieHealth.CurrentHealth -= config.PeaBulletDamage
 						// 注意：生命值可以降到负数，BehaviorSystem 会检查 <= 0 的情况
 					}

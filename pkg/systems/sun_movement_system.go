@@ -1,8 +1,6 @@
 package systems
 
 import (
-	"reflect"
-
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
 )
@@ -22,22 +20,26 @@ func NewSunMovementSystem(em *ecs.EntityManager) *SunMovementSystem {
 // Update 更新所有阳光的位置
 func (s *SunMovementSystem) Update(deltaTime float64) {
 	// 查询所有拥有 SunComponent, PositionComponent, VelocityComponent 的实体
-	entities := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.SunComponent{}),
-		reflect.TypeOf(&components.PositionComponent{}),
-		reflect.TypeOf(&components.VelocityComponent{}),
-	)
+	entities := ecs.GetEntitiesWith3[
+		*components.SunComponent,
+		*components.PositionComponent,
+		*components.VelocityComponent,
+	](s.entityManager)
 
 	for _, id := range entities {
 		// 获取组件
-		sunComp, _ := s.entityManager.GetComponent(id, reflect.TypeOf(&components.SunComponent{}))
-		posComp, _ := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PositionComponent{}))
-		velComp, _ := s.entityManager.GetComponent(id, reflect.TypeOf(&components.VelocityComponent{}))
-
-		// 类型断言
-		sun := sunComp.(*components.SunComponent)
-		pos := posComp.(*components.PositionComponent)
-		vel := velComp.(*components.VelocityComponent)
+		sun, ok := ecs.GetComponent[*components.SunComponent](s.entityManager, id)
+		if !ok {
+			continue
+		}
+		pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, id)
+		if !ok {
+			continue
+		}
+		vel, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, id)
+		if !ok {
+			continue
+		}
 
 		// 根据阳光状态处理移动
 		switch sun.State {

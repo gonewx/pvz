@@ -1,8 +1,6 @@
 package systems
 
 import (
-	"reflect"
-
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
@@ -47,10 +45,10 @@ func NewPlantPreviewSystem(em *ecs.EntityManager, gs *game.GameState) *PlantPrev
 //  2. 网格对齐位置（对齐到格子中心）
 func (s *PlantPreviewSystem) Update(deltaTime float64) {
 	// 查询所有拥有 PlantPreviewComponent 和 PositionComponent 的实体
-	entities := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.PlantPreviewComponent{}),
-		reflect.TypeOf(&components.PositionComponent{}),
-	)
+	entities := ecs.GetEntitiesWith2[
+		*components.PlantPreviewComponent,
+		*components.PositionComponent,
+	](s.entityManager)
 
 	// 如果没有预览实体，直接返回
 	if len(entities) == 0 {
@@ -98,8 +96,10 @@ func (s *PlantPreviewSystem) Update(deltaTime float64) {
 	// 但我们仍需要更新 PositionComponent 以保持实体状态一致
 	// （其他系统可能依赖 PositionComponent）
 	for _, entityID := range entities {
-		posComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
-		pos := posComp.(*components.PositionComponent)
+		pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+		if !ok {
+			continue
+		}
 		// 使用鼠标的世界坐标更新实体的基础位置
 		pos.X = s.mouseWorldX
 		pos.Y = s.mouseWorldY

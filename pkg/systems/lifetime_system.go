@@ -1,8 +1,6 @@
 package systems
 
 import (
-	"reflect"
-
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
 )
@@ -22,14 +20,14 @@ func NewLifetimeSystem(em *ecs.EntityManager) *LifetimeSystem {
 // Update 更新所有拥有生命周期组件的实体
 func (s *LifetimeSystem) Update(deltaTime float64) {
 	// 查询所有拥有 LifetimeComponent 的实体
-	entities := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.LifetimeComponent{}),
-	)
+	entities := ecs.GetEntitiesWith1[*components.LifetimeComponent](s.entityManager)
 
 	for _, id := range entities {
 		// 获取生命周期组件
-		lifetimeComp, _ := s.entityManager.GetComponent(id, reflect.TypeOf(&components.LifetimeComponent{}))
-		lifetime := lifetimeComp.(*components.LifetimeComponent)
+		lifetime, ok := ecs.GetComponent[*components.LifetimeComponent](s.entityManager, id)
+		if !ok {
+			continue
+		}
 
 		// 增加当前生命时间
 		lifetime.CurrentLifetime += deltaTime

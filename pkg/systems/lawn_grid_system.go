@@ -2,7 +2,6 @@ package systems
 
 import (
 	"fmt"
-	"reflect"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
@@ -37,12 +36,11 @@ func (s *LawnGridSystem) IsOccupied(gridEntity ecs.EntityID, col, row int) bool 
 	}
 
 	// 获取 LawnGridComponent
-	gridComp, ok := s.entityManager.GetComponent(gridEntity, reflect.TypeOf(&components.LawnGridComponent{}))
+	grid, ok := ecs.GetComponent[*components.LawnGridComponent](s.entityManager, gridEntity)
 	if !ok {
 		return true // 无法获取组件，视为已占用
 	}
 
-	grid := gridComp.(*components.LawnGridComponent)
 	return grid.Occupancy[row][col] != 0
 }
 
@@ -62,12 +60,10 @@ func (s *LawnGridSystem) OccupyCell(gridEntity ecs.EntityID, col, row int, plant
 	}
 
 	// 获取 LawnGridComponent
-	gridComp, ok := s.entityManager.GetComponent(gridEntity, reflect.TypeOf(&components.LawnGridComponent{}))
+	grid, ok := ecs.GetComponent[*components.LawnGridComponent](s.entityManager, gridEntity)
 	if !ok {
 		return fmt.Errorf("failed to get LawnGridComponent from entity %d", gridEntity)
 	}
-
-	grid := gridComp.(*components.LawnGridComponent)
 
 	// 检查格子是否已被占用
 	if grid.Occupancy[row][col] != 0 {
@@ -94,12 +90,10 @@ func (s *LawnGridSystem) ReleaseCell(gridEntity ecs.EntityID, col, row int) erro
 	}
 
 	// 获取 LawnGridComponent
-	gridComp, ok := s.entityManager.GetComponent(gridEntity, reflect.TypeOf(&components.LawnGridComponent{}))
+	grid, ok := ecs.GetComponent[*components.LawnGridComponent](s.entityManager, gridEntity)
 	if !ok {
 		return fmt.Errorf("failed to get LawnGridComponent from entity %d", gridEntity)
 	}
-
-	grid := gridComp.(*components.LawnGridComponent)
 
 	// 清空占用状态
 	grid.Occupancy[row][col] = 0

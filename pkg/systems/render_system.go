@@ -3,7 +3,6 @@ package systems
 import (
 	"log"
 	"math"
-	"reflect"
 	"sort"
 
 	"github.com/decker502/pvz/pkg/components"
@@ -72,25 +71,25 @@ func (s *RenderSystem) Draw(screen *ebiten.Image, cameraX float64) {
 func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 	// Story 6.3: 所有实体都使用 ReanimComponent 渲染
 	// 查询拥有 PositionComponent 和 ReanimComponent 的实体
-	entities := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.PositionComponent{}),
-		reflect.TypeOf(&components.ReanimComponent{}),
-	)
+	entities := ecs.GetEntitiesWith2[
+		*components.PositionComponent,
+		*components.ReanimComponent,
+	](s.entityManager)
 
 	// 第一遍：渲染植物（底层）
 	for _, id := range entities {
 		// 跳过植物卡片实体（它们由 PlantCardRenderSystem 专门渲染）
-		if _, hasPlantCard := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PlantCardComponent{})); hasPlantCard {
+		if _, hasPlantCard := ecs.GetComponent[*components.PlantCardComponent](s.entityManager, id); hasPlantCard {
 			continue
 		}
 
 		// 跳过植物预览实体（它们由 PlantPreviewRenderSystem 专门渲染）
-		if _, hasPlantPreview := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PlantPreviewComponent{})); hasPlantPreview {
+		if _, hasPlantPreview := ecs.GetComponent[*components.PlantPreviewComponent](s.entityManager, id); hasPlantPreview {
 			continue
 		}
 
 		// 只渲染植物
-		_, isPlant := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PlantComponent{}))
+		_, isPlant := ecs.GetComponent[*components.PlantComponent](s.entityManager, id)
 		if !isPlant {
 			continue // 跳过非植物实体
 		}
@@ -103,23 +102,23 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 	zombiesAndProjectiles := make([]ecs.EntityID, 0)
 	for _, id := range entities {
 		// 跳过植物卡片实体
-		if _, hasPlantCard := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PlantCardComponent{})); hasPlantCard {
+		if _, hasPlantCard := ecs.GetComponent[*components.PlantCardComponent](s.entityManager, id); hasPlantCard {
 			continue
 		}
 
 		// 跳过植物预览实体
-		if _, hasPlantPreview := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PlantPreviewComponent{})); hasPlantPreview {
+		if _, hasPlantPreview := ecs.GetComponent[*components.PlantPreviewComponent](s.entityManager, id); hasPlantPreview {
 			continue
 		}
 
 		// 跳过植物
-		_, isPlant := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PlantComponent{}))
+		_, isPlant := ecs.GetComponent[*components.PlantComponent](s.entityManager, id)
 		if isPlant {
 			continue
 		}
 
 		// 跳过阳光（由 DrawSuns 方法单独渲染）
-		_, isSun := s.entityManager.GetComponent(id, reflect.TypeOf(&components.SunComponent{}))
+		_, isSun := ecs.GetComponent[*components.SunComponent](s.entityManager, id)
 		if isSun {
 			continue
 		}
@@ -130,9 +129,9 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 	// 按Y坐标排序（从小到大，即从上到下）
 	// 这样上方行的僵尸先绘制，下方行的僵尸后绘制会正确遮挡
 	sort.Slice(zombiesAndProjectiles, func(i, j int) bool {
-		posI, _ := s.entityManager.GetComponent(zombiesAndProjectiles[i], reflect.TypeOf(&components.PositionComponent{}))
-		posJ, _ := s.entityManager.GetComponent(zombiesAndProjectiles[j], reflect.TypeOf(&components.PositionComponent{}))
-		return posI.(*components.PositionComponent).Y < posJ.(*components.PositionComponent).Y
+		posI, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombiesAndProjectiles[i])
+		posJ, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombiesAndProjectiles[j])
+		return posI.Y < posJ.Y
 	})
 
 	// 按排序后的顺序渲染
@@ -149,25 +148,25 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 func (s *RenderSystem) DrawSuns(screen *ebiten.Image, cameraX float64) {
 	// Story 6.3: 所有实体都使用 ReanimComponent 渲染
 	// 查询拥有 PositionComponent 和 ReanimComponent 的实体
-	entities := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.PositionComponent{}),
-		reflect.TypeOf(&components.ReanimComponent{}),
-	)
+	entities := ecs.GetEntitiesWith2[
+		*components.PositionComponent,
+		*components.ReanimComponent,
+	](s.entityManager)
 
 	// 只渲染阳光
 	for _, id := range entities {
 		// 跳过植物卡片实体
-		if _, hasPlantCard := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PlantCardComponent{})); hasPlantCard {
+		if _, hasPlantCard := ecs.GetComponent[*components.PlantCardComponent](s.entityManager, id); hasPlantCard {
 			continue
 		}
 
 		// 跳过植物预览实体
-		if _, hasPlantPreview := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PlantPreviewComponent{})); hasPlantPreview {
+		if _, hasPlantPreview := ecs.GetComponent[*components.PlantPreviewComponent](s.entityManager, id); hasPlantPreview {
 			continue
 		}
 
 		// 只渲染阳光
-		_, isSun := s.entityManager.GetComponent(id, reflect.TypeOf(&components.SunComponent{}))
+		_, isSun := ecs.GetComponent[*components.SunComponent](s.entityManager, id)
 		if !isSun {
 			continue
 		}
@@ -183,7 +182,7 @@ func (s *RenderSystem) DrawSuns(screen *ebiten.Image, cameraX float64) {
 //   - cameraX: 摄像机的世界坐标X位置
 func (s *RenderSystem) drawEntity(screen *ebiten.Image, id ecs.EntityID, cameraX float64) {
 	// Story 6.3: 所有实体都使用 ReanimComponent 渲染
-	_, hasReanimComp := s.entityManager.GetComponent(id, reflect.TypeOf(&components.ReanimComponent{}))
+	_, hasReanimComp := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id)
 	if hasReanimComp {
 		s.renderReanimEntity(screen, id, cameraX)
 		return
@@ -240,16 +239,12 @@ func (s *RenderSystem) findPhysicalFrameIndex(reanim *components.ReanimComponent
 //   - cameraX: 摄像机的世界坐标X位置
 func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID, cameraX float64) {
 	// 获取组件
-	posComp, hasPosComp := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PositionComponent{}))
-	reanimComp, hasReanimComp := s.entityManager.GetComponent(id, reflect.TypeOf(&components.ReanimComponent{}))
+	pos, hasPosComp := ecs.GetComponent[*components.PositionComponent](s.entityManager, id)
+	reanim, hasReanimComp := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id)
 
 	if !hasPosComp || !hasReanimComp {
 		return
 	}
-
-	// 类型断言
-	pos := posComp.(*components.PositionComponent)
-	reanim := reanimComp.(*components.ReanimComponent)
 
 	// 如果没有当前动画或动画轨道，跳过
 	if reanim.CurrentAnim == "" || len(reanim.AnimTracks) == 0 {
@@ -276,8 +271,7 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 
 	// 调试：打印第一个植物的位置和部件范围
 	if !s.debugPrinted[id] {
-		if plantComp, hasPlant := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PlantComponent{})); hasPlant {
-			plant := plantComp.(*components.PlantComponent)
+		if plant, hasPlant := ecs.GetComponent[*components.PlantComponent](s.entityManager, id); hasPlant {
 			log.Printf("=== 植物 %d (Type=%d) 位置调试 ===", id, plant.PlantType)
 			log.Printf("世界坐标: (%.1f, %.1f), 屏幕坐标: (%.1f, %.1f)", pos.X, pos.Y, screenX, screenY)
 
@@ -451,10 +445,10 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 //   - cameraX: 摄像机的世界坐标X位置（用于世界坐标到屏幕坐标的转换）
 func (s *RenderSystem) DrawParticles(screen *ebiten.Image, cameraX float64) {
 	// 查询所有拥有 ParticleComponent 和 PositionComponent 的实体
-	entities := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.PositionComponent{}),
-		reflect.TypeOf(&components.ParticleComponent{}),
-	)
+	entities := ecs.GetEntitiesWith2[
+		*components.PositionComponent,
+		*components.ParticleComponent,
+	](s.entityManager)
 
 	if len(entities) == 0 {
 		return
@@ -479,12 +473,11 @@ func (s *RenderSystem) DrawParticles(screen *ebiten.Image, cameraX float64) {
 	batches := make(map[batchKey]*renderBatch)
 
 	for _, id := range entities {
-		particleComp, hasParticle := s.entityManager.GetComponent(id, reflect.TypeOf(&components.ParticleComponent{}))
+		particle, hasParticle := ecs.GetComponent[*components.ParticleComponent](s.entityManager, id)
 		if !hasParticle {
 			continue
 		}
 
-		particle := particleComp.(*components.ParticleComponent)
 		if particle.Image == nil {
 			continue
 		}
@@ -516,15 +509,12 @@ func (s *RenderSystem) DrawParticles(screen *ebiten.Image, cameraX float64) {
 
 			// 为批次中的每个粒子生成顶点
 			for _, id := range batch.entities {
-				posComp, hasPos := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PositionComponent{}))
-				particleComp, hasParticle := s.entityManager.GetComponent(id, reflect.TypeOf(&components.ParticleComponent{}))
+				pos, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, id)
+				particle, hasParticle := ecs.GetComponent[*components.ParticleComponent](s.entityManager, id)
 
 				if !hasPos || !hasParticle {
 					continue
 				}
-
-				pos := posComp.(*components.PositionComponent)
-				particle := particleComp.(*components.ParticleComponent)
 
 				// 生成粒子的顶点（4 个顶点，用索引构建 2 个三角形）
 				vertices := s.buildParticleVertices(particle, pos, cameraX)

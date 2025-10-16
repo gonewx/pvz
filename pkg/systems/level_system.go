@@ -2,7 +2,6 @@ package systems
 
 import (
 	"log"
-	"reflect"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
@@ -137,19 +136,18 @@ func (s *LevelSystem) checkVictoryCondition() {
 func (s *LevelSystem) checkDefeatCondition() {
 	// 查询所有拥有 BehaviorComponent 和 PositionComponent 的实体
 	// 然后通过 BehaviorComponent 的 Type 字段筛选僵尸
-	zombieEntities := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.BehaviorComponent{}),
-		reflect.TypeOf(&components.PositionComponent{}),
-	)
+	zombieEntities := ecs.GetEntitiesWith2[
+		*components.BehaviorComponent,
+		*components.PositionComponent,
+	](s.entityManager)
 
 	// 检查是否有僵尸到达左边界
 	for _, entityID := range zombieEntities {
 		// 获取 BehaviorComponent
-		behaviorComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.BehaviorComponent{}))
+		behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
 		if !ok {
 			continue
 		}
-		behavior := behaviorComp.(*components.BehaviorComponent)
 
 		// 只检查僵尸类型的实体
 		if !isZombieType(behavior.Type) {
@@ -157,11 +155,10 @@ func (s *LevelSystem) checkDefeatCondition() {
 		}
 
 		// 获取位置组件
-		posComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
+		pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
 		if !ok {
 			continue
 		}
-		pos := posComp.(*components.PositionComponent)
 
 		// 僵尸到达左边界，游戏失败
 		if pos.X < DefeatBoundaryX {

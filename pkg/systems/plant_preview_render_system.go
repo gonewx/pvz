@@ -2,7 +2,6 @@ package systems
 
 import (
 	"math"
-	"reflect"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
@@ -36,19 +35,21 @@ func NewPlantPreviewRenderSystem(em *ecs.EntityManager, pps *PlantPreviewSystem)
 //  2. 在网格格子中心渲染半透明预览图像（Alpha=0.5，仅当鼠标在网格内时）
 func (s *PlantPreviewRenderSystem) Draw(screen *ebiten.Image, cameraX float64) {
 	// 查询所有拥有 PlantPreviewComponent, PositionComponent, ReanimComponent 的实体
-	entities := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.PlantPreviewComponent{}),
-		reflect.TypeOf(&components.PositionComponent{}),
-		reflect.TypeOf(&components.ReanimComponent{}),
-	)
+	entities := ecs.GetEntitiesWith3[
+		*components.PlantPreviewComponent,
+		*components.PositionComponent,
+		*components.ReanimComponent,
+	](s.entityManager)
 
 	// 获取两个渲染位置
 	mouseX, mouseY, gridX, gridY, isInGrid := s.plantPreviewSystem.GetPreviewPositions()
 
 	for _, entityID := range entities {
 		// 获取组件
-		reanimComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{}))
-		reanimData := reanimComp.(*components.ReanimComponent)
+		reanimData, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+		if !ok {
+			continue
+		}
 
 		// 1️⃣ 渲染鼠标光标处的不透明图像（Alpha=1.0）
 		tempPosForCursor := &components.PositionComponent{X: mouseX, Y: mouseY}

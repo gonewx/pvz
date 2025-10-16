@@ -3,7 +3,6 @@ package systems
 import (
 	"log"
 	"math"
-	"reflect"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
@@ -32,19 +31,21 @@ func NewSunCollectionSystem(em *ecs.EntityManager, gs *game.GameState, targetX, 
 // Update 检查所有正在收集的阳光是否到达目标位置
 func (s *SunCollectionSystem) Update(deltaTime float64) {
 	// 查询所有正在收集的阳光实体
-	entities := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.SunComponent{}),
-		reflect.TypeOf(&components.PositionComponent{}),
-	)
+	entities := ecs.GetEntitiesWith2[
+		*components.SunComponent,
+		*components.PositionComponent,
+	](s.entityManager)
 
 	for _, id := range entities {
 		// 获取组件
-		sunComp, _ := s.entityManager.GetComponent(id, reflect.TypeOf(&components.SunComponent{}))
-		posComp, _ := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PositionComponent{}))
-
-		// 类型断言
-		sun := sunComp.(*components.SunComponent)
-		pos := posComp.(*components.PositionComponent)
+		sun, ok := ecs.GetComponent[*components.SunComponent](s.entityManager, id)
+		if !ok {
+			continue
+		}
+		pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, id)
+		if !ok {
+			continue
+		}
 
 		// 只处理正在收集的阳光
 		if sun.State != components.SunCollecting {

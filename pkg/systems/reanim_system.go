@@ -3,7 +3,6 @@ package systems
 import (
 	"fmt"
 	"log"
-	"reflect"
 
 	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/components"
@@ -50,18 +49,14 @@ func NewReanimSystem(em *ecs.EntityManager) *ReanimSystem {
 //   - deltaTime: time elapsed since last update (in seconds, currently unused as we use frame-based timing)
 func (s *ReanimSystem) Update(deltaTime float64) {
 	// Query all entities with ReanimComponent
-	entities := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.ReanimComponent{}),
-	)
+	entities := ecs.GetEntitiesWith1[*components.ReanimComponent](s.entityManager)
 
 	for _, id := range entities {
 		// Get the ReanimComponent
-		comp, exists := s.entityManager.GetComponent(id, reflect.TypeOf(&components.ReanimComponent{}))
+		reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id)
 		if !exists {
 			continue
 		}
-
-		reanimComp := comp.(*components.ReanimComponent)
 
 		// Skip if no Reanim data or animation is not set
 		if reanimComp.Reanim == nil || reanimComp.CurrentAnim == "" {
@@ -345,12 +340,10 @@ func (s *ReanimSystem) getAnimationTracks(comp *components.ReanimComponent) []re
 //   - An error if the entity doesn't have a ReanimComponent or the animation doesn't exist
 func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) error {
 	// Get the ReanimComponent
-	comp, exists := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{}))
+	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 	if !exists {
 		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
 	}
-
-	reanimComp := comp.(*components.ReanimComponent)
 
 	// Check if Reanim data is present
 	if reanimComp.Reanim == nil {
@@ -412,11 +405,10 @@ func (s *ReanimSystem) PlayAnimationNoLoop(entityID ecs.EntityID, animName strin
 	}
 
 	// Override IsLooping to false for non-looping animations
-	comp, exists := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{}))
+	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 	if !exists {
 		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
 	}
-	reanimComp := comp.(*components.ReanimComponent)
 	reanimComp.IsLooping = false
 
 	return nil
@@ -571,12 +563,10 @@ func (s *ReanimSystem) calculateCenterOffset(comp *components.ReanimComponent) {
 // Returns:
 //   - An error if the entity doesn't have a ReanimComponent or VisibleTracks is not initialized
 func (s *ReanimSystem) HideTrack(entityID ecs.EntityID, trackName string) error {
-	comp, exists := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{}))
+	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 	if !exists {
 		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
 	}
-
-	reanimComp := comp.(*components.ReanimComponent)
 
 	// If VisibleTracks is not initialized, we can't hide tracks
 	if reanimComp.VisibleTracks == nil {
@@ -598,12 +588,10 @@ func (s *ReanimSystem) HideTrack(entityID ecs.EntityID, trackName string) error 
 // Returns:
 //   - An error if the entity doesn't have a ReanimComponent or VisibleTracks is not initialized
 func (s *ReanimSystem) ShowTrack(entityID ecs.EntityID, trackName string) error {
-	comp, exists := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{}))
+	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 	if !exists {
 		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
 	}
-
-	reanimComp := comp.(*components.ReanimComponent)
 
 	// If VisibleTracks is not initialized, we can't show tracks
 	if reanimComp.VisibleTracks == nil {
@@ -625,12 +613,10 @@ func (s *ReanimSystem) ShowTrack(entityID ecs.EntityID, trackName string) error 
 //   - bool: true if the track is visible, false otherwise
 //   - error: error if the entity doesn't have a ReanimComponent
 func (s *ReanimSystem) IsTrackVisible(entityID ecs.EntityID, trackName string) (bool, error) {
-	comp, exists := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{}))
+	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 	if !exists {
 		return false, fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
 	}
-
-	reanimComp := comp.(*components.ReanimComponent)
 
 	// If VisibleTracks is not initialized, assume blacklist mode (all visible by default)
 	if reanimComp.VisibleTracks == nil || len(reanimComp.VisibleTracks) == 0 {
@@ -653,12 +639,10 @@ func (s *ReanimSystem) IsTrackVisible(entityID ecs.EntityID, trackName string) (
 //   - error: if the entity doesn't have a ReanimComponent, PartGroups is not configured,
 //     or the group name doesn't exist
 func (s *ReanimSystem) HidePartGroup(entityID ecs.EntityID, groupName string) error {
-	comp, exists := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{}))
+	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 	if !exists {
 		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
 	}
-
-	reanimComp := comp.(*components.ReanimComponent)
 
 	// Check if PartGroups is configured
 	if reanimComp.PartGroups == nil {
@@ -693,12 +677,10 @@ func (s *ReanimSystem) HidePartGroup(entityID ecs.EntityID, groupName string) er
 //   - error: if the entity doesn't have a ReanimComponent, PartGroups is not configured,
 //     or the group name doesn't exist
 func (s *ReanimSystem) ShowPartGroup(entityID ecs.EntityID, groupName string) error {
-	comp, exists := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{}))
+	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 	if !exists {
 		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
 	}
-
-	reanimComp := comp.(*components.ReanimComponent)
 
 	// Check if PartGroups is configured
 	if reanimComp.PartGroups == nil {
@@ -732,12 +714,10 @@ func (s *ReanimSystem) ShowPartGroup(entityID ecs.EntityID, groupName string) er
 //   - *ebiten.Image: the image of the first visible part in the group, or nil if not found
 //   - error: if the entity doesn't have a ReanimComponent or the group doesn't exist
 func (s *ReanimSystem) GetPartGroupImage(entityID ecs.EntityID, groupName string) (*ebiten.Image, error) {
-	comp, exists := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{}))
+	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 	if !exists {
 		return nil, fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
 	}
-
-	reanimComp := comp.(*components.ReanimComponent)
 
 	// Check if PartGroups is configured
 	if reanimComp.PartGroups == nil {
@@ -786,8 +766,8 @@ func (s *ReanimSystem) GetPartGroupImage(entityID ecs.EntityID, groupName string
 //   - error: if the entity doesn't have required components or rendering fails
 func (s *ReanimSystem) RenderToTexture(entityID ecs.EntityID, target *ebiten.Image) error {
 	// 验证实体拥有必要的组件
-	_, hasPos := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
-	_, hasReanim := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{}))
+	_, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+	_, hasReanim := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 
 	if !hasPos || !hasReanim {
 		return fmt.Errorf("entity %d missing required components for rendering", entityID)

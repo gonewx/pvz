@@ -51,42 +51,41 @@ func NewBehaviorSystem(em *ecs.EntityManager, rm *game.ResourceManager, rs *Rean
 func (s *BehaviorSystem) Update(deltaTime float64) {
 	// 查询所有拥有 BehaviorComponent, PlantComponent, PositionComponent 的实体（所有植物）
 	// 注意：不要求 TimerComponent，因为坚果墙等防御植物不需要计时器
-	plantEntityList := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.BehaviorComponent{}),
-		reflect.TypeOf(&components.PlantComponent{}),
-		reflect.TypeOf(&components.PositionComponent{}),
-	)
+	plantEntityList := ecs.GetEntitiesWith3[
+		*components.BehaviorComponent,
+		*components.PlantComponent,
+		*components.PositionComponent,
+	](s.entityManager)
 
 	// 查询所有拥有 BehaviorComponent, PositionComponent, VelocityComponent 的实体（移动中的僵尸）
-	zombieEntityList := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.BehaviorComponent{}),
-		reflect.TypeOf(&components.PositionComponent{}),
-		reflect.TypeOf(&components.VelocityComponent{}),
-	)
+	zombieEntityList := ecs.GetEntitiesWith3[
+		*components.BehaviorComponent,
+		*components.PositionComponent,
+		*components.VelocityComponent,
+	](s.entityManager)
 
 	// 查询所有啃食中的僵尸实体（没有 VelocityComponent，有 TimerComponent）
-	eatingZombieEntityList := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.BehaviorComponent{}),
-		reflect.TypeOf(&components.PositionComponent{}),
-		reflect.TypeOf(&components.TimerComponent{}),
-	)
+	eatingZombieEntityList := ecs.GetEntitiesWith3[
+		*components.BehaviorComponent,
+		*components.PositionComponent,
+		*components.TimerComponent,
+	](s.entityManager)
 
 	// 查询所有死亡中的僵尸实体（拥有 BehaviorComponent 但没有 VelocityComponent）
 	// 死亡状态的僵尸在 triggerZombieDeath() 中会移除 VelocityComponent
-	dyingZombieEntityList := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.BehaviorComponent{}),
-		reflect.TypeOf(&components.PositionComponent{}),
-		reflect.TypeOf(&components.ReanimComponent{}),
-	)
+	dyingZombieEntityList := ecs.GetEntitiesWith3[
+		*components.BehaviorComponent,
+		*components.PositionComponent,
+		*components.ReanimComponent,
+	](s.entityManager)
 	// 过滤出真正处于死亡状态的僵尸（BehaviorType == BehaviorZombieDying）
 	var filteredDyingZombies []ecs.EntityID
 	for _, entityID := range dyingZombieEntityList {
-		behaviorComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.BehaviorComponent{}))
+		behaviorComp, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
 		if !ok {
 			continue
 		}
-		behavior := behaviorComp.(*components.BehaviorComponent)
-		if behavior.Type == components.BehaviorZombieDying {
+		if behaviorComp.Type == components.BehaviorZombieDying {
 			filteredDyingZombies = append(filteredDyingZombies, entityID)
 		}
 	}
@@ -98,11 +97,11 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 
 	// 查询所有豌豆子弹实体（拥有 BehaviorComponent, PositionComponent, VelocityComponent）
 	// 注意：子弹和僵尸的组件组合相同，需要通过 BehaviorType 区分
-	projectileEntityList := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.BehaviorComponent{}),
-		reflect.TypeOf(&components.PositionComponent{}),
-		reflect.TypeOf(&components.VelocityComponent{}),
-	)
+	projectileEntityList := ecs.GetEntitiesWith3[
+		*components.BehaviorComponent,
+		*components.PositionComponent,
+		*components.VelocityComponent,
+	](s.entityManager)
 
 	// 日志输出（避免每帧都打印）
 	totalZombies := len(zombieEntityList) + len(eatingZombieEntityList)
@@ -117,11 +116,10 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 
 	// 遍历所有植物实体，根据行为类型分发处理
 	for _, entityID := range plantEntityList {
-		behaviorComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.BehaviorComponent{}))
-		behavior := behaviorComp.(*components.BehaviorComponent)
+		behaviorComp, _ := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
 
 		// 根据行为类型分发
-		switch behavior.Type {
+		switch behaviorComp.Type {
 		case components.BehaviorSunflower:
 			s.handleSunflowerBehavior(entityID, deltaTime)
 		case components.BehaviorPeashooter:
@@ -137,11 +135,10 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 
 	// 遍历所有移动中的僵尸实体，根据行为类型分发处理
 	for _, entityID := range zombieEntityList {
-		behaviorComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.BehaviorComponent{}))
-		behavior := behaviorComp.(*components.BehaviorComponent)
+		behaviorComp, _ := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
 
 		// 根据行为类型分发
-		switch behavior.Type {
+		switch behaviorComp.Type {
 		case components.BehaviorZombieBasic:
 			s.handleZombieBasicBehavior(entityID, deltaTime)
 		case components.BehaviorZombieConehead:
@@ -155,22 +152,20 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 
 	// 遍历所有啃食中的僵尸实体
 	for _, entityID := range eatingZombieEntityList {
-		behaviorComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.BehaviorComponent{}))
-		behavior := behaviorComp.(*components.BehaviorComponent)
+		behaviorComp, _ := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
 
 		// 只处理啃食状态的僵尸
-		if behavior.Type == components.BehaviorZombieEating {
+		if behaviorComp.Type == components.BehaviorZombieEating {
 			s.handleZombieEatingBehavior(entityID, deltaTime)
 		}
 	}
 
 	// 遍历所有子弹实体，根据行为类型分发处理
 	for _, entityID := range projectileEntityList {
-		behaviorComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.BehaviorComponent{}))
-		behavior := behaviorComp.(*components.BehaviorComponent)
+		behaviorComp, _ := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
 
 		// 根据行为类型分发
-		switch behavior.Type {
+		switch behaviorComp.Type {
 		case components.BehaviorPeaProjectile:
 			s.handlePeaProjectileBehavior(entityID, deltaTime)
 		default:
@@ -180,31 +175,29 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 
 	// 遍历所有死亡中的僵尸实体（处理死亡动画完成后的删除）
 	for _, entityID := range dyingZombieEntityList {
-		behaviorComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.BehaviorComponent{}))
+		behaviorComp, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
 		if !ok {
 			continue
 		}
-		behavior := behaviorComp.(*components.BehaviorComponent)
 
 		// 只处理死亡中的僵尸
-		if behavior.Type == components.BehaviorZombieDying {
+		if behaviorComp.Type == components.BehaviorZombieDying {
 			s.handleZombieDyingBehavior(entityID)
 		}
 	}
 
 	// 查询所有击中效果实体（拥有 BehaviorComponent 和 TimerComponent）
-	hitEffectEntityList := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.BehaviorComponent{}),
-		reflect.TypeOf(&components.TimerComponent{}),
-	)
+	hitEffectEntityList := ecs.GetEntitiesWith2[
+		*components.BehaviorComponent,
+		*components.TimerComponent,
+	](s.entityManager)
 
 	// 遍历所有击中效果实体，管理其生命周期
 	for _, entityID := range hitEffectEntityList {
-		behaviorComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.BehaviorComponent{}))
-		behavior := behaviorComp.(*components.BehaviorComponent)
+		behaviorComp, _ := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
 
 		// 只处理击中效果类型
-		if behavior.Type == components.BehaviorPeaBulletHit {
+		if behaviorComp.Type == components.BehaviorPeaBulletHit {
 			s.handleHitEffectBehavior(entityID, deltaTime)
 		}
 	}
@@ -214,8 +207,7 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 // 向日葵会定期生产阳光
 func (s *BehaviorSystem) handleSunflowerBehavior(entityID ecs.EntityID, deltaTime float64) {
 	// 获取计时器组件
-	timerComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.TimerComponent{}))
-	timer := timerComp.(*components.TimerComponent)
+	timer, _ := ecs.GetComponent[*components.TimerComponent](s.entityManager, entityID)
 
 	// 更新计时器
 	timer.CurrentTime += deltaTime
@@ -225,8 +217,7 @@ func (s *BehaviorSystem) handleSunflowerBehavior(entityID ecs.EntityID, deltaTim
 		log.Printf("[BehaviorSystem] 向日葵生产阳光！计时器: %.2f/%.2f 秒", timer.CurrentTime, timer.TargetTime)
 
 		// 获取位置组件，计算阳光生成位置
-		positionComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
-		position := positionComp.(*components.PositionComponent)
+		position, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
 
 		// 阳光生成位置：向日葵位置附近随机偏移
 		// 向日葵生产的阳光应该从向日葵中心附近弹出
@@ -250,22 +241,19 @@ func (s *BehaviorSystem) handleSunflowerBehavior(entityID ecs.EntityID, deltaTim
 		sunID := entities.NewSunEntity(s.entityManager, s.resourceManager, sunStartX, position.Y)
 
 		// 修正阳光的起始位置为向日葵位置（覆盖 NewSunEntity 中的 Y=-50）
-		sunPosComp, _ := s.entityManager.GetComponent(sunID, reflect.TypeOf(&components.PositionComponent{}))
-		sunPos := sunPosComp.(*components.PositionComponent)
+		sunPos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, sunID)
 		sunPos.Y = sunStartY
 
 		// 修正阳光的速度：向日葵生产的阳光应该是静止的
-		sunVelComp, ok := s.entityManager.GetComponent(sunID, reflect.TypeOf(&components.VelocityComponent{}))
+		sunVel, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, sunID)
 		if ok {
-			sunVel := sunVelComp.(*components.VelocityComponent)
 			sunVel.VX = 0
 			sunVel.VY = 0 // 静止，不下落
 		}
 
 		// 修正阳光的状态：向日葵生产的阳光直接是已落地状态（可以点击）
-		sunCompComp, ok := s.entityManager.GetComponent(sunID, reflect.TypeOf(&components.SunComponent{}))
+		sunComp, ok := ecs.GetComponent[*components.SunComponent](s.entityManager, sunID)
 		if ok {
-			sunComp := sunCompComp.(*components.SunComponent)
 			sunComp.State = components.SunLanded // 直接设置为已落地状态
 		}
 
@@ -284,10 +272,8 @@ func (s *BehaviorSystem) handleSunflowerBehavior(entityID ecs.EntityID, deltaTim
 // 普通僵尸会以恒定速度从右向左移动
 func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaTime float64) {
 	// 检查生命值（Story 4.4: 僵尸死亡逻辑）
-	healthComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.HealthComponent{}))
+	health, ok := ecs.GetComponent[*components.HealthComponent](s.entityManager, entityID)
 	if ok {
-		health := healthComp.(*components.HealthComponent)
-
 		// 更新僵尸的受伤状态（掉手臂、掉头）
 		s.updateZombieDamageState(entityID, health)
 
@@ -300,11 +286,10 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 	}
 
 	// 获取位置组件
-	positionComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
+	position, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
 	if !ok {
 		return
 	}
-	position := positionComp.(*components.PositionComponent)
 
 	// Story 5.1: 检测植物碰撞（在移动之前）
 	// 计算僵尸所在格子
@@ -320,11 +305,10 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 	}
 
 	// 获取速度组件
-	velocityComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.VelocityComponent{}))
+	velocity, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID)
 	if !ok {
 		return
 	}
-	velocity := velocityComp.(*components.VelocityComponent)
 
 	// 更新位置：根据速度和时间增量移动僵尸
 	position.X += velocity.VX * deltaTime
@@ -343,22 +327,19 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 // Story 7.4: 添加僵尸死亡粒子效果触发（手臂掉落、头部掉落）
 func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 	// 1. 切换行为类型为 BehaviorZombieDying
-	behaviorComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.BehaviorComponent{}))
+	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
 	if !ok {
 		log.Printf("[BehaviorSystem] 僵尸 %d 缺少 BehaviorComponent，无法触发死亡", entityID)
 		return
 	}
-	behavior := behaviorComp.(*components.BehaviorComponent)
 	behavior.Type = components.BehaviorZombieDying
 	log.Printf("[BehaviorSystem] 僵尸 %d 行为切换为 BehaviorZombieDying", entityID)
 
 	// Story 7.4: 获取僵尸位置，用于触发粒子效果
-	positionComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
+	position, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
 	if !ok {
 		log.Printf("[BehaviorSystem] 警告：僵尸 %d 缺少 PositionComponent，无法触发粒子效果", entityID)
 	} else {
-		position := positionComp.(*components.PositionComponent)
-
 		// Story 7.4: 触发僵尸手臂掉落粒子效果
 		_, err := entities.CreateParticleEffect(
 			s.entityManager,
@@ -416,11 +397,10 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 // 豌豆射手会周期性扫描同行僵尸并发射豌豆子弹
 func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTime float64, zombieEntityList []ecs.EntityID) {
 	// 获取计时器组件
-	timerComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.TimerComponent{}))
+	timer, ok := ecs.GetComponent[*components.TimerComponent](s.entityManager, entityID)
 	if !ok {
 		return
 	}
-	timer := timerComp.(*components.TimerComponent)
 
 	// 更新计时器
 	timer.CurrentTime += deltaTime
@@ -428,11 +408,10 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 	// 检查计时器是否就绪（达到攻击间隔）
 	if timer.CurrentTime >= timer.TargetTime {
 		// 获取豌豆射手的位置组件
-		positionComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
+		peashooterPos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
 		if !ok {
 			return
 		}
-		peashooterPos := positionComp.(*components.PositionComponent)
 
 		// 计算豌豆射手所在的行
 		peashooterRow := utils.GetEntityRow(peashooterPos.Y, config.GridWorldStartY, config.CellHeight)
@@ -440,11 +419,10 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 		// 扫描同行僵尸：查找在豌豆射手正前方（右侧）且在攻击范围内的僵尸
 		hasZombieInLine := false
 		for _, zombieID := range zombieEntityList {
-			zombiePosComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.PositionComponent{}))
+			zombiePos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
 			if !ok {
 				continue
 			}
-			zombiePos := zombiePosComp.(*components.PositionComponent)
 
 			// 计算僵尸所在的行
 			zombieRow := utils.GetEntityRow(zombiePos.Y, config.GridWorldStartY, config.CellHeight)
@@ -491,18 +469,16 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 // 豌豆子弹会以恒定速度向右移动，飞出屏幕后被删除
 func (s *BehaviorSystem) handlePeaProjectileBehavior(entityID ecs.EntityID, deltaTime float64) {
 	// 获取位置组件
-	positionComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
+	position, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
 	if !ok {
 		return
 	}
-	position := positionComp.(*components.PositionComponent)
 
 	// 获取速度组件
-	velocityComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.VelocityComponent{}))
+	velocity, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID)
 	if !ok {
 		return
 	}
-	velocity := velocityComp.(*components.VelocityComponent)
 
 	// 更新位置：根据速度和时间增量移动子弹
 	position.X += velocity.VX * deltaTime
@@ -519,11 +495,10 @@ func (s *BehaviorSystem) handlePeaProjectileBehavior(entityID ecs.EntityID, delt
 // 击中效果会在显示一段时间后自动消失
 func (s *BehaviorSystem) handleHitEffectBehavior(entityID ecs.EntityID, deltaTime float64) {
 	// 获取计时器组件
-	timerComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.TimerComponent{}))
+	timer, ok := ecs.GetComponent[*components.TimerComponent](s.entityManager, entityID)
 	if !ok {
 		return
 	}
-	timer := timerComp.(*components.TimerComponent)
 
 	// 更新计时器
 	timer.CurrentTime += deltaTime
@@ -539,7 +514,7 @@ func (s *BehaviorSystem) handleHitEffectBehavior(entityID ecs.EntityID, deltaTim
 // 当死亡动画完成后，删除僵尸实体
 func (s *BehaviorSystem) handleZombieDyingBehavior(entityID ecs.EntityID) {
 	// 获取 ReanimComponent
-	reanimComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{}))
+	reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 	if !ok {
 		// 如果没有 ReanimComponent，直接删除僵尸
 		log.Printf("[BehaviorSystem] 死亡中的僵尸 %d 缺少 ReanimComponent，直接删除", entityID)
@@ -548,7 +523,6 @@ func (s *BehaviorSystem) handleZombieDyingBehavior(entityID ecs.EntityID) {
 		s.entityManager.DestroyEntity(entityID)
 		return
 	}
-	reanim := reanimComp.(*components.ReanimComponent)
 
 	// 检查死亡动画是否完成
 	// 使用 IsFinished 标志来判断非循环动画是否已完成
@@ -624,18 +598,14 @@ func (s *BehaviorSystem) playShootSound() {
 //   - bool: 是否发生碰撞
 func (s *BehaviorSystem) detectPlantCollision(zombieRow, zombieCol int) (ecs.EntityID, bool) {
 	// 查询所有植物实体（拥有 PlantComponent）
-	plantEntityList := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.PlantComponent{}),
-	)
+	plantEntityList := ecs.GetEntitiesWith1[*components.PlantComponent](s.entityManager)
 
 	// 遍历所有植物，比对网格位置
 	for _, plantID := range plantEntityList {
-		plantComp, ok := s.entityManager.GetComponent(plantID, reflect.TypeOf(&components.PlantComponent{}))
+		plant, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, plantID)
 		if !ok {
 			continue
 		}
-
-		plant := plantComp.(*components.PlantComponent)
 
 		// 检查是否在同一格子
 		if plant.GridRow == zombieRow && plant.GridCol == zombieCol {
@@ -653,11 +623,10 @@ func (s *BehaviorSystem) detectPlantCollision(zombieRow, zombieCol int) (ecs.Ent
 //   - newState: 新的动画状态
 func (s *BehaviorSystem) changeZombieAnimation(zombieID ecs.EntityID, newState components.ZombieAnimState) {
 	// 获取行为组件
-	behaviorComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.BehaviorComponent{}))
+	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
 	if !ok {
 		return
 	}
-	behavior := behaviorComp.(*components.BehaviorComponent)
 
 	// 如果状态没有变化，不需要切换动画
 	if behavior.ZombieAnimState == newState {
@@ -702,11 +671,10 @@ func (s *BehaviorSystem) startEatingPlant(zombieID, plantID ecs.EntityID) {
 	s.entityManager.RemoveComponent(zombieID, reflect.TypeOf(&components.VelocityComponent{}))
 
 	// 2. Story 5.3: 在切换类型之前，先记住原始僵尸类型（用于选择正确的啃食动画）
-	behaviorComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.BehaviorComponent{}))
+	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
 	if !ok {
 		return
 	}
-	behavior := behaviorComp.(*components.BehaviorComponent)
 	originalZombieType := behavior.Type // 记住原始类型
 
 	// 3. 切换 BehaviorComponent.Type 为 BehaviorZombieEating
@@ -716,7 +684,7 @@ func (s *BehaviorSystem) startEatingPlant(zombieID, plantID ecs.EntityID) {
 	s.changeZombieAnimation(zombieID, components.ZombieAnimEating)
 
 	// 4. 添加 TimerComponent 用于伤害间隔
-	s.entityManager.AddComponent(zombieID, &components.TimerComponent{
+	ecs.AddComponent(s.entityManager, zombieID, &components.TimerComponent{
 		Name:        "eating_damage",
 		TargetTime:  config.ZombieEatingDamageInterval,
 		CurrentTime: 0,
@@ -768,9 +736,8 @@ func (s *BehaviorSystem) stopEatingAndResume(zombieID ecs.EntityID) {
 	s.entityManager.RemoveComponent(zombieID, reflect.TypeOf(&components.TimerComponent{}))
 
 	// 2. 切换 BehaviorComponent.Type 回 BehaviorZombieBasic
-	behaviorComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.BehaviorComponent{}))
+	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
 	if ok {
-		behavior := behaviorComp.(*components.BehaviorComponent)
 		behavior.Type = components.BehaviorZombieBasic
 	}
 
@@ -778,7 +745,7 @@ func (s *BehaviorSystem) stopEatingAndResume(zombieID ecs.EntityID) {
 	s.changeZombieAnimation(zombieID, components.ZombieAnimWalking)
 
 	// 3. 恢复 VelocityComponent
-	s.entityManager.AddComponent(zombieID, &components.VelocityComponent{
+	ecs.AddComponent(s.entityManager, zombieID, &components.VelocityComponent{
 		VX: config.ZombieWalkSpeed,
 		VY: 0,
 	})
@@ -807,9 +774,8 @@ func (s *BehaviorSystem) stopEatingAndResume(zombieID ecs.EntityID) {
 //   - deltaTime: 帧间隔时间
 func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, deltaTime float64) {
 	// 检查生命值并更新受伤状态（掉手臂、掉头）
-	healthComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.HealthComponent{}))
+	health, ok := ecs.GetComponent[*components.HealthComponent](s.entityManager, entityID)
 	if ok {
-		health := healthComp.(*components.HealthComponent)
 
 		// 更新僵尸的受伤状态（掉手臂）
 		s.updateZombieDamageState(entityID, health)
@@ -823,9 +789,8 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 	}
 
 	// Story 5.3: 检查护甲状态（护甲僵尸即使在啃食也需要检测护甲破坏）
-	armorComp, hasArmor := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ArmorComponent{}))
+	armor, hasArmor := ecs.GetComponent[*components.ArmorComponent](s.entityManager, entityID)
 	if hasArmor {
-		armor := armorComp.(*components.ArmorComponent)
 		// TODO(Story 6.3): 迁移到 ReanimComponent
 		// 如果护甲已破坏，切换为普通僵尸动画
 		// if armor.CurrentArmor <= 0 {
@@ -847,13 +812,12 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 	}
 
 	// 获取僵尸的 TimerComponent
-	timerComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.TimerComponent{}))
+	timer, ok := ecs.GetComponent[*components.TimerComponent](s.entityManager, entityID)
 	if !ok {
 		// 没有计时器，恢复移动
 		s.stopEatingAndResume(entityID)
 		return
 	}
-	timer := timerComp.(*components.TimerComponent)
 
 	// 更新计时器
 	timer.CurrentTime += deltaTime
@@ -866,11 +830,10 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 	// 如果计时器完成，造成伤害
 	if timer.IsReady {
 		// 获取僵尸当前网格位置
-		posComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
-		if !ok {
-			return
-		}
-		pos := posComp.(*components.PositionComponent)
+		pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+	if !ok {
+		return
+	}
 
 		// 计算僵尸所在格子
 		zombieCol := int((pos.X - config.GridWorldStartX) / config.CellWidth)
@@ -881,9 +844,8 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 
 		if hasPlant {
 			// 植物存在，造成伤害
-			plantHealthComp, ok := s.entityManager.GetComponent(plantID, reflect.TypeOf(&components.HealthComponent{}))
-			if ok {
-				plantHealth := plantHealthComp.(*components.HealthComponent)
+			plantHealth, ok := ecs.GetComponent[*components.HealthComponent](s.entityManager, plantID)
+	if ok {
 				plantHealth.CurrentHealth -= config.ZombieEatingDamage
 
 				log.Printf("[BehaviorSystem] 僵尸 %d 啃食植物 %d，造成 %d 伤害，剩余生命值 %d",
@@ -940,22 +902,20 @@ func (s *BehaviorSystem) playEatingSound() {
 // 外观状态：完好(>66%) → 轻伤(33-66%) → 重伤(<33%)
 func (s *BehaviorSystem) handleWallnutBehavior(entityID ecs.EntityID) {
 	// 获取生命值组件
-	healthComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.HealthComponent{}))
+	health, ok := ecs.GetComponent[*components.HealthComponent](s.entityManager, entityID)
 	if !ok {
 		return
 	}
-	health := healthComp.(*components.HealthComponent)
 
 	// 计算生命值百分比
 	healthPercent := float64(health.CurrentHealth) / float64(health.MaxHealth)
 
 	// Story 6.3: 使用 ReanimComponent 实现外观状态切换
 	// 根据生命值百分比动态替换 PartImages 中的身体图片
-	reanimComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{}))
+	reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 	if !ok {
 		return
 	}
-	reanim := reanimComp.(*components.ReanimComponent)
 
 	// 确定应显示的身体图片路径
 	var targetBodyImagePath string
@@ -995,7 +955,7 @@ func (s *BehaviorSystem) handleWallnutBehavior(entityID ecs.EntityID) {
 // 路障僵尸拥有护甲层，护甲耗尽后切换为普通僵尸外观和行为
 func (s *BehaviorSystem) handleConeheadZombieBehavior(entityID ecs.EntityID, deltaTime float64) {
 	// 首先检查护甲状态
-	armorComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ArmorComponent{}))
+	armor, ok := ecs.GetComponent[*components.ArmorComponent](s.entityManager, entityID)
 	if !ok {
 		// 没有护甲组件（不应该发生），退化为普通僵尸行为
 		log.Printf("[BehaviorSystem] 警告：路障僵尸 %d 缺少 ArmorComponent，转为普通僵尸", entityID)
@@ -1003,14 +963,11 @@ func (s *BehaviorSystem) handleConeheadZombieBehavior(entityID ecs.EntityID, del
 		return
 	}
 
-	armor := armorComp.(*components.ArmorComponent)
-
 	// 如果护甲已破坏，切换为普通僵尸
 	if armor.CurrentArmor <= 0 {
 		// 检查是否已经切换过（避免每帧都触发）
-		behaviorComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.BehaviorComponent{}))
-		if ok {
-			behavior := behaviorComp.(*components.BehaviorComponent)
+		behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
+	if ok {
 			if behavior.Type == components.BehaviorZombieConehead {
 				// 首次护甲破坏，执行切换
 				log.Printf("[BehaviorSystem] 路障僵尸 %d 护甲破坏，切换为普通僵尸", entityID)
@@ -1019,9 +976,8 @@ func (s *BehaviorSystem) handleConeheadZombieBehavior(entityID ecs.EntityID, del
 				behavior.Type = components.BehaviorZombieBasic
 
 				// 2. Story 6.3: 从可见轨道列表中移除路障
-				reanimComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{}))
-				if ok {
-					reanim := reanimComp.(*components.ReanimComponent)
+				reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if ok {
 					if reanim.VisibleTracks != nil {
 						delete(reanim.VisibleTracks, "anim_cone") // 移除路障
 						log.Printf("[BehaviorSystem] 路障僵尸 %d 移除 anim_cone 轨道", entityID)
@@ -1029,7 +985,7 @@ func (s *BehaviorSystem) handleConeheadZombieBehavior(entityID ecs.EntityID, del
 				}
 
 				// 3. 移除护甲组件（可选，但保留可能对调试有帮助）
-				// s.entityManager.RemoveComponent(entityID, reflect.TypeOf(&components.ArmorComponent{}))
+				// ecs.RemoveComponent[*components.ArmorComponent](s.entityManager, entityID)
 			}
 		}
 
@@ -1046,7 +1002,7 @@ func (s *BehaviorSystem) handleConeheadZombieBehavior(entityID ecs.EntityID, del
 // 铁桶僵尸拥有更高的护甲层，护甲耗尽后切换为普通僵尸外观和行为
 func (s *BehaviorSystem) handleBucketheadZombieBehavior(entityID ecs.EntityID, deltaTime float64) {
 	// 首先检查护甲状态
-	armorComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ArmorComponent{}))
+	armor, ok := ecs.GetComponent[*components.ArmorComponent](s.entityManager, entityID)
 	if !ok {
 		// 没有护甲组件（不应该发生），退化为普通僵尸行为
 		log.Printf("[BehaviorSystem] 警告：铁桶僵尸 %d 缺少 ArmorComponent，转为普通僵尸", entityID)
@@ -1054,14 +1010,11 @@ func (s *BehaviorSystem) handleBucketheadZombieBehavior(entityID ecs.EntityID, d
 		return
 	}
 
-	armor := armorComp.(*components.ArmorComponent)
-
 	// 如果护甲已破坏，切换为普通僵尸
 	if armor.CurrentArmor <= 0 {
 		// 检查是否已经切换过（避免每帧都触发）
-		behaviorComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.BehaviorComponent{}))
-		if ok {
-			behavior := behaviorComp.(*components.BehaviorComponent)
+		behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
+	if ok {
 			if behavior.Type == components.BehaviorZombieBuckethead {
 				// 首次护甲破坏，执行切换
 				log.Printf("[BehaviorSystem] 铁桶僵尸 %d 护甲破坏，切换为普通僵尸", entityID)
@@ -1070,9 +1023,8 @@ func (s *BehaviorSystem) handleBucketheadZombieBehavior(entityID ecs.EntityID, d
 				behavior.Type = components.BehaviorZombieBasic
 
 				// 2. Story 6.3: 从可见轨道列表中移除铁桶
-				reanimComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{}))
-				if ok {
-					reanim := reanimComp.(*components.ReanimComponent)
+				reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if ok {
 					if reanim.VisibleTracks != nil {
 						delete(reanim.VisibleTracks, "anim_bucket") // 移除铁桶
 						log.Printf("[BehaviorSystem] 铁桶僵尸 %d 移除 anim_bucket 轨道", entityID)
@@ -1080,7 +1032,7 @@ func (s *BehaviorSystem) handleBucketheadZombieBehavior(entityID ecs.EntityID, d
 				}
 
 				// 3. 移除护甲组件（可选，但保留可能对调试有帮助）
-				// s.entityManager.RemoveComponent(entityID, reflect.TypeOf(&components.ArmorComponent{}))
+				// ecs.RemoveComponent[*components.ArmorComponent](s.entityManager, entityID)
 			}
 		}
 
@@ -1097,11 +1049,10 @@ func (s *BehaviorSystem) handleBucketheadZombieBehavior(entityID ecs.EntityID, d
 // 樱桃炸弹种植后开始引信倒计时（1.5秒），倒计时结束后触发爆炸
 func (s *BehaviorSystem) handleCherryBombBehavior(entityID ecs.EntityID, deltaTime float64) {
 	// 获取计时器组件
-	timerComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.TimerComponent{}))
+	timer, ok := ecs.GetComponent[*components.TimerComponent](s.entityManager, entityID)
 	if !ok {
 		return
 	}
-	timer := timerComp.(*components.TimerComponent)
 
 	// 检查引信计时器状态
 	if !timer.IsReady {
@@ -1124,12 +1075,11 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 	log.Printf("[BehaviorSystem] 樱桃炸弹 %d: 开始爆炸！", entityID)
 
 	// 获取樱桃炸弹的位置和网格信息
-	plantComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PlantComponent{}))
+	plant, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, entityID)
 	if !ok {
 		log.Printf("[BehaviorSystem] 警告：樱桃炸弹 %d 缺少 PlantComponent，无法确定爆炸位置", entityID)
 		return
 	}
-	plant := plantComp.(*components.PlantComponent)
 
 	// 计算3x3爆炸范围的格子坐标
 	// 范围：[centerCol - 1, centerCol + 1] × [centerRow - 1, centerRow + 1]
@@ -1157,10 +1107,7 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 	log.Printf("[BehaviorSystem] 樱桃炸弹爆炸范围: 列[%d-%d], 行[%d-%d]", minCol, maxCol, minRow, maxRow)
 
 	// 查询所有僵尸实体（移动中和啃食中的僵尸）
-	allZombies := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.BehaviorComponent{}),
-		reflect.TypeOf(&components.PositionComponent{}),
-	)
+	allZombies := ecs.GetEntitiesWith2[*components.BehaviorComponent, *components.PositionComponent](s.entityManager)
 
 	// 统计受影响的僵尸数量
 	affectedZombies := 0
@@ -1168,11 +1115,10 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 	// 对每个僵尸检查是否在爆炸范围内
 	for _, zombieID := range allZombies {
 		// 获取僵尸的行为组件，确认是僵尸类型
-		behaviorComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.BehaviorComponent{}))
-		if !ok {
-			continue
-		}
-		behavior := behaviorComp.(*components.BehaviorComponent)
+		behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
+	if !ok {
+		continue
+	}
 
 		// 只处理僵尸类型的实体
 		if behavior.Type != components.BehaviorZombieBasic &&
@@ -1184,11 +1130,10 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 		}
 
 		// 获取僵尸的位置组件
-		posComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.PositionComponent{}))
-		if !ok {
-			continue
-		}
-		pos := posComp.(*components.PositionComponent)
+		pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
+	if !ok {
+		continue
+	}
 
 		// 根据僵尸位置计算所在格子
 		zombieCol, zombieRow, valid := utils.WorldToGridCoords(pos.X, pos.Y)
@@ -1205,9 +1150,8 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 			damage := config.CherryBombDamage
 
 			// 检查是否有护甲组件
-			armorComp, hasArmor := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.ArmorComponent{}))
-			if hasArmor {
-				armor := armorComp.(*components.ArmorComponent)
+			armor, hasArmor := ecs.GetComponent[*components.ArmorComponent](s.entityManager, zombieID)
+	if hasArmor {
 				if armor.CurrentArmor > 0 {
 					// 护甲优先扣除
 					armorDamage := damage
@@ -1223,9 +1167,8 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 
 			// 如果还有剩余伤害，扣除生命值
 			if damage > 0 {
-				healthComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.HealthComponent{}))
-				if ok {
-					health := healthComp.(*components.HealthComponent)
+				health, ok := ecs.GetComponent[*components.HealthComponent](s.entityManager, zombieID)
+	if ok {
 					originalHealth := health.CurrentHealth
 					health.CurrentHealth -= damage
 					if health.CurrentHealth < 0 {
@@ -1254,10 +1197,8 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 
 	// Story 7.4: 创建爆炸粒子效果
 	// 获取樱桃炸弹的世界坐标
-	positionComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
+	position, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
 	if ok {
-		position := positionComp.(*components.PositionComponent)
-
 		// 触发爆炸粒子效果
 		_, err := entities.CreateParticleEffect(
 			s.entityManager,

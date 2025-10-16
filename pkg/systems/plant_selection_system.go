@@ -2,7 +2,6 @@ package systems
 
 import (
 	"fmt"
-	"reflect"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
@@ -57,9 +56,7 @@ func (s *PlantSelectionSystem) Update(dt float64) {
 //   - error: 如果选择失败（槽位已满、植物未解锁等），返回错误信息
 func (s *PlantSelectionSystem) SelectPlant(plantID string) error {
 	// 查询 PlantSelectionComponent 实体
-	entities := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.PlantSelectionComponent{}),
-	)
+	entities := ecs.GetEntitiesWith1[*components.PlantSelectionComponent](s.entityManager)
 
 	if len(entities) == 0 {
 		return fmt.Errorf("no plant selection component found")
@@ -67,11 +64,10 @@ func (s *PlantSelectionSystem) SelectPlant(plantID string) error {
 
 	// 获取第一个选卡组件（通常只有一个）
 	selectionEntity := entities[0]
-	comp, ok := s.entityManager.GetComponent(selectionEntity, reflect.TypeOf(&components.PlantSelectionComponent{}))
+	selectionComp, ok := ecs.GetComponent[*components.PlantSelectionComponent](s.entityManager, selectionEntity)
 	if !ok {
 		return fmt.Errorf("failed to get plant selection component")
 	}
-	selectionComp := comp.(*components.PlantSelectionComponent)
 
 	// 检查是否已选择
 	for _, selected := range selectionComp.SelectedPlants {
@@ -85,11 +81,12 @@ func (s *PlantSelectionSystem) SelectPlant(plantID string) error {
 		return fmt.Errorf("selection slots are full (max %d)", selectionComp.MaxSlots)
 	}
 
+	// TODO(Story 8.1): 实现 GameState.GetPlantUnlockManager() 方法
 	// 检查植物是否已解锁
-	unlockManager := s.gameState.GetPlantUnlockManager()
-	if unlockManager != nil && !unlockManager.IsUnlocked(plantID) {
-		return fmt.Errorf("plant %s is not unlocked", plantID)
-	}
+	// unlockManager := s.gameState.GetPlantUnlockManager()
+	// if unlockManager != nil && !unlockManager.IsUnlocked(plantID) {
+	// 	return fmt.Errorf("plant %s is not unlocked", plantID)
+	// }
 
 	// 添加到选择列表
 	selectionComp.SelectedPlants = append(selectionComp.SelectedPlants, plantID)
@@ -105,20 +102,17 @@ func (s *PlantSelectionSystem) SelectPlant(plantID string) error {
 //   - error: 如果取消失败（植物未被选择），返回错误信息
 func (s *PlantSelectionSystem) DeselectPlant(plantID string) error {
 	// 查询 PlantSelectionComponent 实体
-	entities := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.PlantSelectionComponent{}),
-	)
+	entities := ecs.GetEntitiesWith1[*components.PlantSelectionComponent](s.entityManager)
 
 	if len(entities) == 0 {
 		return fmt.Errorf("no plant selection component found")
 	}
 
 	selectionEntity := entities[0]
-	comp, ok := s.entityManager.GetComponent(selectionEntity, reflect.TypeOf(&components.PlantSelectionComponent{}))
+	selectionComp, ok := ecs.GetComponent[*components.PlantSelectionComponent](s.entityManager, selectionEntity)
 	if !ok {
 		return fmt.Errorf("failed to get plant selection component")
 	}
-	selectionComp := comp.(*components.PlantSelectionComponent)
 
 	// 查找并移除植物
 	found := false
@@ -145,20 +139,17 @@ func (s *PlantSelectionSystem) DeselectPlant(plantID string) error {
 //   - error: 如果确认失败（至少需要选择1株植物），返回错误信息
 func (s *PlantSelectionSystem) ConfirmSelection() error {
 	// 查询 PlantSelectionComponent 实体
-	entities := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.PlantSelectionComponent{}),
-	)
+	entities := ecs.GetEntitiesWith1[*components.PlantSelectionComponent](s.entityManager)
 
 	if len(entities) == 0 {
 		return fmt.Errorf("no plant selection component found")
 	}
 
 	selectionEntity := entities[0]
-	comp, ok := s.entityManager.GetComponent(selectionEntity, reflect.TypeOf(&components.PlantSelectionComponent{}))
+	selectionComp, ok := ecs.GetComponent[*components.PlantSelectionComponent](s.entityManager, selectionEntity)
 	if !ok {
 		return fmt.Errorf("failed to get plant selection component")
 	}
-	selectionComp := comp.(*components.PlantSelectionComponent)
 
 	// 验证至少选择了1株植物
 	if len(selectionComp.SelectedPlants) < 1 {
@@ -168,9 +159,10 @@ func (s *PlantSelectionSystem) ConfirmSelection() error {
 	// 设置确认标志
 	selectionComp.IsConfirmed = true
 
+	// TODO(Story 8.1): 实现 GameState.SelectedPlants 字段
 	// 将选中植物保存到 GameState（供 GameScene 使用）
-	s.gameState.SelectedPlants = make([]string, len(selectionComp.SelectedPlants))
-	copy(s.gameState.SelectedPlants, selectionComp.SelectedPlants)
+	// s.gameState.SelectedPlants = make([]string, len(selectionComp.SelectedPlants))
+	// copy(s.gameState.SelectedPlants, selectionComp.SelectedPlants)
 
 	return nil
 }
@@ -180,20 +172,17 @@ func (s *PlantSelectionSystem) ConfirmSelection() error {
 //   - []string: 已选择的植物ID列表
 func (s *PlantSelectionSystem) GetSelectedPlants() []string {
 	// 查询 PlantSelectionComponent 实体
-	entities := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.PlantSelectionComponent{}),
-	)
+	entities := ecs.GetEntitiesWith1[*components.PlantSelectionComponent](s.entityManager)
 
 	if len(entities) == 0 {
 		return []string{}
 	}
 
 	selectionEntity := entities[0]
-	comp, ok := s.entityManager.GetComponent(selectionEntity, reflect.TypeOf(&components.PlantSelectionComponent{}))
+	selectionComp, ok := ecs.GetComponent[*components.PlantSelectionComponent](s.entityManager, selectionEntity)
 	if !ok {
 		return []string{}
 	}
-	selectionComp := comp.(*components.PlantSelectionComponent)
 
 	// 返回副本，避免外部修改
 	result := make([]string, len(selectionComp.SelectedPlants))

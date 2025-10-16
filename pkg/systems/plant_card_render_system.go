@@ -3,7 +3,6 @@ package systems
 import (
 	"fmt"
 	"image/color"
-	"reflect"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
@@ -50,24 +49,22 @@ func NewPlantCardRenderSystem(em *ecs.EntityManager, cardScale, plantIconScale, 
 // 层4: 冷却遮罩/禁用效果
 func (s *PlantCardRenderSystem) Draw(screen *ebiten.Image) {
 	// 查询所有拥有 PlantCardComponent, PositionComponent 的实体
-	entities := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.PlantCardComponent{}),
-		reflect.TypeOf(&components.PositionComponent{}),
-	)
+	entities := ecs.GetEntitiesWith2[
+		*components.PlantCardComponent,
+		*components.PositionComponent,
+	](s.entityManager)
 
 	for _, entityID := range entities {
 		// 获取组件
-		cardComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PlantCardComponent{}))
+		card, ok := ecs.GetComponent[*components.PlantCardComponent](s.entityManager, entityID)
 		if !ok {
 			continue
 		}
-		card := cardComp.(*components.PlantCardComponent)
 
-		posComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
+		pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
 		if !ok {
 			continue
 		}
-		pos := posComp.(*components.PositionComponent)
 
 		// 绘制多层卡片
 		s.drawCardLayers(screen, card, pos.X, pos.Y)

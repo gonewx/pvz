@@ -164,11 +164,11 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 		}
 
 		// 查询所有可点击的阳光实体（使用世界坐标）
-		entities := s.entityManager.GetEntitiesWith(
-			reflect.TypeOf(&components.PositionComponent{}),
-			reflect.TypeOf(&components.ClickableComponent{}),
-			reflect.TypeOf(&components.SunComponent{}),
-		)
+		entities := ecs.GetEntitiesWith3[
+		*components.PositionComponent,
+		*components.ClickableComponent,
+		*components.SunComponent,
+	](s.entityManager)
 
 		// DEBUG: 阳光实体数量日志（每次点击都打印会刷屏，已禁用）
 		// log.Printf("[InputSystem] 找到 %d 个阳光实体", len(entities))
@@ -178,14 +178,9 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 			id := entities[i]
 
 			// 获取组件
-			posComp, _ := s.entityManager.GetComponent(id, reflect.TypeOf(&components.PositionComponent{}))
-			clickableComp, _ := s.entityManager.GetComponent(id, reflect.TypeOf(&components.ClickableComponent{}))
-			sunComp, _ := s.entityManager.GetComponent(id, reflect.TypeOf(&components.SunComponent{}))
-
-			// 类型断言
-			pos := posComp.(*components.PositionComponent)
-			clickable := clickableComp.(*components.ClickableComponent)
-			sun := sunComp.(*components.SunComponent)
+			pos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, id)
+			clickable, _ := ecs.GetComponent[*components.ClickableComponent](s.entityManager, id)
+			sun, _ := ecs.GetComponent[*components.SunComponent](s.entityManager, id)
 
 			// 只处理可点击的阳光（允许下落中和已落地的阳光）
 			if !clickable.IsEnabled {
@@ -212,14 +207,12 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 // handleSunClick 处理阳光被点击的逻辑
 func (s *InputSystem) handleSunClick(sunID ecs.EntityID, pos *components.PositionComponent) {
 	// 1. 更新阳光状态为收集中
-	sunComp, _ := s.entityManager.GetComponent(sunID, reflect.TypeOf(&components.SunComponent{}))
-	sun := sunComp.(*components.SunComponent)
+	sun, _ := ecs.GetComponent[*components.SunComponent](s.entityManager, sunID)
 	sun.State = components.SunCollecting
 	log.Printf("[InputSystem] 阳光开始收集动画")
 
 	// 2. 禁用点击，防止重复点击
-	clickableComp, _ := s.entityManager.GetComponent(sunID, reflect.TypeOf(&components.ClickableComponent{}))
-	clickable := clickableComp.(*components.ClickableComponent)
+	clickable, _ := ecs.GetComponent[*components.ClickableComponent](s.entityManager, sunID)
 	clickable.IsEnabled = false
 
 	// 3. 播放收集音效（单次播放，不循环）
@@ -250,15 +243,14 @@ func (s *InputSystem) handleSunClick(sunID ecs.EntityID, pos *components.Positio
 	vy := (dy / distance) * speed
 
 	// 6. 更新 VelocityComponent（如果不存在则添加）
-	velComp, exists := s.entityManager.GetComponent(sunID, reflect.TypeOf(&components.VelocityComponent{}))
+	vel, exists := ecs.GetComponent[*components.VelocityComponent](s.entityManager, sunID)
 	if exists {
 		// 更新现有速度
-		vel := velComp.(*components.VelocityComponent)
 		vel.VX = vx
 		vel.VY = vy
 	} else {
 		// 添加新的速度组件（理论上应该已存在，但防御性编程）
-		s.entityManager.AddComponent(sunID, &components.VelocityComponent{
+		ecs.AddComponent(s.entityManager, sunID, &components.VelocityComponent{
 			VX: vx,
 			VY: vy,
 		})
@@ -272,12 +264,12 @@ func (s *InputSystem) handleSunClick(sunID ecs.EntityID, pos *components.Positio
 // 返回 true 表示处理了点击，false 表示未处理
 func (s *InputSystem) handlePlantCardClick(mouseX, mouseY int, cameraX float64) bool {
 	// 查询所有植物卡片实体
-	entities := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.PlantCardComponent{}),
-		reflect.TypeOf(&components.ClickableComponent{}),
-		reflect.TypeOf(&components.PositionComponent{}),
-		reflect.TypeOf(&components.UIComponent{}),
-	)
+	entities := ecs.GetEntitiesWith4[
+		*components.PlantCardComponent,
+		*components.ClickableComponent,
+		*components.PositionComponent,
+		*components.UIComponent,
+	](s.entityManager)
 
 	// DEBUG: 卡片点击检查日志（每次点击都打印会刷屏，已禁用）
 	// log.Printf("[InputSystem] 检查植物卡片点击: 鼠标(%d, %d), 找到 %d 个卡片", mouseX, mouseY, len(entities))
@@ -285,15 +277,10 @@ func (s *InputSystem) handlePlantCardClick(mouseX, mouseY int, cameraX float64) 
 	// 遍历卡片实体，检测点击
 	for _, entityID := range entities {
 		// 获取组件
-		cardComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PlantCardComponent{}))
-		clickableComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.ClickableComponent{}))
-		posComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PositionComponent{}))
-		uiComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.UIComponent{}))
-
-		card := cardComp.(*components.PlantCardComponent)
-		clickable := clickableComp.(*components.ClickableComponent)
-		pos := posComp.(*components.PositionComponent)
-		ui := uiComp.(*components.UIComponent)
+		card, _ := ecs.GetComponent[*components.PlantCardComponent](s.entityManager, entityID)
+		clickable, _ := ecs.GetComponent[*components.ClickableComponent](s.entityManager, entityID)
+		pos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+		ui, _ := ecs.GetComponent[*components.UIComponent](s.entityManager, entityID)
 
 		log.Printf("[InputSystem] 卡片 %d: PlantType=%v, 位置=(%.1f, %.1f), 可点击区域=%.1fx%.1f, IsAvailable=%v, IsEnabled=%v",
 			entityID, card.PlantType, pos.X, pos.Y, clickable.Width, clickable.Height, card.IsAvailable, clickable.IsEnabled)
@@ -374,19 +361,19 @@ func (s *InputSystem) createPlantPreview(plantType components.PlantType, x, y fl
 	entityID := s.entityManager.CreateEntity()
 
 	// 添加位置组件
-	s.entityManager.AddComponent(entityID, &components.PositionComponent{
+	ecs.AddComponent(s.entityManager, entityID, &components.PositionComponent{
 		X: x,
 		Y: y,
 	})
 
 	// 添加 ReanimComponent
-	s.entityManager.AddComponent(entityID, &components.ReanimComponent{
+	ecs.AddComponent(s.entityManager, entityID, &components.ReanimComponent{
 		Reanim:     reanimXML,
 		PartImages: partImages,
 	})
 
 	// 添加植物预览组件
-	s.entityManager.AddComponent(entityID, &components.PlantPreviewComponent{
+	ecs.AddComponent(s.entityManager, entityID, &components.PlantPreviewComponent{
 		PlantType: plantType,
 		Alpha:     0.5, // 半透明效果
 	})
@@ -411,9 +398,7 @@ func (s *InputSystem) createPlantPreview(plantType components.PlantType, x, y fl
 // destroyPlantPreview 删除所有植物预览实体
 func (s *InputSystem) destroyPlantPreview() {
 	// 查询所有拥有 PlantPreviewComponent 的实体
-	entities := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.PlantPreviewComponent{}),
-	)
+	entities := ecs.GetEntitiesWith1[*components.PlantPreviewComponent](s.entityManager)
 
 	// 删除所有预览实体
 	for _, entityID := range entities {
@@ -546,14 +531,11 @@ func (s *InputSystem) getPlantCost(plantType components.PlantType) int {
 // triggerPlantCardCooldown 触发指定植物类型的卡片进入冷却状态
 func (s *InputSystem) triggerPlantCardCooldown(plantType components.PlantType) {
 	// 查询所有植物卡片实体
-	entities := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.PlantCardComponent{}),
-	)
+	entities := ecs.GetEntitiesWith1[*components.PlantCardComponent](s.entityManager)
 
 	// 找到匹配的卡片并触发冷却
 	for _, entityID := range entities {
-		cardComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PlantCardComponent{}))
-		card := cardComp.(*components.PlantCardComponent)
+		card, _ := ecs.GetComponent[*components.PlantCardComponent](s.entityManager, entityID)
 
 		if card.PlantType == plantType {
 			// 触发冷却
@@ -567,18 +549,15 @@ func (s *InputSystem) triggerPlantCardCooldown(plantType components.PlantType) {
 // resetPlantCardSelection 重置指定植物类型的卡片选择状态
 func (s *InputSystem) resetPlantCardSelection(plantType components.PlantType) {
 	// 查询所有植物卡片实体
-	entities := s.entityManager.GetEntitiesWith(
-		reflect.TypeOf(&components.PlantCardComponent{}),
-		reflect.TypeOf(&components.UIComponent{}),
-	)
+	entities := ecs.GetEntitiesWith2[
+		*components.PlantCardComponent,
+		*components.UIComponent,
+	](s.entityManager)
 
 	// 找到匹配的卡片并重置UI状态
 	for _, entityID := range entities {
-		cardComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.PlantCardComponent{}))
-		uiComp, _ := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.UIComponent{}))
-
-		card := cardComp.(*components.PlantCardComponent)
-		ui := uiComp.(*components.UIComponent)
+		card, _ := ecs.GetComponent[*components.PlantCardComponent](s.entityManager, entityID)
+		ui, _ := ecs.GetComponent[*components.UIComponent](s.entityManager, entityID)
 
 		if card.PlantType == plantType {
 			// 重置为正常状态
