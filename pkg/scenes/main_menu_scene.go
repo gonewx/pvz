@@ -192,7 +192,7 @@ func (m *MainMenuScene) initButtons() {
 	}
 
 	// For exit button, we'll use a simple button image
-	exitNormal, err := m.resourceManager.LoadImageByID("IMAGE_REANIM_BUTTON_MIDDLE")
+	exitNormal, err := m.resourceManager.LoadImageByID("IMAGE_BUTTON_MIDDLE")
 	if err != nil {
 		log.Printf("Warning: Failed to load exit button image: %v", err)
 		exitNormal = nil

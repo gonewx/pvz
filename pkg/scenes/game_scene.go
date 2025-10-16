@@ -342,7 +342,7 @@ func (s *GameScene) loadResources() {
 	}
 
 	// Load seed bank (植物选择栏背景)
-	seedBank, err := s.resourceManager.LoadImageByID("IMAGE_REANIM_SEEDBANK")
+	seedBank, err := s.resourceManager.LoadImageByID("IMAGE_SEEDBANK")
 	if err != nil {
 		log.Printf("Warning: Failed to load seed bank image: %v", err)
 		log.Printf("Will use fallback rendering for seed bank")
@@ -351,7 +351,7 @@ func (s *GameScene) loadResources() {
 	}
 
 	// Load shovel slot background
-	shovelSlot, err := s.resourceManager.LoadImageByID("IMAGE_REANIM_SHOVELBANK")
+	shovelSlot, err := s.resourceManager.LoadImageByID("IMAGE_SHOVELBANK")
 	if err != nil {
 		log.Printf("Warning: Failed to load shovel slot: %v", err)
 	} else {
@@ -359,7 +359,7 @@ func (s *GameScene) loadResources() {
 	}
 
 	// Load shovel icon
-	shovel, err := s.resourceManager.LoadImageByID("IMAGE_REANIM_SHOVEL")
+	shovel, err := s.resourceManager.LoadImageByID("IMAGE_SHOVEL")
 	if err != nil {
 		log.Printf("Warning: Failed to load shovel icon: %v", err)
 	} else {

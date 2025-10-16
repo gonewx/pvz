@@ -55,7 +55,7 @@ func NewPlantCardEntity(em *ecs.EntityManager, rm *game.ResourceManager, rs Rean
 	}
 
 	// 加载卡片背景框（所有卡片共享）
-	backgroundImg, err := rm.LoadImageByID("IMAGE_REANIM_SEEDPACKET_LARGER")
+	backgroundImg, err := rm.LoadImageByID("IMAGE_SEEDPACKET_LARGER")
 	if err != nil {
 		em.DestroyEntity(entity)
 		em.RemoveMarkedEntities()

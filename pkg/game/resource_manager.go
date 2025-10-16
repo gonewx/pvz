@@ -653,8 +653,23 @@ func (rm *ResourceManager) buildResourceMap() {
 			fullPath := buildFullPath(rm.config.BasePath, img.Path)
 
 			// Add file extension if not present
+			// Try to find the actual file with common image extensions
 			if filepath.Ext(fullPath) == "" {
-				fullPath += ".png" // Default to PNG for images
+				// Try common image extensions in order of preference
+				extensions := []string{".png", ".jpg", ".jpeg", ".gif"}
+				found := false
+				for _, ext := range extensions {
+					testPath := fullPath + ext
+					if _, err := os.Stat(testPath); err == nil {
+						fullPath = testPath
+						found = true
+						break
+					}
+				}
+				if !found {
+					// Default to PNG if file not found
+					fullPath += ".png"
+				}
 			}
 
 			rm.resourceMap[img.ID] = fullPath
