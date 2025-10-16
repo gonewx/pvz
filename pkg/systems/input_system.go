@@ -3,7 +3,6 @@ package systems
 import (
 	"log"
 	"math"
-	"reflect"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
@@ -165,10 +164,10 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 
 		// 查询所有可点击的阳光实体（使用世界坐标）
 		entities := ecs.GetEntitiesWith3[
-		*components.PositionComponent,
-		*components.ClickableComponent,
-		*components.SunComponent,
-	](s.entityManager)
+			*components.PositionComponent,
+			*components.ClickableComponent,
+			*components.SunComponent,
+		](s.entityManager)
 
 		// DEBUG: 阳光实体数量日志（每次点击都打印会刷屏，已禁用）
 		// log.Printf("[InputSystem] 找到 %d 个阳光实体", len(entities))
@@ -225,7 +224,7 @@ func (s *InputSystem) handleSunClick(sunID ecs.EntityID, pos *components.Positio
 	}
 
 	// 4. 移除 LifetimeComponent，防止收集过程中过期消失
-	s.entityManager.RemoveComponent(sunID, reflect.TypeOf(&components.LifetimeComponent{}))
+	ecs.RemoveComponent[*components.LifetimeComponent](s.entityManager, sunID)
 
 	// 5. 计算飞向阳光计数器的速度向量
 	// 注意：sunCounterX/Y 是屏幕坐标，需要转换为世界坐标

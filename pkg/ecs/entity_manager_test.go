@@ -643,3 +643,83 @@ func TestGenericAPIConsistency(t *testing.T) {
 	})
 }
 
+// TestRemoveComponent_Generic 测试泛型版本的 RemoveComponent
+func TestRemoveComponent_Generic(t *testing.T) {
+	t.Run("Remove existing component", func(t *testing.T) {
+		em := NewEntityManager()
+		entity := em.CreateEntity()
+
+		// 添加组件
+		AddComponent(em, entity, &testPositionComponent{X: 100, Y: 200})
+		AddComponent(em, entity, &testVelocityComponent{VX: 1, VY: 2})
+
+		// 验证组件存在
+		if !HasComponent[*testPositionComponent](em, entity) {
+			t.Error("Position component should exist before removal")
+		}
+		if !HasComponent[*testVelocityComponent](em, entity) {
+			t.Error("Velocity component should exist before removal")
+		}
+
+		// 移除位置组件
+		RemoveComponent[*testPositionComponent](em, entity)
+
+		// 验证位置组件已移除
+		if HasComponent[*testPositionComponent](em, entity) {
+			t.Error("Position component should be removed")
+		}
+
+		// 验证速度组件仍然存在
+		if !HasComponent[*testVelocityComponent](em, entity) {
+			t.Error("Velocity component should still exist")
+		}
+
+		// 验证无法获取已移除的组件
+		_, ok := GetComponent[*testPositionComponent](em, entity)
+		if ok {
+			t.Error("Should not be able to get removed component")
+		}
+	})
+
+	t.Run("Remove non-existent component", func(t *testing.T) {
+		em := NewEntityManager()
+		entity := em.CreateEntity()
+
+		// 移除不存在的组件（不应崩溃）
+		RemoveComponent[*testPositionComponent](em, entity)
+
+		// 验证实体仍然存在
+		AddComponent(em, entity, &testVelocityComponent{VX: 1, VY: 2})
+		if !HasComponent[*testVelocityComponent](em, entity) {
+			t.Error("Entity should still be valid after removing non-existent component")
+		}
+	})
+
+	t.Run("Generic vs Reflection API consistency", func(t *testing.T) {
+		em1 := NewEntityManager()
+		em2 := NewEntityManager()
+
+		// 使用泛型 API
+		entity1 := em1.CreateEntity()
+		AddComponent(em1, entity1, &testPositionComponent{X: 100, Y: 200})
+		RemoveComponent[*testPositionComponent](em1, entity1)
+
+		// 使用反射 API
+		entity2 := em2.CreateEntity()
+		em2.AddComponent(entity2, &testPositionComponent{X: 100, Y: 200})
+		em2.RemoveComponent(entity2, reflect.TypeOf(&testPositionComponent{}))
+
+		// 验证结果一致
+		hasComp1 := HasComponent[*testPositionComponent](em1, entity1)
+		hasComp2 := em2.HasComponent(entity2, reflect.TypeOf(&testPositionComponent{}))
+
+		if hasComp1 != hasComp2 {
+			t.Errorf("Generic and reflection APIs should have consistent results: generic=%v, reflection=%v",
+				hasComp1, hasComp2)
+		}
+
+		if hasComp1 || hasComp2 {
+			t.Error("Component should be removed in both cases")
+		}
+	})
+}

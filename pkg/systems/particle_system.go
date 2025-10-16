@@ -4,7 +4,6 @@ import (
 	"log"
 	"math"
 	"math/rand"
-	"reflect"
 
 	"github.com/hajimehoshi/ebiten/v2"
 
@@ -48,9 +47,10 @@ func (ps *ParticleSystem) Update(dt float64) {
 // and managing emitter lifecycle.
 func (ps *ParticleSystem) updateEmitters(dt float64) {
 	// Query all entities with EmitterComponent and PositionComponent
-	emitterType := reflect.TypeOf(&components.EmitterComponent{})
-	positionType := reflect.TypeOf(&components.PositionComponent{})
-	emitterEntities := ps.EntityManager.GetEntitiesWith(emitterType, positionType)
+	emitterEntities := ecs.GetEntitiesWith2[
+		*components.EmitterComponent,
+		*components.PositionComponent,
+	](ps.EntityManager)
 
 	// DEBUG: 发射器数量日志（每帧打印会刷屏，已禁用）
 	// if len(emitterEntities) > 0 {
@@ -59,18 +59,16 @@ func (ps *ParticleSystem) updateEmitters(dt float64) {
 
 	for _, emitterID := range emitterEntities {
 		// Get emitter component
-		emitterComp, ok := ps.EntityManager.GetComponent(emitterID, emitterType)
+		emitter, ok := ecs.GetComponent[*components.EmitterComponent](ps.EntityManager, emitterID)
 		if !ok {
 			continue
 		}
-		emitter := emitterComp.(*components.EmitterComponent)
 
 		// Get position component
-		posComp, ok := ps.EntityManager.GetComponent(emitterID, positionType)
+		position, ok := ecs.GetComponent[*components.PositionComponent](ps.EntityManager, emitterID)
 		if !ok {
 			continue
 		}
-		position := posComp.(*components.PositionComponent)
 
 		// DEBUG: 发射器处理日志（每个发射器每帧都打印会刷屏，已禁用）
 		// log.Printf("[ParticleSystem] 处理发射器 ID=%d: Active=%v, Age=%.2f, SpawnRate=%.2f, NextSpawnTime=%.2f",
@@ -165,12 +163,11 @@ func (ps *ParticleSystem) updateEmitters(dt float64) {
 
 // cleanupDestroyedParticles removes dead particle IDs from emitter's active list
 func (ps *ParticleSystem) cleanupDestroyedParticles(emitter *components.EmitterComponent) {
-	particleType := reflect.TypeOf(&components.ParticleComponent{})
 	alive := make([]ecs.EntityID, 0, len(emitter.ActiveParticles))
 
 	for _, particleID := range emitter.ActiveParticles {
 		// Check if particle still exists
-		if ps.EntityManager.HasComponent(particleID, particleType) {
+		if ecs.HasComponent[*components.ParticleComponent](ps.EntityManager, particleID) {
 			alive = append(alive, particleID)
 		}
 	}
@@ -181,24 +178,23 @@ func (ps *ParticleSystem) cleanupDestroyedParticles(emitter *components.EmitterC
 // updateParticles processes all particle entities, updating their state
 // and destroying expired particles.
 func (ps *ParticleSystem) updateParticles(dt float64) {
-	particleType := reflect.TypeOf(&components.ParticleComponent{})
-	positionType := reflect.TypeOf(&components.PositionComponent{})
-	particleEntities := ps.EntityManager.GetEntitiesWith(particleType, positionType)
+	particleEntities := ecs.GetEntitiesWith2[
+		*components.ParticleComponent,
+		*components.PositionComponent,
+	](ps.EntityManager)
 
 	for _, particleID := range particleEntities {
 		// Get particle component
-		particleComp, ok := ps.EntityManager.GetComponent(particleID, particleType)
+		particle, ok := ecs.GetComponent[*components.ParticleComponent](ps.EntityManager, particleID)
 		if !ok {
 			continue
 		}
-		particle := particleComp.(*components.ParticleComponent)
 
 		// Get position component
-		posComp, ok := ps.EntityManager.GetComponent(particleID, positionType)
+		position, ok := ecs.GetComponent[*components.PositionComponent](ps.EntityManager, particleID)
 		if !ok {
 			continue
 		}
-		position := posComp.(*components.PositionComponent)
 
 		// Update particle age
 		particle.Age += dt

@@ -3,7 +3,6 @@ package systems
 import (
 	"log"
 	"math/rand"
-	"reflect"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
@@ -378,7 +377,7 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 	}
 
 	// 3. 移除 VelocityComponent（停止移动）
-	s.entityManager.RemoveComponent(entityID, reflect.TypeOf(&components.VelocityComponent{}))
+	ecs.RemoveComponent[*components.VelocityComponent](s.entityManager, entityID)
 	log.Printf("[BehaviorSystem] 僵尸 %d 移除速度组件，停止移动", entityID)
 
 	// 4. 使用 ReanimSystem 播放死亡动画（不循环）
@@ -668,7 +667,7 @@ func (s *BehaviorSystem) startEatingPlant(zombieID, plantID ecs.EntityID) {
 	log.Printf("[BehaviorSystem] 僵尸 %d 开始啃食植物 %d", zombieID, plantID)
 
 	// 1. 移除僵尸的 VelocityComponent（停止移动）
-	s.entityManager.RemoveComponent(zombieID, reflect.TypeOf(&components.VelocityComponent{}))
+	ecs.RemoveComponent[*components.VelocityComponent](s.entityManager, zombieID)
 
 	// 2. Story 5.3: 在切换类型之前，先记住原始僵尸类型（用于选择正确的啃食动画）
 	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
@@ -733,7 +732,7 @@ func (s *BehaviorSystem) stopEatingAndResume(zombieID ecs.EntityID) {
 	log.Printf("[BehaviorSystem] 僵尸 %d 结束啃食，恢复移动", zombieID)
 
 	// 1. 移除 TimerComponent
-	s.entityManager.RemoveComponent(zombieID, reflect.TypeOf(&components.TimerComponent{}))
+	ecs.RemoveComponent[*components.TimerComponent](s.entityManager, zombieID)
 
 	// 2. 切换 BehaviorComponent.Type 回 BehaviorZombieBasic
 	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
@@ -831,9 +830,9 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 	if timer.IsReady {
 		// 获取僵尸当前网格位置
 		pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
-	if !ok {
-		return
-	}
+		if !ok {
+			return
+		}
 
 		// 计算僵尸所在格子
 		zombieCol := int((pos.X - config.GridWorldStartX) / config.CellWidth)
@@ -845,7 +844,7 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 		if hasPlant {
 			// 植物存在，造成伤害
 			plantHealth, ok := ecs.GetComponent[*components.HealthComponent](s.entityManager, plantID)
-	if ok {
+			if ok {
 				plantHealth.CurrentHealth -= config.ZombieEatingDamage
 
 				log.Printf("[BehaviorSystem] 僵尸 %d 啃食植物 %d，造成 %d 伤害，剩余生命值 %d",
@@ -967,7 +966,7 @@ func (s *BehaviorSystem) handleConeheadZombieBehavior(entityID ecs.EntityID, del
 	if armor.CurrentArmor <= 0 {
 		// 检查是否已经切换过（避免每帧都触发）
 		behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
-	if ok {
+		if ok {
 			if behavior.Type == components.BehaviorZombieConehead {
 				// 首次护甲破坏，执行切换
 				log.Printf("[BehaviorSystem] 路障僵尸 %d 护甲破坏，切换为普通僵尸", entityID)
@@ -977,7 +976,7 @@ func (s *BehaviorSystem) handleConeheadZombieBehavior(entityID ecs.EntityID, del
 
 				// 2. Story 6.3: 从可见轨道列表中移除路障
 				reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-	if ok {
+				if ok {
 					if reanim.VisibleTracks != nil {
 						delete(reanim.VisibleTracks, "anim_cone") // 移除路障
 						log.Printf("[BehaviorSystem] 路障僵尸 %d 移除 anim_cone 轨道", entityID)
@@ -1014,7 +1013,7 @@ func (s *BehaviorSystem) handleBucketheadZombieBehavior(entityID ecs.EntityID, d
 	if armor.CurrentArmor <= 0 {
 		// 检查是否已经切换过（避免每帧都触发）
 		behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
-	if ok {
+		if ok {
 			if behavior.Type == components.BehaviorZombieBuckethead {
 				// 首次护甲破坏，执行切换
 				log.Printf("[BehaviorSystem] 铁桶僵尸 %d 护甲破坏，切换为普通僵尸", entityID)
@@ -1024,7 +1023,7 @@ func (s *BehaviorSystem) handleBucketheadZombieBehavior(entityID ecs.EntityID, d
 
 				// 2. Story 6.3: 从可见轨道列表中移除铁桶
 				reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-	if ok {
+				if ok {
 					if reanim.VisibleTracks != nil {
 						delete(reanim.VisibleTracks, "anim_bucket") // 移除铁桶
 						log.Printf("[BehaviorSystem] 铁桶僵尸 %d 移除 anim_bucket 轨道", entityID)
@@ -1116,9 +1115,9 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 	for _, zombieID := range allZombies {
 		// 获取僵尸的行为组件，确认是僵尸类型
 		behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
-	if !ok {
-		continue
-	}
+		if !ok {
+			continue
+		}
 
 		// 只处理僵尸类型的实体
 		if behavior.Type != components.BehaviorZombieBasic &&
@@ -1131,9 +1130,9 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 
 		// 获取僵尸的位置组件
 		pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
-	if !ok {
-		continue
-	}
+		if !ok {
+			continue
+		}
 
 		// 根据僵尸位置计算所在格子
 		zombieCol, zombieRow, valid := utils.WorldToGridCoords(pos.X, pos.Y)
@@ -1151,7 +1150,7 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 
 			// 检查是否有护甲组件
 			armor, hasArmor := ecs.GetComponent[*components.ArmorComponent](s.entityManager, zombieID)
-	if hasArmor {
+			if hasArmor {
 				if armor.CurrentArmor > 0 {
 					// 护甲优先扣除
 					armorDamage := damage
@@ -1168,7 +1167,7 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 			// 如果还有剩余伤害，扣除生命值
 			if damage > 0 {
 				health, ok := ecs.GetComponent[*components.HealthComponent](s.entityManager, zombieID)
-	if ok {
+				if ok {
 					originalHealth := health.CurrentHealth
 					health.CurrentHealth -= damage
 					if health.CurrentHealth < 0 {

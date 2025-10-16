@@ -128,7 +128,6 @@
 //	        pos.X += 10 * dt
 //	    }
 //	}
-//
 package ecs
 
 import "reflect"
@@ -180,6 +179,10 @@ func (em *EntityManager) AddComponent(id EntityID, component interface{}) {
 }
 
 // RemoveComponent 从实体移除指定类型的组件
+//
+// Deprecated: 推荐使用泛型版本 ecs.RemoveComponent[T](em, entity)
+// 泛型版本无需手动使用 reflect.TypeOf，代码更简洁。
+// 此方法保留用于向后兼容。
 func (em *EntityManager) RemoveComponent(id EntityID, componentType reflect.Type) {
 	if compMap, exists := em.components[id]; exists {
 		delete(compMap, componentType)
@@ -230,6 +233,7 @@ func (em *EntityManager) RemoveMarkedEntities() {
 // 示例:
 //   - 1个组件: ecs.GetEntitiesWith1[*PlantComponent](em)
 //   - 3个组件: ecs.GetEntitiesWith3[*Comp1, *Comp2, *Comp3](em)
+//
 // 此方法将在 Epic 9 完成后（Story 9.3+）考虑移除。
 func (em *EntityManager) GetEntitiesWith(componentTypes ...reflect.Type) []EntityID {
 	result := make([]EntityID, 0)
@@ -262,6 +266,30 @@ func (em *EntityManager) GetEntitiesWith(componentTypes ...reflect.Type) []Entit
 // 1. 编译时类型检查
 // 2. 消除手动类型断言
 // 3. 代码更简洁易读
+// GetComponent 使用泛型获取实体的特定类型组件（推荐）
+//
+// 类型参数:
+//   - T: 组件类型，必须与存储时的类型完全一致（包括指针标记）
+//
+// 参数:
+//   - em: EntityManager 实例
+//   - entity: 实体 ID
+//
+// 返回值:
+//   - T: 组件实例（如找到），类型安全，无需类型断言
+//   - bool: 是否找到组件
+//
+// 示例:
+//
+//	plantComp, ok := ecs.GetComponent[*components.PlantComponent](em, entity)
+//	if ok {
+//	    plantComp.Health -= 10 // 无需类型断言
+//	}
+//
+// 注意:
+//   - 类型参数必须使用指针类型（如 *PlantComponent）
+//   - 与存储时的类型必须完全一致
+//   - 如果类型不匹配，将返回零值和 false
 func GetComponent[T any](em *EntityManager, entity EntityID) (T, bool) {
 	var zero T
 	// 注意：这里仍需使用反射获取类型，因为底层存储使用 reflect.Type 作为 key
@@ -278,8 +306,27 @@ func GetComponent[T any](em *EntityManager, entity EntityID) (T, bool) {
 }
 
 // AddComponent 为实体添加组件（泛型版本）
-// 类型参数 T 自动从参数推导，无需显式指定
-// 示例: ecs.AddComponent(em, entity, &components.PlantComponent{Health: 300})
+// AddComponent 使用泛型为实体添加组件（推荐）
+//
+// 类型参数:
+//   - T: 组件类型，自动从参数推导，无需显式指定
+//
+// 参数:
+//   - em: EntityManager 实例
+//   - entity: 实体 ID
+//   - component: 要添加的组件实例
+//
+// 示例:
+//
+//	ecs.AddComponent(em, entity, &components.PlantComponent{
+//	    PlantType: "Peashooter",
+//	    Health:    300,
+//	})
+//
+// 注意:
+//   - 类型自动推导，无需手动指定类型参数
+//   - 组件应使用指针类型（如 *PlantComponent）
+//   - 如果实体已有该类型组件，将被覆盖
 func AddComponent[T any](em *EntityManager, entity EntityID, component T) {
 	componentType := reflect.TypeOf(component)
 	if compMap, exists := em.components[entity]; exists {
@@ -288,8 +335,27 @@ func AddComponent[T any](em *EntityManager, entity EntityID, component T) {
 }
 
 // HasComponent 检查实体是否拥有特定类型组件（泛型版本）
-// 类型参数 T 指定要检查的组件类型
-// 示例: if ecs.HasComponent[*components.PlantComponent](em, entity) { ... }
+// HasComponent 使用泛型检查实体是否拥有特定类型组件（推荐）
+//
+// 类型参数:
+//   - T: 组件类型，必须与存储时的类型完全一致（包括指针标记）
+//
+// 参数:
+//   - em: EntityManager 实例
+//   - entity: 实体 ID
+//
+// 返回值:
+//   - bool: 实体是否拥有该组件
+//
+// 示例:
+//
+//	if ecs.HasComponent[*components.PlantComponent](em, entity) {
+//	    // 实体是植物
+//	}
+//
+// 注意:
+//   - 类型参数必须使用指针类型（如 *PlantComponent）
+//   - 仅检查存在性，不获取组件数据
 func HasComponent[T any](em *EntityManager, entity EntityID) bool {
 	componentType := reflect.TypeOf((*T)(nil)).Elem()
 
@@ -322,7 +388,26 @@ func getEntitiesWithTypes(em *EntityManager, componentTypes []reflect.Type) []En
 }
 
 // GetEntitiesWith1 查询拥有 1 个组件的所有实体（泛型版本）
-// 示例: entities := ecs.GetEntitiesWith1[*components.PlantComponent](em)
+//
+// 类型参数:
+//   - T1: 第 1 个组件类型
+//
+// 参数:
+//   - em: EntityManager 实例
+//
+// 返回值:
+//   - []EntityID: 拥有指定组件的所有实体 ID 列表
+//
+// 示例:
+//
+//	entities := ecs.GetEntitiesWith1[*components.PlantComponent](em)
+//	for _, entity := range entities {
+//	    // 处理每个植物实体
+//	}
+//
+// 注意:
+//   - 类型参数必须使用指针类型（如 *PlantComponent）
+//   - 查询更多组件使用 GetEntitiesWith2/3/4/5
 func GetEntitiesWith1[T1 any](em *EntityManager) []EntityID {
 	types := []reflect.Type{
 		reflect.TypeOf((*T1)(nil)).Elem(),
@@ -331,7 +416,26 @@ func GetEntitiesWith1[T1 any](em *EntityManager) []EntityID {
 }
 
 // GetEntitiesWith2 查询拥有 2 个组件的所有实体（泛型版本）
-// 示例: entities := ecs.GetEntitiesWith2[*components.PlantComponent, *components.PositionComponent](em)
+//
+// 类型参数:
+//   - T1, T2: 2 个组件类型
+//
+// 参数:
+//   - em: EntityManager 实例
+//
+// 返回值:
+//   - []EntityID: 拥有指定组件的所有实体 ID 列表
+//
+// 示例:
+//
+//	entities := ecs.GetEntitiesWith2[
+//	    *components.PlantComponent,
+//	    *components.PositionComponent,
+//	](em)
+//
+// 注意:
+//   - 函数名末尾的 2 表示组件数量，必须匹配类型参数数量
+//   - 类型参数必须使用指针类型
 func GetEntitiesWith2[T1, T2 any](em *EntityManager) []EntityID {
 	types := []reflect.Type{
 		reflect.TypeOf((*T1)(nil)).Elem(),
@@ -341,7 +445,27 @@ func GetEntitiesWith2[T1, T2 any](em *EntityManager) []EntityID {
 }
 
 // GetEntitiesWith3 查询拥有 3 个组件的所有实体（泛型版本）
-// 示例: entities := ecs.GetEntitiesWith3[*Comp1, *Comp2, *Comp3](em)
+//
+// 类型参数:
+//   - T1, T2, T3: 3 个组件类型
+//
+// 参数:
+//   - em: EntityManager 实例
+//
+// 返回值:
+//   - []EntityID: 拥有指定组件的所有实体 ID 列表
+//
+// 示例:
+//
+//	entities := ecs.GetEntitiesWith3[
+//	    *components.BehaviorComponent,
+//	    *components.PlantComponent,
+//	    *components.PositionComponent,
+//	](em)
+//
+// 注意:
+//   - 函数名末尾的 3 表示组件数量，必须匹配类型参数数量
+//   - 类型参数必须使用指针类型
 func GetEntitiesWith3[T1, T2, T3 any](em *EntityManager) []EntityID {
 	types := []reflect.Type{
 		reflect.TypeOf((*T1)(nil)).Elem(),
@@ -352,6 +476,23 @@ func GetEntitiesWith3[T1, T2, T3 any](em *EntityManager) []EntityID {
 }
 
 // GetEntitiesWith4 查询拥有 4 个组件的所有实体（泛型版本）
+//
+// 类型参数:
+//   - T1, T2, T3, T4: 4 个组件类型
+//
+// 参数:
+//   - em: EntityManager 实例
+//
+// 返回值:
+//   - []EntityID: 拥有指定组件的所有实体 ID 列表
+//
+// 示例:
+//
+//	entities := ecs.GetEntitiesWith4[*Comp1, *Comp2, *Comp3, *Comp4](em)
+//
+// 注意:
+//   - 函数名末尾的 4 表示组件数量，必须匹配类型参数数量
+//   - 类型参数必须使用指针类型
 func GetEntitiesWith4[T1, T2, T3, T4 any](em *EntityManager) []EntityID {
 	types := []reflect.Type{
 		reflect.TypeOf((*T1)(nil)).Elem(),
@@ -363,6 +504,24 @@ func GetEntitiesWith4[T1, T2, T3, T4 any](em *EntityManager) []EntityID {
 }
 
 // GetEntitiesWith5 查询拥有 5 个组件的所有实体（泛型版本）
+//
+// 类型参数:
+//   - T1, T2, T3, T4, T5: 5 个组件类型
+//
+// 参数:
+//   - em: EntityManager 实体
+//
+// 返回值:
+//   - []EntityID: 拥有指定组件的所有实体 ID 列表
+//
+// 示例:
+//
+//	entities := ecs.GetEntitiesWith5[*Comp1, *Comp2, *Comp3, *Comp4, *Comp5](em)
+//
+// 注意:
+//   - 函数名末尾的 5 表示组件数量，必须匹配类型参数数量
+//   - 类型参数必须使用指针类型
+//   - 查询超过 5 个组件时，使用反射 API 或分步查询
 func GetEntitiesWith5[T1, T2, T3, T4, T5 any](em *EntityManager) []EntityID {
 	types := []reflect.Type{
 		reflect.TypeOf((*T1)(nil)).Elem(),
@@ -372,4 +531,30 @@ func GetEntitiesWith5[T1, T2, T3, T4, T5 any](em *EntityManager) []EntityID {
 		reflect.TypeOf((*T5)(nil)).Elem(),
 	}
 	return getEntitiesWithTypes(em, types)
+}
+
+// RemoveComponent 移除实体的组件（泛型版本）
+//
+// 类型参数:
+//   - T: 要移除的组件类型（必须是指针类型，如 *components.VelocityComponent）
+//
+// 参数:
+//   - em: EntityManager 实例
+//   - entity: 实体 ID
+//
+// 示例:
+//
+//	// 移除僵尸的速度组件
+//	ecs.RemoveComponent[*components.VelocityComponent](em, zombieID)
+//
+//	// 移除阳光的生命周期组件
+//	ecs.RemoveComponent[*components.LifetimeComponent](em, sunID)
+//
+// 注意:
+//   - 类型参数 T 必须与存储时的类型完全一致（包括指针标记 *）
+//   - 如果实体不存在该组件，操作将被忽略（不会报错）
+//   - 此函数是类型安全的，无需手动使用 reflect.TypeOf
+func RemoveComponent[T any](em *EntityManager, entity EntityID) {
+	compType := reflect.TypeOf((*T)(nil)).Elem()
+	em.RemoveComponent(entity, compType)
 }
