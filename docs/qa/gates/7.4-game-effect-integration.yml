@@ -1,0 +1,188 @@
+# Quality Gate: Story 7.4 - 游戏效果集成与事件触发
+
+schema: 1
+story: "7.4"
+story_title: "游戏效果集成与事件触发"
+gate: CONCERNS
+status_reason: "代码实现质量良好，但缺少关键的单元测试文件（behavior_system_test.go, physics_system_test.go）和手动测试验证。测试覆盖率远低于目标80%。"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-10-16T09:10:00Z"
+
+waiver: { active: false }
+
+# Issues (严重性: low | medium | high)
+top_issues:
+  - id: "TEST-001"
+    severity: high
+    finding: "缺少 AC 9 要求的单元测试文件：behavior_system_test.go 和 physics_system_test.go 不存在"
+    suggested_action: "创建缺失的测试文件，添加粒子触发测试用例（TestZombieDeathParticleEffect, TestCherryBombExplosionParticleEffect, TestPeaHitParticleEffect）"
+    suggested_owner: "dev"
+  - id: "TEST-002"
+    severity: medium
+    finding: "测试覆盖率严重不足：BehaviorSystem 0%, PhysicsSystem 未测试，整体 43.4%（目标 80%）"
+    suggested_action: "提高测试覆盖率至至少 60%，重点覆盖粒子触发逻辑和错误处理路径"
+    suggested_owner: "dev"
+  - id: "TEST-003"
+    severity: medium
+    finding: "手动测试未完成：AC 7（性能测试）和 AC 8（视觉验证）标记为'待手动验证'"
+    suggested_action: "运行游戏进行性能测试（10+僵尸同时死亡，多爆炸），验证帧率 ≥ 60 FPS，并进行视觉对比验证"
+    suggested_owner: "dev"
+
+# Quality Score (0-100)
+quality_score: 70  # 100 - (10 × 3 CONCERNS) = 70
+
+# Evidence
+evidence:
+  tests_reviewed: 16  # 16个测试文件
+  tests_passed: true
+  build_status: "success"
+  trace:
+    ac_covered: [1, 2, 3, 6]  # AC 1-3 (代码实现), AC 6 (自动清理测试)
+    ac_gaps: [4, 7, 8, 9]  # AC 4 (辅助函数-可选), AC 7 (性能测试), AC 8 (视觉验证), AC 9 (单元测试)
+
+# NFR Validation
+nfr_validation:
+  security:
+    status: PASS
+    notes: "无安全风险。粒子效果是纯视觉功能，错误处理不暴露敏感信息。"
+  performance:
+    status: PASS
+    notes: "内存泄漏测试通过。Story 7.3 已验证 1000 粒子 0.22ms < 3ms 目标。但 AC 7 手动性能测试尚未完成。"
+  reliability:
+    status: PASS
+    notes: "错误处理正确，粒子创建失败不阻塞游戏逻辑。构建成功，游戏可运行。自动清理机制确保资源释放。"
+  maintainability:
+    status: CONCERNS
+    notes: "代码结构清晰，遵循 ECS 原则，GoDoc 注释完整。但缺少单元测试文件，测试覆盖率严重不足（BehaviorSystem 0%, 整体 43.4% << 80% 目标）。"
+
+# Recommendations
+recommendations:
+  immediate:  # Must fix before marking Done
+    - action: "创建 behavior_system_test.go 和 physics_system_test.go 测试文件"
+      refs: ["pkg/systems/behavior_system.go:344-388", "pkg/systems/physics_system.go:147-179"]
+      rationale: "AC 9 明确要求创建或扩展测试文件。缺少这些测试会导致回归风险高，代码可维护性差。"
+    - action: "添加粒子触发测试用例（至少3个）"
+      refs: ["TestZombieDeathParticleEffect", "TestCherryBombExplosionParticleEffect", "TestPeaHitParticleEffect"]
+      rationale: "验证粒子效果在正确的游戏事件时触发，位置正确，配置正确。"
+    - action: "运行游戏进行手动性能和视觉测试"
+      refs: ["AC 7", "AC 8"]
+      rationale: "验证粒子效果在实际游戏中的性能和视觉表现。记录测试结果到 Dev Agent Record。"
+  future:  # Can be addressed later
+    - action: "提高测试覆盖率至 80%"
+      refs: ["pkg/systems/behavior_system.go", "pkg/systems/physics_system.go"]
+      rationale: "当前覆盖率 43.4% 低于项目标准 80%。建议在后续迭代中逐步提高。"
+    - action: "清理旧的 TODO 注释"
+      refs: ["behavior_system.go:726, 746, 786, 790, 829"]
+      rationale: "6个 TODO(Story 6.3) 注释可能已过时，建议在 Story 6.3 完全完成后清理。"
+    - action: "考虑添加性能基准测试（benchmark）"
+      refs: ["pkg/systems/particle_system_test.go"]
+      rationale: "添加 go benchmark 测试以自动化性能验证，避免未来性能退化。"
+
+# Code Quality Assessment Details
+code_quality:
+  architecture_compliance: "PASS"
+  details:
+    - "✅ 遵循 ECS 零耦合原则：系统通过 EntityManager 通信，不直接调用"
+    - "✅ 数据-行为分离：组件只包含数据，逻辑在系统中"
+    - "✅ 错误处理正确：所有 CreateParticleEffect() 调用都检查并处理错误"
+    - "✅ GoDoc 注释完整：所有公开函数都有文档注释"
+    - "✅ 命名规范一致：遵循 Go 命名约定"
+    - "⚠️ 技术债务：6个 TODO 注释（主要是 Story 6.3 遗留）"
+
+  testing_strategy: "CONCERNS"
+  details:
+    - "✅ ParticleSystem 有全面的测试（16 个测试用例，全部通过）"
+    - "✅ 内存泄漏测试（TestParticleSystem_NoMemoryLeak）通过"
+    - "✅ 发射器自动清理测试（TestParticleSystem_EmitterAutoCleanup）通过"
+    - "❌ 缺少 behavior_system_test.go（AC 9 要求）"
+    - "❌ 缺少 physics_system_test.go 中的粒子触发测试（AC 9 要求）"
+    - "❌ BehaviorSystem 测试覆盖率 0%"
+    - "❌ 整体测试覆盖率 43.4% << 80% 目标"
+
+  integration_quality: "PASS"
+  details:
+    - "✅ 代码实现正确：僵尸死亡、爆炸、击中粒子效果触发逻辑已实现"
+    - "✅ 错误处理合理：粒子创建失败不阻塞游戏逻辑"
+    - "✅ 构建成功：go build 无错误"
+    - "✅ 坐标系统使用正确：使用世界坐标触发粒子效果"
+    - "⚠️ 手动测试未完成：性能和视觉验证待确认"
+
+# Requirements Traceability (Given-When-Then)
+requirements_mapping:
+  ac_1:
+    description: "BehaviorSystem 触发僵尸死亡和爆炸粒子效果"
+    given: "僵尸生命值 <= 0 或樱桃炸弹倒计时结束"
+    when: "BehaviorSystem.Update() 被调用"
+    then: "创建粒子发射器实体（MoweredZombieArm/Head, BossExplosion），位置正确"
+    status: "✅ IMPLEMENTED"
+    evidence: "behavior_system.go:344-388 (triggerZombieDeath), 1255-1276 (triggerCherryBombExplosion)"
+    test_coverage: "❌ MISSING - 无自动化测试"
+
+  ac_2:
+    description: "PhysicsSystem 触发击中粒子效果"
+    given: "豌豆子弹与僵尸发生碰撞"
+    when: "PhysicsSystem.Update() 检测到碰撞"
+    then: "创建粒子发射器实体（PeaSplat），位置为碰撞点"
+    status: "✅ IMPLEMENTED"
+    evidence: "physics_system.go:147-179"
+    test_coverage: "❌ MISSING - 无自动化测试"
+
+  ac_3:
+    description: "实现至少5种游戏粒子效果"
+    given: "粒子配置文件存在（MoweredZombieArm, MoweredZombieHead, BossExplosion, PeaSplat, CabbageSplat）"
+    when: "游戏运行时触发相应事件"
+    then: "对应的粒子效果正确显示"
+    status: "✅ IMPLEMENTED (代码层面)"
+    evidence: "assets/effect/particles/*.xml - 所有配置文件存在"
+    test_coverage: "⚠️ PARTIAL - 缺少视觉验证测试"
+
+  ac_6:
+    description: "粒子效果自动清理，无内存泄漏"
+    given: "粒子效果触发后播放完成"
+    when: "ParticleSystem.Update() 持续运行"
+    then: "所有粒子和发射器实体被自动删除"
+    status: "✅ IMPLEMENTED & TESTED"
+    evidence: "particle_system.go:157-162 (自动清理逻辑)"
+    test_coverage: "✅ TESTED - TestParticleSystem_NoMemoryLeak, TestParticleSystem_EmitterAutoCleanup"
+
+  ac_7:
+    description: "性能测试：战斗场景保持 60 FPS"
+    given: "多僵尸死亡、多爆炸同时发生"
+    when: "游戏运行在战斗场景"
+    then: "帧率保持 >= 60 FPS（< 16.67ms/帧）"
+    status: "⚠️ NOT VERIFIED"
+    evidence: "Dev Agent Record 标记为'待手动验证'"
+    test_coverage: "❌ MISSING - 手动测试未完成"
+
+  ac_8:
+    description: "视觉验证：效果与原版 PVZ 一致"
+    given: "粒子效果在游戏中显示"
+    when: "玩家观察粒子效果"
+    then: "颜色、大小、速度与原版一致"
+    status: "⚠️ NOT VERIFIED"
+    evidence: "Dev Agent Record 标记为'待手动验证'"
+    test_coverage: "❌ MISSING - 视觉验证未完成"
+
+  ac_9:
+    description: "单元测试：粒子触发逻辑"
+    given: "触发粒子效果的游戏事件发生（僵尸死亡、碰撞）"
+    when: "运行单元测试"
+    then: "验证粒子发射器实体被创建，位置正确，配置正确"
+    status: "❌ NOT IMPLEMENTED"
+    evidence: "behavior_system_test.go 和 physics_system_test.go 文件不存在"
+    test_coverage: "❌ MISSING - 测试文件未创建"
+
+# Summary
+summary:
+  strengths:
+    - "代码实现质量高：遵循 ECS 原则，错误处理正确，GoDoc 注释完整"
+    - "粒子系统核心功能稳定：内存泄漏测试通过，自动清理机制可靠"
+    - "性能优秀：Story 7.3 已验证渲染性能远超目标"
+    - "构建成功：无编译错误，游戏可运行"
+
+  weaknesses:
+    - "缺少关键单元测试：behavior_system_test.go 和 physics_system_test.go 不存在"
+    - "测试覆盖率严重不足：BehaviorSystem 0%, 整体 43.4% << 80% 目标"
+    - "手动测试未完成：性能和视觉验证未进行"
+
+  recommendation: "CONCERNS - 代码实现正确但测试不足。建议开发者补充单元测试并完成手动验证后再标记为 Done。"

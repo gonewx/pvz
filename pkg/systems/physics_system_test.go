@@ -1,6 +1,8 @@
 package systems
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -9,6 +11,32 @@ import (
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
 )
+
+// init 函数在测试开始前切换到项目根目录
+// 确保所有相对路径（如 assets/）都能正确访问
+func init() {
+	// 查找项目根目录（包含 go.mod 文件的目录）
+	dir, err := os.Getwd()
+	if err != nil {
+		return
+	}
+
+	// 向上查找直到找到 go.mod
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			// 找到项目根目录，切换到该目录
+			os.Chdir(dir)
+			return
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			// 已经到达文件系统根目录，停止查找
+			return
+		}
+		dir = parent
+	}
+}
 
 // TestCheckAABBCollision_Hit 测试AABB碰撞检测 - 碰撞盒重叠
 func TestCheckAABBCollision_Hit(t *testing.T) {
@@ -460,4 +488,280 @@ func TestPhysicsSystem_HitSoundPlays(t *testing.T) {
 	// 注意：由于测试环境中音频文件可能不存在，
 	// 我们主要验证音效播放不会影响游戏逻辑的正确执行
 	// 实际音频播放需要在真实游戏环境中手动验证
+}
+
+// TestPeaHitParticleEffect 测试豌豆击中僵尸时是否正确触发粒子效果
+// Story 7.4 AC 9: 验证豌豆击中时创建粒子发射器实体（PeaSplat）
+func TestPeaHitParticleEffect(t *testing.T) {
+	// 准备测试环境
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(testAudioContext)
+
+	// 加载粒子配置（模拟真实环境）
+	if _, err := rm.LoadParticleConfig("PeaSplat"); err != nil {
+		t.Skipf("跳过测试：无法加载粒子资源: %v", err)
+	}
+
+	ps := NewPhysicsSystem(em, rm)
+
+	// 创建豌豆子弹实体
+	bulletID := em.CreateEntity()
+	em.AddComponent(bulletID, &components.BehaviorComponent{
+		Type: components.BehaviorPeaProjectile,
+	})
+	em.AddComponent(bulletID, &components.PositionComponent{
+		X: 400.0,
+		Y: 250.0,
+	})
+	em.AddComponent(bulletID, &components.CollisionComponent{
+		Width:  config.PeaBulletWidth,
+		Height: config.PeaBulletHeight,
+	})
+
+	// 创建僵尸实体（与子弹位置重叠，会发生碰撞）
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.BehaviorComponent{
+		Type: components.BehaviorZombieBasic,
+	})
+	em.AddComponent(zombieID, &components.PositionComponent{
+		X: 410.0, // 与子弹重叠
+		Y: 250.0,
+	})
+	em.AddComponent(zombieID, &components.CollisionComponent{
+		Width:  config.ZombieCollisionWidth,
+		Height: config.ZombieCollisionHeight,
+	})
+	em.AddComponent(zombieID, &components.HealthComponent{
+		CurrentHealth: 270,
+		MaxHealth:     270,
+	})
+
+	// 记录触发前的实体数量
+	initialEntityCount := countAllEntities(em)
+
+	// 执行物理更新（会检测碰撞并触发粒子效果）
+	ps.Update(0.016)
+
+	// 验证：至少创建了粒子发射器实体
+	currentEntityCount := countAllEntities(em)
+	if currentEntityCount <= initialEntityCount {
+		t.Errorf("豌豆击中后未创建粒子发射器实体。初始实体数: %d, 当前实体数: %d",
+			initialEntityCount, currentEntityCount)
+	}
+
+	// 验证：查找粒子发射器实体
+	emitterEntities := em.GetEntitiesWith(
+		reflect.TypeOf(&components.EmitterComponent{}),
+		reflect.TypeOf(&components.PositionComponent{}),
+	)
+
+	if len(emitterEntities) < 1 {
+		t.Errorf("期望至少创建1个粒子发射器（豌豆溅射效果），实际创建: %d", len(emitterEntities))
+	}
+
+	// 验证：粒子发射器位置与子弹碰撞点位置匹配
+	foundCorrectPosition := false
+	for _, emitterID := range emitterEntities {
+		posComp, ok := em.GetComponent(emitterID, reflect.TypeOf(&components.PositionComponent{}))
+		if !ok {
+			continue
+		}
+		pos := posComp.(*components.PositionComponent)
+		// 允许微小的浮点误差
+		if pos.X >= 399.0 && pos.X <= 401.0 && pos.Y >= 249.0 && pos.Y <= 251.0 {
+			foundCorrectPosition = true
+			break
+		}
+	}
+
+	if !foundCorrectPosition {
+		t.Error("粒子发射器位置与子弹碰撞点位置不匹配（期望位置：400, 250）")
+	}
+
+	// 验证：粒子发射器配置正确且激活
+	for _, emitterID := range emitterEntities {
+		emitterComp, ok := em.GetComponent(emitterID, reflect.TypeOf(&components.EmitterComponent{}))
+		if !ok {
+			continue
+		}
+		emitter := emitterComp.(*components.EmitterComponent)
+		if emitter.Config == nil {
+			t.Error("粒子发射器配置为空")
+		}
+		if !emitter.Active {
+			t.Error("粒子发射器应该处于激活状态")
+		}
+	}
+
+	// 验证：子弹被删除（碰撞正常处理）
+	em.RemoveMarkedEntities()
+	_, bulletExists := em.GetComponent(bulletID, reflect.TypeOf(&components.PositionComponent{}))
+	if bulletExists {
+		t.Error("豌豆子弹应该在碰撞后被删除")
+	}
+
+	// 验证：僵尸生命值减少
+	healthComp, ok := em.GetComponent(zombieID, reflect.TypeOf(&components.HealthComponent{}))
+	if !ok {
+		t.Fatal("僵尸应该有 HealthComponent")
+	}
+	health := healthComp.(*components.HealthComponent)
+	expectedHealth := 270 - config.PeaBulletDamage
+	if health.CurrentHealth != expectedHealth {
+		t.Errorf("僵尸生命值应为 %d，实际: %d", expectedHealth, health.CurrentHealth)
+	}
+}
+
+// TestPeaHitParticleEffectErrorHandling 测试豌豆击中时粒子创建失败的错误处理
+// Story 7.4 AC 9: 验证粒子配置加载失败时不阻塞游戏逻辑
+func TestPeaHitParticleEffectErrorHandling(t *testing.T) {
+	// 准备测试环境（不加载粒子配置，模拟失败场景）
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(testAudioContext)
+	ps := NewPhysicsSystem(em, rm)
+
+	// 创建豌豆子弹实体
+	bulletID := em.CreateEntity()
+	em.AddComponent(bulletID, &components.BehaviorComponent{
+		Type: components.BehaviorPeaProjectile,
+	})
+	em.AddComponent(bulletID, &components.PositionComponent{
+		X: 400.0,
+		Y: 250.0,
+	})
+	em.AddComponent(bulletID, &components.CollisionComponent{
+		Width:  config.PeaBulletWidth,
+		Height: config.PeaBulletHeight,
+	})
+
+	// 创建僵尸实体
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.BehaviorComponent{
+		Type: components.BehaviorZombieBasic,
+	})
+	em.AddComponent(zombieID, &components.PositionComponent{
+		X: 410.0,
+		Y: 250.0,
+	})
+	em.AddComponent(zombieID, &components.CollisionComponent{
+		Width:  config.ZombieCollisionWidth,
+		Height: config.ZombieCollisionHeight,
+	})
+	em.AddComponent(zombieID, &components.HealthComponent{
+		CurrentHealth: 270,
+		MaxHealth:     270,
+	})
+
+	// 执行物理更新（粒子配置未加载，应该失败但不阻塞）
+	ps.Update(0.016)
+
+	// 验证：即使粒子创建失败，游戏逻辑仍然正常执行
+	// 子弹应该被删除
+	em.RemoveMarkedEntities()
+	_, bulletExists := em.GetComponent(bulletID, reflect.TypeOf(&components.PositionComponent{}))
+	if bulletExists {
+		t.Error("粒子创建失败不应阻塞游戏逻辑。子弹应该被删除")
+	}
+
+	// 僵尸生命值应该正常减少
+	healthComp, ok := em.GetComponent(zombieID, reflect.TypeOf(&components.HealthComponent{}))
+	if !ok {
+		t.Fatal("粒子创建失败不应阻塞游戏逻辑。僵尸应该有 HealthComponent")
+	}
+	health := healthComp.(*components.HealthComponent)
+	expectedHealth := 270 - config.PeaBulletDamage
+	if health.CurrentHealth != expectedHealth {
+		t.Errorf("粒子创建失败不应阻塞游戏逻辑。僵尸生命值应为 %d，实际: %d", expectedHealth, health.CurrentHealth)
+	}
+}
+
+// TestMultipleBulletsParticleEffects 测试多个子弹击中时创建多个粒子效果
+// Story 7.4 AC 9: 验证多次触发粒子效果时的正确性
+func TestMultipleBulletsParticleEffects(t *testing.T) {
+	// 准备测试环境
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(testAudioContext)
+
+	// 加载粒子配置
+	if _, err := rm.LoadParticleConfig("PeaSplat"); err != nil {
+		t.Skipf("跳过测试：无法加载粒子资源: %v", err)
+	}
+
+	ps := NewPhysicsSystem(em, rm)
+
+	// 创建僵尸实体
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.BehaviorComponent{
+		Type: components.BehaviorZombieBasic,
+	})
+	em.AddComponent(zombieID, &components.PositionComponent{
+		X: 410.0,
+		Y: 250.0,
+	})
+	em.AddComponent(zombieID, &components.CollisionComponent{
+		Width:  config.ZombieCollisionWidth,
+		Height: config.ZombieCollisionHeight,
+	})
+	em.AddComponent(zombieID, &components.HealthComponent{
+		CurrentHealth: 270,
+		MaxHealth:     270,
+	})
+
+	// 第一发子弹击中
+	bullet1 := em.CreateEntity()
+	em.AddComponent(bullet1, &components.BehaviorComponent{Type: components.BehaviorPeaProjectile})
+	em.AddComponent(bullet1, &components.PositionComponent{X: 400.0, Y: 250.0})
+	em.AddComponent(bullet1, &components.CollisionComponent{
+		Width:  config.PeaBulletWidth,
+		Height: config.PeaBulletHeight,
+	})
+
+	initialEmitterCount := len(em.GetEntitiesWith(
+		reflect.TypeOf(&components.EmitterComponent{}),
+		reflect.TypeOf(&components.PositionComponent{}),
+	))
+
+	ps.Update(0.016)
+
+	// 验证：至少创建了1个粒子发射器
+	emitterCountAfterFirst := len(em.GetEntitiesWith(
+		reflect.TypeOf(&components.EmitterComponent{}),
+		reflect.TypeOf(&components.PositionComponent{}),
+	))
+
+	if emitterCountAfterFirst <= initialEmitterCount {
+		t.Errorf("第一发子弹击中后未创建粒子发射器。初始: %d, 当前: %d", initialEmitterCount, emitterCountAfterFirst)
+	}
+
+	em.RemoveMarkedEntities()
+
+	// 第二发子弹击中
+	bullet2 := em.CreateEntity()
+	em.AddComponent(bullet2, &components.BehaviorComponent{Type: components.BehaviorPeaProjectile})
+	em.AddComponent(bullet2, &components.PositionComponent{X: 400.0, Y: 250.0})
+	em.AddComponent(bullet2, &components.CollisionComponent{
+		Width:  config.PeaBulletWidth,
+		Height: config.PeaBulletHeight,
+	})
+
+	ps.Update(0.016)
+
+	// 验证：创建了第二个粒子发射器
+	emitterCountAfterSecond := len(em.GetEntitiesWith(
+		reflect.TypeOf(&components.EmitterComponent{}),
+		reflect.TypeOf(&components.PositionComponent{}),
+	))
+
+	if emitterCountAfterSecond <= emitterCountAfterFirst {
+		t.Errorf("第二发子弹击中后未创建新的粒子发射器。第一次后: %d, 第二次后: %d",
+			emitterCountAfterFirst, emitterCountAfterSecond)
+	}
+
+	// 验证：僵尸生命值累计减少
+	healthComp, _ := em.GetComponent(zombieID, reflect.TypeOf(&components.HealthComponent{}))
+	health := healthComp.(*components.HealthComponent)
+	expectedHealth := 270 - 2*config.PeaBulletDamage
+	if health.CurrentHealth != expectedHealth {
+		t.Errorf("僵尸生命值应为 %d（击中2次），实际: %d", expectedHealth, health.CurrentHealth)
+	}
 }
