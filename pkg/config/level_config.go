@@ -14,6 +14,22 @@ type LevelConfig struct {
 	Name        string       `yaml:"name"`        // 关卡名称，如 "前院白天 1-1"
 	Description string       `yaml:"description"` // 关卡描述（可选）
 	Waves       []WaveConfig `yaml:"waves"`       // 僵尸波次配置列表
+
+	// Story 8.1 新增字段
+	OpeningType     string         `yaml:"openingType"`     // 开场类型：\"tutorial\", \"standard\", \"special\"，默认\"standard\"
+	EnabledLanes    []int          `yaml:"enabledLanes"`    // 启用的行列表，如 [1,2,3] 或 [3]，默认 [1,2,3,4,5]
+	AvailablePlants []string       `yaml:"availablePlants"` // 可用植物ID列表，如 [\"peashooter\", \"sunflower\"]，默认为空（所有已解锁植物）
+	SkipOpening     bool           `yaml:"skipOpening"`     // 是否跳过开场动画（调试用），默认 false
+	TutorialSteps   []TutorialStep `yaml:"tutorialSteps"`   // 教学步骤（可选，Story 8.2 使用）
+	SpecialRules    string         `yaml:"specialRules"`    // 特殊规则类型：\"bowling\", \"conveyor\"，默认为空
+}
+
+// TutorialStep 教学步骤配置（预留给 Story 8.2）
+// 定义教学引导的触发条件、显示文本和触发动作
+type TutorialStep struct {
+	Trigger string `yaml:"trigger"` // 触发条件：\"gameStart\", \"sunCollected\", \"plantPlaced\"
+	Text    string `yaml:"text"`    // 教学文本内容
+	Action  string `yaml:"action"`  // 触发动作：\"waitForSunCollect\", \"waitForPlantPlaced\"
 }
 
 // WaveConfig 单个僵尸波次配置
@@ -53,12 +69,32 @@ func LoadLevelConfig(filepath string) (*LevelConfig, error) {
 		return nil, fmt.Errorf("failed to parse level config YAML from %s: %w", filepath, err)
 	}
 
+	// 应用默认值（向后兼容性）
+	applyDefaults(&levelConfig)
+
 	// 验证必填字段
 	if err := validateLevelConfig(&levelConfig); err != nil {
 		return nil, fmt.Errorf("invalid level config in %s: %w", filepath, err)
 	}
 
 	return &levelConfig, nil
+}
+
+// applyDefaults 为 LevelConfig 中缺失的可选字段设置默认值
+// 确保向后兼容性（旧配置文件可正常加载）
+func applyDefaults(config *LevelConfig) {
+	// 如果 EnabledLanes 为空，设置为所有5行
+	if len(config.EnabledLanes) == 0 {
+		config.EnabledLanes = []int{1, 2, 3, 4, 5}
+	}
+
+	// 如果 OpeningType 为空，设置为标准开场
+	if config.OpeningType == "" {
+		config.OpeningType = "standard"
+	}
+
+	// AvailablePlants、TutorialSteps、SpecialRules 默认为空值（nil/空字符串），无需处理
+	// SkipOpening 默认为 false（bool 零值），无需处理
 }
 
 // validateLevelConfig 验证关卡配置的完整性和合法性
@@ -102,6 +138,32 @@ func validateLevelConfig(config *LevelConfig) error {
 				return fmt.Errorf("wave %d, zombie %d: count must be at least 1, got %d", i, j, zombie.Count)
 			}
 		}
+	}
+
+	// 验证 EnabledLanes（所有值必须在 1-5 范围内）
+	for i, lane := range config.EnabledLanes {
+		if lane < 1 || lane > 5 {
+			return fmt.Errorf("enabledLanes[%d]: lane must be between 1 and 5, got %d", i, lane)
+		}
+	}
+
+	// 验证 OpeningType（必须是合法值或空）
+	validOpeningTypes := map[string]bool{
+		"tutorial": true,
+		"standard": true,
+		"special":  true,
+	}
+	if config.OpeningType != "" && !validOpeningTypes[config.OpeningType] {
+		return fmt.Errorf("openingType must be one of: tutorial, standard, special, got %q", config.OpeningType)
+	}
+
+	// 验证 SpecialRules（必须是合法值或空）
+	validSpecialRules := map[string]bool{
+		"bowling":  true,
+		"conveyor": true,
+	}
+	if config.SpecialRules != "" && !validSpecialRules[config.SpecialRules] {
+		return fmt.Errorf("specialRules must be one of: bowling, conveyor, got %q", config.SpecialRules)
 	}
 
 	return nil

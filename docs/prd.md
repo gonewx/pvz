@@ -16,6 +16,8 @@
 | 2025-10-10 | 1.0 | Initial draft creation from Project Brief. | John (PM) |
 | 2025-10-13 | 1.1 | Added Epic 6: Animation System Migration - Reanim. | Sarah (PO) |
 | 2025-10-15 | 1.2 | Added Epic 7: Particle Effect System - Brownfield Enhancement. | Sarah (PO) |
+| 2025-10-16 | 1.3 | Added Epic 8: Chapter 1 Level Implementation - Day Levels 1-1 to 1-10. | Sarah (PO) |
+| 2025-10-16 | 1.4 | Added Epic 9: ECS Generics Refactor - Brownfield Enhancement. | Sarah (PO) |
 
 ## **2. Requirements (需求)**
 
@@ -116,6 +118,10 @@
     *   **目标:** 将简单帧动画系统直接替换为原版 PVZ 的 Reanim 骨骼动画系统，实现 100% 还原原版动画效果，支持部件变换和复杂动画表现。
 *   **Epic 7: 粒子特效系统 (Particle Effect System) - Brownfield Enhancement**
     *   **目标:** 实现完整的粒子特效系统，支持原版PVZ的所有视觉特效（僵尸肢体掉落、爆炸、溅射等），通过解析XML配置和高性能批量渲染技术，为游戏提供丰富的视觉反馈。
+*   **Epic 8: 第一章关卡实现 - 前院白天 (Chapter 1: Day Level Implementation)**
+    *   **目标:** 实现《植物大战僵尸》第一章(前院白天)的全部 10 个关卡,包括原版忠实的关卡机制、教学引导系统(1-1单行草地引导)、开场动画系统(可配置跳过)、选卡界面和特殊关卡类型(1-5坚果保龄球、1-10传送带模式),为玩家提供完整的冒险模式第一章体验。详见 [Epic 8 详细文档](prd/epic-8-level-chapter1-implementation.md)。
+*   **Epic 9: ECS 框架泛型化重构 (ECS Generics Refactor) - Brownfield Enhancement**
+    *   **目标:** 将当前基于反射的 ECS 框架迁移到 Go 泛型实现，通过编译时类型检查和性能优化，消除运行时反射开销，提升代码可读性和类型安全性，为后续开发提供更高效的开发体验。详见 [Epic 9 详细文档](prd/epic-9-ecs-generics-refactor.md)。
 
 ## **Epic 1: 游戏基础框架与主循环 (Game Foundation & Main Loop)**
 **史诗目标:** 搭建整个Go+Ebitengine项目的基本结构，创建一个可以运行的空窗口，并实现游戏的核心状态管理和主菜单。这是所有后续功能的基础。
@@ -565,3 +571,283 @@
 6. 集成测试：粒子效果播放完成后自动清理，无内存泄漏
 7. 性能测试：战斗场景（多僵尸死亡、多爆炸）保持60 FPS
 8. 视觉验证：效果与原版PVZ一致
+
+---
+
+## **Epic 8: 第一章关卡实现 - 前院白天 (Chapter 1: Day Level Implementation)**
+
+**史诗目标:** 实现《植物大战僵尸》第一章(前院白天)的全部 10 个关卡,包括原版忠实的关卡机制、教学引导系统、开场动画系统、选卡界面和特殊关卡类型,为玩家提供完整的冒险模式第一章体验。
+
+### Epic Overview (史诗概览)
+
+Epic 8 将实现第一章的完整关卡体验,从教学关卡 1-1 到终极挑战关卡 1-10,包括两种特殊关卡类型(坚果保龄球和传送带模式)。
+
+**关卡清单:**
+
+| 关卡 | 场地 | 旗帜 | 新植物 | 新僵尸 | 特殊机制 |
+|------|------|------|--------|--------|----------|
+| **1-1** | 1行(第3行) | 无 | 豌豆射手 | 普通僵尸 | 教学引导 ⭐ |
+| **1-2** | 3行(中间) | 1面 | 向日葵 | - | 标准开场 |
+| **1-3** | 3行(中间) | 1面 | 樱桃炸弹 | 路障僵尸 | 标准开场 |
+| **1-4** | 5行(完整) | 1面 | 坚果墙 | - | 解锁铲子 |
+| **1-5** | 5行(完整) | 无 | 土豆雷 | - | **坚果保龄球** ⭐ |
+| **1-6** | 5行(完整) | 2面 | 寒冰射手 | 撑杆僵尸 | 标准开场 |
+| **1-7** | 5行(完整) | 2面 | 大嘴花 | - | 标准开场 |
+| **1-8** | 5行(完整) | 2面 | 双发射手 | 铁桶僵尸 | 难度拐点 |
+| **1-9** | 5行(完整) | 2面 | - | - | 综合挑战 + 僵尸来信 |
+| **1-10** | 5行(完整) | 无 | 小喷菇 | - | **传送带模式** ⭐ |
+
+**关键系统:**
+1. **教学引导系统** - 1-1 关卡的强制引导机制
+2. **开场动画系统** - 镜头平移、僵尸预告(可配置跳过)
+3. **选卡界面** - 植物选择、解锁系统
+4. **特殊关卡系统** - 坚果保龄球、传送带模式
+5. **关卡进度系统** - 解锁管理、进度保存
+
+### Stories (故事列表)
+
+Epic 8 包含 8 个 Story:
+
+1. **Story 8.1**: 关卡配置系统增强与选卡界面
+2. **Story 8.2**: 关卡 1-1 教学引导系统
+3. **Story 8.3**: 开场动画系统与镜头控制
+4. **Story 8.4**: 关卡 1-2 至 1-4 实现(标准教学关卡)
+5. **Story 8.5**: 特殊关卡类型系统 - 坚果保龄球(1-5)
+6. **Story 8.6**: 关卡 1-6 至 1-9 实现(2面旗帜标准关卡)
+7. **Story 8.7**: 特殊关卡类型系统 - 传送带模式(1-10)
+8. **Story 8.8**: 第一章集成测试与调优
+
+**详细设计文档**: 完整的 Epic 8 规范请参见 [Epic 8 详细文档](prd/epic-8-level-chapter1-implementation.md)。
+
+### Success Criteria (成功标准)
+
+1. ✅ 所有 10 个关卡可玩并符合原版体验(参考 `.meta/levels/chapter1.md`)
+2. ✅ 教学系统在 1-1 正常工作(1行草地、强制引导、2-3只僵尸)
+3. ✅ 开场动画系统可工作且可跳过(skipOpening 配置)
+4. ✅ 选卡界面功能完整
+5. ✅ 特殊关卡正确实现(1-5 坚果保龄球、1-10 传送带模式)
+6. ✅ 旗帜系统正确工作(1-2~1-4: 1面, 1-6~1-9: 2面)
+7. ✅ 关卡进度系统能保存和加载
+8. ✅ 新僵尸机制正确(撑杆僵尸跳跃、铁桶僵尸高血量)
+9. ✅ 代码通过测试(单元测试 + 集成测试, 覆盖率 80%+)
+10. ✅ 性能符合要求(60 FPS)
+
+### Technical Implementation (技术实现)
+
+**新增系统:**
+- `TutorialSystem` - 教学流程管理
+- `PlantSelectionSystem` - 选卡界面管理
+- `CameraSystem` - 镜头控制
+- `OpeningAnimationSystem` - 开场编排
+- `SpecialLevelRuleSystem` - 特殊关卡规则
+- `ConveyorSystem` - 传送带机制
+
+**新增组件:**
+- `TutorialComponent` - 教学状态
+- `PlantSelectionComponent` - 选卡状态
+- `CameraComponent` - 镜头动画
+- `ConveyorComponent` - 传送带状态
+
+**配置扩展示例:**
+```yaml
+# data/levels/level-1-1.yaml
+id: "1-1"
+openingType: "tutorial"           # 开场类型
+enabledLanes: [3]                 # 启用的行
+availablePlants: []               # 可用植物
+skipOpening: false                # 跳过开场(调试)
+
+tutorialSteps:
+  - trigger: "gameStart"
+    text: "天空中会掉落阳光，点击收集它们！"
+    action: "waitForSunCollect"
+```
+
+**参考文档:**
+- 关卡详细说明: `.meta/levels/chapter1.md`
+- Epic 8 完整规范: `docs/prd/epic-8-level-chapter1-implementation.md`
+
+---
+
+## **Epic 9: ECS 框架泛型化重构 (ECS Generics Refactor) - Brownfield Enhancement**
+
+**史诗目标:** 将当前基于反射的 ECS 框架迁移到 Go 泛型实现，通过编译时类型检查和性能优化，消除运行时反射开销，提升代码可读性和类型安全性，为后续开发提供更高效的开发体验。
+
+### Epic Overview (史诗概览)
+
+Epic 9 是一次技术债重构，旨在将项目的核心 ECS（Entity-Component-System）架构从反射实现升级为 Go 泛型实现。当前系统使用 `reflect.TypeOf()` 进行组件查询，存在性能开销、类型安全问题和代码冗长问题。
+
+**当前问题:**
+- **性能开销**: 每次组件查询都需要运行时反射（预计 30-50% 性能损失）
+- **类型安全**: 运行时类型断言，编译时无法检测错误
+- **代码可读性**: 大量 `reflect.TypeOf()` 调用，代码冗长
+
+**目标改进:**
+```go
+// ❌ 当前反射实现
+entities := em.GetEntitiesWith(
+    reflect.TypeOf(&components.PlantComponent{}),
+    reflect.TypeOf(&components.PositionComponent{}),
+)
+comp, ok := em.GetComponent(entity, reflect.TypeOf(&components.PlantComponent{}))
+plantComp := comp.(*components.PlantComponent) // 运行时类型断言
+
+// ✅ 目标泛型实现
+entities := ecs.GetEntitiesWith[
+    *components.PlantComponent,
+    *components.PositionComponent,
+](em)
+plantComp, ok := ecs.GetComponent[*components.PlantComponent](em, entity)
+// 编译时类型安全，无需类型断言
+```
+
+### Stories (故事列表)
+
+Epic 9 包含 3 个 Story:
+
+#### **Story 9.1: 泛型 API 设计、原型验证与 EntityManager 核心重构**
+> **As a** 开发者,
+> **I want** to design and implement generic ECS APIs for EntityManager,
+> **so that** I can replace reflection-based component queries with compile-time type-safe generics.
+
+**Acceptance Criteria:**
+1. 设计泛型 API 接口规范（`GetEntitiesWith[T1, T2, ...]`, `GetComponent[T]`, `AddComponent[T]`）
+2. 创建原型并进行性能基准测试（对比反射 vs 泛型）
+3. 确认性能提升达到预期（目标 30%+ 提升）
+4. 编写迁移指南文档
+5. 实现泛型版本的核心 EntityManager 方法
+6. 更新 `pkg/ecs/entity_manager_test.go`，添加泛型 API 测试
+7. 单元测试覆盖率 ≥ 80%
+
+**预估工作量**: 6-9 小时
+
+---
+
+#### **Story 9.2: 系统批量迁移（17+ 系统文件）**
+> **As a** 开发者,
+> **I want** to migrate all game systems from reflection-based ECS to generic ECS,
+> **so that** the entire codebase benefits from type safety and performance improvements.
+
+**Acceptance Criteria:**
+1. **第一阶段**: 迁移最复杂系统（`BehaviorSystem`, `InputSystem`）验证可行性
+2. **第二阶段**: 批量迁移中等复杂度系统（8个系统文件）
+   - `render_system.go`, `physics_system.go`, `reanim_system.go`, `particle_system.go`
+   - `plant_selection_system.go` ⭐（解除 Story 8.1 阻塞）
+   - `plant_card_system.go`, `plant_preview_system.go`
+3. **第三阶段**: 迁移剩余系统（9个文件）+ 所有测试文件
+4. 所有系统编译通过，消除 `reflect.TypeOf` 调用
+5. 所有单元测试通过
+6. 迁移日志记录完整
+
+**预估工作量**: 8-12 小时
+
+---
+
+#### **Story 9.3: 全面测试、性能基准与文档更新**
+> **As a** 开发者和项目维护者,
+> **I want** to verify the refactor through comprehensive testing and update documentation,
+> **so that** the project is stable, performant, and maintainable.
+
+**Acceptance Criteria:**
+1. **单元测试验证**: 运行 `go test ./...`，所有测试通过，覆盖率 ≥ 80%
+2. **集成测试验证**: 游戏核心功能（植物种植、僵尸战斗、粒子效果、关卡加载）正常
+3. **性能基准测试**:
+   - 创建 `pkg/ecs/entity_manager_benchmark_test.go`
+   - 测试场景：查询 1000 实体、添加/删除组件、大规模实体创建
+   - 对比反射版本 vs 泛型版本，记录性能提升（预期 30-50%）
+4. **文档更新**:
+   - 更新 `CLAUDE.md`，添加"泛型 ECS 使用指南"章节
+   - 更新代码注释，符合 GoDoc 规范
+   - （可选）创建迁移指南 `docs/architecture/ecs-generics-migration-guide.md`
+
+**预估工作量**: 2-4 小时
+
+---
+
+### Success Criteria (成功标准)
+
+1. ✅ 所有 17+ 系统文件成功迁移到泛型 API
+2. ✅ `reflect.TypeOf` 调用在系统层面消除（EntityManager 内部可保留）
+3. ✅ 性能基准测试显示查询速度提升 30-50%
+4. ✅ 所有单元测试和集成测试通过（`go test ./...`）
+5. ✅ 游戏功能无回归（植物、僵尸、粒子、关卡正常）
+6. ✅ 代码可读性显著提升，样板代码减少 50%
+7. ✅ CLAUDE.md 更新完成，包含泛型 ECS 使用指南
+8. ✅ Story 8.1 阻塞解除（`PlantSelectionSystem` 可使用泛型编译）
+
+### Technical Implementation (技术实现)
+
+**核心 API 设计:**
+```go
+// pkg/ecs/generics.go (新文件)
+
+// GetEntitiesWith 查询拥有指定组件类型的所有实体（泛型版本）
+func GetEntitiesWith[T1, T2, T3 any](em *EntityManager) []EntityID {
+    // 使用类型参数进行查询，无需反射
+}
+
+// GetComponent 获取实体的特定类型组件（泛型版本）
+func GetComponent[T any](em *EntityManager, entity EntityID) (T, bool) {
+    // 返回具体类型，无需类型断言
+}
+
+// AddComponent 添加组件（泛型版本）
+func AddComponent[T any](em *EntityManager, entity EntityID, component T) {
+    // 类型安全的添加
+}
+
+// HasComponent 检查组件（泛型版本）
+func HasComponent[T any](em *EntityManager, entity EntityID) bool {
+    // 编译时类型检查
+}
+```
+
+**迁移策略:**
+1. **渐进式迁移**: 先验证最复杂系统，再批量迁移
+2. **向后兼容**: 保留旧反射 API（可选），新旧 API 可共存
+3. **可中断设计**: 任意阶段可暂停，已迁移系统立即受益
+
+**风险缓解:**
+- Git 分支: `feature/ecs-generics-refactor`
+- 每个 Story 完成后创建 Tag（`epic9-story1-complete`）
+- 回滚计划: 可回退到上一个稳定 Tag
+
+### Dependencies and Blockers (依赖与阻塞)
+
+**当前阻塞:**
+- ❌ **Story 8.1**: `PlantSelectionSystem` 因反射冗长性暂时搁置
+
+**解除阻塞:**
+- ✅ Story 9.2 完成后，Story 8.1 可继续开发
+
+**建议时间点:**
+- **立即开始**: 在 Epic 8 后续 Story 之前完成，避免积累更多反射代码
+- **或**: 作为独立 Sprint，集中 1-2 周完成
+
+### Performance Expectations (性能预期)
+
+| 操作 | 反射版本 | 泛型版本 | 预期提升 |
+|------|---------|---------|---------|
+| 查询 1000 实体（3组件） | 120 μs | 60-80 μs | 30-50% ⬆️ |
+| 获取单个组件 | 50 ns | 20-30 ns | 40-60% ⬆️ |
+| 添加组件 | 60 ns | 30-40 ns | 33-50% ⬆️ |
+
+**长期收益:**
+- ✅ 编译时类型检查：100% 运行时错误消除
+- ✅ 代码可读性：显著提升（减少 50% 样板代码）
+- ✅ 开发体验：更好的 IDE 自动补全和类型推导
+
+### Reference Documentation (参考文档)
+
+- **技术债文档**: `docs/technical-debt/ecs-generic-refactor.md`
+- **Epic 9 完整规范**: `docs/prd/epic-9-ecs-generics-refactor.md`
+- **Go 泛型官方文档**: [https://go.dev/doc/tutorial/generics](https://go.dev/doc/tutorial/generics)
+- **ECS 泛型最佳实践**: [arche - A fast, minimalist Entity Component System](https://github.com/mlange-42/arche)
+
+---
+
+**创建日期**: 2025-10-16
+**创建人**: Sarah (Product Owner)
+**Epic 类型**: Brownfield Enhancement (架构优化)
+**优先级**: High（阻塞 Story 8.1）
+**预估总工作量**: 16-25 小时（3-5 个工作日）
