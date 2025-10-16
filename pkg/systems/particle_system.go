@@ -200,6 +200,8 @@ func (ps *ParticleSystem) updateParticles(dt float64) {
 		particle.Age += dt
 
 		// Story 7.5: Update system age (for SystemAlpha calculation)
+		// 修复：EmitterAge 应该是 "发射器创建时的年龄 + 粒子自己的年龄"
+		// 而不是独立的计数器（粒子在创建时已经记录了发射器的初始年龄）
 		particle.EmitterAge += dt
 
 		// Check if particle has expired
@@ -538,7 +540,7 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 		// Story 7.5: System-level alpha (ZombieHead 系统淡出)
 		SystemAlphaKeyframes: emitter.SystemAlphaKeyframes,
 		SystemAlphaInterp:    emitter.SystemAlphaInterp,
-		EmitterAge:           0,                      // 系统年龄从0开始，每帧递增
+		EmitterAge:           emitter.Age,            // 使用发射器的当前年龄（修复：粒子应该基于发射器年龄，而不是自己的独立计数器）
 		EmitterDuration:      emitter.SystemDuration, // 发射器持续时间（用于归一化）
 	}
 
@@ -590,6 +592,13 @@ func (ps *ParticleSystem) applyInterpolation(p *components.ParticleComponent) {
 		// 计算系统时间归一化值（0-1）
 		systemT := p.EmitterAge / p.EmitterDuration
 		systemAlpha := particlePkg.EvaluateKeyframes(p.SystemAlphaKeyframes, systemT, p.SystemAlphaInterp)
+		
+		// DEBUG: SystemAlpha 调试日志（临时启用）
+		if p.Age < 0.05 || int(p.Age*20)%10 == 0 { // 每0.5秒打印一次
+			log.Printf("[SystemAlpha] EmitterAge=%.2fs, EmitterDuration=%.2fs, systemT=%.2f, systemAlpha=%.3f, particleAlpha=%.3f → final=%.3f",
+				p.EmitterAge, p.EmitterDuration, systemT, systemAlpha, p.Alpha, p.Alpha*systemAlpha)
+		}
+		
 		// 系统透明度乘以粒子自身透明度
 		p.Alpha *= systemAlpha
 	}
