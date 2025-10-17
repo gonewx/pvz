@@ -27,10 +27,10 @@ const (
 
 	// Sun Counter (阳光计数器) - relative to SeedBank position
 	SunCounterOffsetX  = 40 // 相对于 SeedBank 的 X 偏移量
-	SunCounterOffsetY  = 63 // 相对于 SeedBank 的 Y 偏移量
+	SunCounterOffsetY  = 64 // 相对于 SeedBank 的 Y 偏移量
 	SunCounterWidth    = 130
 	SunCounterHeight   = 60
-	SunCounterFontSize = 18.0 // 阳光数值字体大小（像素）
+	SunCounterFontSize = 18.0 // 阳光数值字体大小（像素）- 增大以提高可读性
 
 	// Plant Cards (植物卡片) - relative to SeedBank position
 	PlantCardStartOffsetX = 84   // 第一张卡片相对于 SeedBank 的 X 偏移量
@@ -42,7 +42,7 @@ const (
 	// Plant Card Icon (卡片上的植物图标) - Story 6.3 可配置参数
 	PlantIconScale   = 0.55 // 植物图标缩放因子（原始80x90，可调整此值来改变图标大小）
 	PlantIconOffsetY = 5.0  // 植物图标距离卡片顶部的偏移（像素，可调整垂直位置）
-	SunTextOffsetY   = 16.0 // 阳光数字距离卡片底部的偏移（像素，可调整文本位置）
+	SunTextOffsetY   = 16.0 // 植物阳光数字距离卡片底部的偏移（像素，可调整文本位置）
 
 	// Shovel (铲子) - positioned to the right of seed bank
 	ShovelX      = 620 // To the right of seed bank (bar5.png width=612 + small gap)
@@ -71,6 +71,13 @@ type GameScene struct {
 	sunCounterBG *ebiten.Image // Sun counter background (阳光计数器背景)
 	shovelSlot   *ebiten.Image // Shovel slot background (铲子槽位背景)
 	shovel       *ebiten.Image // Shovel icon (铲子图标)
+
+	// Story 8.2 QA改进：草皮叠加层（随动画进度渐进显示）
+	sodRowImage        *ebiten.Image // 草皮叠加图片（sod1row.jpg）
+	soddingAnimDelay   float64       // 铺草皮动画延迟时间（秒）
+	soddingAnimStarted bool          // 铺草皮动画是否已启动
+	soddingAnimTimer   float64       // 铺草皮动画延迟计时器
+	sodDebugPrinted    bool          // 草皮叠加图调试日志是否已打印
 
 	// Font Resources
 	sunCounterFont *text.GoTextFace // Font for sun counter display
@@ -117,6 +124,13 @@ type GameScene struct {
 
 	// Story 7.2: Particle System
 	particleSystem *systems.ParticleSystem // 粒子系统（粒子特效）
+
+	// Story 8.2: Tutorial System
+	tutorialSystem *systems.TutorialSystem // 教学系统（关卡 1-1 教学引导）
+	tutorialFont   interface{}             // 教学文本字体（*utils.BitmapFont 或 *text.GoTextFace）
+
+	// Story 8.2 QA改进：完整的铺草皮动画系统
+	soddingSystem *systems.SoddingSystem // 铺草皮动画系统（SodRoll 滚动动画）
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -218,13 +232,31 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	scene.sunSpawnSystem = systems.NewSunSpawnSystem(
 		scene.entityManager,
 		rm,
-		250.0, // minX - 草坪左边界
-		900.0, // maxX - 草坪右边界
-		100.0, // minTargetY - 草坪上边界
-		550.0, // maxTargetY - 草坪下边界
+		scene.reanimSystem, // Story 8.2 QA修复：传入 ReanimSystem 用于初始化阳光动画
+		250.0,              // minX - 草坪左边界
+		900.0,              // maxX - 草坪右边界
+		100.0,              // minTargetY - 草坪上边界
+		550.0,              // maxTargetY - 草坪下边界
 	)
 
+	// Story 5.5: Load level configuration FIRST (before creating plant cards)
+	// CRITICAL: This must happen before initPlantCardSystems() because plant cards
+	// are created based on CurrentLevel.AvailablePlants
+	levelConfig, err := config.LoadLevelConfig("data/levels/level-1-1.yaml")
+	if err != nil {
+		log.Printf("[GameScene] FATAL: Failed to load level config: %v", err)
+		log.Printf("[GameScene] Game cannot start without level configuration")
+	} else {
+		scene.gameState.LoadLevel(levelConfig)
+		log.Printf("[GameScene] Loaded level: %s (%d waves, %d plants available)",
+			levelConfig.Name, len(levelConfig.Waves), len(levelConfig.AvailablePlants))
+	}
+
+	// Story 8.2 QA改进：关卡加载后，加载草皮相关资源
+	scene.loadSoddingResources()
+
 	// Story 3.1: Initialize plant card systems
+	// NOW CurrentLevel is loaded, so availablePlants will be read correctly
 	scene.initPlantCardSystems(rm)
 
 	// Story 3.2: Initialize plant preview systems
@@ -251,64 +283,92 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	scene.levelSystem = systems.NewLevelSystem(scene.entityManager, scene.gameState, scene.waveSpawnSystem)
 	log.Printf("[GameScene] Initialized level system")
 
-	// 3. Load level configuration
-	levelConfig, err := config.LoadLevelConfig("data/levels/level-1-1.yaml")
-	if err != nil {
-		log.Printf("[GameScene] FATAL: Failed to load level config: %v", err)
-		log.Printf("[GameScene] Game cannot start without level configuration")
-	} else {
-		scene.gameState.LoadLevel(levelConfig)
-		log.Printf("[GameScene] Loaded level: %s (%d waves)", levelConfig.Name, len(levelConfig.Waves))
-	}
-
 	// Story 7.2: Initialize particle system
 	// Story 7.4: Added ResourceManager parameter for loading particle images
 	scene.particleSystem = systems.NewParticleSystem(scene.entityManager, scene.resourceManager)
 	log.Printf("[GameScene] Initialized particle system for visual effects")
+
+	// Story 8.2: Initialize tutorial system (if this is a tutorial level)
+	if scene.gameState.CurrentLevel != nil && scene.gameState.CurrentLevel.OpeningType == "tutorial" && len(scene.gameState.CurrentLevel.TutorialSteps) > 0 {
+		scene.tutorialSystem = systems.NewTutorialSystem(scene.entityManager, scene.gameState, scene.gameState.CurrentLevel)
+		log.Printf("[GameScene] Tutorial system activated for level %s", scene.gameState.CurrentLevel.ID)
+
+		// Load tutorial font (使用原版中文字体 fzse_gbk.ttf)
+		ttFont, err := scene.resourceManager.LoadFont("assets/fonts/fzse_gbk.ttf", 28)
+		if err != nil {
+			log.Printf("FATAL: Failed to load tutorial font fzse_gbk.ttf: %v", err)
+		} else {
+			scene.tutorialFont = ttFont
+			log.Printf("[GameScene] Loaded tutorial font: fzse_gbk.ttf (28px)")
+		}
+
+		// Story 8.2 QA改进：教学关卡开始时预生成阳光
+		// 原版游戏在教学关卡开始时会有阳光掉落，让玩家立即学习收集
+		// 使用 NewSunEntityStatic 让阳光直接出现，而不是同时下落
+		log.Printf("[GameScene] Pre-spawning suns for tutorial level")
+		sunID1 := entities.NewSunEntityStatic(scene.entityManager, scene.resourceManager, 350, 250)
+		sunID2 := entities.NewSunEntityStatic(scene.entityManager, scene.resourceManager, 550, 350)
+		sunID3 := entities.NewSunEntityStatic(scene.entityManager, scene.resourceManager, 450, 450)
+
+		// Story 8.2 QA修复：初始化阳光动画（Sun.reanim 无 anim 定义，使用直接渲染模式）
+		scene.reanimSystem.InitializeDirectRender(sunID1)
+		scene.reanimSystem.InitializeDirectRender(sunID2)
+		scene.reanimSystem.InitializeDirectRender(sunID3)
+
+		log.Printf("[GameScene] Pre-spawned 3 suns for tutorial")
+	}
+
+	// Story 8.2 QA改进：初始化铺草皮动画系统
+	scene.soddingSystem = systems.NewSoddingSystem(scene.entityManager, scene.resourceManager, scene.reanimSystem)
+	log.Printf("[GameScene] Initialized sodding animation system")
 
 	return scene
 }
 
 // initPlantCardSystems initializes the plant card systems and creates plant card entities.
 // Story 3.1: Plant Card UI and State
+// Story 8.1: 根据关卡配置创建植物卡片
 func (s *GameScene) initPlantCardSystems(rm *game.ResourceManager) {
-	// Create plant card entities
-	// 使用相对定位（相对于 SeedBank），与阳光计数器定位方式一致
-	// 这提高了代码可维护性，当 SeedBank 位置改变时，卡片会自动跟随
+	// 获取关卡可用植物列表
+	var availablePlants []string
+	if s.gameState.CurrentLevel != nil && len(s.gameState.CurrentLevel.AvailablePlants) > 0 {
+		availablePlants = s.gameState.CurrentLevel.AvailablePlants
+		log.Printf("[GameScene] Creating %d plant cards from level config: %v", len(availablePlants), availablePlants)
+	} else {
+		// 默认植物列表（向后兼容）
+		availablePlants = []string{"sunflower", "peashooter", "wallnut", "cherrybomb"}
+		log.Printf("[GameScene] Using default plant cards: %v", availablePlants)
+	}
 
-	// 计算第一张卡片的绝对位置
+	// 植物名称到类型的映射
+	plantTypeMap := map[string]components.PlantType{
+		"sunflower":  components.PlantSunflower,
+		"peashooter": components.PlantPeashooter,
+		"wallnut":    components.PlantWallnut,
+		"cherrybomb": components.PlantCherryBomb,
+	}
+
+	// 计算第一张卡片的位置
 	firstCardX := float64(SeedBankX + PlantCardStartOffsetX)
 	cardY := float64(SeedBankY + PlantCardOffsetY)
 
-	// 向日葵卡片（第一张）
-	_, err := entities.NewPlantCardEntity(s.entityManager, rm, s.reanimSystem, components.PlantSunflower, firstCardX, cardY, PlantCardScale)
-	if err != nil {
-		log.Printf("Warning: Failed to create sunflower card: %v", err)
-		// 继续执行，游戏在没有卡片的情况下也能运行（用于测试环境）
-	}
+	// 根据配置创建植物卡片
+	for i, plantName := range availablePlants {
+		plantType, ok := plantTypeMap[plantName]
+		if !ok {
+			log.Printf("Warning: Unknown plant type '%s' in level config, skipping", plantName)
+			continue
+		}
 
-	// 豌豆射手卡片（第二张）
-	secondCardX := firstCardX + PlantCardSpacing
-	_, err = entities.NewPlantCardEntity(s.entityManager, rm, s.reanimSystem, components.PlantPeashooter, secondCardX, cardY, PlantCardScale)
-	if err != nil {
-		log.Printf("Warning: Failed to create peashooter card: %v", err)
-		// 继续执行，游戏在没有卡片的情况下也能运行（用于测试环境）
-	}
+		// 计算卡片位置（水平排列）
+		cardX := firstCardX + float64(i)*PlantCardSpacing
 
-	// 坚果墙卡片（第三张）
-	thirdCardX := secondCardX + PlantCardSpacing
-	_, err = entities.NewPlantCardEntity(s.entityManager, rm, s.reanimSystem, components.PlantWallnut, thirdCardX, cardY, PlantCardScale)
-	if err != nil {
-		log.Printf("Warning: Failed to create wallnut card: %v", err)
-		// 继续执行，游戏在没有卡片的情况下也能运行（用于测试环境）
-	}
-
-	// 樱桃炸弹卡片（第四张）Story 5.4
-	fourthCardX := thirdCardX + PlantCardSpacing
-	_, err = entities.NewPlantCardEntity(s.entityManager, rm, s.reanimSystem, components.PlantCherryBomb, fourthCardX, cardY, PlantCardScale)
-	if err != nil {
-		log.Printf("Warning: Failed to create cherry bomb card: %v", err)
-		// 继续执行，游戏在没有卡片的情况下也能运行（用于测试环境）
+		// 创建卡片
+		_, err := entities.NewPlantCardEntity(s.entityManager, rm, s.reanimSystem, plantType, cardX, cardY, PlantCardScale)
+		if err != nil {
+			log.Printf("Warning: Failed to create %s card: %v", plantName, err)
+			// 继续执行，游戏在没有卡片的情况下也能运行（用于测试环境）
+		}
 	}
 
 	// Initialize PlantCardSystem
@@ -333,10 +393,18 @@ func (s *GameScene) initPlantCardSystems(rm *game.ResourceManager) {
 // If a resource fails to load, it logs a warning but continues.
 // The Draw method will use fallback rendering for missing resources.
 func (s *GameScene) loadResources() {
+	// Story 8.2 QA改进：根据关卡配置加载背景
+	// 如果关卡配置了特定背景，使用配置的背景；否则使用默认背景
+	backgroundImageID := "IMAGE_BACKGROUND1"
+	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.BackgroundImage != "" {
+		backgroundImageID = s.gameState.CurrentLevel.BackgroundImage
+		log.Printf("[GameScene] 使用关卡配置的背景: %s", backgroundImageID)
+	}
+
 	// Load lawn background
-	bg, err := s.resourceManager.LoadImageByID("IMAGE_BACKGROUND1")
+	bg, err := s.resourceManager.LoadImageByID(backgroundImageID)
 	if err != nil {
-		log.Printf("Warning: Failed to load lawn background: %v", err)
+		log.Printf("Warning: Failed to load lawn background %s: %v", backgroundImageID, err)
 		log.Printf("Will use fallback solid color background")
 	} else {
 		s.background = bg
@@ -373,7 +441,7 @@ func (s *GameScene) loadResources() {
 		s.shovel = shovel
 	}
 
-	// Load font for sun counter
+	// Load font for sun counter (使用黑体)
 	font, err := s.resourceManager.LoadFont("assets/fonts/SimHei.ttf", SunCounterFontSize)
 	if err != nil {
 		log.Printf("Warning: Failed to load sun counter font: %v", err)
@@ -382,7 +450,7 @@ func (s *GameScene) loadResources() {
 		s.sunCounterFont = font
 	}
 
-	// Load font for plant card sun cost
+	// Load font for plant card sun cost (使用黑体)
 	cardFont, err := s.resourceManager.LoadFont("assets/fonts/SimHei.ttf", PlantCardFontSize)
 	if err != nil {
 		log.Printf("Warning: Failed to load plant card font: %v", err)
@@ -395,6 +463,87 @@ func (s *GameScene) loadResources() {
 	// A dedicated image can be loaded here in the future if needed
 }
 
+// loadSoddingResources loads sodding animation resources after level config is loaded.
+// Story 8.2 QA改进：铺草皮动画资源加载
+//
+// This method must be called AFTER the level configuration is loaded,
+// because it depends on CurrentLevel.SodRowImage and CurrentLevel.ShowSoddingAnim.
+func (s *GameScene) loadSoddingResources() {
+	// 检查是否需要加载未铺草皮背景资源组
+	if s.gameState.CurrentLevel != nil &&
+		(s.gameState.CurrentLevel.BackgroundImage == "IMAGE_BACKGROUND1UNSODDED" ||
+			s.gameState.CurrentLevel.SodRowImage != "") {
+		if err := s.resourceManager.LoadResourceGroup("DelayLoad_BackgroundUnsodded"); err != nil {
+			log.Printf("Warning: Failed to load BackgroundUnsodded resource group: %v", err)
+		} else {
+			log.Printf("[GameScene] 加载未铺草皮背景资源组成功")
+		}
+	}
+
+	// 重新加载背景（如果需要切换到未铺草皮背景）
+	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.BackgroundImage == "IMAGE_BACKGROUND1UNSODDED" {
+		bg, err := s.resourceManager.LoadImageByID("IMAGE_BACKGROUND1UNSODDED")
+		if err != nil {
+			log.Printf("Warning: Failed to load unsodded background: %v", err)
+		} else {
+			s.background = bg
+			// 重新计算摄像机边界
+			bgWidth := bg.Bounds().Dx()
+			s.maxCameraX = float64(bgWidth - WindowWidth)
+			if s.maxCameraX < 0 {
+				s.maxCameraX = 0
+			}
+			log.Printf("[GameScene] 切换到未铺草皮背景")
+		}
+	}
+
+	// Story 8.2 QA改进：加载草皮叠加图片（RGB + Alpha 合成）
+	// 原版 PVZ 使用分离的 RGB 和 Alpha 存储来节省空间：
+	// - sod1row.jpg = 彩色草地内容 (JPEG)
+	// - sod1row_.png = Alpha 蒙版 (PNG 灰度图，白色=不透明，黑色=透明)
+	// - sod3row.jpg = 三行草皮彩色内容
+	// - sod3row_.png = 三行草皮 Alpha 蒙版
+	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.SodRowImage != "" {
+		// 根据配置选择加载不同的草皮图片
+		var rgbPath, alphaPath string
+		sodImageID := s.gameState.CurrentLevel.SodRowImage
+
+		switch sodImageID {
+		case "IMAGE_SOD1ROW":
+			rgbPath = "assets/images/sod1row.jpg"
+			alphaPath = "assets/images/sod1row_.png"
+		case "IMAGE_SOD3ROW":
+			rgbPath = "assets/images/sod3row.jpg"
+			alphaPath = "assets/images/sod3row_.png"
+		default:
+			log.Printf("Warning: Unknown sod row image ID: %s", sodImageID)
+			rgbPath = "assets/images/sod1row.jpg"
+			alphaPath = "assets/images/sod1row_.png"
+		}
+
+		// 合成 RGB + Alpha 图片
+		sodRowImage, err := s.resourceManager.LoadImageWithAlphaMask(rgbPath, alphaPath)
+		if err != nil {
+			log.Printf("Warning: Failed to composite sod row image: %v", err)
+		} else {
+			s.sodRowImage = sodRowImage
+			log.Printf("[GameScene] ✅ 合成草皮叠加图片 (RGB + Alpha): %s", sodImageID)
+
+			// 启动铺草皮动画（如果配置了）
+			if s.gameState.CurrentLevel.ShowSoddingAnim {
+				// 记录延迟时间，在 Update() 中延迟启动动画
+				s.soddingAnimDelay = s.gameState.CurrentLevel.SoddingAnimDelay
+				s.soddingAnimStarted = false
+				s.soddingAnimTimer = 0
+				log.Printf("[GameScene] 设置铺草皮动画延迟: %.1f 秒", s.soddingAnimDelay)
+			} else {
+				// 不播放动画，草皮在渲染时会以100%进度显示
+				log.Printf("[GameScene] 跳过铺草皮动画，草皮将直接显示")
+			}
+		}
+	}
+}
+
 // Update updates the game scene logic.
 // deltaTime is the time elapsed since the last update in seconds.
 //
@@ -403,6 +552,28 @@ func (s *GameScene) loadResources() {
 //   - ECS system updates (input, sun spawning, movement, collection, lifetime management)
 //   - System execution order ensures correct game logic flow
 func (s *GameScene) Update(deltaTime float64) {
+	// Story 8.2 QA改进：检查是否需要启动铺草皮动画
+	if s.soddingSystem != nil && !s.soddingAnimStarted && s.soddingAnimDelay > 0 {
+		s.soddingAnimTimer += deltaTime
+		if s.soddingAnimTimer >= s.soddingAnimDelay {
+			log.Printf("[GameScene] 启动铺草皮动画（延迟 %.1f 秒后）", s.soddingAnimDelay)
+
+			// 启动动画，传递启用的行列表
+			enabledLanes := s.gameState.CurrentLevel.EnabledLanes
+			s.soddingSystem.StartAnimation(func() {
+				// 动画完成回调：不需要做任何事情，渲染会自动显示完整草皮
+				log.Printf("[GameScene] 铺草皮动画完成")
+			}, enabledLanes)
+
+			s.soddingAnimStarted = true
+		}
+	}
+
+	// Story 8.2 QA改进：铺草皮动画系统更新
+	if s.soddingSystem != nil {
+		s.soddingSystem.Update(deltaTime)
+	}
+
 	// Handle intro animation
 	if s.isIntroAnimPlaying {
 		s.updateIntroAnimation(deltaTime)
@@ -434,6 +605,10 @@ func (s *GameScene) Update(deltaTime float64) {
 	// Story 6.3: Reanim 动画系统（替代旧的 AnimationSystem）
 	s.reanimSystem.Update(deltaTime)   // 8. Update Reanim animation frames
 	s.particleSystem.Update(deltaTime) // 9. Update particle effects (Story 7.2)
+	// Story 8.2: Tutorial system (only if active)
+	if s.tutorialSystem != nil {
+		s.tutorialSystem.Update(deltaTime) // 9.5. Update tutorial text display
+	}
 	// Story 3.2: 植物预览系统 - 更新预览位置（双图像支持）
 	s.plantPreviewSystem.Update(deltaTime) // 10. Update plant preview position (dual-image support)
 	s.lifetimeSystem.Update(deltaTime)     // 11. Check for expired entities
@@ -528,6 +703,12 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	// 阳光在最顶层以确保始终可点击
 	s.renderSystem.DrawSuns(screen, s.cameraX)
 
+	// Layer 8.5: Draw tutorial text (Story 8.2)
+	// 教学文本在阳光之下、UI之上
+	if s.tutorialSystem != nil && s.tutorialFont != nil {
+		s.renderSystem.DrawTutorialText(screen, s.tutorialFont)
+	}
+
 	// Layer 9: Draw level progress UI (Story 5.5)
 	// 进度条显示当前波次进度
 	s.drawLevelProgress(screen)
@@ -591,6 +772,106 @@ func (s *GameScene) drawBackground(screen *ebiten.Image) {
 		// Draw the visible portion at (0, 0)
 		op := &ebiten.DrawImageOptions{}
 		screen.DrawImage(visibleBG, op)
+
+		// Story 8.2 QA改进：在背景上叠加草皮图片（随草皮卷位置同步显示）
+		if s.sodRowImage != nil && s.gameState.CurrentLevel != nil {
+			// sod1row.jpg + sod1row_.png 合成后的尺寸：771x127（只有一行草皮，带透明边缘）
+			// sod3row.jpg + sod3row_.png 合成后的尺寸：771x355（三行草皮）
+			sodBounds := s.sodRowImage.Bounds()
+			sodWidth := sodBounds.Dx()
+			sodHeight := sodBounds.Dy()
+
+			// 计算草皮叠加图的世界位置（基于启用的行）
+			enabledLanes := s.gameState.CurrentLevel.EnabledLanes
+			sodOverlayX, sodOverlayY := config.CalculateSodOverlayPosition(enabledLanes, float64(sodHeight))
+
+			// 获取草皮卷当前位置（世界坐标X）
+			// SoddingSystem.GetSodRollPosition() 会根据动画状态返回正确的位置：
+			// - 未启动：sodRollStartX（不显示草皮）
+			// - 进行中：sodRollStartX + progress * (sodRollEndX - sodRollStartX)
+			// - 已完成：sodRollEndX（完整显示草皮）
+			var sodRollPosX float64 = sodOverlayX // 默认起点（不显示）
+			if s.soddingSystem != nil {
+				sodRollPosX = s.soddingSystem.GetSodRollPosition()
+			}
+
+			// 根据草皮卷位置计算可见宽度（从草皮起始位置到草皮卷位置）
+			visibleWidth := int(sodRollPosX - sodOverlayX)
+			if visibleWidth > sodWidth {
+				visibleWidth = sodWidth
+			}
+			if visibleWidth <= 0 {
+				return // 草皮卷还没到，不显示
+			}
+
+			// 计算视口裁剪区域（水平方向）
+			// 草皮世界坐标起始位置：sodOverlayX
+			// 视口起始位置：viewportX (= cameraX)
+			// 裁剪起点 = viewportX - sodOverlayX
+			sodViewportX := viewportX - int(sodOverlayX)
+			if sodViewportX < 0 {
+				sodViewportX = 0
+			}
+
+			// 限制裁剪区域不超过可见宽度（草皮卷位置控制）
+			sodViewportEndX := sodViewportX + WindowWidth
+			if sodViewportEndX > visibleWidth {
+				sodViewportEndX = visibleWidth
+			}
+
+			// 垂直方向：裁剪草皮图片的全部高度
+			sodViewportRect := image.Rect(
+				sodViewportX,
+				0, // 草皮图片从顶部开始裁剪
+				sodViewportEndX,
+				sodHeight, // 裁剪整个高度
+			)
+
+			visibleSod := s.sodRowImage.SubImage(sodViewportRect).(*ebiten.Image)
+
+			// 计算草皮在屏幕上的绘制位置
+			// 屏幕 X = 草皮世界 X - 摄像机 X = sodOverlayX - cameraX
+			// 屏幕 Y = 草皮世界 Y - 视口 Y = sodOverlayY - viewportY
+			screenX := sodOverlayX - float64(viewportX)
+			screenY := sodOverlayY - float64(viewportY)
+
+			// Story 8.2 QA调试：打印草皮叠加图的坐标信息（只打印一次）
+			if !s.sodDebugPrinted && visibleWidth > 0 {
+				log.Printf("=== 草皮叠加图渲染调试 ===")
+				log.Printf("草皮图尺寸: %dx%d", sodWidth, sodHeight)
+				log.Printf("启用行: %v", enabledLanes)
+				log.Printf("草皮世界坐标: (%.1f, %.1f)", sodOverlayX, sodOverlayY)
+				log.Printf("屏幕坐标: (%.1f, %.1f)", screenX, screenY)
+				log.Printf("可见宽度: %d/%d px", visibleWidth, sodWidth)
+
+				// 计算草皮覆盖的行范围
+				sodTopY := sodOverlayY
+				sodBottomY := sodOverlayY + float64(sodHeight)
+				log.Printf("草皮Y范围: [%.1f - %.1f]", sodTopY, sodBottomY)
+
+				// 对比各行的Y范围
+				for row := 1; row <= 5; row++ {
+					rowStartY := config.GridWorldStartY + float64(row-1)*config.CellHeight
+					rowEndY := rowStartY + config.CellHeight
+					rowCenterY := rowStartY + config.CellHeight/2
+
+					// 检查草皮是否覆盖这一行（使用严格不等式，边界接触不算覆盖）
+					overlaps := sodTopY < rowEndY && sodBottomY > rowStartY
+					overlap := ""
+					if overlaps {
+						overlap = " ← 草皮覆盖"
+					}
+					log.Printf("第%d行: Y[%.1f - %.1f] 中心=%.1f%s", row, rowStartY, rowEndY, rowCenterY, overlap)
+				}
+
+				s.sodDebugPrinted = true
+			}
+
+			// 绘制草皮图片到正确位置
+			sodOp := &ebiten.DrawImageOptions{}
+			sodOp.GeoM.Translate(screenX, screenY)
+			screen.DrawImage(visibleSod, sodOp)
+		}
 	} else {
 		// Fallback: Draw a green background to simulate grass
 		screen.Fill(color.RGBA{R: 34, G: 139, B: 34, A: 255}) // Forest green

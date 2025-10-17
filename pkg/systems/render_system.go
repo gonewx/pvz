@@ -1,13 +1,16 @@
 package systems
 
 import (
+	"image/color"
 	"log"
 	"math"
 	"sort"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
 // RenderSystem 管理游戏世界实体的渲染
@@ -301,6 +304,18 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 			}
 			log.Printf("部件坐标范围: X[%.1f, %.1f], Y[%.1f, %.1f]", minX, maxX, minY, maxY)
 			log.Printf("部件中心: (%.1f, %.1f)", (minX+maxX)/2, (minY+maxY)/2)
+			s.debugPrinted[id] = true
+		}
+	}
+
+	// Story 8.2 QA: 验证 SodRoll 草皮卷动画位置是否正确对齐
+	// 只在第一次渲染时检查并打印关键信息
+	if !s.debugPrinted[id] && pos.X == 0 && pos.Y >= -200 && pos.Y < 220 {
+		_, isPlant := ecs.GetComponent[*components.PlantComponent](s.entityManager, id)
+		if !isPlant {
+			// 验证整体视觉中心是否对齐到目标行中心
+			visualCenterY := pos.Y + 313.8 // SodRollBaseY
+			log.Printf("[SodRoll] Entity %d: Position.Y=%.1f, VisualCenterY=%.1f", id, pos.Y, visualCenterY)
 			s.debugPrinted[id] = true
 		}
 	}
@@ -741,4 +756,94 @@ func (s *RenderSystem) buildParticleVertices(particle *components.ParticleCompon
 
 	// 返回 4 个顶点，在 DrawParticles 中通过索引数组构建 2 个三角形
 	return vertices
+}
+
+// DrawTutorialText 绘制教学文本（Story 8.2 - 位图字体版本）
+// 在屏幕底部中央显示教学提示文本，使用原版位图字体
+// 参数:
+//   - screen: 绘制目标屏幕
+//   - bitmapFont: 位图字体（HouseofTerror28）
+func (s *RenderSystem) DrawTutorialText(screen *ebiten.Image, bitmapFont interface{}) {
+	// 查询教学文本实体
+	textEntities := ecs.GetEntitiesWith1[*components.TutorialTextComponent](s.entityManager)
+
+	if len(textEntities) == 0 {
+		return // 无教学文本实体
+	}
+
+	for _, entity := range textEntities {
+		textComp, ok := ecs.GetComponent[*components.TutorialTextComponent](s.entityManager, entity)
+		if !ok {
+			continue
+		}
+
+		// 如果文本为空，跳过渲染
+		if textComp.Text == "" {
+			continue
+		}
+
+		// 获取屏幕尺寸
+		screenWidth, screenHeight := screen.Bounds().Dx(), screen.Bounds().Dy()
+
+		// 计算文本位置（底部中央）
+		// Y: 屏幕高度 - 100px（距底部 100px）
+		// X: 屏幕宽度 / 2（水平居中）
+		textX := float64(screenWidth) / 2
+		textY := float64(screenHeight) - 100
+
+		// log.Printf("[RenderSystem] DrawTutorialText: text='%s', pos=(%.0f, %.0f), fontType=%T",
+		// textComp.Text, textX, textY, bitmapFont)
+
+		// 检查是否为位图字体
+		if bFont, ok := bitmapFont.(*utils.BitmapFont); ok && bFont != nil {
+			// 使用位图字体绘制（原版效果：白色+黄色描边）
+			// log.Printf("[RenderSystem] Using BitmapFont to draw")
+			bFont.DrawText(screen, textComp.Text, textX, textY, "center")
+		} else if ttFont, ok := bitmapFont.(*text.GoTextFace); ok && ttFont != nil {
+			// 降级方案：使用 TrueType 字体
+			// log.Printf("[RenderSystem] Using TrueType font to draw")
+			s.drawCenteredTextTTF(screen, textComp.Text, textX, textY, ttFont)
+		} else {
+			log.Printf("[RenderSystem] ERROR: Unknown font type or nil font!")
+		}
+	}
+}
+
+// drawCenteredTextTTF 使用 TrueType 字体绘制居中文本（带黄色描边）
+// 模拟原版游戏的教学文本效果：白色文字 + 黄色描边
+// 参数:
+//   - screen: 绘制目标屏幕
+//   - textStr: 文本内容
+//   - centerX: 文本中心X坐标
+//   - centerY: 文本中心Y坐标
+//   - fontFace: TrueType 字体
+func (s *RenderSystem) drawCenteredTextTTF(screen *ebiten.Image, textStr string, centerX, centerY float64, fontFace *text.GoTextFace) {
+	// 测量文本宽度
+	width, _ := text.Measure(textStr, fontFace, 0)
+
+	// 计算左上角坐标（居中对齐）
+	x := centerX - width/2
+	y := centerY
+
+	// Step 1: 绘制黄色描边（在8个方向偏移2像素）
+	// 使用金黄色 (255, 215, 0) 模拟原版效果
+	strokeColor := color.RGBA{R: 255, G: 215, B: 0, A: 255} // 金黄色
+	strokeOffsets := []struct{ dx, dy float64 }{
+		{-2, -2}, {0, -2}, {2, -2}, // 上
+		{-2, 0}, {2, 0}, // 左右
+		{-2, 2}, {0, 2}, {2, 2}, // 下
+	}
+
+	for _, offset := range strokeOffsets {
+		op := &text.DrawOptions{}
+		op.GeoM.Translate(x+offset.dx, y+offset.dy)
+		op.ColorScale.ScaleWithColor(strokeColor)
+		text.Draw(screen, textStr, fontFace, op)
+	}
+
+	// Step 2: 绘制白色主文本（在中心）
+	op := &text.DrawOptions{}
+	op.GeoM.Translate(x, y)
+	op.ColorScale.ScaleWithColor(color.White)
+	text.Draw(screen, textStr, fontFace, op)
 }
