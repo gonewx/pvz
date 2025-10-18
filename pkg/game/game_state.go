@@ -31,6 +31,7 @@ type GameState struct {
 	IsLevelComplete        bool                // 关卡是否完成
 	IsGameOver             bool                // 游戏是否结束（胜利或失败）
 	GameResult             string              // 游戏结果："win", "lose", "" (进行中)
+	ShowingFinalWave       bool                // 是否正在显示最后一波警告动画
 
 	// Story 8.1: 植物解锁和选卡状态
 	plantUnlockManager *PlantUnlockManager // 植物解锁管理器
@@ -203,12 +204,16 @@ func (gs *GameState) IsWaveSpawned(waveIndex int) bool {
 // 在僵尸生成时调用
 func (gs *GameState) IncrementZombiesSpawned(count int) {
 	gs.TotalZombiesSpawned += count
+	log.Printf("[GameState] IncrementZombiesSpawned: +%d, Total=%d", count, gs.TotalZombiesSpawned)
 }
 
 // IncrementZombiesKilled 增加已消灭僵尸计数
 // 在僵尸死亡时调用
 func (gs *GameState) IncrementZombiesKilled() {
 	gs.ZombiesKilled++
+	zombiesOnField := gs.TotalZombiesSpawned - gs.ZombiesKilled
+	log.Printf("[GameState] IncrementZombiesKilled: Killed=%d/%d, OnField=%d",
+		gs.ZombiesKilled, gs.TotalZombiesSpawned, zombiesOnField)
 }
 
 // CheckVictory 检查是否达成胜利条件

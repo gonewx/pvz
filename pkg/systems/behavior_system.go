@@ -48,59 +48,24 @@ func NewBehaviorSystem(em *ecs.EntityManager, rm *game.ResourceManager, rs *Rean
 
 // Update 更新所有拥有行为组件的实体
 func (s *BehaviorSystem) Update(deltaTime float64) {
-	// 查询所有拥有 BehaviorComponent, PlantComponent, PositionComponent 的实体（所有植物）
-	// 注意：不要求 TimerComponent，因为坚果墙等防御植物不需要计时器
-	plantEntityList := ecs.GetEntitiesWith3[
-		*components.BehaviorComponent,
-		*components.PlantComponent,
-		*components.PositionComponent,
-	](s.entityManager)
+	// 查询所有植物实体
+	plantEntityList := s.queryPlants()
 
-	// 查询所有拥有 BehaviorComponent, PositionComponent, VelocityComponent 的实体（移动中的僵尸）
-	zombieEntityList := ecs.GetEntitiesWith3[
-		*components.BehaviorComponent,
-		*components.PositionComponent,
-		*components.VelocityComponent,
-	](s.entityManager)
+	// 查询所有移动中的僵尸实体
+	zombieEntityList := s.queryMovingZombies()
 
-	// 查询所有啃食中的僵尸实体（没有 VelocityComponent，有 TimerComponent）
-	eatingZombieEntityList := ecs.GetEntitiesWith3[
-		*components.BehaviorComponent,
-		*components.PositionComponent,
-		*components.TimerComponent,
-	](s.entityManager)
+	// 查询所有啃食中的僵尸实体
+	eatingZombieEntityList := s.queryEatingZombies()
 
-	// 查询所有死亡中的僵尸实体（拥有 BehaviorComponent 但没有 VelocityComponent）
-	// 死亡状态的僵尸在 triggerZombieDeath() 中会移除 VelocityComponent
-	dyingZombieEntityList := ecs.GetEntitiesWith3[
-		*components.BehaviorComponent,
-		*components.PositionComponent,
-		*components.ReanimComponent,
-	](s.entityManager)
-	// 过滤出真正处于死亡状态的僵尸（BehaviorType == BehaviorZombieDying）
-	var filteredDyingZombies []ecs.EntityID
-	for _, entityID := range dyingZombieEntityList {
-		behaviorComp, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
-		if !ok {
-			continue
-		}
-		if behaviorComp.Type == components.BehaviorZombieDying {
-			filteredDyingZombies = append(filteredDyingZombies, entityID)
-		}
-	}
-	dyingZombieEntityList = filteredDyingZombies
+	// 查询所有死亡中的僵尸实体
+	dyingZombieEntityList := s.queryDyingZombies()
 
-	// 合并所有僵尸列表（移动中 + 啃食中），用于豌豆射手检测目标
+	// 合并所有活动僵尸列表（移动中 + 啃食中），用于豌豆射手检测目标
 	allZombieEntityList := append([]ecs.EntityID{}, zombieEntityList...)
 	allZombieEntityList = append(allZombieEntityList, eatingZombieEntityList...)
 
-	// 查询所有豌豆子弹实体（拥有 BehaviorComponent, PositionComponent, VelocityComponent）
-	// 注意：子弹和僵尸的组件组合相同，需要通过 BehaviorType 区分
-	projectileEntityList := ecs.GetEntitiesWith3[
-		*components.BehaviorComponent,
-		*components.PositionComponent,
-		*components.VelocityComponent,
-	](s.entityManager)
+	// 查询所有豌豆子弹实体
+	projectileEntityList := s.queryProjectiles()
 
 	// 日志输出（避免每帧都打印）
 	totalZombies := len(zombieEntityList) + len(eatingZombieEntityList)
@@ -464,15 +429,17 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 			// 计算僵尸所在的行
 			zombieRow := utils.GetEntityRow(zombiePos.Y, config.GridWorldStartY, config.CellHeight)
 
-			// 检查僵尸是否在同一行、在豌豆射手右侧、且在攻击范围内（草坪内）
-			// 使用 config.GridWorldEndX 判断僵尸是否在草坪右边界内
+			// 检查僵尸是否在同一行、在豌豆射手右侧、且已进入屏幕可见区域
+			// 只攻击屏幕内的僵尸（X坐标 < 屏幕右边界，约800）
+			// 使用 config.GridWorldEndX (971) 作为攻击范围右边界，确保僵尸进入草坪后才被攻击
+			screenRightBoundary := config.GridWorldEndX + 50.0 // 草坪边界右侧50像素内可攻击
 			if zombieRow == peashooterRow &&
 				zombiePos.X > peashooterPos.X &&
-				zombiePos.X <= config.GridWorldEndX {
+				zombiePos.X < screenRightBoundary {
 				hasZombieInLine = true
 				// DEBUG: 只在找到目标时输出
-				log.Printf("[BehaviorSystem] 发现目标僵尸 %d: 位置=(%.1f, %.1f), 豌豆射手X=%.1f, 草坪边界=%.1f",
-					zombieID, zombiePos.X, zombiePos.Y, peashooterPos.X, config.GridWorldEndX)
+				log.Printf("[BehaviorSystem] 发现目标僵尸 %d: 位置=(%.1f, %.1f), 豌豆射手X=%.1f, 攻击边界=%.1f",
+					zombieID, zombiePos.X, zombiePos.Y, peashooterPos.X, screenRightBoundary)
 				break
 			}
 		}
@@ -1256,4 +1223,153 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 	// 删除樱桃炸弹实体
 	s.entityManager.DestroyEntity(entityID)
 	log.Printf("[BehaviorSystem] 樱桃炸弹 %d 已删除", entityID)
+}
+
+// ============================================================================
+// 实体查询辅助函数（封装复杂的查询逻辑）
+// ============================================================================
+
+// queryPlants 查询所有植物实体
+//
+// 返回所有拥有 BehaviorComponent, PlantComponent, PositionComponent 的实体
+func (s *BehaviorSystem) queryPlants() []ecs.EntityID {
+	return ecs.GetEntitiesWith3[
+		*components.BehaviorComponent,
+		*components.PlantComponent,
+		*components.PositionComponent,
+	](s.entityManager)
+}
+
+// queryMovingZombies 查询所有移动中的僵尸实体
+//
+// 返回所有拥有 VelocityComponent 且 BehaviorType 为僵尸类型的实体
+// 注意：排除子弹（BehaviorPeaProjectile）
+func (s *BehaviorSystem) queryMovingZombies() []ecs.EntityID {
+	// 查询所有拥有 BehaviorComponent, PositionComponent, VelocityComponent 的实体
+	candidates := ecs.GetEntitiesWith3[
+		*components.BehaviorComponent,
+		*components.PositionComponent,
+		*components.VelocityComponent,
+	](s.entityManager)
+
+	// 过滤出真正的僵尸（排除子弹和其他实体）
+	var zombies []ecs.EntityID
+	for _, entityID := range candidates {
+		behaviorComp, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
+		if !ok {
+			continue
+		}
+
+		// 只保留僵尸类型的实体
+		if s.isZombieBehaviorType(behaviorComp.Type) {
+			zombies = append(zombies, entityID)
+		}
+	}
+
+	return zombies
+}
+
+// queryEatingZombies 查询所有啃食中的僵尸实体
+//
+// 返回所有处于啃食状态的僵尸（BehaviorType == BehaviorZombieEating）
+func (s *BehaviorSystem) queryEatingZombies() []ecs.EntityID {
+	// 查询所有拥有 BehaviorComponent, PositionComponent, TimerComponent 的实体
+	// 注意：这个查询会同时匹配啃食僵尸和豌豆射手植物（植物也有 TimerComponent）
+	candidates := ecs.GetEntitiesWith3[
+		*components.BehaviorComponent,
+		*components.PositionComponent,
+		*components.TimerComponent,
+	](s.entityManager)
+
+	// 过滤出真正处于啃食状态的僵尸
+	var eatingZombies []ecs.EntityID
+	for _, entityID := range candidates {
+		behaviorComp, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
+		if !ok {
+			continue
+		}
+
+		if behaviorComp.Type == components.BehaviorZombieEating {
+			eatingZombies = append(eatingZombies, entityID)
+		}
+	}
+
+	return eatingZombies
+}
+
+// queryDyingZombies 查询所有死亡中的僵尸实体
+//
+// 返回所有处于死亡状态的僵尸（BehaviorType == BehaviorZombieDying）
+// 死亡状态的僵尸已移除 VelocityComponent，但保留 ReanimComponent（播放死亡动画）
+func (s *BehaviorSystem) queryDyingZombies() []ecs.EntityID {
+	// 查询所有拥有 BehaviorComponent, PositionComponent, ReanimComponent 的实体
+	candidates := ecs.GetEntitiesWith3[
+		*components.BehaviorComponent,
+		*components.PositionComponent,
+		*components.ReanimComponent,
+	](s.entityManager)
+
+	// 过滤出真正处于死亡状态的僵尸
+	var dyingZombies []ecs.EntityID
+	for _, entityID := range candidates {
+		behaviorComp, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
+		if !ok {
+			continue
+		}
+
+		if behaviorComp.Type == components.BehaviorZombieDying {
+			dyingZombies = append(dyingZombies, entityID)
+		}
+	}
+
+	return dyingZombies
+}
+
+// queryProjectiles 查询所有豌豆子弹实体
+//
+// 返回所有 BehaviorType 为 BehaviorPeaProjectile 的实体
+func (s *BehaviorSystem) queryProjectiles() []ecs.EntityID {
+	// 查询所有拥有 BehaviorComponent, PositionComponent, VelocityComponent 的实体
+	// 注意：子弹和移动中的僵尸组件组合相同，需要通过 BehaviorType 区分
+	candidates := ecs.GetEntitiesWith3[
+		*components.BehaviorComponent,
+		*components.PositionComponent,
+		*components.VelocityComponent,
+	](s.entityManager)
+
+	// 过滤出子弹
+	var projectiles []ecs.EntityID
+	for _, entityID := range candidates {
+		behaviorComp, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
+		if !ok {
+			continue
+		}
+
+		if behaviorComp.Type == components.BehaviorPeaProjectile {
+			projectiles = append(projectiles, entityID)
+		}
+	}
+
+	return projectiles
+}
+
+// isZombieBehaviorType 判断行为类型是否为僵尸类型
+//
+// 参数:
+//   - behaviorType: 行为类型
+//
+// 返回:
+//   - true: 是僵尸类型
+//   - false: 不是僵尸类型
+func (s *BehaviorSystem) isZombieBehaviorType(behaviorType components.BehaviorType) bool {
+	switch behaviorType {
+	case components.BehaviorZombieBasic,
+		components.BehaviorZombieConehead,
+		components.BehaviorZombieBuckethead,
+		components.BehaviorZombieEating,
+		components.BehaviorZombieDying:
+		return true
+	default:
+		return false
+	}
 }

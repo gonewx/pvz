@@ -3,6 +3,7 @@ package entities
 import (
 	"fmt"
 
+	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
@@ -120,6 +121,79 @@ func NewFallingPartEffect(em *ecs.EntityManager, partImage *ebiten.Image, x, y, 
 		CurrentTime: 0.0,
 		TargetTime:  2.0, // 2秒后删除
 		IsReady:     false,
+	})
+
+	return entityID, nil
+}
+
+// CreateFinalWaveEntity 创建最后一波警告动画实体
+// 使用 FinalWave.reanim 动画，显示"A huge wave of zombies is approaching!"提示
+//
+// 参数:
+//   - em: 实体管理器
+//   - rm: 资源管理器（用于加载 FinalWave 图片和 reanim 数据）
+//   - reanimSystem: Reanim系统（用于初始化动画）
+//   - x: 动画的世界坐标X位置（通常为屏幕中心）
+//   - y: 动画的世界坐标Y位置（通常为屏幕中心）
+//
+// 返回:
+//   - ecs.EntityID: 创建的动画实体ID，如果失败返回 0
+//   - error: 如果创建失败返回错误信息
+func CreateFinalWaveEntity(em *ecs.EntityManager, rm ResourceLoader, reanimSystem ReanimSystemInterface, x, y float64) (ecs.EntityID, error) {
+	if em == nil {
+		return 0, fmt.Errorf("entity manager cannot be nil")
+	}
+	if rm == nil {
+		return 0, fmt.Errorf("resource manager cannot be nil")
+	}
+	if reanimSystem == nil {
+		return 0, fmt.Errorf("reanim system cannot be nil")
+	}
+
+	// 加载 FinalWave.reanim 数据
+	reanimXML := rm.GetReanimXML("FinalWave")
+	if reanimXML == nil {
+		return 0, fmt.Errorf("FinalWave.reanim not found in resource manager")
+	}
+
+	// 加载 FinalWave 部件图片
+	partImages := rm.GetReanimPartImages("FinalWave")
+	if partImages == nil || len(partImages) == 0 {
+		return 0, fmt.Errorf("FinalWave part images not found")
+	}
+
+	// 创建实体
+	entityID := em.CreateEntity()
+
+	// 添加位置组件（世界坐标）
+	ecs.AddComponent(em, entityID, &components.PositionComponent{
+		X: x,
+		Y: y,
+	})
+
+	// 添加 ReanimComponent（动画组件）
+	reanimComp := &components.ReanimComponent{
+		Reanim:          reanimXML,
+		PartImages:      partImages,
+		CurrentAnim:     "anim",
+		CurrentFrame:    0,
+		IsLooping:       false, // 最后一波警告只播放一次
+		VisibleTracks:   make(map[string]bool),
+		MergedTracks:    make(map[string][]reanim.Frame),
+		FrameAccumulator: 0.0,
+	}
+	ecs.AddComponent(em, entityID, reanimComp)
+
+	// 初始化 Reanim 动画
+	reanimSystem.PlayAnimation(entityID, "anim")
+
+	// 添加生命周期组件（动画播放完毕后自动删除）
+	// FinalWave.reanim 有 27 帧，FPS=12，播放时长约 2.25 秒
+	animDuration := float64(27) / float64(reanimXML.FPS)
+	ecs.AddComponent(em, entityID, &components.LifetimeComponent{
+		MaxLifetime:     animDuration,
+		CurrentLifetime: 0.0,
+		IsExpired:       false,
 	})
 
 	return entityID, nil

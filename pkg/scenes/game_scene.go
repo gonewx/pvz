@@ -128,6 +128,9 @@ type GameScene struct {
 	levelSystem     *systems.LevelSystem     // 关卡管理系统
 	waveSpawnSystem *systems.WaveSpawnSystem // 波次生成系统
 
+	// Zombie Lane Transition System - 僵尸行转换系统
+	zombieLaneTransitionSystem *systems.ZombieLaneTransitionSystem // 僵尸移动到目标行系统
+
 	// Story 7.2: Particle System
 	particleSystem *systems.ParticleSystem // 粒子系统（粒子特效）
 
@@ -292,9 +295,24 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	scene.waveSpawnSystem = systems.NewWaveSpawnSystem(scene.entityManager, rm, scene.reanimSystem, scene.gameState.CurrentLevel)
 	log.Printf("[GameScene] Initialized wave spawn system")
 
+	// Pre-spawn all zombies for the level (they will be activated wave by wave)
+	// 关卡僵尸应该是根据配置,在开始前就已经生成好了,以便开场前展现给用户
+	if scene.gameState.CurrentLevel != nil && len(scene.gameState.CurrentLevel.Waves) > 0 {
+		totalZombies := scene.waveSpawnSystem.PreSpawnAllWaves()
+		log.Printf("[GameScene] Pre-spawned %d zombies for showcase", totalZombies)
+
+		// ❌ 不应该在预生成时计数，只有在激活僵尸时才计数
+		// 预生成的僵尸处于未激活状态，不参与游戏逻辑
+		// scene.gameState.IncrementZombiesSpawned(totalZombies) // 已删除
+	}
+
 	// 2. Create LevelSystem
-	scene.levelSystem = systems.NewLevelSystem(scene.entityManager, scene.gameState, scene.waveSpawnSystem)
+	scene.levelSystem = systems.NewLevelSystem(scene.entityManager, scene.gameState, scene.waveSpawnSystem, rm, scene.reanimSystem)
 	log.Printf("[GameScene] Initialized level system")
+
+	// 3. Create ZombieLaneTransitionSystem (僵尸行转换系统)
+	scene.zombieLaneTransitionSystem = systems.NewZombieLaneTransitionSystem(scene.entityManager)
+	log.Printf("[GameScene] Initialized zombie lane transition system")
 
 	// Story 7.2: Initialize particle system
 	// Story 7.4: Added ResourceManager parameter for loading particle images
@@ -307,7 +325,7 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 
 	// Story 8.2: Initialize tutorial system (if this is a tutorial level)
 	if scene.gameState.CurrentLevel != nil && scene.gameState.CurrentLevel.OpeningType == "tutorial" && len(scene.gameState.CurrentLevel.TutorialSteps) > 0 {
-		scene.tutorialSystem = systems.NewTutorialSystem(scene.entityManager, scene.gameState, scene.resourceManager, scene.reanimSystem, scene.lawnGridSystem, scene.sunSpawnSystem, scene.gameState.CurrentLevel)
+		scene.tutorialSystem = systems.NewTutorialSystem(scene.entityManager, scene.gameState, scene.resourceManager, scene.reanimSystem, scene.lawnGridSystem, scene.sunSpawnSystem, scene.waveSpawnSystem, scene.gameState.CurrentLevel)
 		log.Printf("[GameScene] Tutorial system activated for level %s", scene.gameState.CurrentLevel.ID)
 
 		// 禁用自动阳光生成（第一次收集阳光后由 TutorialSystem 启用）
@@ -617,9 +635,10 @@ func (s *GameScene) Update(deltaTime float64) {
 	}
 
 	// Update all ECS systems in order (order matters for correct game logic)
-	s.levelSystem.Update(deltaTime)            // 0. Update level system (Story 5.5: wave spawning, victory/defeat)
-	s.plantCardSystem.Update(deltaTime)        // 1. Update plant card states (before input)
-	s.inputSystem.Update(deltaTime, s.cameraX) // 2. Process player input (highest priority, 传递摄像机位置)
+	s.levelSystem.Update(deltaTime)                   // 0. Update level system (Story 5.5: wave spawning, victory/defeat)
+	s.zombieLaneTransitionSystem.Update(deltaTime)    // 0.5. Update zombie lane transitions (move to target lane before attacking)
+	s.plantCardSystem.Update(deltaTime)               // 1. Update plant card states (before input)
+	s.inputSystem.Update(deltaTime, s.cameraX)        // 2. Process player input (highest priority, 传递摄像机位置)
 
 	// 3. Generate new suns
 	// 教学关卡：在第一次收集阳光后启用自动生成（由 TutorialSystem 控制）

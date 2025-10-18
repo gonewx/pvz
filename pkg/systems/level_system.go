@@ -5,6 +5,7 @@ import (
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
 )
 
@@ -34,7 +35,9 @@ type LevelSystem struct {
 	entityManager        *ecs.EntityManager
 	gameState            *game.GameState
 	waveSpawnSystem      *WaveSpawnSystem
-	lastWaveWarningShown bool // 是否已显示最后一波提示
+	resourceManager      *game.ResourceManager // 用于加载 FinalWave 音效
+	reanimSystem         *ReanimSystem         // 用于创建 FinalWave 动画实体
+	lastWaveWarningShown bool                  // 是否已显示最后一波提示
 }
 
 // NewLevelSystem 创建关卡管理系统
@@ -44,11 +47,15 @@ type LevelSystem struct {
 //	em - 实体管理器
 //	gs - 游戏状态单例
 //	waveSpawnSystem - 波次生成系统（依赖注入）
-func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *WaveSpawnSystem) *LevelSystem {
+//	rm - 资源管理器（用于加载音效）
+//	rs - Reanim系统（用于创建动画实体）
+func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *WaveSpawnSystem, rm *game.ResourceManager, rs *ReanimSystem) *LevelSystem {
 	return &LevelSystem{
 		entityManager:        em,
 		gameState:            gs,
 		waveSpawnSystem:      waveSpawnSystem,
+		resourceManager:      rm,
+		reanimSystem:         rs,
 		lastWaveWarningShown: false,
 	}
 }
@@ -93,12 +100,12 @@ func (s *LevelSystem) Update(deltaTime float64) {
 	s.checkVictoryCondition()
 }
 
-// checkAndSpawnWaves 检查并生成到期的僵尸波次
+// checkAndSpawnWaves 检查并激活到期的僵尸波次
 //
-// 遍历所有波次，找到时间已到且未生成的波次，调用 WaveSpawnSystem 生成僵尸
-// 教学关卡由 TutorialSystem 控制僵尸生成，不使用此方法
+// 遍历所有波次，找到时间已到且未激活的波次，调用 WaveSpawnSystem.ActivateWave() 激活僵尸
+// 教学关卡由 TutorialSystem 控制僵尸激活，不使用此方法
 func (s *LevelSystem) checkAndSpawnWaves() {
-	// 教学关卡：僵尸由 TutorialSystem 控制生成
+	// 教学关卡：僵尸由 TutorialSystem 控制激活
 	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.OpeningType == "tutorial" {
 		return
 	}
@@ -109,19 +116,13 @@ func (s *LevelSystem) checkAndSpawnWaves() {
 		return
 	}
 
-	// 获取波次配置
-	waveConfig := s.gameState.CurrentLevel.Waves[waveIndex]
+	// 调用 WaveSpawnSystem 激活僵尸（而不是生成）
+	zombieCount := s.waveSpawnSystem.ActivateWave(waveIndex)
 
-	// 调用 WaveSpawnSystem 生成僵尸
-	zombieCount := s.waveSpawnSystem.SpawnWave(waveConfig)
-
-	// 标记波次已生成
+	// 标记波次已激活
 	s.gameState.MarkWaveSpawned(waveIndex)
 
-	// 增加已生成僵尸计数
-	s.gameState.IncrementZombiesSpawned(zombieCount)
-
-	log.Printf("[LevelSystem] Wave %d spawned: %d zombies", waveIndex+1, zombieCount)
+	log.Printf("[LevelSystem] Wave %d activated: %d zombies", waveIndex+1, zombieCount)
 }
 
 // checkVictoryCondition 检查胜利条件
@@ -218,13 +219,36 @@ func (s *LevelSystem) checkLastWaveWarning() {
 
 // showLastWaveWarning 显示最后一波提示
 //
-// 创建临时文本提示实体，显示 "A huge wave of zombies is approaching!"
-// 实现方式：在 GameScene 中通过 GameState 标志位来渲染提示文本
-//
-// 注意：此方法暂时只记录日志，实际UI渲染在 GameScene 中实现（Task 8）
+// 创建 FinalWave.reanim 动画实体，播放最后一波警告动画和音效
+// 动画在屏幕中心显示，从大到小缩放并淡出
 func (s *LevelSystem) showLastWaveWarning() {
-	// TODO: Task 8 将实现实际的UI显示
-	// 当前版本仅记录日志，UI渲染将在 GameScene.Draw() 中通过检查
-	// s.gameState 的状态来实现
-	log.Println("[LevelSystem] WARNING: A huge wave of zombies is approaching!")
+	// 设置 GameState 标志
+	s.gameState.ShowingFinalWave = true
+
+	// 播放最后一波音效
+	if s.resourceManager != nil {
+		sfx, err := s.resourceManager.LoadSoundEffect("assets/sounds/finalwave.ogg")
+		if err != nil {
+			log.Printf("[LevelSystem] WARNING: Failed to load finalwave.ogg: %v", err)
+		} else {
+			sfx.Play()
+			log.Printf("[LevelSystem] Playing finalwave.ogg sound effect")
+		}
+	}
+
+	// 创建 FinalWave 动画实体（显示在屏幕中心）
+	// 动画会自动播放一次后消失
+	finalWaveEntityID, err := entities.CreateFinalWaveEntity(
+		s.entityManager,
+		s.resourceManager,
+		s.reanimSystem,
+		400.0, // X坐标（屏幕中心，世界坐标）
+		300.0, // Y坐标（屏幕中心）
+	)
+
+	if err != nil {
+		log.Printf("[LevelSystem] ERROR: Failed to create FinalWave entity: %v", err)
+	} else {
+		log.Printf("[LevelSystem] Created FinalWave warning entity (ID: %d)", finalWaveEntityID)
+	}
 }

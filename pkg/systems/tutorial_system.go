@@ -20,6 +20,7 @@ type TutorialSystem struct {
 	reanimSystem        *ReanimSystem    // 用于初始化僵尸动画
 	lawnGridSystem      *LawnGridSystem  // 用于控制草坪闪烁效果（Story 8.2）
 	sunSpawnSystem      *SunSpawnSystem  // 用于启用阳光自动生成（Story 8.2）
+	waveSpawnSystem     *WaveSpawnSystem // 用于激活预生成的僵尸（替代自己创建僵尸）
 	tutorialEntity       ecs.EntityID     // 教学实体ID
 	textEntity           ecs.EntityID     // 教学文本实体ID（用于显示/隐藏）
 	arrowIndicatorEntity ecs.EntityID     // 箭头指示符实体ID（用于显示/隐藏）
@@ -53,11 +54,12 @@ type TutorialSystem struct {
 //   - rs: ReanimSystem 实例
 //   - lgs: LawnGridSystem 实例（用于控制草坪闪烁）
 //   - sss: SunSpawnSystem 实例（用于启用阳光自动生成）
+//   - wss: WaveSpawnSystem 实例（用于激活预生成的僵尸）
 //   - levelConfig: 关卡配置（包含 tutorialSteps）
 //
 // 返回：
 //   - *TutorialSystem: 系统实例
-func NewTutorialSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.ResourceManager, rs *ReanimSystem, lgs *LawnGridSystem, sss *SunSpawnSystem, levelConfig *config.LevelConfig) *TutorialSystem {
+func NewTutorialSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.ResourceManager, rs *ReanimSystem, lgs *LawnGridSystem, sss *SunSpawnSystem, wss *WaveSpawnSystem, levelConfig *config.LevelConfig) *TutorialSystem {
 	// 创建教学实体
 	tutorialEntity := em.CreateEntity()
 	ecs.AddComponent(em, tutorialEntity, &components.TutorialComponent{
@@ -76,6 +78,7 @@ func NewTutorialSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.Resou
 		reanimSystem:         rs,
 		lawnGridSystem:       lgs,
 		sunSpawnSystem:       sss, // 保存 SunSpawnSystem 引用
+		waveSpawnSystem:      wss, // 保存 WaveSpawnSystem 引用
 		tutorialEntity:       tutorialEntity,
 		textEntity:           0, // 未创建
 		arrowIndicatorEntity: 0, // 未创建
@@ -322,15 +325,12 @@ func (s *TutorialSystem) checkTriggerCondition(trigger string) bool {
 		return s.gameState.GetSun() >= 100 && !isPlanting
 
 	case "sunClickedWhenEnough":
-		// 阳光≥100时，玩家点击收集阳光（重复提醒）
-		// 需要确保上次文本显示至少3秒（防止文本闪烁）
+		// 阳光≥100时触发（简化逻辑，修复时序bug）
+		// Bug修复（v1.11）：原逻辑要求"阳光增加 + ≥100 + 文本显示≥3秒"同一帧满足
+		// 但阳光增加只有1帧窗口，如果那一帧文本时长不足3秒，就永远错过触发
+		// 新逻辑：阳光≥100时立即触发，不依赖"点击收集"的精确帧
 		currentSun := s.gameState.GetSun()
-		const minTextDisplayDuration = 3.0 // 最少显示3秒
-		// 检查阳光是否增加（玩家点击了阳光）且当前阳光≥100 且上次文本显示≥3秒
-		if currentSun > s.lastSunAmount && currentSun >= 100 && s.lastTextDisplayTime >= minTextDisplayDuration {
-			return true
-		}
-		return false
+		return currentSun >= 100
 
 	case "secondSeedClicked":
 		// 第二次点击豌豆射手卡片（需检查已种植1个植物）
@@ -646,7 +646,7 @@ func (s *TutorialSystem) spawnSkyFallingSun() {
 }
 
 // spawnTutorialZombies 开始生成教学关卡的僵尸波次
-// 只生成第一波，后续波次由 manageWaveSpawning 管理
+// 激活第一波预生成的僵尸，后续波次由 manageWaveSpawning 管理
 func (s *TutorialSystem) spawnTutorialZombies() {
 	// 获取关卡配置
 	levelConfig := s.gameState.CurrentLevel
@@ -655,17 +655,15 @@ func (s *TutorialSystem) spawnTutorialZombies() {
 		return
 	}
 
-	// 生成第一波僵尸（立即出现）
-	if len(levelConfig.Waves) > 0 {
-		wave1 := levelConfig.Waves[0]
-		for _, zombieSpawn := range wave1.Zombies {
-			for i := 0; i < zombieSpawn.Count; i++ {
-				s.spawnZombie(zombieSpawn.Type, zombieSpawn.Lane)
-			}
-		}
+	// ✅ 修复：激活第一波预生成的僵尸，而不是自己创建僵尸
+	if len(levelConfig.Waves) > 0 && !s.gameState.IsWaveSpawned(0) {
+		// 使用 WaveSpawnSystem 激活第一波僵尸
+		activatedCount := s.waveSpawnSystem.ActivateWave(0)
+		log.Printf("[TutorialSystem] Activated wave 1 (%d pre-spawned zombies)", activatedCount)
+
+		// 标记波次已生成
 		s.gameState.MarkWaveSpawned(0)
-		s.gameState.IncrementZombiesSpawned(s.countZombiesInWave(wave1))
-		log.Printf("[TutorialSystem] Spawned wave 1 (first wave)")
+		s.gameState.IncrementZombiesSpawned(activatedCount)
 	}
 
 	// 后续波次将由 manageWaveSpawning 自动处理
@@ -682,6 +680,7 @@ func (s *TutorialSystem) manageWaveSpawning(dt float64) {
 
 	// 获取当前场上的僵尸数量
 	zombiesOnField := s.gameState.TotalZombiesSpawned - s.gameState.ZombiesKilled
+	currentWaveIndex := s.gameState.CurrentWaveIndex
 
 	// 检查是否上一波已全部击杀
 	if zombiesOnField == 0 && s.gameState.TotalZombiesSpawned > 0 {
@@ -689,20 +688,20 @@ func (s *TutorialSystem) manageWaveSpawning(dt float64) {
 			// 刚击杀完毕，开始延迟计时
 			s.lastWaveKilled = true
 			s.waveDelayTimer = 0
-			log.Printf("[TutorialSystem] Wave cleared, starting delay timer")
+			log.Printf("[TutorialSystem] Wave cleared, starting delay timer (WaveIndex=%d, Spawned=%d, Killed=%d)",
+				currentWaveIndex, s.gameState.TotalZombiesSpawned, s.gameState.ZombiesKilled)
 		} else {
 			// 延迟计时中
 			s.waveDelayTimer += dt
 		}
-	}
-
-	// 如果场上有僵尸，重置标志
-	if zombiesOnField > 0 {
-		s.lastWaveKilled = false
+	} else {
+		// 如果场上有僵尸，重置标志
+		if zombiesOnField > 0 {
+			s.lastWaveKilled = false
+		}
 	}
 
 	// 检查是否需要生成下一波
-	currentWaveIndex := s.gameState.CurrentWaveIndex
 	if currentWaveIndex < len(s.gameState.CurrentLevel.Waves) &&
 		!s.gameState.IsWaveSpawned(currentWaveIndex) &&
 		s.lastWaveKilled {
@@ -717,23 +716,18 @@ func (s *TutorialSystem) manageWaveSpawning(dt float64) {
 				s.showFinalWaveWarning()
 			}
 
-			// 生成僵尸
-			log.Printf("[TutorialSystem] Spawning wave %d after %.1f seconds delay", currentWaveIndex+1, s.waveDelayTimer)
-			for _, zombieSpawn := range waveConfig.Zombies {
-				for i := 0; i < zombieSpawn.Count; i++ {
-					s.spawnZombie(zombieSpawn.Type, zombieSpawn.Lane)
-				}
-			}
+			// ✅ 修复：使用 WaveSpawnSystem 激活预生成的僵尸，而不是自己创建僵尸
+			log.Printf("[TutorialSystem] Activating wave %d after %.1f seconds delay", currentWaveIndex+1, s.waveDelayTimer)
+			activatedCount := s.waveSpawnSystem.ActivateWave(currentWaveIndex)
+			log.Printf("[TutorialSystem] Spawned wave %d (%d zombies activated)", currentWaveIndex+1, activatedCount)
 
 			// 标记波次已生成
 			s.gameState.MarkWaveSpawned(currentWaveIndex)
-			s.gameState.IncrementZombiesSpawned(s.countZombiesInWave(waveConfig))
+			s.gameState.IncrementZombiesSpawned(activatedCount) // 使用实际激活的僵尸数量
 
 			// 重置延迟计时器和标志
 			s.waveDelayTimer = 0
 			s.lastWaveKilled = false
-
-			log.Printf("[TutorialSystem] Wave %d spawned", currentWaveIndex+1)
 		}
 	}
 }
@@ -781,52 +775,3 @@ func (s *TutorialSystem) showFinalWaveWarning() {
 	log.Printf("[TutorialSystem] Final wave warning displayed")
 }
 
-// spawnZombie 生成单个僵尸
-func (s *TutorialSystem) spawnZombie(zombieType string, lane int) ecs.EntityID {
-	// 将行号从1-5转换为数组索引0-4
-	row := lane - 1
-	if row < 0 || row > 4 {
-		log.Printf("[TutorialSystem] ERROR: Invalid lane %d (must be 1-5)", lane)
-		return 0
-	}
-
-	// 僵尸生成X坐标（调整为更靠近屏幕，方便玩家观察）
-	// 原来: 1200（太远，需要等很久）
-	// 现在: 1050（刚好在屏幕外，很快进入屏幕）
-	spawnX := 1050.0
-
-	// 根据僵尸类型创建
-	var entityID ecs.EntityID
-	var err error
-
-	switch zombieType {
-	case "basic":
-		entityID, err = entities.NewZombieEntity(
-			s.entityManager,
-			s.resourceManager,
-			s.reanimSystem,
-			row,
-			spawnX,
-		)
-	default:
-		log.Printf("[TutorialSystem] ERROR: Unknown zombie type '%s'", zombieType)
-		return 0
-	}
-
-	if err != nil {
-		log.Printf("[TutorialSystem] ERROR: Failed to spawn zombie: %v", err)
-		return 0
-	}
-
-	log.Printf("[TutorialSystem] Spawned zombie type=%s, lane=%d, entityID=%d, X=%.1f", zombieType, lane, entityID, spawnX)
-	return entityID
-}
-
-// countZombiesInWave 计算波次中的僵尸总数
-func (s *TutorialSystem) countZombiesInWave(wave config.WaveConfig) int {
-	count := 0
-	for _, zombieSpawn := range wave.Zombies {
-		count += zombieSpawn.Count
-	}
-	return count
-}
