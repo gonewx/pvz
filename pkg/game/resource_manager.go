@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"image"
+	"image/color"
 	_ "image/jpeg" // Register JPEG decoder
 	_ "image/png"  // Register PNG decoder
 	"io"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/decker502/pvz/internal/particle"
 	"github.com/decker502/pvz/internal/reanim"
+	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/audio/mp3"
@@ -54,6 +56,7 @@ type ResourceManager struct {
 	audioCache          map[string]*audio.Player            // Cache for loaded audio players: path -> Player
 	audioContext        *audio.Context                      // Global audio context for audio decoding
 	fontFaceCache       map[string]*text.GoTextFace         // Cache for Ebitengine v2 text faces
+	bitmapFontCache     map[string]*utils.BitmapFont        // Cache for bitmap fonts (Story 8.2)
 	reanimXMLCache      map[string]*reanim.ReanimXML        // Cache for parsed Reanim XML data: unit name -> ReanimXML
 	reanimImageCache    map[string]map[string]*ebiten.Image // Cache for Reanim part images: unit name -> (image ref -> Image)
 	particleConfigCache map[string]*particle.ParticleConfig // Cache for parsed particle configurations: config name -> ParticleConfig
@@ -83,6 +86,7 @@ func NewResourceManager(audioContext *audio.Context) *ResourceManager {
 		audioCache:          make(map[string]*audio.Player),
 		audioContext:        audioContext,
 		fontFaceCache:       make(map[string]*text.GoTextFace),
+		bitmapFontCache:     make(map[string]*utils.BitmapFont),
 		reanimXMLCache:      make(map[string]*reanim.ReanimXML),
 		reanimImageCache:    make(map[string]map[string]*ebiten.Image),
 		particleConfigCache: make(map[string]*particle.ParticleConfig),
@@ -137,6 +141,101 @@ func (rm *ResourceManager) LoadImage(path string) (*ebiten.Image, error) {
 
 	// Store in cache
 	rm.imageCache[path] = ebitenImg
+
+	return ebitenImg, nil
+}
+
+// LoadImageWithAlphaMask loads a color image and a separate alpha mask, then composites them
+// into a single RGBA image. This is used for textures that store RGB and Alpha separately
+// to save space (e.g., sod1row.jpg + sod1row_.png).
+//
+// The alpha mask is expected to be a grayscale image where:
+//   - White (255) = fully opaque
+//   - Black (0) = fully transparent
+//
+// Parameters:
+//   - rgbPath: Path to the RGB color image (typically JPEG)
+//   - alphaPath: Path to the alpha mask image (typically PNG grayscale)
+//
+// Returns:
+//   - A composited RGBA ebiten.Image with transparency applied
+//   - An error if loading or compositing fails
+//
+// Example:
+//
+//	img, err := rm.LoadImageWithAlphaMask(
+//	    "assets/images/sod1row.jpg",
+//	    "assets/images/sod1row_.png")
+func (rm *ResourceManager) LoadImageWithAlphaMask(rgbPath, alphaPath string) (*ebiten.Image, error) {
+	// Create cache key for the composite image
+	cacheKey := rgbPath + "+" + alphaPath
+
+	// Check if already cached
+	if cachedImage, exists := rm.imageCache[cacheKey]; exists {
+		return cachedImage, nil
+	}
+
+	// Load RGB image
+	rgbFile, err := os.Open(rgbPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open RGB image %s: %w", rgbPath, err)
+	}
+	defer rgbFile.Close()
+
+	rgbImg, _, err := image.Decode(rgbFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode RGB image %s: %w", rgbPath, err)
+	}
+
+	// Load alpha mask image
+	alphaFile, err := os.Open(alphaPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open alpha mask %s: %w", alphaPath, err)
+	}
+	defer alphaFile.Close()
+
+	alphaMask, _, err := image.Decode(alphaFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode alpha mask %s: %w", alphaPath, err)
+	}
+
+	// Verify dimensions match
+	bounds := rgbImg.Bounds()
+	alphaBounds := alphaMask.Bounds()
+	if bounds.Dx() != alphaBounds.Dx() || bounds.Dy() != alphaBounds.Dy() {
+		return nil, fmt.Errorf("RGB image size %v does not match alpha mask size %v", bounds, alphaBounds)
+	}
+
+	// Create RGBA image for compositing
+	rgba := image.NewRGBA(bounds)
+
+	// Composite RGB + Alpha
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			// Get RGB color
+			r, g, b, _ := rgbImg.At(x, y).RGBA()
+
+			// Get alpha from grayscale value
+			gray, _, _, _ := alphaMask.At(x, y).RGBA()
+			alpha := uint8(gray >> 8) // Convert 16-bit to 8-bit
+
+			// Set RGBA pixel
+			rgba.Set(x, y, color.RGBA{
+				R: uint8(r >> 8),
+				G: uint8(g >> 8),
+				B: uint8(b >> 8),
+				A: alpha,
+			})
+		}
+	}
+
+	// Convert to Ebitengine image
+	ebitenImg := ebiten.NewImageFromImage(rgba)
+
+	// Store in cache
+	rm.imageCache[cacheKey] = ebitenImg
+
+	log.Printf("✅ Composited RGBA image: %s + %s -> %dx%d", rgbPath, alphaPath, bounds.Dx(), bounds.Dy())
 
 	return ebitenImg, nil
 }
@@ -442,6 +541,18 @@ func (rm *ResourceManager) LoadReanimResources() error {
 		}
 	}
 
+	// Story 8.2 QA修复：加载阳光 Reanim 资源
+	// Sun.reanim 包含3个轨道（Sun1, Sun2, Sun3）的动画效果
+	if err := rm.loadEffectReanim("Sun"); err != nil {
+		return fmt.Errorf("failed to load Sun reanim: %w", err)
+	}
+
+	// Story 8.2 QA改进：加载铺草皮动画 Reanim 资源
+	// SodRoll.reanim 包含草皮滚动和旋转端盖的完整动画
+	if err := rm.loadEffectReanim("SodRoll"); err != nil {
+		return fmt.Errorf("failed to load SodRoll reanim: %w", err)
+	}
+
 	return nil
 }
 
@@ -499,6 +610,42 @@ func (rm *ResourceManager) loadZombieReanim(name string) error {
 	return nil
 }
 
+// loadEffectReanim loads Reanim resources for special effects (e.g., Sun, explosions).
+// Parameters:
+//   - name: The effect name (e.g., "Sun")
+//
+// Returns:
+//   - An error if loading fails.
+//
+// Story 8.2 QA修复：阳光动画使用通用的特效加载逻辑，
+// 从 assets/reanim/ 目录加载部件图片（而非 Plants 或 Zombies 子目录）
+func (rm *ResourceManager) loadEffectReanim(name string) error {
+	// 1. 解析 .reanim 文件
+	reanimPath := fmt.Sprintf("assets/effect/reanim/%s.reanim", name)
+	log.Printf("[ResourceManager] Loading effect reanim: %s from %s", name, reanimPath)
+	reanimXML, err := reanim.ParseReanimFile(reanimPath)
+	if err != nil {
+		return fmt.Errorf("failed to parse reanim file: %w", err)
+	}
+	log.Printf("[ResourceManager] Parsed %s.reanim: FPS=%d, Tracks=%d", name, reanimXML.FPS, len(reanimXML.Tracks))
+
+	// 2. 加载部件图片（从 assets/reanim/ 目录）
+	partImages, err := rm.loadReanimPartImages(name, reanimXML, "")
+	if err != nil {
+		return fmt.Errorf("failed to load part images: %w", err)
+	}
+	log.Printf("[ResourceManager] Loaded %d part images for %s", len(partImages), name)
+	for imgID := range partImages {
+		log.Printf("[ResourceManager]   - %s", imgID)
+	}
+
+	// 3. 存储到缓存
+	rm.reanimXMLCache[name] = reanimXML
+	rm.reanimImageCache[name] = partImages
+
+	return nil
+}
+
 // GetReanimXML retrieves the parsed Reanim XML data for a specific unit.
 // Parameters:
 //   - unitName: The unit name (e.g., "peashooter", "zombie")
@@ -543,50 +690,18 @@ func (rm *ResourceManager) loadReanimPartImages(unitName string, reanimXML *rean
 
 	// 加载每个图片
 	for imageRef := range imageRefs {
-		// 构建图片路径
-		// 例如：IMAGE_REANIM_PEASHOOTER_HEAD -> assets/images/Plants/Peashooter/Peashooter_head.png
-		imagePath := rm.buildReanimImagePath(unitName, imageRef, category)
-
-		// 加载图片
-		img, err := rm.LoadImage(imagePath)
+		// 直接使用资源 ID 从配置文件加载图片
+		// 例如：IMAGE_REANIM_PEASHOOTER_HEAD
+		// 资源配置文件中定义了正确的路径：reanim/PeaShooter_head.png
+		img, err := rm.LoadImageByID(imageRef)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load image %s: %w", imagePath, err)
+			return nil, fmt.Errorf("failed to load image %s: %w", imageRef, err)
 		}
 
 		partImages[imageRef] = img
 	}
 
 	return partImages, nil
-}
-
-// buildReanimImagePath builds the file path for a Reanim part image.
-// Parameters:
-//   - unitName: The unit name (e.g., "PeaShooter", "Zombie") - currently unused
-//   - imageRef: The image reference name (e.g., "IMAGE_REANIM_PEASHOOTER_HEAD")
-//   - category: The image category ("Plants" or "Zombies") - currently unused as all images are in assets/effect/reanim/images
-//
-// Returns:
-//   - The constructed file path
-func (rm *ResourceManager) buildReanimImagePath(unitName, imageRef, category string) string {
-	// Reanim 部件图片都在 assets/reanim/ 目录下
-	// 文件名格式：{unitname_lowercase}_{partname}.png
-	// 例如：peashooter_head.png, zombie_arm.png
-	//
-	// 注意：图片引用中包含了实际的单位名称，不一定与当前加载的单位相同
-	// 例如：SunFlower 的 reanim 可能引用 IMAGE_REANIM_PEASHOOTER_BACKLEAF
-
-	// 从 imageRef 中提取完整的文件名
-	// 例如：IMAGE_REANIM_PEASHOOTER_HEAD -> peashooter_head
-	imageRefUpper := strings.ToUpper(imageRef)
-
-	// 移除 IMAGE_REANIM_ 前缀（如果存在）
-	imageRefUpper = strings.TrimPrefix(imageRefUpper, "IMAGE_REANIM_")
-
-	// 转换为小写并替换下划线为文件名格式
-	fileName := strings.ToLower(imageRefUpper)
-
-	// 构建路径：assets/reanim/peashooter_head.png
-	return fmt.Sprintf("assets/reanim/%s.png", fileName)
 }
 
 // LoadResourceConfig loads the resource configuration from a YAML file.
@@ -886,4 +1001,62 @@ func (rm *ResourceManager) LoadParticleConfig(name string) (*particle.ParticleCo
 //	}
 func (rm *ResourceManager) GetParticleConfig(name string) *particle.ParticleConfig {
 	return rm.particleConfigCache[name]
+}
+
+// LoadBitmapFont loads a bitmap font from PNG image and TXT metadata files
+// Story 8.2: 用于加载原版 PVZ 的位图字体（如 HouseofTerror28）
+//
+// Parameters:
+//   - imagePath: PNG 图集文件路径（如 "assets/data/HouseofTerror28.png"）
+//   - metaPath: TXT 元数据文件路径（如 "assets/data/HouseofTerror28.txt"）
+//
+// Returns:
+//   - *utils.BitmapFont: 加载的位图字体实例
+//   - error: 如果加载失败
+//
+// Example usage:
+//
+//	font, err := rm.LoadBitmapFont(
+//	    "assets/data/HouseofTerror28.png",
+//	    "assets/data/HouseofTerror28.txt",
+//	)
+//	if err != nil {
+//	    log.Printf("Failed to load bitmap font: %v", err)
+//	}
+func (rm *ResourceManager) LoadBitmapFont(imagePath, metaPath string) (*utils.BitmapFont, error) {
+	// 使用 imagePath 作为缓存键
+	if cached, ok := rm.bitmapFontCache[imagePath]; ok {
+		return cached, nil
+	}
+
+	// 加载位图字体
+	font, err := utils.LoadBitmapFont(imagePath, metaPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load bitmap font from %s: %w", imagePath, err)
+	}
+
+	// 缓存字体
+	rm.bitmapFontCache[imagePath] = font
+	log.Printf("Loaded bitmap font: %s", imagePath)
+
+	return font, nil
+}
+
+// GetBitmapFont retrieves a cached bitmap font by image path.
+// Returns nil if the font has not been loaded yet.
+//
+// Parameters:
+//   - imagePath: PNG 图集文件路径
+//
+// Returns:
+//   - *utils.BitmapFont: 缓存的字体实例，如果未加载则返回 nil
+//
+// Example usage:
+//
+//	font := rm.GetBitmapFont("assets/data/HouseofTerror28.png")
+//	if font == nil {
+//	    log.Println("Font not loaded yet")
+//	}
+func (rm *ResourceManager) GetBitmapFont(imagePath string) *utils.BitmapFont {
+	return rm.bitmapFontCache[imagePath]
 }

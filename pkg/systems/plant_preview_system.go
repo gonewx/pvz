@@ -16,8 +16,9 @@ import (
 //
 // 注意：所有位置都使用世界坐标系统
 type PlantPreviewSystem struct {
-	entityManager *ecs.EntityManager
-	gameState     *game.GameState
+	entityManager  *ecs.EntityManager
+	gameState      *game.GameState
+	lawnGridSystem *LawnGridSystem // Story 8.1: 用于检查行是否启用
 
 	// 鼠标光标位置（世界坐标）- 用于渲染不透明光标图像
 	mouseWorldX float64
@@ -32,10 +33,12 @@ type PlantPreviewSystem struct {
 }
 
 // NewPlantPreviewSystem 创建植物预览系统
-func NewPlantPreviewSystem(em *ecs.EntityManager, gs *game.GameState) *PlantPreviewSystem {
+// Story 8.1: 添加 lawnGridSystem 参数以支持行启用检查
+func NewPlantPreviewSystem(em *ecs.EntityManager, gs *game.GameState, lawnGridSystem *LawnGridSystem) *PlantPreviewSystem {
 	return &PlantPreviewSystem{
-		entityManager: em,
-		gameState:     gs,
+		entityManager:  em,
+		gameState:      gs,
+		lawnGridSystem: lawnGridSystem,
 	}
 }
 
@@ -75,7 +78,17 @@ func (s *PlantPreviewSystem) Update(deltaTime float64) {
 
 	s.isInGrid = isInGrid
 
-	if isInGrid {
+	// Story 8.1: 如果在网格内，检查该行是否启用（教学关卡可能禁用部分行）
+	if isInGrid && s.lawnGridSystem != nil {
+		// 注意：row 是 0-based (0-4)，IsLaneEnabled 使用 1-based (1-5)
+		lane := row + 1
+		if !s.lawnGridSystem.IsLaneEnabled(lane) {
+			// 该行未启用，视为不在网格内（不显示预览）
+			s.isInGrid = false
+		}
+	}
+
+	if s.isInGrid {
 		// 在网格内，计算格子中心的屏幕坐标
 		gridScreenX, gridScreenY := utils.GridToScreenCoords(
 			col, row,

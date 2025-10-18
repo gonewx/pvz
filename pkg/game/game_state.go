@@ -31,6 +31,9 @@ type GameState struct {
 	// Story 8.1: 植物解锁和选卡状态
 	plantUnlockManager *PlantUnlockManager // 植物解锁管理器
 	SelectedPlants     []string            // 选卡界面选中的植物列表（传递给 GameScene）
+
+	// Story 8.2: 教学系统
+	LawnStrings *LawnStrings // 游戏文本字符串管理器（从 LawnStrings.txt 加载）
 }
 
 // 全局单例实例（这是架构规范允许的唯一全局变量）
@@ -40,10 +43,19 @@ var globalGameState *GameState
 // 使用延迟初始化模式，确保整个游戏生命周期只有一个实例
 func GetGameState() *GameState {
 	if globalGameState == nil {
+		// 加载 LawnStrings.txt（如果加载失败，使用 nil，GetString 会返回 [KEY]）
+		lawnStrings, err := NewLawnStrings("assets/properties/LawnStrings.txt")
+		if err != nil {
+			// 日志记录错误，但不阻止游戏启动（教学文本会显示为 [KEY]）
+			// 在生产环境中应该有更好的错误处理
+			lawnStrings = nil
+		}
+
 		globalGameState = &GameState{
-			Sun:                500, // 临时增加初始阳光用于测试（原版是50）
+			Sun:                50, // 默认阳光值（加载关卡后会被 levelConfig.InitialSun 覆盖）
 			plantUnlockManager: NewPlantUnlockManager(),
 			SelectedPlants:     []string{},
+			LawnStrings:        lawnStrings,
 		}
 	}
 	return globalGameState
@@ -104,6 +116,9 @@ func (gs *GameState) LoadLevel(levelConfig *config.LevelConfig) {
 	gs.IsLevelComplete = false
 	gs.IsGameOver = false
 	gs.GameResult = ""
+
+	// Story 8.2 QA改进：从关卡配置读取初始阳光值
+	gs.Sun = levelConfig.InitialSun
 }
 
 // UpdateLevelTime 更新关卡时间

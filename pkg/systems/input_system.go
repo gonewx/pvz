@@ -119,7 +119,7 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 		mouseWorldX := float64(mouseScreenX) + cameraX
 		mouseWorldY := float64(mouseScreenY)
 
-		_, err := entities.CreateParticleEffect(s.entityManager, s.resourceManager, "ZombieHead", mouseWorldX, mouseWorldY)
+		_, err := entities.CreateParticleEffect(s.entityManager, s.resourceManager, "ZombieHead", mouseWorldX, mouseWorldY, 0.0)
 		if err != nil {
 			log.Printf("[InputSystem] DEBUG: 生成粒子效果失败: %v", err)
 		} else {
@@ -191,9 +191,12 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 				continue
 			}
 
-			// AABB 碰撞检测（点在矩形内）- 使用世界坐标比较
-			if mouseWorldX >= pos.X && mouseWorldX <= pos.X+clickable.Width &&
-				mouseWorldY >= pos.Y && mouseWorldY <= pos.Y+clickable.Height {
+			// AABB 碰撞检测（中心对齐）- 使用世界坐标比较
+			// 注意：PositionComponent 存储的是实体的中心坐标，需要转换为边界框
+			halfWidth := clickable.Width / 2.0
+			halfHeight := clickable.Height / 2.0
+			if mouseWorldX >= pos.X-halfWidth && mouseWorldX <= pos.X+halfWidth &&
+				mouseWorldY >= pos.Y-halfHeight && mouseWorldY <= pos.Y+halfHeight {
 				// 点击命中！
 				log.Printf("[InputSystem] 点击命中阳光! 位置:(%.1f, %.1f), 状态:%d", pos.X, pos.Y, sun.State)
 				s.handleSunClick(id, pos)
@@ -434,6 +437,14 @@ func (s *InputSystem) handleLawnClick(mouseX, mouseY int) bool {
 
 	// DEBUG: 草坪点击日志（只在种植时保留，已优化）
 	// log.Printf("[InputSystem] 草坪点击: col=%d, row=%d", col, row)
+
+	// Story 8.1: 检查该行是否启用（教学关卡可能禁用部分行）
+	// 注意：row 是 0-based (0-4)，IsLaneEnabled 使用 1-based (1-5)
+	lane := row + 1
+	if !s.lawnGridSystem.IsLaneEnabled(lane) {
+		log.Printf("[InputSystem] 行 %d 已被禁用，无法种植", lane)
+		return true // 处理了点击，但该行禁用
+	}
 
 	// 检查格子是否已被占用
 	if s.lawnGridSystem.IsOccupied(s.lawnGridEntityID, col, row) {

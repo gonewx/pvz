@@ -72,9 +72,14 @@ func main() {
 	// Create scene manager
 	sceneManager := game.NewSceneManager()
 
-	// Create and set the initial scene (Main Menu) with resource manager and scene manager
-	mainMenuScene := scenes.NewMainMenuScene(resourceManager, sceneManager)
-	sceneManager.SwitchTo(mainMenuScene)
+	// TEMPORARY: 直接启动教学关卡（Story 8.2 测试）
+	// 正式版本应该从主菜单进入
+	gameScene := scenes.NewGameScene(resourceManager, sceneManager)
+	sceneManager.SwitchTo(gameScene)
+
+	// 原版启动代码（测试完成后恢复）：
+	// mainMenuScene := scenes.NewMainMenuScene(resourceManager, sceneManager)
+	// sceneManager.SwitchTo(mainMenuScene)
 
 	// Create a new game instance with the scene manager
 	gameInstance := &Game{

@@ -126,6 +126,12 @@ func (s *LevelSystem) checkVictoryCondition() {
 	if s.gameState.CheckVictory() {
 		s.gameState.SetGameResult("win")
 		log.Println("[LevelSystem] Victory! All zombies defeated!")
+
+		// Story 8.2: 关卡 1-1 完成后解锁向日葵
+		if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.ID == "1-1" {
+			s.gameState.GetPlantUnlockManager().UnlockPlant("sunflower")
+			log.Println("[LevelSystem] Unlocked plant: sunflower (completed level 1-1)")
+		}
 	}
 }
 

@@ -315,19 +315,23 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 		angle = rand.Float64() * 360.0 // 0-360 度随机
 	}
 
-	// Story 7.6 修复：PvZ 角度坐标系转换
-	// PvZ 使用的坐标系：0° = 向左（僵尸前进方向），180° = 向右（僵尸后方）
-	// 屏幕坐标系：0° = 向右，180° = 向左
-	// 转换公式：screenAngle = (pvzAngle + 180) % 360
-	screenAngle := angle + 180.0
-	if screenAngle >= 360.0 {
-		screenAngle -= 360.0
-	}
+	// Story 7.6: Apply emitter's angle offset (e.g., 180° to flip direction)
+	// This keeps particle system decoupled from business logic (zombie direction)
+	// Business logic (BehaviorSystem) calculates offset based on entity direction
+	angle += emitter.AngleOffset
+
+	// Story 7.6 修正：PvZ 使用标准屏幕坐标系
+	// 0° = 向右，90° = 向下，180° = 向左，270° = 向上
+	// 与数学/物理标准一致，无需复杂转换
+	// 例如：
+	//   - SodRoll [90-180°] → 向下和向左 ⬋ (割草机从左向右，泥土向后飞)
+	//   - ZombieHead [150-185°] → 向左下 ⬋ (僵尸向右走时，头向左后方飞)
 
 	// Convert angle to radians and calculate velocity components
-	angleRad := screenAngle * math.Pi / 180.0
+	// LaunchSpeed is in pixels/second, use directly (no conversion needed)
+	angleRad := angle * math.Pi / 180.0
 	velocityX := speed * math.Cos(angleRad)
-	velocityY := -speed * math.Sin(angleRad) // 取反以适配屏幕坐标系（Y轴向下为正）
+	velocityY := speed * math.Sin(angleRad) // Y轴向下为正，与屏幕坐标系一致
 
 	// Initial rotation and spin speed
 	spinAngleMin, spinAngleMax, _, _ := particlePkg.ParseValue(config.ParticleSpinAngle)
@@ -342,6 +346,7 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 	// Story 7.5 修复：对于"范围+关键帧"格式，需要将初始值添加到关键帧开头
 	// 例如：ParticleSpinSpeed="[-720 720] 0,39.999996" 返回 min=-720, max=720, keyframes=[{0.4, 0}]
 	// 需要添加初始关键帧：[{0, initialSpinSpeed}, {0.4, 0}]
+	// ParticleSpinSpeed is in degrees/second, use directly (no conversion needed)
 	if len(spinKeyframes) > 0 && (spinSpeedMin != 0 || spinSpeedMax != 0) {
 		// 检查第一个关键帧是否在时间 0
 		if spinKeyframes[0].Time > 0 {
@@ -475,6 +480,7 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 		// Story 7.5 修复：对于"范围+关键帧"格式，添加初始乘数关键帧
 		// 例如：CollisionSpin="[-3 -6] 0,39.999996" 返回 keyframes=[{0.4, 0}]
 		// 表示碰撞旋转效果从100%衰减到0%，需要添加初始关键帧：[{0, 1}, {0.4, 0}]
+		// CollisionSpin is in degrees/second, use directly (no conversion needed)
 		if len(spinCurve) > 0 && (spinMin != 0 || spinMax != 0) {
 			// 检查第一个关键帧是否在时间 0
 			if spinCurve[0].Time > 0 {
@@ -607,15 +613,23 @@ func (ps *ParticleSystem) applyInterpolation(p *components.ParticleComponent) {
 // applyFields applies force field effects to a particle.
 // Supports Acceleration and Friction field types.
 //
-// Unit conversion note: Original PvZ uses a fixed time step of 0.01 seconds (100 FPS).
-// Field values in XML are velocity/friction deltas per time step, not true accelerations.
-// We need to convert them by dividing by the original time step (0.01) to get per-second rates.
+// PopCap Mixed Unit System (基于原版 PvZ 游戏观察)：
+// - LaunchSpeed: pixels/second (标准速度单位，直接使用)
+// - Acceleration: velocity increment per tick (每 tick 的速度增量)
+//   - 1 tick = 0.01 seconds (原版固定时间步长)
+//   - 需要除以 0.01 转换为标准加速度 (pixels/second²)
+//
+// 原理：
+// 原版游戏每 0.01 秒更新一次物理，配置值是每次更新的增量。
+// 例如：Acceleration Y=17 表示每 tick（0.01s）速度增加 17 px/s
+// 转换为标准加速度：17 / 0.01 = 1700 px/s²
+// 这样在每帧更新中：velocity += 1700 × dt
 func (ps *ParticleSystem) applyFields(p *components.ParticleComponent, dt float64) {
 	if p.Lifetime <= 0 {
 		return
 	}
 
-	// PopCap's original fixed physics time step (centiseconds)
+	// PopCap's original fixed physics time step
 	const OriginalTimeStep = 0.01 // 1 centisecond = 0.01 seconds
 
 	// Calculate normalized time (0-1) for time-based fields
@@ -641,9 +655,11 @@ func (ps *ParticleSystem) applyFields(p *components.ParticleComponent, dt float6
 				ay = particlePkg.RandomInRange(yMin, yMax)
 			}
 
-			// Unit conversion: Config values are "velocity delta per 0.01s"
-			// Convert to true acceleration (pixels/second²)
-			ax = ax / OriginalTimeStep // pixels/centisecond → pixels/second²
+			// Unit conversion: Config values are "velocity increment per tick (0.01s)"
+			// Convert to standard acceleration (pixels/second²)
+			// 例如：Acceleration=17 表示每 tick 速度增加 17 px/s
+			//       → 标准加速度 = 17 / 0.01 = 1700 px/s²
+			ax = ax / OriginalTimeStep
 			ay = ay / OriginalTimeStep
 
 			// Apply acceleration to velocity
@@ -668,11 +684,7 @@ func (ps *ParticleSystem) applyFields(p *components.ParticleComponent, dt float6
 				frictionY = particlePkg.RandomInRange(yMin, yMax)
 			}
 
-			// Unit conversion: Config values are "velocity decay per 0.01s"
-			// Convert to per-second friction coefficient
-			frictionX = frictionX / OriginalTimeStep
-			frictionY = frictionY / OriginalTimeStep
-
+			// Friction coefficient per second (use directly)
 			// Apply friction (velocity decay)
 			p.VelocityX *= (1 - frictionX*dt)
 			p.VelocityY *= (1 - frictionY*dt)

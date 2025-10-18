@@ -23,6 +23,8 @@
 //	P                 - Toggle pause (停止切换，观看完整动画)
 //	F or /            - Enter search mode
 //	R                 - Clear all active particles
+//	[ / ]             - Decrease/increase angle offset by 15° (Story 7.6: 测试粒子方向)
+//	\                 - Reset angle offset to 0°
 //	Q/Escape          - Quit
 //
 // Search Mode (press F or /):
@@ -90,6 +92,9 @@ type ParticleViewerGame struct {
 
 	// Pause mode (for watching complete animation)
 	paused bool
+
+	// Angle offset (Story 7.6: 用于测试粒子方向)
+	angleOffset float64
 
 	// UI state
 	statusMessage string
@@ -166,6 +171,7 @@ func NewParticleViewerGame() (*ParticleViewerGame, error) {
 		searchQuery:         initialQuery,
 		autoPlay:            *autoPlayFlag,
 		lastSpawnTime:       time.Now(),
+		angleOffset:         0.0, // Story 7.6: 默认无偏移
 	}
 
 	game.updateStatusMessage()
@@ -363,6 +369,23 @@ func (g *ParticleViewerGame) updateNormalMode(dt float64) error {
 		g.statusMessage = "Cleared all particles"
 	}
 
+	// Story 7.6: Angle offset controls (测试粒子方向)
+	if inpututil.IsKeyJustPressed(ebiten.KeyBracketLeft) { // [ 键
+		g.angleOffset -= 15.0 // 减少 15°
+		g.statusMessage = fmt.Sprintf("Angle offset: %.0f°", g.angleOffset)
+		log.Printf("Angle offset changed to %.0f°", g.angleOffset)
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyBracketRight) { // ] 键
+		g.angleOffset += 15.0 // 增加 15°
+		g.statusMessage = fmt.Sprintf("Angle offset: %.0f°", g.angleOffset)
+		log.Printf("Angle offset changed to %.0f°", g.angleOffset)
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyBackslash) { // \ 键
+		g.angleOffset = 0.0 // 重置为 0°
+		g.statusMessage = "Angle offset reset to 0°"
+		log.Println("Angle offset reset to 0°")
+	}
+
 	// Spawn combo effect (ZombieHead + Arms)
 	// TODO: Implement spawnComboEffect for combo effects from assets/config/combo_effects.yaml
 	/*
@@ -442,28 +465,33 @@ func (g *ParticleViewerGame) drawUI(screen *ebiten.Image) {
 	particleInfo := fmt.Sprintf("Active Particles: %d", particleCount)
 	ebitenutil.DebugPrintAt(screen, particleInfo, 10, 70)
 
+	// Story 7.6: Angle offset display
+	angleInfo := fmt.Sprintf("Angle Offset: %.0f° (use [/]/\\ to adjust)", g.angleOffset)
+	ebitenutil.DebugPrintAt(screen, angleInfo, 10, 90)
+
 	// Note about complete effect
 	if emitterCount > 1 {
 		noteInfo := fmt.Sprintf("(All %d emitters are active - complete effect shown)", emitterCount)
-		ebitenutil.DebugPrintAt(screen, noteInfo, 10, 90)
+		ebitenutil.DebugPrintAt(screen, noteInfo, 10, 110)
 	} else {
 		emitterInfo := fmt.Sprintf("Active Emitters: %d", emitterCount)
-		ebitenutil.DebugPrintAt(screen, emitterInfo, 10, 90)
+		ebitenutil.DebugPrintAt(screen, emitterInfo, 10, 110)
 	}
 
 	// Search mode indicator
 	if g.searchMode {
 		searchPrompt := fmt.Sprintf("SEARCH: %s_", g.searchQuery)
-		ebitenutil.DebugPrintAt(screen, searchPrompt, 10, 110)
-		ebitenutil.DebugPrintAt(screen, "(Type to filter, Backspace to delete, Enter/Esc to exit)", 10, 130)
+		ebitenutil.DebugPrintAt(screen, searchPrompt, 10, 130)
+		ebitenutil.DebugPrintAt(screen, "(Type to filter, Backspace to delete, Enter/Esc to exit)", 10, 150)
 	} else if g.statusMessage != "" {
-		ebitenutil.DebugPrintAt(screen, g.statusMessage, 10, 110)
+		ebitenutil.DebugPrintAt(screen, g.statusMessage, 10, 130)
 	}
 
 	// Controls (bottom left)
 	controls := []string{
 		"Navigation: <-/-> = Next/Prev  PgUp/PgDn = Jump 10  Home/End = First/Last  1-9 = Quick Jump",
 		"Actions:    Click/Space = Spawn  R = Clear  P = Pause  F/Slash = Search  Q = Quit",
+		"Angle:      [ = -15°  ] = +15°  \\ = Reset to 0°  (Test particle direction)",
 	}
 	y := screenHeight - len(controls)*20 - 10
 	for i, line := range controls {
@@ -494,13 +522,14 @@ func (g *ParticleViewerGame) spawnCurrentEffect(x, y float64) {
 
 	effectName := g.filteredEffectNames[g.currentIndex]
 
-	_, err := entities.CreateParticleEffect(g.entityManager, g.resourceManager, effectName, x, y)
+	// Story 7.6: 传递角度偏移参数
+	_, err := entities.CreateParticleEffect(g.entityManager, g.resourceManager, effectName, x, y, g.angleOffset)
 	if err != nil {
 		log.Printf("Failed to create effect %s: %v", effectName, err)
 		g.statusMessage = fmt.Sprintf("Error: %v", err)
 	} else {
-		log.Printf("Spawned effect: %s at (%.0f, %.0f)", effectName, x, y)
-		g.statusMessage = fmt.Sprintf("Spawned: %s", effectName)
+		log.Printf("Spawned effect: %s at (%.0f, %.0f) with angle offset %.0f°", effectName, x, y, g.angleOffset)
+		g.statusMessage = fmt.Sprintf("Spawned: %s (angle: %.0f°)", effectName, g.angleOffset)
 	}
 }
 

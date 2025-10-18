@@ -49,7 +49,7 @@ func TestPointInRectCollision(t *testing.T) {
 // TestSunClickStateChange 测试点击已落地阳光的状态变化
 func TestSunClickStateChange(t *testing.T) {
 	em := ecs.NewEntityManager()
-	rm := game.NewResourceManager(testAudioContext)
+	rm := game.NewResourceManager(getTestAudioContext())
 	gs := game.GetGameState()
 	initialSun := gs.GetSun()
 
@@ -110,7 +110,7 @@ func TestSunClickStateChange(t *testing.T) {
 // TestClickFallingSunNoEffect 测试点击掉落中的阳光无效
 func TestClickFallingSunNoEffect(t *testing.T) {
 	em := ecs.NewEntityManager()
-	rm := game.NewResourceManager(testAudioContext)
+	rm := game.NewResourceManager(getTestAudioContext())
 	gs := game.GetGameState()
 
 	// 创建草坪网格系统和实体（测试用）
@@ -155,7 +155,7 @@ func TestClickFallingSunNoEffect(t *testing.T) {
 // TestClickDisabledSunNoEffect 测试点击已被禁用的阳光无效
 func TestClickDisabledSunNoEffect(t *testing.T) {
 	em := ecs.NewEntityManager()
-	rm := game.NewResourceManager(testAudioContext)
+	rm := game.NewResourceManager(getTestAudioContext())
 	gs := game.GetGameState()
 
 	// 创建草坪网格系统和实体（测试用）
@@ -192,7 +192,7 @@ func TestClickDisabledSunNoEffect(t *testing.T) {
 // TestVelocityCalculation 测试飞向阳光计数器的速度向量计算
 func TestVelocityCalculation(t *testing.T) {
 	em := ecs.NewEntityManager()
-	rm := game.NewResourceManager(testAudioContext)
+	rm := game.NewResourceManager(getTestAudioContext())
 	gs := game.GetGameState()
 
 	targetX := 21.0
@@ -249,7 +249,7 @@ func TestVelocityCalculation(t *testing.T) {
 // TestGetPlantCost 测试植物阳光消耗计算
 func TestGetPlantCost(t *testing.T) {
 	em := ecs.NewEntityManager()
-	rm := game.NewResourceManager(testAudioContext)
+	rm := game.NewResourceManager(getTestAudioContext())
 	gs := game.GetGameState()
 	lawnGridSystem := NewLawnGridSystem(em, nil)
 	lawnGridEntityID := em.CreateEntity()
@@ -280,7 +280,7 @@ func TestGetPlantCost(t *testing.T) {
 // TestTriggerPlantCardCooldown 测试触发卡片冷却
 func TestTriggerPlantCardCooldown(t *testing.T) {
 	em := ecs.NewEntityManager()
-	rm := game.NewResourceManager(testAudioContext)
+	rm := game.NewResourceManager(getTestAudioContext())
 	gs := game.GetGameState()
 	lawnGridSystem := NewLawnGridSystem(em, nil)
 	lawnGridEntityID := em.CreateEntity()

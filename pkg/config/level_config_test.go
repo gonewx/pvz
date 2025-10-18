@@ -558,16 +558,16 @@ waves:
 	}
 }
 
-// TestTutorialSteps_Parsing 测试 TutorialSteps 解析 (Story 8.1)
+// TestTutorialSteps_Parsing 测试 TutorialSteps 解析 (Story 8.1, updated in Story 8.2)
 func TestTutorialSteps_Parsing(t *testing.T) {
 	yamlContent := `id: "tutorial-1"
 name: "Tutorial Level"
 tutorialSteps:
   - trigger: "gameStart"
-    text: "Welcome to the game!"
+    textKey: "TUTORIAL_WELCOME"
     action: "waitForSunCollect"
   - trigger: "sunCollected"
-    text: "Now plant a peashooter!"
+    textKey: "TUTORIAL_PLANT_PEASHOOTER"
     action: "waitForPlantPlaced"
 waves:
   - time: 10
@@ -596,8 +596,8 @@ waves:
 	if config.TutorialSteps[0].Trigger != "gameStart" {
 		t.Errorf("Expected first step trigger 'gameStart', got %q", config.TutorialSteps[0].Trigger)
 	}
-	if config.TutorialSteps[0].Text != "Welcome to the game!" {
-		t.Errorf("Expected first step text 'Welcome to the game!', got %q", config.TutorialSteps[0].Text)
+	if config.TutorialSteps[0].TextKey != "TUTORIAL_WELCOME" {
+		t.Errorf("Expected first step textKey 'TUTORIAL_WELCOME', got %q", config.TutorialSteps[0].TextKey)
 	}
 	if config.TutorialSteps[0].Action != "waitForSunCollect" {
 		t.Errorf("Expected first step action 'waitForSunCollect', got %q", config.TutorialSteps[0].Action)

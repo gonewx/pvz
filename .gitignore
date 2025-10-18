@@ -19,3 +19,6 @@ pvz-game
 # !/assets/config/
 
 /bin
+/.meta/screenshot
+main.go.backup
+.meta/v.md

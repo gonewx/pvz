@@ -14,8 +14,9 @@ import (
 func TestPlantPreviewSystemCreation(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
+	lawnGridSystem := NewLawnGridSystem(em, nil) // Story 8.1: 传递 LawnGridSystem
 
-	system := NewPlantPreviewSystem(em, gs)
+	system := NewPlantPreviewSystem(em, gs, lawnGridSystem)
 
 	if system == nil {
 		t.Fatal("Expected NewPlantPreviewSystem to return non-nil")
@@ -26,6 +27,9 @@ func TestPlantPreviewSystemCreation(t *testing.T) {
 	if system.gameState != gs {
 		t.Error("Expected gameState to be set")
 	}
+	if system.lawnGridSystem != lawnGridSystem {
+		t.Error("Expected lawnGridSystem to be set")
+	}
 }
 
 // TestPlantPreviewUpdate 测试预览更新逻辑
@@ -33,8 +37,9 @@ func TestPlantPreviewUpdate(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
 	gs.CameraX = 215 // 设置摄像机位置
+	lawnGridSystem := NewLawnGridSystem(em, nil) // Story 8.1: 传递 LawnGridSystem
 
-	system := NewPlantPreviewSystem(em, gs)
+	system := NewPlantPreviewSystem(em, gs, lawnGridSystem)
 
 	// 创建预览实体
 	previewID := em.CreateEntity()
@@ -75,7 +80,8 @@ func TestGridCoordinateConsistency(t *testing.T) {
 	for _, cameraX := range testCameraPositions {
 		t.Run("CameraX="+string(rune(int(cameraX))), func(t *testing.T) {
 			gs.CameraX = cameraX
-			system := NewPlantPreviewSystem(em, gs)
+			lawnGridSystem := NewLawnGridSystem(em, nil) // Story 8.1: 传递 LawnGridSystem
+			system := NewPlantPreviewSystem(em, gs, lawnGridSystem)
 
 			// 创建预览实体
 			previewID := em.CreateEntity()

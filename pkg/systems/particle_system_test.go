@@ -344,8 +344,9 @@ func TestParticleSystem_AccelerationField(t *testing.T) {
 	ps := NewParticleSystem(em, nil)
 
 	// Create particle with downward acceleration (gravity)
-	// Note: Config values are in PopCap units (velocity delta per 0.01s)
-	// Value 1 = 1 pixel/centisecond = 100 pixels/sec²
+	// PopCap Mixed Unit System:
+	// - Acceleration config value is "velocity increment per 0.01s"
+	// - Engine converts to pixels/second²: value / 0.01
 	particleID := em.CreateEntity()
 	particleComp := &components.ParticleComponent{
 		VelocityX: 0,
@@ -356,7 +357,7 @@ func TestParticleSystem_AccelerationField(t *testing.T) {
 			{
 				FieldType: "Acceleration",
 				X:         "0",
-				Y:         "1", // 1 pixel/centisecond = 100 pixels/sec² downward
+				Y:         "1", // velocity increases by 1 px/s every 0.01s → 100 px/s²
 			},
 		},
 	}
@@ -370,7 +371,7 @@ func TestParticleSystem_AccelerationField(t *testing.T) {
 	ps.Update(1.0)
 
 	// Velocity should have increased by acceleration * dt
-	// Config value 1 → real acceleration 100 pixels/sec²
+	// Config value 1 → converts to 100 px/s² → velocity increases by 100
 	expectedVelocityY := initialVelocityY + 100*1.0
 	if particleComp.VelocityY < expectedVelocityY-1 || particleComp.VelocityY > expectedVelocityY+1 {
 		t.Errorf("VelocityY should be ~%v, got %v", expectedVelocityY, particleComp.VelocityY)
@@ -383,8 +384,7 @@ func TestParticleSystem_FrictionField(t *testing.T) {
 	ps := NewParticleSystem(em, nil)
 
 	// Create particle with friction
-	// Note: Config values are in PopCap units (friction per 0.01s)
-	// Value 0.005 = 0.5% friction per centisecond = 50% per second
+	// PopCap Unit System: Friction is per-second coefficient (use directly)
 	particleID := em.CreateEntity()
 	particleComp := &components.ParticleComponent{
 		VelocityX: 100, // Initial velocity
@@ -394,7 +394,7 @@ func TestParticleSystem_FrictionField(t *testing.T) {
 		Fields: []particle.Field{
 			{
 				FieldType: "Friction",
-				X:         "0.005", // 0.5% per centisecond = 50% friction per second
+				X:         "0.5", // 50% friction per second
 				Y:         "0",
 			},
 		},
@@ -409,7 +409,7 @@ func TestParticleSystem_FrictionField(t *testing.T) {
 	ps.Update(1.0)
 
 	// Velocity should have decreased by friction
-	// Config value 0.005 → real friction 0.5 per second
+	// Config value 0.5 → 50% friction per second (use directly, no conversion)
 	expectedVelocityX := initialVelocityX * (1 - 0.5*1.0)
 	if particleComp.VelocityX < expectedVelocityX-1 || particleComp.VelocityX > expectedVelocityX+1 {
 		t.Errorf("VelocityX should be ~%v, got %v", expectedVelocityX, particleComp.VelocityX)

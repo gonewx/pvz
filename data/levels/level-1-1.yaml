@@ -8,8 +8,36 @@ enabledLanes: [3]             # 只启用第3行（中间行）
 availablePlants:              # 只有豌豆射手
   - "peashooter"
 skipOpening: true             # 跳过开场（教学关卡直接进入）
+initialSun: 150               # 初始阳光150（允许玩家立即购买豌豆射手）
 
-# 波次配置：1波，2-3只普通僵尸
+# Story 8.2 QA改进：背景和草皮配置
+backgroundImage: "IMAGE_BACKGROUND1UNSODDED"  # 使用未铺草皮的背景
+sodRowImage: "IMAGE_SOD1ROW"                  # 铺草皮后叠加1行草地图片
+showSoddingAnim: true                         # 播放铺草皮动画
+soddingAnimDelay: 1.0                         # 游戏开始1秒后播放动画
+
+# Story 8.2: 教学步骤配置
+tutorialSteps:
+  - trigger: "gameStart"
+    textKey: "ADVICE_CLICK_ON_SUN"
+    action: "waitForSunClick"
+  - trigger: "sunClicked"
+    textKey: "ADVICE_CLICKED_ON_SUN"
+    action: "waitForEnoughSun"
+  - trigger: "enoughSun"
+    textKey: "ADVICE_CLICK_SEED_PACKET"
+    action: "waitForSeedClick"
+  - trigger: "seedClicked"
+    textKey: "ADVICE_CLICK_ON_GRASS"
+    action: "waitForPlantPlaced"
+  - trigger: "plantPlaced"
+    textKey: "ADVICE_PLANTED_PEASHOOTER"
+    action: "waitForZombieSpawn"
+  - trigger: "zombieSpawned"
+    textKey: "ADVICE_ZOMBIE_ONSLAUGHT"
+    action: "waitForLevelEnd"
+
+# 波次配置：3波，3只普通僵尸，间隔较长
 waves:
   # 第一波（也是唯一一波）：10秒，第一只僵尸
   - time: 10

@@ -9,6 +9,13 @@ availablePlants:              # 可用植物
   - "peashooter"
   - "sunflower"
 skipOpening: false            # 不跳过开场
+initialSun: 50                # 初始阳光50（标准值）
+
+# 草皮配置（三行）
+backgroundImage: "IMAGE_BACKGROUND1UNSODDED"  # 使用未铺草皮的背景
+sodRowImage: "IMAGE_SOD3ROW"                  # 铺草皮后叠加3行草地图片
+showSoddingAnim: true                         # 播放铺草皮动画
+soddingAnimDelay: 1.0                         # 游戏开始1秒后播放动画
 
 # 波次配置：1面旗帜（2个小波次 + 1个旗帜波）
 waves:

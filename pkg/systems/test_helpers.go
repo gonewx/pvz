@@ -1,10 +1,29 @@
 package systems
 
 import (
+	"sync"
+
 	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/audio"
 )
+
+// testAudioContext 是测试用的共享音频上下文
+// 所有测试文件共享此上下文以避免重复创建
+// 使用延迟初始化避免与 main.go 冲突
+var (
+	testAudioContext     *audio.Context
+	testAudioContextOnce sync.Once
+)
+
+// getTestAudioContext 获取测试音频上下文（延迟创建）
+func getTestAudioContext() *audio.Context {
+	testAudioContextOnce.Do(func() {
+		testAudioContext = audio.NewContext(48000)
+	})
+	return testAudioContext
+}
 
 // createTestReanimComponent 创建测试用的 ReanimComponent
 // 这是一个测试辅助函数，被多个测试文件共享使用
@@ -16,7 +35,7 @@ func createTestReanimComponent(image *ebiten.Image, imageName string) *component
 			PartImages:        map[string]*ebiten.Image{},
 			CurrentAnim:       "idle",
 			CurrentFrame:      0,
-			FrameCounter:      0,
+			FrameAccumulator:  0.0,
 			VisibleFrameCount: 0,
 			IsLooping:         true,
 			IsFinished:        false,
@@ -68,7 +87,7 @@ func createTestReanimComponent(image *ebiten.Image, imageName string) *component
 		PartImages:        partImages,
 		CurrentAnim:       "idle",
 		CurrentFrame:      0,
-		FrameCounter:      0,
+		FrameAccumulator:  0.0,
 		VisibleFrameCount: 1,
 		IsLooping:         true,
 		IsFinished:        false,

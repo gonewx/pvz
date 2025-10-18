@@ -14,7 +14,7 @@ import (
 func TestPlantPreviewRenderSystemCreation(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
-	previewSystem := NewPlantPreviewSystem(em, gs)
+	previewSystem := NewPlantPreviewSystem(em, gs, nil) // Story 8.1: 传递 nil LawnGridSystem（测试用）
 	renderSystem := NewPlantPreviewRenderSystem(em, previewSystem)
 
 	if renderSystem == nil {
@@ -32,7 +32,7 @@ func TestPlantPreviewRenderSystemCreation(t *testing.T) {
 func TestDrawWithNoEntities(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
-	previewSystem := NewPlantPreviewSystem(em, gs)
+	previewSystem := NewPlantPreviewSystem(em, gs, nil) // Story 8.1: 传递 nil LawnGridSystem（测试用）
 	renderSystem := NewPlantPreviewRenderSystem(em, previewSystem)
 
 	// 创建测试屏幕
@@ -46,7 +46,7 @@ func TestDrawWithNoEntities(t *testing.T) {
 func TestDrawPreviewEntity(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
-	previewSystem := NewPlantPreviewSystem(em, gs)
+	previewSystem := NewPlantPreviewSystem(em, gs, nil) // Story 8.1: 传递 nil LawnGridSystem（测试用）
 	renderSystem := NewPlantPreviewRenderSystem(em, previewSystem)
 
 	// 创建测试图像
@@ -78,7 +78,7 @@ func TestDrawPreviewEntity(t *testing.T) {
 func TestDrawWithNilImage(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
-	previewSystem := NewPlantPreviewSystem(em, gs)
+	previewSystem := NewPlantPreviewSystem(em, gs, nil) // Story 8.1: 传递 nil LawnGridSystem（测试用）
 	renderSystem := NewPlantPreviewRenderSystem(em, previewSystem)
 
 	// 创建预览实体，但没有 ReanimComponent
@@ -103,7 +103,7 @@ func TestDrawWithNilImage(t *testing.T) {
 func TestAlphaBlending(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
-	previewSystem := NewPlantPreviewSystem(em, gs)
+	previewSystem := NewPlantPreviewSystem(em, gs, nil) // Story 8.1: 传递 nil LawnGridSystem（测试用）
 	renderSystem := NewPlantPreviewRenderSystem(em, previewSystem)
 
 	testCases := []struct {
@@ -151,7 +151,7 @@ func TestAlphaBlending(t *testing.T) {
 func TestImageCentering(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
-	previewSystem := NewPlantPreviewSystem(em, gs)
+	previewSystem := NewPlantPreviewSystem(em, gs, nil) // Story 8.1: 传递 nil LawnGridSystem（测试用）
 	renderSystem := NewPlantPreviewRenderSystem(em, previewSystem)
 
 	// 创建测试图像（64x80）
@@ -181,7 +181,7 @@ func TestImageCentering(t *testing.T) {
 func TestMultiplePreviewEntities(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
-	previewSystem := NewPlantPreviewSystem(em, gs)
+	previewSystem := NewPlantPreviewSystem(em, gs, nil) // Story 8.1: 传递 nil LawnGridSystem（测试用）
 	renderSystem := NewPlantPreviewRenderSystem(em, previewSystem)
 
 	// 创建多个预览实体
@@ -220,7 +220,7 @@ func TestMultiplePreviewEntities(t *testing.T) {
 func TestDrawWithDifferentImageSizes(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
-	previewSystem := NewPlantPreviewSystem(em, gs)
+	previewSystem := NewPlantPreviewSystem(em, gs, nil) // Story 8.1: 传递 nil LawnGridSystem（测试用）
 	renderSystem := NewPlantPreviewRenderSystem(em, previewSystem)
 
 	testCases := []struct {
@@ -275,7 +275,7 @@ func TestDrawWithDifferentImageSizes(t *testing.T) {
 func TestDrawWithCameraOffset(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
-	previewSystem := NewPlantPreviewSystem(em, gs)
+	previewSystem := NewPlantPreviewSystem(em, gs, nil) // Story 8.1: 传递 nil LawnGridSystem（测试用）
 	renderSystem := NewPlantPreviewRenderSystem(em, previewSystem)
 
 	// 创建测试图像

@@ -64,21 +64,21 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 		}
 
 		// Get FPS from Reanim data, default to 12 if not set
-		fps := reanimComp.Reanim.FPS
+		fps := float64(reanimComp.Reanim.FPS)
 		if fps == 0 {
-			fps = 12 // Default FPS for PVZ animations
+			fps = 12.0 // Default FPS for PVZ animations
 		}
 
-		// Calculate frame skip (how many game loop frames per animation frame)
-		// Game loop runs at 60 FPS
-		frameSkip := 60 / fps
+		// Calculate time per frame (seconds)
+		timePerFrame := 1.0 / fps
 
-		// Increment frame counter
-		reanimComp.FrameCounter++
+		// Accumulate deltaTime
+		reanimComp.FrameAccumulator += deltaTime
 
-		// Check if it's time to advance to the next animation frame
-		if reanimComp.FrameCounter >= frameSkip {
-			reanimComp.FrameCounter = 0
+		// Advance frames based on accumulated time
+		// 限制每次Update只推进1帧，避免跳帧导致视觉抖动
+		if reanimComp.FrameAccumulator >= timePerFrame {
+			reanimComp.FrameAccumulator -= timePerFrame
 			reanimComp.CurrentFrame++
 
 			// Loop animation when reaching the end (only if IsLooping is true)
@@ -88,9 +88,13 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 				} else {
 					// Non-looping animation: stay at the last frame and mark as finished
 					reanimComp.CurrentFrame = reanimComp.VisibleFrameCount - 1
-					reanimComp.IsFinished = true
-					log.Printf("[ReanimSystem] 非循环动画完成: Entity=%d, Anim=%s, Frame=%d/%d",
-						id, reanimComp.CurrentAnim, reanimComp.CurrentFrame, reanimComp.VisibleFrameCount)
+					reanimComp.FrameAccumulator = 0 // Reset accumulator
+					// 只在第一次标记完成时打印日志，避免每帧重复输出
+					if !reanimComp.IsFinished {
+						reanimComp.IsFinished = true
+						log.Printf("[ReanimSystem] 非循环动画完成: Entity=%d, Anim=%s, Frame=%d/%d",
+							id, reanimComp.CurrentAnim, reanimComp.CurrentFrame, reanimComp.VisibleFrameCount)
+					}
 				}
 			}
 		}
@@ -358,7 +362,7 @@ func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) err
 
 	// Reset animation state
 	reanimComp.CurrentFrame = 0
-	reanimComp.FrameCounter = 0
+	reanimComp.FrameAccumulator = 0.0
 	reanimComp.CurrentAnim = animName
 	reanimComp.IsLooping = true   // Default: animations loop
 	reanimComp.IsFinished = false // Reset finished flag
@@ -410,6 +414,107 @@ func (s *ReanimSystem) PlayAnimationNoLoop(entityID ecs.EntityID, animName strin
 		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
 	}
 	reanimComp.IsLooping = false
+
+	return nil
+}
+
+// InitializeDirectRender initializes a ReanimComponent for direct rendering without animation definitions.
+// This is used for entities like Sun that have only track definitions (no <anim> tags).
+// All tracks will be rendered simultaneously, and all frames are visible.
+//
+// This method calculates CenterOffset to center the animation visually (suitable for grid-based entities).
+//
+// Parameters:
+//   - entityID: the entity to initialize
+//
+// Returns:
+//   - An error if the entity doesn't have a ReanimComponent
+func (s *ReanimSystem) InitializeDirectRender(entityID ecs.EntityID) error {
+	return s.initializeDirectRenderInternal(entityID, true)
+}
+
+// InitializeSceneAnimation initializes a ReanimComponent for scene animations.
+// Scene animations (like SodRoll) have absolute coordinates defined in the reanim file,
+// and do not need CenterOffset adjustment.
+//
+// Parameters:
+//   - entityID: the entity to initialize
+//
+// Returns:
+//   - An error if the entity doesn't have a ReanimComponent
+func (s *ReanimSystem) InitializeSceneAnimation(entityID ecs.EntityID) error {
+	return s.initializeDirectRenderInternal(entityID, false)
+}
+
+// initializeDirectRenderInternal is the internal implementation shared by both
+// InitializeDirectRender and InitializeSceneAnimation.
+//
+// Parameters:
+//   - entityID: the entity to initialize
+//   - calculateCenter: whether to calculate CenterOffset (true for entities, false for scenes)
+//
+// Returns:
+//   - An error if the entity doesn't have a ReanimComponent
+func (s *ReanimSystem) initializeDirectRenderInternal(entityID ecs.EntityID, calculateCenter bool) error {
+	// Get the ReanimComponent
+	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !exists {
+		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
+	}
+
+	// Check if Reanim data is present
+	if reanimComp.Reanim == nil {
+		return fmt.Errorf("entity %d has a ReanimComponent but no Reanim data", entityID)
+	}
+
+	log.Printf("[ReanimSystem] InitializeDirectRender for entity %d", entityID)
+
+	// Set animation state (required for rendering)
+	reanimComp.CurrentAnim = "direct_render" // Non-empty string to pass RenderSystem check
+	reanimComp.CurrentFrame = 0
+	reanimComp.FrameAccumulator = 0.0
+	reanimComp.IsFinished = false
+
+	// Calculate standard frame count (max frames across all tracks)
+	standardFrameCount := 0
+	for _, track := range reanimComp.Reanim.Tracks {
+		if len(track.Frames) > standardFrameCount {
+			standardFrameCount = len(track.Frames)
+		}
+	}
+	if standardFrameCount == 0 {
+		standardFrameCount = 1 // At least 1 frame
+	}
+
+	log.Printf("[ReanimSystem] Standard frame count: %d", standardFrameCount)
+
+	// Build AnimVisibles: all frames are visible (all 0s)
+	reanimComp.AnimVisibles = make([]int, standardFrameCount)
+	for i := range reanimComp.AnimVisibles {
+		reanimComp.AnimVisibles[i] = 0 // 0 = visible
+	}
+
+	// Set visible frame count
+	reanimComp.VisibleFrameCount = standardFrameCount
+
+	// Build merged tracks with frame inheritance
+	reanimComp.MergedTracks = s.buildMergedTracks(reanimComp)
+
+	// Store all tracks in rendering order
+	reanimComp.AnimTracks = s.getAnimationTracks(reanimComp)
+
+	log.Printf("[ReanimSystem] Built %d merged tracks, %d anim tracks", len(reanimComp.MergedTracks), len(reanimComp.AnimTracks))
+
+	// Calculate center offset based on the bounding box of visible parts in the first frame
+	// Skip this for scene animations (they have absolute coordinates)
+	if calculateCenter {
+		s.calculateCenterOffset(reanimComp)
+	} else {
+		// Scene animations: no center offset needed
+		reanimComp.CenterOffsetX = 0
+		reanimComp.CenterOffsetY = 0
+		log.Printf("[ReanimSystem] Scene animation: CenterOffset set to (0, 0)")
+	}
 
 	return nil
 }

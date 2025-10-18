@@ -29,9 +29,7 @@ func NewPeaProjectile(em *ecs.EntityManager, rm ResourceLoader, startX, startY f
 	}
 
 	// 加载豌豆子弹图像
-	// 注意：使用 firepea.png 作为临时方案，因为原始的 PeaBullet.png 已删除
-	// TODO: 考虑为豌豆子弹创建专用图片或使用粒子效果
-	peaImage, err := rm.LoadImage("assets/reanim/firepea.png")
+	peaImage, err := rm.LoadImage("assets/images/ProjectilePea.png")
 	if err != nil {
 		return 0, fmt.Errorf("failed to load pea projectile image: %w", err)
 	}

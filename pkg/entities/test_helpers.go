@@ -22,7 +22,7 @@ func (m *mockReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string)
 			reanim := reanimComp.(*components.ReanimComponent)
 			reanim.CurrentAnim = animName
 			reanim.CurrentFrame = 0
-			reanim.FrameCounter = 0
+			reanim.FrameAccumulator = 0.0
 			reanim.IsLooping = true
 			reanim.IsFinished = false
 		}
@@ -37,7 +37,7 @@ func (m *mockReanimSystem) PlayAnimationNoLoop(entityID ecs.EntityID, animName s
 			reanim := reanimComp.(*components.ReanimComponent)
 			reanim.CurrentAnim = animName
 			reanim.CurrentFrame = 0
-			reanim.FrameCounter = 0
+			reanim.FrameAccumulator = 0.0
 			reanim.IsLooping = false
 			reanim.IsFinished = false
 		}

@@ -583,3 +583,81 @@ func TestGetLevelProgress(t *testing.T) {
 		t.Errorf("Expected progress 3/3, got %d/%d", current, total)
 	}
 }
+
+// TestLoadLevel_InitialSun 测试 LoadLevel 是否正确应用初始阳光值 (Story 8.2 QA改进)
+func TestLoadLevel_InitialSun(t *testing.T) {
+	gs := GetGameState()
+
+	// 测试不同的初始阳光值
+	testCases := []struct {
+		name       string
+		initialSun int
+	}{
+		{"教学关卡 150 阳光", 150},
+		{"标准关卡 50 阳光", 50},
+		{"挑战关卡 0 阳光", 0},
+		{"特殊关卡 9999 阳光", 9999},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			levelConfig := &config.LevelConfig{
+				ID:   "test-level",
+				Name: tc.name,
+				Waves: []config.WaveConfig{
+					{Time: 10, Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
+				},
+				InitialSun: tc.initialSun,
+			}
+
+			// 加载关卡（应该覆盖当前阳光值）
+			gs.LoadLevel(levelConfig)
+
+			// 验证阳光值是否被正确设置
+			if gs.Sun != tc.initialSun {
+				t.Errorf("%s: Expected sun %d, got %d", tc.name, tc.initialSun, gs.Sun)
+			}
+		})
+	}
+}
+
+// TestLoadLevel1_1RealConfig 测试加载真实的 1-1 关卡配置
+func TestLoadLevel1_1RealConfig(t *testing.T) {
+	// 加载真实的 1-1 关卡配置
+	levelConfig, err := config.LoadLevelConfig("../../data/levels/level-1-1.yaml")
+	if err != nil {
+		t.Fatalf("Failed to load level-1-1.yaml: %v", err)
+	}
+
+	// 重置 GameState
+	globalGameState = nil
+	gs := GetGameState()
+
+	// 验证单例初始化的默认阳光值（应该是50）
+	if gs.Sun != 50 {
+		t.Errorf("Expected default sun 50 before loading level, got %d", gs.Sun)
+	}
+
+	// 加载关卡
+	gs.LoadLevel(levelConfig)
+
+	// 验证阳光值被关卡配置覆盖（应该是150）
+	if gs.Sun != 150 {
+		t.Errorf("Expected sun 150 from level config, got %d", gs.Sun)
+	}
+
+	// 验证其他关卡配置也正确加载
+	if gs.CurrentLevel.ID != "1-1" {
+		t.Errorf("Expected level ID '1-1', got '%s'", gs.CurrentLevel.ID)
+	}
+
+	if len(gs.CurrentLevel.EnabledLanes) != 1 || gs.CurrentLevel.EnabledLanes[0] != 3 {
+		t.Errorf("Expected enabled lanes [3], got %v", gs.CurrentLevel.EnabledLanes)
+	}
+
+	if len(gs.CurrentLevel.AvailablePlants) != 1 || gs.CurrentLevel.AvailablePlants[0] != "peashooter" {
+		t.Errorf("Expected available plants [peashooter], got %v", gs.CurrentLevel.AvailablePlants)
+	}
+
+	t.Logf("✓ Successfully loaded level 1-1 with initialSun=%d", gs.Sun)
+}

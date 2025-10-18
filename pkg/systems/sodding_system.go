@@ -10,11 +10,16 @@ import (
 )
 
 // SoddingSystem 管理铺草皮动画系统
-// Story 8.2 QA改进：完整的 SodRoll 草皮滚动动画
+// Story 8.2 优化：基于草皮卷图片中心的简化定位逻辑
 //
 // 功能：
 //   - 播放 SodRoll.reanim 草皮滚动动画（2.17秒，52帧 @ 24fps）
-//   - 追踪草皮卷位置，同步显示草皮叠加层
+//   - 根据动画进度线性插值计算草皮卷中心位置，同步显示草皮叠加层
+//
+// 定位原理：
+//   - X轴：草皮卷图片中心从草皮左边缘线性移动到草皮右边缘
+//   - Y轴：草皮卷图片中心与草皮叠加图Y中心对齐（都对齐到目标行中心）
+//   - 草皮可见宽度 = 草皮卷中心X - 草皮左边缘X
 type SoddingSystem struct {
 	entityManager   *ecs.EntityManager
 	resourceManager *game.ResourceManager
@@ -27,11 +32,12 @@ type SoddingSystem struct {
 	animationDuration  float64      // 动画总时长（秒）
 	animationStarted   bool         // 动画是否已经启动过（包括已完成的）
 
-	// 草皮卷位置追踪（用于同步草皮显示）
-	sodRollStartX  float64 // 草皮卷起始X坐标（来自 SodRoll.reanim 第1帧）
-	sodRollStartY  float64 // 草皮卷起始Y坐标（来自 SodRoll.reanim 第1帧）
-	sodRollEndX    float64 // 草皮卷结束X坐标
-	sodRollWidth   float64 // 草皮宽度（用于计算显示进度）
+	// 动画定位参数（基于网格坐标 + 可配置偏移）
+	animStartX float64 // 动画起点X（世界坐标）- 从配置计算
+	animStartY float64 // 动画起点Y（世界坐标）- 从配置计算
+
+	// 缓存最后一帧的中心位置（避免动画完成后跳跃）
+	lastFrameCenterX float64 // 动画结束时的实际中心X
 
 	// 动画完成回调
 	onAnimationComplete func() // 动画完成时调用
@@ -45,7 +51,7 @@ func NewSoddingSystem(entityManager *ecs.EntityManager, rm *game.ResourceManager
 		reanimSystem:       reanimSystem,
 		isAnimationPlaying: false,
 		animationTimer:     0,
-		animationDuration:  52.0 / 24.0, // 52帧 @ 24fps = 2.17秒
+		animationDuration:  0, // 将在 StartAnimation 时从 reanim 数据计算
 	}
 }
 
@@ -53,7 +59,9 @@ func NewSoddingSystem(entityManager *ecs.EntityManager, rm *game.ResourceManager
 // 参数：
 //   - onComplete: 动画完成时的回调函数
 //   - enabledLanes: 启用的行列表，如 [3] 或 [2,3,4]（用于计算动画位置）
-func (s *SoddingSystem) StartAnimation(onComplete func(), enabledLanes []int) {
+//   - sodOverlayX: 草皮叠加图的世界X坐标（左边缘）- 未使用，保留接口兼容性
+//   - sodImageHeight: 草皮图片的实际高度（sod1row=127, sod3row=355）- 用于Y坐标计算
+func (s *SoddingSystem) StartAnimation(onComplete func(), enabledLanes []int, sodOverlayX, sodImageHeight float64) {
 	if s.isAnimationPlaying {
 		log.Printf("[SoddingSystem] Animation already playing, ignoring")
 		return
@@ -62,35 +70,53 @@ func (s *SoddingSystem) StartAnimation(onComplete func(), enabledLanes []int) {
 	log.Printf("[SoddingSystem] Starting SodRoll animation for lanes %v", enabledLanes)
 	s.onAnimationComplete = onComplete
 	s.isAnimationPlaying = true
-	s.animationStarted = true  // 标记动画已经启动
+	s.animationStarted = true // 标记动画已经启动
 	s.animationTimer = 0
 
-	// 计算 SodRoll 实体的Position（动态适配行配置）
-	posX, posY := config.CalculateSodRollPosition(enabledLanes)
-	log.Printf("[SoddingSystem] Calculated SodRoll entity position: (%.1f, %.1f)", posX, posY)
+	// 加载 SodRoll Reanim 资源
+	reanimXML := s.resourceManager.GetReanimXML("SodRoll")
+	if reanimXML == nil {
+		log.Printf("[SoddingSystem] ERROR: Failed to load SodRoll reanim")
+		return
+	}
 
-	// 初始化草皮卷位置参数（用于追踪草皮显示进度）
-	// 注意：这里的坐标是"最终世界坐标"，用于草皮叠加图的显示控制
-	// 草皮卷动画从左向右滚动，当草皮卷到达某个X位置时，草皮叠加图在该位置之前应该显示
-	//
-	// 草皮叠加图从 X≈222 开始，宽771px，到X≈993
-	// 草皮卷应该从草皮叠加图的起点滚到终点
-	sodOverlayStartX := config.GridWorldStartX - 30.0 // 与 CalculateSodOverlayPosition 保持一致
-	s.sodRollStartX = sodOverlayStartX                  // 草皮卷从草皮叠加图起点开始
-	s.sodRollEndX = sodOverlayStartX + config.SodRowWidth // 滚到草皮叠加图终点
-	s.sodRollWidth = config.SodRowWidth
-	s.sodRollStartY = posY + config.SodRollBaseY
+	// 从 reanim 数据计算动画时长
+	maxFrames := 0
+	for _, track := range reanimXML.Tracks {
+		if len(track.Frames) > maxFrames {
+			maxFrames = len(track.Frames)
+		}
+	}
 
-	log.Printf("[SoddingSystem] Sod roll will animate from X=%.1f to X=%.1f", s.sodRollStartX, s.sodRollEndX)
+	fps := reanimXML.FPS
+	if fps == 0 {
+		fps = 12 // PVZ 默认 FPS
+	}
+
+	s.animationDuration = float64(maxFrames) / float64(fps)
+	log.Printf("[SoddingSystem] 从 reanim 读取: 帧数=%d, FPS=%d, 时长=%.2f秒",
+		maxFrames, fps, s.animationDuration)
+
+	// 从配置计算动画起点位置
+	// X坐标：基于网格坐标 + 可配置偏移（手工调节）
+	// Y坐标：自动对齐到目标行中心（读取 reanim 包围盒）
+	s.animStartX, s.animStartY = config.CalculateSodRollPosition(enabledLanes, sodImageHeight, reanimXML)
+
+	log.Printf("[SoddingSystem] ========== 草皮动画坐标配置 ==========")
+	log.Printf("[SoddingSystem] 目标行: %v", enabledLanes)
+	log.Printf("[SoddingSystem] 网格起点X: %.1f", config.GridWorldStartX)
+	log.Printf("[SoddingSystem] 配置偏移X: %.1f", config.SodRollStartOffsetX)
+	log.Printf("[SoddingSystem] 动画起点（计算）: (%.1f, %.1f)", s.animStartX, s.animStartY)
+	log.Printf("[SoddingSystem] ===========================================")
 
 	// 创建 SodRoll 草皮卷实体
-	s.createSodRollEntity(posX, posY)
+	s.createSodRollEntity(s.animStartX, s.animStartY)
 }
 
 // createSodRollEntity 创建草皮卷动画实体
 // 参数：
-//   - posX: 实体的世界X坐标（通常为0）
-//   - posY: 实体的世界Y坐标（动态调整，让动画对齐目标行）
+//   - posX: 实体的世界X坐标
+//   - posY: 实体的世界Y坐标（动态调整，让动画Y中心对齐目标行）
 func (s *SoddingSystem) createSodRollEntity(posX, posY float64) {
 	// 加载 SodRoll Reanim 资源
 	reanimXML := s.resourceManager.GetReanimXML("SodRoll")
@@ -108,11 +134,9 @@ func (s *SoddingSystem) createSodRollEntity(posX, posY float64) {
 	s.sodRollEntityID = s.entityManager.CreateEntity()
 
 	// 添加位置组件
-	// Position + reanim坐标 = 最终世界坐标
-	// 例如：第3行时，posY=78，reanim.Y=244，最终Y=322（第3行中心）
 	ecs.AddComponent(s.entityManager, s.sodRollEntityID, &components.PositionComponent{
-		X: posX, // 通常为0，让reanim的X直接等于世界坐标
-		Y: posY, // 动态调整，让reanim的基准Y对齐目标行
+		X: posX,
+		Y: posY,
 	})
 
 	// 添加 ReanimComponent
@@ -150,10 +174,6 @@ func (s *SoddingSystem) Update(deltaTime float64) {
 
 	s.animationTimer += deltaTime
 
-	// 注意：不需要手动更新实体Position.X
-	// SodRoll.reanim 会自己播放动画（x 从 10.3 到 769.7）
-	// 实体Position保持为(0, posY)，最终世界坐标 = Position + reanim坐标
-
 	// 检查动画是否完成
 	if s.animationTimer >= s.animationDuration {
 		s.completeAnimation()
@@ -164,8 +184,13 @@ func (s *SoddingSystem) Update(deltaTime float64) {
 func (s *SoddingSystem) completeAnimation() {
 	log.Printf("[SoddingSystem] Animation complete, cleaning up entities")
 
-	// 标记草皮卷实体为过期（LifetimeSystem 会自动清理）
+	// 保存最后一帧的中心位置（避免完成后跳跃）
+	// 在标记实体过期之前读取位置
 	if s.sodRollEntityID != 0 {
+		s.lastFrameCenterX = s.calculateCurrentCenterX()
+		log.Printf("[SoddingSystem] 缓存最后一帧中心位置: %.1f", s.lastFrameCenterX)
+
+		// 标记草皮卷实体为过期（LifetimeSystem 会自动清理）
 		if lifetime, ok := ecs.GetComponent[*components.LifetimeComponent](s.entityManager, s.sodRollEntityID); ok {
 			lifetime.IsExpired = true
 		}
@@ -199,21 +224,95 @@ func (s *SoddingSystem) GetProgress() float64 {
 	return progress
 }
 
-// GetSodRollPosition 返回草皮卷当前X坐标（世界坐标）
+// GetSodRollCenterX 返回草皮卷图片中心当前X坐标（世界坐标）
 // 用于同步草皮叠加层的显示
-// 注意：返回的是"逻辑上的草皮卷位置"，用于控制草皮叠加图的显示范围
-func (s *SoddingSystem) GetSodRollPosition() float64 {
-	// 动画未启动：返回起点（不显示草皮）
+//
+// 定位原理：
+//   - 读取 SodRoll 动画当前帧的实际位置
+//   - 计算整体包围盒的中心X坐标
+//   - 草皮可见宽度 = 中心X - 动画起点X
+func (s *SoddingSystem) GetSodRollCenterX() float64 {
+	// 动画未启动：返回起点（草皮不可见）
 	if !s.animationStarted {
-		return s.sodRollStartX
+		return s.animStartX
 	}
 
-	// 动画已完成：返回终点（完整显示草皮）
+	// 动画已完成：返回缓存的最后一帧中心位置（避免跳跃）
 	if !s.isAnimationPlaying {
-		return s.sodRollEndX
+		return s.lastFrameCenterX
 	}
 
-	// 动画进行中：根据进度计算位置
-	progress := s.GetProgress()
-	return s.sodRollStartX + (s.sodRollEndX-s.sodRollStartX)*progress
+	// 动画进行中：读取实际位置
+	return s.calculateCurrentCenterX()
+}
+
+// GetAnimStartX 返回动画起点X坐标（世界坐标）
+// 用于计算草皮可见宽度：visibleWidth = GetSodRollCenterX() - GetAnimStartX()
+func (s *SoddingSystem) GetAnimStartX() float64 {
+	return s.animStartX
+}
+
+// calculateCurrentCenterX 计算草皮卷当前帧的中心X坐标（世界坐标）
+func (s *SoddingSystem) calculateCurrentCenterX() float64 {
+	// 获取 ReanimComponent
+	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, s.sodRollEntityID)
+	if !ok {
+		// 降级：返回起点
+		return s.animStartX
+	}
+
+	// 获取实体Position
+	posComp, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, s.sodRollEntityID)
+	if !ok {
+		// 降级：返回起点
+		return s.animStartX
+	}
+
+	// 计算整体包围盒的中心X坐标
+	// 策略：遍历所有轨道，找到当前帧所有部件的X范围，取中心
+	var minX, maxX *float64
+
+	for _, track := range reanimComp.Reanim.Tracks {
+		// 计算当前帧索引
+		frameIndex := int(reanimComp.CurrentFrame)
+		if frameIndex >= len(track.Frames) {
+			frameIndex = len(track.Frames) - 1
+		}
+		if frameIndex < 0 {
+			continue
+		}
+
+		frame := track.Frames[frameIndex]
+		if frame.X != nil {
+			x := *frame.X
+			if minX == nil || x < *minX {
+				minX = &x
+			}
+			if maxX == nil || x > *maxX {
+				maxX = &x
+			}
+		}
+	}
+
+	// 如果没有找到任何X坐标，返回起点
+	if minX == nil || maxX == nil {
+		return s.animStartX
+	}
+
+	// 计算包围盒中心X（相对于实体Position）
+	// 草皮卷图片右边有透明边，所以追踪中心而不是右边缘
+	centerX := (*minX + *maxX) / 2.0
+
+	// 转换为世界坐标
+	worldCenterX := posComp.X + centerX
+
+	// 调试日志（每10帧输出一次）
+	frameIndex := int(reanimComp.CurrentFrame)
+	if frameIndex%10 == 0 || frameIndex == 0 || frameIndex == len(reanimComp.Reanim.Tracks[0].Frames)-1 {
+		progress := s.GetProgress()
+		log.Printf("[SoddingSystem] 帧:%d, 进度:%.1f%%, 包围盒:[%.1f,%.1f], 中心:%.1f",
+			frameIndex, progress*100, *minX, *maxX, worldCenterX)
+	}
+
+	return worldCenterX
 }

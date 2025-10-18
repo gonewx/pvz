@@ -41,7 +41,7 @@ func init() {
 // TestCheckAABBCollision_Hit 测试AABB碰撞检测 - 碰撞盒重叠
 func TestCheckAABBCollision_Hit(t *testing.T) {
 	em := ecs.NewEntityManager()
-	rm := game.NewResourceManager(testAudioContext)
+	rm := game.NewResourceManager(getTestAudioContext())
 	ps := NewPhysicsSystem(em, rm)
 
 	tests := []struct {
@@ -104,7 +104,7 @@ func TestCheckAABBCollision_Hit(t *testing.T) {
 // TestCheckAABBCollision_Miss 测试AABB碰撞检测 - 碰撞盒不重叠
 func TestCheckAABBCollision_Miss(t *testing.T) {
 	em := ecs.NewEntityManager()
-	rm := game.NewResourceManager(testAudioContext)
+	rm := game.NewResourceManager(getTestAudioContext())
 	ps := NewPhysicsSystem(em, rm)
 
 	tests := []struct {
@@ -158,7 +158,7 @@ func TestCheckAABBCollision_Miss(t *testing.T) {
 // TestPhysicsSystem_BulletZombieCollision 测试子弹与僵尸碰撞
 func TestPhysicsSystem_BulletZombieCollision(t *testing.T) {
 	em := ecs.NewEntityManager()
-	rm := game.NewResourceManager(testAudioContext)
+	rm := game.NewResourceManager(getTestAudioContext())
 	ps := NewPhysicsSystem(em, rm)
 
 	// 创建豌豆子弹实体
@@ -232,7 +232,7 @@ func TestPhysicsSystem_BulletZombieCollision(t *testing.T) {
 // TestPhysicsSystem_NoCollision 测试无碰撞情况
 func TestPhysicsSystem_NoCollision(t *testing.T) {
 	em := ecs.NewEntityManager()
-	rm := game.NewResourceManager(testAudioContext)
+	rm := game.NewResourceManager(getTestAudioContext())
 	ps := NewPhysicsSystem(em, rm)
 
 	// 创建豌豆子弹实体
@@ -284,7 +284,7 @@ func TestPhysicsSystem_NoCollision(t *testing.T) {
 // TestPhysicsSystem_BulletDamagesZombie 测试子弹击中僵尸时生命值正确减少
 func TestPhysicsSystem_BulletDamagesZombie(t *testing.T) {
 	em := ecs.NewEntityManager()
-	rm := game.NewResourceManager(testAudioContext)
+	rm := game.NewResourceManager(getTestAudioContext())
 	ps := NewPhysicsSystem(em, rm)
 
 	// 创建豌豆子弹实体
@@ -344,7 +344,7 @@ func TestPhysicsSystem_BulletDamagesZombie(t *testing.T) {
 // TestPhysicsSystem_MultipleHits 测试多次击中累计伤害
 func TestPhysicsSystem_MultipleHits(t *testing.T) {
 	em := ecs.NewEntityManager()
-	rm := game.NewResourceManager(testAudioContext)
+	rm := game.NewResourceManager(getTestAudioContext())
 	ps := NewPhysicsSystem(em, rm)
 
 	// 创建僵尸实体
@@ -426,7 +426,7 @@ func TestPhysicsSystem_MultipleHits(t *testing.T) {
 // TestPhysicsSystem_HitSoundPlays 测试击中音效播放（Story 4.4: AC 5）
 func TestPhysicsSystem_HitSoundPlays(t *testing.T) {
 	em := ecs.NewEntityManager()
-	rm := game.NewResourceManager(testAudioContext)
+	rm := game.NewResourceManager(getTestAudioContext())
 	ps := NewPhysicsSystem(em, rm)
 
 	// 创建豌豆子弹实体
@@ -495,7 +495,7 @@ func TestPhysicsSystem_HitSoundPlays(t *testing.T) {
 func TestPeaHitParticleEffect(t *testing.T) {
 	// 准备测试环境
 	em := ecs.NewEntityManager()
-	rm := game.NewResourceManager(testAudioContext)
+	rm := game.NewResourceManager(getTestAudioContext())
 
 	// 加载粒子配置（模拟真实环境）
 	if _, err := rm.LoadParticleConfig("PeaSplat"); err != nil {
@@ -617,7 +617,7 @@ func TestPeaHitParticleEffect(t *testing.T) {
 func TestPeaHitParticleEffectErrorHandling(t *testing.T) {
 	// 准备测试环境（不加载粒子配置，模拟失败场景）
 	em := ecs.NewEntityManager()
-	rm := game.NewResourceManager(testAudioContext)
+	rm := game.NewResourceManager(getTestAudioContext())
 	ps := NewPhysicsSystem(em, rm)
 
 	// 创建豌豆子弹实体
@@ -680,7 +680,7 @@ func TestPeaHitParticleEffectErrorHandling(t *testing.T) {
 func TestMultipleBulletsParticleEffects(t *testing.T) {
 	// 准备测试环境
 	em := ecs.NewEntityManager()
-	rm := game.NewResourceManager(testAudioContext)
+	rm := game.NewResourceManager(getTestAudioContext())
 
 	// 加载粒子配置
 	if _, err := rm.LoadParticleConfig("PeaSplat"); err != nil {

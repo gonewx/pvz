@@ -44,7 +44,7 @@ func init() {
 func TestZombieDeathParticleEffect(t *testing.T) {
 	// 准备测试环境
 	em := ecs.NewEntityManager()
-	rm := game.NewResourceManager(testAudioContext)
+	rm := game.NewResourceManager(getTestAudioContext())
 	rs := NewReanimSystem(em)
 	gs := game.GetGameState()
 
@@ -147,8 +147,8 @@ func TestZombieDeathParticleEffect(t *testing.T) {
 func TestCherryBombExplosionParticleEffect(t *testing.T) {
 	// 准备测试环境
 	em := ecs.NewEntityManager()
-	// 使用共享的 testAudioContext
-	rm := game.NewResourceManager(testAudioContext)
+	// 使用共享的 getTestAudioContext()
+	rm := game.NewResourceManager(getTestAudioContext())
 	rs := NewReanimSystem(em)
 	gs := game.GetGameState()
 
@@ -243,8 +243,8 @@ func TestCherryBombExplosionParticleEffect(t *testing.T) {
 func TestParticleEffectErrorHandling(t *testing.T) {
 	// 准备测试环境（不加载粒子配置，模拟失败场景）
 	em := ecs.NewEntityManager()
-	// 使用共享的 testAudioContext
-	rm := game.NewResourceManager(testAudioContext)
+	// 使用共享的 getTestAudioContext()
+	rm := game.NewResourceManager(getTestAudioContext())
 	rs := NewReanimSystem(em)
 	gs := game.GetGameState()
 
@@ -297,8 +297,8 @@ func TestParticleEffectErrorHandling(t *testing.T) {
 func TestZombieDeathNoPosition(t *testing.T) {
 	// 准备测试环境
 	em := ecs.NewEntityManager()
-	// 使用共享的 testAudioContext
-	rm := game.NewResourceManager(testAudioContext)
+	// 使用共享的 getTestAudioContext()
+	rm := game.NewResourceManager(getTestAudioContext())
 	rs := NewReanimSystem(em)
 	gs := game.GetGameState()
 
@@ -336,8 +336,8 @@ func TestZombieDeathNoPosition(t *testing.T) {
 func TestCherryBombExplosionNoPosition(t *testing.T) {
 	// 准备测试环境
 	em := ecs.NewEntityManager()
-	// 使用共享的 testAudioContext
-	rm := game.NewResourceManager(testAudioContext)
+	// 使用共享的 getTestAudioContext()
+	rm := game.NewResourceManager(getTestAudioContext())
 	rs := NewReanimSystem(em)
 	gs := game.GetGameState()
 

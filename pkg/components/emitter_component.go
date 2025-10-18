@@ -55,4 +55,7 @@ type EmitterComponent struct {
 	// System-level properties (Story 7.5: ZombieHead 系统透明度)
 	SystemAlphaKeyframes []particle.Keyframe // 系统级透明度关键帧（影响所有粒子）
 	SystemAlphaInterp    string              // 插值模式
+
+	// Angle offset (角度偏移)
+	AngleOffset float64 // LaunchAngle 的偏移量（度），例如 180° 用于翻转方向
 }

@@ -79,6 +79,12 @@ type GameScene struct {
 	soddingAnimTimer   float64       // 铺草皮动画延迟计时器
 	sodDebugPrinted    bool          // 草皮叠加图调试日志是否已打印
 
+	// 性能优化：缓存草皮渲染参数，避免每帧重复计算
+	sodOverlayX float64 // 草皮世界坐标X（缓存）
+	sodOverlayY float64 // 草皮世界坐标Y（缓存）
+	sodWidth    int     // 草皮图片宽度（缓存）
+	sodHeight   int     // 草皮图片高度（缓存）
+
 	// Font Resources
 	sunCounterFont *text.GoTextFace // Font for sun counter display
 	plantCardFont  *text.GoTextFace // Font for plant card sun cost display
@@ -178,6 +184,21 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	// Initialize ECS framework
 	scene.entityManager = ecs.NewEntityManager()
 
+	// Story 5.5 & 8.1: Load level configuration FIRST (before creating systems that depend on it)
+	// CRITICAL: This must happen before:
+	//   1. LawnGridSystem (needs EnabledLanes)
+	//   2. initPlantCardSystems() (needs AvailablePlants)
+	//   3. WaveSpawnSystem (needs wave configuration)
+	levelConfig, err := config.LoadLevelConfig("data/levels/level-1-1.yaml")
+	if err != nil {
+		log.Printf("[GameScene] FATAL: Failed to load level config: %v", err)
+		log.Printf("[GameScene] Game cannot start without level configuration")
+	} else {
+		scene.gameState.LoadLevel(levelConfig)
+		log.Printf("[GameScene] Loaded level: %s (%d waves, %d plants available, enabled lanes: %v)",
+			levelConfig.Name, len(levelConfig.Waves), len(levelConfig.AvailablePlants), levelConfig.EnabledLanes)
+	}
+
 	// Initialize systems
 	scene.renderSystem = systems.NewRenderSystem(scene.entityManager)
 	scene.sunMovementSystem = systems.NewSunMovementSystem(scene.entityManager)
@@ -191,6 +212,7 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	sunCollectionTargetY := float64(SeedBankY + SunCounterOffsetY)
 
 	// Story 3.3 & 8.1: Initialize lawn grid system and entity with enabled lanes
+	// Now CurrentLevel is loaded, so we can read EnabledLanes correctly
 	var enabledLanes []int
 	if scene.gameState.CurrentLevel != nil {
 		enabledLanes = scene.gameState.CurrentLevel.EnabledLanes
@@ -239,19 +261,6 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 		550.0,              // maxTargetY - 草坪下边界
 	)
 
-	// Story 5.5: Load level configuration FIRST (before creating plant cards)
-	// CRITICAL: This must happen before initPlantCardSystems() because plant cards
-	// are created based on CurrentLevel.AvailablePlants
-	levelConfig, err := config.LoadLevelConfig("data/levels/level-1-1.yaml")
-	if err != nil {
-		log.Printf("[GameScene] FATAL: Failed to load level config: %v", err)
-		log.Printf("[GameScene] Game cannot start without level configuration")
-	} else {
-		scene.gameState.LoadLevel(levelConfig)
-		log.Printf("[GameScene] Loaded level: %s (%d waves, %d plants available)",
-			levelConfig.Name, len(levelConfig.Waves), len(levelConfig.AvailablePlants))
-	}
-
 	// Story 8.2 QA改进：关卡加载后，加载草皮相关资源
 	scene.loadSoddingResources()
 
@@ -261,7 +270,8 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 
 	// Story 3.2: Initialize plant preview systems
 	// PlantPreviewRenderSystem 需要引用 PlantPreviewSystem 来获取两个渲染位置
-	scene.plantPreviewSystem = systems.NewPlantPreviewSystem(scene.entityManager, scene.gameState)
+	// Story 8.1: PlantPreviewSystem 需要 LawnGridSystem 来检查行是否启用
+	scene.plantPreviewSystem = systems.NewPlantPreviewSystem(scene.entityManager, scene.gameState, scene.lawnGridSystem)
 	scene.plantPreviewRenderSystem = systems.NewPlantPreviewRenderSystem(scene.entityManager, scene.plantPreviewSystem)
 
 	// Story 3.4: Initialize behavior system (sunflower sun production, etc.)
@@ -529,6 +539,16 @@ func (s *GameScene) loadSoddingResources() {
 			s.sodRowImage = sodRowImage
 			log.Printf("[GameScene] ✅ 合成草皮叠加图片 (RGB + Alpha): %s", sodImageID)
 
+			// 性能优化：缓存草皮图片尺寸和位置，避免每帧重复计算
+			sodBounds := sodRowImage.Bounds()
+			s.sodWidth = sodBounds.Dx()
+			s.sodHeight = sodBounds.Dy()
+
+			// 计算并缓存草皮世界坐标
+			enabledLanes := s.gameState.CurrentLevel.EnabledLanes
+			s.sodOverlayX, s.sodOverlayY = config.CalculateSodOverlayPosition(enabledLanes, float64(s.sodHeight))
+			log.Printf("[GameScene] 缓存草皮渲染参数: 位置(%.1f, %.1f) 尺寸(%dx%d)", s.sodOverlayX, s.sodOverlayY, s.sodWidth, s.sodHeight)
+
 			// 启动铺草皮动画（如果配置了）
 			if s.gameState.CurrentLevel.ShowSoddingAnim {
 				// 记录延迟时间，在 Update() 中延迟启动动画
@@ -558,12 +578,13 @@ func (s *GameScene) Update(deltaTime float64) {
 		if s.soddingAnimTimer >= s.soddingAnimDelay {
 			log.Printf("[GameScene] 启动铺草皮动画（延迟 %.1f 秒后）", s.soddingAnimDelay)
 
-			// 启动动画，传递启用的行列表
+			// 启动动画，传递启用的行列表、草皮位置和图片高度
+			// 使用缓存的草皮位置确保与渲染位置一致
 			enabledLanes := s.gameState.CurrentLevel.EnabledLanes
 			s.soddingSystem.StartAnimation(func() {
 				// 动画完成回调：不需要做任何事情，渲染会自动显示完整草皮
 				log.Printf("[GameScene] 铺草皮动画完成")
-			}, enabledLanes)
+			}, enabledLanes, s.sodOverlayX, float64(s.sodHeight))
 
 			s.soddingAnimStarted = true
 		}
@@ -726,6 +747,11 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 
 	// DEBUG: Draw grid boundaries (Story 3.3 debugging)
 	s.drawGridDebug(screen)
+
+	// DEBUG: Draw FPS counter to check performance
+	fps := ebiten.ActualFPS()
+	fpsText := fmt.Sprintf("FPS: %.1f", fps)
+	ebitenutil.DebugPrintAt(screen, fpsText, WindowWidth-100, 10)
 }
 
 // drawBackground renders the lawn background.
@@ -775,28 +801,28 @@ func (s *GameScene) drawBackground(screen *ebiten.Image) {
 
 		// Story 8.2 QA改进：在背景上叠加草皮图片（随草皮卷位置同步显示）
 		if s.sodRowImage != nil && s.gameState.CurrentLevel != nil {
-			// sod1row.jpg + sod1row_.png 合成后的尺寸：771x127（只有一行草皮，带透明边缘）
-			// sod3row.jpg + sod3row_.png 合成后的尺寸：771x355（三行草皮）
-			sodBounds := s.sodRowImage.Bounds()
-			sodWidth := sodBounds.Dx()
-			sodHeight := sodBounds.Dy()
+			// 性能优化：使用缓存的尺寸和位置，避免每帧重复计算
+			sodWidth := s.sodWidth
+			sodHeight := s.sodHeight
+			sodOverlayX := s.sodOverlayX
+			sodOverlayY := s.sodOverlayY
 
-			// 计算草皮叠加图的世界位置（基于启用的行）
-			enabledLanes := s.gameState.CurrentLevel.EnabledLanes
-			sodOverlayX, sodOverlayY := config.CalculateSodOverlayPosition(enabledLanes, float64(sodHeight))
-
-			// 获取草皮卷当前位置（世界坐标X）
-			// SoddingSystem.GetSodRollPosition() 会根据动画状态返回正确的位置：
-			// - 未启动：sodRollStartX（不显示草皮）
-			// - 进行中：sodRollStartX + progress * (sodRollEndX - sodRollStartX)
-			// - 已完成：sodRollEndX（完整显示草皮）
-			var sodRollPosX float64 = sodOverlayX // 默认起点（不显示）
+			// 获取草皮卷当前位置（世界坐标X，中心）
+			// 草皮可见宽度 = 草皮卷中心X - 动画起点X
+			var sodRollCenterX float64
+			var animStartX float64
 			if s.soddingSystem != nil {
-				sodRollPosX = s.soddingSystem.GetSodRollPosition()
+				sodRollCenterX = s.soddingSystem.GetSodRollCenterX() // 返回草皮卷中心X
+				animStartX = s.soddingSystem.GetAnimStartX()         // 返回动画起点X
+			} else {
+				// 没有 soddingSystem：不显示草皮
+				sodRollCenterX = sodOverlayX - 10
+				animStartX = sodOverlayX
 			}
 
-			// 根据草皮卷位置计算可见宽度（从草皮起始位置到草皮卷位置）
-			visibleWidth := int(sodRollPosX - sodOverlayX)
+			// 根据草皮卷中心位置计算可见宽度（从动画起点到草皮卷中心）
+			// visibleWidth = sodRollCenterX（草皮卷中心） - animStartX（动画起点）
+			visibleWidth := int(sodRollCenterX - animStartX)
 			if visibleWidth > sodWidth {
 				visibleWidth = sodWidth
 			}
@@ -805,9 +831,6 @@ func (s *GameScene) drawBackground(screen *ebiten.Image) {
 			}
 
 			// 计算视口裁剪区域（水平方向）
-			// 草皮世界坐标起始位置：sodOverlayX
-			// 视口起始位置：viewportX (= cameraX)
-			// 裁剪起点 = viewportX - sodOverlayX
 			sodViewportX := viewportX - int(sodOverlayX)
 			if sodViewportX < 0 {
 				sodViewportX = 0
@@ -830,19 +853,24 @@ func (s *GameScene) drawBackground(screen *ebiten.Image) {
 			visibleSod := s.sodRowImage.SubImage(sodViewportRect).(*ebiten.Image)
 
 			// 计算草皮在屏幕上的绘制位置
-			// 屏幕 X = 草皮世界 X - 摄像机 X = sodOverlayX - cameraX
-			// 屏幕 Y = 草皮世界 Y - 视口 Y = sodOverlayY - viewportY
 			screenX := sodOverlayX - float64(viewportX)
 			screenY := sodOverlayY - float64(viewportY)
 
-			// Story 8.2 QA调试：打印草皮叠加图的坐标信息（只打印一次）
-			if !s.sodDebugPrinted && visibleWidth > 0 {
-				log.Printf("=== 草皮叠加图渲染调试 ===")
-				log.Printf("草皮图尺寸: %dx%d", sodWidth, sodHeight)
-				log.Printf("启用行: %v", enabledLanes)
+			// Story 8.2 QA调试：打印草皮叠加图的坐标信息（每次都打印，便于对比）
+			log.Printf("=== 草皮叠加图渲染调试 ===")
+			log.Printf("草皮图尺寸: %dx%d", sodWidth, sodHeight)
+			log.Printf("启用行: %v", s.gameState.CurrentLevel.EnabledLanes)
+			log.Printf("草皮左边缘: %.1f, 草皮右边缘: %.1f (宽度%.1f)", sodOverlayX, sodOverlayX+float64(sodWidth), float64(sodWidth))
+			log.Printf("动画起点: %.1f", animStartX)
+			log.Printf("草皮卷中心: %.1f", sodRollCenterX)
+			log.Printf("草皮可见宽度: %d/%d px (%.1f%%)", visibleWidth, sodWidth, float64(visibleWidth)/float64(sodWidth)*100)
+			log.Printf("草皮应显示到: %.1f (起点%.1f + 可见宽度%d)", animStartX+float64(visibleWidth), animStartX, visibleWidth)
+			log.Printf("差距: 草皮卷中心 - 草皮应显示到 = %.1f - %.1f = %.1f px",
+				sodRollCenterX, animStartX+float64(visibleWidth), sodRollCenterX-(animStartX+float64(visibleWidth)))
+			log.Printf("屏幕坐标: (%.1f, %.1f)", screenX, screenY)
+
+			if !s.sodDebugPrinted {
 				log.Printf("草皮世界坐标: (%.1f, %.1f)", sodOverlayX, sodOverlayY)
-				log.Printf("屏幕坐标: (%.1f, %.1f)", screenX, screenY)
-				log.Printf("可见宽度: %d/%d px", visibleWidth, sodWidth)
 
 				// 计算草皮覆盖的行范围
 				sodTopY := sodOverlayY
@@ -991,7 +1019,8 @@ func (s *GameScene) drawParticleTestInstructions(screen *ebiten.Image) {
 // drawGridDebug 绘制草坪网格边界（调试用）
 // 在开发阶段帮助可视化可种植区域
 func (s *GameScene) drawGridDebug(screen *ebiten.Image) {
-	// 只在种植模式下显示网格
+	// Story 8.2 QA: 临时启用调试绘制，验证草坪布局
+	// 只在种植模式（选中植物卡片）时显示网格线
 	if !s.gameState.IsPlantingMode {
 		return
 	}
@@ -1023,6 +1052,67 @@ func (s *GameScene) drawGridDebug(screen *ebiten.Image) {
 		y := gridScreenStartY + float64(row)*cellHeight
 		ebitenutil.DrawLine(screen, gridScreenStartX, y, gridScreenStartX+float64(gridColumns)*cellWidth, y, gridColor)
 	}
+
+	// Story 8.2 QA: 绘制草皮叠加图边界（红色矩形）
+	if s.sodRowImage != nil {
+		// 性能优化：使用缓存的尺寸和位置
+		sodWidth := float64(s.sodWidth)
+		sodHeight := float64(s.sodHeight)
+		sodOverlayX := s.sodOverlayX
+		sodOverlayY := s.sodOverlayY
+
+		// 转换为屏幕坐标
+		sodScreenX := sodOverlayX - s.cameraX
+		sodScreenY := sodOverlayY
+
+		// Story 8.2 QA：调试可视化（已禁用）
+		/*
+			// 绘制草皮边界（红色矩形框，不填充）
+			sodColor := color.RGBA{R: 255, G: 0, B: 0, A: 255}
+			thickness := 3.0
+			// 顶边
+			ebitenutil.DrawRect(screen, sodScreenX, sodScreenY, sodWidth, thickness, sodColor)
+			// 底边
+			ebitenutil.DrawRect(screen, sodScreenX, sodScreenY+sodHeight-thickness, sodWidth, thickness, sodColor)
+			// 左边
+			ebitenutil.DrawRect(screen, sodScreenX, sodScreenY, thickness, sodHeight, sodColor)
+			// 右边
+			ebitenutil.DrawRect(screen, sodScreenX+sodWidth-thickness, sodScreenY, thickness, sodHeight, sodColor)
+
+			// 绘制草皮卷中心位置标记（绿色十字）
+			if s.soddingSystem != nil && s.soddingSystem.IsPlaying() {
+				sodRollCenterX := s.soddingSystem.GetSodRollCenterX()
+				sodRollScreenX := sodRollCenterX - s.cameraX
+
+				// 绘制绿色十字标记（中心位置）
+				crossSize := 10.0
+				crossColor := color.RGBA{R: 0, G: 255, B: 0, A: 255}
+				// 竖线
+				ebitenutil.DrawRect(screen, sodRollScreenX-1, sodScreenY-crossSize, 2, sodHeight+crossSize*2, crossColor)
+				// 横线（在草皮中间）
+				midY := sodScreenY + sodHeight/2.0
+				ebitenutil.DrawRect(screen, sodRollScreenX-crossSize, midY-1, crossSize*2, 2, crossColor)
+			}
+		*/
+
+		// 详细调试信息
+		debugInfo := fmt.Sprintf("Sod: world(%.0f,%.0f) screen(%.0f,%.0f) size(%.0fx%.0f) cam(%.0f)",
+			sodOverlayX, sodOverlayY, sodScreenX, sodScreenY, sodWidth, sodHeight, s.cameraX)
+		ebitenutil.DebugPrintAt(screen, debugInfo, 10, 30)
+
+		// 草皮卷中心位置调试信息
+		if s.soddingSystem != nil && s.soddingSystem.IsPlaying() {
+			sodRollCenterX := s.soddingSystem.GetSodRollCenterX() // 返回中心X坐标
+			progress := s.soddingSystem.GetProgress()
+			capInfo := fmt.Sprintf("草皮卷中心: world(%.0f) screen(%.0f) progress(%.1f%%)",
+				sodRollCenterX, sodRollCenterX-s.cameraX, progress*100)
+			ebitenutil.DebugPrintAt(screen, capInfo, 10, 50)
+		}
+	}
+
+	// 绘制坐标信息文本
+	debugText := fmt.Sprintf("Grid: (%.0f, %.0f), Cell: %.0fx%.0f", gridWorldStartX, gridWorldStartY, cellWidth, cellHeight)
+	ebitenutil.DebugPrintAt(screen, debugText, 10, 10)
 }
 
 // drawLevelProgress renders the level progress indicator (Story 5.5)

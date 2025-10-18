@@ -18,6 +18,7 @@ import (
 //   - rm: ResourceManager instance for loading particle configurations
 //   - effectName: Name of the particle effect (e.g., "Award", "BossExplosion")
 //   - worldX, worldY: World coordinates where the emitter should be positioned
+//   - angleOffset: (Optional) Angle offset in degrees to add to LaunchAngle (e.g., 180 to flip direction)
 //
 // Returns:
 //   - ecs.EntityID: The ID of the created emitter entity
@@ -25,12 +26,20 @@ import (
 //
 // Example:
 //
+//	// Simple usage (no offset)
 //	emitterID, err := CreateParticleEffect(entityManager, resourceManager, "Award", 400, 300)
-//	if err != nil {
-//	    log.Printf("Failed to create particle effect: %v", err)
-//	}
-func CreateParticleEffect(em *ecs.EntityManager, rm *game.ResourceManager, effectName string, worldX, worldY float64) (ecs.EntityID, error) {
-	log.Printf("[ParticleFactory] CreateParticleEffect 被调用: effectName='%s', 位置=(%.1f, %.1f)", effectName, worldX, worldY)
+//
+//	// With angle offset (flip direction for zombie walking right)
+//	emitterID, err := CreateParticleEffect(entityManager, resourceManager, "ZombieHead", 400, 300, 180.0)
+func CreateParticleEffect(em *ecs.EntityManager, rm *game.ResourceManager, effectName string, worldX, worldY float64, angleOffset ...float64) (ecs.EntityID, error) {
+	// Determine angle offset (default: 0 = no offset)
+	offset := 0.0
+	if len(angleOffset) > 0 {
+		offset = angleOffset[0]
+	}
+
+	log.Printf("[ParticleFactory] CreateParticleEffect 被调用: effectName='%s', 位置=(%.1f, %.1f), angleOffset=%.1f°",
+		effectName, worldX, worldY, offset)
 
 	// Load particle configuration from ResourceManager
 	particleConfig, err := rm.LoadParticleConfig(effectName)
@@ -102,6 +111,8 @@ func CreateParticleEffect(em *ecs.EntityManager, rm *game.ResourceManager, effec
 			// Story 7.5: SystemAlpha
 			SystemAlphaKeyframes: systemAlphaKeyframes,
 			SystemAlphaInterp:    systemAlphaInterp,
+			// Angle offset
+			AngleOffset: offset,
 		}
 		em.AddComponent(emitterID, emitterComp)
 

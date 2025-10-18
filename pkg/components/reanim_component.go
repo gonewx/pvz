@@ -28,9 +28,10 @@ type ReanimComponent struct {
 	// This is the frame number in the animation sequence, not the game loop frame.
 	CurrentFrame int
 
-	// FrameCounter is the frame counter for FPS control.
-	// Incremented each game loop tick; when it reaches frameSkip, CurrentFrame advances.
-	FrameCounter int
+	// FrameAccumulator is the frame accumulator for precise FPS control (float64).
+	// Accumulates deltaTime until it reaches the time for one animation frame (1.0/fps).
+	// This ensures accurate playback speed regardless of game loop framerate.
+	FrameAccumulator float64
 
 	// VisibleFrameCount is the number of visible frames in the current animation.
 	// Used to determine when to loop the animation (when CurrentFrame >= VisibleFrameCount).

@@ -339,12 +339,35 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 	if !ok {
 		log.Printf("[BehaviorSystem] 警告：僵尸 %d 缺少 PositionComponent，无法触发粒子效果", entityID)
 	} else {
+		// Story 7.6: 检测僵尸行进方向，计算粒子角度偏移
+		// 粒子效果应该在僵尸行进的反方向飞出
+		//
+		// 角度系统：标准屏幕坐标系（0°=右，90°=下，180°=左，270°=上）
+		// ZombieHead 配置：LaunchAngle [150-185°] ≈ 向左下
+		// 该配置是为**向右走的僵尸**设计的（头向左后方飞）
+		//
+		// 我们游戏中僵尸通常向左走，需要翻转方向
+		angleOffset := 180.0 // 默认翻转（适合僵尸向左走）
+		velocity, hasVelocity := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID)
+		if hasVelocity {
+			if velocity.VX > 0 {
+				// 僵尸向右走 → 配置已经正确 → 不翻转
+				angleOffset = 0.0
+			} else {
+				// 僵尸向左走 → 配置方向相反 → 翻转 180°
+				// [150-185°] + 180° = [330-365°] = [-30 to 5°] → 向右后方
+				angleOffset = 180.0
+			}
+			log.Printf("[BehaviorSystem] 僵尸 %d 方向: VX=%.1f → 粒子角度偏移=%.0f°", entityID, velocity.VX, angleOffset)
+		}
+
 		// Story 7.4: 触发僵尸手臂掉落粒子效果
 		_, err := entities.CreateParticleEffect(
 			s.entityManager,
 			s.resourceManager,
 			"MoweredZombieArm", // 粒子效果名称（不带.xml后缀）
 			position.X, position.Y,
+			angleOffset, // Story 7.6: 传递角度偏移
 		)
 		if err != nil {
 			log.Printf("[BehaviorSystem] 警告：创建僵尸手臂掉落粒子效果失败: %v", err)
@@ -359,6 +382,7 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 			s.resourceManager,
 			"MoweredZombieHead", // 粒子效果名称（不带.xml后缀）
 			position.X, position.Y,
+			angleOffset, // Story 7.6: 传递角度偏移
 		)
 		if err != nil {
 			log.Printf("[BehaviorSystem] 警告：创建僵尸头部掉落粒子效果失败: %v", err)

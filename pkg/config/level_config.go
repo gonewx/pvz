@@ -22,14 +22,21 @@ type LevelConfig struct {
 	SkipOpening     bool           `yaml:"skipOpening"`     // 是否跳过开场动画（调试用），默认 false
 	TutorialSteps   []TutorialStep `yaml:"tutorialSteps"`   // 教学步骤（可选，Story 8.2 使用）
 	SpecialRules    string         `yaml:"specialRules"`    // 特殊规则类型：\"bowling\", \"conveyor\"，默认为空
+	InitialSun      int            `yaml:"initialSun"`      // 初始阳光值，默认50（Story 8.2 QA改进）
+
+	// Story 8.2 QA改进：背景和草皮配置
+	BackgroundImage   string `yaml:"backgroundImage"`   // 背景图片ID，如 \"IMAGE_BACKGROUND1_UNSODDED\"，默认 \"IMAGE_BACKGROUND1\"
+	SodRowImage       string `yaml:"sodRowImage"`       // 草皮叠加图片ID，如 \"IMAGE_SOD1ROW\"，空表示无草皮
+	ShowSoddingAnim   bool   `yaml:"showSoddingAnim"`   // 是否播放铺草皮动画，默认 false
+	SoddingAnimDelay  float64 `yaml:"soddingAnimDelay"` // 铺草皮动画延迟（秒），默认 0
 }
 
-// TutorialStep 教学步骤配置（预留给 Story 8.2）
-// 定义教学引导的触发条件、显示文本和触发动作
+// TutorialStep 教学步骤配置（Story 8.2）
+// 定义教学引导的触发条件、文本键和触发动作
 type TutorialStep struct {
-	Trigger string `yaml:"trigger"` // 触发条件：\"gameStart\", \"sunCollected\", \"plantPlaced\"
-	Text    string `yaml:"text"`    // 教学文本内容
-	Action  string `yaml:"action"`  // 触发动作：\"waitForSunCollect\", \"waitForPlantPlaced\"
+	Trigger string `yaml:"trigger"` // 触发条件：\"gameStart\", \"sunClicked\", \"enoughSun\", \"seedClicked\", \"plantPlaced\", \"zombieSpawned\"
+	TextKey string `yaml:"textKey"` // LawnStrings.txt 中的文本键（如 \"ADVICE_CLICK_ON_SUN\"）
+	Action  string `yaml:"action"`  // 触发动作：\"waitForSunClick\", \"waitForEnoughSun\", \"waitForSeedClick\", \"waitForPlantPlaced\", \"waitForZombieSpawn\", \"waitForLevelEnd\"
 }
 
 // WaveConfig 单个僵尸波次配置
@@ -93,7 +100,18 @@ func applyDefaults(config *LevelConfig) {
 		config.OpeningType = "standard"
 	}
 
-	// AvailablePlants、TutorialSteps、SpecialRules 默认为空值（nil/空字符串），无需处理
+	// 如果 InitialSun 为0（未配置），设置为50（原版默认值）
+	if config.InitialSun == 0 {
+		config.InitialSun = 50
+	}
+
+	// Story 8.2 QA改进：背景和草皮默认值
+	// 如果 BackgroundImage 为空，设置为标准背景
+	if config.BackgroundImage == "" {
+		config.BackgroundImage = "IMAGE_BACKGROUND1"
+	}
+
+	// AvailablePlants、TutorialSteps、SpecialRules、SodRowImage 默认为空值（nil/空字符串），无需处理
 	// SkipOpening 默认为 false（bool 零值），无需处理
 }
 
