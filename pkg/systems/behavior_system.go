@@ -441,10 +441,24 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 
 		// 扫描同行僵尸：查找在豌豆射手正前方（右侧）且在攻击范围内的僵尸
 		hasZombieInLine := false
+
+		// DEBUG: 输出僵尸列表信息（每秒一次）
+		s.logFrameCounter++
+		if s.logFrameCounter >= LogOutputFrameInterval && len(zombieEntityList) > 0 {
+			log.Printf("[BehaviorSystem] 扫描僵尸: 总数=%d, 豌豆射手行=%d", len(zombieEntityList), peashooterRow)
+			s.logFrameCounter = 0
+		}
+
 		for _, zombieID := range zombieEntityList {
 			zombiePos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
 			if !ok {
 				continue
+			}
+
+			// 检查僵尸是否已死亡（过滤死亡状态的僵尸）
+			zombieBehavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
+			if !ok || zombieBehavior.Type == components.BehaviorZombieDying {
+				continue // 跳过死亡中的僵尸
 			}
 
 			// 计算僵尸所在的行
@@ -484,7 +498,7 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 			// 重置计时器
 			timer.CurrentTime = 0
 		}
-		// 如果没有僵尸，不发射子弹，但计时器继续累加（下次检测时立即发射）
+		// 如果没有僵尸，不发射子弹，计时器也不重置（保持就绪状态）
 	}
 }
 

@@ -43,13 +43,13 @@ func TestLevel1_1_TutorialConfig(t *testing.T) {
 		t.Error("Expected skipOpening to be true for tutorial level")
 	}
 
-	// Story 8.2 QA改进：验证初始阳光值
+	// Story 8.2 方案A+：验证初始阳光值（教学关卡改为150）
 	if config.InitialSun != 150 {
 		t.Errorf("Expected initialSun 150, got %d", config.InitialSun)
 	}
 
-	// 验证教学步骤数量
-	expectedSteps := 6
+	// 验证教学步骤数量（方案A+：9步完整流程）
+	expectedSteps := 9
 	if len(config.TutorialSteps) != expectedSteps {
 		t.Fatalf("Expected %d tutorial steps, got %d", expectedSteps, len(config.TutorialSteps))
 	}
@@ -64,8 +64,11 @@ func TestLevel1_1_TutorialConfig(t *testing.T) {
 		{"sunClicked", "ADVICE_CLICKED_ON_SUN", "waitForEnoughSun"},
 		{"enoughSun", "ADVICE_CLICK_SEED_PACKET", "waitForSeedClick"},
 		{"seedClicked", "ADVICE_CLICK_ON_GRASS", "waitForPlantPlaced"},
-		{"plantPlaced", "ADVICE_PLANTED_PEASHOOTER", "waitForZombieSpawn"},
-		{"zombieSpawned", "ADVICE_ZOMBIE_ONSLAUGHT", "waitForLevelEnd"},
+		{"plantPlaced", "ADVICE_PLANTED_PEASHOOTER", "waitForCooldownFinished"},
+		{"cooldownFinished", "ADVICE_CLICK_PEASHOOTER", "waitForSecondSeedClick"},
+		{"enoughSunNotPlanting", "ADVICE_ENOUGH_SUN", "reminder"},
+		{"secondSeedClicked", "ADVICE_CLICK_ON_GRASS", "waitForSecondPlantPlaced"},
+		{"secondPlantPlaced", "ADVICE_ZOMBIE_ONSLAUGHT", "waitForLevelEnd"},
 	}
 
 	for i, expected := range expectedStepsData {
@@ -119,6 +122,8 @@ func TestTutorialSteps_AllTextKeysExist(t *testing.T) {
 		"ADVICE_CLICK_SEED_PACKET",
 		"ADVICE_CLICK_ON_GRASS",
 		"ADVICE_PLANTED_PEASHOOTER",
+		"ADVICE_CLICK_PEASHOOTER",    // 方案A+ 新增
+		"ADVICE_ENOUGH_SUN",          // 方案A+ 新增
 		"ADVICE_ZOMBIE_ONSLAUGHT",
 	}
 

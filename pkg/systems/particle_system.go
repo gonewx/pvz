@@ -343,6 +343,13 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 		initialRotation = rand.Float64() * 360.0
 	}
 
+	// 应用发射器的粒子旋转覆盖（如果设置）
+	// 用于教学箭头等需要特定方向的粒子效果
+	if emitter.ParticleRotationOverride != 0 {
+		initialRotation = emitter.ParticleRotationOverride
+		log.Printf("[ParticleSystem] Applied rotation override: %.1f°", initialRotation)
+	}
+
 	// Story 7.5 修复：对于"范围+关键帧"格式，需要将初始值添加到关键帧开头
 	// 例如：ParticleSpinSpeed="[-720 720] 0,39.999996" 返回 min=-720, max=720, keyframes=[{0.4, 0}]
 	// 需要添加初始关键帧：[{0, initialSpinSpeed}, {0.4, 0}]
@@ -503,8 +510,8 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 	}
 
 	// DEBUG: 粒子创建日志
-	log.Printf("[DEBUG] 创建粒子: pos=(%.1f,%.1f), velocity=(%.1f,%.1f), angle=%.1f°, speed=%.1f, groundY=%.1f",
-		spawnX, spawnY, velocityX, velocityY, angle, speed, groundY)
+	log.Printf("[DEBUG] 创建粒子: pos=(%.1f,%.1f), velocity=(%.1f,%.1f), angle=%.1f°, speed=%.1f, groundY=%.1f, image=%v",
+		spawnX, spawnY, velocityX, velocityY, angle, speed, groundY, particleImage != nil)
 
 	// Create ParticleComponent
 	particleComp := &components.ParticleComponent{
@@ -559,6 +566,12 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 	// Add components to particle entity
 	ps.EntityManager.AddComponent(particleID, particleComp)
 	ps.EntityManager.AddComponent(particleID, positionComp)
+
+	// 如果发射器是UI元素（有UIComponent），则粒子也标记为UI粒子
+	// 这样渲染时不会减去cameraX（教学箭头等UI粒子）
+	if uiComp, hasUI := ecs.GetComponent[*components.UIComponent](ps.EntityManager, emitterID); hasUI {
+		ps.EntityManager.AddComponent(particleID, uiComp) // 复制UIComponent
+	}
 
 	// Add particle to emitter's active list
 	emitter.ActiveParticles = append(emitter.ActiveParticles, particleID)

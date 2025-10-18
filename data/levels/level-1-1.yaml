@@ -8,7 +8,7 @@ enabledLanes: [3]             # 只启用第3行（中间行）
 availablePlants:              # 只有豌豆射手
   - "peashooter"
 skipOpening: true             # 跳过开场（教学关卡直接进入）
-initialSun: 150               # 初始阳光150（允许玩家立即购买豌豆射手）
+initialSun: 150               # 初始阳光150（原版1-1关卡配置，足够种植1个豌豆射手）
 
 # Story 8.2 QA改进：背景和草皮配置
 backgroundImage: "IMAGE_BACKGROUND1UNSODDED"  # 使用未铺草皮的背景
@@ -16,46 +16,72 @@ sodRowImage: "IMAGE_SOD1ROW"                  # 铺草皮后叠加1行草地图�
 showSoddingAnim: true                         # 播放铺草皮动画
 soddingAnimDelay: 1.0                         # 游戏开始1秒后播放动画
 
-# Story 8.2: 教学步骤配置
+# Story 8.2: 教学步骤配置（符合原版1-1流程）
 tutorialSteps:
+  # 步骤1：游戏开始 → 直接提示种植（因为阳光已经150）
   - trigger: "gameStart"
-    textKey: "ADVICE_CLICK_ON_SUN"
-    action: "waitForSunClick"
-  - trigger: "sunClicked"
-    textKey: "ADVICE_CLICKED_ON_SUN"
-    action: "waitForEnoughSun"
-  - trigger: "enoughSun"
     textKey: "ADVICE_CLICK_SEED_PACKET"
     action: "waitForSeedClick"
+
+  # 步骤2：点击豌豆射手卡片
   - trigger: "seedClicked"
     textKey: "ADVICE_CLICK_ON_GRASS"
     action: "waitForPlantPlaced"
+
+  # 步骤3：种植第一个豌豆射手
   - trigger: "plantPlaced"
     textKey: "ADVICE_PLANTED_PEASHOOTER"
-    action: "waitForZombieSpawn"
-  - trigger: "zombieSpawned"
+    action: "waitForSunSpawn"
+
+  # 步骤4：第一颗阳光生成后（由TutorialSystem触发）
+  - trigger: "sunSpawned"
+    textKey: "ADVICE_CLICK_ON_SUN"
+    action: "waitForSunClick"
+
+  # 步骤5：第一次点击阳光
+  - trigger: "sunClicked"
+    textKey: "ADVICE_CLICKED_ON_SUN"
+    action: "waitForEnoughSun"
+
+  # 步骤6：阳光≥100时收集阳光（重复提醒，需要时长检测）
+  - trigger: "sunClickedWhenEnough"
+    textKey: "ADVICE_ENOUGH_SUN"
+    action: "reminder"
+
+  # 步骤7：阳光≥100 且 卡片冷却完成（第一次达到可种植状态）
+  - trigger: "enoughSunAndCooldown"
+    textKey: "ADVICE_CLICK_PEASHOOTER"
+    action: "waitForSecondSeedClick"
+
+  # 步骤8：点击卡片准备种植第二个
+  - trigger: "secondSeedClicked"
+    textKey: "ADVICE_CLICK_ON_GRASS"
+    action: "waitForSecondPlantPlaced"
+
+  # 步骤9：种植第二个豌豆射手
+  - trigger: "secondPlantPlaced"
     textKey: "ADVICE_ZOMBIE_ONSLAUGHT"
     action: "waitForLevelEnd"
 
-# 波次配置：3波，3只普通僵尸，间隔较长
+# 波次配置：3波，总共5个僵尸（最后一波3个）
+# 原版机制：上一波消灭完毕后，自动触发下一波（可设置最小延迟）
 waves:
-  # 第一波（也是唯一一波）：10秒，第一只僵尸
-  - time: 10
+  # 第一波：游戏开始后立即出现，1个普通僵尸
+  - zombies:
+      - type: "basic"
+        lane: 3
+        count: 1
+
+  # 第二波：第一波消灭后自动触发，1个普通僵尸
+  - minDelay: 5  # 等待5秒后触发
     zombies:
       - type: "basic"
         lane: 3
         count: 1
 
-  # 第二只僵尸：30秒
-  - time: 30
+  # 第三波（最后一波）：第二波消灭后自动触发，3个普通僵尸
+  - minDelay: 5  # 等待5秒后触发
     zombies:
       - type: "basic"
         lane: 3
-        count: 1
-
-  # 第三只僵尸（最后一只）：50秒
-  - time: 50
-    zombies:
-      - type: "basic"
-        lane: 3
-        count: 1
+        count: 3

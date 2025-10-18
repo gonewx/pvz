@@ -172,7 +172,7 @@ func (s *PlantPreviewRenderSystem) drawReanimPreview(screen *ebiten.Image, reani
 		y3 := b*fw + d*fh + ty
 
 		// 构建顶点数组（两个三角形组成矩形）
-		// 重要：应用半透明 alpha 值
+		// 重要：使用预乘 alpha 混合（ColorR/G/B = alphaF），避免白色背景
 		alphaF := float32(alpha)
 		vs := []ebiten.Vertex{
 			{DstX: float32(x0), DstY: float32(y0), SrcX: 0, SrcY: 0, ColorR: alphaF, ColorG: alphaF, ColorB: alphaF, ColorA: alphaF},

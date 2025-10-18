@@ -188,6 +188,9 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 						zombieHealth, ok := ecs.GetComponent[*components.HealthComponent](ps.em, zombieID)
 						if ok {
 							zombieHealth.CurrentHealth -= config.PeaBulletDamage
+
+							// 方案A+：添加受击闪烁效果
+							ps.addFlashEffect(zombieID)
 						}
 						// 播放击中身体音效
 						ps.playHitSound()
@@ -198,6 +201,9 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 					if ok {
 						zombieHealth.CurrentHealth -= config.PeaBulletDamage
 						// 注意：生命值可以降到负数，BehaviorSystem 会检查 <= 0 的情况
+
+						// 方案A+：添加受击闪烁效果
+						ps.addFlashEffect(zombieID)
 					}
 					// 播放击中身体音效
 					ps.playHitSound()
@@ -249,4 +255,26 @@ func (ps *PhysicsSystem) playArmorHitSound() {
 
 	// 播放音效
 	armorSound.Play()
+}
+
+// addFlashEffect 为僵尸添加受击闪烁效果（方案A+）
+// 参数：
+//   - zombieID: 僵尸实体ID
+func (ps *PhysicsSystem) addFlashEffect(zombieID ecs.EntityID) {
+	// 检查是否已有闪烁组件
+	flashComp, hasFlash := ecs.GetComponent[*components.FlashEffectComponent](ps.em, zombieID)
+
+	if hasFlash {
+		// 已有闪烁组件，重置时间（连续受击时延长闪烁）
+		flashComp.Elapsed = 0
+		flashComp.IsActive = true
+	} else {
+		// 没有闪烁组件，创建新的
+		ecs.AddComponent(ps.em, zombieID, &components.FlashEffectComponent{
+			Duration:  0.1,  // 闪烁持续0.1秒（原版默认值）
+			Elapsed:   0,    // 从0开始计时
+			Intensity: 0.8,  // 闪烁强度80%（白色叠加）
+			IsActive:  true, // 激活状态
+		})
+	}
 }

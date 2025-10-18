@@ -34,16 +34,17 @@ type LevelConfig struct {
 // TutorialStep 教学步骤配置（Story 8.2）
 // 定义教学引导的触发条件、文本键和触发动作
 type TutorialStep struct {
-	Trigger string `yaml:"trigger"` // 触发条件：\"gameStart\", \"sunClicked\", \"enoughSun\", \"seedClicked\", \"plantPlaced\", \"zombieSpawned\"
-	TextKey string `yaml:"textKey"` // LawnStrings.txt 中的文本键（如 \"ADVICE_CLICK_ON_SUN\"）
-	Action  string `yaml:"action"`  // 触发动作：\"waitForSunClick\", \"waitForEnoughSun\", \"waitForSeedClick\", \"waitForPlantPlaced\", \"waitForZombieSpawn\", \"waitForLevelEnd\"
+	Trigger      string        `yaml:"trigger"`      // 触发条件："gameStart", "sunClicked", "enoughSun", "seedClicked", "plantPlaced", "zombieSpawned"
+	TextKey      string        `yaml:"textKey"`      // LawnStrings.txt 中的文本键（如 "ADVICE_CLICK_ON_SUN"）
+	Action       string        `yaml:"action"`       // 触发动作："waitForSunClick", "waitForEnoughSun", "waitForSeedClick", "waitForPlantPlaced", "waitForZombieSpawn", "waitForLevelEnd"
+	ZombieSpawns []ZombieSpawn `yaml:"zombieSpawns"` // 可选：该步骤触发时生成的僵尸（教学关卡专用）
 }
 
 // WaveConfig 单个僵尸波次配置
-// 定义了僵尸波次的触发时间和生成的僵尸列表
+// 定义了僵尸波次的触发条件和生成的僵尸列表
 type WaveConfig struct {
-	Time    float64       `yaml:"time"`    // 波次触发时间（秒，从关卡开始计时）
-	Zombies []ZombieSpawn `yaml:"zombies"` // 本波次要生成的僵尸列表
+	MinDelay float64       `yaml:"minDelay"` // 可选：距离上一波结束的最小延迟（秒），默认 0（立即触发）
+	Zombies  []ZombieSpawn `yaml:"zombies"`  // 本波次要生成的僵尸列表
 }
 
 // ZombieSpawn 单个僵尸生成配置
@@ -134,8 +135,8 @@ func validateLevelConfig(config *LevelConfig) error {
 
 	// 验证每个波次的配置
 	for i, wave := range config.Waves {
-		if wave.Time < 0 {
-			return fmt.Errorf("wave %d: time cannot be negative", i)
+		if wave.MinDelay < 0 {
+			return fmt.Errorf("wave %d: minDelay cannot be negative", i)
 		}
 
 		if len(wave.Zombies) == 0 {

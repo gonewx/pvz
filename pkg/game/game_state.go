@@ -1,6 +1,8 @@
 package game
 
 import (
+	"log"
+
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 )
@@ -18,15 +20,17 @@ type GameState struct {
 	CameraX float64 // 摄像机X位置，用于世界坐标和屏幕坐标转换
 
 	// Story 5.5: 关卡流程状态
-	CurrentLevel        *config.LevelConfig // 当前关卡配置
-	LevelTime           float64             // 关卡已进行时间（秒）
-	CurrentWaveIndex    int                 // 当前波次索引（0表示第一波）
-	SpawnedWaves        []bool              // 每一波是否已生成（用于避免重复生成）
-	TotalZombiesSpawned int                 // 已生成的僵尸总数
-	ZombiesKilled       int                 // 已消灭的僵尸数量
-	IsLevelComplete     bool                // 关卡是否完成
-	IsGameOver          bool                // 游戏是否结束（胜利或失败）
-	GameResult          string              // 游戏结果："win", "lose", "" (进行中)
+	CurrentLevel           *config.LevelConfig // 当前关卡配置
+	LevelTime              float64             // 关卡已进行时间（秒）
+	CurrentWaveIndex       int                 // 当前波次索引（0表示第一波）
+	SpawnedWaves           []bool              // 每一波是否已生成（用于避免重复生成）
+	TotalZombiesSpawned    int                 // 已生成的僵尸总数
+	ZombiesKilled          int                 // 已消灭的僵尸数量
+	LastWaveCompletedTime  float64             // 上一波完成时间（用于计算延迟）
+	IsWaitingForNextWave   bool                // 是否正在等待下一波（延迟中）
+	IsLevelComplete        bool                // 关卡是否完成
+	IsGameOver             bool                // 游戏是否结束（胜利或失败）
+	GameResult             string              // 游戏结果："win", "lose", "" (进行中)
 
 	// Story 8.1: 植物解锁和选卡状态
 	plantUnlockManager *PlantUnlockManager // 植物解锁管理器
@@ -128,19 +132,53 @@ func (gs *GameState) UpdateLevelTime(deltaTime float64) {
 }
 
 // GetCurrentWave 获取当前应该生成的波次索引
-// 根据关卡时间判断应该触发哪一波
-// 返回 -1 表示没有到达任何波次的时间
+// 原版机制：上一波僵尸全部消灭后，等待 MinDelay 秒后触发下一波
+// 返回 -1 表示没有波次需要生成（延迟中或全部生成完毕）
 func (gs *GameState) GetCurrentWave() int {
 	if gs.CurrentLevel == nil {
 		return -1
 	}
 
-	for i, wave := range gs.CurrentLevel.Waves {
-		if gs.LevelTime >= wave.Time && !gs.SpawnedWaves[i] {
-			return i
+	// 获取当前场上的僵尸数量（已生成 - 已消灭）
+	zombiesOnField := gs.TotalZombiesSpawned - gs.ZombiesKilled
+
+	// DEBUG: 输出状态
+	if zombiesOnField == 0 && gs.CurrentWaveIndex < len(gs.CurrentLevel.Waves) {
+		log.Printf("[GetCurrentWave] 🔍 DEBUG: WaveIndex=%d, ZombiesOnField=%d, IsWaiting=%v",
+			gs.CurrentWaveIndex, zombiesOnField, gs.IsWaitingForNextWave)
+	}
+
+	// 第一波：立即触发（游戏开始时）
+	if gs.CurrentWaveIndex == 0 && !gs.SpawnedWaves[0] {
+		log.Printf("[GetCurrentWave] ✅ 第一波立即触发")
+		return 0
+	}
+
+	// 后续波次：上一波消灭完毕后，等待 MinDelay 秒
+	if zombiesOnField == 0 && gs.CurrentWaveIndex < len(gs.CurrentLevel.Waves) {
+		// 检查是否已经标记为等待状态
+		if !gs.IsWaitingForNextWave {
+			// 第一次检测到场上无僵尸，开始等待
+			gs.IsWaitingForNextWave = true
+			gs.LastWaveCompletedTime = gs.LevelTime
+			return -1 // 进入延迟等待
+		}
+
+		// 检查延迟时间是否已过
+		currentWaveIndex := gs.CurrentWaveIndex
+		if currentWaveIndex < len(gs.CurrentLevel.Waves) && !gs.SpawnedWaves[currentWaveIndex] {
+			waveConfig := gs.CurrentLevel.Waves[currentWaveIndex]
+			elapsedSinceCompletion := gs.LevelTime - gs.LastWaveCompletedTime
+
+			if elapsedSinceCompletion >= waveConfig.MinDelay {
+				// 延迟已过，触发下一波
+				gs.IsWaitingForNextWave = false
+				return currentWaveIndex
+			}
 		}
 	}
-	return -1
+
+	return -1 // 没有波次需要生成
 }
 
 // MarkWaveSpawned 标记波次已生成

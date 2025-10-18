@@ -96,7 +96,13 @@ func (s *LevelSystem) Update(deltaTime float64) {
 // checkAndSpawnWaves 检查并生成到期的僵尸波次
 //
 // 遍历所有波次，找到时间已到且未生成的波次，调用 WaveSpawnSystem 生成僵尸
+// 教学关卡由 TutorialSystem 控制僵尸生成，不使用此方法
 func (s *LevelSystem) checkAndSpawnWaves() {
+	// 教学关卡：僵尸由 TutorialSystem 控制生成
+	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.OpeningType == "tutorial" {
+		return
+	}
+
 	waveIndex := s.gameState.GetCurrentWave()
 	if waveIndex == -1 {
 		// 没有到期的波次
@@ -184,7 +190,7 @@ func isZombieType(behaviorType components.BehaviorType) bool {
 
 // checkLastWaveWarning 检查是否需要显示最后一波提示
 //
-// 在最后一波触发前 LastWaveWarningTime 秒显示提示
+// 在最后一波即将生成时显示提示（倒数第二波消灭完毕后）
 // 提示只显示一次
 func (s *LevelSystem) checkLastWaveWarning() {
 	// 如果已经显示过，不再显示
@@ -192,17 +198,18 @@ func (s *LevelSystem) checkLastWaveWarning() {
 		return
 	}
 
-	// 获取最后一波的时间
+	// 获取总波次数
 	totalWaves := len(s.gameState.CurrentLevel.Waves)
 	if totalWaves == 0 {
 		return
 	}
 
-	lastWaveTime := s.gameState.CurrentLevel.Waves[totalWaves-1].Time
-	warningTime := lastWaveTime - LastWaveWarningTime
+	// 在倒数第二波消灭完毕后（等待最后一波触发时）显示提示
+	// 条件：当前波次索引 == totalWaves-1（最后一波） 且最后一波尚未生成
+	currentWaveIndex := s.gameState.CurrentWaveIndex
+	lastWaveIndex := totalWaves - 1
 
-	// 如果时间到了且最后一波还未生成
-	if s.gameState.LevelTime >= warningTime && !s.gameState.IsWaveSpawned(totalWaves-1) {
+	if currentWaveIndex == lastWaveIndex && !s.gameState.IsWaveSpawned(lastWaveIndex) {
 		s.showLastWaveWarning()
 		s.lastWaveWarningShown = true
 		log.Println("[LevelSystem] Last wave warning displayed!")

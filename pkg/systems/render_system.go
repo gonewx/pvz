@@ -39,19 +39,21 @@ import (
 //   - CLAUDE.md#组件使用策略
 //   - docs/stories/6.3.story.md
 type RenderSystem struct {
-	entityManager    *ecs.EntityManager
-	debugPrinted     map[ecs.EntityID]bool // 记录已打印调试信息的实体
-	particleVertices []ebiten.Vertex       // 粒子顶点数组（复用，避免每帧分配）
-	particleIndices  []uint16              // 粒子索引数组（复用，避免每帧分配）
+	entityManager      *ecs.EntityManager
+	debugPrinted       map[ecs.EntityID]bool // 记录已打印调试信息的实体
+	particleVertices   []ebiten.Vertex       // 粒子顶点数组（复用，避免每帧分配）
+	particleIndices    []uint16              // 粒子索引数组（复用，避免每帧分配）
+	particleDebugOnce  bool                  // 粒子调试日志只输出一次
 }
 
 // NewRenderSystem 创建一个新的渲染系统
 func NewRenderSystem(em *ecs.EntityManager) *RenderSystem {
 	return &RenderSystem{
-		entityManager:    em,
-		debugPrinted:     make(map[ecs.EntityID]bool),
-		particleVertices: make([]ebiten.Vertex, 0, 4000), // 预分配容量：支持 1000 个粒子（每粒子 4 顶点）
-		particleIndices:  make([]uint16, 0, 6000),        // 预分配容量：支持 1000 个粒子（每粒子 6 索引）
+		entityManager:     em,
+		debugPrinted:      make(map[ecs.EntityID]bool),
+		particleVertices:  make([]ebiten.Vertex, 0, 4000), // 预分配容量：支持 1000 个粒子（每粒子 4 顶点）
+		particleIndices:   make([]uint16, 0, 6000),        // 预分配容量：支持 1000 个粒子（每粒子 6 索引）
+		particleDebugOnce: true,                           // 启用一次调试日志
 	}
 }
 
@@ -272,6 +274,12 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 	screenX := pos.X - cameraX - reanim.CenterOffsetX
 	screenY := pos.Y - reanim.CenterOffsetY
 
+	// 方案A+：检查是否有闪烁效果组件
+	flashIntensity := 0.0
+	if flashComp, hasFlash := ecs.GetComponent[*components.FlashEffectComponent](s.entityManager, id); hasFlash && flashComp.IsActive {
+		flashIntensity = flashComp.Intensity
+	}
+
 	// 调试：打印第一个植物的位置和部件范围
 	if !s.debugPrinted[id] {
 		if plant, hasPlant := ecs.GetComponent[*components.PlantComponent](s.entityManager, id); hasPlant {
@@ -431,11 +439,18 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		y3 := b*fw + d*fh + ty
 
 		// 构建顶点数组（两个三角形组成矩形）
+		// 方案A+：应用闪烁效果（白色叠加）
+		// 公式：最终颜色 = 原始颜色 + flashIntensity（白色闪烁强度）
+		colorR := float32(1.0 + flashIntensity)
+		colorG := float32(1.0 + flashIntensity)
+		colorB := float32(1.0 + flashIntensity)
+		colorA := float32(1.0)
+
 		vs := []ebiten.Vertex{
-			{DstX: float32(x0), DstY: float32(y0), SrcX: 0, SrcY: 0, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
-			{DstX: float32(x1), DstY: float32(y1), SrcX: float32(w), SrcY: 0, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
-			{DstX: float32(x2), DstY: float32(y2), SrcX: 0, SrcY: float32(h), ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
-			{DstX: float32(x3), DstY: float32(y3), SrcX: float32(w), SrcY: float32(h), ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
+			{DstX: float32(x0), DstY: float32(y0), SrcX: 0, SrcY: 0, ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
+			{DstX: float32(x1), DstY: float32(y1), SrcX: float32(w), SrcY: 0, ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
+			{DstX: float32(x2), DstY: float32(y2), SrcX: 0, SrcY: float32(h), ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
+			{DstX: float32(x3), DstY: float32(y3), SrcX: float32(w), SrcY: float32(h), ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
 		}
 		is := []uint16{0, 1, 2, 1, 3, 2}
 		screen.DrawTriangles(vs, is, img, nil)
@@ -459,6 +474,12 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 //   - screen: 绘制目标屏幕
 //   - cameraX: 摄像机的世界坐标X位置（用于世界坐标到屏幕坐标的转换）
 func (s *RenderSystem) DrawParticles(screen *ebiten.Image, cameraX float64) {
+	// DEBUG: 输出摄像机位置（只输出一次避免刷屏）
+	if s.particleDebugOnce {
+		log.Printf("[RenderSystem] DrawParticles: cameraX=%.1f", cameraX)
+		s.particleDebugOnce = false
+	}
+
 	// 查询所有拥有 ParticleComponent 和 PositionComponent 的实体
 	entities := ecs.GetEntitiesWith2[
 		*components.PositionComponent,
@@ -531,8 +552,15 @@ func (s *RenderSystem) DrawParticles(screen *ebiten.Image, cameraX float64) {
 					continue
 				}
 
+				// 检查粒子是否为UI粒子（不需要减去cameraX）
+				_, isUIParticle := ecs.GetComponent[*components.UIComponent](s.entityManager, id)
+				cameraDelta := cameraX
+				if isUIParticle {
+					cameraDelta = 0 // UI粒子不受摄像机影响
+				}
+
 				// 生成粒子的顶点（4 个顶点，用索引构建 2 个三角形）
-				vertices := s.buildParticleVertices(particle, pos, cameraX)
+				vertices := s.buildParticleVertices(particle, pos, cameraDelta)
 				if len(vertices) != 4 {
 					continue
 				}

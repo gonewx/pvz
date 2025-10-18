@@ -17,12 +17,12 @@ func TestLoadLevelConfig(t *testing.T) {
 name: "Test Level"
 description: "A test level"
 waves:
-  - time: 10
+  - minDelay: 0
     zombies:
       - type: basic
         lane: 3
         count: 1
-  - time: 30
+  - minDelay: 5
     zombies:
       - type: basic
         lane: 1
@@ -59,8 +59,8 @@ waves:
 
 		// 验证第一波
 		wave1 := config.Waves[0]
-		if wave1.Time != 10 {
-			t.Errorf("Wave 1: Expected time 10, got %f", wave1.Time)
+		if wave1.MinDelay != 0 {
+			t.Errorf("Wave 1: Expected minDelay 0, got %f", wave1.MinDelay)
 		}
 		if len(wave1.Zombies) != 1 {
 			t.Fatalf("Wave 1: Expected 1 zombie spawn, got %d", len(wave1.Zombies))
@@ -77,8 +77,8 @@ waves:
 
 		// 验证第二波
 		wave2 := config.Waves[1]
-		if wave2.Time != 30 {
-			t.Errorf("Wave 2: Expected time 30, got %f", wave2.Time)
+		if wave2.MinDelay != 5 {
+			t.Errorf("Wave 2: Expected minDelay 5, got %f", wave2.MinDelay)
 		}
 		if len(wave2.Zombies) != 2 {
 			t.Fatalf("Wave 2: Expected 2 zombie spawns, got %d", len(wave2.Zombies))
@@ -117,7 +117,7 @@ func TestLevelConfigValidation(t *testing.T) {
 		config := &LevelConfig{
 			Name: "Test Level",
 			Waves: []WaveConfig{
-				{Time: 10, Zombies: []ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
+				{MinDelay: 10, Zombies: []ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
 			},
 		}
 		err := validateLevelConfig(config)
@@ -130,7 +130,7 @@ func TestLevelConfigValidation(t *testing.T) {
 		config := &LevelConfig{
 			ID: "1-1",
 			Waves: []WaveConfig{
-				{Time: 10, Zombies: []ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
+				{MinDelay: 10, Zombies: []ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
 			},
 		}
 		err := validateLevelConfig(config)
@@ -156,7 +156,7 @@ func TestLevelConfigValidation(t *testing.T) {
 			ID:   "1-1",
 			Name: "Test Level",
 			Waves: []WaveConfig{
-				{Time: -5, Zombies: []ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
+				{MinDelay: -5, Zombies: []ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
 			},
 		}
 		err := validateLevelConfig(config)
@@ -170,7 +170,7 @@ func TestLevelConfigValidation(t *testing.T) {
 			ID:   "1-1",
 			Name: "Test Level",
 			Waves: []WaveConfig{
-				{Time: 10, Zombies: []ZombieSpawn{}},
+				{MinDelay: 10, Zombies: []ZombieSpawn{}},
 			},
 		}
 		err := validateLevelConfig(config)
@@ -184,7 +184,7 @@ func TestLevelConfigValidation(t *testing.T) {
 			ID:   "1-1",
 			Name: "Test Level",
 			Waves: []WaveConfig{
-				{Time: 10, Zombies: []ZombieSpawn{{Type: "", Lane: 1, Count: 1}}},
+				{MinDelay: 10, Zombies: []ZombieSpawn{{Type: "", Lane: 1, Count: 1}}},
 			},
 		}
 		err := validateLevelConfig(config)
@@ -207,7 +207,7 @@ func TestLevelConfigValidation(t *testing.T) {
 				ID:   "1-1",
 				Name: "Test Level",
 				Waves: []WaveConfig{
-					{Time: 10, Zombies: []ZombieSpawn{{Type: "basic", Lane: tc.lane, Count: 1}}},
+					{MinDelay: 10, Zombies: []ZombieSpawn{{Type: "basic", Lane: tc.lane, Count: 1}}},
 				},
 			}
 			err := validateLevelConfig(config)
@@ -222,7 +222,7 @@ func TestLevelConfigValidation(t *testing.T) {
 			ID:   "1-1",
 			Name: "Test Level",
 			Waves: []WaveConfig{
-				{Time: 10, Zombies: []ZombieSpawn{{Type: "basic", Lane: 1, Count: 0}}},
+				{MinDelay: 10, Zombies: []ZombieSpawn{{Type: "basic", Lane: 1, Count: 0}}},
 			},
 		}
 		err := validateLevelConfig(config)
@@ -236,8 +236,8 @@ func TestLevelConfigValidation(t *testing.T) {
 			ID:   "1-1",
 			Name: "Test Level",
 			Waves: []WaveConfig{
-				{Time: 10, Zombies: []ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
-				{Time: 30, Zombies: []ZombieSpawn{{Type: "conehead", Lane: 3, Count: 2}}},
+				{MinDelay: 10, Zombies: []ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
+				{MinDelay: 30, Zombies: []ZombieSpawn{{Type: "conehead", Lane: 3, Count: 2}}},
 			},
 		}
 		err := validateLevelConfig(config)
@@ -403,7 +403,7 @@ func TestValidateLevelConfig_InvalidEnabledLanes(t *testing.T) {
 				EnabledLanes: tt.enabledLanes,
 				Waves: []WaveConfig{
 					{
-						Time: 10,
+						MinDelay: 10,
 						Zombies: []ZombieSpawn{
 							{Type: "basic", Lane: 2, Count: 1},
 						},
@@ -445,7 +445,7 @@ func TestValidateLevelConfig_InvalidOpeningType(t *testing.T) {
 				OpeningType: tt.openingType,
 				Waves: []WaveConfig{
 					{
-						Time: 10,
+						MinDelay: 10,
 						Zombies: []ZombieSpawn{
 							{Type: "basic", Lane: 2, Count: 1},
 						},
@@ -486,7 +486,7 @@ func TestValidateLevelConfig_InvalidSpecialRules(t *testing.T) {
 				SpecialRules: tt.specialRules,
 				Waves: []WaveConfig{
 					{
-						Time: 10,
+						MinDelay: 10,
 						Zombies: []ZombieSpawn{
 							{Type: "basic", Lane: 2, Count: 1},
 						},

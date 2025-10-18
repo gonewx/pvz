@@ -47,8 +47,8 @@ func TestLevel1_1_Specification(t *testing.T) {
 			}
 		}
 
-		if totalZombies < 2 || totalZombies > 3 {
-			t.Errorf("Expected 2-3 total zombies, got %d", totalZombies)
+		if totalZombies != 5 {
+			t.Errorf("Expected 5 total zombies, got %d", totalZombies)
 		}
 	})
 

@@ -2,6 +2,7 @@ package systems
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
@@ -11,9 +12,14 @@ import (
 // LawnGridSystem 管理草坪网格的占用状态
 // 负责跟踪哪些格子已被植物占用，并提供查询和更新方法
 // Story 8.1: 支持行数限制，禁用特定行
+// Story 8.2: 支持草坪闪烁效果（教学提示）
 type LawnGridSystem struct {
 	entityManager *ecs.EntityManager
 	EnabledLanes  []int // 启用的行列表（1-based），如 [1,2,3] 表示前3行可用
+
+	// 草坪闪烁效果（Story 8.2 教学）
+	flashEnabled bool    // 是否启用闪烁效果
+	flashTime    float64 // 闪烁动画累计时间
 }
 
 // NewLawnGridSystem 创建草坪网格系统
@@ -138,4 +144,39 @@ func (s *LawnGridSystem) IsLaneEnabled(lane int) bool {
 		}
 	}
 	return false
+}
+
+// EnableFlash 启用草坪闪烁效果（Story 8.2 教学）
+// 用于提示玩家可以在草坪上种植植物
+func (s *LawnGridSystem) EnableFlash() {
+	s.flashEnabled = true
+	s.flashTime = 0
+}
+
+// DisableFlash 禁用草坪闪烁效果
+func (s *LawnGridSystem) DisableFlash() {
+	s.flashEnabled = false
+	s.flashTime = 0
+}
+
+// Update 更新草坪闪烁动画
+func (s *LawnGridSystem) Update(dt float64) {
+	if s.flashEnabled {
+		s.flashTime += dt
+	}
+}
+
+// GetFlashAlpha 获取当前闪烁效果的 alpha 值
+// 返回 0.0-0.3 之间的值，用于渲染半透明白色遮罩
+func (s *LawnGridSystem) GetFlashAlpha() float64 {
+	if !s.flashEnabled {
+		return 0.0
+	}
+
+	// 使用正弦函数实现明暗变化（频率：1 Hz，每秒1次呼吸）
+	// Alpha 范围：0.0 - 0.3（由暗到明）
+	const maxAlpha = 0.3
+	const frequency = 1.0
+	alpha := maxAlpha * (0.5 + 0.5*math.Sin(s.flashTime*2*math.Pi*frequency))
+	return alpha
 }

@@ -94,20 +94,20 @@ func (s *SoddingSystem) StartAnimation(onComplete func(), enabledLanes []int, so
 	}
 
 	s.animationDuration = float64(maxFrames) / float64(fps)
-	log.Printf("[SoddingSystem] 从 reanim 读取: 帧数=%d, FPS=%d, 时长=%.2f秒",
-		maxFrames, fps, s.animationDuration)
+	// log.Printf("[SoddingSystem] 从 reanim 读取: 帧数=%d, FPS=%d, 时长=%.2f秒",
+	// 	maxFrames, fps, s.animationDuration)
 
 	// 从配置计算动画起点位置
 	// X坐标：基于网格坐标 + 可配置偏移（手工调节）
 	// Y坐标：自动对齐到目标行中心（读取 reanim 包围盒）
 	s.animStartX, s.animStartY = config.CalculateSodRollPosition(enabledLanes, sodImageHeight, reanimXML)
 
-	log.Printf("[SoddingSystem] ========== 草皮动画坐标配置 ==========")
-	log.Printf("[SoddingSystem] 目标行: %v", enabledLanes)
-	log.Printf("[SoddingSystem] 网格起点X: %.1f", config.GridWorldStartX)
-	log.Printf("[SoddingSystem] 配置偏移X: %.1f", config.SodRollStartOffsetX)
-	log.Printf("[SoddingSystem] 动画起点（计算）: (%.1f, %.1f)", s.animStartX, s.animStartY)
-	log.Printf("[SoddingSystem] ===========================================")
+	// log.Printf("[SoddingSystem] ========== 草皮动画坐标配置 ==========")
+	// log.Printf("[SoddingSystem] 目标行: %v", enabledLanes)
+	// log.Printf("[SoddingSystem] 网格起点X: %.1f", config.GridWorldStartX)
+	// log.Printf("[SoddingSystem] 配置偏移X: %.1f", config.SodRollStartOffsetX)
+	// log.Printf("[SoddingSystem] 动画起点（计算）: (%.1f, %.1f)", s.animStartX, s.animStartY)
+	// log.Printf("[SoddingSystem] ===========================================")
 
 	// 创建 SodRoll 草皮卷实体
 	s.createSodRollEntity(s.animStartX, s.animStartY)
@@ -307,12 +307,12 @@ func (s *SoddingSystem) calculateCurrentCenterX() float64 {
 	worldCenterX := posComp.X + centerX
 
 	// 调试日志（每10帧输出一次）
-	frameIndex := int(reanimComp.CurrentFrame)
-	if frameIndex%10 == 0 || frameIndex == 0 || frameIndex == len(reanimComp.Reanim.Tracks[0].Frames)-1 {
-		progress := s.GetProgress()
-		log.Printf("[SoddingSystem] 帧:%d, 进度:%.1f%%, 包围盒:[%.1f,%.1f], 中心:%.1f",
-			frameIndex, progress*100, *minX, *maxX, worldCenterX)
-	}
+	// frameIndex := int(reanimComp.CurrentFrame)
+	// if frameIndex%10 == 0 || frameIndex == 0 || frameIndex == len(reanimComp.Reanim.Tracks[0].Frames)-1 {
+	// 	progress := s.GetProgress()
+	// 	log.Printf("[SoddingSystem] 帧:%d, 进度:%.1f%%, 包围盒:[%.1f,%.1f], 中心:%.1f",
+	// 		frameIndex, progress*100, *minX, *maxX, worldCenterX)
+	// }
 
 	return worldCenterX
 }

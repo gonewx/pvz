@@ -20,6 +20,7 @@ type SunSpawnSystem struct {
 	maxX            float64       // 阳光生成的最大X坐标
 	minTargetY      float64       // 阳光落地的最小Y坐标
 	maxTargetY      float64       // 阳光落地的最大Y坐标
+	enabled         bool          // Story 8.2: 是否启用自动生成（教学关卡初始禁用）
 }
 
 // NewSunSpawnSystem 创建一个新的阳光生成系统
@@ -42,11 +43,17 @@ func NewSunSpawnSystem(em *ecs.EntityManager, rm *game.ResourceManager, rs *Rean
 		maxX:            maxX,
 		minTargetY:      minTargetY,
 		maxTargetY:      maxTargetY,
+		enabled:         true, // 默认启用（教学关卡会在初始化后禁用）
 	}
 }
 
 // Update 更新阳光生成计时器
 func (s *SunSpawnSystem) Update(deltaTime float64) {
+	// Story 8.2: 检查是否启用（教学关卡初始禁用）
+	if !s.enabled {
+		return
+	}
+
 	// 累加计时器
 	s.spawnTimer += deltaTime
 
@@ -76,4 +83,16 @@ func (s *SunSpawnSystem) Update(deltaTime float64) {
 			log.Printf("[SunSpawnSystem] WARNING: Failed to initialize sun animation: %v", err)
 		}
 	}
+}
+
+// Enable 启用阳光自动生成（教学关卡在第一次收集阳光后调用）
+func (s *SunSpawnSystem) Enable() {
+	s.enabled = true
+	log.Printf("[SunSpawnSystem] Auto spawn ENABLED")
+}
+
+// Disable 禁用阳光自动生成（教学关卡初始化时调用）
+func (s *SunSpawnSystem) Disable() {
+	s.enabled = false
+	log.Printf("[SunSpawnSystem] Auto spawn DISABLED")
 }

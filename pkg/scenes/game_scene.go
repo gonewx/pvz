@@ -131,6 +131,9 @@ type GameScene struct {
 	// Story 7.2: Particle System
 	particleSystem *systems.ParticleSystem // 粒子系统（粒子特效）
 
+	// 方案A+：Flash Effect System
+	flashEffectSystem *systems.FlashEffectSystem // 闪烁效果系统（僵尸受击闪烁）
+
 	// Story 8.2: Tutorial System
 	tutorialSystem *systems.TutorialSystem // 教学系统（关卡 1-1 教学引导）
 	tutorialFont   interface{}             // 教学文本字体（*utils.BitmapFont 或 *text.GoTextFace）
@@ -298,10 +301,17 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	scene.particleSystem = systems.NewParticleSystem(scene.entityManager, scene.resourceManager)
 	log.Printf("[GameScene] Initialized particle system for visual effects")
 
+	// 方案A+：Initialize flash effect system
+	scene.flashEffectSystem = systems.NewFlashEffectSystem(scene.entityManager)
+	log.Printf("[GameScene] Initialized flash effect system for hit feedback")
+
 	// Story 8.2: Initialize tutorial system (if this is a tutorial level)
 	if scene.gameState.CurrentLevel != nil && scene.gameState.CurrentLevel.OpeningType == "tutorial" && len(scene.gameState.CurrentLevel.TutorialSteps) > 0 {
-		scene.tutorialSystem = systems.NewTutorialSystem(scene.entityManager, scene.gameState, scene.gameState.CurrentLevel)
+		scene.tutorialSystem = systems.NewTutorialSystem(scene.entityManager, scene.gameState, scene.resourceManager, scene.reanimSystem, scene.lawnGridSystem, scene.sunSpawnSystem, scene.gameState.CurrentLevel)
 		log.Printf("[GameScene] Tutorial system activated for level %s", scene.gameState.CurrentLevel.ID)
+
+		// 禁用自动阳光生成（第一次收集阳光后由 TutorialSystem 启用）
+		scene.sunSpawnSystem.Disable()
 
 		// Load tutorial font (使用原版中文字体 fzse_gbk.ttf)
 		ttFont, err := scene.resourceManager.LoadFont("assets/fonts/fzse_gbk.ttf", 28)
@@ -312,20 +322,9 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 			log.Printf("[GameScene] Loaded tutorial font: fzse_gbk.ttf (28px)")
 		}
 
-		// Story 8.2 QA改进：教学关卡开始时预生成阳光
-		// 原版游戏在教学关卡开始时会有阳光掉落，让玩家立即学习收集
-		// 使用 NewSunEntityStatic 让阳光直接出现，而不是同时下落
-		log.Printf("[GameScene] Pre-spawning suns for tutorial level")
-		sunID1 := entities.NewSunEntityStatic(scene.entityManager, scene.resourceManager, 350, 250)
-		sunID2 := entities.NewSunEntityStatic(scene.entityManager, scene.resourceManager, 550, 350)
-		sunID3 := entities.NewSunEntityStatic(scene.entityManager, scene.resourceManager, 450, 450)
-
-		// Story 8.2 QA修复：初始化阳光动画（Sun.reanim 无 anim 定义，使用直接渲染模式）
-		scene.reanimSystem.InitializeDirectRender(sunID1)
-		scene.reanimSystem.InitializeDirectRender(sunID2)
-		scene.reanimSystem.InitializeDirectRender(sunID3)
-
-		log.Printf("[GameScene] Pre-spawned 3 suns for tutorial")
+		// Story 8.2: 教学关卡不预生成阳光
+		// 阳光由教学系统在特定步骤触发生成（种植第一个豌豆射手后、收集第一颗阳光后）
+		log.Printf("[GameScene] Tutorial level: suns will be spawned by tutorial system")
 	}
 
 	// Story 8.2 QA改进：初始化铺草皮动画系统
@@ -582,8 +581,11 @@ func (s *GameScene) Update(deltaTime float64) {
 			// 使用缓存的草皮位置确保与渲染位置一致
 			enabledLanes := s.gameState.CurrentLevel.EnabledLanes
 			s.soddingSystem.StartAnimation(func() {
-				// 动画完成回调：不需要做任何事情，渲染会自动显示完整草皮
+				// 动画完成回调：通知教学系统可以开始了
 				log.Printf("[GameScene] 铺草皮动画完成")
+				if s.tutorialSystem != nil {
+					s.tutorialSystem.OnSoddingComplete()
+				}
 			}, enabledLanes, s.sodOverlayX, float64(s.sodHeight))
 
 			s.soddingAnimStarted = true
@@ -618,21 +620,29 @@ func (s *GameScene) Update(deltaTime float64) {
 	s.levelSystem.Update(deltaTime)            // 0. Update level system (Story 5.5: wave spawning, victory/defeat)
 	s.plantCardSystem.Update(deltaTime)        // 1. Update plant card states (before input)
 	s.inputSystem.Update(deltaTime, s.cameraX) // 2. Process player input (highest priority, 传递摄像机位置)
-	s.sunSpawnSystem.Update(deltaTime)         // 3. Generate new suns
-	s.sunMovementSystem.Update(deltaTime)      // 4. Move suns (includes collection animation)
-	s.sunCollectionSystem.Update(deltaTime)    // 5. Check if collection is complete
-	s.behaviorSystem.Update(deltaTime)         // 6. Update plant behaviors (Story 3.4)
-	s.physicsSystem.Update(deltaTime)          // 7. Check collisions (Story 4.3)
+
+	// 3. Generate new suns
+	// 教学关卡：在第一次收集阳光后启用自动生成（由 TutorialSystem 控制）
+	// 非教学关卡：始终启用自动生成
+	s.sunSpawnSystem.Update(deltaTime)
+
+	s.sunMovementSystem.Update(deltaTime)   // 4. Move suns (includes collection animation)
+	s.sunCollectionSystem.Update(deltaTime) // 5. Check if collection is complete
+	s.behaviorSystem.Update(deltaTime)      // 6. Update plant behaviors (Story 3.4)
+	s.physicsSystem.Update(deltaTime)       // 7. Check collisions (Story 4.3)
 	// Story 6.3: Reanim 动画系统（替代旧的 AnimationSystem）
 	s.reanimSystem.Update(deltaTime)   // 8. Update Reanim animation frames
 	s.particleSystem.Update(deltaTime) // 9. Update particle effects (Story 7.2)
+	// 方案A+：闪烁效果系统
+	s.flashEffectSystem.Update(deltaTime) // 9.3. Update flash effects (hit feedback)
 	// Story 8.2: Tutorial system (only if active)
 	if s.tutorialSystem != nil {
 		s.tutorialSystem.Update(deltaTime) // 9.5. Update tutorial text display
 	}
 	// Story 3.2: 植物预览系统 - 更新预览位置（双图像支持）
-	s.plantPreviewSystem.Update(deltaTime) // 10. Update plant preview position (dual-image support)
-	s.lifetimeSystem.Update(deltaTime)     // 11. Check for expired entities
+	s.plantPreviewSystem.Update(deltaTime)  // 10. Update plant preview position (dual-image support)
+	s.lawnGridSystem.Update(deltaTime)      // 10.5. Update lawn flash animation (Story 8.2)
+	s.lifetimeSystem.Update(deltaTime)      // 11. Check for expired entities
 	s.entityManager.RemoveMarkedEntities() // 12. Clean up deleted entities (always last)
 }
 
@@ -706,6 +716,10 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	// 游戏实体在UI卡片上方，这样植物和僵尸可以被看清
 	// 传递 cameraX 以正确转换世界坐标到屏幕坐标
 	s.renderSystem.DrawGameWorld(screen, s.cameraX)
+
+	// Layer 4.5: Draw lawn flash effect (Story 8.2 教学)
+	// 草坪闪烁效果，用于教学提示玩家可以种植
+	s.drawLawnFlash(screen)
 
 	// Layer 5: Draw UI overlays (sun counter text)
 	// 文字始终在最上层以确保可读性
@@ -857,17 +871,17 @@ func (s *GameScene) drawBackground(screen *ebiten.Image) {
 			screenY := sodOverlayY - float64(viewportY)
 
 			// Story 8.2 QA调试：打印草皮叠加图的坐标信息（每次都打印，便于对比）
-			log.Printf("=== 草皮叠加图渲染调试 ===")
-			log.Printf("草皮图尺寸: %dx%d", sodWidth, sodHeight)
-			log.Printf("启用行: %v", s.gameState.CurrentLevel.EnabledLanes)
-			log.Printf("草皮左边缘: %.1f, 草皮右边缘: %.1f (宽度%.1f)", sodOverlayX, sodOverlayX+float64(sodWidth), float64(sodWidth))
-			log.Printf("动画起点: %.1f", animStartX)
-			log.Printf("草皮卷中心: %.1f", sodRollCenterX)
-			log.Printf("草皮可见宽度: %d/%d px (%.1f%%)", visibleWidth, sodWidth, float64(visibleWidth)/float64(sodWidth)*100)
-			log.Printf("草皮应显示到: %.1f (起点%.1f + 可见宽度%d)", animStartX+float64(visibleWidth), animStartX, visibleWidth)
-			log.Printf("差距: 草皮卷中心 - 草皮应显示到 = %.1f - %.1f = %.1f px",
-				sodRollCenterX, animStartX+float64(visibleWidth), sodRollCenterX-(animStartX+float64(visibleWidth)))
-			log.Printf("屏幕坐标: (%.1f, %.1f)", screenX, screenY)
+			// log.Printf("=== 草皮叠加图渲染调试 ===")
+			// log.Printf("草皮图尺寸: %dx%d", sodWidth, sodHeight)
+			// log.Printf("启用行: %v", s.gameState.CurrentLevel.EnabledLanes)
+			// log.Printf("草皮左边缘: %.1f, 草皮右边缘: %.1f (宽度%.1f)", sodOverlayX, sodOverlayX+float64(sodWidth), float64(sodWidth))
+			// log.Printf("动画起点: %.1f", animStartX)
+			// log.Printf("草皮卷中心: %.1f", sodRollCenterX)
+			// log.Printf("草皮可见宽度: %d/%d px (%.1f%%)", visibleWidth, sodWidth, float64(visibleWidth)/float64(sodWidth)*100)
+			// log.Printf("草皮应显示到: %.1f (起点%.1f + 可见宽度%d)", animStartX+float64(visibleWidth), animStartX, visibleWidth)
+			// log.Printf("差距: 草皮卷中心 - 草皮应显示到 = %.1f - %.1f = %.1f px",
+			// 	sodRollCenterX, animStartX+float64(visibleWidth), sodRollCenterX-(animStartX+float64(visibleWidth)))
+			// log.Printf("屏幕坐标: (%.1f, %.1f)", screenX, screenY)
 
 			if !s.sodDebugPrinted {
 				log.Printf("草皮世界坐标: (%.1f, %.1f)", sodOverlayX, sodOverlayY)
@@ -1174,14 +1188,13 @@ func (s *GameScene) drawLastWaveWarning(screen *ebiten.Image) {
 		return
 	}
 
-	// 获取最后一波的时间
-	lastWaveTime := s.gameState.CurrentLevel.Waves[totalWaves-1].Time
-	warningTime := lastWaveTime - systems.LastWaveWarningTime
+	// 获取当前波次索引和最后一波索引
+	currentWaveIndex := s.gameState.CurrentWaveIndex
+	lastWaveIndex := totalWaves - 1
 
-	// 检查是否在提示时间窗口内（提示显示5秒）
-	if s.gameState.LevelTime >= warningTime &&
-		s.gameState.LevelTime < lastWaveTime &&
-		!s.gameState.IsWaveSpawned(totalWaves-1) {
+	// 显示条件：进入最后一波等待期（倒数第二波消灭完毕）
+	// 显示时长：直到最后一波生成前（约 minDelay 秒）
+	if currentWaveIndex == lastWaveIndex && !s.gameState.IsWaveSpawned(lastWaveIndex) {
 
 		// 绘制警告文本（屏幕中央上方）
 		warningText := "A huge wave of zombies is approaching!"
@@ -1278,4 +1291,51 @@ func (s *GameScene) drawGameResultOverlay(screen *ebiten.Image) {
 	hintOp.GeoM.Translate(hintX, hintY)
 	hintOp.ColorScale.ScaleWithColor(color.RGBA{R: 200, G: 200, B: 200, A: 255}) // 浅灰色
 	text.Draw(screen, hintText, s.sunCounterFont, hintOp)
+}
+
+// drawLawnFlash 绘制草坪闪烁效果（Story 8.2 教学）
+// 在玩家选择植物卡片后，已铺设草皮的行会有明暗变化的闪烁效果（由明变暗）
+// 使用黑色半透明遮罩实现草皮颜色变暗
+// 只在关卡指定的启用行（enabledLanes）上显示闪烁效果
+func (s *GameScene) drawLawnFlash(screen *ebiten.Image) {
+	alpha := s.lawnGridSystem.GetFlashAlpha()
+	if alpha <= 0 {
+		return // 没有闪烁效果，直接返回
+	}
+
+	// 获取启用的行列表
+	enabledLanes := s.lawnGridSystem.EnabledLanes
+	if len(enabledLanes) == 0 {
+		return // 没有启用的行
+	}
+
+	// 为每个启用的行单独绘制闪烁效果
+	for _, lane := range enabledLanes {
+		// 计算该行的世界坐标范围
+		// lane 是 1-based (1-5)，需要转换为 0-based (0-4)
+		rowIndex := lane - 1
+
+		// 行的Y坐标范围
+		rowStartY := config.GridWorldStartY + float64(rowIndex)*config.CellHeight
+		rowEndY := rowStartY + config.CellHeight
+
+		// 行的X坐标范围（整个草坪宽度）
+		rowStartX := config.GridWorldStartX
+		rowEndX := config.GridWorldStartX + float64(config.GridColumns)*config.CellWidth
+
+		// 转换为屏幕坐标
+		screenStartX := rowStartX - s.cameraX
+		screenStartY := rowStartY
+		width := rowEndX - rowStartX
+		height := rowEndY - rowStartY
+
+		// 创建黑色半透明遮罩（让草皮变暗）
+		flashImage := ebiten.NewImage(int(width), int(height))
+		flashImage.Fill(color.RGBA{0, 0, 0, uint8(alpha * 255)}) // 黑色，alpha 0.0-0.3
+
+		// 绘制到屏幕
+		op := &ebiten.DrawImageOptions{}
+		op.GeoM.Translate(screenStartX, screenStartY)
+		screen.DrawImage(flashImage, op)
+	}
 }

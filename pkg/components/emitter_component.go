@@ -58,4 +58,9 @@ type EmitterComponent struct {
 
 	// Angle offset (角度偏移)
 	AngleOffset float64 // LaunchAngle 的偏移量（度），例如 180° 用于翻转方向
+
+	// Particle rotation override (粒子旋转覆盖)
+	// 如果非零，将覆盖粒子的初始旋转角度（ParticleSpinAngle）
+	// 用于教学箭头等需要特定方向的粒子效果
+	ParticleRotationOverride float64
 }
