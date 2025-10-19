@@ -18,3 +18,4 @@ type TutorialTextComponent struct {
 	// 当前版本不使用背景框，保留用于后续优化
 	BackgroundAlpha float64
 }
+

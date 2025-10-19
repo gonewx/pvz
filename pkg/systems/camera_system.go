@@ -65,18 +65,49 @@ func (cs *CameraSystem) Update(dt float64) {
 		return
 	}
 
-	// 计算移动方向和距离
+	// 计算当前进度 (0.0 - 1.0)
+	movedDistance := math.Abs(currentX - cameraComp.StartX)
+	progress := 0.0
+	if cameraComp.TotalDistance > 0 {
+		progress = movedDistance / cameraComp.TotalDistance
+	}
+
+	// 应用缓动函数
+	easedSpeed := cameraComp.AnimationSpeed
+	switch cameraComp.EasingType {
+	case "easeInOut":
+		// 二次缓动：先加速后减速
+		easingFactor := cs.easeInOutQuad(progress)
+		// 使用缓动因子调整速度（在中间部分加速）
+		easedSpeed = cameraComp.AnimationSpeed * (1.0 + easingFactor)
+	case "easeOut":
+		// 减速运动
+		easingFactor := cs.easeOutQuad(1.0 - progress)
+		easedSpeed = cameraComp.AnimationSpeed * easingFactor
+	case "linear":
+		// 线性运动，无需调整
+	default:
+		// 默认线性
+	}
+
+	// 计算移动方向
 	direction := 1.0
 	if distanceToTarget < 0 {
 		direction = -1.0
 	}
 
 	// 计算本帧移动的距离
-	// TODO: 如果需要应用缓动效果，可以根据进度调整速度
-	moveDistance := cameraComp.AnimationSpeed * dt * direction
+	moveDistance := easedSpeed * dt * direction
 
 	// 更新镜头位置
 	newX := currentX + moveDistance
+
+	// 防止越过目标
+	if direction > 0 && newX > cameraComp.TargetX {
+		newX = cameraComp.TargetX
+	} else if direction < 0 && newX < cameraComp.TargetX {
+		newX = cameraComp.TargetX
+	}
 
 	// 范围限制
 	newX = math.Max(CameraMinX, math.Min(CameraMaxX, newX))

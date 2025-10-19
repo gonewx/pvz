@@ -54,6 +54,11 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 	// 查询所有移动中的僵尸实体
 	zombieEntityList := s.queryMovingZombies()
 
+	// DEBUG: 记录僵尸数量
+	if len(zombieEntityList) > 0 {
+		log.Printf("[BehaviorSystem] Update called, found %d moving zombies", len(zombieEntityList))
+	}
+
 	// 查询所有啃食中的僵尸实体
 	eatingZombieEntityList := s.queryEatingZombies()
 
@@ -235,6 +240,16 @@ func (s *BehaviorSystem) handleSunflowerBehavior(entityID ecs.EntityID, deltaTim
 // handleZombieBasicBehavior 处理普通僵尸的行为逻辑
 // 普通僵尸会以恒定速度从右向左移动
 func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaTime float64) {
+	// Story 8.3: 检查僵尸是否已激活（开场动画期间僵尸未激活，不应移动）
+	if waveState, ok := ecs.GetComponent[*components.ZombieWaveStateComponent](s.entityManager, entityID); ok {
+		if !waveState.IsActivated {
+			// DEBUG: 记录未激活的僵尸被跳过
+			log.Printf("[BehaviorSystem] Zombie %d NOT activated (wave %d), skipping behavior", entityID, waveState.WaveIndex)
+			// 僵尸未激活，跳过所有行为逻辑（保持静止展示）
+			return
+		}
+	}
+
 	// 检查生命值（Story 4.4: 僵尸死亡逻辑）
 	health, ok := ecs.GetComponent[*components.HealthComponent](s.entityManager, entityID)
 	if ok {
@@ -273,6 +288,10 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 	if !ok {
 		return
 	}
+
+	// DEBUG: 记录僵尸速度
+	log.Printf("[BehaviorSystem] Zombie %d moving: X=%.1f, VX=%.2f, VY=%.2f",
+		entityID, position.X, velocity.VX, velocity.VY)
 
 	// 更新位置：根据速度和时间增量移动僵尸
 	position.X += velocity.VX * deltaTime
@@ -643,6 +662,8 @@ func (s *BehaviorSystem) changeZombieAnimation(zombieID ecs.EntityID, newState c
 	// 根据状态切换动画
 	var animName string
 	switch newState {
+	case components.ZombieAnimIdle:
+		animName = "anim_idle"
 	case components.ZombieAnimWalking:
 		animName = "anim_walk"
 	case components.ZombieAnimEating:
@@ -958,6 +979,14 @@ func (s *BehaviorSystem) handleWallnutBehavior(entityID ecs.EntityID) {
 // handleConeheadZombieBehavior 处理路障僵尸的行为逻辑
 // 路障僵尸拥有护甲层，护甲耗尽后切换为普通僵尸外观和行为
 func (s *BehaviorSystem) handleConeheadZombieBehavior(entityID ecs.EntityID, deltaTime float64) {
+	// Story 8.3: 检查僵尸是否已激活（开场动画期间僵尸未激活，不应移动）
+	if waveState, ok := ecs.GetComponent[*components.ZombieWaveStateComponent](s.entityManager, entityID); ok {
+		if !waveState.IsActivated {
+			// 僵尸未激活，跳过所有行为逻辑（保持静止展示）
+			return
+		}
+	}
+
 	// 首先检查护甲状态
 	armor, ok := ecs.GetComponent[*components.ArmorComponent](s.entityManager, entityID)
 	if !ok {
@@ -1005,6 +1034,14 @@ func (s *BehaviorSystem) handleConeheadZombieBehavior(entityID ecs.EntityID, del
 // handleBucketheadZombieBehavior 处理铁桶僵尸的行为逻辑
 // 铁桶僵尸拥有更高的护甲层，护甲耗尽后切换为普通僵尸外观和行为
 func (s *BehaviorSystem) handleBucketheadZombieBehavior(entityID ecs.EntityID, deltaTime float64) {
+	// Story 8.3: 检查僵尸是否已激活（开场动画期间僵尸未激活，不应移动）
+	if waveState, ok := ecs.GetComponent[*components.ZombieWaveStateComponent](s.entityManager, entityID); ok {
+		if !waveState.IsActivated {
+			// 僵尸未激活，跳过所有行为逻辑（保持静止展示）
+			return
+		}
+	}
+
 	// 首先检查护甲状态
 	armor, ok := ecs.GetComponent[*components.ArmorComponent](s.entityManager, entityID)
 	if !ok {

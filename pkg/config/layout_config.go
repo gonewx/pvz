@@ -5,13 +5,24 @@ import "github.com/decker502/pvz/internal/reanim"
 // 布局配置常量
 // 本文件定义了游戏场景中的布局参数，包括网格系统、UI元素位置等
 
+// Camera Configuration (摄像机配置)
+const (
+	// GameCameraX 是游戏摄像机的X位置（世界坐标）
+	// 这是游戏正常运行时的摄像机位置，镜头居中对准草坪
+	GameCameraX = 220.0
+
+	// GridScreenStartX 是草坪网格在屏幕坐标系中的起始X坐标
+	// 这是草坪相对于屏幕左侧的距离
+	GridScreenStartX = 43.0
+)
+
 // Lawn Grid Configuration (草坪网格配置)
 // 所有坐标使用"世界坐标系"（相对于背景图片左上角）
 // 世界坐标是固定的，不随摄像机移动而变化
 const (
 	// GridWorldStartX 是草坪网格在背景图片中的起始X坐标（世界坐标）
-	// 计算方式：屏幕坐标 + 游戏摄像机位置(220)
-	GridWorldStartX = 263.0
+	// 计算方式：屏幕坐标 + 游戏摄像机位置
+	GridWorldStartX = GridScreenStartX + GameCameraX // 43 + 220 = 263
 
 	// GridWorldStartY 是草坪网格在背景图片中的起始Y坐标（世界坐标）
 	// Y轴不受摄像机水平移动影响，因此世界坐标等于屏幕坐标

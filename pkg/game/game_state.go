@@ -20,18 +20,18 @@ type GameState struct {
 	CameraX float64 // 摄像机X位置，用于世界坐标和屏幕坐标转换
 
 	// Story 5.5: 关卡流程状态
-	CurrentLevel           *config.LevelConfig // 当前关卡配置
-	LevelTime              float64             // 关卡已进行时间（秒）
-	CurrentWaveIndex       int                 // 当前波次索引（0表示第一波）
-	SpawnedWaves           []bool              // 每一波是否已生成（用于避免重复生成）
-	TotalZombiesSpawned    int                 // 已生成的僵尸总数
-	ZombiesKilled          int                 // 已消灭的僵尸数量
-	LastWaveCompletedTime  float64             // 上一波完成时间（用于计算延迟）
-	IsWaitingForNextWave   bool                // 是否正在等待下一波（延迟中）
-	IsLevelComplete        bool                // 关卡是否完成
-	IsGameOver             bool                // 游戏是否结束（胜利或失败）
-	GameResult             string              // 游戏结果："win", "lose", "" (进行中)
-	ShowingFinalWave       bool                // 是否正在显示最后一波警告动画
+	CurrentLevel          *config.LevelConfig // 当前关卡配置
+	LevelTime             float64             // 关卡已进行时间（秒）
+	CurrentWaveIndex      int                 // 当前波次索引（0表示第一波）
+	SpawnedWaves          []bool              // 每一波是否已生成（用于避免重复生成）
+	TotalZombiesSpawned   int                 // 已生成的僵尸总数
+	ZombiesKilled         int                 // 已消灭的僵尸数量
+	LastWaveCompletedTime float64             // 上一波完成时间（用于计算延迟）
+	IsWaitingForNextWave  bool                // 是否正在等待下一波（延迟中）
+	IsLevelComplete       bool                // 关卡是否完成
+	IsGameOver            bool                // 游戏是否结束（胜利或失败）
+	GameResult            string              // 游戏结果："win", "lose", "" (进行中)
+	ShowingFinalWave      bool                // 是否正在显示最后一波警告动画
 
 	// Story 8.1: 植物解锁和选卡状态
 	plantUnlockManager *PlantUnlockManager // 植物解锁管理器

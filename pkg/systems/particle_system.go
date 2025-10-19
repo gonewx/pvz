@@ -239,9 +239,9 @@ func (ps *ParticleSystem) updateParticles(dt float64) {
 				}
 
 				// DEBUG: 碰撞弹跳日志
-				oldVelocityY := particle.VelocityY
-				log.Printf("[碰撞] Age=%.2fs, Y=%.1f, 旧速度=%.1f, 反弹系数=%.2f",
-					particle.Age, position.Y, oldVelocityY, reflectY)
+				// oldVelocityY := particle.VelocityY
+				// log.Printf("[碰撞] Age=%.2fs, Y=%.1f, 旧速度=%.1f, 反弹系数=%.2f",
+				// particle.Age, position.Y, oldVelocityY, reflectY)
 
 				// 反弹：速度反向并乘以反弹系数
 				particle.VelocityY = -particle.VelocityY * reflectY
@@ -611,13 +611,13 @@ func (ps *ParticleSystem) applyInterpolation(p *components.ParticleComponent) {
 		// 计算系统时间归一化值（0-1）
 		systemT := p.EmitterAge / p.EmitterDuration
 		systemAlpha := particlePkg.EvaluateKeyframes(p.SystemAlphaKeyframes, systemT, p.SystemAlphaInterp)
-		
+
 		// DEBUG: SystemAlpha 调试日志（临时启用）
 		if p.Age < 0.05 || int(p.Age*20)%10 == 0 { // 每0.5秒打印一次
 			log.Printf("[SystemAlpha] EmitterAge=%.2fs, EmitterDuration=%.2fs, systemT=%.2f, systemAlpha=%.3f, particleAlpha=%.3f → final=%.3f",
 				p.EmitterAge, p.EmitterDuration, systemT, systemAlpha, p.Alpha, p.Alpha*systemAlpha)
 		}
-		
+
 		// 系统透明度乘以粒子自身透明度
 		p.Alpha *= systemAlpha
 	}

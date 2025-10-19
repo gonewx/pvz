@@ -2,6 +2,8 @@ package systems
 
 import (
 	"log"
+	"math/rand"
+	"time"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
@@ -12,8 +14,8 @@ import (
 
 const (
 	// 开场动画常量
-	OpeningIdleDuration      = 0.5  // Idle 状态持续时间（秒）
-	OpeningShowZombieTime    = 2.0  // 展示僵尸时间（秒）
+	OpeningIdleDuration      = 0.5   // Idle 状态持续时间（秒）
+	OpeningShowZombieTime    = 2.0   // 展示僵尸时间（秒）
 	OpeningCameraSpeed       = 300.0 // 镜头移动速度（像素/秒）
 	OpeningZombiePreviewX    = 1200.0 // 僵尸预告位置X坐标
 	OpeningCameraRightTarget = 800.0  // 镜头右移目标位置
@@ -27,29 +29,26 @@ type OpeningAnimationSystem struct {
 	resourceManager *game.ResourceManager
 	levelConfig     *config.LevelConfig
 	cameraSystem    *CameraSystem
+	reanimSystem    *ReanimSystem // Story 8.3: 用于初始化僵尸预览动画
 	openingEntity   ecs.EntityID
 }
 
 // NewOpeningAnimationSystem 创建开场动画系统。
 // 如果关卡不需要开场动画，返回 nil。
-func NewOpeningAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.ResourceManager, levelConfig *config.LevelConfig, cameraSystem *CameraSystem) *OpeningAnimationSystem {
+func NewOpeningAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.ResourceManager, levelConfig *config.LevelConfig, cameraSystem *CameraSystem, reanimSystem *ReanimSystem) *OpeningAnimationSystem {
 	// 检查是否需要开场动画
 	if levelConfig.SkipOpening {
 		log.Println("[OpeningAnimationSystem] SkipOpening=true, 不创建开场动画系统")
 		return nil
 	}
 
-	if levelConfig.OpeningType == "tutorial" {
-		log.Println("[OpeningAnimationSystem] Tutorial level, 不创建开场动画系统")
-		return nil
-	}
-
+	// 迷你游戏关卡(如1-5保龄球, 1-10传送带)无开场动画
 	if levelConfig.SpecialRules != "" {
 		log.Printf("[OpeningAnimationSystem] Special rules level (%s), 不创建开场动画系统", levelConfig.SpecialRules)
 		return nil
 	}
 
-	log.Println("[OpeningAnimationSystem] 创建开场动画系统")
+	log.Printf("[OpeningAnimationSystem] 创建开场动画系统 (OpeningType: %s)", levelConfig.OpeningType)
 
 	oas := &OpeningAnimationSystem{
 		entityManager:   em,
@@ -57,6 +56,7 @@ func NewOpeningAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *ga
 		resourceManager: rm,
 		levelConfig:     levelConfig,
 		cameraSystem:    cameraSystem,
+		reanimSystem:    reanimSystem,
 		openingEntity:   0,
 	}
 
@@ -84,6 +84,9 @@ func (oas *OpeningAnimationSystem) Update(dt float64) {
 	if !ok || openingComp.IsCompleted {
 		return
 	}
+
+	// DEBUG: 记录僵尸位置（检查是否在开场动画期间移动）
+	// 已移除调试日志
 
 	// 检查快捷键跳过（ESC 或 Space）
 	if oas.checkSkipInput() {
@@ -131,8 +134,8 @@ func (oas *OpeningAnimationSystem) updateCameraMoveRightState(openingComp *compo
 		openingComp.State = "showZombies"
 		openingComp.ElapsedTime = 0
 
-		// 生成预告僵尸
-		oas.spawnPreviewZombies(openingComp)
+		// Story 8.3: 不再生成预览僵尸
+		// 直接使用 WaveSpawnSystem 预生成的关卡僵尸（IsActivated=false 保持静止）
 
 		log.Println("[OpeningAnimationSystem] State: cameraMoveRight → showZombies")
 	}
@@ -140,14 +143,17 @@ func (oas *OpeningAnimationSystem) updateCameraMoveRightState(openingComp *compo
 
 // updateShowZombiesState 处理展示僵尸状态。
 func (oas *OpeningAnimationSystem) updateShowZombiesState(openingComp *components.OpeningAnimationComponent) {
+	// Story 8.3: 不再生成预览僵尸，直接使用 WaveSpawnSystem 预生成的关卡僵尸
+	// 僵尸在开场动画期间保持静止（BehaviorSystem 检查 IsActivated 标志）
+
 	// 等待一定时间展示僵尸
 	if openingComp.ElapsedTime >= OpeningShowZombieTime {
 		// 切换到镜头返回状态
 		openingComp.State = "cameraMoveLeft"
 		openingComp.ElapsedTime = 0
 
-		// 触发镜头返回
-		oas.cameraSystem.MoveTo(0, 0, OpeningCameraSpeed)
+		// 触发镜头返回到草坪起始位置（使用游戏摄像机位置）
+		oas.cameraSystem.MoveTo(config.GameCameraX, 0, OpeningCameraSpeed)
 
 		log.Println("[OpeningAnimationSystem] State: showZombies → cameraMoveLeft")
 	}
@@ -167,8 +173,7 @@ func (oas *OpeningAnimationSystem) updateCameraMoveLeftState(openingComp *compon
 
 // updateGameStartState 处理游戏开始状态。
 func (oas *OpeningAnimationSystem) updateGameStartState(openingComp *components.OpeningAnimationComponent) {
-	// 清理预告僵尸
-	oas.clearPreviewZombies(openingComp)
+	// Story 8.3: 不再需要清理预览僵尸（因为直接使用关卡僵尸）
 
 	// 标记开场动画完成
 	openingComp.IsCompleted = true
@@ -185,23 +190,20 @@ func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.O
 
 	log.Printf("[OpeningAnimationSystem] Spawning %d preview zombies", len(zombieTypes))
 
-	// 计算僵尸位置布局
-	screenHeight := 600.0 // TODO: 从配置获取
-	zombieCount := len(zombieTypes)
-	if zombieCount == 0 {
+	if len(zombieTypes) == 0 {
 		return
 	}
 
-	// 生成僵尸实体
+	// 初始化随机数种子（使用当前时间）
+	rand.Seed(time.Now().UnixNano())
+
+	// 生成僵尸实体，随机分配到5行
 	for i, zombieType := range zombieTypes {
-		// 计算Y坐标（均匀分布）
-		var y float64
-		if zombieCount == 1 {
-			y = screenHeight / 2
-		} else {
-			spacing := screenHeight / float64(zombieCount+1)
-			y = spacing * float64(i+1)
-		}
+		// 随机选择一行（0-4）
+		randomLane := rand.Intn(config.GridRows)
+
+		// 计算Y坐标（使用网格行位置）
+		y := config.GridWorldStartY + float64(randomLane)*config.CellHeight + config.CellHeight/2
 
 		// 创建僵尸实体
 		zombieEntity := oas.entityManager.CreateEntity()
@@ -212,19 +214,33 @@ func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.O
 			Y: y,
 		})
 
-		// 添加行为组件（特殊的预告行为，不移动）
+		// 添加行为组件（特殊的预告行为，不移动、不攻击）
 		ecs.AddComponent(oas.entityManager, zombieEntity, &components.BehaviorComponent{
-			Type: oas.zombieTypeToBehaviorType(zombieType),
-			// 其他字段根据需要设置
+			Type: components.BehaviorZombiePreview, // 使用预览行为，防止僵尸移动
 		})
 
-		// TODO: 添加 ReanimComponent 播放 idle 动画
-		// TODO: 添加 HealthComponent（可选）
+		// 添加 ReanimComponent 播放 idle 动画
+		reanimXML := oas.resourceManager.GetReanimXML("Zombie")
+		partImages := oas.resourceManager.GetReanimPartImages("Zombie")
+		if reanimXML != nil && partImages != nil {
+			reanimComp := &components.ReanimComponent{
+				Reanim:      reanimXML,
+				PartImages:  partImages,
+				CurrentAnim: "anim_idle",
+				IsLooping:   true,
+			}
+			ecs.AddComponent(oas.entityManager, zombieEntity, reanimComp)
+
+			// 初始化 Reanim（设置锚点为底部中心）
+			if err := oas.reanimSystem.InitializeDirectRender(zombieEntity); err != nil {
+				log.Printf("[OpeningAnimationSystem] Failed to initialize zombie reanim: %v", err)
+			}
+		}
 
 		// 保存僵尸实体ID
 		openingComp.ZombieEntities = append(openingComp.ZombieEntities, zombieEntity)
 
-		log.Printf("[OpeningAnimationSystem] Spawned preview zombie: type=%s, x=%.0f, y=%.0f", zombieType, OpeningZombiePreviewX, y)
+		log.Printf("[OpeningAnimationSystem] Spawned preview zombie %d: type=%s, lane=%d, x=%.0f, y=%.0f", i, zombieType, randomLane, OpeningZombiePreviewX, y)
 	}
 }
 
@@ -286,8 +302,7 @@ func (oas *OpeningAnimationSystem) Skip() {
 	// 停止镜头动画
 	oas.cameraSystem.StopAnimation()
 
-	// 清理预告僵尸
-	oas.clearPreviewZombies(openingComp)
+	// Story 8.3: 不再需要清理预览僵尸（因为直接使用关卡僵尸）
 
 	// 设置跳过标志
 	openingComp.IsSkipped = true
@@ -309,4 +324,12 @@ func (oas *OpeningAnimationSystem) IsCompleted() bool {
 	}
 
 	return openingComp.IsCompleted
+}
+
+// GetEntity 返回开场动画实体ID（用于调试和验证工具）
+func (oas *OpeningAnimationSystem) GetEntity() ecs.EntityID {
+	if oas == nil {
+		return 0
+	}
+	return oas.openingEntity
 }

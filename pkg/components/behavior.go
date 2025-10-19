@@ -36,14 +36,18 @@ const (
 	// 爆炸对以自身为中心的3x3范围内的所有僵尸造成1800点伤害（足以秒杀所有僵尸）
 	// 爆炸后樱桃炸弹实体被移除
 	BehaviorCherryBomb
+	// BehaviorZombiePreview 僵尸预告行为：开场动画中的僵尸预览，不移动、不攻击、只播放 idle 动画
+	BehaviorZombiePreview
 )
 
 // ZombieAnimState 定义僵尸的动画状态
 type ZombieAnimState int
 
 const (
+	// ZombieAnimIdle 待机/静止状态（用于开场预览）
+	ZombieAnimIdle ZombieAnimState = iota
 	// ZombieAnimWalking 行走状态
-	ZombieAnimWalking ZombieAnimState = iota
+	ZombieAnimWalking
 	// ZombieAnimEating 啃食/攻击状态
 	ZombieAnimEating
 	// ZombieAnimDying 死亡状态

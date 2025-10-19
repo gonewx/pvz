@@ -54,7 +54,21 @@ func (s *ZombieLaneTransitionSystem) Update(deltaTime float64) {
 		*components.PositionComponent,
 	](s.entityManager)
 
+	// DEBUG: 记录系统是否被调用
+	if len(entities) > 0 {
+		log.Printf("[ZombieLaneTransitionSystem] Update called, processing %d zombies", len(entities))
+	}
+
 	for _, entityID := range entities {
+		// Story 8.3: 检查僵尸是否已激活（开场动画期间僵尸未激活，不应移动）
+		if waveState, ok := ecs.GetComponent[*components.ZombieWaveStateComponent](s.entityManager, entityID); ok {
+			if !waveState.IsActivated {
+				// 僵尸未激活，跳过行转换逻辑（保持静止展示）
+				log.Printf("[ZombieLaneTransitionSystem] Zombie %d NOT activated, skipping transition", entityID)
+				continue
+			}
+		}
+
 		targetLaneComp, ok := ecs.GetComponent[*components.ZombieTargetLaneComponent](s.entityManager, entityID)
 		if !ok {
 			continue
@@ -73,6 +87,18 @@ func (s *ZombieLaneTransitionSystem) Update(deltaTime float64) {
 		// 计算目标行的中心Y坐标
 		targetY := config.GridWorldStartY + float64(targetLaneComp.TargetRow)*config.CellHeight + config.CellHeight/2.0
 
+		// Story 8.3: 如果僵尸还没有Y轴速度（刚激活），计算并设置Y轴速度
+		vel, hasVel := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID)
+		if hasVel && vel.VY == 0 && math.Abs(pos.Y-targetY) > LaneTransitionTolerance {
+			// 计算到达目标行所需的Y轴速度
+			// 假设需要在3秒内到达目标行
+			deltaY := targetY - pos.Y
+			vySpeed := deltaY / 3.0
+			vel.VY = vySpeed
+			log.Printf("[ZombieLaneTransitionSystem] Initialized zombie %d VY speed: %.2f (deltaY=%.2f)",
+				entityID, vySpeed, deltaY)
+		}
+
 		// 检查是否已到达目标行（Y坐标在容差范围内）
 		deltaY := math.Abs(pos.Y - targetY)
 		if deltaY <= LaneTransitionTolerance {
@@ -81,7 +107,7 @@ func (s *ZombieLaneTransitionSystem) Update(deltaTime float64) {
 			continue
 		}
 
-		// 还未到达，继续移动（速度已在 WaveSpawnSystem 中设置）
+		// 还未到达，继续移动
 		// 这里只需要记录日志
 		if deltaY > 50 { // 只在距离较远时记录日志，避免刷屏
 			log.Printf("[ZombieLaneTransitionSystem] Zombie %d moving to target lane %d, current Y=%.2f, target Y=%.2f, delta=%.2f",
@@ -125,8 +151,8 @@ func (s *ZombieLaneTransitionSystem) onReachedTargetLane(
 				// 根据僵尸类型设置移动速度
 				// 所有僵尸的基础速度都是 -23.0（向左移动）
 				vel.VX = -23.0
-				log.Printf("[ZombieLaneTransitionSystem] Started zombie %d normal movement, behavior=%d, VX=%.2f",
-					entityID, behavior.Type, vel.VX)
+				log.Printf("[ZombieLaneTransitionSystem] ⚠️ SET VX=-23.0 for zombie %d (reached target lane), behavior=%d",
+					entityID, behavior.Type)
 			}
 		}
 	}

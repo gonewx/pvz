@@ -7,7 +7,7 @@ openingType: "tutorial"       # 教学关卡（无开场动画）
 enabledLanes: [3]             # 只启用第3行（中间行）
 availablePlants:              # 只有豌豆射手
   - "peashooter"
-skipOpening: true             # 跳过开场（教学关卡直接进入）
+skipOpening: false            # 启用完整开场动画(铺草皮 + 僵尸预告)
 initialSun: 150               # 初始阳光150（原版1-1关卡配置，足够种植1个豌豆射手）
 
 # Story 8.2 QA改进：背景和草皮配置
@@ -63,23 +63,16 @@ tutorialSteps:
     textKey: "ADVICE_ZOMBIE_ONSLAUGHT"
     action: "waitForLevelEnd"
 
-# 波次配置：3波，总共5个僵尸（最后一波3个）
+# 波次配置：2波，总共5个僵尸（符合原版设计：缓慢出现）
 # 原版机制：上一波消灭完毕后，自动触发下一波（可设置最小延迟）
 waves:
-  # 第一波：游戏开始后立即出现，1个普通僵尸
+  # 第一波：游戏开始后出现，2个普通僵尸
   - zombies:
       - type: "basic"
         lane: 3
-        count: 1
+        count: 2
 
-  # 第二波：第一波消灭后自动触发，1个普通僵尸
-  - minDelay: 5  # 等待5秒后触发
-    zombies:
-      - type: "basic"
-        lane: 3
-        count: 1
-
-  # 第三波（最后一波）：第二波消灭后自动触发，3个普通僵尸
+  # 第二波（最后一波）：第一波消灭后自动触发，3个普通僵尸
   - minDelay: 5  # 等待5秒后触发
     zombies:
       - type: "basic"

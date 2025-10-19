@@ -50,11 +50,11 @@ const (
 	ShovelWidth  = 70
 	ShovelHeight = 74
 
-	// Camera and Animation Constants
+	// Animation Constants
 	// The background image is wider than the window, we show only a portion
 	IntroAnimDuration = 3.0 // Duration of intro animation in seconds
 	CameraScrollSpeed = 100 // Pixels per second for intro animation
-	GameCameraX       = 220 // Final camera X position for gameplay (centered on lawn)
+	// GameCameraX 已移至 config.GameCameraX (统一配置管理)
 )
 
 // GameScene represents the main gameplay screen.
@@ -143,6 +143,11 @@ type GameScene struct {
 
 	// Story 8.2 QA改进：完整的铺草皮动画系统
 	soddingSystem *systems.SoddingSystem // 铺草皮动画系统（SodRoll 滚动动画）
+
+	// Story 8.3: Camera and Opening Animation Systems
+	cameraSystem  *systems.CameraSystem            // 镜头控制系统（镜头移动、缓动）
+	openingSystem *systems.OpeningAnimationSystem  // 开场动画系统（僵尸预告、跳过）
+	rewardSystem  *systems.RewardAnimationSystem   // 奖励动画系统（关卡完成奖励）
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -165,8 +170,8 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 		// Initialize camera at the leftmost position for intro animation
 		// cameraX:            0,
 		// isIntroAnimPlaying: true,
-		cameraX:            GameCameraX, // 直接设置为游戏镜头位置，跳过开场动画
-		isIntroAnimPlaying: false,       // 禁用开场动画
+		cameraX:            config.GameCameraX, // 直接设置为游戏镜头位置，跳过开场动画
+		isIntroAnimPlaying: false,              // 禁用开场动画
 		introAnimTimer:     0,
 	}
 
@@ -307,25 +312,23 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	}
 
 	// Story 8.3: Create CameraSystem (always create, used by opening animation)
-	// TODO: 当开场动画系统启用后，取消注释
-	// cameraSystem := systems.NewCameraSystem(scene.entityManager, scene.gameState)
-	// log.Printf("[GameScene] Initialized camera system")
+	scene.cameraSystem = systems.NewCameraSystem(scene.entityManager, scene.gameState)
+	log.Printf("[GameScene] Initialized camera system")
 
 	// Story 8.3: Create RewardAnimationSystem
-	rewardSystem := systems.NewRewardAnimationSystem(scene.entityManager, scene.gameState, rm)
+	scene.rewardSystem = systems.NewRewardAnimationSystem(scene.entityManager, scene.gameState, rm)
 	log.Printf("[GameScene] Initialized reward animation system")
 
 	// Story 8.3: Create OpeningAnimationSystem (conditionally, may return nil)
-	// TODO: 实现开场动画系统集成
-	// openingSystem := systems.NewOpeningAnimationSystem(scene.entityManager, scene.gameState, rm, levelConfig, cameraSystem)
-	// if openingSystem != nil {
-	// 	log.Printf("[GameScene] Initialized opening animation system")
-	// } else {
-	// 	log.Printf("[GameScene] Skipping opening animation system (tutorial/skip/special level)")
-	// }
+	scene.openingSystem = systems.NewOpeningAnimationSystem(scene.entityManager, scene.gameState, rm, levelConfig, scene.cameraSystem, scene.reanimSystem)
+	if scene.openingSystem != nil {
+		log.Printf("[GameScene] Initialized opening animation system")
+	} else {
+		log.Printf("[GameScene] Skipping opening animation system (tutorial/skip/special level)")
+	}
 
-	// 2. Create LevelSystem
-	scene.levelSystem = systems.NewLevelSystem(scene.entityManager, scene.gameState, scene.waveSpawnSystem, rm, scene.reanimSystem, rewardSystem)
+	// 2. Create LevelSystem (需要 RewardAnimationSystem)
+	scene.levelSystem = systems.NewLevelSystem(scene.entityManager, scene.gameState, scene.waveSpawnSystem, rm, scene.reanimSystem, scene.rewardSystem)
 	log.Printf("[GameScene] Initialized level system")
 
 	// 3. Create ZombieLaneTransitionSystem (僵尸行转换系统)
@@ -607,14 +610,59 @@ func (s *GameScene) loadSoddingResources() {
 //   - ECS system updates (input, sun spawning, movement, collection, lifetime management)
 //   - System execution order ensures correct game logic flow
 func (s *GameScene) Update(deltaTime float64) {
-	// Story 8.2 QA改进：检查是否需要启动铺草皮动画
-	if s.soddingSystem != nil && !s.soddingAnimStarted && s.soddingAnimDelay > 0 {
+	// Story 8.2 QA改进：铺草皮动画系统更新（必须在开场动画之前）
+	if s.soddingSystem != nil {
+		s.soddingSystem.Update(deltaTime)
+	}
+
+	// Story 8.3: Check if opening animation is playing
+	if s.openingSystem != nil && !s.openingSystem.IsCompleted() {
+		// 开场动画期间，只更新镜头系统、开场动画系统和 Reanim 系统（僵尸动画需要）
+		s.cameraSystem.Update(deltaTime)
+		s.openingSystem.Update(deltaTime)
+		s.reanimSystem.Update(deltaTime) // 更新僵尸 idle 动画
+
+		// 同步镜头位置到本地 cameraX（用于渲染）
+		s.cameraX = s.gameState.CameraX
+		return // 暂停其他游戏系统
+	}
+
+	// 开场动画刚完成，触发铺草皮动画（如果配置了且还未启动）
+	if s.openingSystem != nil && s.openingSystem.IsCompleted() && !s.soddingAnimStarted && s.soddingSystem != nil {
+		log.Printf("[GameScene] 开场动画完成，启动铺草皮动画")
+
+		// 启动动画，传递启用的行列表、草皮位置和图片高度
+		enabledLanes := s.gameState.CurrentLevel.EnabledLanes
+		s.soddingSystem.StartAnimation(func() {
+			// 动画完成回调：通知教学系统可以开始了
+			log.Printf("[GameScene] 铺草皮动画完成")
+			if s.tutorialSystem != nil {
+				s.tutorialSystem.OnSoddingComplete()
+			}
+		}, enabledLanes, s.sodOverlayX, float64(s.sodHeight))
+
+		s.soddingAnimStarted = true
+		// 标记开场动画系统为 nil，避免重复检查
+		s.openingSystem = nil
+		return // 等待铺草皮动画完成
+	}
+
+	// Story 8.3: 如果铺草皮动画正在播放，暂停其他游戏系统
+	if s.soddingSystem != nil && s.soddingSystem.IsPlaying() {
+		// 铺草皮动画期间，只更新铺草皮系统、镜头系统和 Reanim 系统（草皮卷动画需要）
+		s.cameraSystem.Update(deltaTime)
+		s.reanimSystem.Update(deltaTime) // 更新草皮卷动画帧
+		s.cameraX = s.gameState.CameraX
+		return // 暂停其他游戏系统（包括僵尸激活）
+	}
+
+	// 如果没有开场动画，使用延迟启动铺草皮动画（原逻辑）
+	if s.openingSystem == nil && s.soddingSystem != nil && !s.soddingAnimStarted && s.soddingAnimDelay > 0 {
 		s.soddingAnimTimer += deltaTime
 		if s.soddingAnimTimer >= s.soddingAnimDelay {
 			log.Printf("[GameScene] 启动铺草皮动画（延迟 %.1f 秒后）", s.soddingAnimDelay)
 
 			// 启动动画，传递启用的行列表、草皮位置和图片高度
-			// 使用缓存的草皮位置确保与渲染位置一致
 			enabledLanes := s.gameState.CurrentLevel.EnabledLanes
 			s.soddingSystem.StartAnimation(func() {
 				// 动画完成回调：通知教学系统可以开始了
@@ -626,11 +674,6 @@ func (s *GameScene) Update(deltaTime float64) {
 
 			s.soddingAnimStarted = true
 		}
-	}
-
-	// Story 8.2 QA改进：铺草皮动画系统更新
-	if s.soddingSystem != nil {
-		s.soddingSystem.Update(deltaTime)
 	}
 
 	// Handle intro animation
@@ -695,7 +738,7 @@ func (s *GameScene) updateIntroAnimation(deltaTime float64) {
 
 	if progress >= 1.0 {
 		// Animation complete, camera settled at gameplay position
-		s.cameraX = GameCameraX
+		s.cameraX = config.GameCameraX
 		s.isIntroAnimPlaying = false
 		return
 	}
@@ -706,10 +749,10 @@ func (s *GameScene) updateIntroAnimation(deltaTime float64) {
 		easedProgress := s.easeOutQuad(phaseProgress)
 		s.cameraX = easedProgress * s.maxCameraX
 	} else {
-		// Phase 2: Scroll from right (maxCameraX) back to center (GameCameraX)
+		// Phase 2: Scroll from right (maxCameraX) back to center (config.GameCameraX)
 		phaseProgress := (progress - 0.5) / 0.5
 		easedProgress := s.easeOutQuad(phaseProgress)
-		s.cameraX = s.maxCameraX + easedProgress*(GameCameraX-s.maxCameraX)
+		s.cameraX = s.maxCameraX + easedProgress*(config.GameCameraX-s.maxCameraX)
 	}
 }
 

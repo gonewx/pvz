@@ -9,7 +9,7 @@ import (
 )
 
 // NewZombieEntity 创建普通僵尸实体
-// 僵尸从屏幕右侧外生成，以恒定速度从右向左移动
+// 僵尸从屏幕右侧外生成，可选择是否立即开始移动
 //
 // 参数:
 //   - em: 实体管理器
@@ -21,6 +21,8 @@ import (
 // 返回:
 //   - ecs.EntityID: 创建的僵尸实体ID，如果失败返回 0
 //   - error: 如果创建失败返回错误信息
+//
+// 注意：僵尸默认创建时速度为0（待命状态），需要通过 WaveSpawnSystem.ActivateWave() 激活
 func NewZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs ReanimSystemInterface, row int, spawnX float64) (ecs.EntityID, error) {
 	if em == nil {
 		return 0, fmt.Errorf("entity manager cannot be nil")
@@ -93,21 +95,24 @@ func NewZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs ReanimSystemIn
 		},
 	})
 
-	// 使用 ReanimSystem 初始化动画（播放走路动画）
-	if err := rs.PlayAnimation(entityID, "anim_walk"); err != nil {
-		return 0, fmt.Errorf("failed to play Zombie walk animation: %w", err)
+	// Story 8.3: 使用 ReanimSystem 初始化动画（播放 idle 动画，等待激活）
+	// 激活后会由 WaveSpawnSystem.ActivateWave() 切换为 walk 动画
+	if err := rs.PlayAnimation(entityID, "anim_idle"); err != nil {
+		return 0, fmt.Errorf("failed to play Zombie idle animation: %w", err)
 	}
 
-	// 添加速度组件（从右向左移动）
+	// 添加速度组件（初始速度为0，待命状态）
+	// Story 8.3: 僵尸在预生成时不移动，等待 WaveSpawnSystem.ActivateWave() 激活
 	em.AddComponent(entityID, &components.VelocityComponent{
-		VX: config.ZombieWalkSpeed, // 负值表示向左移动
-		VY: 0.0,
+		VX: 0.0, // 待命状态：不向左移动
+		VY: 0.0, // 待命状态：不垂直移动
 	})
 
-	// 添加行为组件（标识为普通僵尸）
+	// 添加行为组件（标识为普通僵尸，初始为 idle 状态）
+	// Story 8.3: 僵尸初始为静止状态，等待 WaveSpawnSystem.ActivateWave() 激活后切换为 Walking
 	em.AddComponent(entityID, &components.BehaviorComponent{
 		Type:            components.BehaviorZombieBasic,
-		ZombieAnimState: components.ZombieAnimWalking,
+		ZombieAnimState: components.ZombieAnimIdle,
 	})
 
 	// 添加生命值组件（本Story定义但不使用，为Story 4.4准备）
@@ -213,21 +218,24 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs Reanim
 		},
 	})
 
-	// 使用 ReanimSystem 初始化动画（播放走路动画）
-	if err := rs.PlayAnimation(entityID, "anim_walk"); err != nil {
-		return 0, fmt.Errorf("failed to play ZombieConeHead walk animation: %w", err)
+	// Story 8.3: 使用 ReanimSystem 初始化动画（播放 idle 动画，等待激活）
+	// 激活后会由 WaveSpawnSystem.ActivateWave() 切换为 walk 动画
+	if err := rs.PlayAnimation(entityID, "anim_idle"); err != nil {
+		return 0, fmt.Errorf("failed to play ZombieConeHead idle animation: %w", err)
 	}
 
-	// 添加速度组件（从右向左移动）
+	// 添加速度组件（初始速度为0，待命状态）
+	// Story 8.3: 僵尸在预生成时不移动，等待 WaveSpawnSystem.ActivateWave() 激活
 	em.AddComponent(entityID, &components.VelocityComponent{
-		VX: config.ZombieWalkSpeed, // 负值表示向左移动
-		VY: 0.0,
+		VX: 0.0, // 待命状态：不向左移动
+		VY: 0.0, // 待命状态：不垂直移动
 	})
 
-	// 添加行为组件（标识为路障僵尸，初始状态为行走）
+	// 添加行为组件（标识为路障僵尸，初始为 idle 状态）
+	// Story 8.3: 僵尸初始为静止状态，等待 WaveSpawnSystem.ActivateWave() 激活后切换为 Walking
 	em.AddComponent(entityID, &components.BehaviorComponent{
 		Type:            components.BehaviorZombieConehead,
-		ZombieAnimState: components.ZombieAnimWalking,
+		ZombieAnimState: components.ZombieAnimIdle,
 	})
 
 	// 添加护甲组件（路障僵尸的关键特性）
@@ -339,21 +347,24 @@ func NewBucketheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs Rean
 		},
 	})
 
-	// 使用 ReanimSystem 初始化动画（播放走路动画）
-	if err := rs.PlayAnimation(entityID, "anim_walk"); err != nil {
-		return 0, fmt.Errorf("failed to play ZombieBucketHead walk animation: %w", err)
+	// Story 8.3: 使用 ReanimSystem 初始化动画（播放 idle 动画，等待激活）
+	// 激活后会由 WaveSpawnSystem.ActivateWave() 切换为 walk 动画
+	if err := rs.PlayAnimation(entityID, "anim_idle"); err != nil {
+		return 0, fmt.Errorf("failed to play ZombieBucketHead idle animation: %w", err)
 	}
 
-	// 添加速度组件（从右向左移动）
+	// 添加速度组件（初始速度为0，待命状态）
+	// Story 8.3: 僵尸在预生成时不移动，等待 WaveSpawnSystem.ActivateWave() 激活
 	em.AddComponent(entityID, &components.VelocityComponent{
-		VX: config.ZombieWalkSpeed, // 负值表示向左移动
-		VY: 0.0,
+		VX: 0.0, // 待命状态：不向左移动
+		VY: 0.0, // 待命状态：不垂直移动
 	})
 
-	// 添加行为组件（标识为铁桶僵尸，初始状态为行走）
+	// 添加行为组件（标识为铁桶僵尸，初始为 idle 状态）
+	// Story 8.3: 僵尸初始为静止状态，等待 WaveSpawnSystem.ActivateWave() 激活后切换为 Walking
 	em.AddComponent(entityID, &components.BehaviorComponent{
 		Type:            components.BehaviorZombieBuckethead,
-		ZombieAnimState: components.ZombieAnimWalking,
+		ZombieAnimState: components.ZombieAnimIdle,
 	})
 
 	// 添加护甲组件（铁桶僵尸的关键特性）

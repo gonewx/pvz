@@ -21,3 +21,4 @@ type TutorialComponent struct {
 	// 包含触发条件、文本键和动作定义
 	TutorialSteps []config.TutorialStep
 }
+

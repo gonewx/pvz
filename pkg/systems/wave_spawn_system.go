@@ -167,6 +167,18 @@ func (s *WaveSpawnSystem) ActivateWave(waveIndex int) int {
 				}
 			}
 
+			// Story 8.3: 切换到 walk 动画（僵尸开始移动）
+			if behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID); ok {
+				if behavior.ZombieAnimState == components.ZombieAnimIdle {
+					behavior.ZombieAnimState = components.ZombieAnimWalking
+					if err := s.reanimSystem.PlayAnimation(entityID, "anim_walk"); err != nil {
+						log.Printf("[WaveSpawnSystem] Warning: Failed to play walk animation for zombie %d: %v", entityID, err)
+					} else {
+						log.Printf("[WaveSpawnSystem] Zombie %d switched to walk animation (activated)", entityID)
+					}
+				}
+			}
+
 			activated++
 		}
 	}
@@ -190,22 +202,21 @@ func (s *WaveSpawnSystem) ActivateWave(waveIndex int) int {
 //
 //	僵尸实体ID
 func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIndex int, indexInWave int) ecs.EntityID {
-	// 将行号从1-5转换为数组索引0-4
-	row := lane - 1
-	if row < 0 || row > 4 {
-		log.Printf("[WaveSpawnSystem] ERROR: Invalid lane %d (must be 1-5)", lane)
-		return 0
-	}
+	// Story 8.3: 开场预览期间，僵尸随机分布在5行上
+	// 激活后，僵尸会移动到配置的目标行
 
-	// 计算站位位置
+	// 目标行：配置中指定的行（游戏开始后僵尸应该到达的行）
+	targetLane := s.findNearestEnabledLane(lane)
+	targetRow := targetLane - 1
+
+	// 预览行：随机选择一行（0-4）用于开场预览展示
+	previewRow := rand.Intn(5)
+
+	// 计算预览位置（僵尸初始站位）
 	// X坐标：基础位置 + 索引偏移（避免重叠）
 	indexOffsetX := float64(indexInWave) * 120.0 // 同波僵尸间隔120像素
 	spawnX := s.getZombieSpawnX() + indexOffsetX
-	spawnY := s.getZombieSpawnY(row)
-
-	// 查找目标有效行
-	targetLane := s.findNearestEnabledLane(lane)
-	targetRow := targetLane - 1
+	spawnY := s.getZombieSpawnY(previewRow) // 使用随机行的Y坐标
 
 	// 根据类型创建僵尸
 	var entityID ecs.EntityID
@@ -217,7 +228,7 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 			s.entityManager,
 			s.resourceManager,
 			s.reanimSystem,
-			row,
+			previewRow,
 			spawnX,
 		)
 	case "conehead":
@@ -225,7 +236,7 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 			s.entityManager,
 			s.resourceManager,
 			s.reanimSystem,
-			row,
+			previewRow,
 			spawnX,
 		)
 	case "buckethead":
@@ -233,7 +244,7 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 			s.entityManager,
 			s.resourceManager,
 			s.reanimSystem,
-			row,
+			previewRow,
 			spawnX,
 		)
 	default:
@@ -257,11 +268,41 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 	if vel, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID); ok {
 		vel.VX = 0 // 待命状态：不向左移动
 		vel.VY = 0 // 待命状态：不垂直移动
+		log.Printf("[WaveSpawnSystem] Cleared zombie %d velocity: VX=%.2f, VY=%.2f", entityID, vel.VX, vel.VY)
 	}
 
-	// 如果生成行不是有效行，添加目标行组件（稍后会自动移动）
-	if row != targetRow {
-		s.addTargetLaneComponent(entityID, targetRow, spawnY)
+	// Story 8.3: 切换到 idle 动画（预览期间僵尸静止）
+	// 激活时会切换回 walk 动画
+	if behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID); ok {
+		behavior.ZombieAnimState = components.ZombieAnimIdle
+
+		// 读取当前动画状态（调试用）
+		if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
+			log.Printf("[WaveSpawnSystem] Zombie %d 切换前动画: %s, 帧: %d", entityID, reanimComp.CurrentAnim, reanimComp.CurrentFrame)
+		}
+
+		if err := s.reanimSystem.PlayAnimation(entityID, "anim_idle"); err != nil {
+			log.Printf("[WaveSpawnSystem] Warning: Failed to play idle animation for zombie %d: %v", entityID, err)
+		} else {
+			// 验证切换后的状态
+			if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
+				log.Printf("[WaveSpawnSystem] Zombie %d 切换后动画: %s, 帧: %d (preview mode)", entityID, reanimComp.CurrentAnim, reanimComp.CurrentFrame)
+			}
+		}
+	}
+
+	// Story 8.3: 如果预览行不是目标行，添加目标行组件
+	// 激活后僵尸会自动移动到目标行
+	// 注意：预览期间不设置Y轴速度，保持静止
+	if previewRow != targetRow {
+		// 只添加目标行组件，不设置速度（setVelocity=false）
+		ecs.AddComponent(s.entityManager, entityID, &components.ZombieTargetLaneComponent{
+			TargetRow:            targetRow,
+			HasReachedTargetLane: false,
+		})
+
+		log.Printf("[WaveSpawnSystem] Added target lane component (no velocity): targetRow=%d, previewRow=%d",
+			targetRow, previewRow)
 	}
 
 	log.Printf("[WaveSpawnSystem] Pre-spawned zombie %d: wave=%d, index=%d, lane=%d, pos=(%.1f, %.1f)",
