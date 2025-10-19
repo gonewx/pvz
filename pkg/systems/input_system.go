@@ -180,6 +180,7 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 			pos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, id)
 			clickable, _ := ecs.GetComponent[*components.ClickableComponent](s.entityManager, id)
 			sun, _ := ecs.GetComponent[*components.SunComponent](s.entityManager, id)
+			reanim, _ := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id)
 
 			// 只处理可点击的阳光（允许下落中和已落地的阳光）
 			if !clickable.IsEnabled {
@@ -191,14 +192,45 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 				continue
 			}
 
-			// AABB 碰撞检测（中心对齐）- 使用世界坐标比较
-			// 注意：PositionComponent 存储的是实体的中心坐标，需要转换为边界框
+			// 计算点击检测的中心位置
+			//
+			// 问题分析：阳光的视觉中心（Sun1 核心）和几何中心不一致
+			// - Sun.reanim 有3个部件：Sun1(小核心), Sun2(中), Sun3(大光晕)
+			// - Sun1 (36x36) 在 (-14.2, -14.2)，是视觉上的"阳光核心"
+			// - Sun3 (117x116) 在 (16, -70.6)，是大光晕，占据右侧大量空间
+			// - calculateCenterOffset 计算的是几何中心 ≈ (44.2, -19.4)
+			// - 但玩家点击的是视觉中心（Sun1），而不是几何中心
+			//
+			// 修复方案：点击中心应该对齐到实际的视觉中心（渲染后的中心）
+			// - 渲染原点 = pos - CenterOffset
+			// - Sun1 中心 ≈ 渲染原点 + 0 (Sun1 的中心接近部件坐标原点)
+			// - 因此点击中心 = pos - CenterOffset (而不是 pos)
+			//
+			// 但是这会让所有使用 Reanim 的实体都偏移，只有阳光需要特殊处理
+			// 因为阳光的部件分布不均匀（Sun3 拉偏了几何中心）
+			//
+			// 临时方案：如果有 Reanim，点击中心向左偏移 CenterOffset
+			clickCenterX := pos.X
+			clickCenterY := pos.Y
+
+			// 修复阳光点击偏移：考虑 CenterOffset
+			if reanim != nil && sun != nil {
+				// 对于阳光，点击中心应该在渲染原点附近（Sun1 的位置）
+				// 而不是 pos（几何中心）
+				clickCenterX = pos.X - reanim.CenterOffsetX
+				clickCenterY = pos.Y - reanim.CenterOffsetY
+				log.Printf("[InputSystem] 阳光 %d: 调整点击中心 pos=(%.1f, %.1f) -> click=(%.1f, %.1f), offset=(%.1f, %.1f)",
+					id, pos.X, pos.Y, clickCenterX, clickCenterY, reanim.CenterOffsetX, reanim.CenterOffsetY)
+			}
+
 			halfWidth := clickable.Width / 2.0
 			halfHeight := clickable.Height / 2.0
-			if mouseWorldX >= pos.X-halfWidth && mouseWorldX <= pos.X+halfWidth &&
-				mouseWorldY >= pos.Y-halfHeight && mouseWorldY <= pos.Y+halfHeight {
+
+			if mouseWorldX >= clickCenterX-halfWidth && mouseWorldX <= clickCenterX+halfWidth &&
+				mouseWorldY >= clickCenterY-halfHeight && mouseWorldY <= clickCenterY+halfHeight {
 				// 点击命中！
-				log.Printf("[InputSystem] 点击命中阳光! 位置:(%.1f, %.1f), 状态:%d", pos.X, pos.Y, sun.State)
+				log.Printf("[InputSystem] ✓ 点击命中阳光! 鼠标=(%.1f, %.1f), 点击中心=(%.1f, %.1f)",
+					mouseWorldX, mouseWorldY, clickCenterX, clickCenterY)
 				s.handleSunClick(id, pos)
 				break // 只处理第一个命中的阳光
 			}
