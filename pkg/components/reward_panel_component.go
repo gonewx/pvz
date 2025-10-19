@@ -1,5 +1,7 @@
 package components
 
+import "github.com/hajimehoshi/ebiten/v2"
+
 // RewardPanelComponent 管理奖励面板的显示状态和动画数据。
 // 用于展示新解锁的植物信息，包括植物名称、描述和卡片动画。
 type RewardPanelComponent struct {
@@ -11,6 +13,12 @@ type RewardPanelComponent struct {
 
 	// PlantDescription 植物描述（从 LawnStrings 加载）
 	PlantDescription string
+
+	// SunCost 植物的阳光消耗值
+	SunCost int
+
+	// PlantIconTexture 植物图标纹理（Reanim 离屏渲染）
+	PlantIconTexture *ebiten.Image
 
 	// CardScale 卡片缩放比例（动画用，从 0.5 渐变到 1.5）
 	CardScale float64

@@ -4,7 +4,9 @@ import (
 	"log"
 	"math"
 
+	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -39,6 +41,7 @@ type RewardAnimationSystem struct {
 	entityManager   *ecs.EntityManager
 	gameState       *game.GameState
 	resourceManager *game.ResourceManager
+	reanimSystem    *ReanimSystem    // Reanim系统用于创建和管理动画
 	rewardEntity    ecs.EntityID // 奖励动画实体ID（卡片包）
 	panelEntity     ecs.EntityID // 奖励面板实体ID
 	isActive        bool         // 系统是否激活
@@ -47,11 +50,12 @@ type RewardAnimationSystem struct {
 }
 
 // NewRewardAnimationSystem 创建新的奖励动画系统。
-func NewRewardAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.ResourceManager) *RewardAnimationSystem {
+func NewRewardAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.ResourceManager, reanimSys *ReanimSystem) *RewardAnimationSystem {
 	return &RewardAnimationSystem{
 		entityManager:   em,
 		gameState:       gs,
 		resourceManager: rm,
+		reanimSystem:    reanimSys,
 		rewardEntity:    0,
 		panelEntity:     0,
 		isActive:        false,
@@ -101,7 +105,46 @@ func (ras *RewardAnimationSystem) TriggerReward(plantID string) {
 		Y: startY,
 	})
 
-	// TODO: 添加 SpriteComponent（卡片包图片）
+	// 添加 ReanimComponent（卡片包图片 + 植物图标合成）
+	// Story 6.3: 所有游戏世界实体使用 ReanimComponent 渲染
+	cardPackImg := ras.resourceManager.GetImageByID("IMAGE_SEEDPACKET_LARGER")
+	if cardPackImg == nil {
+		// Fallback: 尝试直接加载
+		var err error
+		cardPackImg, err = ras.resourceManager.LoadImage("images/SeedPacket_Larger.png")
+		if err != nil {
+			log.Printf("[RewardAnimationSystem] Warning: Failed to load card pack image: %v", err)
+		}
+	}
+
+	if cardPackImg != nil {
+		// 渲染植物图标到卡片包上（预合成）
+		plantIcon := ras.renderPlantIcon(plantID)
+		cardPackWithIcon := ras.compositePlantCard(cardPackImg, plantIcon)
+
+		// 创建 ReanimComponent 并使用 ReanimSystem 初始化
+		reanimDef := ras.createCardPackReanim()
+		reanimComp := &components.ReanimComponent{
+			Reanim:            reanimDef,
+			PartImages:        map[string]*ebiten.Image{"card_pack": cardPackWithIcon},
+			CurrentAnim:       "",
+			CurrentFrame:      0,
+			FrameAccumulator:  0,
+			VisibleFrameCount: 0,
+			IsLooping:         true,
+		}
+
+		ecs.AddComponent(ras.entityManager, ras.rewardEntity, reanimComp)
+
+		// 使用 ReanimSystem 播放动画（这会初始化 AnimTracks 和 MergedTracks）
+		err := ras.reanimSystem.PlayAnimation(ras.rewardEntity, "idle")
+		if err != nil {
+			log.Printf("[RewardAnimationSystem] Warning: Failed to play animation: %v", err)
+		}
+
+		log.Printf("[RewardAnimationSystem] 卡片包 ReanimComponent 已创建并初始化")
+	}
+
 	// TODO: 触发 Award.xml 粒子特效
 }
 
@@ -272,15 +315,31 @@ func (ras *RewardAnimationSystem) createRewardPanel(plantID string) {
 	// 从 PlantUnlockManager 和 LawnStrings 获取植物信息
 	plantName, plantDesc := ras.getPlantInfo(plantID)
 
-	// 计算卡片位置（屏幕上方中央）
-	cardX := ras.screenWidth / 2
-	cardY := ras.screenHeight * 0.35
+	// 渲染植物图标（使用 ReanimSystem 离屏渲染）
+	plantIcon := ras.renderPlantIcon(plantID)
+	if plantIcon != nil {
+		log.Printf("[RewardAnimationSystem] 植物图标渲染成功：%dx%d", plantIcon.Bounds().Dx(), plantIcon.Bounds().Dy())
+	} else {
+		log.Printf("[RewardAnimationSystem] 警告：植物图标渲染失败")
+	}
+
+	// 计算卡片位置（使用配置中的位置比例）
+	// 卡片位置基于800x600的奖励背景，需要计算背景在屏幕上的偏移
+	bgWidth := config.RewardPanelBackgroundWidth
+	bgHeight := config.RewardPanelBackgroundHeight
+	offsetX := (ras.screenWidth - bgWidth) / 2
+	offsetY := (ras.screenHeight - bgHeight) / 2
+
+	cardX := offsetX + bgWidth*config.RewardPanelCardX   // 使用配置的X位置
+	cardY := offsetY + bgHeight*config.RewardPanelCardY  // 使用配置的Y位置
 
 	// 添加 RewardPanelComponent
 	ecs.AddComponent(ras.entityManager, ras.panelEntity, &components.RewardPanelComponent{
 		PlantID:          plantID,
 		PlantName:        plantName,
 		PlantDescription: plantDesc,
+		SunCost:          game.GetPlantSunCost(plantID), // 从 config 获取阳光值
+		PlantIconTexture: plantIcon,                     // 添加植物图标纹理
 		CardScale:        RewardCardScaleStart,
 		CardX:            cardX,
 		CardY:            cardY,
@@ -289,7 +348,7 @@ func (ras *RewardAnimationSystem) createRewardPanel(plantID string) {
 		AnimationTime:    0,
 	})
 
-	log.Printf("[RewardAnimationSystem] 创建奖励面板：%s - %s", plantName, plantDesc)
+	log.Printf("[RewardAnimationSystem] 创建奖励面板：%s - %s (阳光: %d)", plantName, plantDesc, game.GetPlantSunCost(plantID))
 }
 
 // getPlantInfo 获取植物名称和描述。
@@ -297,18 +356,25 @@ func (ras *RewardAnimationSystem) getPlantInfo(plantID string) (name, desc strin
 	// 从 PlantUnlockManager 获取植物信息
 	plantInfo := ras.gameState.GetPlantUnlockManager().GetPlantInfo(plantID)
 
+	log.Printf("[RewardAnimationSystem] 植物信息 - NameKey: %s, DescriptionKey: %s", plantInfo.NameKey, plantInfo.DescriptionKey)
+
 	// 从 LawnStrings 加载本地化文本
 	if ras.gameState.LawnStrings != nil {
 		name = ras.gameState.LawnStrings.GetString(plantInfo.NameKey)
 		desc = ras.gameState.LawnStrings.GetString(plantInfo.DescriptionKey)
+		log.Printf("[RewardAnimationSystem] LawnStrings 查询结果 - Name: '%s', Desc: '%s'", name, desc)
+	} else {
+		log.Printf("[RewardAnimationSystem] WARNING: LawnStrings is nil!")
 	}
 
 	// 如果加载失败，使用默认值
 	if name == "" {
 		name = plantInfo.NameKey
+		log.Printf("[RewardAnimationSystem] Name 为空，使用 NameKey: %s", name)
 	}
 	if desc == "" {
 		desc = plantInfo.DescriptionKey
+		log.Printf("[RewardAnimationSystem] Desc 为空，使用 DescriptionKey: %s", desc)
 	}
 
 	return name, desc
@@ -335,4 +401,147 @@ func (ras *RewardAnimationSystem) IsActive() bool {
 // IsCompleted 返回系统是否已完成。
 func (ras *RewardAnimationSystem) IsCompleted() bool {
 	return !ras.isActive && ras.rewardEntity == 0
+}
+
+// GetEntity 返回当前奖励动画实体ID（用于调试和验证）。
+func (ras *RewardAnimationSystem) GetEntity() ecs.EntityID {
+	return ras.rewardEntity
+}
+
+// createCardPackReanim 创建卡片包的最小化 Reanim 定义。
+// 返回一个单帧、单 track 的静态图片 Reanim。
+func (ras *RewardAnimationSystem) createCardPackReanim() *reanim.ReanimXML {
+	frameNum := 0
+	x := 0.0
+	y := 0.0
+	scaleX := 1.0
+	scaleY := 1.0
+	skewX := 0.0
+	skewY := 0.0
+
+	return &reanim.ReanimXML{
+		FPS: 12,
+		Tracks: []reanim.Track{
+			{
+				Name: "idle",
+				Frames: []reanim.Frame{
+					{
+						FrameNum:  &frameNum,
+						X:         &x,
+						Y:         &y,
+						ScaleX:    &scaleX,
+						ScaleY:    &scaleY,
+						SkewX:     &skewX,
+						SkewY:     &skewY,
+						ImagePath: "card_pack",
+					},
+				},
+			},
+		},
+	}
+}
+
+// renderPlantIcon 使用 ReanimSystem 离屏渲染植物图标。
+// 参考 plant_card_factory.go 的 renderPlantIcon 实现。
+func (ras *RewardAnimationSystem) renderPlantIcon(plantID string) *ebiten.Image {
+	// 根据 plantID 确定 Reanim 名称
+	var reanimName string
+	switch plantID {
+	case "sunflower":
+		reanimName = "SunFlower"
+	case "peashooter":
+		reanimName = "PeaShooter"
+	case "cherrybomb":
+		reanimName = "CherryBomb"
+	case "wallnut":
+		reanimName = "Wallnut"
+	default:
+		log.Printf("[RewardAnimationSystem] Unknown plant ID: %s", plantID)
+		return nil
+	}
+
+	// 创建临时实体用于离屏渲染
+	tempEntity := ras.entityManager.CreateEntity()
+	defer func() {
+		ras.entityManager.DestroyEntity(tempEntity)
+		ras.entityManager.RemoveMarkedEntities()
+	}()
+
+	// 加载 Reanim 资源
+	reanimXML := ras.resourceManager.GetReanimXML(reanimName)
+	partImages := ras.resourceManager.GetReanimPartImages(reanimName)
+
+	if reanimXML == nil || partImages == nil {
+		log.Printf("[RewardAnimationSystem] Failed to load Reanim resources for %s", reanimName)
+		return nil
+	}
+
+	// 添加 PositionComponent (设置为纹理中心，考虑 Reanim 的 CenterOffset)
+	// 由于 RenderSystem 会减去 CenterOffset，我们需要将位置设置为纹理中心
+	// 这样 screenX = Position.X - CenterOffsetX 会得到正确的绘制原点
+	iconCenterX := 50.0 // 纹理宽度的一半 (100/2)
+	iconCenterY := 70.0 // 纹理高度的一半 (140/2)
+	ecs.AddComponent(ras.entityManager, tempEntity, &components.PositionComponent{
+		X: iconCenterX,
+		Y: iconCenterY,
+	})
+
+	// 添加 ReanimComponent
+	ecs.AddComponent(ras.entityManager, tempEntity, &components.ReanimComponent{
+		Reanim:     reanimXML,
+		PartImages: partImages,
+	})
+
+	// 播放 idle 动画
+	if err := ras.reanimSystem.PlayAnimation(tempEntity, "anim_idle"); err != nil {
+		log.Printf("[RewardAnimationSystem] Failed to play animation: %v", err)
+		return nil
+	}
+
+	// 离屏渲染到纹理 (100x140 用于奖励卡片，比普通卡片大)
+	iconTexture := ebiten.NewImage(100, 140)
+	ras.reanimSystem.RenderToTexture(tempEntity, iconTexture)
+
+	return iconTexture
+}
+
+// compositePlantCard 将植物图标合成到卡片包背景上。
+// 参数:
+//   - cardPack: 卡片包背景图片（SeedPacket_Larger.png）
+//   - plantIcon: 植物图标纹理（100x140，Reanim 离屏渲染）
+//
+// 返回:
+//   - 合成后的图片（卡片包 + 居中的植物图标）
+func (ras *RewardAnimationSystem) compositePlantCard(cardPack, plantIcon *ebiten.Image) *ebiten.Image {
+	if cardPack == nil {
+		return plantIcon
+	}
+	if plantIcon == nil {
+		return cardPack
+	}
+
+	// 创建合成图片（使用卡片包的尺寸）
+	cardWidth := cardPack.Bounds().Dx()
+	cardHeight := cardPack.Bounds().Dy()
+	composite := ebiten.NewImage(cardWidth, cardHeight)
+
+	// 1. 绘制卡片包背景
+	composite.DrawImage(cardPack, &ebiten.DrawImageOptions{})
+
+	// 2. 绘制植物图标（居中对齐）
+	iconWidth := plantIcon.Bounds().Dx()
+	iconHeight := plantIcon.Bounds().Dy()
+
+	iconOp := &ebiten.DrawImageOptions{}
+	// 居中对齐：卡片中心 - 图标中心
+	iconX := float64(cardWidth-iconWidth) / 2
+	iconY := float64(cardHeight-iconHeight) / 2
+	iconOp.GeoM.Translate(iconX, iconY)
+
+	composite.DrawImage(plantIcon, iconOp)
+
+	log.Printf("[RewardAnimationSystem] 合成卡片包图片：卡片尺寸=%dx%d, 图标尺寸=%dx%d, 图标位置=(%.1f, %.1f)",
+		cardWidth, cardHeight, iconWidth, iconHeight, iconX, iconY)
+
+	return composite
 }

@@ -527,9 +527,11 @@ func (rm *ResourceManager) LoadReanimResources() error {
 	// 注意：文件名使用 PascalCase（与实际文件名匹配）
 	plants := []string{"PeaShooter", "SunFlower", "Wallnut", "CherryBomb"}
 	for _, plantName := range plants {
+		log.Printf("[ResourceManager] Loading plant reanim: %s", plantName)
 		if err := rm.loadPlantReanim(plantName); err != nil {
 			return fmt.Errorf("failed to load %s reanim: %w", plantName, err)
 		}
+		log.Printf("[ResourceManager] Successfully loaded %s reanim", plantName)
 	}
 
 	// 加载僵尸 Reanim 资源

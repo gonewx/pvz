@@ -1,6 +1,10 @@
 package game
 
-import "sort"
+import (
+	"sort"
+
+	"github.com/decker502/pvz/pkg/config"
+)
 
 // PlantUnlockManager 管理玩家的植物解锁进度
 // 负责追踪哪些植物已经解锁，以及提供解锁查询接口
@@ -120,20 +124,20 @@ type PlantInfo struct {
 // 存储所有植物的名称和描述文本键（从 LawnStrings.txt 读取）
 var PlantInfoMap = map[string]PlantInfo{
 	"peashooter": {
-		NameKey:        "PEASHOOTER_NAME",
-		DescriptionKey: "PEASHOOTER_DESC",
+		NameKey:        "PEASHOOTER",
+		DescriptionKey: "PEASHOOTER_TOOLTIP",
 	},
 	"sunflower": {
-		NameKey:        "SUNFLOWER_NAME",
-		DescriptionKey: "SUNFLOWER_DESC",
+		NameKey:        "SUNFLOWER",
+		DescriptionKey: "SUNFLOWER_TOOLTIP",
 	},
 	"cherrybomb": {
-		NameKey:        "CHERRYBOMB_NAME",
-		DescriptionKey: "CHERRYBOMB_DESC",
+		NameKey:        "CHERRYBOMB",
+		DescriptionKey: "CHERRYBOMB_TOOLTIP",
 	},
 	"wallnut": {
-		NameKey:        "WALLNUT_NAME",
-		DescriptionKey: "WALLNUT_DESC",
+		NameKey:        "WALLNUT",
+		DescriptionKey: "WALLNUT_TOOLTIP",
 	},
 	"potatomine": {
 		NameKey:        "POTATOMINE_NAME",
@@ -189,4 +193,33 @@ func GetPlantInfoWithStrings(plantID string, lawnStrings *LawnStrings) (name, de
 	name = lawnStrings.GetString(info.NameKey)
 	desc = lawnStrings.GetString(info.DescriptionKey)
 	return name, desc
+}
+
+// GetPlantSunCost 获取植物的阳光消耗值（从 config 包获取）
+// 参数:
+//   - plantID: 植物ID
+//
+// 返回:
+//   - int: 阳光消耗值，如果植物ID未知则返回0
+func GetPlantSunCost(plantID string) int {
+	switch plantID {
+	case "sunflower":
+		return config.SunflowerSunCost
+	case "peashooter":
+		return config.PeashooterSunCost
+	case "wallnut":
+		return config.WallnutCost
+	case "cherrybomb":
+		return config.CherryBombSunCost
+	case "potatomine":
+		return 25 // TODO: 添加到 config 包
+	case "snowpea":
+		return 175 // TODO: 添加到 config 包
+	case "chomper":
+		return 150 // TODO: 添加到 config 包
+	case "repeater":
+		return 200 // TODO: 添加到 config 包
+	default:
+		return 0
+	}
 }

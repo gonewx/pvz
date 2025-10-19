@@ -315,8 +315,8 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	scene.cameraSystem = systems.NewCameraSystem(scene.entityManager, scene.gameState)
 	log.Printf("[GameScene] Initialized camera system")
 
-	// Story 8.3: Create RewardAnimationSystem
-	scene.rewardSystem = systems.NewRewardAnimationSystem(scene.entityManager, scene.gameState, rm)
+	// Story 8.3: Create RewardAnimationSystem (需要 ReanimSystem)
+	scene.rewardSystem = systems.NewRewardAnimationSystem(scene.entityManager, scene.gameState, rm, scene.reanimSystem)
 	log.Printf("[GameScene] Initialized reward animation system")
 
 	// Story 8.3: Create OpeningAnimationSystem (conditionally, may return nil)

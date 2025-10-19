@@ -14,8 +14,9 @@ func TestRewardAnimationSystem_NewRewardAnimationSystem(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
 	rm := game.NewResourceManager(nil)
+	reanimSys := NewReanimSystem(em)
 
-	system := NewRewardAnimationSystem(em, gs, rm)
+	system := NewRewardAnimationSystem(em, gs, rm, reanimSys)
 
 	if system == nil {
 		t.Fatal("NewRewardAnimationSystem 返回 nil")
@@ -51,8 +52,9 @@ func TestRewardAnimationSystem_TriggerReward(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
 	rm := game.NewResourceManager(nil)
+	reanimSys := NewReanimSystem(em)
 
-	system := NewRewardAnimationSystem(em, gs, rm)
+	system := NewRewardAnimationSystem(em, gs, rm, reanimSys)
 
 	// 触发奖励
 	plantID := "sunflower"
@@ -106,8 +108,9 @@ func TestRewardAnimationSystem_TriggerReward_IgnoreDuplicate(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
 	rm := game.NewResourceManager(nil)
+	reanimSys := NewReanimSystem(em)
 
-	system := NewRewardAnimationSystem(em, gs, rm)
+	system := NewRewardAnimationSystem(em, gs, rm, reanimSys)
 
 	// 第一次触发
 	system.TriggerReward("sunflower")
@@ -134,8 +137,9 @@ func TestRewardAnimationSystem_DroppingPhase(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
 	rm := game.NewResourceManager(nil)
+	reanimSys := NewReanimSystem(em)
 
-	system := NewRewardAnimationSystem(em, gs, rm)
+	system := NewRewardAnimationSystem(em, gs, rm, reanimSys)
 	system.TriggerReward("sunflower")
 
 	// 获取初始状态
@@ -177,8 +181,9 @@ func TestRewardAnimationSystem_DroppingToBouncingTransition(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
 	rm := game.NewResourceManager(nil)
+	reanimSys := NewReanimSystem(em)
 
-	system := NewRewardAnimationSystem(em, gs, rm)
+	system := NewRewardAnimationSystem(em, gs, rm, reanimSys)
 	system.TriggerReward("sunflower")
 
 	// 模拟足够长的时间让卡片到达目标位置
@@ -221,8 +226,9 @@ func TestRewardAnimationSystem_BouncingPhase(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
 	rm := game.NewResourceManager(nil)
+	reanimSys := NewReanimSystem(em)
 
-	system := NewRewardAnimationSystem(em, gs, rm)
+	system := NewRewardAnimationSystem(em, gs, rm, reanimSys)
 	system.TriggerReward("sunflower")
 
 	// 推进到弹跳阶段
@@ -282,8 +288,9 @@ func TestRewardAnimationSystem_ParabolaCalculation(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
 	rm := game.NewResourceManager(nil)
+	reanimSys := NewReanimSystem(em)
 
-	system := NewRewardAnimationSystem(em, gs, rm)
+	system := NewRewardAnimationSystem(em, gs, rm, reanimSys)
 	system.TriggerReward("sunflower")
 
 	// 记录初始状态
@@ -327,8 +334,9 @@ func TestRewardAnimationSystem_EasingFunction(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
 	rm := game.NewResourceManager(nil)
+	reanimSys := NewReanimSystem(em)
 
-	system := NewRewardAnimationSystem(em, gs, rm)
+	system := NewRewardAnimationSystem(em, gs, rm, reanimSys)
 
 	tests := []struct {
 		input    float64
@@ -355,8 +363,9 @@ func TestRewardAnimationSystem_IsActive(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
 	rm := game.NewResourceManager(nil)
+	reanimSys := NewReanimSystem(em)
 
-	system := NewRewardAnimationSystem(em, gs, rm)
+	system := NewRewardAnimationSystem(em, gs, rm, reanimSys)
 
 	// 初始状态应为未激活
 	if system.IsActive() {
@@ -375,8 +384,9 @@ func TestRewardAnimationSystem_IsCompleted(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
 	rm := game.NewResourceManager(nil)
+	reanimSys := NewReanimSystem(em)
 
-	system := NewRewardAnimationSystem(em, gs, rm)
+	system := NewRewardAnimationSystem(em, gs, rm, reanimSys)
 
 	// 初始状态应为已完成（未激活）
 	if !system.IsCompleted() {
@@ -395,8 +405,9 @@ func TestRewardAnimationSystem_GetPlantInfo(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
 	rm := game.NewResourceManager(nil)
+	reanimSys := NewReanimSystem(em)
 
-	system := NewRewardAnimationSystem(em, gs, rm)
+	system := NewRewardAnimationSystem(em, gs, rm, reanimSys)
 
 	// 测试获取植物信息
 	plantID := "sunflower"
@@ -419,8 +430,9 @@ func TestRewardAnimationSystem_CreateRewardPanel(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
 	rm := game.NewResourceManager(nil)
+	reanimSys := NewReanimSystem(em)
 
-	system := NewRewardAnimationSystem(em, gs, rm)
+	system := NewRewardAnimationSystem(em, gs, rm, reanimSys)
 
 	// 创建奖励面板
 	plantID := "sunflower"
@@ -472,8 +484,9 @@ func TestRewardAnimationSystem_ShowingPhaseAnimation(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
 	rm := game.NewResourceManager(nil)
+	reanimSys := NewReanimSystem(em)
 
-	system := NewRewardAnimationSystem(em, gs, rm)
+	system := NewRewardAnimationSystem(em, gs, rm, reanimSys)
 
 	// 创建奖励面板
 	system.createRewardPanel("sunflower")
@@ -514,8 +527,9 @@ func TestRewardAnimationSystem_UpdateInactive(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
 	rm := game.NewResourceManager(nil)
+	reanimSys := NewReanimSystem(em)
 
-	system := NewRewardAnimationSystem(em, gs, rm)
+	system := NewRewardAnimationSystem(em, gs, rm, reanimSys)
 
 	// 未触发奖励，直接更新（不应崩溃）
 	system.Update(0.1)
