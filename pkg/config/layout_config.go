@@ -5,6 +5,16 @@ import "github.com/decker502/pvz/internal/reanim"
 // 布局配置常量
 // 本文件定义了游戏场景中的布局参数，包括网格系统、UI元素位置等
 
+// Background Configuration (背景配置)
+const (
+	// BackgroundWidth 背景图片宽度（像素）
+	// 用于限制僵尸生成位置和镜头移动范围
+	BackgroundWidth = 1400.0
+
+	// BackgroundHeight 背景图片高度（像素）
+	BackgroundHeight = 600.0
+)
+
 // Camera Configuration (摄像机配置)
 const (
 	// GameCameraX 是游戏摄像机的X位置（世界坐标）
@@ -78,6 +88,20 @@ const (
 
 	// TutorialTextBackgroundAlpha 教学文本背景条的透明度（0-255）
 	TutorialTextBackgroundAlpha = 128
+
+	// ========== 僵尸生成位置配置参数（可手工调节） ==========
+
+	// ZombieSpawnMinX 僵尸生成的最小X坐标（世界坐标）
+	// 用于开场预览和正常游戏，僵尸在此范围内随机分布
+	ZombieSpawnMinX = 1100.0
+
+	// ZombieSpawnMaxX 僵尸生成的最大X坐标（世界坐标）
+	// 不能超过背景宽度，留出边距避免僵尸贴边
+	ZombieSpawnMaxX = 1350.0 // BackgroundWidth(1400) - 50 边距
+
+	// OpeningZombiePreviewX 开场动画僵尸预览位置X坐标（已废弃，使用 ZombieSpawnMinX/MaxX 范围）
+	// 保留此常量以保持向后兼容
+	OpeningZombiePreviewX = 1200.0
 )
 
 // GetGridWorldBounds 返回草坪网格的世界坐标边界

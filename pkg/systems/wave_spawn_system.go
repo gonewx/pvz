@@ -11,18 +11,6 @@ import (
 	"github.com/decker502/pvz/pkg/game"
 )
 
-// 僵尸生成位置常量
-const (
-	// ZombieSpawnX 僵尸生成的X坐标（屏幕右侧外）
-	ZombieSpawnX = 1200.0
-
-	// ZombieSpawnXRandomRange 僵尸生成X坐标的随机范围（避免完全重叠）
-	ZombieSpawnXRandomRange = 200.0 // 增大到200，避免僵尸在X轴重叠
-
-	// ZombieSpawnYRandomRange 僵尸生成Y坐标的随机范围（在行中心上下浮动）
-	ZombieSpawnYRandomRange = 60.0 // 增大到60，避免僵尸在Y轴重叠
-)
-
 // WaveSpawnSystem 波次生成系统
 //
 // 职责：
@@ -156,6 +144,30 @@ func (s *WaveSpawnSystem) ActivateWave(waveIndex int) int {
 			// 标记为已激活
 			waveState.IsActivated = true
 
+			// 获取僵尸当前位置
+			pos, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+			if hasPos {
+				// 计算当前所在行（0-4）
+				currentRow := int((pos.Y - config.GridWorldStartY - config.ZombieVerticalOffset - config.CellHeight/2.0) / config.CellHeight)
+				if currentRow < 0 {
+					currentRow = 0
+				}
+				if currentRow > 4 {
+					currentRow = 4
+				}
+
+				// 从 enabledLanes 中随机选择一个有效行作为目标行
+				targetRow := s.randomEnabledLane()
+
+				log.Printf("[WaveSpawnSystem] Zombie %d activating: currentRow=%d, targetRow=%d", entityID, currentRow, targetRow)
+
+				// 如果当前行不是目标行，添加目标行组件
+				if currentRow != targetRow {
+					s.addTargetLaneComponent(entityID, targetRow, pos.Y)
+					log.Printf("[WaveSpawnSystem] Zombie %d will transition from row %d to row %d", entityID, currentRow, targetRow)
+				}
+			}
+
 			// 启动僵尸移动（设置X轴速度）
 			if vel, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID); ok {
 				// 如果僵尸还在行转换中（VY != 0），保持Y轴速度不变
@@ -203,19 +215,14 @@ func (s *WaveSpawnSystem) ActivateWave(waveIndex int) int {
 //	僵尸实体ID
 func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIndex int, indexInWave int) ecs.EntityID {
 	// Story 8.3: 开场预览期间，僵尸随机分布在5行上
-	// 激活后，僵尸会移动到配置的目标行
-
-	// 目标行：配置中指定的行（游戏开始后僵尸应该到达的行）
-	targetLane := s.findNearestEnabledLane(lane)
-	targetRow := targetLane - 1
+	// 激活后，僵尸会移动到随机选择的有效行
 
 	// 预览行：随机选择一行（0-4）用于开场预览展示
 	previewRow := rand.Intn(5)
 
 	// 计算预览位置（僵尸初始站位）
-	// X坐标：基础位置 + 索引偏移（避免重叠）
-	indexOffsetX := float64(indexInWave) * 120.0 // 同波僵尸间隔120像素
-	spawnX := s.getZombieSpawnX() + indexOffsetX
+	// X坐标：在配置的范围内随机生成，不依赖波次索引
+	spawnX := s.getZombieSpawnX()
 	spawnY := s.getZombieSpawnY(previewRow) // 使用随机行的Y坐标
 
 	// 根据类型创建僵尸
@@ -291,22 +298,11 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 		}
 	}
 
-	// Story 8.3: 如果预览行不是目标行，添加目标行组件
-	// 激活后僵尸会自动移动到目标行
-	// 注意：预览期间不设置Y轴速度，保持静止
-	if previewRow != targetRow {
-		// 只添加目标行组件，不设置速度（setVelocity=false）
-		ecs.AddComponent(s.entityManager, entityID, &components.ZombieTargetLaneComponent{
-			TargetRow:            targetRow,
-			HasReachedTargetLane: false,
-		})
+	// 注意：不在创建时添加目标行组件
+	// 目标行将在激活时（ActivateWave）才随机选择并添加
 
-		log.Printf("[WaveSpawnSystem] Added target lane component (no velocity): targetRow=%d, previewRow=%d",
-			targetRow, previewRow)
-	}
-
-	log.Printf("[WaveSpawnSystem] Pre-spawned zombie %d: wave=%d, index=%d, lane=%d, pos=(%.1f, %.1f)",
-		entityID, waveIndex, indexInWave, lane, spawnX, spawnY)
+	log.Printf("[WaveSpawnSystem] Pre-spawned zombie %d: wave=%d, index=%d, previewRow=%d, pos=(%.1f, %.1f)",
+		entityID, waveIndex, indexInWave, previewRow, spawnX, spawnY)
 
 	return entityID
 }
@@ -332,10 +328,9 @@ func (s *WaveSpawnSystem) spawnZombieWithOffset(zombieType string, lane int, ind
 		return 0
 	}
 
-	// 计算生成位置，基于索引添加额外偏移
-	// 每个僵尸间隔100-150像素，避免重叠
-	indexOffsetX := float64(index) * 120.0 // 基础间隔120像素
-	spawnX := s.getZombieSpawnX() + indexOffsetX
+	// 计算生成位置
+	// X坐标：在配置的范围内随机生成，不依赖索引
+	spawnX := s.getZombieSpawnX()
 	spawnY := s.getZombieSpawnY(row)
 
 	// 查找目标有效行（如果当前行无效）
@@ -411,7 +406,8 @@ func (s *WaveSpawnSystem) addTargetLaneComponent(entityID ecs.EntityID, targetRo
 	})
 
 	// 添加或更新速度组件，添加Y轴速度以移动到目标行
-	targetY := config.GridWorldStartY + float64(targetRow)*config.CellHeight + config.CellHeight/2.0
+	// 必须与僵尸工厂函数的Y坐标计算公式保持一致
+	targetY := config.GridWorldStartY + float64(targetRow)*config.CellHeight + config.CellHeight/2.0 + config.ZombieVerticalOffset
 	deltaY := targetY - currentY
 
 	// 计算Y轴速度（每秒移动距离）
@@ -436,11 +432,12 @@ func (s *WaveSpawnSystem) addTargetLaneComponent(entityID ecs.EntityID, targetRo
 
 // getZombieSpawnX 获取僵尸生成X坐标
 //
-// 返回屏幕右侧外的生成坐标，带随机偏移避免僵尸完全重叠
+// 在配置的范围内随机生成，不依赖波次索引
+// 范围：config.ZombieSpawnMinX ~ config.ZombieSpawnMaxX
 func (s *WaveSpawnSystem) getZombieSpawnX() float64 {
-	// 添加随机偏移：ZombieSpawnX ± ZombieSpawnXRandomRange/2
-	randomOffset := (rand.Float64() - 0.5) * ZombieSpawnXRandomRange
-	return ZombieSpawnX + randomOffset
+	// 在配置范围内均匀随机分布
+	spawnRange := config.ZombieSpawnMaxX - config.ZombieSpawnMinX
+	return config.ZombieSpawnMinX + rand.Float64()*spawnRange
 }
 
 // getZombieSpawnY 获取僵尸生成Y坐标
@@ -451,14 +448,13 @@ func (s *WaveSpawnSystem) getZombieSpawnX() float64 {
 //
 // 返回：
 //
-//	僵尸生成Y坐标（行中心 + 随机偏移）
+//	僵尸生成Y坐标（行中心 + 垂直偏移修正值）
 func (s *WaveSpawnSystem) getZombieSpawnY(row int) float64 {
 	// 计算行中心Y坐标
 	rowCenterY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2.0
 
-	// 添加随机偏移：rowCenterY ± ZombieSpawnYRandomRange/2
-	randomOffset := (rand.Float64() - 0.5) * ZombieSpawnYRandomRange
-	return rowCenterY + randomOffset
+	// 应用僵尸垂直偏移修正值
+	return rowCenterY + config.ZombieVerticalOffset
 }
 
 // findNearestEnabledLane 查找最近的有效行
@@ -504,6 +500,23 @@ func abs(x int) int {
 		return -x
 	}
 	return x
+}
+
+// randomEnabledLane 从 enabledLanes 中随机选择一个有效行（返回0-4行索引）
+//
+// 返回：
+//
+//	随机选择的行索引（0-4），如果没有限制则从所有行中随机选择
+func (s *WaveSpawnSystem) randomEnabledLane() int {
+	// 如果没有关卡配置或无行限制，从所有行中随机选择
+	if s.levelConfig == nil || len(s.levelConfig.EnabledLanes) == 0 {
+		return rand.Intn(5) // 0-4
+	}
+
+	// 从 EnabledLanes 中随机选择一个（注意：EnabledLanes 是 1-based）
+	randomIndex := rand.Intn(len(s.levelConfig.EnabledLanes))
+	selectedLane := s.levelConfig.EnabledLanes[randomIndex] // 1-5
+	return selectedLane - 1                                  // 转换为 0-4
 }
 
 // validateLaneConfig 验证行是否在关卡配置的 EnabledLanes 中 (Story 8.1)

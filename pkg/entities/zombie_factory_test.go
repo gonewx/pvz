@@ -65,7 +65,8 @@ func TestNewZombieEntity(t *testing.T) {
 				t.Error("Zombie entity should have PositionComponent")
 			} else {
 				pos := posComp.(*components.PositionComponent)
-				expectedY := config.GridWorldStartY + float64(tt.row)*config.CellHeight + config.ZombieVerticalOffset
+				// Y坐标 = 行起点 + 行偏移 + 行中心偏移 + 垂直修正
+				expectedY := config.GridWorldStartY + float64(tt.row)*config.CellHeight + config.CellHeight/2.0 + config.ZombieVerticalOffset
 				if pos.X != tt.spawnX {
 					t.Errorf("Position X mismatch: got %.1f, want %.1f", pos.X, tt.spawnX)
 				}

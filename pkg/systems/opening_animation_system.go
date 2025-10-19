@@ -17,7 +17,6 @@ const (
 	OpeningIdleDuration      = 0.5    // Idle 状态持续时间（秒）
 	OpeningShowZombieTime    = 2.0    // 展示僵尸时间（秒）
 	OpeningCameraSpeed       = 300.0  // 镜头移动速度（像素/秒）
-	OpeningZombiePreviewX    = 1200.0 // 僵尸预告位置X坐标
 	OpeningCameraRightTarget = 600.0  // 镜头右移目标位置（背景最右边）
 )
 
@@ -207,14 +206,15 @@ func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.O
 		randomLane := rand.Intn(config.GridRows)
 
 		// 计算Y坐标（使用网格行位置）
-		y := config.GridWorldStartY + float64(randomLane)*config.CellHeight + config.CellHeight/2
+		// 必须与僵尸工厂函数的Y坐标计算公式保持一致
+		y := config.GridWorldStartY + float64(randomLane)*config.CellHeight + config.CellHeight/2 + config.ZombieVerticalOffset
 
 		// 创建僵尸实体
 		zombieEntity := oas.entityManager.CreateEntity()
 
 		// 添加位置组件
 		ecs.AddComponent(oas.entityManager, zombieEntity, &components.PositionComponent{
-			X: OpeningZombiePreviewX,
+			X: config.OpeningZombiePreviewX,
 			Y: y,
 		})
 
@@ -244,7 +244,7 @@ func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.O
 		// 保存僵尸实体ID
 		openingComp.ZombieEntities = append(openingComp.ZombieEntities, zombieEntity)
 
-		log.Printf("[OpeningAnimationSystem] Spawned preview zombie %d: type=%s, lane=%d, x=%.0f, y=%.0f", i, zombieType, randomLane, OpeningZombiePreviewX, y)
+		log.Printf("[OpeningAnimationSystem] Spawned preview zombie %d: type=%s, lane=%d, x=%.0f, y=%.0f", i, zombieType, randomLane, config.OpeningZombiePreviewX, y)
 	}
 }
 

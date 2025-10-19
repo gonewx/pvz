@@ -127,7 +127,7 @@ func NewOpeningVerifyGame() (*OpeningVerifyGame, error) {
 	// Create opening animation system
 	var openingSystem *systems.OpeningAnimationSystem
 	if levelConfig.OpeningType == "standard" && !levelConfig.SkipOpening {
-		openingSystem = systems.NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem)
+		openingSystem = systems.NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem, reanimSystem)
 		log.Println("Opening animation system created")
 	} else {
 		log.Printf("Opening animation skipped: OpeningType=%s, SkipOpening=%v",

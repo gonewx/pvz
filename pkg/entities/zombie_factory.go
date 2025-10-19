@@ -33,8 +33,9 @@ func NewZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs ReanimSystemIn
 
 	// 计算僵尸Y坐标（世界坐标，基于行）
 	// 使用和植物相同的Y坐标计算，确保同一行的实体在同一高度
+	// 行中心 = GridWorldStartY + row*CellHeight + CellHeight/2.0
 	// 使用 config.ZombieVerticalOffset 以便手工调整
-	spawnY := config.GridWorldStartY + float64(row)*config.CellHeight + config.ZombieVerticalOffset
+	spawnY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2.0 + config.ZombieVerticalOffset
 
 	// 创建实体
 	entityID := em.CreateEntity()
@@ -152,7 +153,9 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs Reanim
 	}
 
 	// 计算僵尸Y坐标（世界坐标，基于行）
-	spawnY := config.GridWorldStartY + float64(row)*config.CellHeight + config.ZombieVerticalOffset
+	// 行中心 = GridWorldStartY + row*CellHeight + CellHeight/2.0
+	// 使用 config.ZombieVerticalOffset 以便手工调整
+	spawnY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2.0 + config.ZombieVerticalOffset
 
 	// 创建实体
 	entityID := em.CreateEntity()
@@ -281,7 +284,9 @@ func NewBucketheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs Rean
 	}
 
 	// 计算僵尸Y坐标（世界坐标，基于行）
-	spawnY := config.GridWorldStartY + float64(row)*config.CellHeight + config.ZombieVerticalOffset
+	// 行中心 = GridWorldStartY + row*CellHeight + CellHeight/2.0
+	// 使用 config.ZombieVerticalOffset 以便手工调整
+	spawnY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2.0 + config.ZombieVerticalOffset
 
 	// 创建实体
 	entityID := em.CreateEntity()

@@ -134,11 +134,22 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 	}
 
 	// 按Y坐标排序（从小到大，即从上到下）
-	// 这样上方行的僵尸先绘制，下方行的僵尸后绘制会正确遮挡
+	// 当Y坐标相同时，按X坐标排序（从大到小，即从右到左）
+	// 这样可以确保：
+	//   1. 上方行的僵尸先绘制，下方行的僵尸后绘制会正确遮挡
+	//   2. 同一行中，右侧的僵尸先绘制，左侧的僵尸后绘制会遮挡右侧（符合透视效果）
+	//   3. 避免同行僵尸重叠时的渲染闪烁
 	sort.Slice(zombiesAndProjectiles, func(i, j int) bool {
 		posI, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombiesAndProjectiles[i])
 		posJ, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombiesAndProjectiles[j])
-		return posI.Y < posJ.Y
+
+		// 主排序：按Y坐标（从小到大）
+		if posI.Y != posJ.Y {
+			return posI.Y < posJ.Y
+		}
+
+		// 二级排序：当Y坐标相同时，按X坐标（从大到小，右侧先渲染）
+		return posI.X > posJ.X
 	})
 
 	// 按排序后的顺序渲染

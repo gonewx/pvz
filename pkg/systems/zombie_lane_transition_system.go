@@ -85,7 +85,8 @@ func (s *ZombieLaneTransitionSystem) Update(deltaTime float64) {
 		}
 
 		// 计算目标行的中心Y坐标
-		targetY := config.GridWorldStartY + float64(targetLaneComp.TargetRow)*config.CellHeight + config.CellHeight/2.0
+		// 必须与僵尸工厂函数的Y坐标计算公式保持一致
+		targetY := config.GridWorldStartY + float64(targetLaneComp.TargetRow)*config.CellHeight + config.CellHeight/2.0 + config.ZombieVerticalOffset
 
 		// Story 8.3: 如果僵尸还没有Y轴速度（刚激活），计算并设置Y轴速度
 		vel, hasVel := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID)
