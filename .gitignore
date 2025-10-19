@@ -22,3 +22,5 @@ pvz-game
 /.meta/screenshot
 main.go.backup
 .meta/v.md
+
+pvz.log

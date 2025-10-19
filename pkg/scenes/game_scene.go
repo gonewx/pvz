@@ -306,8 +306,26 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 		// scene.gameState.IncrementZombiesSpawned(totalZombies) // 已删除
 	}
 
+	// Story 8.3: Create CameraSystem (always create, used by opening animation)
+	// TODO: 当开场动画系统启用后，取消注释
+	// cameraSystem := systems.NewCameraSystem(scene.entityManager, scene.gameState)
+	// log.Printf("[GameScene] Initialized camera system")
+
+	// Story 8.3: Create RewardAnimationSystem
+	rewardSystem := systems.NewRewardAnimationSystem(scene.entityManager, scene.gameState, rm)
+	log.Printf("[GameScene] Initialized reward animation system")
+
+	// Story 8.3: Create OpeningAnimationSystem (conditionally, may return nil)
+	// TODO: 实现开场动画系统集成
+	// openingSystem := systems.NewOpeningAnimationSystem(scene.entityManager, scene.gameState, rm, levelConfig, cameraSystem)
+	// if openingSystem != nil {
+	// 	log.Printf("[GameScene] Initialized opening animation system")
+	// } else {
+	// 	log.Printf("[GameScene] Skipping opening animation system (tutorial/skip/special level)")
+	// }
+
 	// 2. Create LevelSystem
-	scene.levelSystem = systems.NewLevelSystem(scene.entityManager, scene.gameState, scene.waveSpawnSystem, rm, scene.reanimSystem)
+	scene.levelSystem = systems.NewLevelSystem(scene.entityManager, scene.gameState, scene.waveSpawnSystem, rm, scene.reanimSystem, rewardSystem)
 	log.Printf("[GameScene] Initialized level system")
 
 	// 3. Create ZombieLaneTransitionSystem (僵尸行转换系统)

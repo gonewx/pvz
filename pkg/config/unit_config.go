@@ -97,12 +97,12 @@ const (
 	// 建议值范围：80.0 - 120.0
 	// 增大此值可以让阳光更容易点击
 	// 原版游戏阳光图片约80x80，建议设置为100-110以提高手感
-	SunClickableWidth = 100.0
+	SunClickableWidth = 80.0
 
 	// SunClickableHeight 阳光可点击区域高度（像素）
 	// 建议值范围：80.0 - 120.0
 	// 增大此值可以让阳光更容易点击
-	SunClickableHeight = 100.0
+	SunClickableHeight = 80.0
 )
 
 // Effect Configuration (效果配置)

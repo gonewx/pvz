@@ -26,6 +26,7 @@ const (
 //   - 调用 WaveSpawnSystem 生成僵尸
 //   - 检测胜利/失败条件
 //   - 触发最后一波提示
+//   - 触发关卡完成奖励动画（Story 8.3）
 //
 // 架构说明：
 //   - 通过 GameState 单例管理关卡状态
@@ -35,9 +36,10 @@ type LevelSystem struct {
 	entityManager        *ecs.EntityManager
 	gameState            *game.GameState
 	waveSpawnSystem      *WaveSpawnSystem
-	resourceManager      *game.ResourceManager // 用于加载 FinalWave 音效
-	reanimSystem         *ReanimSystem         // 用于创建 FinalWave 动画实体
-	lastWaveWarningShown bool                  // 是否已显示最后一波提示
+	resourceManager      *game.ResourceManager   // 用于加载 FinalWave 音效
+	reanimSystem         *ReanimSystem           // 用于创建 FinalWave 动画实体
+	rewardSystem         *RewardAnimationSystem  // 用于触发奖励动画（Story 8.3）
+	lastWaveWarningShown bool                    // 是否已显示最后一波提示
 }
 
 // NewLevelSystem 创建关卡管理系统
@@ -49,13 +51,15 @@ type LevelSystem struct {
 //	waveSpawnSystem - 波次生成系统（依赖注入）
 //	rm - 资源管理器（用于加载音效）
 //	rs - Reanim系统（用于创建动画实体）
-func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *WaveSpawnSystem, rm *game.ResourceManager, rs *ReanimSystem) *LevelSystem {
+//	rewardSystem - 奖励动画系统（可选，Story 8.3）
+func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *WaveSpawnSystem, rm *game.ResourceManager, rs *ReanimSystem, rewardSystem *RewardAnimationSystem) *LevelSystem {
 	return &LevelSystem{
 		entityManager:        em,
 		gameState:            gs,
 		waveSpawnSystem:      waveSpawnSystem,
 		resourceManager:      rm,
 		reanimSystem:         rs,
+		rewardSystem:         rewardSystem,
 		lastWaveWarningShown: false,
 	}
 }
@@ -139,7 +143,31 @@ func (s *LevelSystem) checkVictoryCondition() {
 			s.gameState.GetPlantUnlockManager().UnlockPlant("sunflower")
 			log.Println("[LevelSystem] Unlocked plant: sunflower (completed level 1-1)")
 		}
+
+		// Story 8.3: 检查是否有新植物解锁，触发奖励动画
+		s.triggerRewardIfNeeded()
 	}
+}
+
+// triggerRewardIfNeeded 检查是否有新植物解锁，如果有则触发奖励动画
+func (s *LevelSystem) triggerRewardIfNeeded() {
+	if s.rewardSystem == nil {
+		return
+	}
+
+	// 获取最后解锁的植物
+	lastUnlocked := s.gameState.GetPlantUnlockManager().GetLastUnlocked()
+	if lastUnlocked == "" {
+		log.Println("[LevelSystem] No new plant unlocked, skipping reward animation")
+		return
+	}
+
+	// 触发奖励动画
+	log.Printf("[LevelSystem] Triggering reward animation for plant: %s", lastUnlocked)
+	s.rewardSystem.TriggerReward(lastUnlocked)
+
+	// 清除最后解锁标记（避免重复触发）
+	s.gameState.GetPlantUnlockManager().ClearLastUnlocked()
 }
 
 // checkDefeatCondition 检查失败条件
