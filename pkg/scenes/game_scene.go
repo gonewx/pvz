@@ -145,9 +145,9 @@ type GameScene struct {
 	soddingSystem *systems.SoddingSystem // 铺草皮动画系统（SodRoll 滚动动画）
 
 	// Story 8.3: Camera and Opening Animation Systems
-	cameraSystem  *systems.CameraSystem            // 镜头控制系统（镜头移动、缓动）
-	openingSystem *systems.OpeningAnimationSystem  // 开场动画系统（僵尸预告、跳过）
-	rewardSystem  *systems.RewardAnimationSystem   // 奖励动画系统（关卡完成奖励）
+	cameraSystem  *systems.CameraSystem           // 镜头控制系统（镜头移动、缓动）
+	openingSystem *systems.OpeningAnimationSystem // 开场动画系统（僵尸预告、跳过）
+	rewardSystem  *systems.RewardAnimationSystem  // 奖励动画系统（关卡完成奖励）
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -696,10 +696,10 @@ func (s *GameScene) Update(deltaTime float64) {
 	}
 
 	// Update all ECS systems in order (order matters for correct game logic)
-	s.levelSystem.Update(deltaTime)                   // 0. Update level system (Story 5.5: wave spawning, victory/defeat)
-	s.zombieLaneTransitionSystem.Update(deltaTime)    // 0.5. Update zombie lane transitions (move to target lane before attacking)
-	s.plantCardSystem.Update(deltaTime)               // 1. Update plant card states (before input)
-	s.inputSystem.Update(deltaTime, s.cameraX)        // 2. Process player input (highest priority, 传递摄像机位置)
+	s.levelSystem.Update(deltaTime)                // 0. Update level system (Story 5.5: wave spawning, victory/defeat)
+	s.zombieLaneTransitionSystem.Update(deltaTime) // 0.5. Update zombie lane transitions (move to target lane before attacking)
+	s.plantCardSystem.Update(deltaTime)            // 1. Update plant card states (before input)
+	s.inputSystem.Update(deltaTime, s.cameraX)     // 2. Process player input (highest priority, 传递摄像机位置)
 
 	// 3. Generate new suns
 	// 教学关卡：在第一次收集阳光后启用自动生成（由 TutorialSystem 控制）
@@ -720,9 +720,9 @@ func (s *GameScene) Update(deltaTime float64) {
 		s.tutorialSystem.Update(deltaTime) // 9.5. Update tutorial text display
 	}
 	// Story 3.2: 植物预览系统 - 更新预览位置（双图像支持）
-	s.plantPreviewSystem.Update(deltaTime)  // 10. Update plant preview position (dual-image support)
-	s.lawnGridSystem.Update(deltaTime)      // 10.5. Update lawn flash animation (Story 8.2)
-	s.lifetimeSystem.Update(deltaTime)      // 11. Check for expired entities
+	s.plantPreviewSystem.Update(deltaTime) // 10. Update plant preview position (dual-image support)
+	s.lawnGridSystem.Update(deltaTime)     // 10.5. Update lawn flash animation (Story 8.2)
+	s.lifetimeSystem.Update(deltaTime)     // 11. Check for expired entities
 	s.entityManager.RemoveMarkedEntities() // 12. Clean up deleted entities (always last)
 }
 

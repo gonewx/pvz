@@ -18,7 +18,7 @@ const (
 	OpeningShowZombieTime    = 2.0    // 展示僵尸时间（秒）
 	OpeningCameraSpeed       = 300.0  // 镜头移动速度（像素/秒）
 	OpeningZombiePreviewX    = 1200.0 // 僵尸预告位置X坐标
-	OpeningCameraRightTarget = 800.0  // 镜头右移目标位置
+	OpeningCameraRightTarget = 600.0  // 镜头右移目标位置（背景最右边）
 )
 
 // OpeningAnimationSystem 管理关卡开场动画流程。
@@ -91,9 +91,6 @@ func (oas *OpeningAnimationSystem) Update(dt float64) {
 		return
 	}
 
-	// DEBUG: 记录僵尸位置（检查是否在开场动画期间移动）
-	// 已验证：僵尸在开场动画期间位置保持不变，速度为0
-
 	// 检查快捷键跳过（ESC 或 Space）
 	if oas.checkSkipInput() {
 		oas.Skip()
@@ -158,7 +155,8 @@ func (oas *OpeningAnimationSystem) updateShowZombiesState(openingComp *component
 		openingComp.State = "cameraMoveLeft"
 		openingComp.ElapsedTime = 0
 
-		// 触发镜头返回到草坪起始位置（使用游戏摄像机位置）
+		// 触发镜头返回到游戏位置（GameCameraX = 220）
+		// 僵尸会自然移出屏幕右侧（符合设计）
 		oas.cameraSystem.MoveTo(config.GameCameraX, 0, OpeningCameraSpeed)
 
 		log.Println("[OpeningAnimationSystem] State: showZombies → cameraMoveLeft")

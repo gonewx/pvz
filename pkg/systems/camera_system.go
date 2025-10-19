@@ -11,7 +11,8 @@ import (
 const (
 	// 镜头移动范围限制（防止移出背景边界）
 	CameraMinX = 0.0
-	CameraMaxX = 800.0 // TODO: 从背景图尺寸和屏幕尺寸计算
+	// CameraMaxX 根据背景宽度1400和窗口宽度800计算：1400 - 800 = 600
+	CameraMaxX = 600.0
 )
 
 // CameraSystem 管理镜头移动和平滑动画。
