@@ -221,8 +221,8 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 	previewRow := rand.Intn(5)
 
 	// 计算预览位置（僵尸初始站位）
-	// X坐标：在配置的范围内随机生成，不依赖波次索引
-	spawnX := s.getZombieSpawnX()
+	// X坐标：在配置的范围内随机生成，根据预览行的最大X值
+	spawnX := s.getZombieSpawnX(previewRow)
 	spawnY := s.getZombieSpawnY(previewRow) // 使用随机行的Y坐标
 
 	// 根据类型创建僵尸
@@ -329,8 +329,8 @@ func (s *WaveSpawnSystem) spawnZombieWithOffset(zombieType string, lane int, ind
 	}
 
 	// 计算生成位置
-	// X坐标：在配置的范围内随机生成，不依赖索引
-	spawnX := s.getZombieSpawnX()
+	// X坐标：在配置的范围内随机生成，根据行号的最大X值
+	spawnX := s.getZombieSpawnX(row)
 	spawnY := s.getZombieSpawnY(row)
 
 	// 查找目标有效行（如果当前行无效）
@@ -432,12 +432,47 @@ func (s *WaveSpawnSystem) addTargetLaneComponent(entityID ecs.EntityID, targetRo
 
 // getZombieSpawnX 获取僵尸生成X坐标
 //
-// 在配置的范围内随机生成，不依赖波次索引
-// 范围：config.ZombieSpawnMinX ~ config.ZombieSpawnMaxX
-func (s *WaveSpawnSystem) getZombieSpawnX() float64 {
+// 在配置的范围内随机生成，根据行号使用不同的最大X值
+// 范围：config.ZombieSpawnMinX ~ getZombieSpawnMaxX(row)
+//
+// 参数：
+//
+//	row - 行索引（0-4）
+//
+// 返回：
+//
+//	随机生成的X坐标
+func (s *WaveSpawnSystem) getZombieSpawnX(row int) float64 {
+	// 根据行号获取最大X值
+	maxX := s.getZombieSpawnMaxX(row)
+
 	// 在配置范围内均匀随机分布
-	spawnRange := config.ZombieSpawnMaxX - config.ZombieSpawnMinX
+	spawnRange := maxX - config.ZombieSpawnMinX
 	return config.ZombieSpawnMinX + rand.Float64()*spawnRange
+}
+
+// getZombieSpawnMaxX 根据行号获取僵尸生成的最大X坐标
+//
+// 第1行（row=0）使用 ZombieSpawnMaxX_Row1
+// 第2行（row=1）使用 ZombieSpawnMaxX_Row2
+// 其他行使用默认的 ZombieSpawnMaxX
+//
+// 参数：
+//
+//	row - 行索引（0-4）
+//
+// 返回：
+//
+//	该行的最大X坐标
+func (s *WaveSpawnSystem) getZombieSpawnMaxX(row int) float64 {
+	switch row {
+	case 0: // 第1行
+		return config.ZombieSpawnMaxX_Row1
+	case 1: // 第2行
+		return config.ZombieSpawnMaxX_Row2
+	default: // 其他行（第3、4、5行）
+		return config.ZombieSpawnMaxX
+	}
 }
 
 // getZombieSpawnY 获取僵尸生成Y坐标

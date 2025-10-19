@@ -97,7 +97,18 @@ const (
 
 	// ZombieSpawnMaxX 僵尸生成的最大X坐标（世界坐标）
 	// 不能超过背景宽度，留出边距避免僵尸贴边
-	ZombieSpawnMaxX = 1350.0 // BackgroundWidth(1400) - 50 边距
+	// 这是默认值，适用于第3、4、5行（没有特殊配置的行）
+	ZombieSpawnMaxX = 1250.0 // BackgroundWidth(1400) - 50 边距
+
+	// ZombieSpawnMaxX_Row1 第1行僵尸生成的最大X坐标（世界坐标）
+	// 建议值范围：1100.0 - 1350.0
+	// 调整此值可以控制第1行僵尸的生成范围
+	ZombieSpawnMaxX_Row1 = 1300.0
+
+	// ZombieSpawnMaxX_Row2 第2行僵尸生成的最大X坐标（世界坐标）
+	// 建议值范围：1100.0 - 1350.0
+	// 调整此值可以控制第2行僵尸的生成范围
+	ZombieSpawnMaxX_Row2 = 1350.0
 
 	// OpeningZombiePreviewX 开场动画僵尸预览位置X坐标（已废弃，使用 ZombieSpawnMinX/MaxX 范围）
 	// 保留此常量以保持向后兼容
