@@ -51,6 +51,22 @@ const (
 	// 草皮叠加图Y偏移（相对于目标行中心）
 	// 调整此值可以改变草皮显示的垂直位置
 	SodOverlayOffsetY = 0.0 // 相对于行中心的Y偏移量
+
+	// ========== 教学文本UI配置参数（可手工调节） ==========
+
+	// TutorialTextBackgroundHeight 教学文本背景条高度（像素）
+	TutorialTextBackgroundHeight = 100.0
+
+	// TutorialTextOffsetFromBottom 教学文本距离屏幕底部的偏移（像素）
+	// 文字Y坐标 = screenHeight - TutorialTextOffsetFromBottom
+	TutorialTextOffsetFromBottom = 140.0
+
+	// TutorialTextBackgroundOffsetFromBottom 教学文本背景条距离屏幕底部的偏移（像素）
+	// 背景条顶部Y坐标 = screenHeight - TutorialTextBackgroundOffsetFromBottom
+	TutorialTextBackgroundOffsetFromBottom = 180.0
+
+	// TutorialTextBackgroundAlpha 教学文本背景条的透明度（0-255）
+	TutorialTextBackgroundAlpha = 128
 )
 
 // GetGridWorldBounds 返回草坪网格的世界坐标边界

@@ -7,9 +7,11 @@ import (
 	"sort"
 
 	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
@@ -786,12 +788,12 @@ func (s *RenderSystem) buildParticleVertices(particle *components.ParticleCompon
 	return vertices
 }
 
-// DrawTutorialText 绘制教学文本（Story 8.2 - 位图字体版本）
-// 在屏幕底部中央显示教学提示文本，使用原版位图字体
+// DrawTutorialText 绘制教学文本（Story 8.2 - TrueType 字体版本）
+// 在屏幕底部中央显示教学提示文本，带半透明黑色背景条
 // 参数:
 //   - screen: 绘制目标屏幕
-//   - bitmapFont: 位图字体（HouseofTerror28）
-func (s *RenderSystem) DrawTutorialText(screen *ebiten.Image, bitmapFont interface{}) {
+//   - tutorialFont: 教学字体（SimHei.ttf 或其他 TrueType 字体）
+func (s *RenderSystem) DrawTutorialText(screen *ebiten.Image, tutorialFont interface{}) {
 	// 查询教学文本实体
 	textEntities := ecs.GetEntitiesWith1[*components.TutorialTextComponent](s.entityManager)
 
@@ -813,32 +815,34 @@ func (s *RenderSystem) DrawTutorialText(screen *ebiten.Image, bitmapFont interfa
 		// 获取屏幕尺寸
 		screenWidth, screenHeight := screen.Bounds().Dx(), screen.Bounds().Dy()
 
+		// 绘制半透明黑色背景条（横贯整个屏幕）
+		// 使用配置常量，方便后续手工调整
+		bgY := float64(screenHeight) - config.TutorialTextBackgroundOffsetFromBottom
+		bgHeight := config.TutorialTextBackgroundHeight
+		ebitenutil.DrawRect(screen, 0, bgY, float64(screenWidth), bgHeight,
+			color.RGBA{0, 0, 0, uint8(config.TutorialTextBackgroundAlpha)})
+
 		// 计算文本位置（底部中央）
-		// Y: 屏幕高度 - 100px（距底部 100px）
-		// X: 屏幕宽度 / 2（水平居中）
+		// 使用配置常量，方便后续手工调整
 		textX := float64(screenWidth) / 2
-		textY := float64(screenHeight) - 100
+		textY := float64(screenHeight) - config.TutorialTextOffsetFromBottom
 
-		// log.Printf("[RenderSystem] DrawTutorialText: text='%s', pos=(%.0f, %.0f), fontType=%T",
-		// textComp.Text, textX, textY, bitmapFont)
-
-		// 检查是否为位图字体
-		if bFont, ok := bitmapFont.(*utils.BitmapFont); ok && bFont != nil {
-			// 使用位图字体绘制（原版效果：白色+黄色描边）
-			// log.Printf("[RenderSystem] Using BitmapFont to draw")
-			bFont.DrawText(screen, textComp.Text, textX, textY, "center")
-		} else if ttFont, ok := bitmapFont.(*text.GoTextFace); ok && ttFont != nil {
-			// 降级方案：使用 TrueType 字体
-			// log.Printf("[RenderSystem] Using TrueType font to draw")
+		// 检查是否为 TrueType 字体
+		if ttFont, ok := tutorialFont.(*text.GoTextFace); ok && ttFont != nil {
+			// 使用 TrueType 字体绘制（浅黄色文字 + 黑色描边）
 			s.drawCenteredTextTTF(screen, textComp.Text, textX, textY, ttFont)
+		} else if bFont, ok := tutorialFont.(*utils.BitmapFont); ok && bFont != nil {
+			// 备选：位图字体（不支持中文，已废弃）
+			log.Printf("[RenderSystem] WARNING: BitmapFont does not support Chinese, using fallback")
+			bFont.DrawText(screen, textComp.Text, textX, textY, "center")
 		} else {
 			log.Printf("[RenderSystem] ERROR: Unknown font type or nil font!")
 		}
 	}
 }
 
-// drawCenteredTextTTF 使用 TrueType 字体绘制居中文本（带黄色描边）
-// 模拟原版游戏的教学文本效果：白色文字 + 黄色描边
+// drawCenteredTextTTF 使用 TrueType 字体绘制居中文本（带黑色描边）
+// 教学文本效果：浅黄色文字 + 黑色描边
 // 参数:
 //   - screen: 绘制目标屏幕
 //   - textStr: 文本内容
@@ -853,13 +857,12 @@ func (s *RenderSystem) drawCenteredTextTTF(screen *ebiten.Image, textStr string,
 	x := centerX - width/2
 	y := centerY
 
-	// Step 1: 绘制黄色描边（在8个方向偏移2像素）
-	// 使用金黄色 (255, 215, 0) 模拟原版效果
-	strokeColor := color.RGBA{R: 255, G: 215, B: 0, A: 255} // 金黄色
+	// Step 1: 绘制黑色描边（在8个方向偏移1-2像素）
+	strokeColor := color.RGBA{R: 0, G: 0, B: 0, A: 255} // 黑色
 	strokeOffsets := []struct{ dx, dy float64 }{
-		{-2, -2}, {0, -2}, {2, -2}, // 上
-		{-2, 0}, {2, 0}, // 左右
-		{-2, 2}, {0, 2}, {2, 2}, // 下
+		{-1, -1}, {0, -1}, {1, -1}, // 上
+		{-1, 0}, {1, 0}, // 左右
+		{-1, 1}, {0, 1}, {1, 1}, // 下
 	}
 
 	for _, offset := range strokeOffsets {
@@ -869,9 +872,11 @@ func (s *RenderSystem) drawCenteredTextTTF(screen *ebiten.Image, textStr string,
 		text.Draw(screen, textStr, fontFace, op)
 	}
 
-	// Step 2: 绘制白色主文本（在中心）
+	// Step 2: 绘制浅黄色主文本（在中心）
+	// 使用浅黄色 RGB(255, 242, 0)
+	textColor := color.RGBA{R: 255, G: 242, B: 0, A: 255}
 	op := &text.DrawOptions{}
 	op.GeoM.Translate(x, y)
-	op.ColorScale.ScaleWithColor(color.White)
+	op.ColorScale.ScaleWithColor(textColor)
 	text.Draw(screen, textStr, fontFace, op)
 }

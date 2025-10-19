@@ -331,13 +331,13 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 		// 禁用自动阳光生成（第一次收集阳光后由 TutorialSystem 启用）
 		scene.sunSpawnSystem.Disable()
 
-		// Load tutorial font (使用原版中文字体 fzse_gbk.ttf)
-		ttFont, err := scene.resourceManager.LoadFont("assets/fonts/fzse_gbk.ttf", 28)
+		// Load tutorial font (使用简体中文黑体字体 SimHei.ttf)
+		ttFont, err := scene.resourceManager.LoadFont("assets/fonts/SimHei.ttf", 28)
 		if err != nil {
-			log.Printf("FATAL: Failed to load tutorial font fzse_gbk.ttf: %v", err)
+			log.Printf("FATAL: Failed to load tutorial font SimHei.ttf: %v", err)
 		} else {
 			scene.tutorialFont = ttFont
-			log.Printf("[GameScene] Loaded tutorial font: fzse_gbk.ttf (28px)")
+			log.Printf("[GameScene] Loaded tutorial font: SimHei.ttf (28px)")
 		}
 
 		// Story 8.2: 教学关卡不预生成阳光
