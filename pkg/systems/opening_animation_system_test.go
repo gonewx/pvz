@@ -63,11 +63,12 @@ func TestOpeningAnimationSystem_NewOpeningAnimationSystem(t *testing.T) {
 				},
 			}
 
-			// 创建 CameraSystem
+			// 创建 CameraSystem 和 ReanimSystem
 			cameraSystem := NewCameraSystem(em, gs)
+			reanimSystem := NewReanimSystem(em)
 
 			// 创建 OpeningAnimationSystem
-			system := NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem)
+			system := NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem, reanimSystem)
 
 			// 验证系统是否按预期创建
 			if tt.shouldBeNil {
@@ -121,7 +122,8 @@ func TestOpeningAnimationSystem_StateMachine(t *testing.T) {
 	}
 
 	cameraSystem := NewCameraSystem(em, gs)
-	system := NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem)
+	reanimSystem := NewReanimSystem(em)
+	system := NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem, reanimSystem)
 
 	if system == nil {
 		t.Fatal("系统创建失败")
@@ -162,9 +164,10 @@ func TestOpeningAnimationSystem_StateMachine(t *testing.T) {
 		t.Errorf("镜头完成后应切换到 showZombies，实际为 %s", openingComp.State)
 	}
 
-	// 验证僵尸预告是否生成
-	if len(openingComp.ZombieEntities) == 0 {
-		t.Errorf("应生成预告僵尸实体")
+	// Story 8.3: 不再生成预览僵尸，直接使用 WaveSpawnSystem 预生成的关卡僵尸
+	// 因此 ZombieEntities 列表应为空
+	if len(openingComp.ZombieEntities) != 0 {
+		t.Errorf("不应生成预告僵尸实体（Story 8.3 改用关卡僵尸），实际生成 %d 个", len(openingComp.ZombieEntities))
 	}
 
 	// 模拟展示僵尸 2 秒
@@ -204,9 +207,9 @@ func TestOpeningAnimationSystem_StateMachine(t *testing.T) {
 		t.Errorf("gameStart 状态应标记为已完成")
 	}
 
-	// 验证僵尸是否已清理
+	// Story 8.3: 不再生成预览僵尸，ZombieEntities 始终为空
 	if len(openingComp.ZombieEntities) != 0 {
-		t.Errorf("gameStart 状态应清理所有预告僵尸，剩余 %d 个", len(openingComp.ZombieEntities))
+		t.Errorf("ZombieEntities 应始终为空（Story 8.3 改用关卡僵尸），剩余 %d 个", len(openingComp.ZombieEntities))
 	}
 }
 
@@ -229,7 +232,8 @@ func TestOpeningAnimationSystem_Skip(t *testing.T) {
 	}
 
 	cameraSystem := NewCameraSystem(em, gs)
-	system := NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem)
+	reanimSystem := NewReanimSystem(em)
+	system := NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem, reanimSystem)
 
 	if system == nil {
 		t.Fatal("系统创建失败")
@@ -251,10 +255,9 @@ func TestOpeningAnimationSystem_Skip(t *testing.T) {
 		t.Fatalf("未能到达 showZombies 状态，当前状态：%s", openingComp.State)
 	}
 
-	// 验证僵尸已生成
-	zombieCountBeforeSkip := len(openingComp.ZombieEntities)
-	if zombieCountBeforeSkip == 0 {
-		t.Errorf("应生成预告僵尸")
+	// Story 8.3: 不再生成预览僵尸
+	if len(openingComp.ZombieEntities) != 0 {
+		t.Errorf("不应生成预告僵尸（Story 8.3 改用关卡僵尸），实际生成 %d 个", len(openingComp.ZombieEntities))
 	}
 
 	// 调用 Skip 方法
@@ -274,9 +277,9 @@ func TestOpeningAnimationSystem_Skip(t *testing.T) {
 		t.Errorf("IsCompleted 应为 true")
 	}
 
-	// 验证僵尸是否已清理
+	// Story 8.3: ZombieEntities 始终为空
 	if len(openingComp.ZombieEntities) != 0 {
-		t.Errorf("Skip 应清理所有僵尸，剩余 %d 个", len(openingComp.ZombieEntities))
+		t.Errorf("ZombieEntities 应始终为空（Story 8.3 改用关卡僵尸），剩余 %d 个", len(openingComp.ZombieEntities))
 	}
 
 	// 验证镜头动画是否停止
@@ -285,120 +288,10 @@ func TestOpeningAnimationSystem_Skip(t *testing.T) {
 	}
 }
 
-// TestOpeningAnimationSystem_ZombiePreview 测试僵尸预告生成逻辑。
-func TestOpeningAnimationSystem_ZombiePreview(t *testing.T) {
-	tests := []struct {
-		name          string
-		waves         []config.WaveConfig
-		expectedCount int
-		expectedTypes []string
-	}{
-		{
-			name: "单一僵尸类型",
-			waves: []config.WaveConfig{
-				{Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 3}}},
-			},
-			expectedCount: 1,
-			expectedTypes: []string{"basic"},
-		},
-		{
-			name: "多种僵尸类型（去重）",
-			waves: []config.WaveConfig{
-				{Zombies: []config.ZombieSpawn{
-					{Type: "basic", Lane: 3},
-					{Type: "conehead", Lane: 2},
-					{Type: "basic", Lane: 4}, // 重复
-				}},
-			},
-			expectedCount: 2,
-			expectedTypes: []string{"basic", "conehead"},
-		},
-		{
-			name: "三种僵尸类型",
-			waves: []config.WaveConfig{
-				{Zombies: []config.ZombieSpawn{
-					{Type: "basic", Lane: 3},
-					{Type: "conehead", Lane: 2},
-					{Type: "buckethead", Lane: 1},
-				}},
-			},
-			expectedCount: 3,
-			expectedTypes: []string{"basic", "conehead", "buckethead"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// 创建测试依赖
-			em := ecs.NewEntityManager()
-			gs := game.GetGameState()
-			rm := game.NewResourceManager(nil)
-			levelConfig := &config.LevelConfig{
-				SkipOpening:  false,
-				OpeningType:  "standard",
-				SpecialRules: "",
-				Waves:        tt.waves,
-			}
-
-			cameraSystem := NewCameraSystem(em, gs)
-			system := NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem)
-
-			if system == nil {
-				t.Fatal("系统创建失败")
-			}
-
-			// 推进到 showZombies 状态
-			system.Update(0.5) // idle → cameraMoveRight
-			for i := 0; i < 30; i++ {
-				system.Update(0.1)
-				cameraSystem.Update(0.1)
-				if !cameraSystem.IsAnimating() {
-					break
-				}
-			}
-			system.Update(0.1) // cameraMoveRight → showZombies
-
-			openingComp, _ := ecs.GetComponent[*components.OpeningAnimationComponent](em, system.openingEntity)
-
-			// 验证僵尸数量
-			if len(openingComp.ZombieEntities) != tt.expectedCount {
-				t.Errorf("僵尸数量不匹配：期望 %d，实际 %d", tt.expectedCount, len(openingComp.ZombieEntities))
-			}
-
-			// 验证僵尸位置和组件
-			for _, zombieID := range openingComp.ZombieEntities {
-				// 验证位置组件
-				posComp, ok := ecs.GetComponent[*components.PositionComponent](em, zombieID)
-				if !ok {
-					t.Errorf("僵尸实体 %d 缺少 PositionComponent", zombieID)
-					continue
-				}
-
-				// 验证X坐标
-				if posComp.X != OpeningZombiePreviewX {
-					t.Errorf("僵尸X坐标应为 %.0f，实际为 %.0f", OpeningZombiePreviewX, posComp.X)
-				}
-
-				// 验证行为组件
-				behaviorComp, ok := ecs.GetComponent[*components.BehaviorComponent](em, zombieID)
-				if !ok {
-					t.Errorf("僵尸实体 %d 缺少 BehaviorComponent", zombieID)
-					continue
-				}
-
-				// 验证行为类型（应为僵尸类型）
-				validTypes := map[components.BehaviorType]bool{
-					components.BehaviorZombieBasic:      true,
-					components.BehaviorZombieConehead:   true,
-					components.BehaviorZombieBuckethead: true,
-				}
-				if !validTypes[behaviorComp.Type] {
-					t.Errorf("僵尸行为类型不合法：%v", behaviorComp.Type)
-				}
-			}
-		})
-	}
-}
+// TestOpeningAnimationSystem_ZombiePreview 已废弃。
+// Story 8.3: 不再生成预览僵尸，直接使用 WaveSpawnSystem 预生成的关卡僵尸。
+// 开场动画期间僵尸保持静止（IsActivated=false），动画结束后激活。
+// 保留此注释以说明功能变更。
 
 // TestOpeningAnimationSystem_IsCompleted 测试完成状态查询。
 func TestOpeningAnimationSystem_IsCompleted(t *testing.T) {
@@ -422,7 +315,8 @@ func TestOpeningAnimationSystem_IsCompleted(t *testing.T) {
 	}
 
 	cameraSystem := NewCameraSystem(em, gs)
-	system := NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem)
+	reanimSystem := NewReanimSystem(em)
+	system := NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem, reanimSystem)
 
 	if system == nil {
 		t.Fatal("系统创建失败")
@@ -491,7 +385,8 @@ func TestOpeningAnimationSystem_GetUniqueZombieTypes(t *testing.T) {
 			}
 
 			cameraSystem := NewCameraSystem(em, gs)
-			system := NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem)
+			reanimSystem := NewReanimSystem(em)
+			system := NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem, reanimSystem)
 
 			if system == nil {
 				t.Fatal("系统创建失败")

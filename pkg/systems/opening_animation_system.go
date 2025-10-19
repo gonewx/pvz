@@ -36,9 +36,21 @@ type OpeningAnimationSystem struct {
 // NewOpeningAnimationSystem 创建开场动画系统。
 // 如果关卡不需要开场动画，返回 nil。
 func NewOpeningAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.ResourceManager, levelConfig *config.LevelConfig, cameraSystem *CameraSystem, reanimSystem *ReanimSystem) *OpeningAnimationSystem {
+	// 检查 levelConfig 是否为 nil
+	if levelConfig == nil {
+		log.Println("[OpeningAnimationSystem] levelConfig is nil, 不创建开场动画系统")
+		return nil
+	}
+
 	// 检查是否需要开场动画
 	if levelConfig.SkipOpening {
 		log.Println("[OpeningAnimationSystem] SkipOpening=true, 不创建开场动画系统")
+		return nil
+	}
+
+	// 教学关卡无开场动画
+	if levelConfig.OpeningType == "tutorial" {
+		log.Println("[OpeningAnimationSystem] Tutorial level, 不创建开场动画系统")
 		return nil
 	}
 

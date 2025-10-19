@@ -178,67 +178,10 @@ func TestGameSceneConstants(t *testing.T) {
 	}
 }
 
-// TestGameSceneIntroAnimation tests the intro camera animation logic.
-// It verifies that the camera position correctly transitions through the animation phases.
-func TestGameSceneIntroAnimation(t *testing.T) {
-	// Create a GameScene with mock dependencies
-	rm := game.NewResourceManager(testAudioContext)
-	sm := game.NewSceneManager()
-	scene := NewGameScene(rm, sm)
-
-	// Set a non-zero maxCameraX to enable meaningful animation
-	// (In real usage, this is set when background is loaded)
-	scene.maxCameraX = 400.0
-
-	// Test 1: Initial state - animation should be playing
-	if !scene.isIntroAnimPlaying {
-		t.Error("Intro animation should be playing initially")
-	}
-	if scene.cameraX != 0 {
-		t.Errorf("Initial cameraX should be 0, got %f", scene.cameraX)
-	}
-
-	// Test 2: Phase 1 - camera moves from left to right (0 to 1.5 seconds)
-	scene.Update(0.75) // 25% progress (0.75 / 3.0)
-	if scene.cameraX <= 0 || scene.cameraX >= scene.maxCameraX {
-		t.Errorf("Camera should be moving rightward in phase 1, cameraX=%f", scene.cameraX)
-	}
-	if !scene.isIntroAnimPlaying {
-		t.Error("Animation should still be playing during phase 1")
-	}
-
-	// Test 3: Mid-animation (phase 1 complete) - camera should be near maxCameraX
-	scene = NewGameScene(rm, sm)
-	scene.maxCameraX = 400.0
-	scene.Update(1.5) // 50% progress - end of phase 1
-	expectedCameraX := scene.maxCameraX
-	tolerance := 5.0 // Allow small numerical error
-	if scene.cameraX < expectedCameraX-tolerance || scene.cameraX > expectedCameraX+tolerance {
-		t.Errorf("Camera should be at maxCameraX (≈%f) at phase 1 end, got %f",
-			expectedCameraX, scene.cameraX)
-	}
-
-	// Test 4: Phase 2 - camera moves from right back to center (1.5 to 3.0 seconds)
-	scene.Update(0.75) // Now at 75% progress (2.25 / 3.0)
-	if scene.cameraX <= float64(GameCameraX) || scene.cameraX >= scene.maxCameraX {
-		t.Errorf("Camera should be moving leftward in phase 2, cameraX=%f", scene.cameraX)
-	}
-	if !scene.isIntroAnimPlaying {
-		t.Error("Animation should still be playing during phase 2")
-	}
-
-	// Test 5: Animation complete - camera settled at GameCameraX
-	scene = NewGameScene(rm, sm)
-	scene.maxCameraX = 400.0
-	scene.Update(3.5) // 100%+ progress (exceeds 3.0 seconds)
-	if scene.cameraX != float64(GameCameraX) {
-		t.Errorf("Camera should be at GameCameraX (%d) after animation completes, got %f",
-			GameCameraX, scene.cameraX)
-	}
-	if scene.isIntroAnimPlaying {
-		t.Error("Animation should be stopped after completion")
-	}
-}
+// TestGameSceneIntroAnimation 已废弃。
+// 开场动画逻辑已移至 OpeningAnimationSystem (Story 8.3)。
+// 相关测试请参考 pkg/systems/opening_animation_system_test.go。
+// 保留此注释以说明测试迁移情况。
 
 // TestEaseOutQuad tests the easing function used in the animation.
 func TestEaseOutQuad(t *testing.T) {
