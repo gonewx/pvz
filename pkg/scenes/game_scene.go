@@ -36,7 +36,8 @@ const (
 	PlantCardStartOffsetX = 84   // 第一张卡片相对于 SeedBank 的 X 偏移量
 	PlantCardOffsetY      = 8    // 卡片相对于 SeedBank 的 Y 偏移量
 	PlantCardSpacing      = 60   // 卡片槽之间的间距（包含卡槽边框，每个卡槽约76px宽）
-	PlantCardScale        = 0.50 // 卡片背景缩放因子（实际图片100x140，缩放后54x76适配卡槽）
+	// PlantCardScale 已移至 config.PlantCardScale（统一配置管理）
+	PlantCardScale        = config.PlantCardScale // 卡片缩放因子（0.50）
 
 	// Story 8.4: 卡片内部配置（图标缩放、偏移等）已移至 config.plant_card_config.go，不再在此定义
 

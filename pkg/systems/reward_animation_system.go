@@ -9,6 +9,7 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -16,18 +17,12 @@ import (
 
 const (
 	// Phase 1 - Appearing (出现阶段)
-	RewardAppearDuration     = 0.3  // 出现动画持续时间（秒）
-	RewardAppearScaleStart   = 0.5  // 初始缩放
-	RewardAppearScaleEnd     = 0.8  // 最终缩放
-	RewardAppearRiseDistance = 20.0 // 上升距离（像素）
-
-	// Phase 2 - Waiting (等待点击阶段)
-	RewardArrowBlinkFrequency = 3.0 // 箭头闪烁频率（Hz）
+	RewardAppearDuration   = 0.6  // 出现动画持续时间（秒）
+	RewardAppearJumpHeight = 40.0 // 微小跳跃高度（像素）
 
 	// Phase 3 - Expanding (展开阶段)
 	RewardExpandDuration     = 2.0 // 展开动画持续时间（秒）
-	RewardExpandScaleStart   = 0.8 // 初始缩放
-	RewardExpandScaleEnd     = 1.0 // 最终缩放
+	RewardExpandScaleEnd     = 1.0 // 最终缩放（放大到原始大小）
 	RewardExpandTargetYRatio = 0.3 // 目标Y位置（screenHeight * ratio）
 
 	// Phase 4 - Showing (显示奖励面板)
@@ -58,6 +53,7 @@ type RewardAnimationSystem struct {
 	reanimSystem    *ReanimSystem // Reanim系统用于创建和管理动画
 	rewardEntity    ecs.EntityID  // 奖励动画实体ID（卡片包）
 	panelEntity     ecs.EntityID  // 奖励面板实体ID
+	glowEntity      ecs.EntityID  // 光晕粒子发射器实体ID
 	isActive        bool          // 系统是否激活
 	screenWidth     float64
 	screenHeight    float64
@@ -72,6 +68,7 @@ func NewRewardAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *gam
 		reanimSystem:    reanimSys,
 		rewardEntity:    0,
 		panelEntity:     0,
+		glowEntity:      0,
 		isActive:        false,
 		screenWidth:     800, // TODO: 从配置获取
 		screenHeight:    600,
@@ -92,19 +89,23 @@ func (ras *RewardAnimationSystem) TriggerReward(plantID string) {
 	ras.rewardEntity = ras.entityManager.CreateEntity()
 	ras.isActive = true
 
-	// 随机选择草坪行（1-5行）
-	randomLane := rand.Intn(config.GridRows) + 1
+	// 随机选择草坪行（2-4行，偏中间位置）
+	randomLane := 1 + rand.Intn(3) // 第2、3或4行
 
-	// 计算起始位置（草坪右侧边缘，随机行中央）
-	startX := config.GridWorldEndX - RewardCardPackOffsetFromRight
-	startY := config.GridWorldStartY + float64(randomLane-1)*config.CellHeight + config.CellHeight/2.0
+	// 计算起始位置（草坪偏右半部分随机位置，确保不超出草坪范围）
+	// 草坪共9列（0-8），选择第4-6列（偏右但不超出草坪）
+	randomCol := 3 + rand.Intn(3) // 第4、5或第6列
+	startX := config.GridWorldStartX + float64(randomCol)*config.CellWidth + config.CellWidth/2.0
+	startY := config.GridWorldStartY + float64(randomLane)*config.CellHeight + config.CellHeight/2.0
 
 	// 计算 Phase 3 目标位置（屏幕中央上方）
-	targetX := ras.screenWidth / 2.0
+	// 注意：PositionComponent 存储的是世界坐标，需要从屏幕坐标转换
+	// 世界坐标 = 屏幕坐标 + CameraX
+	targetX := ras.screenWidth/2.0 + ras.gameState.CameraX
 	targetY := ras.screenHeight * RewardExpandTargetYRatio
 
-	log.Printf("[RewardAnimationSystem] 卡片包起始位置: (%.1f, %.1f), 目标位置: (%.1f, %.1f), 随机行: %d",
-		startX, startY, targetX, targetY, randomLane)
+	log.Printf("[RewardAnimationSystem] 卡片包起始位置（草坪格子）: (%.1f, %.1f), 目标位置: (%.1f, %.1f), 随机行: %d, 随机列: %d",
+		startX, startY, targetX, targetY, randomLane, randomCol)
 
 	// 添加 RewardAnimationComponent
 	ecs.AddComponent(ras.entityManager, ras.rewardEntity, &components.RewardAnimationComponent{
@@ -114,10 +115,8 @@ func (ras *RewardAnimationSystem) TriggerReward(plantID string) {
 		StartY:      startY,
 		TargetX:     targetX,
 		TargetY:     targetY,
-		Scale:       RewardAppearScaleStart,
+		Scale:       config.PlantCardScale, // 使用标准卡片缩放（0.50）
 		PlantID:     plantID,
-		ShowArrow:   false,
-		ArrowAlpha:  1.0,
 	})
 
 	// 添加 PositionComponent
@@ -126,44 +125,53 @@ func (ras *RewardAnimationSystem) TriggerReward(plantID string) {
 		Y: startY,
 	})
 
-	// 添加 ReanimComponent（卡片包图片 + 植物图标合成）
-	cardPackImg := ras.resourceManager.GetImageByID("IMAGE_SEEDPACKET_LARGER")
-	if cardPackImg == nil {
-		// Fallback: 尝试直接加载
-		var err error
-		cardPackImg, err = ras.resourceManager.LoadImage("images/SeedPacket_Larger.png")
-		if err != nil {
-			log.Printf("[RewardAnimationSystem] Warning: Failed to load card pack image: %v", err)
-		}
+	// Story 8.4: 使用 NewPlantCardEntity 创建卡片包
+	// 这样可以自动获得：背景图、植物图标、阳光数字等完整渲染
+	plantType := ras.plantIDToType(plantID)
+	if plantType == components.PlantUnknown {
+		log.Printf("[RewardAnimationSystem] Unknown plant ID: %s, aborting", plantID)
+		ras.entityManager.DestroyEntity(ras.rewardEntity)
+		ras.entityManager.RemoveMarkedEntities()
+		ras.isActive = false
+		return
 	}
 
-	if cardPackImg != nil {
-		// 渲染植物图标到卡片包上（预合成）
-		plantIcon := ras.renderPlantIcon(plantID)
-		cardPackWithIcon := ras.compositePlantCard(cardPackImg, plantIcon)
-
-		// 创建 ReanimComponent 并使用 ReanimSystem 初始化
-		reanimDef := ras.createCardPackReanim()
-		reanimComp := &components.ReanimComponent{
-			Reanim:            reanimDef,
-			PartImages:        map[string]*ebiten.Image{"card_pack": cardPackWithIcon},
-			CurrentAnim:       "",
-			CurrentFrame:      0,
-			FrameAccumulator:  0,
-			VisibleFrameCount: 0,
-			IsLooping:         true,
-		}
-
-		ecs.AddComponent(ras.entityManager, ras.rewardEntity, reanimComp)
-
-		// 使用 ReanimSystem 播放动画
-		err := ras.reanimSystem.PlayAnimation(ras.rewardEntity, "idle")
-		if err != nil {
-			log.Printf("[RewardAnimationSystem] Warning: Failed to play animation: %v", err)
-		}
-
-		log.Printf("[RewardAnimationSystem] 卡片包 ReanimComponent 已创建并初始化")
+	// 创建植物卡片实体作为卡片包（使用统一工厂方法）
+	// 注意：这里的位置会被 RewardAnimationComponent 覆盖更新
+	cardEntity, err := entities.NewPlantCardEntity(
+		ras.entityManager,
+		ras.resourceManager,
+		ras.reanimSystem,
+		plantType,
+		startX,
+		startY,
+		config.PlantCardScale, // 使用标准卡片缩放（0.50）
+	)
+	if err != nil {
+		log.Printf("[RewardAnimationSystem] Failed to create card pack entity: %v", err)
+		ras.entityManager.DestroyEntity(ras.rewardEntity)
+		ras.entityManager.RemoveMarkedEntities()
+		ras.isActive = false
+		return
 	}
+
+	// 重要：使用卡片实体作为奖励实体
+	ras.entityManager.DestroyEntity(ras.rewardEntity)
+	ras.rewardEntity = cardEntity
+
+	// 重新添加 RewardAnimationComponent（控制动画状态）
+	ecs.AddComponent(ras.entityManager, ras.rewardEntity, &components.RewardAnimationComponent{
+		Phase:       "appearing",
+		ElapsedTime: 0,
+		StartX:      startX,
+		StartY:      startY,
+		TargetX:     targetX,
+		TargetY:     targetY,
+		Scale:       config.PlantCardScale, // 使用标准卡片缩放（0.50）
+		PlantID:     plantID,
+	})
+
+	log.Printf("[RewardAnimationSystem] 卡片包已创建（使用 Story 8.4 统一工厂方法）")
 
 	// TODO: Phase 2 粒子背景框效果（需要查找合适的粒子配置）
 }
@@ -195,11 +203,51 @@ func (ras *RewardAnimationSystem) Update(dt float64) {
 	case "closing":
 		ras.updateClosingPhase(dt, rewardComp)
 	}
+
+	// 更新光晕粒子发射器位置（跟随卡片包）
+	//
+	// 设计说明：
+	//   - 调用者期望：光晕中心对齐卡片中心，箭头在卡片上方
+	//   - 粒子系统：锚点是发射器的参考位置，EmitterOffset 定义发射器相对锚点的偏移
+	//   - 配置文件：ParticleAnchorOffsets 定义"视觉中心 → 锚点"的转换偏移
+	//
+	// 流程：
+	//   1. 计算卡片中心坐标（视觉中心）
+	//   2. 从配置获取粒子效果的锚点偏移
+	//   3. 锚点 = 视觉中心 + 锚点偏移
+	//   4. 粒子系统根据 XML 中的 EmitterOffset 自动计算各发射器位置
+	if ras.glowEntity != 0 {
+		rewardPos, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.rewardEntity)
+		if ok {
+			glowPos, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.glowEntity)
+			if ok {
+				cardComp, _ := ecs.GetComponent[*components.PlantCardComponent](ras.entityManager, ras.rewardEntity)
+
+				// 计算卡片中心坐标（期望的视觉中心）
+				visualCenterX := rewardPos.X
+				visualCenterY := rewardPos.Y
+				if cardComp != nil && cardComp.BackgroundImage != nil {
+					cardWidth := float64(cardComp.BackgroundImage.Bounds().Dx()) * cardComp.CardScale
+					cardHeight := float64(cardComp.BackgroundImage.Bounds().Dy()) * cardComp.CardScale
+					visualCenterX += cardWidth / 2.0
+					visualCenterY += cardHeight / 2.0
+				}
+
+				// 从配置获取粒子效果的锚点偏移（将视觉中心转换为粒子锚点）
+				offsetX, offsetY := config.GetParticleAnchorOffset("SeedPacket")
+				anchorX := visualCenterX + offsetX
+				anchorY := visualCenterY + offsetY
+
+				glowPos.X = anchorX
+				glowPos.Y = anchorY
+			}
+		}
+	}
 }
 
-// updateAppearingPhase 处理卡片包弹出阶段（0.3秒）。
-// - 缩放动画：0.8 → 1.0
-// - 微小上升：Y -= 20px
+// updateAppearingPhase 处理卡片包弹出阶段（0.4秒）。
+// - 缩放动画：0.5 → 0.8
+// - 微小抛物线：从草坪弹起，轻微上升后落回原位，无弹跳
 func (ras *RewardAnimationSystem) updateAppearingPhase(dt float64, rewardComp *components.RewardAnimationComponent) {
 	// 获取位置组件
 	posComp, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.rewardEntity)
@@ -213,33 +261,62 @@ func (ras *RewardAnimationSystem) updateAppearingPhase(dt float64, rewardComp *c
 		progress = 1.0
 	}
 
-	// 应用缓动函数（easeOutQuad - 快速开始，缓慢结束）
-	easedProgress := easeOutQuad(progress)
+	// Phase 1 不需要缩放动画，保持标准卡片大小（config.PlantCardScale = 0.50）
+	// Scale 已在 TriggerReward 中设置，这里无需修改
 
-	// 更新缩放
-	rewardComp.Scale = RewardAppearScaleStart + (RewardAppearScaleEnd-RewardAppearScaleStart)*easedProgress
+	// 计算Y轴位置（微小抛物线）
+	// 使用 sin 曲线：从起点向上跳跃，到达最高点，然后平滑落回起点
+	// sin(0) = 0（起点），sin(PI/2) = 1（最高点），sin(PI) = 0（落回起点）
+	// 向上为负方向（Y轴向下为正）
+	yOffset := -RewardAppearJumpHeight * math.Sin(progress*math.Pi)
 
-	// 更新位置（微小上升）
-	posComp.Y = rewardComp.StartY - RewardAppearRiseDistance*easedProgress
+	posComp.Y = rewardComp.StartY + yOffset
 
 	// 检查完成
 	if rewardComp.ElapsedTime >= RewardAppearDuration {
 		log.Printf("[RewardAnimationSystem] Phase 1 (appearing) 完成，切换到 waiting")
 		rewardComp.Phase = "waiting"
 		rewardComp.ElapsedTime = 0
-		rewardComp.ShowArrow = true // 显示箭头指示器
+
+		// 创建光晕粒子效果（包含光晕 + 向下箭头）
+		if ras.glowEntity == 0 {
+			// 验证猜想：有Name的发射器是"主粒子"
+			// SeedPacketGlow 有 EmitterOffsetY=62，如果它应该在卡片中心
+			// 那么基准位置应该是：卡片中心 - 62
+			cardComp, _ := ecs.GetComponent[*components.PlantCardComponent](ras.entityManager, ras.rewardEntity)
+			particleX := posComp.X
+			particleY := posComp.Y
+			if cardComp != nil && cardComp.BackgroundImage != nil {
+				cardWidth := float64(cardComp.BackgroundImage.Bounds().Dx()) * cardComp.CardScale
+				cardHeight := float64(cardComp.BackgroundImage.Bounds().Dy()) * cardComp.CardScale
+				particleX += cardWidth / 2.0   // X：卡片水平中心
+				particleY += cardHeight / 2.0  // Y：卡片垂直中心
+				particleY -= 62.0              // 减去主粒子的偏移量，使主粒子在中心
+			}
+
+			glowID, err := entities.CreateParticleEffect(
+				ras.entityManager,
+				ras.resourceManager,
+				"SeedPacket",
+				particleX,
+				particleY,
+				0.0,  // angleOffset = 0
+				true, // isUIParticle = true
+			)
+			if err != nil {
+				log.Printf("[RewardAnimationSystem] 创建光晕粒子失败: %v", err)
+			} else {
+				ras.glowEntity = glowID
+				log.Printf("[RewardAnimationSystem] 创建光晕粒子成功: ID=%d（验证主粒子假设，基准位置=(%.1f, %.1f)）", glowID, particleX, particleY)
+			}
+		}
 	}
 }
 
-// updateWaitingPhase 处理等待玩家点击阶段。
-// - 卡片包静止
-// - 箭头闪烁动画
-// - TODO: 粒子背景框效果
-// - 检测玩家点击
+// updateWaitingPhase 处理等待阶段。
+// - 卡片包静止，显示光晕和箭头粒子效果
+// - 等待玩家点击后进入展开阶段
 func (ras *RewardAnimationSystem) updateWaitingPhase(dt float64, rewardComp *components.RewardAnimationComponent) {
-	// 更新箭头闪烁动画（sin 曲线）
-	rewardComp.ArrowAlpha = 0.5 + 0.5*math.Sin(rewardComp.ElapsedTime*RewardArrowBlinkFrequency*2*math.Pi)
-
 	// 检测玩家点击（鼠标或空格键）
 	clicked := inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) ||
 		inpututil.IsKeyJustPressed(ebiten.KeySpace)
@@ -248,7 +325,6 @@ func (ras *RewardAnimationSystem) updateWaitingPhase(dt float64, rewardComp *com
 		log.Printf("[RewardAnimationSystem] 玩家点击卡片包，切换到 expanding")
 		rewardComp.Phase = "expanding"
 		rewardComp.ElapsedTime = 0
-		rewardComp.ShowArrow = false // 隐藏箭头
 
 		// TODO: 触发 Award.xml 粒子特效
 	}
@@ -256,7 +332,7 @@ func (ras *RewardAnimationSystem) updateWaitingPhase(dt float64, rewardComp *com
 
 // updateExpandingPhase 处理卡片展开阶段（2秒）。
 // - TODO: Award.xml 粒子特效播放
-// - 卡片放大：1.0 → 2.0
+// - 卡片放大：0.8 → 1.0
 // - 移动到屏幕中央上方
 func (ras *RewardAnimationSystem) updateExpandingPhase(dt float64, rewardComp *components.RewardAnimationComponent) {
 	// 获取位置组件
@@ -274,13 +350,18 @@ func (ras *RewardAnimationSystem) updateExpandingPhase(dt float64, rewardComp *c
 	// 应用缓动函数（easeOutQuad）
 	easedProgress := easeOutQuad(progress)
 
-	// 更新缩放
-	rewardComp.Scale = RewardExpandScaleStart + (RewardExpandScaleEnd-RewardExpandScaleStart)*easedProgress
+	// 更新缩放（从标准卡片大小 0.50 放大到原始大小 1.0）
+	rewardComp.Scale = config.PlantCardScale + (RewardExpandScaleEnd-config.PlantCardScale)*easedProgress
+
+	// 同步缩放到 PlantCardComponent（Story 8.4）
+	if cardComp, ok := ecs.GetComponent[*components.PlantCardComponent](ras.entityManager, ras.rewardEntity); ok {
+		cardComp.CardScale = rewardComp.Scale
+	}
 
 	// 更新位置（从当前位置移动到目标位置）
+	// 注意：起始Y坐标已经包含了抛物线结束时的偏移
 	posComp.X = rewardComp.StartX + (rewardComp.TargetX-rewardComp.StartX)*easedProgress
-	posComp.Y = (rewardComp.StartY - RewardAppearRiseDistance) +
-		(rewardComp.TargetY-(rewardComp.StartY-RewardAppearRiseDistance))*easedProgress
+	posComp.Y = rewardComp.StartY + (rewardComp.TargetY-rewardComp.StartY)*easedProgress
 
 	// 检查完成
 	if rewardComp.ElapsedTime >= RewardExpandDuration {
@@ -295,7 +376,7 @@ func (ras *RewardAnimationSystem) updateExpandingPhase(dt float64, rewardComp *c
 
 // updateShowingPhase 处理显示奖励面板阶段。
 // - 显示新植物介绍面板
-// - 等待玩家点击"下一关"或关闭
+// - 需要玩家手动点击才能关闭（无自动播放）
 func (ras *RewardAnimationSystem) updateShowingPhase(dt float64, rewardComp *components.RewardAnimationComponent) {
 	// 更新面板动画（如果有）
 	if panelComp, ok := ecs.GetComponent[*components.RewardPanelComponent](ras.entityManager, ras.panelEntity); ok {
@@ -308,7 +389,7 @@ func (ras *RewardAnimationSystem) updateShowingPhase(dt float64, rewardComp *com
 		panelComp.CardScale = RewardCardScaleStart + (RewardCardScaleEnd-RewardCardScaleStart)*easedProgress
 	}
 
-	// 检测玩家点击（鼠标或空格键）
+	// 检测玩家点击（鼠标或空格键）- 手动关闭
 	clicked := inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) ||
 		inpututil.IsKeyJustPressed(ebiten.KeySpace)
 
@@ -333,9 +414,13 @@ func (ras *RewardAnimationSystem) updateClosingPhase(dt float64, rewardComp *com
 		if ras.panelEntity != 0 {
 			ras.entityManager.DestroyEntity(ras.panelEntity)
 		}
+		if ras.glowEntity != 0 {
+			ras.entityManager.DestroyEntity(ras.glowEntity)
+		}
 
 		ras.rewardEntity = 0
 		ras.panelEntity = 0
+		ras.glowEntity = 0
 		ras.isActive = false
 
 		// TODO: 触发场景切换（返回主菜单或进入下一关）
@@ -432,71 +517,36 @@ func (ras *RewardAnimationSystem) createCardPackReanim() *reanim.ReanimXML {
 	}
 }
 
-// renderPlantIcon 使用 ReanimSystem 离屏渲染植物图标。
-func (ras *RewardAnimationSystem) renderPlantIcon(plantID string) *ebiten.Image {
-	// 根据 plantID 确定 Reanim 名称
-	var reanimName string
+// plantIDToType 将 plantID 字符串转换为 PlantType 枚举
+func (ras *RewardAnimationSystem) plantIDToType(plantID string) components.PlantType {
 	switch plantID {
 	case "sunflower":
-		reanimName = "SunFlower"
+		return components.PlantSunflower
 	case "peashooter":
-		reanimName = "PeaShooter"
+		return components.PlantPeashooter
 	case "cherrybomb":
-		reanimName = "CherryBomb"
+		return components.PlantCherryBomb
 	case "wallnut":
-		reanimName = "Wallnut"
+		return components.PlantWallnut
 	default:
-		log.Printf("[RewardAnimationSystem] Unknown plant ID: %s", plantID)
-		return nil
+		return components.PlantUnknown
 	}
+}
 
-	// 创建临时实体用于离屏渲染
-	tempEntity := ras.entityManager.CreateEntity()
-	defer func() {
-		ras.entityManager.DestroyEntity(tempEntity)
-		ras.entityManager.RemoveMarkedEntities()
-	}()
-
-	// 加载 Reanim 资源
-	reanimXML := ras.resourceManager.GetReanimXML(reanimName)
-	partImages := ras.resourceManager.GetReanimPartImages(reanimName)
-
-	if reanimXML == nil || partImages == nil {
-		log.Printf("[RewardAnimationSystem] Failed to load Reanim resources for %s", reanimName)
-		return nil
+// getReanimName 根据 plantID 获取 Reanim 资源名称
+func (ras *RewardAnimationSystem) getReanimName(plantID string) string {
+	switch plantID {
+	case "sunflower":
+		return "SunFlower"
+	case "peashooter":
+		return "PeaShooter"
+	case "cherrybomb":
+		return "CherryBomb"
+	case "wallnut":
+		return "Wallnut"
+	default:
+		return ""
 	}
-
-	// 添加 PositionComponent
-	iconCenterX := 50.0
-	iconCenterY := 70.0
-	ecs.AddComponent(ras.entityManager, tempEntity, &components.PositionComponent{
-		X: iconCenterX,
-		Y: iconCenterY,
-	})
-
-	// 添加 ReanimComponent
-	ecs.AddComponent(ras.entityManager, tempEntity, &components.ReanimComponent{
-		Reanim:     reanimXML,
-		PartImages: partImages,
-	})
-
-	// 播放 idle 动画
-	if err := ras.reanimSystem.PlayAnimation(tempEntity, "anim_idle"); err != nil {
-		log.Printf("[RewardAnimationSystem] Failed to play animation: %v", err)
-		return nil
-	}
-
-	// 创建离屏画布
-	canvas := ebiten.NewImage(100, 140)
-
-	// 更新 Reanim 动画到第0帧
-	ras.reanimSystem.Update(0.01)
-
-	// 使用 RenderSystem 渲染（需要传入 entities 列表）
-	// 注意：这里简化实现，实际需要调用完整的渲染流程
-	// TODO: 完整实现离屏渲染
-
-	return canvas
 }
 
 // compositePlantCard 将植物图标合成到卡片包图片上。

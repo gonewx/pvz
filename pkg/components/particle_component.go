@@ -78,4 +78,12 @@ type ParticleComponent struct {
 	SystemAlphaInterp    string              // 插值模式
 	EmitterAge           float64             // 发射器年龄（用于计算 SystemAlpha）
 	EmitterDuration      float64             // 发射器持续时间（用于归一化 SystemAlpha）
+
+	// Position Field 支持（位置动画路径）
+	// Position Field 直接设置粒子相对于初始位置的偏移量（覆盖速度积分）
+	// 例如：SeedPacket 箭头使用 Position Field 实现"向下晃动再回到原位"的动画
+	InitialX        float64 // 粒子初始 X 坐标（用于 Position Field 计算相对位置）
+	InitialY        float64 // 粒子初始 Y 坐标
+	PositionOffsetX float64 // Position Field 计算的 X 偏移量（每帧更新）
+	PositionOffsetY float64 // Position Field 计算的 Y 偏移量
 }

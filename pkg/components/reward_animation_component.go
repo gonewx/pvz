@@ -5,7 +5,7 @@ package components
 //
 // 动画流程（5个阶段）：
 // 1. appearing (0.3秒): 卡片从草坪右侧随机行弹出，微小上升 + 缩放动画 (0.8 → 1.0)
-// 2. waiting: 卡片静止，显示粒子背景框 + 橙色箭头指示器（闪烁），等待玩家点击
+// 2. waiting: 卡片静止，显示 SeedPacket 粒子效果（光晕 + 向下箭头），等待玩家点击
 // 3. expanding (2秒): 点击后触发 Award.xml 粒子特效，卡片放大并移动到屏幕中央上方
 // 4. showing: 粒子特效完成后显示新植物介绍面板，等待玩家点击"下一关"或关闭
 // 5. closing (0.5秒): 淡出动画，清理实体，返回主菜单或进入下一关
@@ -29,10 +29,4 @@ type RewardAnimationComponent struct {
 
 	// PlantID 解锁的植物ID（如 "sunflower"）
 	PlantID string
-
-	// ShowArrow 是否显示橙色箭头指示器（Phase 2 使用）
-	ShowArrow bool
-
-	// ArrowAlpha 箭头透明度（0.0-1.0），用于闪烁动画
-	ArrowAlpha float64
 }

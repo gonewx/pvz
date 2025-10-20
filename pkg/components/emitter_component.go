@@ -52,6 +52,12 @@ type EmitterComponent struct {
 	EmitterBoxY   float64 // Vertical spawn area size
 	EmitterRadius float64 // Circular spawn radius (alternative to box)
 
+	// Emitter position offset (发射器位置偏移)
+	// 相对于发射器实体位置的偏移量，用于将粒子生成位置微调到特定位置
+	// 例如：SeedPacket 光晕效果使用 EmitterOffsetY=62 将光晕向下移动
+	EmitterOffsetX float64 // Horizontal offset from emitter position
+	EmitterOffsetY float64 // Vertical offset from emitter position
+
 	// System-level properties (Story 7.5: ZombieHead 系统透明度)
 	SystemAlphaKeyframes []particle.Keyframe // 系统级透明度关键帧（影响所有粒子）
 	SystemAlphaInterp    string              // 插值模式

@@ -218,9 +218,25 @@ func (ps *ParticleSystem) updateParticles(dt float64) {
 		// 		particleID, particle.Age, particle.Lifetime, particle.Alpha, particle.Scale)
 		// }
 
-		// Apply velocity to position
-		position.X += particle.VelocityX * dt
-		position.Y += particle.VelocityY * dt
+		// Apply velocity to position (if no Position Field is active)
+		// Position Field 直接设置位置，覆盖速度积分
+		hasPositionField := false
+		for _, field := range particle.Fields {
+			if field.FieldType == "Position" {
+				hasPositionField = true
+				break
+			}
+		}
+
+		if hasPositionField {
+			// Position Field: 使用初始位置 + 偏移量
+			position.X = particle.InitialX + particle.PositionOffsetX
+			position.Y = particle.InitialY + particle.PositionOffsetY
+		} else {
+			// 正常模式：基于速度积分更新位置
+			position.X += particle.VelocityX * dt
+			position.Y += particle.VelocityY * dt
+		}
 
 		// Story 7.5: Ground collision detection (ZombieHead 弹跳效果)
 		if particle.GroundY > 0 && position.Y >= particle.GroundY {
@@ -402,8 +418,9 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 
 	// Spawn position
 	// 优先使用圆形发射半径（EmitterRadius），否则回退到方形发射盒（EmitterBoxX/Y）
-	spawnX := emitterPos.X
-	spawnY := emitterPos.Y
+	// 应用发射器偏移量（EmitterOffsetX/Y）
+	spawnX := emitterPos.X + emitter.EmitterOffsetX
+	spawnY := emitterPos.Y + emitter.EmitterOffsetY
 	if emitter.EmitterRadius > 0 {
 		// 均匀分布在圆形区域内：半径使用 sqrt 随机，角度均匀
 		r := math.Sqrt(rand.Float64()) * emitter.EmitterRadius
@@ -555,6 +572,12 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 		SystemAlphaInterp:    emitter.SystemAlphaInterp,
 		EmitterAge:           emitter.Age,            // 使用发射器的当前年龄（修复：粒子应该基于发射器年龄，而不是自己的独立计数器）
 		EmitterDuration:      emitter.SystemDuration, // 发射器持续时间（用于归一化）
+
+		// Position Field 支持：保存初始位置
+		InitialX:        spawnX,
+		InitialY:        spawnY,
+		PositionOffsetX: 0,
+		PositionOffsetY: 0,
 	}
 
 	// Create PositionComponent
@@ -575,6 +598,13 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 
 	// Add particle to emitter's active list
 	emitter.ActiveParticles = append(emitter.ActiveParticles, particleID)
+
+	// DEBUG: 临时调试 - 打印 Position Field 的内容
+	for _, field := range config.Fields {
+		if field.FieldType == "Position" {
+			log.Printf("[DEBUG] 粒子创建 - Position Field: X='%s', Y='%s'", field.X, field.Y)
+		}
+	}
 
 	// DEBUG: 粒子创建日志（每个粒子创建时打印会刷屏，已禁用）
 	// log.Printf("[ParticleSystem] 粒子创建完成: ID=%d, 位置=(%.1f, %.1f), 生命周期=%.2fs, Image=%v, Alpha=%.2f, Scale=%.2f, 颜色=(%.2f,%.2f,%.2f), 亮度=%.2f",
@@ -701,6 +731,38 @@ func (ps *ParticleSystem) applyFields(p *components.ParticleComponent, dt float6
 			// Apply friction (velocity decay)
 			p.VelocityX *= (1 - frictionX*dt)
 			p.VelocityY *= (1 - frictionY*dt)
+
+		case "Position":
+			// Position Field: 直接设置粒子相对于初始位置的偏移量
+			// 这是一个动画路径，覆盖基于速度的位置更新
+			//
+			// 例如: SeedPacket 箭头
+			//   <Y>0 Linear 10,50 Linear 0</Y>
+			//   - t=0.0 (开始): offsetY = 0
+			//   - t=0.5 (中点): offsetY = 10
+			//   - t=1.0 (结束): offsetY = 0
+			//   效果：箭头向下移动10像素，再回到原位
+
+			// Parse position values (must use keyframes for animation)
+			_, _, xKeyframes, xInterp := particlePkg.ParseValue(field.X)
+			_, _, yKeyframes, yInterp := particlePkg.ParseValue(field.Y)
+
+			// Calculate position offset for this frame
+			if len(xKeyframes) > 0 {
+				p.PositionOffsetX = particlePkg.EvaluateKeyframes(xKeyframes, t, xInterp)
+			} else if field.X != "" {
+				// 静态值（无动画）
+				xMin, xMax, _, _ := particlePkg.ParseValue(field.X)
+				p.PositionOffsetX = particlePkg.RandomInRange(xMin, xMax)
+			}
+
+			if len(yKeyframes) > 0 {
+				p.PositionOffsetY = particlePkg.EvaluateKeyframes(yKeyframes, t, yInterp)
+			} else if field.Y != "" {
+				// 静态值（无动画）
+				yMin, yMax, _, _ := particlePkg.ParseValue(field.Y)
+				p.PositionOffsetY = particlePkg.RandomInRange(yMin, yMax)
+			}
 
 			// Additional field types can be added here
 			// case "Attractor":

@@ -183,13 +183,41 @@ func ParseValue(s string) (min, max float64, keyframes []Keyframe, interpolation
 					val1, err1 := strconv.ParseFloat(pair[0], 64)
 					val2, err2 := strconv.ParseFloat(pair[1], 64)
 					if err1 == nil && err2 == nil {
-						// 检查是否是 PopCap 格式："initialValue,timePercent finalValue"
-						// 条件：val2 > 1（表示百分比），且后面还有单独的值（不含逗号）
-						if val2 > 1 && i+1 < len(parts) && !strings.Contains(parts[i+1], ",") {
+						// 检查是否是 PopCap 三关键帧格式："initialValue middleValue,timePercent finalValue"
+						// 例如："0 Linear 10,50 Linear 0"
+						// 条件：
+						//   1. val2 > 1（表示百分比，如 50）
+						//   2. 后面还有单独的值（finalValue）
+						//   3. 已经有初始值（initialValue != nil）
+						if val2 > 1 && i+1 < len(parts) && !strings.Contains(parts[i+1], ",") && initialValue != nil {
+							// 尝试解析后续值（finalValue）
+							nextVal, err := strconv.ParseFloat(parts[i+1], 64)
+							if err == nil {
+								// PopCap 三关键帧格式:
+								// 已有: Keyframe{Time: 0, Value: initialValue}
+								// 添加: Keyframe{Time: timePercent/100, Value: middleValue}
+								// 添加: Keyframe{Time: 1, Value: finalValue}
+								middleValue := val1
+								timePercent := val2
+								finalValue := nextVal
+
+								// 添加中间关键帧
+								keyframes = append(keyframes, Keyframe{Time: timePercent / 100.0, Value: middleValue})
+								// 添加结束关键帧
+								keyframes = append(keyframes, Keyframe{Time: 1.0, Value: finalValue})
+								// 标记下一个值已处理
+								processedIndices[i+1] = true
+								continue
+							}
+						}
+
+						// 检查是否是 PopCap 两关键帧格式："initialValue,timePercent finalValue"
+						// 条件：val2 > 1，后面有值，但没有初始值（initialValue == nil）
+						if val2 > 1 && i+1 < len(parts) && !strings.Contains(parts[i+1], ",") && initialValue == nil {
 							// 尝试解析后续值
 							nextVal, err := strconv.ParseFloat(parts[i+1], 64)
 							if err == nil {
-								// PopCap 格式: "initialValue,timePercent finalValue"
+								// PopCap 两关键帧格式: "initialValue,timePercent finalValue"
 								initialValuePop := val1
 								timePercent := val2
 								finalValue := nextVal
@@ -200,6 +228,7 @@ func ParseValue(s string) (min, max float64, keyframes []Keyframe, interpolation
 								keyframes = append(keyframes, Keyframe{Time: timePercent / 100.0, Value: finalValue})
 								// 标记下一个值已处理
 								processedIndices[i+1] = true
+								initialValue = &initialValuePop // 标记已有初始值
 								continue
 							}
 						}
