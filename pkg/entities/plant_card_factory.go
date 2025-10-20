@@ -324,6 +324,7 @@ func renderEffectMask(screen *ebiten.Image, card *components.PlantCardComponent,
 	}
 
 	// 绘制冷却遮罩（从下往上填充）
+	// 冷却遮罩应该比阳光不足遮罩更深（更黑）
 	cooldownProgress := getCooldownProgress(card)
 	if cooldownProgress > 0 {
 		maskHeight := cardHeight * cooldownProgress
@@ -332,7 +333,8 @@ func renderEffectMask(screen *ebiten.Image, card *components.PlantCardComponent,
 		// 确保遮罩高度至少为1像素
 		if intMaskHeight > 0 {
 			mask := ebiten.NewImage(intCardWidth, intMaskHeight)
-			mask.Fill(color.RGBA{0, 0, 0, 128}) // 半透明黑色
+			// 深黑色遮罩，透明度180（比阳光不足遮罩更深）
+			mask.Fill(color.RGBA{0, 0, 0, 180})
 
 			maskOp := &ebiten.DrawImageOptions{}
 			maskOp.GeoM.Translate(x, y+cardHeight-maskHeight)
@@ -341,9 +343,11 @@ func renderEffectMask(screen *ebiten.Image, card *components.PlantCardComponent,
 	}
 
 	// 绘制禁用遮罩（阳光不足）
+	// 浅灰色遮罩，比冷却遮罩更浅
 	if isCardDisabled(card) {
 		disabledMask := ebiten.NewImage(intCardWidth, intCardHeight)
-		disabledMask.Fill(color.RGBA{50, 50, 50, 150}) // 灰色遮罩
+		// 浅灰色遮罩，透明度120（比冷却遮罩更浅）
+		disabledMask.Fill(color.RGBA{80, 80, 80, 120})
 
 		disabledOp := &ebiten.DrawImageOptions{}
 		disabledOp.GeoM.Translate(x, y)
