@@ -49,6 +49,7 @@ type VerifyGame struct {
 	plantEntities    []ecs.EntityID // 测试用植物实体（使用 Reanim）
 
 	triggered bool // 是否已触发奖励
+	completed bool // 是否已完成验证（Phase 3 结束）
 }
 
 // NewVerifyGame 创建验证游戏实例
@@ -124,6 +125,7 @@ func NewVerifyGame() (*VerifyGame, error) {
 		panelRenderSystem:     panelRenderSystem,
 		debugFont:             debugFont,
 		triggered:             false,
+		completed:             false,
 	}
 
 	// 自动触发奖励动画（无需手动按T键）
@@ -160,20 +162,24 @@ func (vg *VerifyGame) Update() error {
 	dt := 1.0 / 60.0
 	vg.reanimSystem.Update(dt)
 	vg.particleSystem.Update(dt) // 更新粒子系统
-	vg.rewardSystem.Update(dt)
+
+	// 只在未完成验证时更新奖励系统
+	if !vg.completed {
+		vg.rewardSystem.Update(dt)
+	}
 
 	// 检查是否完成（到 Phase 4 showing 时停止，不显示面板）
-	if vg.triggered {
+	if vg.triggered && !vg.completed {
 		rewardComp, ok := ecs.GetComponent[*components.RewardAnimationComponent](
 			vg.entityManager,
 			vg.rewardSystem.GetEntity(),
 		)
 		if ok && rewardComp.Phase == "showing" {
-			// Phase 4 (showing) 时，本验证程序不显示面板
-			// 直接标记为完成
+			// Phase 4 (showing) 时，本验证程序标记为完成
+			// 停止更新奖励系统，防止创建面板
 			log.Println("[VerifyGame] Phase 3 (expanding) 完成，卡片包验证结束")
 			log.Println("[VerifyGame] 按 R 重启或 Q 退出")
-			vg.triggered = false // 防止重复日志
+			vg.completed = true
 		}
 	}
 
@@ -200,8 +206,9 @@ func (vg *VerifyGame) Draw(screen *ebiten.Image) {
 	// 绘制粒子效果（光晕）
 	vg.renderSystem.DrawParticles(screen, cameraOffsetX)
 
-	// 绘制奖励面板（Story 8.4: 使用新的卡片工厂方法）
-	vg.panelRenderSystem.Draw(screen)
+	// 验证程序不显示奖励面板，所以不调用 panelRenderSystem.Draw()
+	// 这样可以避免创建重复的卡片实体
+	// vg.panelRenderSystem.Draw(screen)
 
 	// 绘制植物卡片实体（Story 8.4: 使用统一的植物卡片渲染系统）
 	// 注意：当前验证程序主要验证卡片包动画，不创建植物卡片实体，
@@ -234,6 +241,7 @@ func (vg *VerifyGame) reset() {
 	)
 
 	vg.triggered = false
+	vg.completed = false
 }
 
 // drawDebugInfo 绘制调试信息

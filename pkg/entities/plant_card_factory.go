@@ -285,7 +285,7 @@ func renderSunCost(screen *ebiten.Image, card *components.PlantCardComponent, x,
 	cardWidth := float64(card.BackgroundImage.Bounds().Dx()) * card.CardScale
 	cardHeight := float64(card.BackgroundImage.Bounds().Dy()) * card.CardScale
 
-	sunText := fmt.Sprintf("%03d", card.SunCost)
+	sunText := fmt.Sprintf("%d", card.SunCost)
 
 	// 字体大小也应用整体缩放
 	face := &text.GoTextFace{
