@@ -323,47 +323,47 @@ func renderEffectMask(screen *ebiten.Image, card *components.PlantCardComponent,
 		return // 卡片太小，跳过遮罩绘制
 	}
 
-	// 绘制冷却遮罩（从下往上填充）
-	// 冷却遮罩应该比阳光不足遮罩更深（更黑）
-	cooldownProgress := getCooldownProgress(card)
-	if cooldownProgress > 0 {
-		maskHeight := cardHeight * cooldownProgress
-		intMaskHeight := int(maskHeight)
+	isCoolingDown := card.CurrentCooldown > 0
+	isDisabled := !card.IsAvailable && card.CurrentCooldown == 0
 
-		// 确保遮罩高度至少为1像素
-		if intMaskHeight > 0 {
-			mask := ebiten.NewImage(intCardWidth, intMaskHeight)
-			// 深黑色遮罩，透明度180（比阳光不足遮罩更深）
-			mask.Fill(color.RGBA{0, 0, 0, 180})
+	// 第1层：冷却中或阳光不足时，绘制浅灰色底层遮罩（表示禁用状态）
+	if isCoolingDown || isDisabled {
+		baseMask := ebiten.NewImage(intCardWidth, intCardHeight)
+		// 浅灰色全遮罩，透明度120
+		baseMask.Fill(color.RGBA{80, 80, 80, 120})
 
-			maskOp := &ebiten.DrawImageOptions{}
-			maskOp.GeoM.Translate(x, y+cardHeight-maskHeight)
-			screen.DrawImage(mask, maskOp)
-		}
+		baseMaskOp := &ebiten.DrawImageOptions{}
+		baseMaskOp.GeoM.Translate(x, y)
+		screen.DrawImage(baseMask, baseMaskOp)
 	}
 
-	// 绘制禁用遮罩（阳光不足）
-	// 浅灰色遮罩，比冷却遮罩更浅
-	if isCardDisabled(card) {
-		disabledMask := ebiten.NewImage(intCardWidth, intCardHeight)
-		// 浅灰色遮罩，透明度120（比冷却遮罩更浅）
-		disabledMask.Fill(color.RGBA{80, 80, 80, 120})
+	// 第2层：冷却中时，额外绘制深黑色动态遮罩（从下往上逐渐恢复）
+	if isCoolingDown {
+		cooldownProgress := getCooldownProgress(card)
+		if cooldownProgress > 0 {
+			maskHeight := cardHeight * cooldownProgress
+			intMaskHeight := int(maskHeight)
 
-		disabledOp := &ebiten.DrawImageOptions{}
-		disabledOp.GeoM.Translate(x, y)
-		screen.DrawImage(disabledMask, disabledOp)
+			// 确保遮罩高度至少为1像素
+			if intMaskHeight > 0 {
+				cooldownMask := ebiten.NewImage(intCardWidth, intMaskHeight)
+				// 深黑色遮罩，透明度180（比底层遮罩更深，叠加显示冷却进度）
+				cooldownMask.Fill(color.RGBA{0, 0, 0, 180})
+
+				cooldownMaskOp := &ebiten.DrawImageOptions{}
+				// 遮罩固定在顶部，高度减少时底部先露出（从下到上恢复）
+				cooldownMaskOp.GeoM.Translate(x, y)
+				screen.DrawImage(cooldownMask, cooldownMaskOp)
+			}
+		}
 	}
 }
 
 // getCooldownProgress 计算冷却进度（0.0-1.0）
+// 只要有冷却时间就返回进度，不管阳光是否足够
 func getCooldownProgress(card *components.PlantCardComponent) float64 {
-	if !card.IsAvailable && card.CurrentCooldown > 0 && card.CooldownTime > 0 {
+	if card.CurrentCooldown > 0 && card.CooldownTime > 0 {
 		return card.CurrentCooldown / card.CooldownTime
 	}
 	return 0.0
-}
-
-// isCardDisabled 判断卡片是否处于禁用状态（阳光不足）
-func isCardDisabled(card *components.PlantCardComponent) bool {
-	return !card.IsAvailable && card.CurrentCooldown == 0
 }
