@@ -300,6 +300,73 @@ RenderSystem       PlantCardRenderSystem
 - **Story 6.3 详细说明**：`docs/stories/6.3.story.md`
 - **渲染系统文档**：`pkg/systems/render_system.go`（文件头部注释）
 
+## UI 元素复用策略（Story 8.4）
+
+### 概述
+
+为了消除重复代码并提高可维护性，项目实现了 **PlantCardRenderer** 通用渲染工具类，用于渲染植物卡片 UI 元素。
+
+### PlantCardRenderer 使用指南
+
+**位置**：`pkg/utils/plant_card_renderer.go`
+
+**用途**：渲染植物卡片的通用功能，包括：
+- 背景框
+- 植物图标
+- 阳光数字
+- 冷却遮罩
+- 禁用遮罩
+- 透明度效果
+
+**使用示例**：
+
+```go
+// 1. 创建渲染器实例（通常在系统构造函数中）
+renderer := utils.NewPlantCardRenderer()
+
+// 2. 在渲染循环中调用
+renderer.Render(utils.PlantCardRenderOptions{
+    Screen:           screen,
+    X:                100,  // 卡片左上角X坐标
+    Y:                200,  // 卡片左上角Y坐标
+    BackgroundImage:  cardBg,
+    PlantIconImage:   icon,  // 可选，nil表示不绘制图标
+    SunCost:          100,
+    SunFont:          fontSource,
+    SunFontSize:      14.0,
+    SunTextOffsetY:   10.0,
+    CardScale:        0.8,
+    PlantIconScale:   0.7,   // 可选
+    PlantIconOffsetY: 5.0,   // 可选
+    CooldownProgress: 0.3,   // 0.0-1.0，0表示无冷却
+    IsDisabled:       false,
+    Alpha:            1.0,   // 0.0-1.0
+})
+```
+
+### 当前使用场景
+
+| 系统 | 用途 | 代码减少 |
+|------|------|----------|
+| PlantCardRenderSystem | 选卡界面植物卡片渲染 | 42 行 (28%) |
+| RewardPanelRenderSystem | 奖励面板植物卡片渲染 | 19 行 (drawSunCost方法) |
+
+### 设计原则
+
+1. **单一职责** - PlantCardRenderer 只负责视觉渲染
+2. **低耦合** - 不依赖具体的组件类型（PlantCardComponent, RewardPanelComponent）
+3. **高复用** - 可在任何渲染系统中使用
+4. **配置驱动** - 通过 PlantCardRenderOptions 控制所有渲染行为
+
+### 扩展性
+
+**未来支持的新功能**：
+- 图鉴界面：只需 5-10 行代码调用 PlantCardRenderer
+- 商店界面：只需 5-10 行代码调用 PlantCardRenderer
+- 自定义效果：通过 PlantCardRenderOptions 添加新字段即可
+
+**相关文档**：`docs/stories/8.4.story.md`
+
 ## 编码规范
 
 ### 命名约定
