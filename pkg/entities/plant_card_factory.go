@@ -211,10 +211,10 @@ func RenderPlantIcon(em *ecs.EntityManager, rm *game.ResourceManager, rs ReanimS
 //   - sunFontSize: 字体大小（基准值，会应用 cardScale）
 //
 // 渲染层级：
-//   1. 背景框（应用卡片缩放）
-//   2. 植物图标（应用卡片缩放和配置的相对缩放）
-//   3. 阳光数字（应用卡片缩放，包括字体大小）
-//   4. 效果遮罩（冷却/禁用，应用卡片缩放）
+//  1. 背景框（应用卡片缩放）
+//  2. 植物图标（应用卡片缩放和配置的相对缩放）
+//  3. 阳光数字（应用卡片缩放，包括字体大小）
+//  4. 效果遮罩（冷却/禁用，应用卡片缩放）
 func RenderPlantCard(screen *ebiten.Image, card *components.PlantCardComponent, x, y float64, sunFont *text.GoTextFaceSource, sunFontSize float64) {
 	if card == nil {
 		return
@@ -330,7 +330,7 @@ func renderEffectMask(screen *ebiten.Image, card *components.PlantCardComponent,
 	if isCoolingDown || isDisabled {
 		baseMask := ebiten.NewImage(intCardWidth, intCardHeight)
 		// 浅灰色全遮罩，透明度120
-		baseMask.Fill(color.RGBA{80, 80, 80, 120})
+		baseMask.Fill(color.RGBA{0, 0, 0, 120})
 
 		baseMaskOp := &ebiten.DrawImageOptions{}
 		baseMaskOp.GeoM.Translate(x, y)
