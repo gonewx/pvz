@@ -99,9 +99,10 @@ func CreateParticleEffect(em *ecs.EntityManager, rm *game.ResourceManager, effec
 		spawnRateMin, spawnRateMax, _, _ := particle.ParseValue(emitterConfig.SpawnRate)
 		spawnRate := particle.RandomInRange(spawnRateMin, spawnRateMax)
 
-		spawnMinActiveVal, _, _, _ := particle.ParseValue(emitterConfig.SpawnMinActive)
-		spawnMaxActiveVal, _, _, _ := particle.ParseValue(emitterConfig.SpawnMaxActive)
-		spawnMaxLaunchedVal, _, _, _ := particle.ParseValue(emitterConfig.SpawnMaxLaunched)
+		// Parse spawn constraints (支持关键帧动画)
+		spawnMinActiveVal, _, spawnMinActiveKeyframes, spawnMinActiveInterp := particle.ParseValue(emitterConfig.SpawnMinActive)
+		spawnMaxActiveVal, _, spawnMaxActiveKeyframes, spawnMaxActiveInterp := particle.ParseValue(emitterConfig.SpawnMaxActive)
+		spawnMaxLaunchedVal, _, spawnMaxLaunchedKeyframes, spawnMaxLaunchedInterp := particle.ParseValue(emitterConfig.SpawnMaxLaunched)
 
 		emitterBoxXVal, _, _, _ := particle.ParseValue(emitterConfig.EmitterBoxX)
 		emitterBoxYVal, _, _, _ := particle.ParseValue(emitterConfig.EmitterBoxY)
@@ -130,11 +131,18 @@ func CreateParticleEffect(em *ecs.EntityManager, rm *game.ResourceManager, effec
 			SpawnMinActive:   int(spawnMinActiveVal),
 			SpawnMaxActive:   int(spawnMaxActiveVal),
 			SpawnMaxLaunched: int(spawnMaxLaunchedVal),
-			EmitterBoxX:      emitterBoxXVal,
-			EmitterBoxY:      emitterBoxYVal,
-			EmitterRadius:    emitterRadiusVal,
-			EmitterOffsetX:   emitterOffsetXVal,
-			EmitterOffsetY:   emitterOffsetYVal,
+			// 保存关键帧数据（用于动态粒子数量控制）
+			SpawnMinActiveKeyframes:   spawnMinActiveKeyframes,
+			SpawnMinActiveInterp:      spawnMinActiveInterp,
+			SpawnMaxActiveKeyframes:   spawnMaxActiveKeyframes,
+			SpawnMaxActiveInterp:      spawnMaxActiveInterp,
+			SpawnMaxLaunchedKeyframes: spawnMaxLaunchedKeyframes,
+			SpawnMaxLaunchedInterp:    spawnMaxLaunchedInterp,
+			EmitterBoxX:               emitterBoxXVal,
+			EmitterBoxY:               emitterBoxYVal,
+			EmitterRadius:             emitterRadiusVal,
+			EmitterOffsetX:            emitterOffsetXVal,
+			EmitterOffsetY:            emitterOffsetYVal,
 			// Story 7.5: SystemAlpha
 			SystemAlphaKeyframes: systemAlphaKeyframes,
 			SystemAlphaInterp:    systemAlphaInterp,

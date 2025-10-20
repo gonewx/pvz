@@ -3,7 +3,6 @@
 package particle
 
 import (
-	"math"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -278,12 +277,12 @@ func ParseValue(s string) (min, max float64, keyframes []Keyframe, interpolation
 	return 0, 0, nil, ""
 }
 
-// EvaluateKeyframes calculates the interpolated value at time t (0-1)
+// EvaluateKeyframes calculates the interpolated value at time t
 // using the provided keyframes and interpolation mode.
 //
 // Parameters:
 //   - keyframes: Array of keyframes (must be sorted by Time)
-//   - t: Normalized time (0-1)
+//   - t: Time value (can be normalized 0-1 or absolute time in seconds)
 //   - interpolation: Interpolation mode ("Linear", "EaseIn", etc.)
 //
 // Returns the interpolated value at time t.
@@ -295,12 +294,13 @@ func EvaluateKeyframes(keyframes []Keyframe, t float64, interpolation string) fl
 		return keyframes[0].Value
 	}
 
-	// Clamp t to [0, 1]
-	t = math.Max(0, math.Min(1, t))
-
-	// Story 7.4 修复：如果 t 小于第一个关键帧的时间，返回第一个关键帧的值
+	// Clamp t to valid range (不再限制在 0-1，支持绝对时间)
+	// 只在超出关键帧范围时裁剪
 	if t < keyframes[0].Time {
 		return keyframes[0].Value
+	}
+	if t >= keyframes[len(keyframes)-1].Time {
+		return keyframes[len(keyframes)-1].Value
 	}
 
 	// Find the keyframe interval containing t

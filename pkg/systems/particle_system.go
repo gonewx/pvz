@@ -43,6 +43,78 @@ func (ps *ParticleSystem) Update(dt float64) {
 	ps.updateParticles(dt)
 }
 
+// GetDynamicSpawnMinActive 计算当前时刻的 SpawnMinActive（支持关键帧动画）
+// 导出为公开方法以便测试使用
+func (ps *ParticleSystem) GetDynamicSpawnMinActive(emitter *components.EmitterComponent) int {
+	// 如果有关键帧，使用动态计算
+	if len(emitter.SpawnMinActiveKeyframes) > 0 {
+		var t float64
+		if emitter.SystemDuration > 0 {
+			// 有限持续时间 → 使用归一化时间 (0-1)
+			t = emitter.Age / emitter.SystemDuration
+		} else {
+			// 无限持续时间 → 使用绝对时间（秒）
+			// Award.xml 格式: "0,1 1,1 4,19.999998" 表示 t=0s值1, t=1s值1, t=4s值20
+			t = emitter.Age
+		}
+		value := particlePkg.EvaluateKeyframes(emitter.SpawnMinActiveKeyframes, t, emitter.SpawnMinActiveInterp)
+		return int(value)
+	}
+	// 否则返回静态值
+	return emitter.SpawnMinActive
+}
+
+// getDynamicSpawnMinActive 私有方法（内部使用）
+func (ps *ParticleSystem) getDynamicSpawnMinActive(emitter *components.EmitterComponent) int {
+	return ps.GetDynamicSpawnMinActive(emitter)
+}
+
+// GetDynamicSpawnMaxActive 计算当前时刻的 SpawnMaxActive（支持关键帧动画）
+// 导出为公开方法以便测试使用
+func (ps *ParticleSystem) GetDynamicSpawnMaxActive(emitter *components.EmitterComponent) int {
+	// 如果有关键帧，使用动态计算
+	if len(emitter.SpawnMaxActiveKeyframes) > 0 {
+		var t float64
+		if emitter.SystemDuration > 0 {
+			t = emitter.Age / emitter.SystemDuration
+		} else {
+			t = emitter.Age // 绝对时间
+		}
+		value := particlePkg.EvaluateKeyframes(emitter.SpawnMaxActiveKeyframes, t, emitter.SpawnMaxActiveInterp)
+		return int(value)
+	}
+	// 否则返回静态值
+	return emitter.SpawnMaxActive
+}
+
+// getDynamicSpawnMaxActive 私有方法（内部使用）
+func (ps *ParticleSystem) getDynamicSpawnMaxActive(emitter *components.EmitterComponent) int {
+	return ps.GetDynamicSpawnMaxActive(emitter)
+}
+
+// GetDynamicSpawnMaxLaunched 计算当前时刻的 SpawnMaxLaunched（支持关键帧动画）
+// 导出为公开方法以便测试使用
+func (ps *ParticleSystem) GetDynamicSpawnMaxLaunched(emitter *components.EmitterComponent) int {
+	// 如果有关键帧，使用动态计算
+	if len(emitter.SpawnMaxLaunchedKeyframes) > 0 {
+		var t float64
+		if emitter.SystemDuration > 0 {
+			t = emitter.Age / emitter.SystemDuration
+		} else {
+			t = emitter.Age // 绝对时间
+		}
+		value := particlePkg.EvaluateKeyframes(emitter.SpawnMaxLaunchedKeyframes, t, emitter.SpawnMaxLaunchedInterp)
+		return int(value)
+	}
+	// 否则返回静态值
+	return emitter.SpawnMaxLaunched
+}
+
+// getDynamicSpawnMaxLaunched 私有方法（内部使用）
+func (ps *ParticleSystem) getDynamicSpawnMaxLaunched(emitter *components.EmitterComponent) int {
+	return ps.GetDynamicSpawnMaxLaunched(emitter)
+}
+
 // updateEmitters processes all emitter entities, spawning new particles
 // and managing emitter lifecycle.
 func (ps *ParticleSystem) updateEmitters(dt float64) {
@@ -84,12 +156,17 @@ func (ps *ParticleSystem) updateEmitters(dt float64) {
 
 		// Spawn particles if emitter is active
 		if emitter.Active && emitter.Config != nil {
+			// 动态计算当前时刻的 Spawn 约束参数（支持关键帧动画）
+			spawnMinActive := ps.getDynamicSpawnMinActive(emitter)
+			spawnMaxActive := ps.getDynamicSpawnMaxActive(emitter)
+			spawnMaxLaunched := ps.getDynamicSpawnMaxLaunched(emitter)
+
 			// Story 7.4 Fix: Handle SpawnRate=0 (instant burst effects)
 			// When SpawnRate=0, spawn all particles immediately on first update
 			if emitter.SpawnRate == 0 {
 				if emitter.TotalLaunched == 0 {
 					// Instant burst: spawn SpawnMinActive particles immediately
-					targetCount := emitter.SpawnMinActive
+					targetCount := spawnMinActive
 					if targetCount == 0 {
 						targetCount = 1 // At least one particle
 					}
@@ -101,11 +178,11 @@ func (ps *ParticleSystem) updateEmitters(dt float64) {
 						// Check spawn constraints
 						activeCount := len(emitter.ActiveParticles)
 						canSpawn := true
-						if emitter.SpawnMaxActive > 0 && activeCount >= emitter.SpawnMaxActive {
+						if spawnMaxActive > 0 && activeCount >= spawnMaxActive {
 							canSpawn = false
 							break
 						}
-						if emitter.SpawnMaxLaunched > 0 && emitter.TotalLaunched >= emitter.SpawnMaxLaunched {
+						if spawnMaxLaunched > 0 && emitter.TotalLaunched >= spawnMaxLaunched {
 							canSpawn = false
 							break
 						}
@@ -121,13 +198,13 @@ func (ps *ParticleSystem) updateEmitters(dt float64) {
 				for emitter.Age >= emitter.NextSpawnTime {
 					activeCount := len(emitter.ActiveParticles)
 
-					// Check spawn constraints
+					// Check spawn constraints (使用动态计算的值)
 					canSpawn := true
-					if emitter.SpawnMaxActive > 0 && activeCount >= emitter.SpawnMaxActive {
+					if spawnMaxActive > 0 && activeCount >= spawnMaxActive {
 						canSpawn = false
 						break // Can't spawn more this frame
 					}
-					if emitter.SpawnMaxLaunched > 0 && emitter.TotalLaunched >= emitter.SpawnMaxLaunched {
+					if spawnMaxLaunched > 0 && emitter.TotalLaunched >= spawnMaxLaunched {
 						canSpawn = false
 						break // Reached total launch limit
 					}

@@ -40,12 +40,21 @@ type EmitterComponent struct {
 
 	// SpawnMinActive: Minimum number of particles to keep active
 	SpawnMinActive int
+	// SpawnMinActive keyframes (for dynamic particle count over time)
+	SpawnMinActiveKeyframes []particle.Keyframe
+	SpawnMinActiveInterp    string
 
 	// SpawnMaxActive: Maximum number of particles allowed to be active simultaneously
 	SpawnMaxActive int
+	// SpawnMaxActive keyframes (for dynamic particle count over time)
+	SpawnMaxActiveKeyframes []particle.Keyframe
+	SpawnMaxActiveInterp    string
 
 	// SpawnMaxLaunched: Maximum total particles to launch (0 = unlimited)
 	SpawnMaxLaunched int
+	// SpawnMaxLaunched keyframes (for dynamic particle count over time)
+	SpawnMaxLaunchedKeyframes []particle.Keyframe
+	SpawnMaxLaunchedInterp    string
 
 	// Emitter area properties (发射区域)
 	EmitterBoxX   float64 // Horizontal spawn area size (random position within box)
