@@ -6,8 +6,10 @@ import "github.com/hajimehoshi/ebiten/v2"
 type PlantType int
 
 const (
+	// PlantUnknown 未知植物类型
+	PlantUnknown PlantType = iota
 	// PlantSunflower 向日葵
-	PlantSunflower PlantType = iota
+	PlantSunflower
 	// PlantPeashooter 豌豆射手
 	PlantPeashooter
 	// PlantWallnut 坚果墙
@@ -42,4 +44,8 @@ type PlantCardComponent struct {
 	BackgroundImage *ebiten.Image
 	// PlantIconTexture 植物预览图标（Reanim 离屏渲染生成的纹理）
 	PlantIconTexture *ebiten.Image
+
+	// Story 8.4: 卡片缩放
+	// CardScale 卡片整体缩放因子（用于控制卡片显示大小，如 0.54 为标准大小，1.0 为原始大小）
+	CardScale float64
 }

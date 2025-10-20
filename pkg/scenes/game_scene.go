@@ -37,12 +37,8 @@ const (
 	PlantCardOffsetY      = 8    // 卡片相对于 SeedBank 的 Y 偏移量
 	PlantCardSpacing      = 60   // 卡片槽之间的间距（包含卡槽边框，每个卡槽约76px宽）
 	PlantCardScale        = 0.50 // 卡片背景缩放因子（实际图片100x140，缩放后54x76适配卡槽）
-	PlantCardFontSize     = 15.0 // 卡片阳光数字字体大小（像素）
 
-	// Plant Card Icon (卡片上的植物图标) - Story 6.3 可配置参数
-	PlantIconScale   = 0.55 // 植物图标缩放因子（原始80x90，可调整此值来改变图标大小）
-	PlantIconOffsetY = 5.0  // 植物图标距离卡片顶部的偏移（像素，可调整垂直位置）
-	SunTextOffsetY   = 16.0 // 植物阳光数字距离卡片底部的偏移（像素，可调整文本位置）
+	// Story 8.4: 卡片内部配置（图标缩放、偏移等）已移至 config.plant_card_config.go，不再在此定义
 
 	// Shovel (铲子) - positioned to the right of seed bank
 	ShovelX      = 620 // To the right of seed bank (bar5.png width=612 + small gap)
@@ -426,14 +422,11 @@ func (s *GameScene) initPlantCardSystems(rm *game.ResourceManager) {
 		rm,
 	)
 
-	// Initialize PlantCardRenderSystem (Story 6.3: 可配置的多层渲染)
+	// Initialize PlantCardRenderSystem (Story 6.3 + 8.4: 配置内部封装)
+	// 所有内部配置（图标缩放、偏移等）从 config.plant_card_config.go 读取
 	s.plantCardRenderSystem = systems.NewPlantCardRenderSystem(
 		s.entityManager,
-		PlantCardScale,   // 卡片背景缩放因子 (0.50)
-		PlantIconScale,   // 植物图标缩放因子 (0.55, 可调整)
-		PlantIconOffsetY, // 植物图标距离顶部的偏移 (5.0 像素, 可调整)
-		SunTextOffsetY,   // 阳光数字距离底部的偏移 (18.0 像素, 可调整)
-		s.plantCardFont,  // 阳光数字字体（黑色渲染）
+		s.plantCardFont, // 阳光数字字体
 	)
 }
 
@@ -498,8 +491,8 @@ func (s *GameScene) loadResources() {
 		s.sunCounterFont = font
 	}
 
-	// Load font for plant card sun cost (使用黑体)
-	cardFont, err := s.resourceManager.LoadFont("assets/fonts/SimHei.ttf", PlantCardFontSize)
+	// Load font for plant card sun cost (使用黑体，字体大小从配置读取)
+	cardFont, err := s.resourceManager.LoadFont("assets/fonts/SimHei.ttf", float64(config.PlantCardSunCostFontSize))
 	if err != nil {
 		log.Printf("Warning: Failed to load plant card font: %v", err)
 		log.Printf("Will use fallback debug text rendering for card cost")

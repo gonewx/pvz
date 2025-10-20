@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	_ "image/gif"  // Register GIF decoder
 	_ "image/jpeg" // Register JPEG decoder
 	_ "image/png"  // Register PNG decoder
 	"io"
@@ -13,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	auaudio "github.com/decker502/pvz/internal/audio"
 	"github.com/decker502/pvz/internal/particle"
 	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/utils"
@@ -29,8 +31,8 @@ import (
 // ensuring that resources are loaded only once and reused throughout the game.
 //
 // The ResourceManager implements the following key features:
-// - Image loading and caching (PNG format support)
-// - Audio loading and caching (MP3/OGG format support)
+// - Image loading and caching (PNG, JPEG, GIF format support)
+// - Audio loading and caching (MP3, OGG, AU format support)
 // - Error handling for missing or corrupted resources
 // - Resource path normalization
 //
@@ -96,7 +98,7 @@ func NewResourceManager(audioContext *audio.Context) *ResourceManager {
 
 // LoadImage loads an image file from the specified path and caches it for future use.
 // If the image has already been loaded, it returns the cached version.
-// Supported formats: PNG (via image/png decoder).
+// Supported formats: PNG, JPEG, GIF (via image decoders).
 //
 // Parameters:
 //   - path: The file path to the image resource (e.g., "assets/images/interface/MainMenu.png").
@@ -262,7 +264,7 @@ func (rm *ResourceManager) GetImage(path string) *ebiten.Image {
 
 // LoadAudio loads an audio file from the specified path and caches it for future use.
 // If the audio has already been loaded, it returns the cached player.
-// Supported formats: MP3 (.mp3) and OGG Vorbis (.ogg).
+// Supported formats: MP3 (.mp3), OGG Vorbis (.ogg), and Sun/NeXT audio (.au).
 //
 // The audio is automatically wrapped in an infinite loop, making it suitable for background music.
 // For sound effects that should not loop, consider adding a separate LoadSoundEffect method.
@@ -276,7 +278,7 @@ func (rm *ResourceManager) GetImage(path string) *ebiten.Image {
 //
 // Error handling:
 //   - Returns an error if the file does not exist or cannot be opened.
-//   - Returns an error if the audio format is not supported (must be .mp3 or .ogg).
+//   - Returns an error if the audio format is not supported (must be .mp3, .ogg, or .au).
 //   - Returns an error if the file is corrupted or cannot be decoded.
 //   - Does not panic - all errors are returned to the caller for handling.
 //
@@ -333,8 +335,14 @@ func (rm *ResourceManager) LoadAudio(path string) (*audio.Player, error) {
 			return nil, fmt.Errorf("failed to decode OGG audio %s: %w", path, err)
 		}
 		stream = decodedStream
+	case ".au":
+		decodedStream, err := auaudio.DecodeAU(reader)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode AU audio %s: %w", path, err)
+		}
+		stream = decodedStream
 	default:
-		return nil, fmt.Errorf("unsupported audio format: %s (supported: .mp3, .ogg)", ext)
+		return nil, fmt.Errorf("unsupported audio format: %s (supported: .mp3, .ogg, .au)", ext)
 	}
 
 	// Wrap the stream in an infinite loop for background music
@@ -355,7 +363,7 @@ func (rm *ResourceManager) LoadAudio(path string) (*audio.Player, error) {
 // LoadSoundEffect loads a sound effect from the specified path and caches it for future use.
 // Unlike LoadAudio, this method does NOT wrap the audio in an infinite loop,
 // making it suitable for one-shot sound effects like button clicks, collection sounds, etc.
-// Supported formats: MP3 (.mp3) and OGG Vorbis (.ogg).
+// Supported formats: MP3 (.mp3), OGG Vorbis (.ogg), and Sun/NeXT audio (.au).
 //
 // Parameters:
 //   - path: The file path to the sound effect resource (e.g., "assets/audio/Sound/points.ogg").
@@ -413,8 +421,14 @@ func (rm *ResourceManager) LoadSoundEffect(path string) (*audio.Player, error) {
 			return nil, fmt.Errorf("failed to decode OGG sound effect %s: %w", path, err)
 		}
 		stream = decodedStream
+	case ".au":
+		decodedStream, err := auaudio.DecodeAU(reader)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode AU sound effect %s: %w", path, err)
+		}
+		stream = decodedStream
 	default:
-		return nil, fmt.Errorf("unsupported audio format: %s (supported: .mp3, .ogg)", ext)
+		return nil, fmt.Errorf("unsupported audio format: %s (supported: .mp3, .ogg, .au)", ext)
 	}
 
 	// Create an audio player WITHOUT infinite loop
@@ -937,6 +951,46 @@ func (rm *ResourceManager) LoadResourceGroup(groupName string) error {
 	// Fonts are not loaded here as they require a size parameter
 	// They should be loaded individually using LoadFont when needed
 
+	return nil
+}
+
+// LoadAllResources loads all resource groups defined in the configuration file.
+// This is a convenience method to batch-load all game resources at once,
+// typically used during game initialization or for verification/testing programs.
+//
+// The function iterates through all resource groups in the YAML configuration
+// and loads each one. If any group fails to load, it logs a warning and continues
+// loading other groups (fail-soft behavior).
+//
+// Returns:
+//   - An error only if the resource config hasn't been loaded yet
+//   - Individual resource loading errors are logged but don't stop the process
+//
+// Example:
+//
+//	// Load all resources at startup
+//	if err := rm.LoadAllResources(); err != nil {
+//	    log.Fatal("Failed to start resource loading:", err)
+//	}
+func (rm *ResourceManager) LoadAllResources() error {
+	// Check if resource config is loaded
+	if rm.config == nil {
+		return fmt.Errorf("resource config not loaded - call LoadResourceConfig first")
+	}
+
+	log.Printf("[ResourceManager] Loading all resource groups (%d groups total)...", len(rm.config.Groups))
+
+	// Load each resource group
+	loadedCount := 0
+	for groupName := range rm.config.Groups {
+		if err := rm.LoadResourceGroup(groupName); err != nil {
+			log.Printf("Warning: Failed to load resource group %s: %v (continuing)", groupName, err)
+			continue
+		}
+		loadedCount++
+	}
+
+	log.Printf("[ResourceManager] Successfully loaded %d/%d resource groups", loadedCount, len(rm.config.Groups))
 	return nil
 }
 

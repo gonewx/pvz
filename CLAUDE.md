@@ -304,66 +304,77 @@ RenderSystem       PlantCardRenderSystem
 
 ### 概述
 
-为了消除重复代码并提高可维护性，项目实现了 **PlantCardRenderer** 通用渲染工具类，用于渲染植物卡片 UI 元素。
+为了消除重复代码并提高可维护性，项目实现了统一的植物卡片渲染机制，所有渲染逻辑封装在 **PlantCardFactory** 中。
 
-### PlantCardRenderer 使用指南
+### 植物卡片渲染架构
 
-**位置**：`pkg/utils/plant_card_renderer.go`
+**工厂位置**：`pkg/entities/plant_card_factory.go`
 
-**用途**：渲染植物卡片的通用功能，包括：
-- 背景框
-- 植物图标
-- 阳光数字
-- 冷却遮罩
-- 禁用遮罩
-- 透明度效果
+**渲染函数**：
+- `NewPlantCardEntity()` - 创建植物卡片实体（包含所有组件和渲染资源）
+- `RenderPlantCard()` - 统一的渲染函数（封装所有渲染逻辑）
+- `RenderPlantIcon()` - 使用 Reanim 系统离屏渲染植物预览图标
+
+**渲染功能**：
+- 背景框（应用卡片缩放）
+- 植物图标（使用配置的缩放和偏移）
+- 阳光数字（使用配置的偏移）
+- 冷却遮罩（从下往上填充）
+- 禁用遮罩（阳光不足时的灰色遮罩）
 
 **使用示例**：
 
 ```go
-// 1. 创建渲染器实例（通常在系统构造函数中）
-renderer := utils.NewPlantCardRenderer()
+// 1. 创建植物卡片实体（在初始化时）
+cardEntity, err := entities.NewPlantCardEntity(
+    em,                        // 实体管理器
+    rm,                        // 资源管理器
+    rs,                        // Reanim系统（用于渲染植物预览）
+    components.PlantPeashooter, // 植物类型
+    100, 50,                   // 卡片位置(x, y)
+    0.54,                      // 卡片缩放因子
+)
 
-// 2. 在渲染循环中调用
-renderer.Render(utils.PlantCardRenderOptions{
-    Screen:           screen,
-    X:                100,  // 卡片左上角X坐标
-    Y:                200,  // 卡片左上角Y坐标
-    BackgroundImage:  cardBg,
-    PlantIconImage:   icon,  // 可选，nil表示不绘制图标
-    SunCost:          100,
-    SunFont:          fontSource,
-    SunFontSize:      14.0,
-    SunTextOffsetY:   10.0,
-    CardScale:        0.8,
-    PlantIconScale:   0.7,   // 可选
-    PlantIconOffsetY: 5.0,   // 可选
-    CooldownProgress: 0.3,   // 0.0-1.0，0表示无冷却
-    IsDisabled:       false,
-    Alpha:            1.0,   // 0.0-1.0
-})
+// 2. 在渲染系统中调用统一渲染函数
+entities.RenderPlantCard(
+    screen,      // 渲染目标
+    card,        // PlantCardComponent
+    pos.X, pos.Y, // 卡片位置
+    sunFont,     // 阳光字体（可选）
+    sunFontSize, // 字体大小
+)
 ```
 
 ### 当前使用场景
 
-| 系统 | 用途 | 代码减少 |
-|------|------|----------|
-| PlantCardRenderSystem | 选卡界面植物卡片渲染 | 42 行 (28%) |
-| RewardPanelRenderSystem | 奖励面板植物卡片渲染 | 19 行 (drawSunCost方法) |
+| 系统 | 使用方式 | 说明 |
+|------|---------|------|
+| PlantCardRenderSystem | 直接调用 `entities.RenderPlantCard()` | 选卡界面植物卡片渲染 |
+| RewardPanelRenderSystem | 调用 `entities.NewPlantCardEntity()` 创建实体 | 奖励面板通过实体系统统一渲染 |
 
 ### 设计原则
 
-1. **单一职责** - PlantCardRenderer 只负责视觉渲染
-2. **低耦合** - 不依赖具体的组件类型（PlantCardComponent, RewardPanelComponent）
-3. **高复用** - 可在任何渲染系统中使用
-4. **配置驱动** - 通过 PlantCardRenderOptions 控制所有渲染行为
+1. **工厂封装** - 所有卡片配置（背景、缩放、偏移）在工厂内部封装
+2. **统一整体** - 卡片作为统一整体，不暴露内部细节给调用者
+3. **配置驱动** - 所有内部配置在 `pkg/config/plant_card_config.go` 中定义
+4. **高复用** - 统一的渲染函数可在任何场景使用
+
+### 配置说明
+
+**配置文件**：`pkg/config/plant_card_config.go`
+
+**配置项**：
+- `PlantCardBackgroundID` - 卡片背景图资源ID
+- `PlantCardIconScale` - 植物图标缩放因子
+- `PlantCardIconOffsetY` - 植物图标Y轴偏移
+- `PlantCardSunCostOffsetY` - 阳光数字Y轴偏移
 
 ### 扩展性
 
 **未来支持的新功能**：
-- 图鉴界面：只需 5-10 行代码调用 PlantCardRenderer
-- 商店界面：只需 5-10 行代码调用 PlantCardRenderer
-- 自定义效果：通过 PlantCardRenderOptions 添加新字段即可
+- 图鉴界面：通过 `NewPlantCardEntity()` 创建卡片实体
+- 商店界面：通过 `NewPlantCardEntity()` 创建卡片实体
+- 自定义效果：在 `RenderPlantCard()` 中添加新的渲染层级
 
 **相关文档**：`docs/stories/8.4.story.md`
 

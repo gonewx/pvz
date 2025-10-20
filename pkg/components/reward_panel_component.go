@@ -23,8 +23,7 @@ type RewardPanelComponent struct {
 	// CardScale 卡片缩放比例（动画用，从 0.5 渐变到 1.5）
 	CardScale float64
 
-	// CardX, CardY 卡片位置（屏幕坐标）
-	CardX, CardY float64
+	// 注意：卡片位置由 RewardPanelRenderSystem 根据配置自动计算（水平居中，垂直位置从配置读取）
 
 	// IsVisible 面板是否可见
 	IsVisible bool

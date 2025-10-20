@@ -7,30 +7,28 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
-	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
 // RewardPanelRenderSystem 负责渲染奖励面板 UI。
-// 包括背景、植物卡片、文本信息等元素的绘制。
-// Story 8.4: 使用 PlantCardRenderer 进行卡片渲染，消除重复代码
+// 包括背景、文本信息等元素的绘制。
+// 植物卡片通过创建实体，由 PlantCardRenderSystem 统一渲染。
 type RewardPanelRenderSystem struct {
 	entityManager   *ecs.EntityManager
 	gameState       *game.GameState
 	resourceManager *game.ResourceManager
-	reanimSystem    *ReanimSystem // 用于渲染植物 Reanim
-	cardRenderer    *utils.PlantCardRenderer // Story 8.4: 通用卡片渲染器
+	reanimSystem    *ReanimSystem // 用于离屏渲染植物图标
 	screenWidth     float64
 	screenHeight    float64
 	titleFont       *text.GoTextFace // 标题字体
 	plantInfoFont   *text.GoTextFace // 植物名称和描述字体
-	sunCostFont     *text.GoTextFace // 阳光值字体
 	buttonFont      *text.GoTextFace // 按钮字体
 
-	// 植物显示实体映射：面板实体ID -> 植物显示实体ID
-	plantDisplayEntities map[ecs.EntityID]ecs.EntityID
+	// 植物卡片实体映射：面板实体ID -> 卡片实体ID
+	plantCardEntities map[ecs.EntityID]ecs.EntityID
 }
 
 // NewRewardPanelRenderSystem 创建奖励面板渲染系统。
@@ -46,29 +44,22 @@ func NewRewardPanelRenderSystem(em *ecs.EntityManager, gs *game.GameState, rm *g
 		log.Printf("[RewardPanelRenderSystem] Warning: Failed to load plant info font: %v", err)
 	}
 
-	sunCostFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.RewardPanelSunCostFontSize)
-	if err != nil {
-		log.Printf("[RewardPanelRenderSystem] Warning: Failed to load sun cost font: %v", err)
-	}
-
 	buttonFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.RewardPanelButtonTextFontSize)
 	if err != nil {
 		log.Printf("[RewardPanelRenderSystem] Warning: Failed to load button font: %v", err)
 	}
 
 	return &RewardPanelRenderSystem{
-		entityManager:        em,
-		gameState:            gs,
-		resourceManager:      rm,
-		reanimSystem:         rs,
-		cardRenderer:         utils.NewPlantCardRenderer(), // Story 8.4: 初始化渲染器
-		screenWidth:          800, // TODO: 从配置获取
-		screenHeight:         600,
-		titleFont:            titleFont,
-		plantInfoFont:        plantInfoFont,
-		sunCostFont:          sunCostFont,
-		buttonFont:           buttonFont,
-		plantDisplayEntities: make(map[ecs.EntityID]ecs.EntityID),
+		entityManager:     em,
+		gameState:         gs,
+		resourceManager:   rm,
+		reanimSystem:      rs,
+		screenWidth:       800, // TODO: 从配置获取
+		screenHeight:      600,
+		titleFont:         titleFont,
+		plantInfoFont:     plantInfoFont,
+		buttonFont:        buttonFont,
+		plantCardEntities: make(map[ecs.EntityID]ecs.EntityID), // 初始化卡片实体映射
 	}
 }
 
@@ -83,8 +74,8 @@ func (rprs *RewardPanelRenderSystem) Draw(screen *ebiten.Image) {
 			continue
 		}
 
-		// 确保植物显示实体存在
-		rprs.ensurePlantDisplayEntity(entity, panelComp)
+		// 确保植物卡片实体存在（由 PlantCardRenderSystem 渲染）
+		rprs.ensurePlantCardEntity(entity, panelComp)
 
 		// 绘制奖励面板
 		rprs.drawPanel(screen, entity, panelComp)
@@ -99,8 +90,7 @@ func (rprs *RewardPanelRenderSystem) drawPanel(screen *ebiten.Image, panelEntity
 	// 2. 绘制标题文本："你得到了一株新植物！"
 	rprs.drawTitle(screen, panel.FadeAlpha)
 
-	// 3. 绘制植物卡片（SeedPacket_Larger.png）
-	rprs.drawPlantCard(screen, panelEntity, panel)
+	// 3. 植物卡片由 PlantCardRenderSystem 渲染（在 ensurePlantCardEntity 中创建的实体）
 
 	// 4. 绘制植物名称和描述
 	rprs.drawPlantInfo(screen, panel)
@@ -184,81 +174,111 @@ func (rprs *RewardPanelRenderSystem) drawTitle(screen *ebiten.Image, alpha float
 	text.Draw(screen, titleText, rprs.titleFont, op)
 }
 
-// drawPlantCard 绘制植物卡片（背景框 + 植物 Reanim + 阳光数字）。
-// Story 8.4: 使用 PlantCardRenderer 渲染背景框和阳光数字
-func (rprs *RewardPanelRenderSystem) drawPlantCard(screen *ebiten.Image, panelEntity ecs.EntityID, panel *components.RewardPanelComponent) {
-	cardImage := rprs.resourceManager.GetImageByID("IMAGE_SEEDPACKET_LARGER")
-	if cardImage == nil {
+// ensurePlantCardEntity 确保植物卡片实体存在，如果不存在则创建。
+// 植物卡片实体由 PlantCardRenderSystem 统一渲染。
+func (rprs *RewardPanelRenderSystem) ensurePlantCardEntity(panelEntity ecs.EntityID, panel *components.RewardPanelComponent) {
+	// 检查是否已经创建了卡片实体
+	if _, exists := rprs.plantCardEntities[panelEntity]; exists {
+		// 卡片实体已存在，更新位置
+		rprs.updatePlantCardEntity(panelEntity, panel)
 		return
 	}
 
-	// 计算缩放因子
-	cardWidth, cardHeight := cardImage.Bounds().Dx(), cardImage.Bounds().Dy()
-	scaleFactor := panel.CardScale * config.RewardPanelCardScale
-
-	// 计算卡片左上角位置（PlantCardRenderer 需要左上角坐标）
-	cardX := panel.CardX - float64(cardWidth)*scaleFactor/2.0
-	cardY := panel.CardY - float64(cardHeight)*scaleFactor/2.0
-
-	// Story 8.4: 使用 PlantCardRenderer 渲染背景框和阳光数字
-	var sunFontSource *text.GoTextFaceSource
-	var sunFontSize float64
-	if rprs.sunCostFont != nil {
-		sunFontSource = rprs.sunCostFont.Source
-		sunFontSize = rprs.sunCostFont.Size
+	// 映射 plantID 到 PlantType
+	plantType := rprs.getPlantType(panel.PlantID)
+	if plantType == components.PlantUnknown {
+		log.Printf("[RewardPanelRenderSystem] Unknown plant ID: %s", panel.PlantID)
+		return
 	}
 
-	rprs.cardRenderer.Render(utils.PlantCardRenderOptions{
-		Screen:          screen,
-		X:               cardX,
-		Y:               cardY,
-		BackgroundImage: cardImage,
-		SunCost:         panel.SunCost,
-		SunFont:         sunFontSource,
-		SunFontSize:     sunFontSize,
-		SunTextOffsetY:  config.RewardPanelSunCostOffsetY * scaleFactor,
-		SunTextColor:    config.RewardPanelSunCostColor,
-		CardScale:       scaleFactor,
-		Alpha:           panel.FadeAlpha,
-	})
+	// 计算卡片缩放因子
+	cardScale := panel.CardScale * config.RewardPanelCardScale
 
-	// 保留 Reanim 渲染逻辑：渲染植物 Reanim 实体（叠加在卡片框上）
-	plantEntityID, exists := rprs.plantDisplayEntities[panelEntity]
-	if exists && plantEntityID != 0 {
-		// 更新植物实体的位置（跟随卡片位置和偏移）
-		if posComp, ok := ecs.GetComponent[*components.PositionComponent](rprs.entityManager, plantEntityID); ok {
-			posComp.X = panel.CardX
-			posComp.Y = panel.CardY + config.RewardPanelPlantIconOffsetY*scaleFactor
-		}
+	// 自动计算卡片位置（水平居中，垂直位置从配置读取）
+	cardX, cardY := rprs.calculateCardPosition(cardScale)
 
-		// 渲染植物 Reanim
-		rprs.renderPlantReanimEntity(screen, plantEntityID, scaleFactor, panel.FadeAlpha)
+	// 创建植物卡片实体（使用现有的工厂函数）
+	cardEntity, err := entities.NewPlantCardEntity(
+		rprs.entityManager,
+		rprs.resourceManager,
+		rprs.reanimSystem,
+		plantType,
+		cardX,
+		cardY,
+		cardScale,
+	)
+
+	if err != nil {
+		log.Printf("[RewardPanelRenderSystem] Failed to create plant card entity: %v", err)
+		return
+	}
+
+	// 保存卡片实体ID
+	rprs.plantCardEntities[panelEntity] = cardEntity
+	log.Printf("[RewardPanelRenderSystem] Created plant card entity %d for panel %d (plant: %s)",
+		cardEntity, panelEntity, panel.PlantID)
+}
+
+// calculateCardPosition 计算卡片的居中位置
+// 返回: (cardX, cardY) 屏幕坐标
+func (rprs *RewardPanelRenderSystem) calculateCardPosition(cardScale float64) (float64, float64) {
+	// 背景在屏幕上的偏移
+	bgWidth := config.RewardPanelBackgroundWidth
+	bgHeight := config.RewardPanelBackgroundHeight
+	offsetX := (rprs.screenWidth - bgWidth) / 2
+	offsetY := (rprs.screenHeight - bgHeight) / 2
+
+	// 获取卡片原始尺寸（假设为固定值，可从资源获取）
+	// SeedPacket_Larger.png 原始尺寸约为 100x140
+	cardOriginalWidth := 100.0
+	cardWidth := cardOriginalWidth * cardScale
+
+	// 自动计算水平居中位置
+	cardX := offsetX + (bgWidth-cardWidth)/2
+
+	// 从配置读取垂直位置比例
+	cardY := offsetY + bgHeight*config.RewardPanelCardYRatio
+
+	return cardX, cardY
+}
+
+// updatePlantCardEntity 更新卡片实体的位置。
+func (rprs *RewardPanelRenderSystem) updatePlantCardEntity(panelEntity ecs.EntityID, panel *components.RewardPanelComponent) {
+	cardEntity, exists := rprs.plantCardEntities[panelEntity]
+	if !exists {
+		return
+	}
+
+	// 重新计算位置（如果面板大小改变）
+	cardScale := panel.CardScale * config.RewardPanelCardScale
+	cardX, cardY := rprs.calculateCardPosition(cardScale)
+
+	// 更新位置
+	if posComp, ok := ecs.GetComponent[*components.PositionComponent](rprs.entityManager, cardEntity); ok {
+		posComp.X = cardX
+		posComp.Y = cardY
+	}
+
+	// 更新卡片缩放（如果有动画）
+	if cardComp, ok := ecs.GetComponent[*components.PlantCardComponent](rprs.entityManager, cardEntity); ok {
+		cardComp.CardScale = cardScale
 	}
 }
 
-// loadPlantIcon 根据植物ID加载植物图标（头部图片）。
-func (rprs *RewardPanelRenderSystem) loadPlantIcon(plantID string) *ebiten.Image {
-	// 根据不同植物加载对应的头部图片
-	var iconID string
+// getPlantType 将 plantID 映射到 PlantType 枚举。
+func (rprs *RewardPanelRenderSystem) getPlantType(plantID string) components.PlantType {
 	switch plantID {
 	case "sunflower":
-		iconID = "IMAGE_REANIM_SUNFLOWER_HEAD"
+		return components.PlantSunflower
 	case "peashooter":
-		iconID = "IMAGE_REANIM_PEASHOOTER_HEAD"
+		return components.PlantPeashooter
 	case "cherrybomb":
-		iconID = "IMAGE_REANIM_CHERRYBOMB"
+		return components.PlantCherryBomb
 	case "wallnut":
-		iconID = "IMAGE_REANIM_WALLNUT_BODY"
+		return components.PlantWallnut
 	default:
-		log.Printf("[RewardPanelRenderSystem] Unknown plant ID: %s", plantID)
-		return nil
+		return components.PlantUnknown
 	}
-
-	icon := rprs.resourceManager.GetImageByID(iconID)
-	if icon == nil {
-		log.Printf("[RewardPanelRenderSystem] Failed to load plant icon: %s", iconID)
-	}
-	return icon
 }
 
 // drawPlantInfo 绘制植物名称和描述。
@@ -418,164 +438,6 @@ func (rprs *RewardPanelRenderSystem) drawFallbackButton(screen *ebiten.Image, al
 	}
 }
 
-// ensurePlantDisplayEntity 确保植物显示实体存在，如果不存在则创建。
-func (rprs *RewardPanelRenderSystem) ensurePlantDisplayEntity(panelEntity ecs.EntityID, panel *components.RewardPanelComponent) {
-	// 检查是否已经有显示实体
-	if _, exists := rprs.plantDisplayEntities[panelEntity]; exists {
-		return
-	}
-
-	// 创建植物显示实体
-	if panel.PlantID == "" {
-		return
-	}
-
-	plantEntity := rprs.createPlantDisplayEntity(panel.PlantID, panel.CardX, panel.CardY)
-	if plantEntity != 0 {
-		rprs.plantDisplayEntities[panelEntity] = plantEntity
-		log.Printf("[RewardPanelRenderSystem] Created plant display entity %d for panel %d (plant: %s)",
-			plantEntity, panelEntity, panel.PlantID)
-	}
-}
-
-// createPlantDisplayEntity 创建用于显示的植物 Reanim 实体。
-func (rprs *RewardPanelRenderSystem) createPlantDisplayEntity(plantID string, x, y float64) ecs.EntityID {
-	// 根据植物ID获取 Reanim 名称
-	reanimName := ""
-	animName := ""
-
-	switch plantID {
-	case "sunflower":
-		reanimName = "SunFlower"
-		animName = "anim_idle"
-	case "peashooter":
-		reanimName = "PeaShooter"
-		animName = "anim_full_idle" // 豌豆射手需要完整待机动画才显示头部
-	case "cherrybomb":
-		reanimName = "CherryBomb"
-		animName = "anim_idle"
-	case "wallnut":
-		reanimName = "Wallnut"
-		animName = "anim_idle"
-	default:
-		log.Printf("[RewardPanelRenderSystem] Unknown plant ID: %s", plantID)
-		return 0
-	}
-
-	// 加载 Reanim 数据
-	reanimXML := rprs.resourceManager.GetReanimXML(reanimName)
-	partImages := rprs.resourceManager.GetReanimPartImages(reanimName)
-
-	if reanimXML == nil || partImages == nil {
-		log.Printf("[RewardPanelRenderSystem] Failed to load Reanim resources for %s", reanimName)
-		return 0
-	}
-
-	// 创建实体
-	entityID := rprs.entityManager.CreateEntity()
-
-	// 添加位置组件
-	ecs.AddComponent(rprs.entityManager, entityID, &components.PositionComponent{
-		X: x,
-		Y: y,
-	})
-
-	// 添加 Reanim 组件
-	ecs.AddComponent(rprs.entityManager, entityID, &components.ReanimComponent{
-		Reanim:     reanimXML,
-		PartImages: partImages,
-	})
-
-	// 播放动画
-	if err := rprs.reanimSystem.PlayAnimation(entityID, animName); err != nil {
-		log.Printf("[RewardPanelRenderSystem] Failed to play animation %s: %v", animName, err)
-		rprs.entityManager.DestroyEntity(entityID)
-		return 0
-	}
-
-	return entityID
-}
-
-// renderPlantReanimEntity 渲染植物 Reanim 实体（简化版）。
-// 参数:
-//   - screen: 绘制目标屏幕
-//   - id: 实体ID
-//   - scale: 缩放比例
-//   - alpha: 透明度 (0.0-1.0)
-func (rprs *RewardPanelRenderSystem) renderPlantReanimEntity(screen *ebiten.Image, id ecs.EntityID, scale float64, alpha float64) {
-	// 获取组件
-	pos, hasPosComp := ecs.GetComponent[*components.PositionComponent](rprs.entityManager, id)
-	reanim, hasReanimComp := ecs.GetComponent[*components.ReanimComponent](rprs.entityManager, id)
-
-	if !hasPosComp || !hasReanimComp {
-		return
-	}
-
-	// 如果没有当前动画或动画轨道，跳过
-	if reanim.CurrentAnim == "" || len(reanim.AnimTracks) == 0 {
-		return
-	}
-
-	// 将逻辑帧映射到物理帧索引
-	physicalIndex := rprs.findPhysicalFrameIndex(reanim, reanim.CurrentFrame)
-	if physicalIndex < 0 {
-		return
-	}
-
-	// 计算绘制原点（应用 CenterOffset）
-	// UI 坐标不需要摄像机转换
-	screenX := pos.X - reanim.CenterOffsetX*scale
-	screenY := pos.Y - reanim.CenterOffsetY*scale
-
-	// 遍历所有轨道并渲染部件
-	for _, track := range reanim.AnimTracks {
-		if len(track.Frames) == 0 {
-			continue
-		}
-
-		// 获取当前帧的变换
-		if physicalIndex >= len(track.Frames) {
-			continue
-		}
-
-		transform := track.Frames[physicalIndex]
-
-		// 获取部件图片
-		partImage, exists := reanim.PartImages[track.Name]
-		if !exists || partImage == nil {
-			continue
-		}
-
-		// 构建变换矩阵
-		op := &ebiten.DrawImageOptions{}
-
-		// 1. 锚点偏移（图片左上角移动到锚点）
-		imgWidth := float64(partImage.Bounds().Dx())
-		imgHeight := float64(partImage.Bounds().Dy())
-		op.GeoM.Translate(-imgWidth/2, -imgHeight/2) // 图片中心作为锚点
-
-		// 2. 应用部件变换
-		if transform.ScaleX != nil && transform.ScaleY != nil {
-			op.GeoM.Scale(*transform.ScaleX, *transform.ScaleY)
-		}
-		// Note: Reanim Frame 没有 RotZ 字段，旋转通过 SkewX/SkewY 实现
-		if transform.X != nil && transform.Y != nil {
-			op.GeoM.Translate(float64(*transform.X), float64(*transform.Y))
-		}
-
-		// 3. 应用额外的缩放（卡片缩放）
-		op.GeoM.Scale(scale, scale)
-
-		// 4. 移动到最终位置
-		op.GeoM.Translate(screenX, screenY)
-
-		// 应用透明度
-		op.ColorScale.ScaleAlpha(float32(alpha))
-
-		// 渲染部件
-		screen.DrawImage(partImage, op)
-	}
-}
 
 // findPhysicalFrameIndex 将逻辑帧号映射到物理帧索引（简化版）。
 func (rprs *RewardPanelRenderSystem) findPhysicalFrameIndex(reanim *components.ReanimComponent, logicalFrameNum int) int {
