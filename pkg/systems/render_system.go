@@ -623,6 +623,125 @@ func (s *RenderSystem) DrawParticles(screen *ebiten.Image, cameraX float64) {
 	renderBatches(true)
 }
 
+// DrawGameWorldParticles 只渲染游戏世界的粒子（过滤掉 UI 粒子）
+// 用于 GameScene Layer 6，确保 UI 粒子（如奖励动画）由各自的系统管理
+//
+// 参数:
+//   - screen: 绘制目标屏幕
+//   - cameraX: 摄像机的世界坐标X位置
+func (s *RenderSystem) DrawGameWorldParticles(screen *ebiten.Image, cameraX float64) {
+	// 查询所有拥有 ParticleComponent 和 PositionComponent 的实体
+	entities := ecs.GetEntitiesWith2[
+		*components.PositionComponent,
+		*components.ParticleComponent,
+	](s.entityManager)
+
+	if len(entities) == 0 {
+		return
+	}
+
+	// 过滤掉 UI 粒子
+	gameWorldEntities := make([]ecs.EntityID, 0, len(entities))
+	for _, id := range entities {
+		_, isUIParticle := ecs.GetComponent[*components.UIComponent](s.entityManager, id)
+		if !isUIParticle {
+			gameWorldEntities = append(gameWorldEntities, id)
+		}
+	}
+
+	if len(gameWorldEntities) == 0 {
+		return
+	}
+
+	// 使用相同的批量渲染逻辑
+	type renderBatch struct {
+		image    *ebiten.Image
+		additive bool
+		entities []ecs.EntityID
+	}
+
+	type batchKey struct {
+		img      *ebiten.Image
+		additive bool
+	}
+
+	batches := make(map[batchKey]*renderBatch)
+
+	for _, id := range gameWorldEntities {
+		particle, hasParticle := ecs.GetComponent[*components.ParticleComponent](s.entityManager, id)
+		if !hasParticle || particle.Image == nil {
+			continue
+		}
+
+		key := batchKey{img: particle.Image, additive: particle.Additive}
+		batch, exists := batches[key]
+		if !exists {
+			batch = &renderBatch{
+				image:    particle.Image,
+				additive: particle.Additive,
+				entities: make([]ecs.EntityID, 0),
+			}
+			batches[key] = batch
+		}
+		batch.entities = append(batch.entities, id)
+	}
+
+	renderBatches := func(targetAdditive bool) {
+		for _, batch := range batches {
+			if batch.additive != targetAdditive {
+				continue
+			}
+
+			s.particleVertices = s.particleVertices[:0]
+			s.particleIndices = s.particleIndices[:0]
+
+			for _, id := range batch.entities {
+				pos, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, id)
+				particle, hasParticle := ecs.GetComponent[*components.ParticleComponent](s.entityManager, id)
+
+				if !hasPos || !hasParticle {
+					continue
+				}
+
+				vertices := s.buildParticleVertices(particle, pos, cameraX)
+				if len(vertices) != 4 {
+					continue
+				}
+
+				baseIndex := uint16(len(s.particleVertices))
+				s.particleVertices = append(s.particleVertices, vertices...)
+				s.particleIndices = append(s.particleIndices,
+					baseIndex+0, baseIndex+1, baseIndex+2,
+					baseIndex+1, baseIndex+3, baseIndex+2,
+				)
+			}
+
+			if len(s.particleVertices) == 0 {
+				continue
+			}
+
+			op := &ebiten.DrawTrianglesOptions{}
+			op.AntiAlias = true
+
+			if batch.additive {
+				op.Blend = ebiten.Blend{
+					BlendFactorSourceRGB:        ebiten.BlendFactorOne,
+					BlendFactorDestinationRGB:   ebiten.BlendFactorOne,
+					BlendOperationRGB:           ebiten.BlendOperationAdd,
+					BlendFactorSourceAlpha:      ebiten.BlendFactorOne,
+					BlendFactorDestinationAlpha: ebiten.BlendFactorOne,
+					BlendOperationAlpha:         ebiten.BlendOperationAdd,
+				}
+			}
+
+			screen.DrawTriangles(s.particleVertices, s.particleIndices, batch.image, op)
+		}
+	}
+
+	renderBatches(false)
+	renderBatches(true)
+}
+
 // buildParticleVertices 为单个粒子生成顶点数组
 //
 // 生成顺序：

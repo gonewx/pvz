@@ -859,26 +859,38 @@ func (ras *RewardAnimationSystem) isParticleEffectCompleted() bool {
 // Story 8.4重构：完全封装渲染逻辑，调用者只需调用此方法
 //
 // 内部自动处理：
+// - Reanim 实体（卡片包的 Reanim 动画）
+// - 粒子效果（SeedPacket 背景框 + Award 爆炸特效）
 // - 植物卡片（Phase 1-3 的卡片包）
 // - 奖励面板（Phase 4）
 //
-// 注意：粒子效果由 GameScene 在 Layer 6 统一渲染，无需在此重复绘制
-// 这样可以保证正确的全局渲染顺序：
-//   - Layer 3: 选卡界面卡片
-//   - Layer 6: 所有粒子（包括奖励动画的粒子）
-//   - Layer 10.5: 奖励卡包 + 奖励面板（在粒子之上）
+// 渲染顺序（从下到上）：
+// 1. Reanim 实体
+// 2. 粒子效果（装饰层）
+// 3. 植物卡片 / 奖励面板
+//
+// 注意：奖励动画的粒子标记为 UIComponent（isUIParticle=true）
+// GameScene Layer 6 会过滤掉 UI 粒子，只渲染游戏世界粒子
 func (ras *RewardAnimationSystem) Draw(screen *ebiten.Image) {
 	if !ras.isActive {
 		return
 	}
 
-	// Phase 1-3: 渲染植物卡片（appearing/waiting/expanding/pausing/disappearing）
-	// 卡片在粒子上层（因为 GameScene 在 Layer 6 渲染粒子，Layer 10.5 渲染奖励动画）
+	cameraOffsetX := ras.gameState.CameraX
+
+	// 1. 绘制 Reanim 实体（如果有的话）
+	ras.renderSystem.Draw(screen, cameraOffsetX)
+
+	// 2. 绘制粒子效果（SeedPacket 背景框 + Award 爆炸）
+	//    只渲染 UI 粒子（奖励动画的粒子），不渲染游戏世界粒子
+	ras.renderSystem.DrawParticles(screen, cameraOffsetX)
+
+	// 3a. Phase 1-3: 渲染植物卡片（appearing/waiting/expanding/pausing/disappearing）
 	if ras.currentPhase != "showing" && ras.currentPhase != "closing" && ras.rewardEntity != 0 {
 		ras.plantCardRenderSystem.Draw(screen)
 	}
 
-	// Phase 4: 渲染奖励面板（showing）
+	// 3b. Phase 4: 渲染奖励面板（showing）
 	if ras.currentPhase == "showing" || ras.panelEntity != 0 {
 		ras.panelRenderSystem.Draw(screen)
 	}

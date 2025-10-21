@@ -819,9 +819,9 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	s.drawSunCounter(screen)
 
 	// Layer 6: Draw particle effects (Story 7.3)
-	// 粒子效果在UI和游戏世界之间，提供视觉特效（爆炸、溅射等）
-	// 粒子应该覆盖植物卡片和游戏实体，但在植物预览和阳光之下
-	s.renderSystem.DrawParticles(screen, s.cameraX)
+	// 只渲染游戏世界的粒子（爆炸、溅射等），过滤掉 UI 粒子
+	// UI 粒子（如奖励动画）由各自的系统在更高层级渲染
+	s.renderSystem.DrawGameWorldParticles(screen, s.cameraX)
 
 	// Layer 7: Draw plant preview (Story 3.2)
 	// 拖拽预览在所有内容上方
