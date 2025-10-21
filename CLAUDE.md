@@ -378,6 +378,136 @@ entities.RenderPlantCard(
 
 **相关文档**：`docs/stories/8.4.story.md`
 
+## 植物选择栏模块化架构（架构优化）
+
+### 概述
+
+植物选择栏作为游戏的核心 UI 模块，已通过 `PlantSelectionModule` 实现模块化封装，遵循 ECS 架构的"高内聚、低耦合"原则。
+
+### 设计原则
+
+1. **高内聚** - 所有选卡相关功能（选择、取消、冷却、渲染）封装在单一模块中
+2. **低耦合** - 通过清晰的接口与其他系统交互，不直接访问外部系统
+3. **可复用** - 支持在不同场景（游戏中、选卡界面、图鉴）使用
+
+### 架构对比
+
+#### ❌ 旧架构（已重构前）
+```
+GameScene
+  ├── 直接创建 PlantCardEntity (耦合)
+  ├── PlantCardSystem (更新状态)
+  └── PlantCardRenderSystem (渲染)
+```
+**问题**：
+- 职责分散在多处
+- GameScene 直接管理卡片创建
+- 难以复用到其他场景
+
+#### ✅ 新架构（当前）
+```
+PlantSelectionModule
+  ├── PlantSelectionSystem (选卡逻辑)
+  ├── PlantCardSystem (卡片状态)
+  └── PlantCardRenderSystem (渲染)
+
+GameScene 通过模块接口调用：
+  ├── plantSelectionModule.Update()
+  └── plantSelectionModule.Draw()
+```
+**优点**：
+- ✅ 所有功能封装在模块内
+- ✅ GameScene 只通过接口交互
+- ✅ 可轻松移植到其他场景
+
+### 组件和系统映射
+
+| 组件 | 系统 | 职责 |
+|------|------|------|
+| PlantSelectionComponent | PlantSelectionSystem | 管理选择列表、确认状态 |
+| PlantCardComponent | PlantCardSystem | 更新卡片冷却、可用性 |
+| PlantCardComponent | PlantCardRenderSystem | 渲染卡片（背景、图标、遮罩） |
+| PositionComponent | InputSystem | 处理点击事件 |
+
+### 使用示例
+
+#### 初始化模块
+
+```go
+// 在 GameScene.initPlantCardSystems() 中
+plantSelectionModule, err := modules.NewPlantSelectionModule(
+    entityManager,
+    gameState,
+    resourceManager,
+    reanimSystem,
+    levelConfig,        // 从关卡配置读取可用植物
+    plantCardFont,
+    SeedBankX,
+    SeedBankY,
+)
+```
+
+#### 更新和渲染
+
+```go
+// 在 GameScene.Update() 中
+func (s *GameScene) Update(dt float64) {
+    if s.plantSelectionModule != nil {
+        s.plantSelectionModule.Update(dt)
+    }
+}
+
+// 在 GameScene.Draw() 中
+func (s *GameScene) Draw(screen *ebiten.Image) {
+    if s.plantSelectionModule != nil {
+        s.plantSelectionModule.Draw(screen)
+    }
+}
+```
+
+#### 获取选择结果
+
+```go
+// 获取玩家选择的植物列表
+selectedPlants := plantSelectionModule.GetSelectedPlants()
+// 返回：[]string{"peashooter", "sunflower", "wallnut"}
+```
+
+### 代码位置
+
+**模块位置**: `pkg/modules/plant_selection_module.go`
+
+**核心方法**:
+- `NewPlantSelectionModule()` - 创建模块实例
+- `Update(deltaTime)` - 更新所有子系统
+- `Draw(screen)` - 渲染所有植物卡片
+- `GetSelectedPlants()` - 获取选择结果
+- `Cleanup()` - 清理资源
+
+**使用场景**:
+- **GameScene** - 游戏中的植物选择栏（当前）
+- **PlantSelectionScene** - 关卡开始前的选卡界面（Epic 8 待实现）
+- **图鉴界面** - 展示所有植物（未来扩展）
+- **商店界面** - 购买新植物（未来扩展）
+
+### 扩展性
+
+**未来支持的新功能**：
+- 图鉴界面：创建 `PlantAlmanacScene`，使用 `PlantSelectionModule` 管理卡片显示
+- 商店界面：创建 `ShopScene`，使用 `PlantSelectionModule` 管理卡片购买
+- 对战选择：创建 `BattleSelectScene`，使用 `PlantSelectionModule` 管理卡片选择
+
+**统一模式**：
+```go
+// 所有使用植物卡片的场景都采用相同模式：
+module := modules.NewPlantSelectionModule(...)
+module.Update(dt)
+module.Draw(screen)
+selectedPlants := module.GetSelectedPlants()
+```
+
+**相关文档**：Sprint Change Proposal - 植物选择栏架构一致性审查
+
 ## 粒子系统渲染层级管理（Story 8.5）
 
 ### 问题背景

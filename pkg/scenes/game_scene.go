@@ -9,8 +9,8 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/decker502/pvz/pkg/modules"
 	"github.com/decker502/pvz/pkg/systems"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -103,9 +103,15 @@ type GameScene struct {
 	reanimSystem        *systems.ReanimSystem
 	sunCollectionSystem *systems.SunCollectionSystem
 
-	// Story 3.1: Plant Card Systems
-	plantCardSystem       *systems.PlantCardSystem
-	plantCardRenderSystem *systems.PlantCardRenderSystem
+	// 植物选择栏模块（Story 3.1 架构优化：封装所有选卡功能）
+	// 替代原有的分散系统：
+	//   - plantCardSystem       *systems.PlantCardSystem       (已移至模块内部)
+	//   - plantCardRenderSystem *systems.PlantCardRenderSystem (已移至模块内部)
+	// 优点：
+	//   - 高内聚：所有选卡功能封装在单一模块中
+	//   - 低耦合：通过清晰的接口与其他系统交互
+	//   - 可复用：支持在不同场景（游戏中、选卡界面、图鉴）使用
+	plantSelectionModule *modules.PlantSelectionModule
 
 	// Story 3.2: Plant Preview Systems
 	plantPreviewSystem       *systems.PlantPreviewSystem
@@ -374,60 +380,48 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	return scene
 }
 
-// initPlantCardSystems initializes the plant card systems and creates plant card entities.
-// Story 3.1: Plant Card UI and State
-// Story 8.1: 根据关卡配置创建植物卡片
+// initPlantCardSystems initializes the plant selection module.
+// Story 3.1 架构优化：使用 PlantSelectionModule 统一管理所有选卡功能
 // Story 8.3: 使用 PlantUnlockManager 统一管理植物可用性
+//
+// 重构说明：
+//   - 旧方式：直接在 GameScene 中创建卡片实体和系统（分散）
+//   - 新方式：使用 PlantSelectionModule 统一封装（内聚）
+//
+// 优点：
+//   - 高内聚：所有选卡功能封装在单一模块中
+//   - 低耦合：GameScene 只通过模块接口交互
+//   - 可复用：模块可在不同场景（游戏中、选卡界面）使用
 func (s *GameScene) initPlantCardSystems(rm *game.ResourceManager) {
-	// Story 8.3: 通过 PlantUnlockManager 统一获取可用植物列表（方案 A）
-	availablePlants := s.gameState.GetPlantUnlockManager().GetAvailablePlantsForLevel(s.gameState.CurrentLevel)
-	log.Printf("[GameScene] Creating %d plant cards: %v", len(availablePlants), availablePlants)
-
-	// 植物名称到类型的映射
-	plantTypeMap := map[string]components.PlantType{
-		"sunflower":  components.PlantSunflower,
-		"peashooter": components.PlantPeashooter,
-		"wallnut":    components.PlantWallnut,
-		"cherrybomb": components.PlantCherryBomb,
-	}
-
-	// 计算第一张卡片的位置
-	firstCardX := float64(SeedBankX + PlantCardStartOffsetX)
-	cardY := float64(SeedBankY + PlantCardOffsetY)
-
-	// 根据配置创建植物卡片
-	for i, plantName := range availablePlants {
-		plantType, ok := plantTypeMap[plantName]
-		if !ok {
-			log.Printf("Warning: Unknown plant type '%s' in level config, skipping", plantName)
-			continue
-		}
-
-		// 计算卡片位置（水平排列）
-		cardX := firstCardX + float64(i)*PlantCardSpacing
-
-		// 创建卡片
-		_, err := entities.NewPlantCardEntity(s.entityManager, rm, s.reanimSystem, plantType, cardX, cardY, PlantCardScale)
-		if err != nil {
-			log.Printf("Warning: Failed to create %s card: %v", plantName, err)
-			// 继续执行，游戏在没有卡片的情况下也能运行（用于测试环境）
+	// Story 8.3: 获取当前关卡配置
+	// 注意：CurrentLevel 从 GameState.LoadLevel() 加载
+	levelConfig := s.gameState.CurrentLevel
+	if levelConfig == nil {
+		log.Printf("[GameScene] Warning: No level config found, using default plant cards")
+		levelConfig = &config.LevelConfig{
+			AvailablePlants: []string{"sunflower", "peashooter", "wallnut", "cherrybomb"},
 		}
 	}
 
-	// Initialize PlantCardSystem
-	s.plantCardSystem = systems.NewPlantCardSystem(
+	// 创建植物选择栏模块
+	var err error
+	s.plantSelectionModule, err = modules.NewPlantSelectionModule(
 		s.entityManager,
 		s.gameState,
 		rm,
+		s.reanimSystem,
+		levelConfig,
+		s.plantCardFont,
+		SeedBankX,
+		SeedBankY,
 	)
+	if err != nil {
+		log.Printf("[GameScene] Error: Failed to initialize plant selection module: %v", err)
+		// 游戏可在没有卡片的情况下运行（用于测试环境）
+		return
+	}
 
-	// Initialize PlantCardRenderSystem (Story 6.3 + 8.4: 配置内部封装)
-	// 所有内部配置（图标缩放、偏移等）从 config.plant_card_config.go 读取
-	// Draw() 方法会自动过滤掉奖励卡片（有 RewardCardComponent 的卡片）
-	s.plantCardRenderSystem = systems.NewPlantCardRenderSystem(
-		s.entityManager,
-		s.plantCardFont, // 阳光数字字体
-	)
+	log.Printf("[GameScene] Plant selection module initialized successfully")
 }
 
 // loadResources loads all UI images required for the game scene.
@@ -712,7 +706,12 @@ func (s *GameScene) Update(deltaTime float64) {
 	s.levelSystem.Update(deltaTime)                // 0. Update level system (Story 5.5: wave spawning, victory/defeat)
 	s.rewardSystem.Update(deltaTime)               // 0.1. Update reward animation system (Story 8.3: 卡片包动画)
 	s.zombieLaneTransitionSystem.Update(deltaTime) // 0.5. Update zombie lane transitions (move to target lane before attacking)
-	s.plantCardSystem.Update(deltaTime)            // 1. Update plant card states (before input)
+
+	// Story 3.1 架构优化：使用模块化方式更新植物选择栏
+	if s.plantSelectionModule != nil {
+		s.plantSelectionModule.Update(deltaTime) // 1. Update plant card states (before input)
+	}
+
 	s.inputSystem.Update(deltaTime, s.cameraX)     // 2. Process player input (highest priority, 传递摄像机位置)
 
 	// 3. Generate new suns
@@ -802,9 +801,11 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	s.drawSeedBank(screen)
 	s.drawShovel(screen)
 
-	// Layer 3: Draw plant cards (Story 3.1)
+	// Layer 3: Draw plant cards (Story 3.1 架构优化)
 	// 在植物和僵尸下方渲染，符合原版PVZ设计
-	s.plantCardRenderSystem.Draw(screen)
+	if s.plantSelectionModule != nil {
+		s.plantSelectionModule.Draw(screen)
+	}
 
 	// Layer 4: Draw game world entities (plants, zombies, projectiles) - 不包括阳光
 	// 游戏实体在UI卡片上方，这样植物和僵尸可以被看清
