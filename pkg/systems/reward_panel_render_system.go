@@ -113,16 +113,16 @@ func (rprs *RewardPanelRenderSystem) drawBackground(screen *ebiten.Image, alpha 
 	log.Printf("[RewardPanelRenderSystem] Drawing background with alpha=%.2f", alpha)
 	// 绘制背景图（全屏）
 	op := &ebiten.DrawImageOptions{}
-	
+
 	// 缩放到屏幕尺寸
 	bgWidth, bgHeight := bgImage.Bounds().Dx(), bgImage.Bounds().Dy()
 	scaleX := rprs.screenWidth / float64(bgWidth)
 	scaleY := rprs.screenHeight / float64(bgHeight)
 	op.GeoM.Scale(scaleX, scaleY)
-	
+
 	// 应用透明度
 	op.ColorScale.ScaleAlpha(float32(alpha))
-	
+
 	screen.DrawImage(bgImage, op)
 }
 
@@ -150,7 +150,7 @@ func (rprs *RewardPanelRenderSystem) drawTitle(screen *ebiten.Image, alpha float
 	offsetY := (rprs.screenHeight - bgHeight) / 2
 
 	// 使用 TTF 字体渲染标题（使用配置中的颜色和位置，带阴影效果）
-	titleX := offsetX + bgWidth/2                   // 背景中心X
+	titleX := offsetX + bgWidth/2                         // 背景中心X
 	titleY := offsetY + bgHeight*config.RewardPanelTitleY // 使用配置的Y位置
 
 	// 1. 先绘制阴影（黑色，稍微偏移）
@@ -165,8 +165,8 @@ func (rprs *RewardPanelRenderSystem) drawTitle(screen *ebiten.Image, alpha float
 	// 2. 再绘制主文字（橙黄色）
 	op := &text.DrawOptions{}
 	op.GeoM.Translate(titleX, titleY)
-	op.PrimaryAlign = text.AlignCenter   // 水平居中
-	op.SecondaryAlign = text.AlignStart  // 垂直从上开始
+	op.PrimaryAlign = text.AlignCenter                         // 水平居中
+	op.SecondaryAlign = text.AlignStart                        // 垂直从上开始
 	op.ColorScale.ScaleWithColor(config.RewardPanelTitleColor) // 使用配置的橙黄色
 	op.ColorScale.ScaleAlpha(float32(alpha))
 	text.Draw(screen, titleText, rprs.titleFont, op)
@@ -175,10 +175,11 @@ func (rprs *RewardPanelRenderSystem) drawTitle(screen *ebiten.Image, alpha float
 // drawPlantCard 绘制植物卡片（独立渲染，不依赖外部系统）。
 // Story 8.4: 使用统一的植物卡片渲染函数
 func (rprs *RewardPanelRenderSystem) drawPlantCard(screen *ebiten.Image, panel *components.RewardPanelComponent) {
-	log.Printf("[RewardPanelRenderSystem] drawPlantCard called, alpha=%.2f", panel.FadeAlpha)
-
-	if panel.FadeAlpha < 0.3 {
-		log.Printf("[RewardPanelRenderSystem] Skipping card draw, alpha too low: %.2f", panel.FadeAlpha)
+	log.Printf("[DEBUG] drawPlantCard: plantID=%s, alpha=%.2f", panel.PlantID, panel.FadeAlpha)
+	
+	// 降低透明度阈值，让卡片更早显示（与面板淡入同步）
+	if panel.FadeAlpha < 0.01 {
+		log.Printf("[DEBUG] drawPlantCard: alpha too low, skipping")
 		return // 透明度太低时不绘制
 	}
 
@@ -188,6 +189,7 @@ func (rprs *RewardPanelRenderSystem) drawPlantCard(screen *ebiten.Image, panel *
 		log.Printf("[RewardPanelRenderSystem] Unknown plant ID: %s", panel.PlantID)
 		return
 	}
+	log.Printf("[DEBUG] drawPlantCard: plantType=%d", plantType)
 	log.Printf("[RewardPanelRenderSystem] Plant type: %d, ID: %s", plantType, panel.PlantID)
 
 	// 计算卡片缩放因子和位置
@@ -356,16 +358,17 @@ func (rprs *RewardPanelRenderSystem) getPlantType(plantID string) components.Pla
 }
 
 // getReanimName 根据 PlantType 获取 Reanim 名称
+// 注意：必须与 ResourceManager.LoadReanimResources() 中的名称完全一致
 func (rprs *RewardPanelRenderSystem) getReanimName(plantType components.PlantType) string {
 	switch plantType {
 	case components.PlantSunflower:
-		return "Sunflower"
+		return "SunFlower" // 修复：与资源加载时的名称一致
 	case components.PlantPeashooter:
-		return "Peashooter"
+		return "PeaShooter" // 修复：与资源加载时的名称一致
 	case components.PlantCherryBomb:
 		return "CherryBomb"
 	case components.PlantWallnut:
-		return "WallNut"
+		return "Wallnut" // 修复：与资源加载时的名称一致（小写n）
 	default:
 		return ""
 	}
@@ -381,7 +384,7 @@ func (rprs *RewardPanelRenderSystem) drawPlantInfo(screen *ebiten.Image, panel *
 		offsetY := (rprs.screenHeight - bgHeight) / 2
 
 		// 绘制植物名称（使用配置中的颜色和位置，带阴影效果）
-		nameX := offsetX + bgWidth/2 // 背景中心X
+		nameX := offsetX + bgWidth/2                             // 背景中心X
 		nameY := offsetY + bgHeight*config.RewardPanelPlantNameY // 使用配置的Y位置
 
 		if panel.PlantName != "" {
@@ -397,22 +400,22 @@ func (rprs *RewardPanelRenderSystem) drawPlantInfo(screen *ebiten.Image, panel *
 			// 2. 再绘制主文字（金黄色）
 			op := &text.DrawOptions{}
 			op.GeoM.Translate(nameX, nameY)
-			op.PrimaryAlign = text.AlignCenter   // 水平居中
-			op.SecondaryAlign = text.AlignStart  // 垂直从上开始
+			op.PrimaryAlign = text.AlignCenter                             // 水平居中
+			op.SecondaryAlign = text.AlignStart                            // 垂直从上开始
 			op.ColorScale.ScaleWithColor(config.RewardPanelPlantNameColor) // 使用配置的金黄色
 			op.ColorScale.ScaleAlpha(float32(panel.FadeAlpha))
 			text.Draw(screen, panel.PlantName, rprs.plantInfoFont, op)
 		}
 
 		// 绘制植物描述（使用配置中的颜色和位置，使用植物信息字体）
-		descX := offsetX + bgWidth/2 // 背景中心X
+		descX := offsetX + bgWidth/2                               // 背景中心X
 		descY := offsetY + bgHeight*config.RewardPanelDescriptionY // 使用配置的Y位置
 
 		if panel.PlantDescription != "" {
 			op := &text.DrawOptions{}
 			op.GeoM.Translate(descX, descY)
-			op.PrimaryAlign = text.AlignCenter   // 水平居中
-			op.SecondaryAlign = text.AlignStart  // 垂直从上开始
+			op.PrimaryAlign = text.AlignCenter                               // 水平居中
+			op.SecondaryAlign = text.AlignStart                              // 垂直从上开始
 			op.ColorScale.ScaleWithColor(config.RewardPanelDescriptionColor) // 使用配置的深蓝黑色
 			op.ColorScale.ScaleAlpha(float32(panel.FadeAlpha))
 			text.Draw(screen, panel.PlantDescription, rprs.plantInfoFont, op) // 使用植物信息字体（与植物名称一样大）
@@ -439,7 +442,7 @@ func (rprs *RewardPanelRenderSystem) drawHint(screen *ebiten.Image, alpha float6
 	hintY := rprs.screenHeight * 0.85
 
 	op := &text.DrawOptions{}
-	op.GeoM.Translate(hintX-70, hintY) // 居中偏移
+	op.GeoM.Translate(hintX-70, hintY)                           // 居中偏移
 	op.ColorScale.ScaleWithColor(color.RGBA{200, 200, 200, 255}) // 灰白色
 	op.ColorScale.ScaleAlpha(float32(alpha))
 	text.Draw(screen, hintText, rprs.plantInfoFont, op)
@@ -497,8 +500,8 @@ func (rprs *RewardPanelRenderSystem) drawNextLevelButton(screen *ebiten.Image, a
 		// 2. 再绘制主文字（橙黄色）
 		textOp := &text.DrawOptions{}
 		textOp.GeoM.Translate(buttonX, buttonY)
-		textOp.PrimaryAlign = text.AlignCenter  // 水平居中
-		textOp.SecondaryAlign = text.AlignCenter // 垂直居中
+		textOp.PrimaryAlign = text.AlignCenter                              // 水平居中
+		textOp.SecondaryAlign = text.AlignCenter                            // 垂直居中
 		textOp.ColorScale.ScaleWithColor(config.RewardPanelButtonTextColor) // 使用配置的橙黄色
 		textOp.ColorScale.ScaleAlpha(float32(alpha))
 		text.Draw(screen, buttonText, rprs.buttonFont, textOp)
@@ -524,13 +527,12 @@ func (rprs *RewardPanelRenderSystem) drawFallbackButton(screen *ebiten.Image, al
 	if rprs.titleFont != nil {
 		buttonText := "下一关"
 		op := &text.DrawOptions{}
-		op.GeoM.Translate(buttonX-30, buttonY-10) // 居中偏移
+		op.GeoM.Translate(buttonX-30, buttonY-10)                    // 居中偏移
 		op.ColorScale.ScaleWithColor(color.RGBA{255, 255, 255, 255}) // 白色文字
 		op.ColorScale.ScaleAlpha(float32(alpha))
 		text.Draw(screen, buttonText, rprs.titleFont, op)
 	}
 }
-
 
 // findPhysicalFrameIndex 将逻辑帧号映射到物理帧索引（简化版）。
 func (rprs *RewardPanelRenderSystem) findPhysicalFrameIndex(reanim *components.ReanimComponent, logicalFrameNum int) int {

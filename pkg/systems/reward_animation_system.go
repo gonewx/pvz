@@ -77,28 +77,38 @@ type RewardAnimationSystem struct {
 	screenWidth     float64
 	screenHeight    float64
 
-	// Story 8.4重构：内部封装渲染系统，调用者无需关心
-	panelRenderSystem *RewardPanelRenderSystem // 奖励面板渲染系统（内部使用）
+	// Story 8.4重构：内部封装所有渲染系统，调用者无需关心
+	panelRenderSystem     *RewardPanelRenderSystem // 奖励面板渲染系统（内部使用）
+	plantCardRenderSystem *PlantCardRenderSystem   // 植物卡片渲染系统（内部使用，渲染Phase 1-3的卡片包）
 }
 
 // NewRewardAnimationSystem 创建新的奖励动画系统。
 func NewRewardAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.ResourceManager, reanimSys *ReanimSystem, particleSys *ParticleSystem) *RewardAnimationSystem {
-	// Story 8.4重构：内部创建RewardPanelRenderSystem，调用者无需关心
+	// Story 8.4重构：内部创建所有渲染系统，调用者无需关心
 	panelRenderSystem := NewRewardPanelRenderSystem(em, gs, rm, reanimSys)
 
+	// 创建植物卡片渲染系统（用于渲染 Phase 1-3 的卡片包）
+	sunFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.PlantCardSunCostFontSize)
+	if err != nil {
+		log.Printf("[RewardAnimationSystem] Warning: Failed to load sun cost font: %v", err)
+		sunFont = nil
+	}
+	plantCardRenderSystem := NewPlantCardRenderSystem(em, sunFont)
+
 	return &RewardAnimationSystem{
-		entityManager:     em,
-		gameState:         gs,
-		resourceManager:   rm,
-		reanimSystem:      reanimSys,
-		particleSystem:    particleSys,
-		rewardEntity:      0,
-		panelEntity:       0,
-		glowEntity:        0,
-		isActive:          false,
-		screenWidth:       800, // TODO: 从配置获取
-		screenHeight:      600,
-		panelRenderSystem: panelRenderSystem, // 内部封装
+		entityManager:         em,
+		gameState:             gs,
+		resourceManager:       rm,
+		reanimSystem:          reanimSys,
+		particleSystem:        particleSys,
+		rewardEntity:          0,
+		panelEntity:           0,
+		glowEntity:            0,
+		isActive:              false,
+		screenWidth:           800, // TODO: 从配置获取
+		screenHeight:          600,
+		panelRenderSystem:     panelRenderSystem,     // 内部封装
+		plantCardRenderSystem: plantCardRenderSystem, // 内部封装
 	}
 }
 
@@ -847,14 +857,22 @@ func (ras *RewardAnimationSystem) isParticleEffectCompleted() bool {
 // Story 8.4重构：完全封装渲染逻辑，调用者只需调用此方法
 //
 // 内部自动处理：
-// - Phase 1-3: 渲染卡片包（通过RenderSystem，已在主场景的DrawGameWorld中处理）
-// - Phase 4: 渲染奖励面板（内部调用panelRenderSystem）
+// - Phase 1-3: 渲染卡片包（通过内部 plantCardRenderSystem）
+// - Phase 4: 渲染奖励面板（通过内部 panelRenderSystem）
 //
-// 注意：卡片包和粒子效果通过ECS组件系统自动渲染，无需在此处理
+// 渲染顺序：卡片包在粒子之后渲染，确保卡片不被粒子遮挡
 func (ras *RewardAnimationSystem) Draw(screen *ebiten.Image) {
-	// 只在 showing 阶段渲染奖励面板
-	// 其他阶段（appearing/waiting/expanding等）的渲染由主RenderSystem自动处理
-	if ras.currentPhase == "showing" || (ras.panelEntity != 0) {
+	if !ras.isActive {
+		return
+	}
+
+	// Phase 1-3: 渲染卡片包（appearing/waiting/expanding/pausing/disappearing）
+	if ras.currentPhase != "showing" && ras.currentPhase != "closing" && ras.rewardEntity != 0 {
+		ras.plantCardRenderSystem.Draw(screen)
+	}
+
+	// Phase 4: 渲染奖励面板（showing）
+	if ras.currentPhase == "showing" || ras.panelEntity != 0 {
 		ras.panelRenderSystem.Draw(screen)
 	}
 }

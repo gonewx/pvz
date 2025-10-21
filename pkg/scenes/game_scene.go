@@ -144,10 +144,10 @@ type GameScene struct {
 	// Story 8.3: Camera and Opening Animation Systems
 	cameraSystem  *systems.CameraSystem           // 镜头控制系统（镜头移动、缓动）
 	openingSystem *systems.OpeningAnimationSystem // 开场动画系统（僵尸预告、跳过）
-	rewardSystem  *systems.RewardAnimationSystem  // 奖励动画系统（关卡完成奖励）
 
-	// Story 8.4: Reward Panel Render System
-	rewardPanelRenderSystem *systems.RewardPanelRenderSystem // 奖励面板渲染系统（新植物介绍）
+	// Story 8.3 + 8.4重构: Reward Animation System (完全封装奖励流程)
+	// 内部自动管理卡片包动画、粒子效果、奖励面板渲染等所有细节
+	rewardSystem *systems.RewardAnimationSystem
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -320,13 +320,10 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	scene.particleSystem = systems.NewParticleSystem(scene.entityManager, scene.resourceManager)
 	log.Printf("[GameScene] Initialized particle system for visual effects")
 
-	// Story 8.3: Create RewardAnimationSystem (需要 ReanimSystem 和 ParticleSystem)
+	// Story 8.3 + 8.4重构: Create RewardAnimationSystem (完全封装，无需单独创建面板渲染系统)
+	// RewardAnimationSystem内部自动创建和管理RewardPanelRenderSystem
 	scene.rewardSystem = systems.NewRewardAnimationSystem(scene.entityManager, scene.gameState, rm, scene.reanimSystem, scene.particleSystem)
-	log.Printf("[GameScene] Initialized reward animation system")
-
-	// Story 8.4: Create RewardPanelRenderSystem (新植物介绍面板渲染)
-	scene.rewardPanelRenderSystem = systems.NewRewardPanelRenderSystem(scene.entityManager, scene.gameState, rm, scene.reanimSystem)
-	log.Printf("[GameScene] Initialized reward panel render system")
+	log.Printf("[GameScene] Initialized reward animation system (fully encapsulated)")
 
 	// Story 8.3: Create OpeningAnimationSystem (conditionally, may return nil)
 	scene.openingSystem = systems.NewOpeningAnimationSystem(scene.entityManager, scene.gameState, rm, levelConfig, scene.cameraSystem, scene.reanimSystem)
@@ -849,9 +846,9 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	s.drawLastWaveWarning(screen)
 
 	// Layer 10.5: Draw reward panel (Story 8.3 + 8.4)
-	// 奖励面板（关卡完成后显示新植物介绍）
-	// 在游戏结果覆盖层之前渲染，因为它是正常游戏流程的一部分
-	s.rewardPanelRenderSystem.Draw(screen)
+	// Story 8.4重构：RewardAnimationSystem完全封装奖励面板渲染
+	// 内部自动管理面板和植物卡片的渲染，调用者只需调用Draw方法
+	s.rewardSystem.Draw(screen)
 
 	// Story 8.3: 移除 "You Win" 覆盖层逻辑
 	// 奖励流程完成后通过"下一关"按钮进入下一关，不再显示 You Win
