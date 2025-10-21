@@ -866,8 +866,12 @@ func (ras *RewardAnimationSystem) isParticleEffectCompleted() bool {
 //
 // 渲染顺序（从下到上）：
 // 1. Reanim 实体
-// 2. 粒子效果
-// 3. 植物卡片 / 奖励面板
+// 2. 粒子效果（背景装饰层）
+// 3. 植物卡片（前景层，不被粒子遮挡）
+// 4. 奖励面板（最上层）
+//
+// 注意：此渲染顺序仅影响奖励动画内部元素，不影响 GameScene 的其他 UI
+// GameScene 的选卡界面卡片由 plantCardRenderSystem 在 Layer 3 独立渲染
 func (ras *RewardAnimationSystem) Draw(screen *ebiten.Image) {
 	if !ras.isActive {
 		return
@@ -879,14 +883,16 @@ func (ras *RewardAnimationSystem) Draw(screen *ebiten.Image) {
 	ras.renderSystem.Draw(screen, cameraOffsetX)
 
 	// 2. 绘制粒子效果（SeedPacket 背景框 + Award 爆炸）
+	//    粒子在卡片下层，作为背景装饰
 	ras.renderSystem.DrawParticles(screen, cameraOffsetX)
 
-	// 3a. Phase 1-3: 渲染植物卡片（appearing/waiting/expanding/pausing/disappearing）
+	// 3. Phase 1-3: 渲染植物卡片（appearing/waiting/expanding/pausing/disappearing）
+	//    卡片在粒子上层，确保植物图标清晰可见
 	if ras.currentPhase != "showing" && ras.currentPhase != "closing" && ras.rewardEntity != 0 {
 		ras.plantCardRenderSystem.Draw(screen)
 	}
 
-	// 3b. Phase 4: 渲染奖励面板（showing）
+	// 4. Phase 4: 渲染奖励面板（showing）
 	if ras.currentPhase == "showing" || ras.panelEntity != 0 {
 		ras.panelRenderSystem.Draw(screen)
 	}

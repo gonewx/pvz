@@ -26,6 +26,7 @@ type RewardPanelRenderSystem struct {
 	titleFont       *text.GoTextFace // 标题字体
 	plantInfoFont   *text.GoTextFace // 植物名称和描述字体
 	buttonFont      *text.GoTextFace // 按钮字体
+	sunCostFont     *text.GoTextFace // 阳光数字字体（用于卡片）
 
 	// 植物卡片实体映射：面板实体ID -> 卡片实体ID
 	plantCardEntities map[ecs.EntityID]ecs.EntityID
@@ -49,6 +50,13 @@ func NewRewardPanelRenderSystem(em *ecs.EntityManager, gs *game.GameState, rm *g
 		log.Printf("[RewardPanelRenderSystem] Warning: Failed to load button font: %v", err)
 	}
 
+	// 加载阳光数字字体（用于植物卡片）
+	sunCostFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.PlantCardSunCostFontSize)
+	if err != nil {
+		log.Printf("[RewardPanelRenderSystem] Warning: Failed to load sun cost font: %v", err)
+		sunCostFont = nil
+	}
+
 	return &RewardPanelRenderSystem{
 		entityManager:     em,
 		gameState:         gs,
@@ -59,6 +67,7 @@ func NewRewardPanelRenderSystem(em *ecs.EntityManager, gs *game.GameState, rm *g
 		titleFont:         titleFont,
 		plantInfoFont:     plantInfoFont,
 		buttonFont:        buttonFont,
+		sunCostFont:       sunCostFont,
 		plantCardEntities: make(map[ecs.EntityID]ecs.EntityID), // 初始化卡片实体映射
 	}
 }
@@ -230,13 +239,18 @@ func (rprs *RewardPanelRenderSystem) drawPlantCard(screen *ebiten.Image, panel *
 	tempCard.PlantIconTexture = plantIcon
 
 	// 调用统一渲染函数绘制卡片
+	// 从 GoTextFace 中提取 GoTextFaceSource
+	var sunFontSource *text.GoTextFaceSource
+	if rprs.sunCostFont != nil {
+		sunFontSource = rprs.sunCostFont.Source
+	}
 	entities.RenderPlantCard(
 		screen,
 		tempCard,
 		cardX,
 		cardY,
-		nil, // sunFont（不显示阳光数字）
-		0,   // sunFontSize
+		sunFontSource,                   // 阳光数字字体源
+		config.PlantCardSunCostFontSize, // 字体大小
 	)
 }
 

@@ -37,7 +37,7 @@ type VerifyGame struct {
 	gameState             *game.GameState
 	resourceManager       *game.ResourceManager
 	reanimSystem          *systems.ReanimSystem
-	particleSystem        *systems.ParticleSystem          // 粒子系统（用于光晕效果）
+	particleSystem        *systems.ParticleSystem // 粒子系统（用于光晕效果）
 	rewardSystem          *systems.RewardAnimationSystem
 	renderSystem          *systems.RenderSystem
 	plantCardRenderSystem *systems.PlantCardRenderSystem   // 植物卡片渲染系统（Story 8.4）
