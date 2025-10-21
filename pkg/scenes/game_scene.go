@@ -689,11 +689,14 @@ func (s *GameScene) Update(deltaTime float64) {
 	s.gameState.CameraX = s.cameraX
 
 	// Story 5.5: Check if game is over (win or lose)
-	// If game is over, stop updating game systems but allow rendering
+	// If game is over, stop updating game systems but allow reward animation to play
 	if s.gameState.IsGameOver {
-		// 游戏结束时不更新游戏系统，只保留渲染
-		// 这样玩家可以看到最终的游戏状态（僵尸位置、植物状态等）
-		return
+		// 游戏结束时仍然更新奖励系统和必要的动画系统
+		// 这样玩家可以看到完整的奖励动画流程
+		s.rewardSystem.Update(deltaTime)   // 奖励动画系统（卡片包动画）
+		s.reanimSystem.Update(deltaTime)   // Reanim 系统（植物卡片动画）
+		s.particleSystem.Update(deltaTime) // 粒子系统（光晕效果）
+		return // 停止其他游戏系统（僵尸移动、植物攻击等）
 	}
 
 	// Update all ECS systems in order (order matters for correct game logic)
