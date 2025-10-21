@@ -312,8 +312,13 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	scene.cameraSystem = systems.NewCameraSystem(scene.entityManager, scene.gameState)
 	log.Printf("[GameScene] Initialized camera system")
 
-	// Story 8.3: Create RewardAnimationSystem (需要 ReanimSystem)
-	scene.rewardSystem = systems.NewRewardAnimationSystem(scene.entityManager, scene.gameState, rm, scene.reanimSystem)
+	// Story 7.2: Initialize particle system (must be before RewardAnimationSystem)
+	// Story 7.4: Added ResourceManager parameter for loading particle images
+	scene.particleSystem = systems.NewParticleSystem(scene.entityManager, scene.resourceManager)
+	log.Printf("[GameScene] Initialized particle system for visual effects")
+
+	// Story 8.3: Create RewardAnimationSystem (需要 ReanimSystem 和 ParticleSystem)
+	scene.rewardSystem = systems.NewRewardAnimationSystem(scene.entityManager, scene.gameState, rm, scene.reanimSystem, scene.particleSystem)
 	log.Printf("[GameScene] Initialized reward animation system")
 
 	// Story 8.3: Create OpeningAnimationSystem (conditionally, may return nil)
@@ -331,11 +336,6 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	// 3. Create ZombieLaneTransitionSystem (僵尸行转换系统)
 	scene.zombieLaneTransitionSystem = systems.NewZombieLaneTransitionSystem(scene.entityManager)
 	log.Printf("[GameScene] Initialized zombie lane transition system")
-
-	// Story 7.2: Initialize particle system
-	// Story 7.4: Added ResourceManager parameter for loading particle images
-	scene.particleSystem = systems.NewParticleSystem(scene.entityManager, scene.resourceManager)
-	log.Printf("[GameScene] Initialized particle system for visual effects")
 
 	// 方案A+：Initialize flash effect system
 	scene.flashEffectSystem = systems.NewFlashEffectSystem(scene.entityManager)

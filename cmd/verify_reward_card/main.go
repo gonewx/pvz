@@ -88,7 +88,7 @@ func NewVerifyGame() (*VerifyGame, error) {
 	reanimSystem := systems.NewReanimSystem(em)
 	particleSystem := systems.NewParticleSystem(em, rm) // 粒子系统用于光晕效果
 	renderSystem := systems.NewRenderSystem(em)
-	rewardSystem := systems.NewRewardAnimationSystem(em, gs, rm, reanimSystem)
+	rewardSystem := systems.NewRewardAnimationSystem(em, gs, rm, reanimSystem, particleSystem)
 
 	// 创建植物卡片渲染系统（Story 8.4: 使用统一的植物卡片渲染）
 	// 加载阳光字体用于卡片渲染
@@ -238,6 +238,7 @@ func (vg *VerifyGame) reset() {
 		vg.gameState,
 		vg.resourceManager,
 		vg.reanimSystem,
+		vg.particleSystem,
 	)
 
 	vg.triggered = false
@@ -280,6 +281,25 @@ func (vg *VerifyGame) drawDebugInfo(screen *ebiten.Image) {
 
 		if posComp != nil {
 			debugText += fmt.Sprintf("位置: (%.1f, %.1f)\n", posComp.X, posComp.Y)
+
+			// 计算卡片在屏幕上的实际可见位置
+			screenX := posComp.X - vg.gameState.CameraX
+			debugText += fmt.Sprintf("屏幕位置: (%.1f, %.1f)\n", screenX, posComp.Y)
+
+			// 显示卡片中心位置（用于验证居中）
+			if cardComp, ok := ecs.GetComponent[*components.PlantCardComponent](vg.entityManager, rewardEntity); ok && cardComp.BackgroundImage != nil {
+				cardWidth := float64(cardComp.BackgroundImage.Bounds().Dx()) * cardComp.CardScale
+				cardHeight := float64(cardComp.BackgroundImage.Bounds().Dy()) * cardComp.CardScale
+				centerX := posComp.X + cardWidth/2.0
+				centerY := posComp.Y + cardHeight/2.0
+				screenCenterX := centerX - vg.gameState.CameraX
+				debugText += fmt.Sprintf("卡片尺寸: %.1fx%.1f (缩放: %.2f)\n", cardWidth, cardHeight, cardComp.CardScale)
+				debugText += fmt.Sprintf("卡片中心世界坐标: (%.1f, %.1f)\n", centerX, centerY)
+				debugText += fmt.Sprintf("卡片中心屏幕坐标: (%.1f, %.1f)\n", screenCenterX, centerY)
+				debugText += fmt.Sprintf("草坪中心世界X: %.1f, 屏幕宽度/2: %.1f\n",
+					config.GridWorldStartX+float64(config.GridColumns)*config.CellWidth/2.0,
+					float64(screenWidth)/2.0)
+			}
 		}
 
 		// 阶段说明
