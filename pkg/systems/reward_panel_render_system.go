@@ -74,10 +74,8 @@ func (rprs *RewardPanelRenderSystem) Draw(screen *ebiten.Image) {
 			continue
 		}
 
-		// 确保植物卡片实体存在（由 PlantCardRenderSystem 渲染）
-		rprs.ensurePlantCardEntity(entity, panelComp)
-
-		// 绘制奖励面板
+		// Story 8.4: 奖励面板作为独立模块，直接渲染所有元素
+		// 不再依赖外部 PlantCardRenderSystem
 		rprs.drawPanel(screen, entity, panelComp)
 	}
 }
