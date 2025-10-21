@@ -836,9 +836,10 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	// 在游戏结果覆盖层之前渲染，因为它是正常游戏流程的一部分
 	s.rewardPanelRenderSystem.Draw(screen)
 
-	// Layer 11: Draw game result overlay (Story 5.5)
-	// 胜利/失败界面（如果游戏结束）
-	s.drawGameResultOverlay(screen)
+	// Story 8.3: 移除 "You Win" 覆盖层逻辑
+	// 奖励流程完成后通过"下一关"按钮进入下一关，不再显示 You Win
+	// Layer 11: Draw game result overlay (Story 5.5) - DISABLED for Story 8.3
+	// s.drawGameResultOverlay(screen) // 已禁用：改为通过奖励面板的"下一关"按钮进入下一关
 
 	// DEBUG: Draw particle test instructions (Story 7.4 debugging)
 	s.drawParticleTestInstructions(screen)

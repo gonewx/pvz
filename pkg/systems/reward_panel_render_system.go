@@ -106,6 +106,7 @@ func (rprs *RewardPanelRenderSystem) drawPanel(screen *ebiten.Image, panelEntity
 func (rprs *RewardPanelRenderSystem) drawBackground(screen *ebiten.Image, alpha float64) {
 	bgImage := rprs.resourceManager.GetImageByID("IMAGE_AWARDSCREEN_BACK")
 	if bgImage == nil {
+		log.Printf("[RewardPanelRenderSystem] WARNING: IMAGE_AWARDSCREEN_BACK not loaded! Drawing fallback overlay")
 		// 如果背景图未加载，绘制半透明黑色遮罩
 		overlay := ebiten.NewImage(int(rprs.screenWidth), int(rprs.screenHeight))
 		overlay.Fill(color.RGBA{0, 0, 0, uint8(alpha * 200)})
@@ -113,6 +114,7 @@ func (rprs *RewardPanelRenderSystem) drawBackground(screen *ebiten.Image, alpha 
 		return
 	}
 
+	log.Printf("[RewardPanelRenderSystem] Drawing background with alpha=%.2f", alpha)
 	// 绘制背景图（全屏）
 	op := &ebiten.DrawImageOptions{}
 	
@@ -365,10 +367,13 @@ func (rprs *RewardPanelRenderSystem) drawNextLevelButton(screen *ebiten.Image, a
 	// 加载按钮图片（使用 SeedChooser_Button.png）
 	buttonImage := rprs.resourceManager.GetImageByID("IMAGE_SEEDCHOOSER_BUTTON")
 	if buttonImage == nil {
+		log.Printf("[RewardPanelRenderSystem] WARNING: IMAGE_SEEDCHOOSER_BUTTON not loaded! Drawing fallback button")
 		// 如果资源未加载，绘制简单的矩形按钮作为后备
 		rprs.drawFallbackButton(screen, alpha)
 		return
 	}
+
+	log.Printf("[RewardPanelRenderSystem] Drawing next level button with alpha=%.2f", alpha)
 
 	// 奖励背景是 800x600
 	bgWidth := config.RewardPanelBackgroundWidth
