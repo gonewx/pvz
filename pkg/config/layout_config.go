@@ -93,26 +93,64 @@ const (
 
 	// ZombieSpawnMinX 僵尸生成的最小X坐标（世界坐标）
 	// 用于开场预览和正常游戏，僵尸在此范围内随机分布
-	ZombieSpawnMinX = 1100.0
+	ZombieSpawnMinX = 1050.0
 
 	// ZombieSpawnMaxX 僵尸生成的最大X坐标（世界坐标）
 	// 不能超过背景宽度，留出边距避免僵尸贴边
 	// 这是默认值，适用于第3、4、5行（没有特殊配置的行）
-	ZombieSpawnMaxX = 1250.0 // BackgroundWidth(1400) - 50 边距
+	ZombieSpawnMaxX = 1250.0 // 减少范围，让僵尸更快进入画面
 
 	// ZombieSpawnMaxX_Row1 第1行僵尸生成的最大X坐标（世界坐标）
-	// 建议值范围：1100.0 - 1350.0
+	// 建议值范围：1000.0 - 1350.0
 	// 调整此值可以控制第1行僵尸的生成范围
-	ZombieSpawnMaxX_Row1 = 1300.0
+	ZombieSpawnMaxX_Row1 = 1150.0
 
 	// ZombieSpawnMaxX_Row2 第2行僵尸生成的最大X坐标（世界坐标）
-	// 建议值范围：1100.0 - 1350.0
+	// 建议值范围：1000.0 - 1350.0
 	// 调整此值可以控制第2行僵尸的生成范围
-	ZombieSpawnMaxX_Row2 = 1350.0
+	ZombieSpawnMaxX_Row2 = 1200.0
 
 	// OpeningZombiePreviewX 开场动画僵尸预览位置X坐标（已废弃，使用 ZombieSpawnMinX/MaxX 范围）
 	// 保留此常量以保持向后兼容
 	OpeningZombiePreviewX = 1200.0
+
+	// ========== UI元素位置配置参数（可手工调节） ==========
+
+	// MenuButtonOffsetFromRight 菜单按钮距离屏幕右边缘的距离（像素）
+	MenuButtonOffsetFromRight = 145.0
+
+	// MenuButtonOffsetFromTop 菜单按钮距离屏幕顶部的距离（像素）
+	MenuButtonOffsetFromTop = 0.0
+
+	// MenuButtonTextPadding 菜单按钮文字左右内边距（像素）
+	MenuButtonTextPadding = 16.0
+
+	// MenuButtonTextWidth 菜单按钮文字宽度（"菜单"两个字，像素）
+	MenuButtonTextWidth = 32.0
+
+	// ProgressBarOffsetFromRight 进度条距离屏幕右边缘的距离（像素）
+	ProgressBarOffsetFromRight = 170.0
+
+	// ProgressBarOffsetFromBottom 进度条距离屏幕底部的距离（像素）
+	ProgressBarOffsetFromBottom = 60.0
+
+	// ProgressBarZombieHeadOffsetX 僵尸头图标X偏移（相对于进度条左上角，像素）
+	ProgressBarZombieHeadOffsetX = 8.0
+
+	// ProgressBarZombieHeadOffsetY 僵尸头图标Y偏移（相对于进度条左上角，像素）
+	ProgressBarZombieHeadOffsetY = 2.0
+
+	// ProgressBarFillOffsetX 进度条填充X偏移（相对于进度条左上角，像素）
+	ProgressBarFillOffsetX = 35.0
+
+	// ProgressBarFillOffsetY 进度条填充Y偏移（相对于进度条左上角，像素）
+	ProgressBarFillOffsetY = 16.0
+
+	// ProgressBarLevelTextOffsetX 关卡编号文字X偏移（相对于进度条背景右边缘，像素）
+	ProgressBarLevelTextOffsetX = 5.0
+
+	// ProgressBarLevelTextOffsetY 关卡编号文字Y偏移（相对于进度条左上角，像素）
+	ProgressBarLevelTextOffsetY = 8.0
 )
 
 // GetGridWorldBounds 返回草坪网格的世界坐标边界
