@@ -513,8 +513,16 @@ func (s *GameScene) loadResources() {
 // This method must be called AFTER the level configuration is loaded,
 // because it depends on CurrentLevel.SodRowImage and CurrentLevel.ShowSoddingAnim.
 func (s *GameScene) loadSoddingResources() {
+	// Story 8.3: 加载 LoadingImages 资源组（包含按钮等 UI 资源）
+	// 包含 IMAGE_SEEDCHOOSER_BUTTON 等资源
+	if err := s.resourceManager.LoadResourceGroup("LoadingImages"); err != nil {
+		log.Printf("Warning: Failed to load LoadingImages resources: %v", err)
+	} else {
+		log.Printf("[GameScene] 加载 UI 资源组成功 (LoadingImages)")
+	}
+
 	// Story 8.3: 加载奖励面板资源（延迟加载组）
-	// 包含 AwardScreen_Back.jpg 和 SeedChooser_Button.png 等资源
+	// 包含 AwardScreen_Back.jpg 等资源
 	if err := s.resourceManager.LoadResourceGroup("DelayLoad_AwardScreen"); err != nil {
 		log.Printf("Warning: Failed to load reward panel resources: %v", err)
 	} else {
