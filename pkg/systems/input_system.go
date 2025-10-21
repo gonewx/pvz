@@ -69,6 +69,22 @@ func NewInputSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.Ga
 //   - deltaTime: 时间增量（秒）
 //   - cameraX: 摄像机的世界坐标X位置（用于屏幕坐标到世界坐标的转换）
 func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
+	// Story 10.1: ESC 键切换暂停/恢复
+	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
+		s.gameState.TogglePause()
+		if s.gameState.IsPaused {
+			log.Printf("[InputSystem] 游戏暂停 (ESC)")
+		} else {
+			log.Printf("[InputSystem] 游戏恢复 (ESC)")
+		}
+		return // 处理暂停切换后立即返回，避免响应其他输入
+	}
+
+	// Story 10.1: 暂停时屏蔽游戏世界交互
+	if s.gameState.IsPaused {
+		return // 暂停时不处理任何游戏输入
+	}
+
 	// 注意：植物预览位置现在由 PlantPreviewSystem 统一管理，无需在这里更新
 
 	// DEBUG: 按 P 键在鼠标位置生成 PeaSplat 粒子效果（测试用）

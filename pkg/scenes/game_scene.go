@@ -164,6 +164,9 @@ type GameScene struct {
 	buttonSystem       *systems.ButtonSystem       // 按钮交互系统
 	buttonRenderSystem *systems.ButtonRenderSystem // 按钮渲染系统
 	menuButtonEntity   ecs.EntityID                // 菜单按钮实体ID
+
+	// Story 10.1: Pause Menu Systems (暂停菜单系统)
+	pauseMenuModule *modules.PauseMenuModule // 暂停菜单模块（Story 10.1）
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -395,6 +398,9 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	// 创建菜单按钮实体
 	scene.initMenuButton(rm)
 
+	// Story 10.1: 初始化暂停菜单系统
+	scene.initPauseMenuModule(rm)
+
 	return scene
 }
 
@@ -459,13 +465,16 @@ func (s *GameScene) initMenuButton(rm *game.ResourceManager) {
 		rm,
 		buttonX,
 		buttonY,
-		"菜单",                                       // 按钮文字
-		20.0,                                       // 字体大小
-		[4]uint8{0, 200, 0, 255},                   // 绿色文字
-		middleWidth,                                // 中间宽度
+		"菜单",                     // 按钮文字
+		20.0,                     // 字体大小
+		[4]uint8{0, 200, 0, 255}, // 绿色文字
+		middleWidth,              // 中间宽度
 		func() {
-			log.Printf("[GameScene] Menu button clicked!")
-			// TODO: 打开暂停菜单
+			// Story 10.1: 点击菜单按钮打开暂停菜单
+			log.Printf("[GameScene] Menu button clicked! Opening pause menu...")
+			if s.pauseMenuModule != nil {
+				s.pauseMenuModule.Show()
+			}
 		},
 	)
 
@@ -473,6 +482,45 @@ func (s *GameScene) initMenuButton(rm *game.ResourceManager) {
 		log.Printf("[GameScene] Warning: Failed to create menu button: %v", err)
 	} else {
 		log.Printf("[GameScene] Menu button created successfully (Entity ID: %d)", s.menuButtonEntity)
+	}
+}
+
+// initPauseMenu 初始化暂停菜单（ECS 架构）
+// Story 10.1: 创建暂停菜单实体和三个按钮
+func (s *GameScene) initPauseMenuModule(rm *game.ResourceManager) {
+	var err error
+	s.pauseMenuModule, err = modules.NewPauseMenuModule(
+		s.entityManager,
+		s.gameState,
+		rm,
+		s.buttonSystem,
+		s.buttonRenderSystem,
+		WindowWidth,
+		WindowHeight,
+		modules.PauseMenuCallbacks{
+			OnContinue: func() {
+				s.gameState.SetPaused(false) // 恢复游戏
+			},
+			OnRestart: func() {
+				// 重新加载当前关卡
+				s.sceneManager.SwitchTo(NewGameScene(s.resourceManager, s.sceneManager))
+			},
+			OnMainMenu: func() {
+				// 返回主菜单
+				s.sceneManager.SwitchTo(NewMainMenuScene(s.resourceManager, s.sceneManager))
+			},
+			OnPauseMusic: func() {
+				// TODO: 暂停 BGM（当BGM系统实现后）
+			},
+			OnResumeMusic: func() {
+				// TODO: 恢复 BGM（当BGM系统实现后）
+			},
+		},
+	)
+	if err != nil {
+		log.Printf("[GameScene] Warning: Failed to initialize pause menu module: %v", err)
+	} else {
+		log.Printf("[GameScene] Pause menu module initialized")
 	}
 }
 
@@ -688,7 +736,21 @@ func (s *GameScene) loadSoddingResources() {
 //   - Intro animation (camera scrolling left → right → center)
 //   - ECS system updates (input, sun spawning, movement, collection, lifetime management)
 //   - System execution order ensures correct game logic flow
+//   - Story 10.1: Pause menu (只更新 UI 系统，跳过游戏逻辑)
 func (s *GameScene) Update(deltaTime float64) {
+	// Story 10.1: 更新暂停菜单模块
+	if s.pauseMenuModule != nil {
+		s.pauseMenuModule.Update(deltaTime)
+	}
+
+	// Story 10.1: Check if game is paused
+	if s.gameState.IsPaused {
+		// 暂停时只更新 UI 系统（按钮交互、暂停菜单）
+		if s.buttonSystem != nil {
+			s.buttonSystem.Update(deltaTime)
+		}
+		return // 跳过所有游戏逻辑系统
+	}
 	// Story 8.2 QA改进：铺草皮动画系统更新（必须在开场动画之前）
 	if s.soddingSystem != nil {
 		s.soddingSystem.Update(deltaTime)
@@ -951,6 +1013,11 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	fps := ebiten.ActualFPS()
 	fpsText := fmt.Sprintf("FPS: %.1f", fps)
 	ebitenutil.DebugPrintAt(screen, fpsText, WindowWidth-100, 10)
+
+	// Story 10.1: Draw pause menu (最顶层 - 在所有其他元素之上)
+	if s.pauseMenuModule != nil {
+		s.pauseMenuModule.Draw(screen)
+	}
 }
 
 // drawBackground renders the lawn background.

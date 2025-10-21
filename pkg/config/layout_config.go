@@ -151,6 +151,26 @@ const (
 
 	// ProgressBarLevelTextOffsetY 关卡编号文字Y偏移（相对于进度条左上角，像素）
 	ProgressBarLevelTextOffsetY = 8.0
+
+	// ========== 暂停菜单配置参数（Story 10.1）（可手工调节） ==========
+
+	// PauseMenuOverlayAlpha 暂停菜单遮罩透明度（0-255）
+	PauseMenuOverlayAlpha = 150
+
+	// PauseMenuPanelWidth 暂停菜单面板宽度（像素）
+	PauseMenuPanelWidth = 400.0
+
+	// PauseMenuPanelHeight 暂停菜单面板高度（像素）
+	PauseMenuPanelHeight = 300.0
+
+	// PauseMenuButtonSpacing 暂停菜单按钮之间的垂直间距（像素）
+	PauseMenuButtonSpacing = 20.0
+
+	// PauseMenuButtonWidth 暂停菜单按钮宽度（像素）
+	PauseMenuButtonWidth = 200.0
+
+	// PauseMenuButtonHeight 暂停菜单按钮高度（像素）
+	PauseMenuButtonHeight = 50.0
 )
 
 // GetGridWorldBounds 返回草坪网格的世界坐标边界

@@ -39,6 +39,9 @@ type GameState struct {
 
 	// Story 8.2: 教学系统
 	LawnStrings *LawnStrings // 游戏文本字符串管理器（从 LawnStrings.txt 加载）
+
+	// Story 10.1: 暂停菜单系统
+	IsPaused bool // 游戏是否暂停
 }
 
 // 全局单例实例（这是架构规范允许的唯一全局变量）
@@ -283,4 +286,16 @@ func (gs *GameState) SetSelectedPlants(plants []string) {
 //   - []string: 选中的植物ID列表
 func (gs *GameState) GetSelectedPlants() []string {
 	return gs.SelectedPlants
+}
+
+// SetPaused 设置暂停状态
+// Story 10.1: 用于控制游戏暂停/恢复
+func (gs *GameState) SetPaused(paused bool) {
+	gs.IsPaused = paused
+}
+
+// TogglePause 切换暂停状态
+// Story 10.1: ESC 快捷键使用
+func (gs *GameState) TogglePause() {
+	gs.IsPaused = !gs.IsPaused
 }

@@ -122,6 +122,8 @@
     *   **目标:** 实现《植物大战僵尸》第一章(前院白天)的全部 10 个关卡,包括原版忠实的关卡机制、教学引导系统(1-1单行草地引导)、开场动画系统(可配置跳过)、选卡界面和特殊关卡类型(1-5坚果保龄球、1-10传送带模式),为玩家提供完整的冒险模式第一章体验。详见 [Epic 8 详细文档](prd/epic-8-level-chapter1-implementation.md)。
 *   **Epic 9: ECS 框架泛型化重构 (ECS Generics Refactor) - Brownfield Enhancement**
     *   **目标:** 将当前基于反射的 ECS 框架迁移到 Go 泛型实现，通过编译时类型检查和性能优化，消除运行时反射开销，提升代码可读性和类型安全性，为后续开发提供更高效的开发体验。详见 [Epic 9 详细文档](prd/epic-9-ecs-generics-refactor.md)。
+*   **Epic 10: 游戏体验完善 (Game Experience Polish) - Brownfield Enhancement**
+    *   **目标:** 完善核心游戏体验，实现暂停菜单、植物攻击动画、粒子特效和除草车防线系统，提升游戏的完整性和可玩性，确保所有核心机制符合原版游戏标准。详见 [Epic 10 详细文档](prd/epic-10-game-experience-polish.md)。
 
 ## **Epic 1: 游戏基础框架与主循环 (Game Foundation & Main Loop)**
 **史诗目标:** 搭建整个Go+Ebitengine项目的基本结构，创建一个可以运行的空窗口，并实现游戏的核心状态管理和主菜单。这是所有后续功能的基础。
@@ -851,3 +853,215 @@ func HasComponent[T any](em *EntityManager, entity EntityID) bool {
 **Epic 类型**: Brownfield Enhancement (架构优化)
 **优先级**: High（阻塞 Story 8.1）
 **预估总工作量**: 16-25 小时（3-5 个工作日）
+
+---
+
+## **Epic 10: 游戏体验完善 (Game Experience Polish) - Brownfield Enhancement**
+
+**史诗目标:** 完善核心游戏体验，实现暂停菜单、植物攻击动画、粒子特效和除草车防线系统，提升游戏的完整性和可玩性，确保所有核心机制符合原版游戏标准。
+
+### Epic Overview (史诗概览)
+
+Epic 10 是对核心游戏体验的最后完善，实现后游戏基本达到 MVP 标准。本 Epic 包含 4 个关键功能模块，每个模块都是原版游戏的标志性特性。
+
+**核心功能模块:**
+
+1. **暂停菜单系统** - 用户体验核心功能
+   - 暂停/恢复游戏
+   - 菜单面板（继续、重新开始、返回主菜单）
+   - 音乐控制
+   - ESC 键快捷键
+
+2. **除草车最后防线系统** - 原版标志性机制
+   - 每行左侧台阶放置除草车
+   - 僵尸到达左侧触发
+   - 除草车自动清除所在行所有僵尸
+   - 一次性使用，失败条件增强
+
+3. **植物攻击动画系统** - 视觉表现增强
+   - 植物发射子弹时切换攻击动画
+   - 动画状态机管理
+   - 支持多种射手植物
+   - 使用原版 Reanim 动画
+
+4. **植物种植粒子特效** - 视觉反馈完善
+   - 种植时土粒飞溅效果
+   - 使用原版粒子配置
+   - 抛物线运动
+   - 性能优化
+
+### Stories (故事列表)
+
+Epic 10 包含 4 个 Story，按优先级排序：
+
+#### **Story 10.1: 暂停菜单系统**
+> **As a** 玩家,
+> **I want** to pause the game and access a menu with options,
+> **so that** I can take a break, restart the level, or return to the main menu without losing progress.
+
+**Acceptance Criteria:**
+1. 点击右上角的"菜单"按钮时，游戏暂停，所有游戏逻辑系统停止更新
+2. 暂停时显示半透明遮罩和暂停菜单面板，包含三个按钮：继续、重新开始、返回主菜单
+3. 点击"继续"按钮时，关闭暂停菜单，游戏恢复运行
+4. 点击"重新开始"按钮时，重新加载当前关卡
+5. 点击"返回主菜单"按钮时，返回主菜单场景
+6. 暂停时，背景音乐音量降低或暂停，恢复时音乐恢复正常
+7. 暂停时，游戏世界的所有交互被屏蔽
+8. 按 ESC 键也能切换暂停/恢复状态
+
+**优先级**: ⭐⭐⭐⭐ 中高  
+**预估工作量**: 8-12 小时
+
+---
+
+#### **Story 10.2: 除草车最后防线系统**
+> **As a** 玩家,
+> **I want** lawnmowers as a last line of defense on each lane,
+> **so that** I have one final chance to stop zombies from reaching my house.
+
+**Acceptance Criteria:**
+1. 游戏开始时，每个有效行的左侧台阶上放置一辆除草车
+2. 除草车正确显示在对应行的左侧，使用原版除草车图像和动画
+3. 当僵尸到达屏幕左侧边界（X < 100）时，该行的除草车自动触发
+4. 除草车触发后从左向右快速移动（速度约 300 像素/秒），播放行驶动画
+5. 除草车移动过程中，消灭路径上所在行的所有僵尸
+6. 除草车移动到屏幕右侧后消失，该行除草车标记为已使用
+7. 除草车触发时播放对应的音效
+8. 除草车使用后，该行再有僵尸到达左侧边界则游戏失败
+9. 所有行的除草车都用完后，任意僵尸到达左侧边界直接失败
+10. 除草车状态在游戏重启时正确重置
+
+**优先级**: ⭐⭐⭐⭐⭐ 高  
+**预估工作量**: 12-16 小时
+
+---
+
+#### **Story 10.3: 植物攻击动画系统**
+> **As a** 玩家,
+> **I want** plants to play attack animations when shooting projectiles,
+> **so that** the game visually communicates plant actions and feels more alive.
+
+**Acceptance Criteria:**
+1. 豌豆射手发射子弹时，自动切换到攻击动画（anim_shooting）
+2. 攻击动画播放完毕后，自动切换回空闲动画（anim_idle）
+3. 攻击动画播放期间，植物不应再次触发攻击动画
+4. 所有射手类植物都支持攻击动画
+5. 攻击动画使用原版 Reanim 动画资源
+6. 动画切换自然流畅，无明显跳帧或闪烁
+7. 攻击动画不影响子弹发射逻辑
+8. 向日葵等非射手植物不受此功能影响
+
+**优先级**: ⭐⭐⭐⭐ 中高  
+**预估工作量**: 6-8 小时
+
+---
+
+#### **Story 10.4: 植物种植粒子特效**
+> **As a** 玩家,
+> **I want** to see soil particles splash when planting plants,
+> **so that** the planting action feels more impactful and visually satisfying.
+
+**Acceptance Criteria:**
+1. 玩家成功种植植物时，在种植位置生成土粒飞溅粒子效果
+2. 粒子效果使用原版配置文件（PlantingPool.xml 或类似文件）
+3. 土粒粒子从地面向上飞溅，然后落下，形成自然的抛物线运动
+4. 粒子效果持续 0.5-1.0 秒后自动消失
+5. 粒子颜色和大小符合原版表现
+6. 所有植物种植时都触发粒子效果
+7. 粒子效果在正确的渲染层级显示
+8. 粒子系统性能良好，同时种植多个植物不影响帧率
+
+**优先级**: ⭐⭐⭐ 中  
+**预估工作量**: 4-6 小时
+
+---
+
+### Success Criteria (成功标准)
+
+1. ✅ 所有 4 个用户故事完成，AC 全部满足
+2. ✅ 暂停菜单功能完整，UI 美观，交互流畅
+3. ✅ 植物攻击动画自然切换，无卡顿或闪烁
+4. ✅ 种植粒子特效符合原版表现，性能良好
+5. ✅ 除草车系统完整，触发准确，动画流畅
+6. ✅ 现有功能无回归，通过 QA 测试
+7. ✅ 代码符合编码规范，通过 linter 检查
+8. ✅ 所有新功能有对应的单元测试（覆盖率 > 80%）
+9. ✅ 文档更新（AGENTS.md, CLAUDE.md）
+10. ✅ 游戏体验达到 MVP 标准
+
+### Technical Implementation (技术实现)
+
+**新增组件:**
+- `PauseMenuComponent` - 暂停菜单状态
+- `LawnmowerComponent` - 除草车数据
+- `LawnmowerStateComponent` - 全局除草车状态
+- `AttackAnimState` - 攻击动画状态（在 PlantComponent 中）
+
+**新增系统:**
+- `PauseMenuRenderSystem` - 暂停菜单渲染
+- `LawnmowerSystem` - 除草车触发和移动管理
+
+**系统修改:**
+- `GameScene.Update()` - 暂停状态检测
+- `InputSystem.handleLawnClick()` - 种植粒子效果触发
+- `BehaviorSystem` - 植物攻击动画管理
+- `LevelSystem.checkDefeatCondition()` - 除草车状态检测
+
+**工厂函数:**
+- `NewPauseMenuEntity()` - 暂停菜单实体
+- `NewLawnmowerEntity()` - 除草车实体
+- `NewPlantingParticleEffect()` - 种植粒子效果
+
+### Architecture Highlights (架构亮点)
+
+1. **ECS 架构一致性** - 所有新功能遵循 ECS 模式，零耦合原则
+2. **泛型 API 使用** - 使用 Epic 9 的泛型 ECS API，类型安全
+3. **原版忠实还原** - 所有功能使用原版资源和配置
+4. **性能优化** - 粒子批量渲染，除草车碰撞优化
+5. **可扩展性** - 模块化设计，易于添加新功能
+
+### Dependencies and Blockers (依赖与阻塞)
+
+**前置依赖:**
+- ✅ Epic 1-9 已完成（ECS 框架、Reanim 系统、粒子系统）
+- ✅ 菜单按钮 UI 已创建（Story 8.5）
+
+**并行依赖:**
+- Story 10.1 和 10.2 可并行开发（独立模块）
+- Story 10.3 和 10.4 可并行开发（独立模块）
+
+**后续依赖:**
+- Epic 11（如有）可能依赖暂停菜单系统
+- 第一章关卡完整体验依赖除草车系统
+
+### Timeline Estimate (时间估算)
+
+| Story | 预估工作量 | 优先级 |
+|-------|-----------|--------|
+| Story 10.1: 暂停菜单系统 | 8-12 小时 | 中高 |
+| Story 10.2: 除草车系统 | 12-16 小时 | 高 |
+| Story 10.3: 植物攻击动画 | 6-8 小时 | 中高 |
+| Story 10.4: 种植粒子特效 | 4-6 小时 | 中 |
+| **总计** | **30-42 小时** | - |
+
+**建议实施顺序:**
+1. Story 10.2（除草车）- 最高优先级，影响游戏完整性
+2. Story 10.1（暂停菜单）- 用户体验核心功能
+3. Story 10.3（攻击动画）- 视觉表现增强
+4. Story 10.4（种植特效）- 视觉表现锦上添花
+
+### Reference Documentation (参考文档)
+
+- **Epic 10 完整规范**: `docs/prd/epic-10-game-experience-polish.md`
+- **Story 10.1 详细文档**: `docs/stories/10.1.story.md`
+- **Story 10.2 详细文档**: `docs/stories/10.2.story.md`
+- **Story 10.3 详细文档**: `docs/stories/10.3.story.md`
+- **Story 10.4 详细文档**: `docs/stories/10.4.story.md`
+
+---
+
+**创建日期**: 2025-10-21
+**创建人**: Sarah (Product Owner)
+**Epic 类型**: Brownfield Enhancement (体验完善)
+**优先级**: High（完成 MVP 必需）
+**预估总工作量**: 30-42 小时（6-8 个工作日）
