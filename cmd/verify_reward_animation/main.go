@@ -215,11 +215,18 @@ func (vg *VerifyRewardAnimationGame) Draw(screen *ebiten.Image) {
 		screen.DrawImage(backgroundImg, opts)
 	}
 
-	// Story 8.4：完全封装的奖励动画渲染
-	// RewardAnimationSystem 内部自动处理所有渲染：
-	//   1. Reanim 实体
-	//   2. 粒子效果（SeedPacket 背景框 + Award 爆炸）
-	//   3. 植物卡片（Phase 1-3）/ 奖励面板（Phase 4）
+	// 渲染顺序（验证工具独立渲染）：
+	cameraOffsetX := vg.gameState.CameraX
+	
+	// 1. 绘制 Reanim 实体（如果有的话）
+	vg.renderSystem.Draw(screen, cameraOffsetX)
+	
+	// 2. 绘制粒子效果（SeedPacket 背景框 + Award 爆炸）
+	vg.renderSystem.DrawParticles(screen, cameraOffsetX)
+	
+	// 3. 绘制奖励动画（植物卡片 + 奖励面板）
+	// 注意：在实际游戏中，粒子由 GameScene Layer 6 统一渲染
+	// 但验证工具是独立的，需要手动渲染粒子
 	vg.rewardSystem.Draw(screen)
 
 	// 绘制调试信息
