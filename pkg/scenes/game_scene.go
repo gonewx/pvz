@@ -508,10 +508,19 @@ func (s *GameScene) loadResources() {
 
 // loadSoddingResources loads sodding animation resources after level config is loaded.
 // Story 8.2 QA改进：铺草皮动画资源加载
+// Story 8.3: 添加奖励面板资源加载
 //
 // This method must be called AFTER the level configuration is loaded,
 // because it depends on CurrentLevel.SodRowImage and CurrentLevel.ShowSoddingAnim.
 func (s *GameScene) loadSoddingResources() {
+	// Story 8.3: 加载奖励面板资源（延迟加载组）
+	// 包含 AwardScreen_Back.jpg 和 SeedChooser_Button.png 等资源
+	if err := s.resourceManager.LoadResourceGroup("DelayLoad_AwardScreen"); err != nil {
+		log.Printf("Warning: Failed to load reward panel resources: %v", err)
+	} else {
+		log.Printf("[GameScene] 加载奖励面板资源组成功 (DelayLoad_AwardScreen)")
+	}
+
 	// 检查是否需要加载未铺草皮背景资源组
 	if s.gameState.CurrentLevel != nil &&
 		(s.gameState.CurrentLevel.BackgroundImage == "IMAGE_BACKGROUND1UNSODDED" ||
