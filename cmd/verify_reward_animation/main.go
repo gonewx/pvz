@@ -33,14 +33,13 @@ var (
 // VerifyRewardAnimationGame 完整奖励动画流程验证游戏
 // 包含卡片包动画（Phase 1-3）和面板显示（Phase 4）
 type VerifyRewardAnimationGame struct {
-	entityManager         *ecs.EntityManager
-	gameState             *game.GameState
-	resourceManager       *game.ResourceManager
-	reanimSystem          *systems.ReanimSystem
-	particleSystem        *systems.ParticleSystem        // 粒子系统（用于光晕效果）
-	rewardSystem          *systems.RewardAnimationSystem // 奖励动画系统（Story 8.4重构：完全封装）
-	renderSystem          *systems.RenderSystem
-	plantCardRenderSystem *systems.PlantCardRenderSystem // 植物卡片渲染系统（用于渲染Phase 1-3的卡片包）
+	entityManager   *ecs.EntityManager
+	gameState       *game.GameState
+	resourceManager *game.ResourceManager
+	reanimSystem    *systems.ReanimSystem
+	particleSystem  *systems.ParticleSystem        // 粒子系统（用于光晕效果）
+	rewardSystem    *systems.RewardAnimationSystem // 奖励动画系统（Story 8.4重构：完全封装）
+	renderSystem    *systems.RenderSystem
 
 	debugFont *text.GoTextFace // 中文调试字体
 
@@ -91,16 +90,8 @@ func NewVerifyRewardAnimationGame() (*VerifyRewardAnimationGame, error) {
 	particleSystem := systems.NewParticleSystem(em, rm) // 粒子系统用于光晕效果
 	renderSystem := systems.NewRenderSystem(em)
 
-	// 创建植物卡片渲染系统（用于渲染 Phase 1-3 的卡片包）
-	sunFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.PlantCardSunCostFontSize)
-	if err != nil {
-		log.Printf("Warning: Failed to load sun cost font: %v", err)
-		sunFont = nil
-	}
-	plantCardRenderSystem := systems.NewPlantCardRenderSystem(em, sunFont)
-
-	// Story 8.4重构：RewardAnimationSystem完全封装面板渲染逻辑
-	// 内部自动创建和管理RewardPanelRenderSystem
+	// Story 8.4重构：RewardAnimationSystem完全封装所有渲染逻辑
+	// 内部自动创建和管理 RewardPanelRenderSystem 和 PlantCardRenderSystem
 	rewardSystem := systems.NewRewardAnimationSystem(em, gs, rm, reanimSystem, particleSystem)
 
 	// 加载中文调试字体
@@ -130,17 +121,16 @@ func NewVerifyRewardAnimationGame() (*VerifyRewardAnimationGame, error) {
 	log.Println("════════════════════════════════════════════════════════")
 
 	game := &VerifyRewardAnimationGame{
-		entityManager:         em,
-		gameState:             gs,
-		resourceManager:       rm,
-		reanimSystem:          reanimSystem,
-		particleSystem:        particleSystem,
-		rewardSystem:          rewardSystem,
-		renderSystem:          renderSystem,
-		plantCardRenderSystem: plantCardRenderSystem,
-		debugFont:             debugFont,
-		triggered:             false,
-		completed:             false,
+		entityManager:   em,
+		gameState:       gs,
+		resourceManager: rm,
+		reanimSystem:    reanimSystem,
+		particleSystem:  particleSystem,
+		rewardSystem:    rewardSystem,
+		renderSystem:    renderSystem,
+		debugFont:       debugFont,
+		triggered:       false,
+		completed:       false,
 	}
 
 	// 自动触发奖励动画（无需手动按T键）
@@ -227,22 +217,21 @@ func (vg *VerifyRewardAnimationGame) Draw(screen *ebiten.Image) {
 
 	// 渲染顺序（从下往上）：
 	// 1. Reanim 实体（背景层）
-	// 2. 植物卡片（Phase 1-3 的卡片包）
-	// 3. 粒子效果（光晕，装饰层）
-	// 4. 奖励面板（Phase 4，最上层）
-	
+	// 2. 粒子效果（光晕，中间层）
+	// 3. RewardAnimationSystem（前景层，完全封装）
+	//    - Phase 1-3: 植物卡片
+	//    - Phase 4: 奖励面板
+
 	cameraOffsetX := vg.gameState.CameraX
-	
+
 	// 1. 绘制 Reanim 实体
 	vg.renderSystem.Draw(screen, cameraOffsetX)
-	
-	// 2. 绘制植物卡片（Phase 1-3 的卡片包）
-	vg.plantCardRenderSystem.Draw(screen)
 
-	// 3. 绘制粒子效果（光晕）
+	// 2. 绘制粒子效果（光晕）
 	vg.renderSystem.DrawParticles(screen, cameraOffsetX)
 
-	// 4. 绘制奖励面板（Phase 4）
+	// 3. 绘制奖励动画（Story 8.4：完全封装）
+	//    内部自动管理 Phase 1-3 的卡片包和 Phase 4 的奖励面板
 	vg.rewardSystem.Draw(screen)
 
 	// 绘制调试信息
