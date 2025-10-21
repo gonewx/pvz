@@ -104,6 +104,7 @@ func NewPlantCardEntity(em *ecs.EntityManager, rm *game.ResourceManager, rs Rean
 		BackgroundImage:  backgroundImg,
 		PlantIconTexture: plantIcon,
 		CardScale:        cardScale, // Story 8.4: 保存卡片缩放因子
+		Alpha:            1.0,       // Story 8.4: 默认完全不透明
 	})
 
 	// 添加 UIComponent (标记为UI元素)
@@ -237,7 +238,7 @@ func RenderPlantCard(screen *ebiten.Image, card *components.PlantCardComponent, 
 	renderEffectMask(screen, card, x, y)
 }
 
-// renderCardBackground 绘制卡片背景框（应用卡片缩放）
+// renderCardBackground 绘制卡片背景框（应用卡片缩放和透明度）
 func renderCardBackground(screen *ebiten.Image, card *components.PlantCardComponent, x, y float64) {
 	if card.BackgroundImage == nil {
 		return
@@ -246,10 +247,14 @@ func renderCardBackground(screen *ebiten.Image, card *components.PlantCardCompon
 	op := &ebiten.DrawImageOptions{}
 	op.GeoM.Scale(card.CardScale, card.CardScale)
 	op.GeoM.Translate(x, y)
+	// 应用透明度（Story 8.4: 用于淡入淡出动画）
+	if card.Alpha < 1.0 {
+		op.ColorScale.ScaleAlpha(float32(card.Alpha))
+	}
 	screen.DrawImage(card.BackgroundImage, op)
 }
 
-// renderPlantIcon 绘制植物图标（使用配置中的缩放和偏移）
+// renderPlantIcon 绘制植物图标（使用配置中的缩放和偏移，应用透明度）
 func renderPlantIcon(screen *ebiten.Image, card *components.PlantCardComponent, x, y float64) {
 	if card.PlantIconTexture == nil || card.BackgroundImage == nil {
 		return
@@ -270,10 +275,14 @@ func renderPlantIcon(screen *ebiten.Image, card *components.PlantCardComponent, 
 	// 应用整体缩放：iconScale 用于微调，cardScale 用于整体缩放
 	op.GeoM.Scale(iconScale*card.CardScale, iconScale*card.CardScale)
 	op.GeoM.Translate(x+offsetX, y+iconOffsetY*card.CardScale)
+	// 应用透明度（Story 8.4: 用于淡入淡出动画）
+	if card.Alpha < 1.0 {
+		op.ColorScale.ScaleAlpha(float32(card.Alpha))
+	}
 	screen.DrawImage(card.PlantIconTexture, op)
 }
 
-// renderSunCost 绘制阳光数字（使用配置中的偏移）
+// renderSunCost 绘制阳光数字（使用配置中的偏移，应用透明度）
 func renderSunCost(screen *ebiten.Image, card *components.PlantCardComponent, x, y float64, sunFont *text.GoTextFaceSource, fontSize float64) {
 	if card.BackgroundImage == nil {
 		return
@@ -302,6 +311,10 @@ func renderSunCost(screen *ebiten.Image, card *components.PlantCardComponent, x,
 	op.PrimaryAlign = text.AlignCenter
 	op.SecondaryAlign = text.AlignCenter
 	op.ColorScale.ScaleWithColor(color.RGBA{0, 0, 0, 255})
+	// 应用透明度（Story 8.4: 用于淡入淡出动画）
+	if card.Alpha < 1.0 {
+		op.ColorScale.ScaleAlpha(float32(card.Alpha))
+	}
 	text.Draw(screen, sunText, face, op)
 }
 

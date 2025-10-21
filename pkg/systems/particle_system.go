@@ -840,3 +840,182 @@ func (ps *ParticleSystem) applyFields(p *components.ParticleComponent, dt float6
 		}
 	}
 }
+
+// IsParticleEffectCompleted 检查指定的粒子特效是否播放完成
+//
+// 判断标准（优雅且系统化）：
+//   发射器年龄 >= MAX(关键帧最后时间点, SystemDuration) + MAX(ParticleDuration)
+//
+// 原理：
+//   - 发射器在最后时间点停止生成新粒子
+//   - 最后生成的粒子在 ParticleDuration 后消失
+//   - 所以总时长 = 生成结束时间 + 粒子寿命
+//
+// 参数:
+//   - emitterGroupID: 粒子特效的主发射器实体ID（由 CreateParticleEffect 返回）
+//
+// 返回:
+//   - true: 粒子特效已完成（所有粒子应该已消失）
+//   - false: 粒子特效仍在播放
+func (ps *ParticleSystem) IsParticleEffectCompleted(emitterGroupID ecs.EntityID) bool {
+	if emitterGroupID == 0 {
+		return false // 无效的实体ID
+	}
+
+	// 获取主发射器的位置组件（用于识别同组发射器）
+	mainPos, ok := ecs.GetComponent[*components.PositionComponent](ps.EntityManager, emitterGroupID)
+	if !ok {
+		return false // 主发射器已被删除
+	}
+
+	// 查询所有发射器实体
+	allEmitters := ecs.GetEntitiesWith2[
+		*components.EmitterComponent,
+		*components.PositionComponent,
+	](ps.EntityManager)
+
+	// 计算粒子特效的预期完成时间
+	var maxCompletionTime float64 = 0
+	emitterCount := 0
+
+	for _, emitterID := range allEmitters {
+		emitterPos, _ := ecs.GetComponent[*components.PositionComponent](ps.EntityManager, emitterID)
+
+		// 使用指针比较识别同组发射器（CreateParticleEffect 创建的发射器共享同一个 PositionComponent）
+		if emitterPos == mainPos {
+			emitterComp, ok := ecs.GetComponent[*components.EmitterComponent](ps.EntityManager, emitterID)
+			if !ok {
+				continue
+			}
+
+			emitterCount++
+
+			// 计算该发射器的完成时间
+			// = 停止生成新粒子的时间 + 粒子寿命
+			var stopSpawningTime float64
+
+			// 1. 如果有 SystemDuration，以它为准
+			if emitterComp.SystemDuration > 0 {
+				stopSpawningTime = emitterComp.SystemDuration
+
+				// 关键帧时间是相对于 SystemDuration 的百分比
+				// 如果关键帧的最后时间点超过了SystemDuration，需要取最大值
+				keyframeEndTime := ps.getLastKeyframeTime(emitterComp) * emitterComp.SystemDuration
+				if keyframeEndTime > stopSpawningTime {
+					stopSpawningTime = keyframeEndTime
+				}
+			} else {
+				// 2. SystemDuration=0 表示由关键帧控制生成
+				// 这种情况下，关键帧时间是绝对时间（秒），而不是百分比
+				// 直接使用关键帧的最后时间点
+				stopSpawningTime = ps.getLastKeyframeTime(emitterComp)
+			}
+
+			// 3. 获取粒子寿命（从配置中读取）
+			particleLifetime := ps.getParticleLifetime(emitterComp)
+
+			// 4. 该发射器的完成时间 = 停止生成时间 + 粒子寿命
+			completionTime := stopSpawningTime + particleLifetime
+
+			// 调试日志：显示每个发射器的计算结果
+			emitterName := "Unknown"
+			if emitterComp.Config != nil {
+				emitterName = emitterComp.Config.Name
+			}
+			log.Printf("[ParticleSystem] 发射器 '%s': stopSpawningTime=%.2fs, particleLifetime=%.2fs, completionTime=%.2fs",
+				emitterName, stopSpawningTime, particleLifetime, completionTime)
+
+			// 5. 取所有发射器中的最大值
+			if completionTime > maxCompletionTime {
+				maxCompletionTime = completionTime
+			}
+		}
+	}
+
+	// 检查是否所有发射器都已达到完成时间
+	// 使用主发射器的年龄作为参考
+	mainEmitter, ok := ecs.GetComponent[*components.EmitterComponent](ps.EntityManager, emitterGroupID)
+	if !ok {
+		return false
+	}
+
+	completed := mainEmitter.Age >= maxCompletionTime
+
+	// 调试日志：显示最终结果
+	log.Printf("[ParticleSystem] 粒子特效完成检测: emitterCount=%d, maxCompletionTime=%.2fs, currentAge=%.2fs, completed=%v",
+		emitterCount, maxCompletionTime, mainEmitter.Age, completed)
+
+	return completed
+}
+
+// getLastKeyframeTime 获取发射器关键帧动画的最后时间点
+// 返回值：
+//   - 如果有 SystemDuration：返回归一化时间 (0-1)，调用者需要乘以 SystemDuration
+//   - 如果无 SystemDuration：返回绝对时间（秒），关键帧的 Time 字段是厘秒，需要转换
+func (ps *ParticleSystem) getLastKeyframeTime(emitter *components.EmitterComponent) float64 {
+	var maxTime float64 = 0
+
+	// 检查所有关键帧数组，找到最大时间
+	if len(emitter.SpawnMinActiveKeyframes) > 0 {
+		lastKF := emitter.SpawnMinActiveKeyframes[len(emitter.SpawnMinActiveKeyframes)-1]
+		if lastKF.Time > maxTime {
+			maxTime = lastKF.Time
+		}
+	}
+
+	if len(emitter.SpawnMaxActiveKeyframes) > 0 {
+		lastKF := emitter.SpawnMaxActiveKeyframes[len(emitter.SpawnMaxActiveKeyframes)-1]
+		if lastKF.Time > maxTime {
+			maxTime = lastKF.Time
+		}
+	}
+
+	if len(emitter.SpawnMaxLaunchedKeyframes) > 0 {
+		lastKF := emitter.SpawnMaxLaunchedKeyframes[len(emitter.SpawnMaxLaunchedKeyframes)-1]
+		if lastKF.Time > maxTime {
+			maxTime = lastKF.Time
+		}
+	}
+
+	// 关键帧时间的单位取决于是否有 SystemDuration：
+	// - 有 SystemDuration: Time 是百分比（需要除以100）→ 返回归一化值
+	// - 无 SystemDuration: Time 是厘秒 → 返回秒
+	if emitter.SystemDuration > 0 {
+		// 百分比模式：返回归一化时间（0-1）
+		return maxTime / 100.0
+	} else {
+		// 绝对时间模式：厘秒转秒
+		return maxTime / 100.0
+	}
+}
+
+// getParticleLifetime 获取粒子的寿命（从配置中读取 ParticleDuration 字段）
+// ParticleDuration 单位是厘秒（centiseconds），需要转换为秒
+func (ps *ParticleSystem) getParticleLifetime(emitter *components.EmitterComponent) float64 {
+	if emitter.Config == nil {
+		return 0
+	}
+
+	// ParticleDuration 是 EmitterConfig 的顶级字段，是一个 string 类型
+	// 需要使用 ParseValue 解析
+	if emitter.Config.ParticleDuration == "" {
+		return 0 // 没有配置 ParticleDuration
+	}
+
+	// 解析 ParticleDuration（可能是单值、范围或关键帧）
+	minVal, maxVal, keyframes, _ := particlePkg.ParseValue(emitter.Config.ParticleDuration)
+
+	// 如果有关键帧，取最后一个关键帧的值
+	if len(keyframes) > 0 {
+		lastKF := keyframes[len(keyframes)-1]
+		return lastKF.Value / 100.0 // 厘秒 → 秒
+	}
+
+	// 否则，取静态值（范围的最大值或单值）
+	lifetime := maxVal
+	if maxVal == 0 {
+		lifetime = minVal
+	}
+
+	return lifetime / 100.0 // 厘秒 → 秒
+}

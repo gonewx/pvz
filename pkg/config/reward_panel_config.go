@@ -8,6 +8,22 @@ import "image/color"
 // 注意：植物卡片的内部配置（图标缩放、阳光偏移等）在 plant_card_config.go 中定义
 
 const (
+	// ========== 奖励动画时间配置 ==========
+
+	// Phase 3.5 - Pausing (停顿阶段)
+	// 卡片包到达目标位置后的短暂停顿，让玩家看清楚 Award 粒子特效
+	RewardPausingDuration = 2.5 // 停顿时长（秒）
+
+	// Phase 3.6 - Disappearing (消失阶段)
+	// 卡片包渐渐消失的动画时长
+	RewardDisappearDuration = 1.0 // 消失动画时长（秒）
+
+	// Phase 4 - Showing (面板显示阶段)
+	// 奖励面板淡入动画时长
+	RewardPanelFadeInDuration = 0.5 // 面板淡入动画时长（秒）
+
+	// ========== 奖励面板UI配置 ==========
+
 	// 奖励面板背景尺寸（固定为 800x600）
 	RewardPanelBackgroundWidth  = 800.0
 	RewardPanelBackgroundHeight = 600.0

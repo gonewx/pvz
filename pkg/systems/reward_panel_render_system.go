@@ -242,7 +242,7 @@ func (rprs *RewardPanelRenderSystem) calculateCardPosition(cardScale float64) (f
 	return cardX, cardY
 }
 
-// updatePlantCardEntity 更新卡片实体的位置。
+// updatePlantCardEntity 更新卡片实体的位置和透明度。
 func (rprs *RewardPanelRenderSystem) updatePlantCardEntity(panelEntity ecs.EntityID, panel *components.RewardPanelComponent) {
 	cardEntity, exists := rprs.plantCardEntities[panelEntity]
 	if !exists {
@@ -259,9 +259,10 @@ func (rprs *RewardPanelRenderSystem) updatePlantCardEntity(panelEntity ecs.Entit
 		posComp.Y = cardY
 	}
 
-	// 更新卡片缩放（如果有动画）
+	// 更新卡片缩放和透明度（同步面板的淡入淡出效果）
 	if cardComp, ok := ecs.GetComponent[*components.PlantCardComponent](rprs.entityManager, cardEntity); ok {
 		cardComp.CardScale = cardScale
+		cardComp.Alpha = panel.FadeAlpha // Story 8.4: 同步面板透明度，使卡片与面板一起淡入淡出
 	}
 }
 

@@ -145,6 +145,9 @@ type GameScene struct {
 	cameraSystem  *systems.CameraSystem           // 镜头控制系统（镜头移动、缓动）
 	openingSystem *systems.OpeningAnimationSystem // 开场动画系统（僵尸预告、跳过）
 	rewardSystem  *systems.RewardAnimationSystem  // 奖励动画系统（关卡完成奖励）
+
+	// Story 8.4: Reward Panel Render System
+	rewardPanelRenderSystem *systems.RewardPanelRenderSystem // 奖励面板渲染系统（新植物介绍）
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -320,6 +323,10 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	// Story 8.3: Create RewardAnimationSystem (需要 ReanimSystem 和 ParticleSystem)
 	scene.rewardSystem = systems.NewRewardAnimationSystem(scene.entityManager, scene.gameState, rm, scene.reanimSystem, scene.particleSystem)
 	log.Printf("[GameScene] Initialized reward animation system")
+
+	// Story 8.4: Create RewardPanelRenderSystem (新植物介绍面板渲染)
+	scene.rewardPanelRenderSystem = systems.NewRewardPanelRenderSystem(scene.entityManager, scene.gameState, rm, scene.reanimSystem)
+	log.Printf("[GameScene] Initialized reward panel render system")
 
 	// Story 8.3: Create OpeningAnimationSystem (conditionally, may return nil)
 	scene.openingSystem = systems.NewOpeningAnimationSystem(scene.entityManager, scene.gameState, rm, levelConfig, scene.cameraSystem, scene.reanimSystem)
@@ -691,6 +698,7 @@ func (s *GameScene) Update(deltaTime float64) {
 
 	// Update all ECS systems in order (order matters for correct game logic)
 	s.levelSystem.Update(deltaTime)                // 0. Update level system (Story 5.5: wave spawning, victory/defeat)
+	s.rewardSystem.Update(deltaTime)               // 0.1. Update reward animation system (Story 8.3: 卡片包动画)
 	s.zombieLaneTransitionSystem.Update(deltaTime) // 0.5. Update zombie lane transitions (move to target lane before attacking)
 	s.plantCardSystem.Update(deltaTime)            // 1. Update plant card states (before input)
 	s.inputSystem.Update(deltaTime, s.cameraX)     // 2. Process player input (highest priority, 传递摄像机位置)
@@ -825,6 +833,11 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	// Layer 10: Draw last wave warning (Story 5.5)
 	// 最后一波提示（如果需要显示）
 	s.drawLastWaveWarning(screen)
+
+	// Layer 10.5: Draw reward panel (Story 8.3 + 8.4)
+	// 奖励面板（关卡完成后显示新植物介绍）
+	// 在游戏结果覆盖层之前渲染，因为它是正常游戏流程的一部分
+	s.rewardPanelRenderSystem.Draw(screen)
 
 	// Layer 11: Draw game result overlay (Story 5.5)
 	// 胜利/失败界面（如果游戏结束）

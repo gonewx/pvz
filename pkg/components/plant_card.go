@@ -48,4 +48,8 @@ type PlantCardComponent struct {
 	// Story 8.4: 卡片缩放
 	// CardScale 卡片整体缩放因子（用于控制卡片显示大小，如 0.54 为标准大小，1.0 为原始大小）
 	CardScale float64
+
+	// Story 8.4: 卡片透明度（用于淡入淡出动画）
+	// Alpha 卡片透明度（0.0 = 完全透明，1.0 = 完全不透明，默认 1.0）
+	Alpha float64
 }

@@ -25,6 +25,9 @@ const (
 	RewardExpandScaleEnd     = 1.0  // 最终缩放（放大到原始大小）
 	RewardExpandTargetYRatio = 0.45 // 目标Y位置（screenHeight * ratio）- 草坪上方中央
 
+	// Phase 3.5 - Flashing (闪光展示阶段)
+	RewardFlashingDuration = 2.5 // Award 粒子光芒展示时长（秒）- 让玩家充分欣赏视觉效果
+
 	// Phase 4 - Showing (显示奖励面板)
 	RewardCardScaleStart    = 0.5 // 卡片初始缩放
 	RewardCardScaleEnd      = 1.5 // 卡片最终缩放
@@ -50,22 +53,27 @@ type RewardAnimationSystem struct {
 	entityManager   *ecs.EntityManager
 	gameState       *game.GameState
 	resourceManager *game.ResourceManager
-	reanimSystem    *ReanimSystem // Reanim系统用于创建和管理动画
-	rewardEntity    ecs.EntityID  // 奖励动画实体ID（卡片包）
-	panelEntity     ecs.EntityID  // 奖励面板实体ID
-	glowEntity      ecs.EntityID  // 光晕粒子发射器实体ID
-	isActive        bool          // 系统是否激活
+	reanimSystem    *ReanimSystem    // Reanim系统用于创建和管理动画
+	particleSystem  *ParticleSystem  // 粒子系统用于检查粒子特效完成状态
+	rewardEntity    ecs.EntityID     // 奖励动画实体ID（卡片包）
+	panelEntity     ecs.EntityID     // 奖励面板实体ID
+	glowEntity      ecs.EntityID     // 光晕粒子发射器实体ID
+	isActive        bool             // 系统是否激活
+	currentPhase    string           // 当前阶段（flashing/showing/closing 时可能没有 rewardEntity）
+	currentPlantID  string           // 当前植物ID（保存用于面板创建）
+	phaseElapsed    float64          // 当前阶段经过时间
 	screenWidth     float64
 	screenHeight    float64
 }
 
 // NewRewardAnimationSystem 创建新的奖励动画系统。
-func NewRewardAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.ResourceManager, reanimSys *ReanimSystem) *RewardAnimationSystem {
+func NewRewardAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.ResourceManager, reanimSys *ReanimSystem, particleSys *ParticleSystem) *RewardAnimationSystem {
 	return &RewardAnimationSystem{
 		entityManager:   em,
 		gameState:       gs,
 		resourceManager: rm,
 		reanimSystem:    reanimSys,
+		particleSystem:  particleSys,
 		rewardEntity:    0,
 		panelEntity:     0,
 		glowEntity:      0,
@@ -92,34 +100,38 @@ func (ras *RewardAnimationSystem) TriggerReward(plantID string) {
 	// 随机选择草坪行（2-4行，偏中间位置）
 	randomLane := 1 + rand.Intn(3) // 第2、3或4行
 
-	// 计算起始位置（草坪偏右半部分随机位置，确保不超出草坪范围）
-	// 草坪共9列（0-8），选择第4-6列（偏右但不超出草坪）
-	randomCol := 3 + rand.Intn(3) // 第4、5或第6列
-	startX := config.GridWorldStartX + float64(randomCol)*config.CellWidth + config.CellWidth/2.0
+	// 计算起始位置（屏幕坐标，从屏幕右侧弹出）
+	// 屏幕宽度：800，选择屏幕右半部分（500-700）
+	startX := 500.0 + rand.Float64()*200.0 // 屏幕坐标 500-700
 	startY := config.GridWorldStartY + float64(randomLane)*config.CellHeight + config.CellHeight/2.0
 
-	// 计算 Phase 3 目标位置（屏幕可见区域中央上方）
+	// 计算 Phase 3 目标位置（屏幕坐标中央上方）
 	//
 	// 设计说明：
-	//   - 用户期望：卡片在屏幕可见区域的水平中央
-	//   - 屏幕可见区域（世界坐标）：[CameraX, CameraX + ScreenWidth]
-	//   - 屏幕中央（世界坐标）= CameraX + ScreenWidth/2 = 220 + 800/2 = 620
+	//   - 用户期望：卡片在屏幕的水平中央上方
+	//   - 屏幕宽度：800
+	//   - 屏幕中央X：800 / 2 = 400
 	//
 	// 计算流程：
-	//   1. 计算屏幕中央的世界坐标
+	//   1. 计算屏幕中央坐标
 	//   2. 减去半个卡片宽度，得到卡片左上角X坐标
-	//   3. Y坐标：草坪顶部上方约50像素
-	screenCenterX := ras.gameState.CameraX + ras.screenWidth/2.0 // 220 + 400 = 620
-	lawnTopY := config.GridWorldStartY                           // 76
+	//   3. Y坐标：草坪顶部上方约50像素（屏幕坐标）
+	screenCenterX := ras.screenWidth / 2.0 // 400
+	lawnTopY := config.GridWorldStartY     // 76 (世界坐标和屏幕坐标Y相同)
 
 	// 注意：PositionComponent 是卡片左上角坐标，需要减去半个卡片宽度使卡片中心对齐
 	// 卡片原始尺寸 100x140，在 expanding 结束时，CardScale = 1.0，所以卡片宽度 = 100
-	cardWidthAtEnd := 100.0                          // RewardExpandScaleEnd = 1.0 时的卡片宽度
-	targetX := screenCenterX - cardWidthAtEnd/2.0    // 卡片左上角X = 屏幕中心X - 半宽 = 620 - 50 = 570
-	targetY := lawnTopY - 50.0                       // 草坪顶部上方50像素
+	cardWidthAtEnd := 100.0                       // RewardExpandScaleEnd = 1.0 时的卡片宽度
+	targetX := screenCenterX - cardWidthAtEnd/2.0 // 卡片左上角X = 屏幕中心X - 半宽 = 400 - 50 = 350
+	targetY := lawnTopY + 50.0                    // 草坪顶部下方50像素
 
-	log.Printf("[RewardAnimationSystem] 卡片包起始位置（草坪格子）: (%.1f, %.1f), 目标位置: (%.1f, %.1f), 随机行: %d, 随机列: %d",
-		startX, startY, targetX, targetY, randomLane, randomCol)
+	log.Printf("[RewardAnimationSystem] ===== 位置计算调试信息 =====")
+	log.Printf("[RewardAnimationSystem] 屏幕宽度: %.1f, 屏幕中心X: %.1f", ras.screenWidth, screenCenterX)
+	log.Printf("[RewardAnimationSystem] 起始屏幕坐标: (%.1f, %.1f)", startX, startY)
+	log.Printf("[RewardAnimationSystem] 卡片宽度(scale=1.0): %.1f", cardWidthAtEnd)
+	log.Printf("[RewardAnimationSystem] 目标X计算: %.1f - %.1f/2 = %.1f", screenCenterX, cardWidthAtEnd, targetX)
+	log.Printf("[RewardAnimationSystem] 卡片包起始位置: (%.1f, %.1f), 目标位置: (%.1f, %.1f)", startX, startY, targetX, targetY)
+	log.Printf("[RewardAnimationSystem] 随机行: %d", randomLane)
 
 	// 添加 RewardAnimationComponent
 	ecs.AddComponent(ras.entityManager, ras.rewardEntity, &components.RewardAnimationComponent{
@@ -212,6 +224,10 @@ func (ras *RewardAnimationSystem) Update(dt float64) {
 		ras.updateWaitingPhase(dt, rewardComp)
 	case "expanding":
 		ras.updateExpandingPhase(dt, rewardComp)
+	case "pausing":
+		ras.updatePausingPhase(dt, rewardComp)
+	case "disappearing":
+		ras.updateDisappearingPhase(dt, rewardComp)
 	case "showing":
 		ras.updateShowingPhase(dt, rewardComp)
 	case "closing":
@@ -304,9 +320,9 @@ func (ras *RewardAnimationSystem) updateAppearingPhase(dt float64, rewardComp *c
 			if cardComp != nil && cardComp.BackgroundImage != nil {
 				cardWidth := float64(cardComp.BackgroundImage.Bounds().Dx()) * cardComp.CardScale
 				cardHeight := float64(cardComp.BackgroundImage.Bounds().Dy()) * cardComp.CardScale
-				particleX += cardWidth / 2.0   // X：卡片水平中心
-				particleY += cardHeight / 2.0  // Y：卡片垂直中心
-				particleY -= 62.0              // 减去主粒子的偏移量，使主粒子在中心
+				particleX += cardWidth / 2.0  // X：卡片水平中心
+				particleY += cardHeight / 2.0 // Y：卡片垂直中心
+				particleY -= 62.0             // 减去主粒子的偏移量，使主粒子在中心
 			}
 
 			glowID, err := entities.CreateParticleEffect(
@@ -342,64 +358,7 @@ func (ras *RewardAnimationSystem) updateWaitingPhase(dt float64, rewardComp *com
 		rewardComp.ElapsedTime = 0
 
 		// 清理 Phase 2 的光晕粒子（SeedPacket）
-		// 注意：需要立即清理发射器及所有已生成的粒子，让它们立即消失
-		if ras.glowEntity != 0 {
-			// 获取发射器的所有活跃粒子并立即销毁
-			emitter, ok := ecs.GetComponent[*components.EmitterComponent](ras.entityManager, ras.glowEntity)
-			if ok && len(emitter.ActiveParticles) > 0 {
-				// 立即销毁所有已生成的粒子实体
-				for _, particleID := range emitter.ActiveParticles {
-					// 方法1：直接销毁粒子实体
-					ras.entityManager.DestroyEntity(particleID)
-
-					// 方法2：如果方法1不够快，设置粒子生命周期让它立即过期
-					if particle, ok := ecs.GetComponent[*components.ParticleComponent](ras.entityManager, particleID); ok {
-						particle.Age = particle.Lifetime + 1.0 // 让粒子立即过期
-					}
-				}
-				log.Printf("[RewardAnimationSystem] 清理 %d 个光晕粒子", len(emitter.ActiveParticles))
-			}
-
-			// 清理发射器实体（SeedPacket有2个发射器，需要查找并清理所有相关发射器）
-			// Story 7.4: CreateParticleEffect 创建的所有发射器共享同一个 PositionComponent
-			// 我们需要找到所有共享同一位置的发射器实体
-			glowPos, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.glowEntity)
-			if ok {
-				// 查询所有发射器实体
-				allEmitters := ecs.GetEntitiesWith2[
-					*components.EmitterComponent,
-					*components.PositionComponent,
-				](ras.entityManager)
-
-				// 清理所有与光晕粒子共享位置的发射器
-				cleanedCount := 0
-				for _, emitterID := range allEmitters {
-					emitterPos, _ := ecs.GetComponent[*components.PositionComponent](ras.entityManager, emitterID)
-					// 使用指针比较，共享同一个 PositionComponent 实例的发射器属于同一组
-					if emitterPos == glowPos {
-						// 清理该发射器的所有粒子
-						if emitterComp, ok := ecs.GetComponent[*components.EmitterComponent](ras.entityManager, emitterID); ok {
-							for _, particleID := range emitterComp.ActiveParticles {
-								ras.entityManager.DestroyEntity(particleID)
-								// 让粒子立即过期
-								if particle, ok := ecs.GetComponent[*components.ParticleComponent](ras.entityManager, particleID); ok {
-									particle.Age = particle.Lifetime + 1.0
-								}
-							}
-						}
-						ras.entityManager.DestroyEntity(emitterID)
-						cleanedCount++
-					}
-				}
-				log.Printf("[RewardAnimationSystem] 清理了 %d 个发射器实体", cleanedCount)
-			}
-
-			// 立即移除标记的实体，让清理生效
-			ras.entityManager.RemoveMarkedEntities()
-
-			ras.glowEntity = 0
-			log.Printf("[RewardAnimationSystem] 清理光晕粒子完成")
-		}
+		ras.cleanupGlowParticles()
 
 		// 注意：Award 粒子特效在 expanding 阶段结束时才触发
 		// 这样卡片先移动到目标位置，然后才显示光芒效果
@@ -439,9 +398,18 @@ func (ras *RewardAnimationSystem) updateExpandingPhase(dt float64, rewardComp *c
 	posComp.X = rewardComp.StartX + (rewardComp.TargetX-rewardComp.StartX)*easedProgress
 	posComp.Y = rewardComp.StartY + (rewardComp.TargetY-rewardComp.StartY)*easedProgress
 
+	// 调试：每0.5秒输出一次当前位置
+	if int(rewardComp.ElapsedTime*2)%1 == 0 && rewardComp.ElapsedTime > 0.01 {
+		log.Printf("[Expanding] 进度: %.2f%%, 当前位置: (%.1f, %.1f), 当前缩放: %.2f",
+			progress*100, posComp.X, posComp.Y, rewardComp.Scale)
+	}
+
 	// 检查完成
 	if rewardComp.ElapsedTime >= RewardExpandDuration {
-		log.Printf("[RewardAnimationSystem] Phase 3 (expanding) 移动完成，触发 Award 粒子特效")
+		log.Printf("[RewardAnimationSystem] Phase 3 (expanding) 移动完成")
+		log.Printf("[RewardAnimationSystem] 最终位置: (%.1f, %.1f), 最终缩放: %.2f", posComp.X, posComp.Y, rewardComp.Scale)
+		log.Printf("[RewardAnimationSystem] 目标位置: (%.1f, %.1f)", rewardComp.TargetX, rewardComp.TargetY)
+		log.Printf("[RewardAnimationSystem] 触发 Award 粒子特效")
 
 		// 在移动完成后触发 Award.xml 粒子特效（12个光芒发射器）
 		posComp, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.rewardEntity)
@@ -477,27 +445,97 @@ func (ras *RewardAnimationSystem) updateExpandingPhase(dt float64, rewardComp *c
 			}
 		}
 
+		// Phase 3 完成，进入短暂停顿阶段（让玩家看清楚卡片包到达目标位置）
+		rewardComp.Phase = "pausing"
+		rewardComp.ElapsedTime = 0
+		log.Printf("[RewardAnimationSystem] Phase 3 完成，进入 pausing 阶段（短暂停顿）")
+	}
+}
+
+// updatePausingPhase 处理短暂停顿阶段。
+// - 卡片包静止在目标位置，展示 Award 粒子特效
+// - 持续时间由 config.RewardPausingDuration 配置
+// - 然后自动进入消失阶段
+func (ras *RewardAnimationSystem) updatePausingPhase(dt float64, rewardComp *components.RewardAnimationComponent) {
+	// 检查完成
+	if rewardComp.ElapsedTime >= config.RewardPausingDuration {
+		log.Printf("[RewardAnimationSystem] 停顿完成，进入 disappearing 阶段")
+		rewardComp.Phase = "disappearing"
+		rewardComp.ElapsedTime = 0
+	}
+}
+
+// updateDisappearingPhase 处理卡片包消失阶段。
+// - 卡片包淡出（透明度 1.0 → 0.0）
+// - 持续时间由 config.RewardDisappearDuration 配置
+// - 消失完成后，立即进入 Phase 4 显示面板
+func (ras *RewardAnimationSystem) updateDisappearingPhase(dt float64, rewardComp *components.RewardAnimationComponent) {
+	// 计算透明度（从 1.0 淡出到 0.0）
+	progress := rewardComp.ElapsedTime / config.RewardDisappearDuration
+	if progress > 1.0 {
+		progress = 1.0
+	}
+	alpha := 1.0 - progress
+
+	// 更新卡片透明度（通过 PlantCardComponent.Alpha）
+	if cardComp, ok := ecs.GetComponent[*components.PlantCardComponent](ras.entityManager, ras.rewardEntity); ok {
+		cardComp.Alpha = alpha
+	}
+
+	// 检查完成
+	if rewardComp.ElapsedTime >= config.RewardDisappearDuration {
+		log.Printf("[RewardAnimationSystem] 卡片包消失完成，进入面板显示阶段")
+
+		// 保存 PlantID（在删除组件前）
+		plantID := rewardComp.PlantID
+
+		// 隐藏卡片包（移除 PlantCardComponent，使其不被渲染）
+		if ras.rewardEntity != 0 {
+			if _, hasCard := ecs.GetComponent[*components.PlantCardComponent](ras.entityManager, ras.rewardEntity); hasCard {
+				ecs.RemoveComponent[*components.PlantCardComponent](ras.entityManager, ras.rewardEntity)
+				log.Printf("[RewardAnimationSystem] 移除卡片包的 PlantCardComponent（隐藏渲染）")
+			}
+		}
+
+		// 清理 Award 粒子特效（避免与面板视觉冲突）
+		if ras.glowEntity != 0 {
+			ras.cleanupGlowParticles()
+			log.Printf("[RewardAnimationSystem] 清理 Award 粒子特效")
+		}
+
+		// 立即移除所有标记的实体
+		ras.entityManager.RemoveMarkedEntities()
+
+		// 进入 Phase 4 (showing)
 		rewardComp.Phase = "showing"
 		rewardComp.ElapsedTime = 0
 
 		// 创建奖励面板
-		ras.createRewardPanel(rewardComp.PlantID)
+		ras.createRewardPanel(plantID)
+		log.Printf("[RewardAnimationSystem] 进入 Phase 4 (showing)，显示奖励面板")
 	}
 }
 
 // updateShowingPhase 处理显示奖励面板阶段。
-// - 显示新植物介绍面板
-// - 需要玩家手动点击才能关闭（无自动播放）
+// - 面板淡入动画（透明度 0.0 → 1.0，持续 config.RewardPanelFadeInDuration）
+// - 淡入完成后，等待玩家点击关闭
 func (ras *RewardAnimationSystem) updateShowingPhase(dt float64, rewardComp *components.RewardAnimationComponent) {
-	// 更新面板动画（如果有）
-	if panelComp, ok := ecs.GetComponent[*components.RewardPanelComponent](ras.entityManager, ras.panelEntity); ok {
-		// 卡片缩放动画（0.5 → 1.5）
-		progress := rewardComp.ElapsedTime / RewardCardScaleDuration
-		if progress > 1.0 {
-			progress = 1.0
+	// 更新面板透明度（淡入动画）
+	if ras.panelEntity != 0 {
+		panelComp, ok := ecs.GetComponent[*components.RewardPanelComponent](ras.entityManager, ras.panelEntity)
+		if ok {
+			// 更新动画时间
+			panelComp.AnimationTime += dt
+
+			// 计算淡入进度（0.0 → 1.0）
+			progress := panelComp.AnimationTime / config.RewardPanelFadeInDuration
+			if progress > 1.0 {
+				progress = 1.0
+			}
+
+			// 应用淡入效果
+			panelComp.FadeAlpha = progress
 		}
-		easedProgress := easeOutQuad(progress)
-		panelComp.CardScale = RewardCardScaleStart + (RewardCardScaleEnd-RewardCardScaleStart)*easedProgress
 	}
 
 	// 检测玩家点击（鼠标或空格键）- 手动关闭
@@ -565,9 +603,11 @@ func (ras *RewardAnimationSystem) createRewardPanel(plantID string) {
 		PlantName:        plantName,
 		PlantDescription: plantDesc,
 		SunCost:          sunCost,            // 设置阳光值
-		CardScale:        RewardCardScaleStart,
+		CardScale:        1.0,                // 卡片固定大小，不做动画
+		FadeAlpha:        0.0,                // Story 8.4: 初始完全透明，用于淡入动画
 		// Story 8.4: 卡片位置由 RewardPanelRenderSystem 自动计算（水平居中）
 		IsVisible:        true,
+		AnimationTime:    0.0,                // Story 8.4: 动画时间计数器，用于淡入效果
 	})
 
 	log.Printf("[RewardAnimationSystem] 奖励面板已创建：%s - %s", plantName, plantDesc)
@@ -682,4 +722,78 @@ func (ras *RewardAnimationSystem) compositePlantCard(cardPackImg, plantIcon *ebi
 	compositeImg.DrawImage(plantIcon, op)
 
 	return compositeImg
+}
+
+// cleanupGlowParticles 清理光晕粒子和发射器
+// 用于清理 SeedPacket（Phase 2）或 Award（Phase 3）粒子特效
+func (ras *RewardAnimationSystem) cleanupGlowParticles() {
+	// 注意：需要立即清理发射器及所有已生成的粒子，让它们立即消失
+	if ras.glowEntity != 0 {
+		// 获取发射器的所有活跃粒子并立即销毁
+		emitter, ok := ecs.GetComponent[*components.EmitterComponent](ras.entityManager, ras.glowEntity)
+		if ok && len(emitter.ActiveParticles) > 0 {
+			// 立即销毁所有已生成的粒子实体
+			for _, particleID := range emitter.ActiveParticles {
+				// 方法1：直接销毁粒子实体
+				ras.entityManager.DestroyEntity(particleID)
+
+				// 方法2：如果方法1不够快，设置粒子生命周期让它立即过期
+				if particle, ok := ecs.GetComponent[*components.ParticleComponent](ras.entityManager, particleID); ok {
+					particle.Age = particle.Lifetime + 1.0 // 让粒子立即过期
+				}
+			}
+			log.Printf("[RewardAnimationSystem] 清理 %d 个光晕粒子", len(emitter.ActiveParticles))
+		}
+
+		// 清理发射器实体（SeedPacket有2个发射器，Award有13个发射器，需要查找并清理所有相关发射器）
+		// Story 7.4: CreateParticleEffect 创建的所有发射器共享同一个 PositionComponent
+		// 我们需要找到所有共享同一位置的发射器实体
+		glowPos, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.glowEntity)
+		if ok {
+			// 查询所有发射器实体
+			allEmitters := ecs.GetEntitiesWith2[
+				*components.EmitterComponent,
+				*components.PositionComponent,
+			](ras.entityManager)
+
+			// 清理所有与光晕粒子共享位置的发射器
+			cleanedCount := 0
+			for _, emitterID := range allEmitters {
+				emitterPos, _ := ecs.GetComponent[*components.PositionComponent](ras.entityManager, emitterID)
+				// 使用指针比较，共享同一个 PositionComponent 实例的发射器属于同一组
+				if emitterPos == glowPos {
+					// 清理该发射器的所有粒子
+					if emitterComp, ok := ecs.GetComponent[*components.EmitterComponent](ras.entityManager, emitterID); ok {
+						for _, particleID := range emitterComp.ActiveParticles {
+							ras.entityManager.DestroyEntity(particleID)
+							// 让粒子立即过期
+							if particle, ok := ecs.GetComponent[*components.ParticleComponent](ras.entityManager, particleID); ok {
+								particle.Age = particle.Lifetime + 1.0
+							}
+						}
+					}
+					ras.entityManager.DestroyEntity(emitterID)
+					cleanedCount++
+				}
+			}
+			log.Printf("[RewardAnimationSystem] 清理了 %d 个发射器实体", cleanedCount)
+		}
+
+		// 立即移除标记的实体，让清理生效
+		ras.entityManager.RemoveMarkedEntities()
+
+		ras.glowEntity = 0
+		log.Printf("[RewardAnimationSystem] 清理光晕粒子完成")
+	}
+}
+
+// isParticleEffectCompleted 检查粒子特效是否播放完成
+// 委托给 ParticleSystem 来判断（遵循模块职责分离原则）
+func (ras *RewardAnimationSystem) isParticleEffectCompleted() bool {
+	if ras.particleSystem == nil || ras.glowEntity == 0 {
+		return false
+	}
+
+	// 使用 ParticleSystem 提供的公开接口
+	return ras.particleSystem.IsParticleEffectCompleted(ras.glowEntity)
 }
