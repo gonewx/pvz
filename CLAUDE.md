@@ -378,6 +378,172 @@ entities.RenderPlantCard(
 
 **相关文档**：`docs/stories/8.4.story.md`
 
+## 粒子系统渲染层级管理（Story 8.5）
+
+### 问题背景
+
+在实现奖励动画系统时，发现了**渲染层级冲突**问题：
+- 奖励动画的粒子效果和植物选择栏的卡片渲染顺序错误
+- 两处使用同样的 `PlantCardRenderSystem`，无法分别控制渲染层级
+- 不同系统的卡片会被错误地处理（状态更新、点击事件）
+
+### 解决方案：系统自管理模式（System Self-Management）
+
+#### 核心设计原则
+
+**符合 ECS 架构**：
+- ✅ **系统负责自己的实体** - `RewardAnimationSystem` 管理自己的卡片
+- ✅ **低耦合** - 不依赖全局的 `PlantCardRenderSystem`
+- ✅ **职责清晰** - 每个系统只关心自己的实体
+- ✅ **扩展性强** - 新增模块不影响现有系统
+
+#### RewardCardComponent 标记组件
+
+**位置**：`pkg/components/reward_card_component.go`
+
+**用途**：
+- 区分奖励卡片和选择栏卡片
+- 允许不同系统有针对性地处理实体
+
+**使用**：
+```go
+// 在 RewardAnimationSystem 创建奖励卡片时添加标记
+ecs.AddComponent(em, cardEntity, &components.RewardCardComponent{})
+```
+
+#### 粒子渲染层级分离
+
+**两个渲染方法**：
+
+1. **`RenderSystem.DrawGameWorldParticles()`** - 只渲染游戏世界粒子
+   ```go
+   // GameScene.Draw() - Layer 6
+   s.renderSystem.DrawGameWorldParticles(screen, s.cameraX)
+   // 过滤掉有 UIComponent 的粒子
+   ```
+
+2. **`RenderSystem.DrawParticles()`** - 渲染所有粒子
+   ```go
+   // RewardAnimationSystem.Draw() 内部调用
+   ras.renderSystem.DrawParticles(screen, cameraOffsetX)
+   // 包含 UI 粒子
+   ```
+
+#### 系统自管理渲染
+
+**RewardAnimationSystem** 直接渲染自己的实体：
+
+```go
+func (ras *RewardAnimationSystem) Draw(screen *ebiten.Image) {
+    // 1. 绘制 Reanim 实体
+    ras.renderSystem.Draw(screen, cameraOffsetX)
+    
+    // 2. 绘制粒子效果（包含 UI 粒子）
+    ras.renderSystem.DrawParticles(screen, cameraOffsetX)
+    
+    // 3. 直接渲染自己管理的卡片实体
+    if card, ok := ecs.GetComponent[*components.PlantCardComponent](ras.entityManager, ras.rewardEntity); ok {
+        if pos, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.rewardEntity); ok {
+            entities.RenderPlantCard(screen, card, pos.X, pos.Y, ras.sunFont, ras.sunFontSize)
+        }
+    }
+}
+```
+
+#### 系统自动过滤
+
+**三个系统自动跳过奖励卡片**：
+
+1. **PlantCardRenderSystem.Draw()** - 跳过渲染
+   ```go
+   // 跳过奖励卡片（由 RewardAnimationSystem 自行渲染）
+   if _, isRewardCard := ecs.GetComponent[*components.RewardCardComponent](s.entityManager, entityID); isRewardCard {
+       continue
+   }
+   ```
+
+2. **PlantCardSystem.Update()** - 跳过状态更新
+   ```go
+   // 跳过奖励卡片（由 RewardAnimationSystem 管理）
+   if _, isRewardCard := ecs.GetComponent[*components.RewardCardComponent](s.entityManager, entityID); isRewardCard {
+       continue
+   }
+   ```
+
+3. **InputSystem.handlePlantCardClick()** - 跳过点击处理
+   ```go
+   // 跳过奖励卡片（奖励卡片不应被点击选择）
+   if _, isRewardCard := ecs.GetComponent[*components.RewardCardComponent](s.entityManager, entityID); isRewardCard {
+       continue
+   }
+   ```
+
+### 最终渲染顺序
+
+```
+GameScene.Draw():
+  → Layer 1-5: 背景、植物、僵尸等
+  → Layer 6: PlantCardRenderSystem.Draw()  (选择栏卡片)
+  → Layer 6: renderSystem.DrawGameWorldParticles()  (游戏世界粒子)
+  → Layer 7+: UI 层
+
+RewardAnimationSystem.Draw() (独立渲染):
+  → Reanim 实体
+  → UI 粒子效果
+  → 奖励卡片 (最上层)
+```
+
+### 架构对比
+
+#### ❌ 旧架构（问题）
+```
+PlantCardRenderSystem.Draw()
+  → 渲染所有卡片（包括奖励卡片）
+  → 无法区分渲染层级
+  → 需要复杂的过滤逻辑
+
+GameScene.Draw()
+  → renderSystem.DrawParticles() 
+  → 渲染所有粒子（包括 UI 粒子）
+  → 奖励粒子在错误的层级
+```
+
+#### ✅ 新架构（优化）
+```
+GameScene.Draw() - Layer 6
+  → PlantCardRenderSystem.Draw() (自动过滤奖励卡片)
+  → renderSystem.DrawGameWorldParticles() (只渲染游戏粒子)
+
+RewardAnimationSystem.Draw() (完全封装)
+  → 直接渲染自己的卡片实体
+  → renderSystem.DrawParticles() (包含 UI 粒子)
+  → 不影响其他系统
+```
+
+### 设计优势
+
+1. **符合 ECS 原则** - 系统管理自己的实体
+2. **低耦合** - 系统之间独立，互不影响
+3. **高内聚** - 相关逻辑封装在同一个系统内
+4. **易扩展** - 新增模块（如商店、图鉴）可以采用相同模式
+5. **易维护** - 职责清晰，修改范围明确
+
+### 扩展建议
+
+**未来类似场景**：
+- 图鉴界面：创建 `PlantAlmanacSystem`，自己管理和渲染卡片
+- 商店界面：创建 `ShopSystem`，自己管理和渲染卡片
+- 对战选择：创建 `BattleSelectSystem`，自己管理和渲染卡片
+
+**统一模式**：
+```go
+// 1. 创建标记组件 (如 AlmanacCardComponent)
+// 2. 系统内部直接渲染
+// 3. 其他系统自动过滤
+```
+
+**相关文档**：`docs/stories/8.5.story.md`
+
 ## 编码规范
 
 ### 命名约定
