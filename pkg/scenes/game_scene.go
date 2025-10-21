@@ -9,6 +9,7 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/modules"
 	"github.com/decker502/pvz/pkg/systems"
@@ -68,6 +69,10 @@ type GameScene struct {
 	sunCounterBG *ebiten.Image // Sun counter background (阳光计数器背景)
 	shovelSlot   *ebiten.Image // Shovel slot background (铲子槽位背景)
 	shovel       *ebiten.Image // Shovel icon (铲子图标)
+	// Progress bar resources (进度条资源)
+	flagMeter     *ebiten.Image // Flag meter background (进度条背景，2行切片)
+	flagMeterProg *ebiten.Image // Flag meter progress bar (进度条填充)
+	flagMeterFlag *ebiten.Image // Flag meter flags/parts (进度条标志，3列切片)
 
 	// Story 8.2 QA改进：草皮叠加层（随动画进度渐进显示）
 	sodRowImage        *ebiten.Image // 草皮叠加图片（sod1row.jpg）
@@ -154,6 +159,11 @@ type GameScene struct {
 	// Story 8.3 + 8.4重构: Reward Animation System (完全封装奖励流程)
 	// 内部自动管理卡片包动画、粒子效果、奖励面板渲染等所有细节
 	rewardSystem *systems.RewardAnimationSystem
+
+	// Button Systems (按钮系统 - ECS 架构)
+	buttonSystem       *systems.ButtonSystem       // 按钮交互系统
+	buttonRenderSystem *systems.ButtonRenderSystem // 按钮渲染系统
+	menuButtonEntity   ecs.EntityID                // 菜单按钮实体ID
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -377,6 +387,14 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	scene.soddingSystem = systems.NewSoddingSystem(scene.entityManager, scene.resourceManager, scene.reanimSystem)
 	log.Printf("[GameScene] Initialized sodding animation system")
 
+	// 按钮系统初始化（ECS 架构）
+	scene.buttonSystem = systems.NewButtonSystem(scene.entityManager)
+	scene.buttonRenderSystem = systems.NewButtonRenderSystem(scene.entityManager)
+	log.Printf("[GameScene] Initialized button systems")
+
+	// 创建菜单按钮实体
+	scene.initMenuButton(rm)
+
 	return scene
 }
 
@@ -422,6 +440,40 @@ func (s *GameScene) initPlantCardSystems(rm *game.ResourceManager) {
 	}
 
 	log.Printf("[GameScene] Plant selection module initialized successfully")
+}
+
+// initMenuButton 初始化菜单按钮（ECS 架构）
+// 创建可复用的三段式按钮实体，文字自动居中
+func (s *GameScene) initMenuButton(rm *game.ResourceManager) {
+	// 计算菜单按钮位置（右上角）
+	buttonX := float64(WindowWidth) - config.MenuButtonOffsetFromRight
+	buttonY := config.MenuButtonOffsetFromTop
+
+	// 按钮中间部分宽度（根据文字长度）
+	middleWidth := config.MenuButtonTextWidth + config.MenuButtonTextPadding*2
+
+	// 创建菜单按钮实体
+	var err error
+	s.menuButtonEntity, err = entities.NewMenuButton(
+		s.entityManager,
+		rm,
+		buttonX,
+		buttonY,
+		"菜单",                                       // 按钮文字
+		20.0,                                       // 字体大小
+		[4]uint8{0, 200, 0, 255},                   // 绿色文字
+		middleWidth,                                // 中间宽度
+		func() {
+			log.Printf("[GameScene] Menu button clicked!")
+			// TODO: 打开暂停菜单
+		},
+	)
+
+	if err != nil {
+		log.Printf("[GameScene] Warning: Failed to create menu button: %v", err)
+	} else {
+		log.Printf("[GameScene] Menu button created successfully (Entity ID: %d)", s.menuButtonEntity)
+	}
 }
 
 // loadResources loads all UI images required for the game scene.
@@ -494,8 +546,31 @@ func (s *GameScene) loadResources() {
 		s.plantCardFont = cardFont
 	}
 
+	// Load progress bar resources (进度条资源)
+	flagMeter, err := s.resourceManager.LoadImageByID("IMAGE_FLAGMETER")
+	if err != nil {
+		log.Printf("Warning: Failed to load progress bar background: %v", err)
+	} else {
+		s.flagMeter = flagMeter
+	}
+
+	flagMeterProg, err := s.resourceManager.LoadImageByID("IMAGE_FLAGMETERLEVELPROGRESS")
+	if err != nil {
+		log.Printf("Warning: Failed to load progress bar fill: %v", err)
+	} else {
+		s.flagMeterProg = flagMeterProg
+	}
+
+	flagMeterFlag, err := s.resourceManager.LoadImageByID("IMAGE_FLAGMETERPARTS")
+	if err != nil {
+		log.Printf("Warning: Failed to load progress bar flags: %v", err)
+	} else {
+		s.flagMeterFlag = flagMeterFlag
+	}
+
 	// Note: Sun counter background is drawn procedurally for now
 	// A dedicated image can be loaded here in the future if needed
+	// Menu button resources are now loaded via ButtonFactory (ECS architecture)
 }
 
 // loadSoddingResources loads sodding animation resources after level config is loaded.
@@ -712,7 +787,7 @@ func (s *GameScene) Update(deltaTime float64) {
 		s.plantSelectionModule.Update(deltaTime) // 1. Update plant card states (before input)
 	}
 
-	s.inputSystem.Update(deltaTime, s.cameraX)     // 2. Process player input (highest priority, 传递摄像机位置)
+	s.inputSystem.Update(deltaTime, s.cameraX) // 2. Process player input (highest priority, 传递摄像机位置)
 
 	// 3. Generate new suns
 	// 教学关卡：在第一次收集阳光后启用自动生成（由 TutorialSystem 控制）
@@ -735,6 +810,10 @@ func (s *GameScene) Update(deltaTime float64) {
 	// Story 3.2: 植物预览系统 - 更新预览位置（双图像支持）
 	s.plantPreviewSystem.Update(deltaTime) // 10. Update plant preview position (dual-image support)
 	s.lawnGridSystem.Update(deltaTime)     // 10.5. Update lawn flash animation (Story 8.2)
+	// ECS 按钮系统更新（交互检测）
+	if s.buttonSystem != nil {
+		s.buttonSystem.Update(deltaTime) // 10.7. Update button interactions (hover, click)
+	}
 	s.lifetimeSystem.Update(deltaTime)     // 11. Check for expired entities
 	s.entityManager.RemoveMarkedEntities() // 12. Clean up deleted entities (always last)
 }
@@ -801,6 +880,11 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	s.drawSeedBank(screen)
 	s.drawShovel(screen)
 
+	// 使用 ECS 按钮系统渲染菜单按钮
+	if s.buttonRenderSystem != nil {
+		s.buttonRenderSystem.Draw(screen)
+	}
+
 	// Layer 3: Draw plant cards (Story 3.1 架构优化)
 	// 在植物和僵尸下方渲染，符合原版PVZ设计
 	if s.plantSelectionModule != nil {
@@ -839,13 +923,13 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 		s.renderSystem.DrawTutorialText(screen, s.tutorialFont)
 	}
 
-	// Layer 9: Draw level progress UI (Story 5.5)
-	// 进度条显示当前波次进度
-	s.drawLevelProgress(screen)
+	// Layer 9: Draw level progress bar (Story 5.5 - 正式版本)
+	// 右下角图形化进度条
+	s.drawProgressBar(screen)
 
-	// Layer 10: Draw last wave warning (Story 5.5)
-	// 最后一波提示（如果需要显示）
-	s.drawLastWaveWarning(screen)
+	// Layer 10: Draw last wave warning (Story 5.5) - DISABLED for production
+	// 最后一波提示（如果需要显示）（开发调试用，已禁用）
+	// s.drawLastWaveWarning(screen) // 已禁用：改为使用 FinalWave.reanim 动画
 
 	// Layer 10.5: Draw reward panel (Story 8.3 + 8.4)
 	// Story 8.4重构：RewardAnimationSystem完全封装奖励面板渲染
@@ -1079,7 +1163,13 @@ func (s *GameScene) drawSunCounter(screen *ebiten.Image) {
 
 // drawShovel renders the shovel slot and icon at the right side of the seed bank.
 // The shovel will be used in future stories for removing plants.
+// Story 8.5: 1-1关（教学关卡）不显示铲子
 func (s *GameScene) drawShovel(screen *ebiten.Image) {
+	// 教学关卡不显示铲子（玩家还不需要学习移除植物）
+	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.OpeningType == "tutorial" {
+		return
+	}
+
 	// Draw shovel slot background first
 	if s.shovelSlot != nil {
 		op := &ebiten.DrawImageOptions{}
@@ -1445,5 +1535,89 @@ func (s *GameScene) drawLawnFlash(screen *ebiten.Image) {
 		op := &ebiten.DrawImageOptions{}
 		op.GeoM.Translate(screenStartX, screenStartY)
 		screen.DrawImage(flashImage, op)
+	}
+}
+
+// drawProgressBar 渲染右下角的进度条（使用原版资源）
+// 显示当前关卡进度和已消灭的僵尸波次
+func (s *GameScene) drawProgressBar(screen *ebiten.Image) {
+	// 只在关卡加载后且有进度条资源时显示
+	if s.gameState.CurrentLevel == nil || s.flagMeter == nil {
+		return
+	}
+
+	// 进度条位置：右下角（从配置读取）
+	progressX := float64(WindowWidth) - config.ProgressBarOffsetFromRight
+	progressY := float64(WindowHeight) - config.ProgressBarOffsetFromBottom
+
+	// 绘制背景（FlagMeter第1行 - 正常状态）
+	bgBounds := s.flagMeter.Bounds()
+	bgHeight := bgBounds.Dy() / 2 // 2行切片，每行高度27像素
+	bgRect := image.Rect(0, 0, bgBounds.Dx(), bgHeight)
+	bgImage := s.flagMeter.SubImage(bgRect).(*ebiten.Image)
+
+	bgOp := &ebiten.DrawImageOptions{}
+	bgOp.GeoM.Translate(progressX, progressY)
+	screen.DrawImage(bgImage, bgOp)
+
+	// 绘制僵尸头图标（FlagMeterParts第1列）
+	if s.flagMeterFlag != nil {
+		partsBounds := s.flagMeterFlag.Bounds()
+		partWidth := partsBounds.Dx() / 3 // 3列切片
+		zombieHeadRect := image.Rect(0, 0, partWidth, partsBounds.Dy())
+		zombieHeadImage := s.flagMeterFlag.SubImage(zombieHeadRect).(*ebiten.Image)
+
+		// 僵尸头位置：进度条左侧（从配置读取偏移）
+		headOp := &ebiten.DrawImageOptions{}
+		headOp.GeoM.Translate(
+			progressX+config.ProgressBarZombieHeadOffsetX,
+			progressY+config.ProgressBarZombieHeadOffsetY,
+		)
+		screen.DrawImage(zombieHeadImage, headOp)
+	}
+
+	// 计算进度（已击杀僵尸数 / 总僵尸数）
+	totalZombies := s.gameState.TotalZombiesSpawned
+	killedZombies := s.gameState.ZombiesKilled
+	progress := 0.0
+	if totalZombies > 0 {
+		progress = float64(killedZombies) / float64(totalZombies)
+	}
+
+	// 绘制进度条填充（从左到右）
+	if s.flagMeterProg != nil && progress > 0 {
+		progBounds := s.flagMeterProg.Bounds()
+		fillWidth := int(float64(progBounds.Dx()) * progress)
+		if fillWidth > progBounds.Dx() {
+			fillWidth = progBounds.Dx()
+		}
+
+		if fillWidth > 0 {
+			// 裁剪进度条图片
+			fillRect := image.Rect(0, 0, fillWidth, progBounds.Dy())
+			fillImage := s.flagMeterProg.SubImage(fillRect).(*ebiten.Image)
+
+			// 进度条位置：在背景内部，僵尸头右侧（从配置读取偏移）
+			fillOp := &ebiten.DrawImageOptions{}
+			fillOp.GeoM.Translate(
+				progressX+config.ProgressBarFillOffsetX,
+				progressY+config.ProgressBarFillOffsetY,
+			)
+			screen.DrawImage(fillImage, fillOp)
+		}
+	}
+
+	// 绘制关卡编号文字（如"关卡 1-1"）
+	if s.sunCounterFont != nil && s.gameState.CurrentLevel != nil {
+		levelText := fmt.Sprintf("关卡 %s", s.gameState.CurrentLevel.ID)
+
+		// 文字位置：进度条右侧（从配置读取偏移）
+		textX := progressX + float64(bgBounds.Dx()) + config.ProgressBarLevelTextOffsetX
+		textY := progressY + config.ProgressBarLevelTextOffsetY
+
+		op := &text.DrawOptions{}
+		op.GeoM.Translate(textX, textY)
+		op.ColorScale.ScaleWithColor(color.RGBA{R: 255, G: 255, B: 255, A: 255}) // 白色
+		text.Draw(screen, levelText, s.sunCounterFont, op)
 	}
 }

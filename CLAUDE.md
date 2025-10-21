@@ -293,6 +293,7 @@ RenderSystem       PlantCardRenderSystem
 | ✨ 粒子 | ParticleComponent | RenderSystem.DrawParticles() | 高性能批量渲染 (Story 7.3) |
 | 👻 植物预览 | ReanimComponent | PlantPreviewRenderSystem | 完整动画（双图像渲染） |
 | 🎴 植物卡片 | SpriteComponent | PlantCardRenderSystem | UI 元素 |
+| 🔘 按钮 | ButtonComponent | ButtonRenderSystem | UI 交互元素（自动居中文字） |
 
 ### 相关文档
 
@@ -507,6 +508,172 @@ selectedPlants := module.GetSelectedPlants()
 ```
 
 **相关文档**：Sprint Change Proposal - 植物选择栏架构一致性审查
+
+## 按钮组件系统（ECS 架构）
+
+### 概述
+
+按钮组件系统是一个完全符合 ECS 架构的可复用 UI 交互系统，用于创建各种类型的按钮（菜单按钮、下一关按钮、设置按钮等）。
+
+### 设计原则
+
+1. **ECS 架构** - 完全遵循实体-组件-系统模式
+2. **可复用** - 通过工厂函数轻松创建各种按钮
+3. **自动居中** - 使用 ebiten 原生 API 实现文字自动居中
+4. **类型安全** - 使用泛型 ECS API，编译时类型检查
+
+### 核心组件
+
+#### ButtonComponent（按钮数据组件）
+
+**文件位置**：`pkg/components/button_component.go`
+
+**支持的按钮类型**：
+- `ButtonTypeNineSlice` - 三段式可拉伸按钮（左、中、右）
+- `ButtonTypeSimple` - 简单图片按钮
+
+**核心字段**：
+```go
+type ButtonComponent struct {
+    Type ButtonType  // 按钮类型
+
+    // 三段式按钮资源
+    LeftImage, MiddleImage, RightImage *ebiten.Image
+    MiddleWidth float64
+
+    // 简单按钮资源
+    NormalImage, HoverImage, PressedImage *ebiten.Image
+
+    // 文字配置
+    Text      string
+    Font      *text.GoTextFace
+    TextColor [4]uint8  // R, G, B, A
+
+    // 状态
+    State   UIState  // Normal/Hover/Clicked/Disabled
+    Enabled bool
+
+    // 回调
+    OnClick func()
+}
+```
+
+#### ButtonRenderSystem（按钮渲染系统）
+
+**文件位置**：`pkg/systems/button_render_system.go`
+
+**职责**：
+- 渲染按钮背景（三段式 or 简单图片）
+- 渲染按钮文字（自动水平和垂直居中）
+- 根据按钮状态选择不同图片
+
+**自动居中实现**：
+```go
+// 使用 ebiten 的对齐选项实现自动居中
+op := &text.DrawOptions{}
+op.LayoutOptions.PrimaryAlign = text.AlignCenter   // 水平居中
+op.LayoutOptions.SecondaryAlign = text.AlignCenter // 垂直居中
+op.GeoM.Translate(centerX, centerY)
+text.Draw(screen, buttonText, font, op)
+```
+
+#### ButtonSystem（按钮交互系统）
+
+**文件位置**：`pkg/systems/button_system.go`
+
+**职责**：
+- 检测鼠标悬停（更新状态为 UIHovered）
+- 检测鼠标点击（触发 OnClick 回调）
+- 根据 Enabled 状态决定是否响应交互
+
+### 使用示例
+
+#### 创建菜单按钮
+
+```go
+// 使用工厂函数创建三段式菜单按钮
+menuButtonEntity, err := entities.NewMenuButton(
+    entityManager,
+    resourceManager,
+    x, y,                             // 位置
+    "菜单",                            // 按钮文字
+    20.0,                             // 字体大小
+    [4]uint8{0, 200, 0, 255},         // 绿色文字
+    middleWidth,                      // 中间部分宽度
+    func() {
+        log.Printf("Menu button clicked!")
+        // 打开暂停菜单
+    },
+)
+```
+
+#### 初始化按钮系统
+
+```go
+// 在 GameScene 中初始化
+scene.buttonSystem = systems.NewButtonSystem(scene.entityManager)
+scene.buttonRenderSystem = systems.NewButtonRenderSystem(scene.entityManager)
+```
+
+#### 更新和渲染
+
+```go
+// 在 GameScene.Update() 中
+func (s *GameScene) Update(dt float64) {
+    if s.buttonSystem != nil {
+        s.buttonSystem.Update(dt)  // 更新按钮交互
+    }
+}
+
+// 在 GameScene.Draw() 中
+func (s *GameScene) Draw(screen *ebiten.Image) {
+    if s.buttonRenderSystem != nil {
+        s.buttonRenderSystem.Draw(screen)  // 渲染所有按钮
+    }
+}
+```
+
+### 代码位置
+
+**组件**：`pkg/components/button_component.go`
+**系统**：
+- `pkg/systems/button_render_system.go` - 渲染系统
+- `pkg/systems/button_system.go` - 交互系统
+
+**工厂**：`pkg/entities/button_factory.go`
+- `NewMenuButton()` - 创建三段式菜单按钮
+
+**使用场景**：
+- **GameScene** - 右上角菜单按钮（当前实现）
+- **RewardPanelRenderSystem** - 下一关按钮（未来扩展）
+- **PauseMenu** - 继续、重新开始、退出按钮（未来扩展）
+- **SettingsScene** - 设置选项按钮（未来扩展）
+
+### 架构优势
+
+1. **完全符合 ECS** - 数据（Component）、逻辑（System）、创建（Factory）分离
+2. **高复用性** - 一行代码创建按钮，支持任意场景
+3. **自动居中** - 无需手动计算，使用 ebiten 原生对齐功能
+4. **类型安全** - 使用泛型 ECS API，编译时捕获错误
+5. **易扩展** - 轻松添加新的按钮类型和状态
+
+### 扩展性
+
+**未来支持的新功能**：
+- 按钮悬停效果（切换 HoverImage）
+- 按钮按下效果（切换 PressedImage）
+- 按钮禁用状态（灰色显示）
+- 按钮音效（点击时播放声音）
+- 按钮动画（缩放、淡入淡出）
+
+**统一模式**：
+```go
+// 所有按钮都采用相同模式创建：
+buttonEntity, err := entities.NewMenuButton(...)
+// 系统自动处理渲染和交互
+```
+
+**相关文档**：本次架构重构 - 菜单按钮 ECS 化
 
 ## 粒子系统渲染层级管理（Story 8.5）
 
