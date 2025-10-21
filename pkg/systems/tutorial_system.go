@@ -14,31 +14,31 @@ import (
 // 管理关卡 1-1 的分步教学引导流程
 // 检测触发条件，显示教学文本，推进教学步骤
 type TutorialSystem struct {
-	entityManager       *ecs.EntityManager
-	gameState           *game.GameState
-	resourceManager     *game.ResourceManager
-	reanimSystem        *ReanimSystem    // 用于初始化僵尸动画
-	lawnGridSystem      *LawnGridSystem  // 用于控制草坪闪烁效果（Story 8.2）
-	sunSpawnSystem      *SunSpawnSystem  // 用于启用阳光自动生成（Story 8.2）
-	waveSpawnSystem     *WaveSpawnSystem // 用于激活预生成的僵尸（替代自己创建僵尸）
+	entityManager        *ecs.EntityManager
+	gameState            *game.GameState
+	resourceManager      *game.ResourceManager
+	reanimSystem         *ReanimSystem    // 用于初始化僵尸动画
+	lawnGridSystem       *LawnGridSystem  // 用于控制草坪闪烁效果（Story 8.2）
+	sunSpawnSystem       *SunSpawnSystem  // 用于启用阳光自动生成（Story 8.2）
+	waveSpawnSystem      *WaveSpawnSystem // 用于激活预生成的僵尸（替代自己创建僵尸）
 	tutorialEntity       ecs.EntityID     // 教学实体ID
 	textEntity           ecs.EntityID     // 教学文本实体ID（用于显示/隐藏）
 	arrowIndicatorEntity ecs.EntityID     // 箭头指示符实体ID（用于显示/隐藏）
 	cardHighlightEntity  ecs.EntityID     // 卡片闪烁效果实体ID（用于显示/隐藏）
 
 	// 状态跟踪变量（用于检测变化）
-	lastSunAmount   int  // 上一帧的阳光数量
-	lastPlantCount  int  // 上一帧的植物数量
-	lastZombieCount int  // 上一帧的僵尸数量
-	plantCount      int  // 当前种植的植物总数（用于第二次种植检测）
-	initialized     bool // 是否已初始化（用于 gameStart 触发）
-	soddingComplete bool // 铺草皮动画是否完成（用于延迟 gameStart 触发）
-	sunSpawned      bool // 第一颗阳光是否已生成（用于 sunSpawned 触发）
-	lastSunCount    int  // 上一帧的阳光实体数量（用于检测新阳光生成）
+	lastSunAmount       int     // 上一帧的阳光数量
+	lastPlantCount      int     // 上一帧的植物数量
+	lastZombieCount     int     // 上一帧的僵尸数量
+	plantCount          int     // 当前种植的植物总数（用于第二次种植检测）
+	initialized         bool    // 是否已初始化（用于 gameStart 触发）
+	soddingComplete     bool    // 铺草皮动画是否完成（用于延迟 gameStart 触发）
+	sunSpawned          bool    // 第一颗阳光是否已生成（用于 sunSpawned 触发）
+	lastSunCount        int     // 上一帧的阳光实体数量（用于检测新阳光生成）
 	lastTextDisplayTime float64 // 上次教学文本显示的时间（用于时长检测，防止文本闪烁）
 
 	// 粒子效果重复显示定时器
-	arrowRepeatTimer float64 // 箭头重复显示计时器（秒）
+	arrowRepeatTimer    float64 // 箭头重复显示计时器（秒）
 	arrowRepeatInterval float64 // 箭头重复间隔（秒），粒子效果播放1秒后重新创建
 
 	// 僵尸波次管理（教学关卡专用）
@@ -86,7 +86,7 @@ func NewTutorialSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.Resou
 		lastSunAmount:        gs.GetSun(),
 		lastPlantCount:       0,
 		lastZombieCount:      0,
-		plantCount:           0,    // 初始化植物计数
+		plantCount:           0, // 初始化植物计数
 		initialized:          false,
 		sunSpawned:           false, // 阳光未生成
 		lastSunCount:         0,     // 初始化阳光实体计数
@@ -454,15 +454,31 @@ func (s *TutorialSystem) showArrowIndicator(targetEntity ecs.EntityID) {
 		return
 	}
 
-	// 计算箭头位置
-	// 卡片大小：原始100x140，缩放0.5后 = 50x70
-	// 卡片位置是左上角，需要加上半宽以对齐中心
-	const cardScaledWidth = 50.0
-	const cardScaledHeight = 70.0
-	const arrowOffsetY = 85.0 // 箭头在卡片下方15px（70 + 15），调整位置使其不遮挡卡片
+	// Story 8.4 Bug修复：从 PlantCardComponent 读取实际的 CardScale，而不是使用硬编码常量
+	// 因为不同场景可能使用不同的缩放因子
+	card, ok := ecs.GetComponent[*components.PlantCardComponent](s.entityManager, targetEntity)
+	if !ok {
+		log.Printf("[TutorialSystem] Target entity has no PlantCardComponent, cannot show arrow")
+		return
+	}
 
-	arrowX := pos.X + cardScaledWidth/2  // 卡片中心X
-	arrowY := pos.Y + arrowOffsetY       // 卡片下方
+	// 使用实际的卡片缩放计算尺寸（用于调试日志）
+	// 卡片背景图原始尺寸：100x140
+	const cardOriginalWidth = 100.0
+	const cardOriginalHeight = 140.0
+	cardScaledWidth := cardOriginalWidth * card.CardScale
+	cardScaledHeight := cardOriginalHeight * card.CardScale
+
+	// 箭头位置说明：
+	// - 发射器位置直接使用卡片左上角坐标（pos.X, pos.Y）
+	// - UpsellArrow.xml 中的 EmitterOffsetX=25, EmitterOffsetY=80 会自动调整粒子位置
+	// - 最终粒子出现在：(pos.X + 25, pos.Y + 80)，刚好在卡片下方指向卡片
+	// - 这是原版设计的正确位置，无需手动调整
+	arrowX := pos.X // 发射器X坐标（卡片左上角）
+	arrowY := pos.Y // 发射器Y坐标（卡片左上角）
+
+	log.Printf("[TutorialSystem] Arrow indicator: cardScale=%.2f, cardSize=(%.1f x %.1f), cardPos=(%.1f, %.1f), emitterPos=(%.1f, %.1f)",
+		card.CardScale, cardScaledWidth, cardScaledHeight, pos.X, pos.Y, arrowX, arrowY)
 
 	// 创建箭头粒子效果（使用 UpsellArrow.xml - 教学专用箭头）
 	// 根据原版设计："箭头从草坪指向豌豆射手卡片"，箭头应在卡片下方向上指
@@ -774,4 +790,3 @@ func (s *TutorialSystem) showFinalWaveWarning() {
 
 	log.Printf("[TutorialSystem] Final wave warning displayed")
 }
-
