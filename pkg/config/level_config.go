@@ -24,6 +24,9 @@ type LevelConfig struct {
 	SpecialRules    string         `yaml:"specialRules"`    // 特殊规则类型：\"bowling\", \"conveyor\"，默认为空
 	InitialSun      int            `yaml:"initialSun"`      // 初始阳光值，默认50（Story 8.2 QA改进）
 
+	// Story 8.3 新增字段
+	RewardPlant string `yaml:"rewardPlant"` // 完成本关后奖励的植物ID，如 "sunflower"，默认为空（无奖励）
+
 	// Story 8.2 QA改进：背景和草皮配置
 	BackgroundImage   string `yaml:"backgroundImage"`   // 背景图片ID，如 \"IMAGE_BACKGROUND1_UNSODDED\"，默认 \"IMAGE_BACKGROUND1\"
 	SodRowImage       string `yaml:"sodRowImage"`       // 草皮叠加图片ID，如 \"IMAGE_SOD1ROW\"，空表示无草皮

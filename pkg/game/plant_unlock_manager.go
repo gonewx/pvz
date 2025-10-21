@@ -14,25 +14,25 @@ type PlantUnlockManager struct {
 }
 
 // NewPlantUnlockManager 创建一个新的植物解锁管理器
-// 初始化时包含第一章的默认解锁植物（开发阶段）
+// 初始化时解锁列表为空（Story 8.3 方案 A）
 //
 // 返回:
 //   - *PlantUnlockManager: 新创建的植物解锁管理器实例
 //
-// 注意: 默认解锁列表仅用于开发阶段，Story 8.6 实现进度保存后将从存档加载
+// 注意:
+//   - 方案 A：availablePlants 直接控制本关可用植物（不检查解锁状态）
+//   - 植物通过完成关卡逐步解锁（rewardPlant），影响后续关卡的可选植物
+//   - Story 8.6: 实现进度保存后将从存档加载
 func NewPlantUnlockManager() *PlantUnlockManager {
 	return &PlantUnlockManager{
 		unlockedPlants: map[string]bool{
-			// 第一章植物（1-1 到 1-10 逐步解锁）
-			"peashooter": true, // 豌豆射手（1-1解锁）
-			"sunflower":  true, // 向日葵（1-2解锁）
-			"cherrybomb": true, // 樱桃炸弹（1-3解锁）
-			"wallnut":    true, // 坚果墙（1-4解锁）
-			"potatomine": true, // 土豆地雷（1-5解锁）
-			"snowpea":    true, // 寒冰射手（1-6解锁）
-			"chomper":    true, // 大嘴花（1-7解锁）
-			"repeater":   true, // 双发射手（1-8解锁）
-			// 更多植物将在后续章节解锁
+			// 初始无解锁植物
+			// 各关卡通过 availablePlants 直接控制可用植物
+			// 通过完成关卡解锁（rewardPlant）：
+			// "sunflower"  - 1-1 完成后解锁
+			// "cherrybomb" - 1-3 完成后解锁
+			// "wallnut"    - 1-4 完成后解锁
+			// ...
 		},
 	}
 }
@@ -113,6 +113,43 @@ func (m *PlantUnlockManager) GetLastUnlocked() string {
 func (m *PlantUnlockManager) ClearLastUnlocked() {
 	m.lastUnlocked = ""
 }
+
+// GetAvailablePlantsForLevel 获取指定关卡可用的植物列表
+// Story 8.3 方案 A：统一管理植物可用性逻辑
+//
+// 参数:
+//   - levelConfig: 关卡配置（如果为 nil，返回所有已解锁植物）
+//
+// 返回:
+//   - []string: 本关可用的植物ID列表
+//
+// 逻辑:
+//   - 如果关卡配置了 availablePlants，直接返回（覆盖解锁状态）
+//   - 如果 availablePlants 为空，返回所有已解锁的植物
+//
+// 使用场景:
+//   - 教学关卡：强制使用特定植物（如 1-1 只有豌豆射手）
+//   - 正常关卡：使用所有已解锁植物（availablePlants 留空）
+func (m *PlantUnlockManager) GetAvailablePlantsForLevel(levelConfig interface{}) []string {
+	// 类型断言：获取关卡配置
+	type levelConfigInterface interface {
+		GetAvailablePlants() []string
+	}
+
+	// 如果传入了关卡配置，检查 availablePlants
+	if levelConfig != nil {
+		// 尝试类型断言到我们需要的接口
+		// 由于 config.LevelConfig 是结构体，我们直接导入 config 包
+		if lc, ok := levelConfig.(*config.LevelConfig); ok && len(lc.AvailablePlants) > 0 {
+			// 方案 A：availablePlants 直接控制本关可用植物（不检查解锁状态）
+			return lc.AvailablePlants
+		}
+	}
+
+	// 如果 availablePlants 为空或未配置，返回所有已解锁的植物
+	return m.GetUnlockedPlants()
+}
+
 
 // PlantInfo 植物信息结构（名称和描述的文本键）
 type PlantInfo struct {

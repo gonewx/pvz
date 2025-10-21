@@ -380,17 +380,11 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 // initPlantCardSystems initializes the plant card systems and creates plant card entities.
 // Story 3.1: Plant Card UI and State
 // Story 8.1: 根据关卡配置创建植物卡片
+// Story 8.3: 使用 PlantUnlockManager 统一管理植物可用性
 func (s *GameScene) initPlantCardSystems(rm *game.ResourceManager) {
-	// 获取关卡可用植物列表
-	var availablePlants []string
-	if s.gameState.CurrentLevel != nil && len(s.gameState.CurrentLevel.AvailablePlants) > 0 {
-		availablePlants = s.gameState.CurrentLevel.AvailablePlants
-		log.Printf("[GameScene] Creating %d plant cards from level config: %v", len(availablePlants), availablePlants)
-	} else {
-		// 默认植物列表（向后兼容）
-		availablePlants = []string{"sunflower", "peashooter", "wallnut", "cherrybomb"}
-		log.Printf("[GameScene] Using default plant cards: %v", availablePlants)
-	}
+	// Story 8.3: 通过 PlantUnlockManager 统一获取可用植物列表（方案 A）
+	availablePlants := s.gameState.GetPlantUnlockManager().GetAvailablePlantsForLevel(s.gameState.CurrentLevel)
+	log.Printf("[GameScene] Creating %d plant cards: %v", len(availablePlants), availablePlants)
 
 	// 植物名称到类型的映射
 	plantTypeMap := map[string]components.PlantType{
@@ -1319,10 +1313,17 @@ func (s *GameScene) drawLastWaveWarning(screen *ebiten.Image) {
 
 // drawGameResultOverlay renders the victory or defeat overlay (Story 5.5)
 // Displays when the game ends (IsGameOver = true)
+// Story 8.3: 奖励流程期间不显示 You Win，让玩家专注于奖励动画
 func (s *GameScene) drawGameResultOverlay(screen *ebiten.Image) {
 	// 只在游戏结束时显示
 	if !s.gameState.IsGameOver {
 		return
+	}
+
+	// Story 8.3: 如果奖励动画正在播放，不显示游戏结果覆盖层
+	// 奖励流程完成后才显示 You Win 或直接进入下一关
+	if s.rewardSystem != nil && s.rewardSystem.IsActive() {
+		return // 奖励动画播放期间，隐藏 You Win
 	}
 
 	// 根据游戏结果选择显示内容

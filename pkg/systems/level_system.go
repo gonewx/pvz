@@ -138,10 +138,11 @@ func (s *LevelSystem) checkVictoryCondition() {
 		s.gameState.SetGameResult("win")
 		log.Println("[LevelSystem] Victory! All zombies defeated!")
 
-		// Story 8.2: 关卡 1-1 完成后解锁向日葵
-		if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.ID == "1-1" {
-			s.gameState.GetPlantUnlockManager().UnlockPlant("sunflower")
-			log.Println("[LevelSystem] Unlocked plant: sunflower (completed level 1-1)")
+		// Story 8.3: 从关卡配置读取奖励植物（如果配置了）
+		if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.RewardPlant != "" {
+			rewardPlant := s.gameState.CurrentLevel.RewardPlant
+			s.gameState.GetPlantUnlockManager().UnlockPlant(rewardPlant)
+			log.Printf("[LevelSystem] Unlocked plant: %s (completed level %s)", rewardPlant, s.gameState.CurrentLevel.ID)
 		}
 
 		// Story 8.3: 检查是否有新植物解锁，触发奖励动画
