@@ -33,11 +33,11 @@ const (
 	SunCounterFontSize = 18.0 // 阳光数值字体大小（像素）- 增大以提高可读性
 
 	// Plant Cards (植物卡片) - relative to SeedBank position
-	PlantCardStartOffsetX = 84   // 第一张卡片相对于 SeedBank 的 X 偏移量
-	PlantCardOffsetY      = 8    // 卡片相对于 SeedBank 的 Y 偏移量
-	PlantCardSpacing      = 60   // 卡片槽之间的间距（包含卡槽边框，每个卡槽约76px宽）
+	PlantCardStartOffsetX = 84 // 第一张卡片相对于 SeedBank 的 X 偏移量
+	PlantCardOffsetY      = 8  // 卡片相对于 SeedBank 的 Y 偏移量
+	PlantCardSpacing      = 60 // 卡片槽之间的间距（包含卡槽边框，每个卡槽约76px宽）
 	// PlantCardScale 已移至 config.PlantCardScale（统一配置管理）
-	PlantCardScale        = config.PlantCardScale // 卡片缩放因子（0.50）
+	PlantCardScale = config.PlantCardScale // 卡片缩放因子（0.50）
 
 	// Story 8.4: 卡片内部配置（图标缩放、偏移等）已移至 config.plant_card_config.go，不再在此定义
 
@@ -322,7 +322,7 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 
 	// Story 8.3 + 8.4重构: Create RewardAnimationSystem (完全封装，无需单独创建面板渲染系统)
 	// RewardAnimationSystem内部自动创建和管理RewardPanelRenderSystem
-	scene.rewardSystem = systems.NewRewardAnimationSystem(scene.entityManager, scene.gameState, rm, scene.reanimSystem, scene.particleSystem)
+	scene.rewardSystem = systems.NewRewardAnimationSystem(scene.entityManager, scene.gameState, rm, scene.reanimSystem, scene.particleSystem, scene.renderSystem)
 	log.Printf("[GameScene] Initialized reward animation system (fully encapsulated)")
 
 	// Story 8.3: Create OpeningAnimationSystem (conditionally, may return nil)
@@ -704,7 +704,7 @@ func (s *GameScene) Update(deltaTime float64) {
 		s.rewardSystem.Update(deltaTime)   // 奖励动画系统（卡片包动画）
 		s.reanimSystem.Update(deltaTime)   // Reanim 系统（植物卡片动画）
 		s.particleSystem.Update(deltaTime) // 粒子系统（光晕效果）
-		return // 停止其他游戏系统（僵尸移动、植物攻击等）
+		return                             // 停止其他游戏系统（僵尸移动、植物攻击等）
 	}
 
 	// Update all ECS systems in order (order matters for correct game logic)

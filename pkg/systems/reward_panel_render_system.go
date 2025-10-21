@@ -175,11 +175,8 @@ func (rprs *RewardPanelRenderSystem) drawTitle(screen *ebiten.Image, alpha float
 // drawPlantCard 绘制植物卡片（独立渲染，不依赖外部系统）。
 // Story 8.4: 使用统一的植物卡片渲染函数
 func (rprs *RewardPanelRenderSystem) drawPlantCard(screen *ebiten.Image, panel *components.RewardPanelComponent) {
-	log.Printf("[DEBUG] drawPlantCard: plantID=%s, alpha=%.2f", panel.PlantID, panel.FadeAlpha)
-	
 	// 降低透明度阈值，让卡片更早显示（与面板淡入同步）
 	if panel.FadeAlpha < 0.01 {
-		log.Printf("[DEBUG] drawPlantCard: alpha too low, skipping")
 		return // 透明度太低时不绘制
 	}
 
@@ -189,13 +186,10 @@ func (rprs *RewardPanelRenderSystem) drawPlantCard(screen *ebiten.Image, panel *
 		log.Printf("[RewardPanelRenderSystem] Unknown plant ID: %s", panel.PlantID)
 		return
 	}
-	log.Printf("[DEBUG] drawPlantCard: plantType=%d", plantType)
-	log.Printf("[RewardPanelRenderSystem] Plant type: %d, ID: %s", plantType, panel.PlantID)
 
 	// 计算卡片缩放因子和位置
 	cardScale := panel.CardScale * config.RewardPanelCardScale
 	cardX, cardY := rprs.calculateCardPosition(cardScale)
-	log.Printf("[RewardPanelRenderSystem] Card position: (%.1f, %.1f), scale: %.2f", cardX, cardY, cardScale)
 
 	// 创建临时的 PlantCardComponent 用于渲染
 	// 使用 entities.RenderPlantCard 统一渲染函数（Story 8.4）
@@ -206,6 +200,7 @@ func (rprs *RewardPanelRenderSystem) drawPlantCard(screen *ebiten.Image, panel *
 		CooldownTime:    0, // 奖励卡片没有冷却
 		CurrentCooldown: 0,
 		IsAvailable:     true,
+		Alpha:           panel.FadeAlpha, // 使用面板的淡入透明度
 	}
 
 	// 加载卡片资源（背景和植物图标）
@@ -220,7 +215,6 @@ func (rprs *RewardPanelRenderSystem) drawPlantCard(screen *ebiten.Image, panel *
 		log.Printf("[RewardPanelRenderSystem] No reanim name for plant type: %d", plantType)
 		return
 	}
-	log.Printf("[RewardPanelRenderSystem] Rendering plant icon: %s", reanimName)
 
 	// 使用 ReanimSystem 渲染植物图标
 	plantIcon, err := entities.RenderPlantIcon(
@@ -234,10 +228,8 @@ func (rprs *RewardPanelRenderSystem) drawPlantCard(screen *ebiten.Image, panel *
 		return
 	}
 	tempCard.PlantIconTexture = plantIcon
-	log.Printf("[RewardPanelRenderSystem] Plant icon rendered successfully")
 
 	// 调用统一渲染函数绘制卡片
-	log.Printf("[RewardPanelRenderSystem] Calling RenderPlantCard at position (%.1f, %.1f)", cardX, cardY)
 	entities.RenderPlantCard(
 		screen,
 		tempCard,
@@ -246,7 +238,6 @@ func (rprs *RewardPanelRenderSystem) drawPlantCard(screen *ebiten.Image, panel *
 		nil, // sunFont（不显示阳光数字）
 		0,   // sunFontSize
 	)
-	log.Printf("[RewardPanelRenderSystem] Plant card rendered")
 }
 
 // ensurePlantCardEntity 确保植物卡片实体存在，如果不存在则创建。

@@ -33,9 +33,9 @@ var (
 // VerifyPanelGame 奖励植物介绍面板验证游戏
 // 直接使用 RewardPanelRenderSystem 显示面板
 type VerifyPanelGame struct {
-	entityManager       *ecs.EntityManager
-	gameState           *game.GameState
-	resourceManager     *game.ResourceManager
+	entityManager         *ecs.EntityManager
+	gameState             *game.GameState
+	resourceManager       *game.ResourceManager
 	reanimSystem          *systems.ReanimSystem            // Reanim 动画系统（必须每帧更新）
 	panelRenderSystem     *systems.RewardPanelRenderSystem // 面板渲染系统
 	plantCardRenderSystem *systems.PlantCardRenderSystem   // 植物卡片渲染系统（新增）
@@ -194,9 +194,6 @@ func (vpg *VerifyPanelGame) Draw(screen *ebiten.Image) {
 
 	// 绘制奖励面板
 	vpg.panelRenderSystem.Draw(screen)
-
-	// 绘制植物卡片实体（由 PlantCardRenderSystem 渲染）
-	vpg.plantCardRenderSystem.Draw(screen)
 
 	// 绘制调试信息
 	vpg.drawDebugInfo(screen)

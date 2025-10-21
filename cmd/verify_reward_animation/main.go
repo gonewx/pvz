@@ -91,8 +91,8 @@ func NewVerifyRewardAnimationGame() (*VerifyRewardAnimationGame, error) {
 	renderSystem := systems.NewRenderSystem(em)
 
 	// Story 8.4重构：RewardAnimationSystem完全封装所有渲染逻辑
-	// 内部自动创建和管理 RewardPanelRenderSystem 和 PlantCardRenderSystem
-	rewardSystem := systems.NewRewardAnimationSystem(em, gs, rm, reanimSystem, particleSystem)
+	// 内部自动创建和管理所有渲染系统（Reanim、粒子、卡片、面板）
+	rewardSystem := systems.NewRewardAnimationSystem(em, gs, rm, reanimSystem, particleSystem, renderSystem)
 
 	// 加载中文调试字体
 	debugFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 14)
@@ -215,23 +215,11 @@ func (vg *VerifyRewardAnimationGame) Draw(screen *ebiten.Image) {
 		screen.DrawImage(backgroundImg, opts)
 	}
 
-	// 渲染顺序（从下往上）：
-	// 1. Reanim 实体（背景层）
-	// 2. 粒子效果（光晕，中间层）
-	// 3. RewardAnimationSystem（前景层，完全封装）
-	//    - Phase 1-3: 植物卡片
-	//    - Phase 4: 奖励面板
-
-	cameraOffsetX := vg.gameState.CameraX
-
-	// 1. 绘制 Reanim 实体
-	vg.renderSystem.Draw(screen, cameraOffsetX)
-
-	// 2. 绘制粒子效果（光晕）
-	vg.renderSystem.DrawParticles(screen, cameraOffsetX)
-
-	// 3. 绘制奖励动画（Story 8.4：完全封装）
-	//    内部自动管理 Phase 1-3 的卡片包和 Phase 4 的奖励面板
+	// Story 8.4：完全封装的奖励动画渲染
+	// RewardAnimationSystem 内部自动处理所有渲染：
+	//   1. Reanim 实体
+	//   2. 粒子效果（SeedPacket 背景框 + Award 爆炸）
+	//   3. 植物卡片（Phase 1-3）/ 奖励面板（Phase 4）
 	vg.rewardSystem.Draw(screen)
 
 	// 绘制调试信息
@@ -258,6 +246,7 @@ func (vg *VerifyRewardAnimationGame) reset() {
 		vg.resourceManager,
 		vg.reanimSystem,
 		vg.particleSystem,
+		vg.renderSystem,
 	)
 
 	vg.triggered = false

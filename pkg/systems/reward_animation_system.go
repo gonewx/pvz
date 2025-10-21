@@ -67,6 +67,7 @@ type RewardAnimationSystem struct {
 	resourceManager *game.ResourceManager
 	reanimSystem    *ReanimSystem   // Reanim系统用于创建和管理动画
 	particleSystem  *ParticleSystem // 粒子系统用于检查粒子特效完成状态
+	renderSystem    *RenderSystem   // 渲染系统用于绘制Reanim和粒子效果
 	rewardEntity    ecs.EntityID    // 奖励动画实体ID（卡片包）
 	panelEntity     ecs.EntityID    // 奖励面板实体ID
 	glowEntity      ecs.EntityID    // 光晕粒子发射器实体ID
@@ -83,7 +84,7 @@ type RewardAnimationSystem struct {
 }
 
 // NewRewardAnimationSystem 创建新的奖励动画系统。
-func NewRewardAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.ResourceManager, reanimSys *ReanimSystem, particleSys *ParticleSystem) *RewardAnimationSystem {
+func NewRewardAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.ResourceManager, reanimSys *ReanimSystem, particleSys *ParticleSystem, renderSys *RenderSystem) *RewardAnimationSystem {
 	// Story 8.4重构：内部创建所有渲染系统，调用者无需关心
 	panelRenderSystem := NewRewardPanelRenderSystem(em, gs, rm, reanimSys)
 
@@ -101,6 +102,7 @@ func NewRewardAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *gam
 		resourceManager:       rm,
 		reanimSystem:          reanimSys,
 		particleSystem:        particleSys,
+		renderSystem:          renderSys, // 渲染系统用于绘制Reanim和粒子
 		rewardEntity:          0,
 		panelEntity:           0,
 		glowEntity:            0,
@@ -857,21 +859,34 @@ func (ras *RewardAnimationSystem) isParticleEffectCompleted() bool {
 // Story 8.4重构：完全封装渲染逻辑，调用者只需调用此方法
 //
 // 内部自动处理：
-// - Phase 1-3: 渲染卡片包（通过内部 plantCardRenderSystem）
-// - Phase 4: 渲染奖励面板（通过内部 panelRenderSystem）
+// - Reanim 实体（卡片包的 Reanim 动画）
+// - 粒子效果（SeedPacket 背景框 + Award 爆炸特效）
+// - 植物卡片（Phase 1-3 的卡片包）
+// - 奖励面板（Phase 4）
 //
-// 渲染顺序：卡片包在粒子之后渲染，确保卡片不被粒子遮挡
+// 渲染顺序（从下到上）：
+// 1. Reanim 实体
+// 2. 粒子效果
+// 3. 植物卡片 / 奖励面板
 func (ras *RewardAnimationSystem) Draw(screen *ebiten.Image) {
 	if !ras.isActive {
 		return
 	}
 
-	// Phase 1-3: 渲染卡片包（appearing/waiting/expanding/pausing/disappearing）
+	cameraOffsetX := ras.gameState.CameraX
+
+	// 1. 绘制 Reanim 实体（如果有的话）
+	ras.renderSystem.Draw(screen, cameraOffsetX)
+
+	// 2. 绘制粒子效果（SeedPacket 背景框 + Award 爆炸）
+	ras.renderSystem.DrawParticles(screen, cameraOffsetX)
+
+	// 3a. Phase 1-3: 渲染植物卡片（appearing/waiting/expanding/pausing/disappearing）
 	if ras.currentPhase != "showing" && ras.currentPhase != "closing" && ras.rewardEntity != 0 {
 		ras.plantCardRenderSystem.Draw(screen)
 	}
 
-	// Phase 4: 渲染奖励面板（showing）
+	// 3b. Phase 4: 渲染奖励面板（showing）
 	if ras.currentPhase == "showing" || ras.panelEntity != 0 {
 		ras.panelRenderSystem.Draw(screen)
 	}
