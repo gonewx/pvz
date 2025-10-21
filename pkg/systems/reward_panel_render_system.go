@@ -90,16 +90,14 @@ func (rprs *RewardPanelRenderSystem) drawPanel(screen *ebiten.Image, panelEntity
 	// 2. 绘制标题文本："你得到了一株新植物！"
 	rprs.drawTitle(screen, panel.FadeAlpha)
 
-	// 3. 植物卡片由 PlantCardRenderSystem 渲染（在 ensurePlantCardEntity 中创建的实体）
+	// 3. 绘制植物卡片（独立渲染，不依赖外部系统）
+	rprs.drawPlantCard(screen, panel)
 
 	// 4. 绘制植物名称和描述
 	rprs.drawPlantInfo(screen, panel)
 
 	// 5. 绘制"下一关"按钮
 	rprs.drawNextLevelButton(screen, panel.FadeAlpha)
-
-	// 6. 绘制提示文本："点击任意位置继续"（现在改为点击按钮）
-	// rprs.drawHint(screen, panel.FadeAlpha) // 不再需要，按钮已经说明了
 }
 
 // drawBackground 绘制奖励背景。
@@ -174,6 +172,69 @@ func (rprs *RewardPanelRenderSystem) drawTitle(screen *ebiten.Image, alpha float
 	op.ColorScale.ScaleWithColor(config.RewardPanelTitleColor) // 使用配置的橙黄色
 	op.ColorScale.ScaleAlpha(float32(alpha))
 	text.Draw(screen, titleText, rprs.titleFont, op)
+}
+
+// drawPlantCard 绘制植物卡片（独立渲染，不依赖外部系统）。
+// Story 8.4: 使用统一的植物卡片渲染函数
+func (rprs *RewardPanelRenderSystem) drawPlantCard(screen *ebiten.Image, panel *components.RewardPanelComponent) {
+	if panel.FadeAlpha < 0.3 {
+		return // 透明度太低时不绘制
+	}
+
+	// 映射 plantID 到 PlantType
+	plantType := rprs.getPlantType(panel.PlantID)
+	if plantType == components.PlantUnknown {
+		log.Printf("[RewardPanelRenderSystem] Unknown plant ID: %s", panel.PlantID)
+		return
+	}
+
+	// 计算卡片缩放因子和位置
+	cardScale := panel.CardScale * config.RewardPanelCardScale
+	cardX, cardY := rprs.calculateCardPosition(cardScale)
+
+	// 创建临时的 PlantCardComponent 用于渲染
+	// 使用 entities.RenderPlantCard 统一渲染函数（Story 8.4）
+	tempCard := &components.PlantCardComponent{
+		PlantType:       plantType,
+		CardScale:       cardScale,
+		SunCost:         panel.SunCost,
+		CooldownTime:    0, // 奖励卡片没有冷却
+		CurrentCooldown: 0,
+		IsAvailable:     true,
+	}
+
+	// 加载卡片资源（背景和植物图标）
+	tempCard.BackgroundImage = rprs.resourceManager.GetImageByID(config.PlantCardBackgroundID)
+
+	// 获取 Reanim 名称
+	reanimName := rprs.getReanimName(plantType)
+	if reanimName == "" {
+		log.Printf("[RewardPanelRenderSystem] No reanim name for plant type: %d", plantType)
+		return
+	}
+
+	// 使用 ReanimSystem 渲染植物图标
+	plantIcon, err := entities.RenderPlantIcon(
+		rprs.entityManager,
+		rprs.resourceManager,
+		rprs.reanimSystem,
+		reanimName,
+	)
+	if err != nil {
+		log.Printf("[RewardPanelRenderSystem] Failed to render plant icon: %v", err)
+		return
+	}
+	tempCard.PlantIconTexture = plantIcon
+
+	// 调用统一渲染函数绘制卡片
+	entities.RenderPlantCard(
+		screen,
+		tempCard,
+		cardX,
+		cardY,
+		nil, // sunFont（不显示阳光数字）
+		0,   // sunFontSize
+	)
 }
 
 // ensurePlantCardEntity 确保植物卡片实体存在，如果不存在则创建。
@@ -281,6 +342,22 @@ func (rprs *RewardPanelRenderSystem) getPlantType(plantID string) components.Pla
 		return components.PlantWallnut
 	default:
 		return components.PlantUnknown
+	}
+}
+
+// getReanimName 根据 PlantType 获取 Reanim 名称
+func (rprs *RewardPanelRenderSystem) getReanimName(plantType components.PlantType) string {
+	switch plantType {
+	case components.PlantSunflower:
+		return "Sunflower"
+	case components.PlantPeashooter:
+		return "Peashooter"
+	case components.PlantCherryBomb:
+		return "CherryBomb"
+	case components.PlantWallnut:
+		return "WallNut"
+	default:
+		return ""
 	}
 }
 
