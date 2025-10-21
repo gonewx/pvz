@@ -43,6 +43,18 @@ const (
 // RewardAnimationSystem 管理关卡完成后的奖励动画流程。
 // 负责卡片包弹出、等待点击、展开、显示奖励面板等阶段的状态管理和动画更新。
 //
+// 设计原则：完全封装奖励流程，调用者只需：
+// 1. 创建系统：NewRewardAnimationSystem()
+// 2. 触发奖励：TriggerReward(plantID)
+// 3. 更新逻辑：Update(dt)
+// 4. 渲染画面：Draw(screen)
+//
+// 内部自动管理：
+// - 卡片包的创建和渲染
+// - 粒子效果的创建和渲染
+// - 奖励面板的创建和渲染
+// - 所有阶段的转换和清理
+//
 // 动画流程（5个阶段）：
 // 1. appearing (0.3秒): 卡片从草坪右侧随机行弹出，微小上升 + 缩放动画 (0.8 → 1.0)
 // 2. waiting: 卡片静止，显示粒子背景框 + 橙色箭头指示器（闪烁），等待玩家点击
@@ -53,33 +65,40 @@ type RewardAnimationSystem struct {
 	entityManager   *ecs.EntityManager
 	gameState       *game.GameState
 	resourceManager *game.ResourceManager
-	reanimSystem    *ReanimSystem    // Reanim系统用于创建和管理动画
-	particleSystem  *ParticleSystem  // 粒子系统用于检查粒子特效完成状态
-	rewardEntity    ecs.EntityID     // 奖励动画实体ID（卡片包）
-	panelEntity     ecs.EntityID     // 奖励面板实体ID
-	glowEntity      ecs.EntityID     // 光晕粒子发射器实体ID
-	isActive        bool             // 系统是否激活
-	currentPhase    string           // 当前阶段（flashing/showing/closing 时可能没有 rewardEntity）
-	currentPlantID  string           // 当前植物ID（保存用于面板创建）
-	phaseElapsed    float64          // 当前阶段经过时间
+	reanimSystem    *ReanimSystem   // Reanim系统用于创建和管理动画
+	particleSystem  *ParticleSystem // 粒子系统用于检查粒子特效完成状态
+	rewardEntity    ecs.EntityID    // 奖励动画实体ID（卡片包）
+	panelEntity     ecs.EntityID    // 奖励面板实体ID
+	glowEntity      ecs.EntityID    // 光晕粒子发射器实体ID
+	isActive        bool            // 系统是否激活
+	currentPhase    string          // 当前阶段（flashing/showing/closing 时可能没有 rewardEntity）
+	currentPlantID  string          // 当前植物ID（保存用于面板创建）
+	phaseElapsed    float64         // 当前阶段经过时间
 	screenWidth     float64
 	screenHeight    float64
+
+	// Story 8.4重构：内部封装渲染系统，调用者无需关心
+	panelRenderSystem *RewardPanelRenderSystem // 奖励面板渲染系统（内部使用）
 }
 
 // NewRewardAnimationSystem 创建新的奖励动画系统。
 func NewRewardAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.ResourceManager, reanimSys *ReanimSystem, particleSys *ParticleSystem) *RewardAnimationSystem {
+	// Story 8.4重构：内部创建RewardPanelRenderSystem，调用者无需关心
+	panelRenderSystem := NewRewardPanelRenderSystem(em, gs, rm, reanimSys)
+
 	return &RewardAnimationSystem{
-		entityManager:   em,
-		gameState:       gs,
-		resourceManager: rm,
-		reanimSystem:    reanimSys,
-		particleSystem:  particleSys,
-		rewardEntity:    0,
-		panelEntity:     0,
-		glowEntity:      0,
-		isActive:        false,
-		screenWidth:     800, // TODO: 从配置获取
-		screenHeight:    600,
+		entityManager:     em,
+		gameState:         gs,
+		resourceManager:   rm,
+		reanimSystem:      reanimSys,
+		particleSystem:    particleSys,
+		rewardEntity:      0,
+		panelEntity:       0,
+		glowEntity:        0,
+		isActive:          false,
+		screenWidth:       800, // TODO: 从配置获取
+		screenHeight:      600,
+		panelRenderSystem: panelRenderSystem, // 内部封装
 	}
 }
 
@@ -208,8 +227,23 @@ func (ras *RewardAnimationSystem) Update(dt float64) {
 		return
 	}
 
-	// 查询奖励动画实体
-	rewardComp, ok := ecs.GetComponent[*components.RewardAnimationComponent](ras.entityManager, ras.rewardEntity)
+	// Phase 1-3: 使用 rewardEntity（卡片包）的 RewardAnimationComponent
+	// Phase 4+: 使用系统内部的 currentPhase，因为卡片包已消失
+	var rewardComp *components.RewardAnimationComponent
+	var ok bool
+
+	if ras.currentPhase == "showing" || ras.currentPhase == "closing" {
+		// showing/closing 阶段：卡片包已消失，直接处理面板逻辑
+		if ras.currentPhase == "showing" {
+			ras.updateShowingPhaseInternal(dt)
+		} else if ras.currentPhase == "closing" {
+			ras.updateClosingPhaseInternal(dt)
+		}
+		return
+	}
+
+	// Phase 1-3: 查询奖励动画实体（卡片包）
+	rewardComp, ok = ecs.GetComponent[*components.RewardAnimationComponent](ras.entityManager, ras.rewardEntity)
 	if !ok {
 		return
 	}
@@ -228,11 +262,10 @@ func (ras *RewardAnimationSystem) Update(dt float64) {
 		ras.updatePausingPhase(dt, rewardComp)
 	case "disappearing":
 		ras.updateDisappearingPhase(dt, rewardComp)
-	case "showing":
-		ras.updateShowingPhase(dt, rewardComp)
-	case "closing":
-		ras.updateClosingPhase(dt, rewardComp)
 	}
+
+	// 同步当前阶段到系统（用于Draw方法判断）
+	ras.currentPhase = rewardComp.Phase
 
 	// 更新粒子发射器位置（跟随卡片包）
 	//
@@ -489,26 +522,31 @@ func (ras *RewardAnimationSystem) updateDisappearingPhase(dt float64, rewardComp
 		// 保存 PlantID（在删除组件前）
 		plantID := rewardComp.PlantID
 
+		// 重要：先更新组件状态，避免下一帧重复进入此阶段
+		rewardComp.Phase = "showing"
+		rewardComp.ElapsedTime = 0
+
 		// 隐藏卡片包（移除 PlantCardComponent，使其不被渲染）
 		if ras.rewardEntity != 0 {
 			if _, hasCard := ecs.GetComponent[*components.PlantCardComponent](ras.entityManager, ras.rewardEntity); hasCard {
 				ecs.RemoveComponent[*components.PlantCardComponent](ras.entityManager, ras.rewardEntity)
-				log.Printf("[RewardAnimationSystem] 移除卡片包的 PlantCardComponent（隐藏渲染）")
 			}
 		}
 
 		// 清理 Award 粒子特效（避免与面板视觉冲突）
 		if ras.glowEntity != 0 {
 			ras.cleanupGlowParticles()
-			log.Printf("[RewardAnimationSystem] 清理 Award 粒子特效")
 		}
 
 		// 立即移除所有标记的实体
 		ras.entityManager.RemoveMarkedEntities()
 
 		// 进入 Phase 4 (showing)
-		rewardComp.Phase = "showing"
-		rewardComp.ElapsedTime = 0
+		// 注意：不再使用rewardComp，因为rewardEntity的PlantCardComponent已被移除
+		// 直接设置系统内部状态
+		ras.currentPhase = "showing"
+		ras.phaseElapsed = 0
+		ras.currentPlantID = plantID // 保存植物ID
 
 		// 创建奖励面板
 		ras.createRewardPanel(plantID)
@@ -516,10 +554,12 @@ func (ras *RewardAnimationSystem) updateDisappearingPhase(dt float64, rewardComp
 	}
 }
 
-// updateShowingPhase 处理显示奖励面板阶段。
+// updateShowingPhaseInternal 处理显示奖励面板阶段（内部版本，不依赖rewardComp）。
 // - 面板淡入动画（透明度 0.0 → 1.0，持续 config.RewardPanelFadeInDuration）
 // - 淡入完成后，等待玩家点击关闭
-func (ras *RewardAnimationSystem) updateShowingPhase(dt float64, rewardComp *components.RewardAnimationComponent) {
+func (ras *RewardAnimationSystem) updateShowingPhaseInternal(dt float64) {
+	ras.phaseElapsed += dt
+
 	// 更新面板透明度（淡入动画）
 	if ras.panelEntity != 0 {
 		panelComp, ok := ecs.GetComponent[*components.RewardPanelComponent](ras.entityManager, ras.panelEntity)
@@ -544,22 +584,26 @@ func (ras *RewardAnimationSystem) updateShowingPhase(dt float64, rewardComp *com
 
 	if clicked {
 		log.Printf("[RewardAnimationSystem] 玩家关闭奖励面板，切换到 closing")
-		rewardComp.Phase = "closing"
-		rewardComp.ElapsedTime = 0
+		ras.currentPhase = "closing"
+		ras.phaseElapsed = 0
 	}
 }
 
-// updateClosingPhase 处理关闭奖励面板阶段（0.5秒）。
+// updateClosingPhaseInternal 处理关闭奖励面板阶段（0.5秒，内部版本）。
 // - 淡出动画
 // - 清理实体
 // - TODO: 触发场景切换
-func (ras *RewardAnimationSystem) updateClosingPhase(dt float64, rewardComp *components.RewardAnimationComponent) {
+func (ras *RewardAnimationSystem) updateClosingPhaseInternal(dt float64) {
+	ras.phaseElapsed += dt
+
 	// 检查完成
-	if rewardComp.ElapsedTime >= RewardFadeOutDuration {
+	if ras.phaseElapsed >= RewardFadeOutDuration {
 		log.Printf("[RewardAnimationSystem] Phase 5 (closing) 完成，清理实体")
 
 		// 清理奖励实体
-		ras.entityManager.DestroyEntity(ras.rewardEntity)
+		if ras.rewardEntity != 0 {
+			ras.entityManager.DestroyEntity(ras.rewardEntity)
+		}
 		if ras.panelEntity != 0 {
 			ras.entityManager.DestroyEntity(ras.panelEntity)
 		}
@@ -571,6 +615,7 @@ func (ras *RewardAnimationSystem) updateClosingPhase(dt float64, rewardComp *com
 		ras.panelEntity = 0
 		ras.glowEntity = 0
 		ras.isActive = false
+		ras.currentPhase = ""
 
 		// TODO: 触发场景切换（返回主菜单或进入下一关）
 		log.Printf("[RewardAnimationSystem] 奖励动画完成")
@@ -599,15 +644,15 @@ func (ras *RewardAnimationSystem) createRewardPanel(plantID string) {
 
 	// 添加 RewardPanelComponent
 	ecs.AddComponent(ras.entityManager, ras.panelEntity, &components.RewardPanelComponent{
-		PlantID:          plantID,            // 设置 PlantID，让渲染系统自动加载图标
+		PlantID:          plantID, // 设置 PlantID，让渲染系统自动加载图标
 		PlantName:        plantName,
 		PlantDescription: plantDesc,
-		SunCost:          sunCost,            // 设置阳光值
-		CardScale:        1.0,                // 卡片固定大小，不做动画
-		FadeAlpha:        0.0,                // Story 8.4: 初始完全透明，用于淡入动画
+		SunCost:          sunCost, // 设置阳光值
+		CardScale:        1.0,     // 卡片固定大小，不做动画
+		FadeAlpha:        0.0,     // Story 8.4: 初始完全透明，用于淡入动画
 		// Story 8.4: 卡片位置由 RewardPanelRenderSystem 自动计算（水平居中）
-		IsVisible:        true,
-		AnimationTime:    0.0,                // Story 8.4: 动画时间计数器，用于淡入效果
+		IsVisible:     true,
+		AnimationTime: 0.0, // Story 8.4: 动画时间计数器，用于淡入效果
 	})
 
 	log.Printf("[RewardAnimationSystem] 奖励面板已创建：%s - %s", plantName, plantDesc)
@@ -796,4 +841,20 @@ func (ras *RewardAnimationSystem) isParticleEffectCompleted() bool {
 
 	// 使用 ParticleSystem 提供的公开接口
 	return ras.particleSystem.IsParticleEffectCompleted(ras.glowEntity)
+}
+
+// Draw 渲染奖励动画的所有元素
+// Story 8.4重构：完全封装渲染逻辑，调用者只需调用此方法
+//
+// 内部自动处理：
+// - Phase 1-3: 渲染卡片包（通过RenderSystem，已在主场景的DrawGameWorld中处理）
+// - Phase 4: 渲染奖励面板（内部调用panelRenderSystem）
+//
+// 注意：卡片包和粒子效果通过ECS组件系统自动渲染，无需在此处理
+func (ras *RewardAnimationSystem) Draw(screen *ebiten.Image) {
+	// 只在 showing 阶段渲染奖励面板
+	// 其他阶段（appearing/waiting/expanding等）的渲染由主RenderSystem自动处理
+	if ras.currentPhase == "showing" || (ras.panelEntity != 0) {
+		ras.panelRenderSystem.Draw(screen)
+	}
 }

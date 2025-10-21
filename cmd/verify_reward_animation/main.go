@@ -37,11 +37,10 @@ type VerifyRewardAnimationGame struct {
 	gameState             *game.GameState
 	resourceManager       *game.ResourceManager
 	reanimSystem          *systems.ReanimSystem
-	particleSystem        *systems.ParticleSystem          // 粒子系统（用于光晕效果）
-	rewardSystem          *systems.RewardAnimationSystem   // 奖励动画系统
+	particleSystem        *systems.ParticleSystem        // 粒子系统（用于光晕效果）
+	rewardSystem          *systems.RewardAnimationSystem // 奖励动画系统（Story 8.4重构：完全封装）
 	renderSystem          *systems.RenderSystem
-	plantCardRenderSystem *systems.PlantCardRenderSystem   // 植物卡片渲染系统（Story 8.4）
-	panelRenderSystem     *systems.RewardPanelRenderSystem // 奖励面板渲染系统（Story 8.4）
+	plantCardRenderSystem *systems.PlantCardRenderSystem // 植物卡片渲染系统（用于渲染Phase 1-3的卡片包）
 
 	debugFont *text.GoTextFace // 中文调试字体
 
@@ -91,10 +90,8 @@ func NewVerifyRewardAnimationGame() (*VerifyRewardAnimationGame, error) {
 	reanimSystem := systems.NewReanimSystem(em)
 	particleSystem := systems.NewParticleSystem(em, rm) // 粒子系统用于光晕效果
 	renderSystem := systems.NewRenderSystem(em)
-	rewardSystem := systems.NewRewardAnimationSystem(em, gs, rm, reanimSystem, particleSystem)
 
-	// 创建植物卡片渲染系统（Story 8.4: 使用统一的植物卡片渲染）
-	// 加载阳光字体用于卡片渲染
+	// 创建植物卡片渲染系统（用于渲染 Phase 1-3 的卡片包）
 	sunFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.PlantCardSunCostFontSize)
 	if err != nil {
 		log.Printf("Warning: Failed to load sun cost font: %v", err)
@@ -102,8 +99,9 @@ func NewVerifyRewardAnimationGame() (*VerifyRewardAnimationGame, error) {
 	}
 	plantCardRenderSystem := systems.NewPlantCardRenderSystem(em, sunFont)
 
-	// 创建奖励面板渲染系统（Story 8.4: 使用新的卡片工厂方法）
-	panelRenderSystem := systems.NewRewardPanelRenderSystem(em, gs, rm, reanimSystem)
+	// Story 8.4重构：RewardAnimationSystem完全封装面板渲染逻辑
+	// 内部自动创建和管理RewardPanelRenderSystem
+	rewardSystem := systems.NewRewardAnimationSystem(em, gs, rm, reanimSystem, particleSystem)
 
 	// 加载中文调试字体
 	debugFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 14)
@@ -140,7 +138,6 @@ func NewVerifyRewardAnimationGame() (*VerifyRewardAnimationGame, error) {
 		rewardSystem:          rewardSystem,
 		renderSystem:          renderSystem,
 		plantCardRenderSystem: plantCardRenderSystem,
-		panelRenderSystem:     panelRenderSystem,
 		debugFont:             debugFont,
 		triggered:             false,
 		completed:             false,
@@ -228,18 +225,25 @@ func (vg *VerifyRewardAnimationGame) Draw(screen *ebiten.Image) {
 		screen.DrawImage(backgroundImg, opts)
 	}
 
-	// 绘制卡片包（通过 RenderSystem）
+	// 渲染顺序（从下往上）：
+	// 1. Reanim 实体（背景层）
+	// 2. 植物卡片（Phase 1-3 的卡片包）
+	// 3. 粒子效果（光晕，装饰层）
+	// 4. 奖励面板（Phase 4，最上层）
+	
 	cameraOffsetX := vg.gameState.CameraX
+	
+	// 1. 绘制 Reanim 实体
 	vg.renderSystem.Draw(screen, cameraOffsetX)
+	
+	// 2. 绘制植物卡片（Phase 1-3 的卡片包）
+	vg.plantCardRenderSystem.Draw(screen)
 
-	// 绘制粒子效果（光晕）
+	// 3. 绘制粒子效果（光晕）
 	vg.renderSystem.DrawParticles(screen, cameraOffsetX)
 
-	// 绘制奖励面板（Phase 4）
-	vg.panelRenderSystem.Draw(screen)
-
-	// 绘制植物卡片实体（Story 8.4: 使用统一的植物卡片渲染系统）
-	vg.plantCardRenderSystem.Draw(screen)
+	// 4. 绘制奖励面板（Phase 4）
+	vg.rewardSystem.Draw(screen)
 
 	// 绘制调试信息
 	vg.drawDebugInfo(screen)
@@ -279,6 +283,22 @@ func (vg *VerifyRewardAnimationGame) reset() {
 // drawDebugInfo 绘制调试信息
 func (vg *VerifyRewardAnimationGame) drawDebugInfo(screen *ebiten.Image) {
 	rewardEntity := vg.rewardSystem.GetEntity()
+
+	// Phase 4 (showing) 时不显示调试信息，避免遮挡奖励面板
+	if rewardEntity != 0 {
+		rewardComp, ok := ecs.GetComponent[*components.RewardAnimationComponent](vg.entityManager, rewardEntity)
+		if ok && rewardComp.Phase == "showing" {
+			// 只显示简短提示
+			if vg.debugFont != nil {
+				hintText := "Phase 4: 显示奖励面板 - 按 Space 关闭"
+				op := &text.DrawOptions{}
+				op.GeoM.Translate(10, 10)
+				op.ColorScale.ScaleWithColor(color.White)
+				text.Draw(screen, hintText, vg.debugFont, op)
+			}
+			return
+		}
+	}
 
 	var debugText string
 
