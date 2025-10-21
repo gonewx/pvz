@@ -1,0 +1,311 @@
+2025/10/21 14:35:38 Loading all resources...
+2025/10/21 14:35:38 [ResourceManager] Loading all resource groups (29 groups total)...
+2025/10/21 14:35:39 [ResourceManager] Successfully loaded 29/29 resource groups
+2025/10/21 14:35:39 Loading reward panel resources...
+2025/10/21 14:35:39 Loading Reanim resources...
+2025/10/21 14:35:39 [ResourceManager] Loading plant reanim: PeaShooter
+2025/10/21 14:35:39 [ResourceManager] Successfully loaded PeaShooter reanim
+2025/10/21 14:35:39 [ResourceManager] Loading plant reanim: SunFlower
+2025/10/21 14:35:39 [ResourceManager] Successfully loaded SunFlower reanim
+2025/10/21 14:35:39 [ResourceManager] Loading plant reanim: Wallnut
+2025/10/21 14:35:39 [ResourceManager] Successfully loaded Wallnut reanim
+2025/10/21 14:35:39 [ResourceManager] Loading plant reanim: CherryBomb
+2025/10/21 14:35:39 [ResourceManager] Successfully loaded CherryBomb reanim
+2025/10/21 14:35:39 [ResourceManager] Loading effect reanim: Sun from assets/effect/reanim/Sun.reanim
+2025/10/21 14:35:39 [ResourceManager] Parsed Sun.reanim: FPS=12, Tracks=3
+2025/10/21 14:35:39 [ResourceManager] Loaded 3 part images for Sun
+2025/10/21 14:35:39 [ResourceManager]   - IMAGE_REANIM_SUN3
+2025/10/21 14:35:39 [ResourceManager]   - IMAGE_REANIM_SUN2
+2025/10/21 14:35:39 [ResourceManager]   - IMAGE_REANIM_SUN1
+2025/10/21 14:35:39 [ResourceManager] Loading effect reanim: SodRoll from assets/effect/reanim/SodRoll.reanim
+2025/10/21 14:35:39 [ResourceManager] Parsed SodRoll.reanim: FPS=24, Tracks=2
+2025/10/21 14:35:39 [ResourceManager] Loaded 2 part images for SodRoll
+2025/10/21 14:35:39 [ResourceManager]   - IMAGE_REANIM_SODROLL
+2025/10/21 14:35:39 [ResourceManager]   - IMAGE_REANIM_SODROLLCAP
+2025/10/21 14:35:39 ╔════════════════════════════════════════════════════════╗
+2025/10/21 14:35:39 ║      完整奖励动画流程验证程序 (Story 8.3 + 8.4)         ║
+2025/10/21 14:35:39 ╚════════════════════════════════════════════════════════╝
+2025/10/21 14:35:39 [VerifyRewardAnimation] 测试植物: sunflower
+2025/10/21 14:35:39 
+2025/10/21 14:35:39 【验证流程】
+2025/10/21 14:35:39   Phase 1: appearing     - 卡片包弹出动画 (0.3s)
+2025/10/21 14:35:39   Phase 2: waiting       - 等待用户点击 (手动触发)
+2025/10/21 14:35:39   Phase 3: expanding     - 卡片包移动+展开动画 (2s)
+2025/10/21 14:35:39   Phase 3.5: pausing     - 短暂停顿+Award粒子 (0.5s)
+2025/10/21 14:35:39   Phase 3.6: disappearing - 卡片包渐渐消失 (0.3s)
+2025/10/21 14:35:39   Phase 4: showing       - 显示奖励面板 (持续)
+2025/10/21 14:35:39 
+2025/10/21 14:35:39 【快捷键】
+2025/10/21 14:35:39   Space/Click - 展开卡片包 (Phase 2)
+2025/10/21 14:35:39   R - 重启验证
+2025/10/21 14:35:39   Q - 退出程序
+2025/10/21 14:35:39 ════════════════════════════════════════════════════════
+2025/10/21 14:35:39 [VerifyRewardAnimation] 自动触发奖励动画
+2025/10/21 14:35:39 [RewardAnimationSystem] 触发奖励动画，植物ID: sunflower
+2025/10/21 14:35:39 [RewardAnimationSystem] ===== 位置计算调试信息 =====
+2025/10/21 14:35:39 [RewardAnimationSystem] 屏幕宽度: 800.0, 屏幕中心X: 400.0
+2025/10/21 14:35:39 [RewardAnimationSystem] 起始屏幕坐标: (662.3, 226.0)
+2025/10/21 14:35:39 [RewardAnimationSystem] 卡片宽度(scale=1.0): 100.0
+2025/10/21 14:35:39 [RewardAnimationSystem] 目标X计算: 400.0 - 100.0/2 = 350.0
+2025/10/21 14:35:39 [RewardAnimationSystem] 卡片包起始位置: (662.3, 226.0), 目标位置: (350.0, 126.0)
+2025/10/21 14:35:39 [RewardAnimationSystem] 随机行: 1
+2025/10/21 14:35:39 [ReanimSystem] 计算中心偏移 - 边界框: X[5.6, 67.8], Y[14.4, 77.7], 中心偏移: (36.7, 46.0)
+2025/10/21 14:35:39 [PlantCardFactory] Rendered plant icon: SunFlower (80x90)
+2025/10/21 14:35:39 [PlantCardFactory] Created plant card (Type: 1, Cost: 50, Icon: 80x90)
+2025/10/21 14:35:39 [RewardAnimationSystem] 卡片包已创建（使用 Story 8.4 统一工厂方法）
+2025/10/21 14:35:39 [RenderSystem] DrawParticles: cameraX=220.0
+2025/10/21 14:35:40 [RewardAnimationSystem] Phase 1 (appearing) 完成，切换到 waiting
+2025/10/21 14:35:40 [ParticleFactory] CreateParticleEffect 被调用: effectName='SeedPacket', 位置=(687.3, 199.0), angleOffset=0.0°, isUIParticle=true
+2025/10/21 14:35:40 [ParticleFactory] 粒子配置加载成功: 2 个发射器
+2025/10/21 14:35:40 [ParticleFactory] 发射器实体创建成功: ID=4, Name='', SpawnRate=0.00, SystemDuration=1.00, isUI=true
+2025/10/21 14:35:40 [ParticleFactory] 发射器实体创建成功: ID=5, Name='SeedPacketGlow', SpawnRate=0.00, SystemDuration=1.00, isUI=true
+2025/10/21 14:35:40 [RewardAnimationSystem] 创建光晕粒子成功: ID=4（验证主粒子假设，基准位置=(687.3, 199.0)）
+2025/10/21 14:35:40 [DEBUG] 创建粒子: pos=(687.3,199.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:40 [DEBUG] 粒子创建 - Position Field: X='', Y='0 Linear 10,50 Linear 0'
+2025/10/21 14:35:40 [DEBUG] 创建粒子: pos=(687.3,261.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:41 [RewardAnimationSystem] 玩家点击卡片包，切换到 expanding
+2025/10/21 14:35:41 [RewardAnimationSystem] 清理 1 个光晕粒子
+2025/10/21 14:35:41 [RewardAnimationSystem] 清理了 2 个发射器实体
+2025/10/21 14:35:41 [RewardAnimationSystem] 清理光晕粒子完成
+2025/10/21 14:35:41 [Expanding] 进度: 0.83%, 当前位置: (657.1, 224.3), 当前缩放: 0.51
+2025/10/21 14:35:41 [Expanding] 进度: 1.67%, 当前位置: (652.0, 222.7), 当前缩放: 0.52
+2025/10/21 14:35:41 [Expanding] 进度: 2.50%, 当前位置: (646.9, 221.1), 当前缩放: 0.52
+2025/10/21 14:35:41 [Expanding] 进度: 3.33%, 当前位置: (641.8, 219.4), 当前缩放: 0.53
+2025/10/21 14:35:41 [Expanding] 进度: 4.17%, 当前位置: (636.8, 217.8), 当前缩放: 0.54
+2025/10/21 14:35:41 [Expanding] 进度: 5.00%, 当前位置: (631.8, 216.2), 当前缩放: 0.55
+2025/10/21 14:35:41 [Expanding] 进度: 5.83%, 当前位置: (626.9, 214.7), 当前缩放: 0.56
+2025/10/21 14:35:41 [Expanding] 进度: 6.67%, 当前位置: (622.0, 213.1), 当前缩放: 0.56
+2025/10/21 14:35:41 [Expanding] 进度: 7.50%, 当前位置: (617.2, 211.6), 当前缩放: 0.57
+2025/10/21 14:35:41 [Expanding] 进度: 8.33%, 当前位置: (612.4, 210.0), 当前缩放: 0.58
+2025/10/21 14:35:41 [Expanding] 进度: 9.17%, 当前位置: (607.7, 208.5), 当前缩放: 0.59
+2025/10/21 14:35:41 [Expanding] 进度: 10.00%, 当前位置: (603.0, 207.0), 当前缩放: 0.59
+2025/10/21 14:35:41 [Expanding] 进度: 10.83%, 当前位置: (598.3, 205.5), 当前缩放: 0.60
+2025/10/21 14:35:41 [Expanding] 进度: 11.67%, 当前位置: (593.7, 204.0), 当前缩放: 0.61
+2025/10/21 14:35:41 [Expanding] 进度: 12.50%, 当前位置: (589.1, 202.6), 当前缩放: 0.62
+2025/10/21 14:35:41 [Expanding] 进度: 13.33%, 当前位置: (584.6, 201.1), 当前缩放: 0.62
+2025/10/21 14:35:41 [Expanding] 进度: 14.17%, 当前位置: (580.1, 199.7), 当前缩放: 0.63
+2025/10/21 14:35:41 [Expanding] 进度: 15.00%, 当前位置: (575.6, 198.2), 当前缩放: 0.64
+2025/10/21 14:35:42 [Expanding] 进度: 15.83%, 当前位置: (571.2, 196.8), 当前缩放: 0.65
+2025/10/21 14:35:42 [Expanding] 进度: 16.67%, 当前位置: (566.9, 195.4), 当前缩放: 0.65
+2025/10/21 14:35:42 [Expanding] 进度: 17.50%, 当前位置: (562.6, 194.1), 当前缩放: 0.66
+2025/10/21 14:35:42 [Expanding] 进度: 18.33%, 当前位置: (558.3, 192.7), 当前缩放: 0.67
+2025/10/21 14:35:42 [Expanding] 进度: 19.17%, 当前位置: (554.1, 191.3), 当前缩放: 0.67
+2025/10/21 14:35:42 [Expanding] 进度: 20.00%, 当前位置: (549.9, 190.0), 当前缩放: 0.68
+2025/10/21 14:35:42 [Expanding] 进度: 20.83%, 当前位置: (545.7, 188.7), 当前缩放: 0.69
+2025/10/21 14:35:42 [Expanding] 进度: 21.67%, 当前位置: (541.6, 187.4), 当前缩放: 0.69
+2025/10/21 14:35:42 [Expanding] 进度: 22.50%, 当前位置: (537.6, 186.1), 当前缩放: 0.70
+2025/10/21 14:35:42 [Expanding] 进度: 23.33%, 当前位置: (533.6, 184.8), 当前缩放: 0.71
+2025/10/21 14:35:42 [Expanding] 进度: 24.17%, 当前位置: (529.6, 183.5), 当前缩放: 0.71
+2025/10/21 14:35:42 [Expanding] 进度: 25.00%, 当前位置: (525.7, 182.2), 当前缩放: 0.72
+2025/10/21 14:35:42 [Expanding] 进度: 25.83%, 当前位置: (521.8, 181.0), 当前缩放: 0.72
+2025/10/21 14:35:42 [Expanding] 进度: 26.67%, 当前位置: (517.9, 179.8), 当前缩放: 0.73
+2025/10/21 14:35:42 [Expanding] 进度: 27.50%, 当前位置: (514.1, 178.6), 当前缩放: 0.74
+2025/10/21 14:35:42 [Expanding] 进度: 28.33%, 当前位置: (510.4, 177.4), 当前缩放: 0.74
+2025/10/21 14:35:42 [Expanding] 进度: 29.17%, 当前位置: (506.7, 176.2), 当前缩放: 0.75
+2025/10/21 14:35:42 [Expanding] 进度: 30.00%, 当前位置: (503.0, 175.0), 当前缩放: 0.76
+2025/10/21 14:35:42 [Expanding] 进度: 30.83%, 当前位置: (499.4, 173.8), 当前缩放: 0.76
+2025/10/21 14:35:42 [Expanding] 进度: 31.67%, 当前位置: (495.8, 172.7), 当前缩放: 0.77
+2025/10/21 14:35:42 [Expanding] 进度: 32.50%, 当前位置: (492.3, 171.6), 当前缩放: 0.77
+2025/10/21 14:35:42 [Expanding] 进度: 33.33%, 当前位置: (488.8, 170.4), 当前缩放: 0.78
+2025/10/21 14:35:42 [Expanding] 进度: 34.17%, 当前位置: (485.3, 169.3), 当前缩放: 0.78
+2025/10/21 14:35:42 [Expanding] 进度: 35.00%, 当前位置: (481.9, 168.2), 当前缩放: 0.79
+2025/10/21 14:35:42 [Expanding] 进度: 35.83%, 当前位置: (478.6, 167.2), 当前缩放: 0.79
+2025/10/21 14:35:42 [Expanding] 进度: 36.67%, 当前位置: (475.3, 166.1), 当前缩放: 0.80
+2025/10/21 14:35:42 [Expanding] 进度: 37.50%, 当前位置: (472.0, 165.1), 当前缩放: 0.80
+2025/10/21 14:35:42 [Expanding] 进度: 38.33%, 当前位置: (468.8, 164.0), 当前缩放: 0.81
+2025/10/21 14:35:42 [Expanding] 进度: 39.17%, 当前位置: (465.6, 163.0), 当前缩放: 0.81
+2025/10/21 14:35:42 [Expanding] 进度: 40.00%, 当前位置: (462.4, 162.0), 当前缩放: 0.82
+2025/10/21 14:35:42 [Expanding] 进度: 40.83%, 当前位置: (459.3, 161.0), 当前缩放: 0.82
+2025/10/21 14:35:42 [Expanding] 进度: 41.67%, 当前位置: (456.3, 160.0), 当前缩放: 0.83
+2025/10/21 14:35:42 [Expanding] 进度: 42.50%, 当前位置: (453.3, 159.1), 当前缩放: 0.83
+2025/10/21 14:35:42 [Expanding] 进度: 43.33%, 当前位置: (450.3, 158.1), 当前缩放: 0.84
+2025/10/21 14:35:42 [Expanding] 进度: 44.17%, 当前位置: (447.4, 157.2), 当前缩放: 0.84
+2025/10/21 14:35:42 [Expanding] 进度: 45.00%, 当前位置: (444.5, 156.2), 当前缩放: 0.85
+2025/10/21 14:35:42 [Expanding] 进度: 45.83%, 当前位置: (441.6, 155.3), 当前缩放: 0.85
+2025/10/21 14:35:42 [Expanding] 进度: 46.67%, 当前位置: (438.8, 154.4), 当前缩放: 0.86
+2025/10/21 14:35:42 [Expanding] 进度: 47.50%, 当前位置: (436.1, 153.6), 当前缩放: 0.86
+2025/10/21 14:35:42 [Expanding] 进度: 48.33%, 当前位置: (433.4, 152.7), 当前缩放: 0.87
+2025/10/21 14:35:42 [Expanding] 进度: 49.17%, 当前位置: (430.7, 151.8), 当前缩放: 0.87
+2025/10/21 14:35:42 [Expanding] 进度: 50.00%, 当前位置: (428.1, 151.0), 当前缩放: 0.88
+2025/10/21 14:35:42 [Expanding] 进度: 50.83%, 当前位置: (425.5, 150.2), 当前缩放: 0.88
+2025/10/21 14:35:42 [Expanding] 进度: 51.67%, 当前位置: (423.0, 149.4), 当前缩放: 0.88
+2025/10/21 14:35:42 [Expanding] 进度: 52.50%, 当前位置: (420.5, 148.6), 当前缩放: 0.89
+2025/10/21 14:35:42 [Expanding] 进度: 53.33%, 当前位置: (418.0, 147.8), 当前缩放: 0.89
+2025/10/21 14:35:42 [Expanding] 进度: 54.17%, 当前位置: (415.6, 147.0), 当前缩放: 0.89
+2025/10/21 14:35:42 [Expanding] 进度: 55.00%, 当前位置: (413.2, 146.2), 当前缩放: 0.90
+2025/10/21 14:35:42 [Expanding] 进度: 55.83%, 当前位置: (410.9, 145.5), 当前缩放: 0.90
+2025/10/21 14:35:42 [Expanding] 进度: 56.67%, 当前位置: (408.6, 144.8), 当前缩放: 0.91
+2025/10/21 14:35:42 [Expanding] 进度: 57.50%, 当前位置: (406.4, 144.1), 当前缩放: 0.91
+2025/10/21 14:35:42 [Expanding] 进度: 58.33%, 当前位置: (404.2, 143.4), 当前缩放: 0.91
+2025/10/21 14:35:42 [Expanding] 进度: 59.17%, 当前位置: (402.1, 142.7), 当前缩放: 0.92
+2025/10/21 14:35:42 [Expanding] 进度: 60.00%, 当前位置: (400.0, 142.0), 当前缩放: 0.92
+2025/10/21 14:35:42 [Expanding] 进度: 60.83%, 当前位置: (397.9, 141.3), 当前缩放: 0.92
+2025/10/21 14:35:42 [Expanding] 进度: 61.67%, 当前位置: (395.9, 140.7), 当前缩放: 0.93
+2025/10/21 14:35:42 [Expanding] 进度: 62.50%, 当前位置: (393.9, 140.1), 当前缩放: 0.93
+2025/10/21 14:35:42 [Expanding] 进度: 63.33%, 当前位置: (392.0, 139.4), 当前缩放: 0.93
+2025/10/21 14:35:42 [Expanding] 进度: 64.17%, 当前位置: (390.1, 138.8), 当前缩放: 0.94
+2025/10/21 14:35:42 [Expanding] 进度: 65.00%, 当前位置: (388.3, 138.2), 当前缩放: 0.94
+2025/10/21 14:35:43 [Expanding] 进度: 65.83%, 当前位置: (386.5, 137.7), 当前缩放: 0.94
+2025/10/21 14:35:43 [Expanding] 进度: 66.67%, 当前位置: (384.7, 137.1), 当前缩放: 0.94
+2025/10/21 14:35:43 [Expanding] 进度: 67.50%, 当前位置: (383.0, 136.6), 当前缩放: 0.95
+2025/10/21 14:35:43 [Expanding] 进度: 68.33%, 当前位置: (381.3, 136.0), 当前缩放: 0.95
+2025/10/21 14:35:43 [Expanding] 进度: 69.17%, 当前位置: (379.7, 135.5), 当前缩放: 0.95
+2025/10/21 14:35:43 [Expanding] 进度: 70.00%, 当前位置: (378.1, 135.0), 当前缩放: 0.95
+2025/10/21 14:35:43 [Expanding] 进度: 70.83%, 当前位置: (376.6, 134.5), 当前缩放: 0.96
+2025/10/21 14:35:43 [Expanding] 进度: 71.67%, 当前位置: (375.1, 134.0), 当前缩放: 0.96
+2025/10/21 14:35:43 [Expanding] 进度: 72.50%, 当前位置: (373.6, 133.6), 当前缩放: 0.96
+2025/10/21 14:35:43 [Expanding] 进度: 73.33%, 当前位置: (372.2, 133.1), 当前缩放: 0.96
+2025/10/21 14:35:43 [Expanding] 进度: 74.17%, 当前位置: (370.8, 132.7), 当前缩放: 0.97
+2025/10/21 14:35:43 [Expanding] 进度: 75.00%, 当前位置: (369.5, 132.2), 当前缩放: 0.97
+2025/10/21 14:35:43 [Expanding] 进度: 75.83%, 当前位置: (368.2, 131.8), 当前缩放: 0.97
+2025/10/21 14:35:43 [Expanding] 进度: 76.67%, 当前位置: (367.0, 131.4), 当前缩放: 0.97
+2025/10/21 14:35:43 [Expanding] 进度: 77.50%, 当前位置: (365.8, 131.1), 当前缩放: 0.97
+2025/10/21 14:35:43 [Expanding] 进度: 78.33%, 当前位置: (364.7, 130.7), 当前缩放: 0.98
+2025/10/21 14:35:43 [Expanding] 进度: 79.17%, 当前位置: (363.6, 130.3), 当前缩放: 0.98
+2025/10/21 14:35:43 [Expanding] 进度: 80.00%, 当前位置: (362.5, 130.0), 当前缩放: 0.98
+2025/10/21 14:35:43 [Expanding] 进度: 80.83%, 当前位置: (361.5, 129.7), 当前缩放: 0.98
+2025/10/21 14:35:43 [Expanding] 进度: 81.67%, 当前位置: (360.5, 129.4), 当前缩放: 0.98
+2025/10/21 14:35:43 [Expanding] 进度: 82.50%, 当前位置: (359.6, 129.1), 当前缩放: 0.98
+2025/10/21 14:35:43 [Expanding] 进度: 83.33%, 当前位置: (358.7, 128.8), 当前缩放: 0.99
+2025/10/21 14:35:43 [Expanding] 进度: 84.17%, 当前位置: (357.8, 128.5), 当前缩放: 0.99
+2025/10/21 14:35:43 [Expanding] 进度: 85.00%, 当前位置: (357.0, 128.2), 当前缩放: 0.99
+2025/10/21 14:35:43 [Expanding] 进度: 85.83%, 当前位置: (356.3, 128.0), 当前缩放: 0.99
+2025/10/21 14:35:43 [Expanding] 进度: 86.67%, 当前位置: (355.6, 127.8), 当前缩放: 0.99
+2025/10/21 14:35:43 [Expanding] 进度: 87.50%, 当前位置: (354.9, 127.6), 当前缩放: 0.99
+2025/10/21 14:35:43 [Expanding] 进度: 88.33%, 当前位置: (354.3, 127.4), 当前缩放: 0.99
+2025/10/21 14:35:43 [Expanding] 进度: 89.17%, 当前位置: (353.7, 127.2), 当前缩放: 0.99
+2025/10/21 14:35:43 [Expanding] 进度: 90.00%, 当前位置: (353.1, 127.0), 当前缩放: 0.99
+2025/10/21 14:35:43 [Expanding] 进度: 90.83%, 当前位置: (352.6, 126.8), 当前缩放: 1.00
+2025/10/21 14:35:43 [Expanding] 进度: 91.67%, 当前位置: (352.2, 126.7), 当前缩放: 1.00
+2025/10/21 14:35:43 [Expanding] 进度: 92.50%, 当前位置: (351.8, 126.6), 当前缩放: 1.00
+2025/10/21 14:35:43 [Expanding] 进度: 93.33%, 当前位置: (351.4, 126.4), 当前缩放: 1.00
+2025/10/21 14:35:43 [Expanding] 进度: 94.17%, 当前位置: (351.1, 126.3), 当前缩放: 1.00
+2025/10/21 14:35:43 [Expanding] 进度: 95.00%, 当前位置: (350.8, 126.2), 当前缩放: 1.00
+2025/10/21 14:35:43 [Expanding] 进度: 95.83%, 当前位置: (350.5, 126.2), 当前缩放: 1.00
+2025/10/21 14:35:43 [Expanding] 进度: 96.67%, 当前位置: (350.3, 126.1), 当前缩放: 1.00
+2025/10/21 14:35:43 [Expanding] 进度: 97.50%, 当前位置: (350.2, 126.1), 当前缩放: 1.00
+2025/10/21 14:35:43 [Expanding] 进度: 98.33%, 当前位置: (350.1, 126.0), 当前缩放: 1.00
+2025/10/21 14:35:43 [Expanding] 进度: 99.17%, 当前位置: (350.0, 126.0), 当前缩放: 1.00
+2025/10/21 14:35:43 [Expanding] 进度: 100.00%, 当前位置: (350.0, 126.0), 当前缩放: 1.00
+2025/10/21 14:35:43 [Expanding] 进度: 100.00%, 当前位置: (350.0, 126.0), 当前缩放: 1.00
+2025/10/21 14:35:43 [RewardAnimationSystem] Phase 3 (expanding) 移动完成
+2025/10/21 14:35:43 [RewardAnimationSystem] 最终位置: (350.0, 126.0), 最终缩放: 1.00
+2025/10/21 14:35:43 [RewardAnimationSystem] 目标位置: (350.0, 126.0)
+2025/10/21 14:35:43 [RewardAnimationSystem] 触发 Award 粒子特效
+2025/10/21 14:35:43 [ParticleFactory] CreateParticleEffect 被调用: effectName='Award', 位置=(400.0, 196.0), angleOffset=0.0°, isUIParticle=true
+2025/10/21 14:35:43 [ParticleFactory] 粒子配置加载成功: 13 个发射器
+2025/10/21 14:35:43 [ParticleFactory] 发射器实体创建成功: ID=8, Name='AwardRay8', SpawnRate=0.00, SystemDuration=0.00, isUI=true
+2025/10/21 14:35:43 [ParticleFactory] 发射器实体创建成功: ID=9, Name='AwardRay7', SpawnRate=0.00, SystemDuration=0.00, isUI=true
+2025/10/21 14:35:43 [ParticleFactory] 发射器实体创建成功: ID=10, Name='AwardRay6', SpawnRate=0.00, SystemDuration=0.00, isUI=true
+2025/10/21 14:35:43 [ParticleFactory] 发射器实体创建成功: ID=11, Name='AwardRay5', SpawnRate=0.00, SystemDuration=0.00, isUI=true
+2025/10/21 14:35:43 [ParticleFactory] 发射器实体创建成功: ID=12, Name='AwardRay4', SpawnRate=0.00, SystemDuration=0.00, isUI=true
+2025/10/21 14:35:43 [ParticleFactory] 发射器实体创建成功: ID=13, Name='AwardRay3', SpawnRate=0.00, SystemDuration=0.00, isUI=true
+2025/10/21 14:35:43 [ParticleFactory] 发射器实体创建成功: ID=14, Name='AwardRay2', SpawnRate=0.00, SystemDuration=0.00, isUI=true
+2025/10/21 14:35:43 [ParticleFactory] 发射器实体创建成功: ID=15, Name='AwardRay1', SpawnRate=0.00, SystemDuration=0.00, isUI=true
+2025/10/21 14:35:43 [ParticleFactory] 发射器实体创建成功: ID=16, Name='AwardGlow', SpawnRate=0.00, SystemDuration=0.00, isUI=true
+2025/10/21 14:35:43 [ParticleFactory] 发射器实体创建成功: ID=17, Name='AwardFlash4', SpawnRate=0.00, SystemDuration=2.00, isUI=true
+2025/10/21 14:35:43 [ParticleFactory] 发射器实体创建成功: ID=18, Name='AwardFlash3', SpawnRate=0.00, SystemDuration=2.00, isUI=true
+2025/10/21 14:35:43 [ParticleFactory] 发射器实体创建成功: ID=19, Name='AwardFlash2', SpawnRate=0.00, SystemDuration=2.00, isUI=true
+2025/10/21 14:35:43 [ParticleFactory] 发射器实体创建成功: ID=20, Name='AwardFlash1', SpawnRate=0.00, SystemDuration=0.00, isUI=true
+2025/10/21 14:35:43 [RewardAnimationSystem] 创建 Award 粒子特效成功: ID=8（13个发射器：8光芒+1光晕+4闪光）
+2025/10/21 14:35:43 [RewardAnimationSystem] Phase 3 完成，进入 pausing 阶段（短暂停顿）
+2025/10/21 14:35:43 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:43 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:43 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:43 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:43 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:43 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:43 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:43 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:43 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:43 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:43 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:43 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:43 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:43 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:43 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:43 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:43 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:43 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:43 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:43 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:43 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:43 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:44 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:44 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:44 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:44 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:44 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:44 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [RewardAnimationSystem] 停顿完成，进入 disappearing 阶段
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:45 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:46 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:46 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:46 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:46 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:46 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:46 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:46 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:46 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:46 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:46 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:46 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:46 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:46 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:46 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:46 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:46 [DEBUG] 创建粒子: pos=(400.0,196.0), velocity=(0.0,0.0), angle=0.0°, speed=0.0, groundY=0.0, image=true
+2025/10/21 14:35:46 [RewardAnimationSystem] 卡片包消失完成，进入面板显示阶段
+2025/10/21 14:35:46 [RewardAnimationSystem] 移除卡片包的 PlantCardComponent（隐藏渲染）
+2025/10/21 14:35:46 [RewardAnimationSystem] 清理 4 个光晕粒子
+2025/10/21 14:35:46 [RewardAnimationSystem] 清理了 13 个发射器实体
+2025/10/21 14:35:46 [RewardAnimationSystem] 清理光晕粒子完成
+2025/10/21 14:35:46 [RewardAnimationSystem] 清理 Award 粒子特效
+2025/10/21 14:35:46 [RewardAnimationSystem] 奖励面板已创建：向日葵 - 提供你额外的阳光
+2025/10/21 14:35:46 [RewardAnimationSystem] 进入 Phase 4 (showing)，显示奖励面板
+2025/10/21 14:35:46 [ReanimSystem] 计算中心偏移 - 边界框: X[5.6, 67.8], Y[14.4, 77.7], 中心偏移: (36.7, 46.0)
+2025/10/21 14:35:46 [PlantCardFactory] Rendered plant icon: SunFlower (80x90)
+2025/10/21 14:35:46 [PlantCardFactory] Created plant card (Type: 1, Cost: 50, Icon: 80x90)
+2025/10/21 14:35:46 [RewardPanelRenderSystem] Created plant card entity 95 for panel 94 (plant: sunflower)
+2025/10/21 14:35:47 ╔════════════════════════════════════════════════════════╗
+2025/10/21 14:35:47 ║           ✅ 完整奖励动画流程验证完成！               ║
+2025/10/21 14:35:47 ╚════════════════════════════════════════════════════════╝
+2025/10/21 14:35:47 
+2025/10/21 14:35:47 【验证成果】
+2025/10/21 14:35:47   ✅ Phase 1: appearing     - 卡片包弹出 (完成)
+2025/10/21 14:35:47   ✅ Phase 2: waiting       - 等待点击 (完成)
+2025/10/21 14:35:47   ✅ Phase 3: expanding     - 移动+展开动画 (完成)
+2025/10/21 14:35:47   ✅ Phase 3.5: pausing     - 短暂停顿+粒子 (完成)
+2025/10/21 14:35:47   ✅ Phase 3.6: disappearing - 卡片包消失 (完成)
+2025/10/21 14:35:47   ✅ Phase 4: showing       - 面板显示 (完成)
+2025/10/21 14:35:47 
+2025/10/21 14:35:47 按 R 重启或 Q 退出
+2025/10/21 14:35:47 ════════════════════════════════════════════════════════
