@@ -28,7 +28,7 @@ const (
 
 	// PlantCardSunCostOffsetY 阳光数字相对于卡片底部的Y偏移（像素）
 	// 基于原始卡片高度（140px），渲染时会乘以 PlantCardScale
-	PlantCardSunCostOffsetY = 17.0
+	PlantCardSunCostOffsetY = 18.0
 
 	// PlantCardSunCostFontSize 阳光数字字体大小（基准值）
 	// 渲染时会乘以 PlantCardScale，确保字体大小随卡片整体缩放

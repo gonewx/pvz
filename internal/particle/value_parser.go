@@ -3,6 +3,7 @@
 package particle
 
 import (
+	"math"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -210,27 +211,74 @@ func ParseValue(s string) (min, max float64, keyframes []Keyframe, interpolation
 							}
 						}
 
-						// 检查是否是 PopCap 两关键帧格式："initialValue,timePercent finalValue"
+						// 检查是否是 PopCap 触发格式："value1,timePercent value2,timePercent"
+						// 用于 Flash 触发：在特定时间点从 value1 跳变到 value2
+						if val2 > 1 && i+1 < len(parts) && strings.Contains(parts[i+1], ",") && initialValue == nil {
+							// 尝试解析下一个逗号对
+							nextParts := strings.Split(parts[i+1], ",")
+							if len(nextParts) == 2 {
+								nextVal1, err1 := strconv.ParseFloat(nextParts[0], 64)
+								nextVal2, err2 := strconv.ParseFloat(nextParts[1], 64)
+								if err1 == nil && err2 == nil {
+									// 检查时间是否相同（容差 0.001）
+									if math.Abs(val2-nextVal2) < 0.001 {
+										// PopCap 触发格式: "value1,time% value2,time%"
+										// 在 time% 时刻从 value1 跳变到 value2
+										triggerValue1 := val1
+										triggerValue2 := nextVal1
+										timePercent := val2
+
+										// 添加初始关键帧（t=0，值为 value1）
+										keyframes = append(keyframes, Keyframe{Time: 0, Value: triggerValue1})
+										// 添加触发关键帧（t=timePercent%，值为 value2）
+										keyframes = append(keyframes, Keyframe{Time: timePercent / 100.0, Value: triggerValue2})
+										// 标记下一个值已处理
+										processedIndices[i+1] = true
+										initialValue = &triggerValue1 // 标记已有初始值
+										continue
+									}
+								}
+							}
+						}
+
+						// 检查是否是 PopCap 保持-插值格式："initialValue,timePercent finalValue"
 						// 条件：val2 > 1，后面有值，但没有初始值（initialValue == nil）
 						if val2 > 1 && i+1 < len(parts) && !strings.Contains(parts[i+1], ",") && initialValue == nil {
 							// 尝试解析后续值
 							nextVal, err := strconv.ParseFloat(parts[i+1], 64)
 							if err == nil {
-								// PopCap 两关键帧格式: "initialValue,timePercent finalValue"
-								initialValuePop := val1
-								timePercent := val2
-								finalValue := nextVal
+							// PopCap 保持-插值格式: "initialValue,holdPercent finalValue"
+							// 动画行为：
+							// 1. 从 0% 到 holdPercent：保持 initialValue 不变
+							// 2. 从 holdPercent 到 100%：从 initialValue 插值到 finalValue
+							// 例如：".2,50 0" -> 前50%保持0.2亮度，后50%淡出到0
+							initialValuePop := val1
+							holdPercent := val2
+							finalValue := nextVal
 
-								// 添加初始关键帧
-								keyframes = append(keyframes, Keyframe{Time: 0, Value: initialValuePop})
-								// 添加结束关键帧（时间归一化：percent/100）
-								keyframes = append(keyframes, Keyframe{Time: timePercent / 100.0, Value: finalValue})
-								// 标记下一个值已处理
-								processedIndices[i+1] = true
-								initialValue = &initialValuePop // 标记已有初始值
+							// 添加初始关键帧（t=0，值为 initialValue）
+							keyframes = append(keyframes, Keyframe{Time: 0, Value: initialValuePop})
+							// 添加保持关键帧（t=holdPercent%，值仍为 initialValue）
+							keyframes = append(keyframes, Keyframe{Time: holdPercent / 100.0, Value: initialValuePop})
+							// 添加最终关键帧（t=100%，值为 finalValue）
+							keyframes = append(keyframes, Keyframe{Time: 1.0, Value: finalValue})
+							// 标记下一个值已处理
+							processedIndices[i+1] = true
+							initialValue = &initialValuePop // 标记已有初始值
 								continue
 							}
 						}
+
+
+						// 检查这是否是最后一个逗号对（后面没有其他逗号对）
+						isLastKeyframePair := true
+						for j := i + 1; j < len(parts); j++ {
+							if strings.Contains(parts[j], ",") {
+								isLastKeyframePair = false
+								break
+							}
+						}
+
 
 						// Story 7.5 新增："value,timePercent" 格式（用于 CollisionReflect 等）
 						// 条件：有初始值 且 val2看起来像百分比（>10）
@@ -242,6 +290,21 @@ func ParseValue(s string) (min, max float64, keyframes []Keyframe, interpolation
 							time := val2 / 100.0
 							value := val1
 							keyframes = append(keyframes, Keyframe{Time: time, Value: value})
+
+							// 只在最后一个逗号对时添加 Time=1.0 保持帧
+							// 例如：".3 .3,40 0,50" → 最后添加 {1.0, 0} 使粒子在50%后保持值为0
+							if isLastKeyframePair {
+								keyframes = append(keyframes, Keyframe{Time: 1.0, Value: value})
+							}
+						} else if initialValue != nil && val2 <= 10 {
+							// PopCap 快速插值格式："initialValue finalValue,timePercent"
+							// 例如：".4 Linear 10,9.999999"
+							// 含义：从 initialValue 快速插值到 finalValue，在 timePercent% 完成，然后保持
+							finalValue := val1
+							timePercent := val2
+							keyframes = append(keyframes, Keyframe{Time: timePercent / 100.0, Value: finalValue})
+							// 添加保持关键帧
+							keyframes = append(keyframes, Keyframe{Time: 1.0, Value: finalValue})
 						} else {
 							// 标准 "time,value" 格式
 							keyframes = append(keyframes, Keyframe{Time: val1, Value: val2})

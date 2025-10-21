@@ -161,43 +161,36 @@ func (ps *ParticleSystem) updateEmitters(dt float64) {
 			spawnMaxActive := ps.getDynamicSpawnMaxActive(emitter)
 			spawnMaxLaunched := ps.getDynamicSpawnMaxLaunched(emitter)
 
-			// Story 7.4 Fix: Handle SpawnRate=0 (instant burst effects)
-			// When SpawnRate=0, spawn all particles immediately on first update
+			// 获取当前活跃粒子数量
+			activeCount := len(emitter.ActiveParticles)
+
+			// SpawnRate=0: 不按时间间隔生成，而是持续保持 SpawnMinActive 数量的粒子活跃
+			// 这是 Award.xml 等复合粒子效果的核心机制
 			if emitter.SpawnRate == 0 {
-				if emitter.TotalLaunched == 0 {
-					// Instant burst: spawn SpawnMinActive particles immediately
-					targetCount := spawnMinActive
-					if targetCount == 0 {
-						targetCount = 1 // At least one particle
+				// 持续补充模式：如果活跃粒子数 < SpawnMinActive，就补充到目标数量
+				for activeCount < spawnMinActive {
+					// Check spawn constraints
+					canSpawn := true
+					if spawnMaxActive > 0 && activeCount >= spawnMaxActive {
+						canSpawn = false
+						break
+					}
+					if spawnMaxLaunched > 0 && emitter.TotalLaunched >= spawnMaxLaunched {
+						canSpawn = false
+						break
 					}
 
-					// DEBUG: 立即生成模式日志（已禁用避免刷屏）
-					// log.Printf("[ParticleSystem] 立即生成模式: 生成 %d 个粒子", targetCount)
-
-					for i := 0; i < targetCount; i++ {
-						// Check spawn constraints
-						activeCount := len(emitter.ActiveParticles)
-						canSpawn := true
-						if spawnMaxActive > 0 && activeCount >= spawnMaxActive {
-							canSpawn = false
-							break
-						}
-						if spawnMaxLaunched > 0 && emitter.TotalLaunched >= spawnMaxLaunched {
-							canSpawn = false
-							break
-						}
-
-						if canSpawn {
-							ps.spawnParticle(emitterID, emitter, position)
-							emitter.TotalLaunched++
-						}
+					if canSpawn {
+						ps.spawnParticle(emitterID, emitter, position)
+						emitter.TotalLaunched++
+						activeCount++ // 更新本地计数
+					} else {
+						break
 					}
 				}
 			} else if emitter.SpawnRate > 0 {
 				// Continuous spawn mode: spawn particles at regular intervals
 				for emitter.Age >= emitter.NextSpawnTime {
-					activeCount := len(emitter.ActiveParticles)
-
 					// Check spawn constraints (使用动态计算的值)
 					canSpawn := true
 					if spawnMaxActive > 0 && activeCount >= spawnMaxActive {
