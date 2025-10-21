@@ -157,20 +157,66 @@ const (
 	// PauseMenuOverlayAlpha 暂停菜单遮罩透明度（0-255）
 	PauseMenuOverlayAlpha = 150
 
-	// PauseMenuPanelWidth 暂停菜单面板宽度（像素）
-	PauseMenuPanelWidth = 400.0
+	// PauseMenuBackToGameButtonFontSize "返回游戏"按钮字体大小（可调节）
+	PauseMenuBackToGameButtonFontSize = 45.0
 
-	// PauseMenuPanelHeight 暂停菜单面板高度（像素）
-	PauseMenuPanelHeight = 300.0
+	// PauseMenuInnerButtonFontSize "重新开始"和"主菜单"按钮字体大小（可调节）
+	PauseMenuInnerButtonFontSize = 20.0
 
-	// PauseMenuButtonSpacing 暂停菜单按钮之间的垂直间距（像素）
-	PauseMenuButtonSpacing = 20.0
+	// PauseMenuBackToGameButtonOffsetY "返回游戏"按钮Y偏移（相对于屏幕中心，像素）
+	// 正值向下，负值向上。调整此值控制按钮相对于墓碑背景的垂直位置
+	PauseMenuBackToGameButtonOffsetY = 132.0
 
-	// PauseMenuButtonWidth 暂停菜单按钮宽度（像素）
-	PauseMenuButtonWidth = 200.0
+	// PauseMenuRestartButtonOffsetY "重新开始"按钮Y偏移（相对于屏幕中心，像素）
+	// 此按钮在墓碑内部，位于顶部
+	// 建议值范围：50.0 - 100.0
+	PauseMenuRestartButtonOffsetY = 30.0
 
-	// PauseMenuButtonHeight 暂停菜单按钮高度（像素）
-	PauseMenuButtonHeight = 50.0
+	// PauseMenuMainMenuButtonOffsetY "主菜单"按钮Y偏移（相对于屏幕中心，像素）
+	// 此按钮在墓碑内部，位于中间偏下
+	// 建议值范围：120.0 - 160.0
+	PauseMenuMainMenuButtonOffsetY = 75.0
+
+	// ========== 暂停菜单UI元素偏移（Story 10.1）（可手工调节） ==========
+
+	// PauseMenuMusicSliderOffsetX 音乐滑动条X偏移（相对于屏幕中心，像素）
+	PauseMenuMusicSliderOffsetX = 0.0
+
+	// PauseMenuMusicSliderOffsetY 音乐滑动条Y偏移（相对于屏幕中心，像素）
+	PauseMenuMusicSliderOffsetY = -120.0
+
+	// PauseMenuSoundSliderOffsetX 音效滑动条X偏移（相对于屏幕中心，像素）
+	PauseMenuSoundSliderOffsetX = 0.0
+
+	// PauseMenuSoundSliderOffsetY 音效滑动条Y偏移（相对于屏幕中心，像素）
+	PauseMenuSoundSliderOffsetY = -90.0
+
+	// PauseMenu3DCheckboxOffsetX 3D加速复选框X偏移（相对于屏幕中心，像素）
+	PauseMenu3DCheckboxOffsetX = 60.0
+
+	// PauseMenu3DCheckboxOffsetY 3D加速复选框Y偏移（相对于屏幕中心，像素）
+	PauseMenu3DCheckboxOffsetY = -60.0
+
+	// PauseMenuFullscreenCheckboxOffsetX 全屏复选框X偏移（相对于屏幕中心，像素）
+	PauseMenuFullscreenCheckboxOffsetX = 60.0
+
+	// PauseMenuFullscreenCheckboxOffsetY 全屏复选框Y偏移（相对于屏幕中心，像素）
+	PauseMenuFullscreenCheckboxOffsetY = -30.0
+
+	// PauseMenuLabelFontSize UI元素标签文字字体大小（像素）
+	PauseMenuLabelFontSize = 16.0
+
+	// PauseMenuLabelOffsetX 标签文字X偏移（相对于滑动条/复选框位置，像素）
+	// 负值表示在左侧
+	PauseMenuLabelOffsetX = -80.0
+
+	// PauseMenuLabelOffsetY 标签文字Y偏移（相对于滑动条/复选框位置，像素）
+	// 用于垂直居中对齐
+	PauseMenuLabelOffsetY = 0.0
+
+	// PauseMenuInnerButtonWidth 墓碑内部按钮总宽度（像素）
+	// 包含左右边框，中间部分宽度 = 总宽度 - 左右边框宽度
+	PauseMenuInnerButtonWidth = 180.0
 )
 
 // GetGridWorldBounds 返回草坪网格的世界坐标边界

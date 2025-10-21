@@ -680,3 +680,90 @@ func TestLoadLevel1_1RealConfig(t *testing.T) {
 
 	t.Logf("✓ Successfully loaded level 1-1 with initialSun=%d", gs.Sun)
 }
+
+// TestSetPaused 测试设置暂停状态 (Story 10.1)
+func TestSetPaused(t *testing.T) {
+	gs := GetGameState()
+
+	// 初始状态应该是未暂停
+	if gs.IsPaused {
+		t.Error("Expected IsPaused to be false initially")
+	}
+
+	// 设置为暂停
+	gs.SetPaused(true)
+	if !gs.IsPaused {
+		t.Error("Expected IsPaused to be true after SetPaused(true)")
+	}
+
+	// 设置为恢复
+	gs.SetPaused(false)
+	if gs.IsPaused {
+		t.Error("Expected IsPaused to be false after SetPaused(false)")
+	}
+}
+
+// TestTogglePause 测试切换暂停状态 (Story 10.1)
+func TestTogglePause(t *testing.T) {
+	gs := GetGameState()
+
+	// 初始状态为未暂停
+	gs.IsPaused = false
+
+	// 第一次切换，应该变为暂停
+	gs.TogglePause()
+	if !gs.IsPaused {
+		t.Error("Expected IsPaused to be true after first toggle")
+	}
+
+	// 第二次切换，应该变为恢复
+	gs.TogglePause()
+	if gs.IsPaused {
+		t.Error("Expected IsPaused to be false after second toggle")
+	}
+
+	// 第三次切换，应该再次变为暂停
+	gs.TogglePause()
+	if !gs.IsPaused {
+		t.Error("Expected IsPaused to be true after third toggle")
+	}
+}
+
+// TestPauseStateInitial 测试暂停状态的初始值 (Story 10.1)
+func TestPauseStateInitial(t *testing.T) {
+	// 重置全局状态以测试初始化
+	globalGameState = nil
+	gs := GetGameState()
+
+	// 初始状态应该是未暂停
+	if gs.IsPaused {
+		t.Error("Expected IsPaused to be false on initialization")
+	}
+}
+
+// TestPauseStateIndependent 测试暂停状态独立于其他状态 (Story 10.1)
+func TestPauseStateIndependent(t *testing.T) {
+	gs := GetGameState()
+
+	// 设置一些其他游戏状态
+	gs.Sun = 500
+	gs.IsPlantingMode = true
+	gs.SelectedPlantType = components.PlantPeashooter
+
+	// 暂停游戏
+	gs.SetPaused(true)
+
+	// 验证其他状态没有受到影响
+	if gs.Sun != 500 {
+		t.Errorf("Expected Sun 500, got %d", gs.Sun)
+	}
+	if !gs.IsPlantingMode {
+		t.Error("Expected IsPlantingMode to remain true")
+	}
+	if gs.SelectedPlantType != components.PlantPeashooter {
+		t.Errorf("Expected SelectedPlantType to remain PlantPeashooter, got %v", gs.SelectedPlantType)
+	}
+	if !gs.IsPaused {
+		t.Error("Expected IsPaused to be true")
+	}
+}

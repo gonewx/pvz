@@ -2,6 +2,7 @@ package modules
 
 import (
 	"fmt"
+	"image/color"
 	"log"
 
 	"github.com/decker502/pvz/pkg/components"
@@ -11,6 +12,7 @@ import (
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/systems"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
 // PauseMenuModule 暂停菜单模块
@@ -45,6 +47,15 @@ type PauseMenuModule struct {
 
 	// 按钮实体列表（用于显示/隐藏控制）
 	buttonEntities []ecs.EntityID
+
+	// UI 元素实体
+	musicSliderEntity ecs.EntityID // 音乐滑动条
+	soundSliderEntity ecs.EntityID // 音效滑动条
+	enable3DEntity    ecs.EntityID // 3D加速复选框
+	fullscreenEntity  ecs.EntityID // 全屏复选框
+
+	// UI 文字字体
+	labelFont *text.GoTextFace // 标签文字字体
 
 	// 外部依赖
 	gameState *game.GameState
@@ -118,18 +129,43 @@ func NewPauseMenuModule(
 		buttonEntities:     make([]ecs.EntityID, 0, 3),
 	}
 
-	// 1. 创建暂停菜单实体
+	// 1. 加载暂停菜单背景图（原版墓碑背景，双图层）
+	menuBackImage := rm.GetImageByID("IMAGE_OPTIONS_MENUBACK")
+	if menuBackImage == nil {
+		log.Printf("[PauseMenuModule] Warning: Failed to load pause menu background image")
+	}
+
+	// 加载遮罩图片（用于边缘透明效果，类似草皮渲染）
+	menuBackMaskImage := rm.GetImageByID("IMAGE_OPTIONS_MENUBACK_MASK")
+	if menuBackMaskImage == nil {
+		log.Printf("[PauseMenuModule] Warning: Failed to load pause menu mask image, edge transparency may not work")
+	}
+
+	// 2. 创建暂停菜单实体
 	module.pauseMenuEntity = em.CreateEntity()
 
-	// 2. 初始化暂停菜单渲染系统
-	module.pauseMenuRenderSystem = systems.NewPauseMenuRenderSystem(em, windowWidth, windowHeight)
+	// 3. 加载标签文字字体（用于滑动条和复选框）
+	labelFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.PauseMenuLabelFontSize)
+	if err != nil {
+		log.Printf("[PauseMenuModule] Warning: Failed to load label font: %v", err)
+		labelFont = nil
+	}
+	module.labelFont = labelFont
 
-	// 3. 创建暂停菜单按钮
+	// 4. 初始化暂停菜单渲染系统（传入背景图和遮罩图）
+	module.pauseMenuRenderSystem = systems.NewPauseMenuRenderSystem(em, windowWidth, windowHeight, menuBackImage, menuBackMaskImage)
+
+	// 5. 创建暂停菜单按钮
 	if err := module.createPauseMenuButtons(rm); err != nil {
 		return nil, fmt.Errorf("failed to create pause menu buttons: %w", err)
 	}
 
-	// 4. 添加暂停菜单组件
+	// 6. 创建UI元素（滑动条和复选框）
+	if err := module.createUIElements(rm); err != nil {
+		log.Printf("[PauseMenuModule] Warning: Failed to create UI elements: %v", err)
+	}
+
+	// 7. 添加暂停菜单组件
 	pauseMenuComp := module.getPauseMenuComponent()
 	ecs.AddComponent(em, module.pauseMenuEntity, pauseMenuComp)
 
@@ -138,84 +174,184 @@ func NewPauseMenuModule(
 	return module, nil
 }
 
-// createPauseMenuButtons 创建暂停菜单的三个按钮
+// createPauseMenuButtons 创建暂停菜单按钮
 // 内部方法，由 NewPauseMenuModule 调用
+// Story 10.1: 使用原版资源 - "返回游戏"按钮使用 options_backtogamebutton 图片
 func (m *PauseMenuModule) createPauseMenuButtons(rm *game.ResourceManager) error {
 	// 按钮初始位置：屏幕外（隐藏）
 	hiddenX := -1000.0
 	hiddenY := -1000.0
 
-	// 计算按钮中间宽度
-	buttonMiddleWidth := config.PauseMenuButtonWidth - 40 // 扣除左右边框
+	// 加载"返回游戏"按钮图片（原版资源）
+	backToGameNormal := rm.GetImageByID("IMAGE_OPTIONS_BACKTOGAMEBUTTON0")
+	backToGameHover := rm.GetImageByID("IMAGE_OPTIONS_BACKTOGAMEBUTTON2")
 
-	// 1. 创建"继续"按钮
-	continueButton, err := entities.NewMenuButton(
-		m.entityManager,
-		rm,
-		hiddenX, // 初始隐藏
-		hiddenY,
-		"继续",
-		24.0,
-		[4]uint8{255, 255, 255, 255}, // 白色文字
-		buttonMiddleWidth,
-		func() {
-			log.Printf("[PauseMenuModule] Continue button clicked!")
+	if backToGameNormal == nil {
+		return fmt.Errorf("failed to load back to game button images")
+	}
+
+	log.Printf("[PauseMenuModule] Loaded back to game button images: Normal=%v, Hover=%v",
+		backToGameNormal != nil, backToGameHover != nil)
+
+	// 加载"返回游戏"按钮文字字体（中文，使用配置的字号）
+	buttonFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.PauseMenuBackToGameButtonFontSize)
+	if err != nil {
+		log.Printf("[PauseMenuModule] Warning: Failed to load button font: %v", err)
+		buttonFont = nil
+	}
+
+	// 创建"返回游戏"按钮实体
+	backToGameEntity := m.entityManager.CreateEntity()
+
+	// 添加位置组件
+	ecs.AddComponent(m.entityManager, backToGameEntity, &components.PositionComponent{
+		X: hiddenX,
+		Y: hiddenY,
+	})
+
+	// 添加按钮组件（简单图片按钮）
+	ecs.AddComponent(m.entityManager, backToGameEntity, &components.ButtonComponent{
+		Type:         components.ButtonTypeSimple,
+		NormalImage:  backToGameNormal,
+		HoverImage:   backToGameHover,
+		PressedImage: backToGameHover,
+		Text:         "返回游戏",                   // 渲染中文文字
+		Font:         buttonFont,               // 中文字体
+		TextColor:    [4]uint8{0, 200, 0, 255}, // 绿色文字（与其他按钮一致）
+		State:        components.UINormal,
+		Enabled:      true,
+		OnClick: func() {
+			log.Printf("[PauseMenuModule] Back to game button clicked!")
 			m.Hide() // 隐藏暂停菜单（会自动触发 onResumeMusic）
 			if m.onContinue != nil {
 				m.onContinue()
 			}
 		},
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create continue button: %w", err)
-	}
-	m.buttonEntities = append(m.buttonEntities, continueButton)
+	})
 
-	// 2. 创建"重新开始"按钮
-	restartButton, err := entities.NewMenuButton(
+	m.buttonEntities = append(m.buttonEntities, backToGameEntity)
+
+	// 4. 创建"重新开始"按钮（使用三段式按钮）
+	restartEntity, err := m.createThreeSliceButton(rm, hiddenX, hiddenY, "重新开始", func() {
+		log.Printf("[PauseMenuModule] Restart button clicked!")
+		m.Hide()
+		if m.onRestart != nil {
+			m.onRestart()
+		}
+	})
+	if err != nil {
+		log.Printf("[PauseMenuModule] Warning: Failed to create restart button: %v", err)
+	} else {
+		m.buttonEntities = append(m.buttonEntities, restartEntity)
+	}
+
+	// 5. 创建"主菜单"按钮（使用三段式按钮）
+	mainMenuEntity, err := m.createThreeSliceButton(rm, hiddenX, hiddenY, "主菜单", func() {
+		log.Printf("[PauseMenuModule] Main menu button clicked!")
+		m.Hide()
+		if m.onMainMenu != nil {
+			m.onMainMenu()
+		}
+	})
+	if err != nil {
+		log.Printf("[PauseMenuModule] Warning: Failed to create main menu button: %v", err)
+	} else {
+		m.buttonEntities = append(m.buttonEntities, mainMenuEntity)
+	}
+
+	return nil
+}
+
+// createThreeSliceButton 创建三段式按钮（复用 entities.NewMenuButton）
+func (m *PauseMenuModule) createThreeSliceButton(rm *game.ResourceManager, x, y float64, text string, onClick func()) (ecs.EntityID, error) {
+	// 复用 entities.NewMenuButton 工厂函数
+	return entities.NewMenuButton(
 		m.entityManager,
 		rm,
-		hiddenX, // 初始隐藏
-		hiddenY,
-		"重新开始",
-		24.0,
-		[4]uint8{255, 255, 255, 255}, // 白色文字
-		buttonMiddleWidth,
-		func() {
-			log.Printf("[PauseMenuModule] Restart button clicked!")
-			m.Hide() // 隐藏暂停菜单
-			if m.onRestart != nil {
-				m.onRestart()
-			}
-		},
+		x,
+		y,
+		text,
+		config.PauseMenuInnerButtonFontSize, // 使用内部按钮的字体大小
+		[4]uint8{0, 200, 0, 255},            // 绿色文字
+		config.PauseMenuInnerButtonWidth-40, // 减去左右边框宽度
+		onClick,
 	)
-	if err != nil {
-		return fmt.Errorf("failed to create restart button: %w", err)
-	}
-	m.buttonEntities = append(m.buttonEntities, restartButton)
+}
 
-	// 3. 创建"返回主菜单"按钮
-	mainMenuButton, err := entities.NewMenuButton(
-		m.entityManager,
-		rm,
-		hiddenX, // 初始隐藏
-		hiddenY,
-		"返回主菜单",
-		24.0,
-		[4]uint8{255, 255, 255, 255}, // 白色文字
-		buttonMiddleWidth,
-		func() {
-			log.Printf("[PauseMenuModule] Main menu button clicked!")
-			m.Hide() // 隐藏暂停菜单
-			if m.onMainMenu != nil {
-				m.onMainMenu()
-			}
+// createUIElements 创建UI元素（滑动条和复选框）
+// Story 10.1: 完整实现暂停菜单UI
+func (m *PauseMenuModule) createUIElements(rm *game.ResourceManager) error {
+	// 初始位置：屏幕外（隐藏）
+	hiddenX := -1000.0
+	hiddenY := -1000.0
+
+	// 1. 创建音乐滑动条
+	m.musicSliderEntity = m.entityManager.CreateEntity()
+	ecs.AddComponent(m.entityManager, m.musicSliderEntity, &components.PositionComponent{
+		X: hiddenX,
+		Y: hiddenY,
+	})
+	ecs.AddComponent(m.entityManager, m.musicSliderEntity, &components.SliderComponent{
+		SlotImage: rm.GetImageByID("IMAGE_OPTIONS_SLIDERSLOT"),
+		KnobImage: rm.GetImageByID("IMAGE_OPTIONS_SLIDERKNOB2"),
+		Value:     0.8, // 默认80%音量
+		Label:     "音乐",
+		OnValueChange: func(value float64) {
+			log.Printf("[PauseMenuModule] Music volume changed: %.2f", value)
+			// TODO: 实际控制音乐音量
 		},
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create main menu button: %w", err)
-	}
-	m.buttonEntities = append(m.buttonEntities, mainMenuButton)
+	})
+
+	// 2. 创建音效滑动条
+	m.soundSliderEntity = m.entityManager.CreateEntity()
+	ecs.AddComponent(m.entityManager, m.soundSliderEntity, &components.PositionComponent{
+		X: hiddenX,
+		Y: hiddenY,
+	})
+	ecs.AddComponent(m.entityManager, m.soundSliderEntity, &components.SliderComponent{
+		SlotImage: rm.GetImageByID("IMAGE_OPTIONS_SLIDERSLOT"),
+		KnobImage: rm.GetImageByID("IMAGE_OPTIONS_SLIDERKNOB2"),
+		Value:     0.8, // 默认80%音量
+		Label:     "音效",
+		OnValueChange: func(value float64) {
+			log.Printf("[PauseMenuModule] Sound volume changed: %.2f", value)
+			// TODO: 实际控制音效音量
+		},
+	})
+
+	// 3. 创建3D加速复选框
+	m.enable3DEntity = m.entityManager.CreateEntity()
+	ecs.AddComponent(m.entityManager, m.enable3DEntity, &components.PositionComponent{
+		X: hiddenX,
+		Y: hiddenY,
+	})
+	ecs.AddComponent(m.entityManager, m.enable3DEntity, &components.CheckboxComponent{
+		UncheckedImage: rm.GetImageByID("IMAGE_OPTIONS_CHECKBOX0"),
+		CheckedImage:   rm.GetImageByID("IMAGE_OPTIONS_CHECKBOX1"),
+		IsChecked:      true, // 默认开启
+		Label:          "3D 加速",
+		OnToggle: func(isChecked bool) {
+			log.Printf("[PauseMenuModule] 3D acceleration toggled: %v", isChecked)
+			// TODO: 实际控制3D加速
+		},
+	})
+
+	// 4. 创建全屏复选框
+	m.fullscreenEntity = m.entityManager.CreateEntity()
+	ecs.AddComponent(m.entityManager, m.fullscreenEntity, &components.PositionComponent{
+		X: hiddenX,
+		Y: hiddenY,
+	})
+	ecs.AddComponent(m.entityManager, m.fullscreenEntity, &components.CheckboxComponent{
+		UncheckedImage: rm.GetImageByID("IMAGE_OPTIONS_CHECKBOX0"),
+		CheckedImage:   rm.GetImageByID("IMAGE_OPTIONS_CHECKBOX1"),
+		IsChecked:      false, // 默认窗口模式
+		Label:          "全屏",
+		OnToggle: func(isChecked bool) {
+			log.Printf("[PauseMenuModule] Fullscreen toggled: %v", isChecked)
+			// TODO: 实际切换全屏
+		},
+	})
 
 	return nil
 }
@@ -223,13 +359,17 @@ func (m *PauseMenuModule) createPauseMenuButtons(rm *game.ResourceManager) error
 // getPauseMenuComponent 构建暂停菜单组件
 // 内部方法，用于初始化组件
 func (m *PauseMenuModule) getPauseMenuComponent() *components.PauseMenuComponent {
-	return &components.PauseMenuComponent{
-		IsActive:       false, // 初始状态：未激活
-		ContinueButton: m.buttonEntities[0],
-		RestartButton:  m.buttonEntities[1],
-		MainMenuButton: m.buttonEntities[2],
-		OverlayAlpha:   config.PauseMenuOverlayAlpha,
+	comp := &components.PauseMenuComponent{
+		IsActive:     false, // 初始状态：未激活
+		OverlayAlpha: config.PauseMenuOverlayAlpha,
 	}
+
+	// 设置按钮ID（如果存在）
+	if len(m.buttonEntities) > 0 {
+		comp.ContinueButton = m.buttonEntities[0] // "返回游戏"按钮
+	}
+
+	return comp
 }
 
 // Update 更新暂停菜单状态
@@ -288,29 +428,140 @@ func (m *PauseMenuModule) updateButtonsVisibility(visible bool) {
 }
 
 // showButtons 显示所有暂停菜单按钮（移动到正确位置）
+// Story 10.1: 完整布局 - "返回游戏"在下方，"重新开始"和"主菜单"在上方
 func (m *PauseMenuModule) showButtons() {
-	// 计算菜单面板中心位置
-	panelCenterX := float64(m.windowWidth) / 2.0
-	panelCenterY := float64(m.windowHeight) / 2.0
-
-	// 计算按钮位置（垂直居中排列）
-	buttonStartY := panelCenterY - config.PauseMenuButtonHeight - config.PauseMenuButtonSpacing
-	buttonX := panelCenterX - config.PauseMenuButtonWidth/2.0 // 居中
-
-	// 按钮位置数组
-	buttonPositions := []struct {
-		x, y float64
-	}{
-		{buttonX, buttonStartY}, // 继续按钮
-		{buttonX, buttonStartY + config.PauseMenuButtonHeight + config.PauseMenuButtonSpacing},   // 重新开始按钮
-		{buttonX, buttonStartY + (config.PauseMenuButtonHeight+config.PauseMenuButtonSpacing)*2}, // 返回主菜单按钮
+	if len(m.buttonEntities) == 0 {
+		return
 	}
 
-	// 更新所有按钮位置
-	for i, entityID := range m.buttonEntities {
+	// 屏幕中心位置
+	screenCenterX := float64(m.windowWidth) / 2.0
+	screenCenterY := float64(m.windowHeight) / 2.0
+
+	// 按钮索引：
+	// 0: "返回游戏"按钮（在墓碑下方）
+	// 1: "重新开始"按钮（在墓碑内部，上方）
+	// 2: "主菜单"按钮（在墓碑内部，下方）
+
+	// 1. "返回游戏"按钮（在墓碑底部外侧）
+	if len(m.buttonEntities) > 0 {
+		backToGameEntity := m.buttonEntities[0]
+		if button, ok := ecs.GetComponent[*components.ButtonComponent](m.entityManager, backToGameEntity); ok {
+			buttonWidth := float64(button.NormalImage.Bounds().Dx())
+			buttonHeight := float64(button.NormalImage.Bounds().Dy())
+			buttonX := screenCenterX - buttonWidth/2.0
+			buttonY := screenCenterY + config.PauseMenuBackToGameButtonOffsetY
+
+			if pos, ok := ecs.GetComponent[*components.PositionComponent](m.entityManager, backToGameEntity); ok {
+				pos.X = buttonX
+				pos.Y = buttonY
+				log.Printf("[PauseMenuModule] Back to game button positioned at (%.1f, %.1f), size: %.1fx%.1f",
+					buttonX, buttonY, buttonWidth, buttonHeight)
+			}
+		}
+	}
+
+	// 2. "重新开始"按钮（在墓碑内部，顶部）
+	if len(m.buttonEntities) > 1 {
+		restartEntity := m.buttonEntities[1]
+		if button, ok := ecs.GetComponent[*components.ButtonComponent](m.entityManager, restartEntity); ok {
+			// 计算实际按钮宽度：左边缘 + 中间 + 右边缘
+			var buttonWidth float64
+			if button.Type == components.ButtonTypeNineSlice {
+				leftWidth := float64(button.LeftImage.Bounds().Dx())
+				rightWidth := float64(button.RightImage.Bounds().Dx())
+				buttonWidth = leftWidth + button.MiddleWidth + rightWidth
+			} else {
+				buttonWidth = config.PauseMenuInnerButtonWidth
+			}
+
+			// 水平居中
+			buttonX := screenCenterX - buttonWidth/2.0
+			buttonY := screenCenterY + config.PauseMenuRestartButtonOffsetY
+
+			if pos, ok := ecs.GetComponent[*components.PositionComponent](m.entityManager, restartEntity); ok {
+				pos.X = buttonX
+				pos.Y = buttonY
+			}
+		}
+	}
+
+	// 3. "主菜单"按钮（在墓碑内部，中间偏下）
+	if len(m.buttonEntities) > 2 {
+		mainMenuEntity := m.buttonEntities[2]
+		if button, ok := ecs.GetComponent[*components.ButtonComponent](m.entityManager, mainMenuEntity); ok {
+			// 计算实际按钮宽度：左边缘 + 中间 + 右边缘
+			var buttonWidth float64
+			if button.Type == components.ButtonTypeNineSlice {
+				leftWidth := float64(button.LeftImage.Bounds().Dx())
+				rightWidth := float64(button.RightImage.Bounds().Dx())
+				buttonWidth = leftWidth + button.MiddleWidth + rightWidth
+			} else {
+				buttonWidth = config.PauseMenuInnerButtonWidth
+			}
+
+			// 水平居中
+			buttonX := screenCenterX - buttonWidth/2.0
+			buttonY := screenCenterY + config.PauseMenuMainMenuButtonOffsetY
+
+			if pos, ok := ecs.GetComponent[*components.PositionComponent](m.entityManager, mainMenuEntity); ok {
+				pos.X = buttonX
+				pos.Y = buttonY
+			}
+		}
+	}
+
+	// 4. 显示UI元素（滑动条和复选框）
+	m.showUIElements()
+}
+
+// showUIElements 显示UI元素（滑动条和复选框）
+func (m *PauseMenuModule) showUIElements() {
+	screenCenterX := float64(m.windowWidth) / 2.0
+	screenCenterY := float64(m.windowHeight) / 2.0
+
+	// UI元素在墓碑内部的垂直排列
+	// 音乐滑动条：第1行
+	if pos, ok := ecs.GetComponent[*components.PositionComponent](m.entityManager, m.musicSliderEntity); ok {
+		pos.X = screenCenterX + config.PauseMenuMusicSliderOffsetX
+		pos.Y = screenCenterY + config.PauseMenuMusicSliderOffsetY
+	}
+
+	// 音效滑动条：第2行
+	if pos, ok := ecs.GetComponent[*components.PositionComponent](m.entityManager, m.soundSliderEntity); ok {
+		pos.X = screenCenterX + config.PauseMenuSoundSliderOffsetX
+		pos.Y = screenCenterY + config.PauseMenuSoundSliderOffsetY
+	}
+
+	// 3D加速复选框：第3行
+	if pos, ok := ecs.GetComponent[*components.PositionComponent](m.entityManager, m.enable3DEntity); ok {
+		pos.X = screenCenterX + config.PauseMenu3DCheckboxOffsetX
+		pos.Y = screenCenterY + config.PauseMenu3DCheckboxOffsetY
+	}
+
+	// 全屏复选框：第4行
+	if pos, ok := ecs.GetComponent[*components.PositionComponent](m.entityManager, m.fullscreenEntity); ok {
+		pos.X = screenCenterX + config.PauseMenuFullscreenCheckboxOffsetX
+		pos.Y = screenCenterY + config.PauseMenuFullscreenCheckboxOffsetY
+	}
+}
+
+// hideUIElements 隐藏UI元素（移动到屏幕外）
+func (m *PauseMenuModule) hideUIElements() {
+	hiddenX := -1000.0
+	hiddenY := -1000.0
+
+	uiElements := []ecs.EntityID{
+		m.musicSliderEntity,
+		m.soundSliderEntity,
+		m.enable3DEntity,
+		m.fullscreenEntity,
+	}
+
+	for _, entityID := range uiElements {
 		if pos, ok := ecs.GetComponent[*components.PositionComponent](m.entityManager, entityID); ok {
-			pos.X = buttonPositions[i].x
-			pos.Y = buttonPositions[i].y
+			pos.X = hiddenX
+			pos.Y = hiddenY
 		}
 	}
 }
@@ -326,17 +577,156 @@ func (m *PauseMenuModule) hideButtons() {
 			pos.Y = hiddenY
 		}
 	}
+
+	// 同时隐藏UI元素
+	m.hideUIElements()
 }
 
 // Draw 渲染暂停菜单到屏幕
 // 参数:
 //   - screen: 目标渲染屏幕
 //
-// 注意：
-//   - 只渲染暂停菜单遮罩和面板
-//   - 按钮由 ButtonRenderSystem 自动渲染（外部调用）
+// 渲染顺序：
+//  1. 半透明遮罩
+//  2. 墓碑背景面板
+//  3. UI元素（滑动条、复选框）
+//  4. 菜单按钮（在背景上方）
 func (m *PauseMenuModule) Draw(screen *ebiten.Image) {
+	// 1. 渲染遮罩和墓碑背景
 	m.pauseMenuRenderSystem.Draw(screen)
+
+	// 2. 渲染UI元素
+	m.drawUIElements(screen)
+
+	// 3. 渲染暂停菜单的按钮（在背景上方）
+	if m.buttonRenderSystem != nil {
+		// 只渲染暂停菜单的按钮
+		for _, buttonEntity := range m.buttonEntities {
+			m.buttonRenderSystem.DrawButton(screen, buttonEntity)
+		}
+	}
+}
+
+// drawUIElements 渲染UI元素（滑动条和复选框）
+func (m *PauseMenuModule) drawUIElements(screen *ebiten.Image) {
+	// 渲染音乐滑动条
+	if slider, ok := ecs.GetComponent[*components.SliderComponent](m.entityManager, m.musicSliderEntity); ok {
+		if pos, ok := ecs.GetComponent[*components.PositionComponent](m.entityManager, m.musicSliderEntity); ok {
+			m.drawSlider(screen, slider, pos.X, pos.Y)
+		}
+	}
+
+	// 渲染音效滑动条
+	if slider, ok := ecs.GetComponent[*components.SliderComponent](m.entityManager, m.soundSliderEntity); ok {
+		if pos, ok := ecs.GetComponent[*components.PositionComponent](m.entityManager, m.soundSliderEntity); ok {
+			m.drawSlider(screen, slider, pos.X, pos.Y)
+		}
+	}
+
+	// 渲染3D加速复选框
+	if checkbox, ok := ecs.GetComponent[*components.CheckboxComponent](m.entityManager, m.enable3DEntity); ok {
+		if pos, ok := ecs.GetComponent[*components.PositionComponent](m.entityManager, m.enable3DEntity); ok {
+			m.drawCheckbox(screen, checkbox, pos.X, pos.Y)
+		}
+	}
+
+	// 渲染全屏复选框
+	if checkbox, ok := ecs.GetComponent[*components.CheckboxComponent](m.entityManager, m.fullscreenEntity); ok {
+		if pos, ok := ecs.GetComponent[*components.PositionComponent](m.entityManager, m.fullscreenEntity); ok {
+			m.drawCheckbox(screen, checkbox, pos.X, pos.Y)
+		}
+	}
+}
+
+// drawSlider 渲染单个滑动条
+func (m *PauseMenuModule) drawSlider(screen *ebiten.Image, slider *components.SliderComponent, x, y float64) {
+	if slider.SlotImage == nil || slider.KnobImage == nil {
+		return
+	}
+
+	// 渲染文字标签（在滑槽左侧，带阴影效果）
+	if m.labelFont != nil && slider.Label != "" {
+		labelX := x + config.PauseMenuLabelOffsetX
+		labelY := y + config.PauseMenuLabelOffsetY
+
+		// 阴影偏移量
+		shadowOffsetX := 2.0
+		shadowOffsetY := 2.0
+		visualCenterOffsetY := -shadowOffsetY / 2.0
+
+		// 1. 先绘制阴影
+		shadowOp := &text.DrawOptions{}
+		shadowOp.GeoM.Translate(labelX+shadowOffsetX, labelY+shadowOffsetY+visualCenterOffsetY)
+		shadowOp.ColorScale.ScaleWithColor(color.RGBA{0, 0, 0, 180})
+		text.Draw(screen, slider.Label, m.labelFont, shadowOp)
+
+		// 2. 再绘制主文字（浅蓝紫色，参考截图）
+		op := &text.DrawOptions{}
+		op.GeoM.Translate(labelX, labelY+visualCenterOffsetY)
+		op.ColorScale.ScaleWithColor(color.RGBA{180, 180, 255, 255}) // 浅蓝紫色
+		text.Draw(screen, slider.Label, m.labelFont, op)
+	}
+
+	// 渲染滑槽
+	slotOp := &ebiten.DrawImageOptions{}
+	slotOp.GeoM.Translate(x, y)
+	screen.DrawImage(slider.SlotImage, slotOp)
+
+	// 渲染滑块（根据value位置）
+	slotWidth := float64(slider.SlotImage.Bounds().Dx())
+	slotHeight := float64(slider.SlotImage.Bounds().Dy())
+	knobHeight := float64(slider.KnobImage.Bounds().Dy())
+
+	// 水平位置：根据value值
+	knobX := x + slotWidth*slider.Value - float64(slider.KnobImage.Bounds().Dx())/2.0
+	// 垂直位置：相对于滑槽居中
+	knobY := y + (slotHeight-knobHeight)/2.0
+
+	knobOp := &ebiten.DrawImageOptions{}
+	knobOp.GeoM.Translate(knobX, knobY)
+	screen.DrawImage(slider.KnobImage, knobOp)
+}
+
+// drawCheckbox 渲染单个复选框
+func (m *PauseMenuModule) drawCheckbox(screen *ebiten.Image, checkbox *components.CheckboxComponent, x, y float64) {
+	var image *ebiten.Image
+	if checkbox.IsChecked {
+		image = checkbox.CheckedImage
+	} else {
+		image = checkbox.UncheckedImage
+	}
+
+	if image == nil {
+		return
+	}
+
+	// 渲染文字标签（在复选框左侧，带阴影效果）
+	if m.labelFont != nil && checkbox.Label != "" {
+		labelX := x + config.PauseMenuLabelOffsetX
+		labelY := y + config.PauseMenuLabelOffsetY
+
+		// 阴影偏移量
+		shadowOffsetX := 2.0
+		shadowOffsetY := 2.0
+		visualCenterOffsetY := -shadowOffsetY / 2.0
+
+		// 1. 先绘制阴影
+		shadowOp := &text.DrawOptions{}
+		shadowOp.GeoM.Translate(labelX+shadowOffsetX, labelY+shadowOffsetY+visualCenterOffsetY)
+		shadowOp.ColorScale.ScaleWithColor(color.RGBA{0, 0, 0, 180})
+		text.Draw(screen, checkbox.Label, m.labelFont, shadowOp)
+
+		// 2. 再绘制主文字（浅蓝紫色，参考截图）
+		op := &text.DrawOptions{}
+		op.GeoM.Translate(labelX, labelY+visualCenterOffsetY)
+		op.ColorScale.ScaleWithColor(color.RGBA{180, 180, 255, 255}) // 浅蓝紫色
+		text.Draw(screen, checkbox.Label, m.labelFont, op)
+	}
+
+	// 渲染复选框
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Translate(x, y)
+	screen.DrawImage(image, op)
 }
 
 // Show 显示暂停菜单
@@ -393,6 +783,11 @@ func (m *PauseMenuModule) Toggle() {
 //   - bool: 如果暂停菜单当前激活，返回 true
 func (m *PauseMenuModule) IsActive() bool {
 	return m.gameState.IsPaused
+}
+
+// GetButtonEntities 返回所有按钮实体ID（调试用）
+func (m *PauseMenuModule) GetButtonEntities() []ecs.EntityID {
+	return m.buttonEntities
 }
 
 // Cleanup 清理模块资源
