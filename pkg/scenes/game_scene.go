@@ -423,6 +423,7 @@ func (s *GameScene) initPlantCardSystems(rm *game.ResourceManager) {
 
 	// Initialize PlantCardRenderSystem (Story 6.3 + 8.4: 配置内部封装)
 	// 所有内部配置（图标缩放、偏移等）从 config.plant_card_config.go 读取
+	// Draw() 方法会自动过滤掉奖励卡片（有 RewardCardComponent 的卡片）
 	s.plantCardRenderSystem = systems.NewPlantCardRenderSystem(
 		s.entityManager,
 		s.plantCardFont, // 阳光数字字体

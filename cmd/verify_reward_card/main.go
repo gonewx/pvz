@@ -97,7 +97,7 @@ func NewVerifyGame() (*VerifyGame, error) {
 		log.Printf("Warning: Failed to load sun cost font: %v", err)
 		sunFont = nil
 	}
-	plantCardRenderSystem := systems.NewPlantCardRenderSystem(em, sunFont)
+	plantCardRenderSystem := systems.NewPlantCardRenderSystem(em, sunFont) // 此工具只有奖励卡片，会正常渲染
 
 	// 创建奖励面板渲染系统（Story 8.4: 使用新的卡片工厂方法）
 	panelRenderSystem := systems.NewRewardPanelRenderSystem(em, gs, rm, reanimSystem)

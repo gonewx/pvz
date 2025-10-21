@@ -41,11 +41,11 @@ import (
 //   - CLAUDE.md#组件使用策略
 //   - docs/stories/6.3.story.md
 type RenderSystem struct {
-	entityManager      *ecs.EntityManager
-	debugPrinted       map[ecs.EntityID]bool // 记录已打印调试信息的实体
-	particleVertices   []ebiten.Vertex       // 粒子顶点数组（复用，避免每帧分配）
-	particleIndices    []uint16              // 粒子索引数组（复用，避免每帧分配）
-	particleDebugOnce  bool                  // 粒子调试日志只输出一次
+	entityManager     *ecs.EntityManager
+	debugPrinted      map[ecs.EntityID]bool // 记录已打印调试信息的实体
+	particleVertices  []ebiten.Vertex       // 粒子顶点数组（复用，避免每帧分配）
+	particleIndices   []uint16              // 粒子索引数组（复用，避免每帧分配）
+	particleDebugOnce bool                  // 粒子调试日志只输出一次
 }
 
 // NewRenderSystem 创建一个新的渲染系统
@@ -642,10 +642,13 @@ func (s *RenderSystem) DrawGameWorldParticles(screen *ebiten.Image, cameraX floa
 
 	// 过滤掉 UI 粒子
 	gameWorldEntities := make([]ecs.EntityID, 0, len(entities))
+	uiParticleCount := 0
 	for _, id := range entities {
 		_, isUIParticle := ecs.GetComponent[*components.UIComponent](s.entityManager, id)
 		if !isUIParticle {
 			gameWorldEntities = append(gameWorldEntities, id)
+		} else {
+			uiParticleCount++
 		}
 	}
 

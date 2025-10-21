@@ -13,6 +13,7 @@ import (
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
 const (
@@ -79,8 +80,9 @@ type RewardAnimationSystem struct {
 	screenHeight    float64
 
 	// Story 8.4重构：内部封装所有渲染系统，调用者无需关心
-	panelRenderSystem     *RewardPanelRenderSystem // 奖励面板渲染系统（内部使用）
-	plantCardRenderSystem *PlantCardRenderSystem   // 植物卡片渲染系统（内部使用，渲染Phase 1-3的卡片包）
+	panelRenderSystem *RewardPanelRenderSystem // 奖励面板渲染系统（内部使用）
+	sunFont           *text.GoTextFaceSource   // 阳光数字字体源（用于渲染卡片）
+	sunFontSize       float64                  // 阳光字体大小
 }
 
 // NewRewardAnimationSystem 创建新的奖励动画系统。
@@ -88,29 +90,33 @@ func NewRewardAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *gam
 	// Story 8.4重构：内部创建所有渲染系统，调用者无需关心
 	panelRenderSystem := NewRewardPanelRenderSystem(em, gs, rm, reanimSys)
 
-	// 创建植物卡片渲染系统（用于渲染 Phase 1-3 的卡片包）
+	// 加载阳光字体（用于渲染卡片的阳光数字）
 	sunFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.PlantCardSunCostFontSize)
+	var fontSource *text.GoTextFaceSource
+	var fontSize float64 = config.PlantCardSunCostFontSize
 	if err != nil {
 		log.Printf("[RewardAnimationSystem] Warning: Failed to load sun cost font: %v", err)
-		sunFont = nil
+		fontSource = nil
+	} else {
+		fontSource = sunFont.Source
 	}
-	plantCardRenderSystem := NewPlantCardRenderSystem(em, sunFont)
 
 	return &RewardAnimationSystem{
-		entityManager:         em,
-		gameState:             gs,
-		resourceManager:       rm,
-		reanimSystem:          reanimSys,
-		particleSystem:        particleSys,
-		renderSystem:          renderSys, // 渲染系统用于绘制Reanim和粒子
-		rewardEntity:          0,
-		panelEntity:           0,
-		glowEntity:            0,
-		isActive:              false,
-		screenWidth:           800, // TODO: 从配置获取
-		screenHeight:          600,
-		panelRenderSystem:     panelRenderSystem,     // 内部封装
-		plantCardRenderSystem: plantCardRenderSystem, // 内部封装
+		entityManager:     em,
+		gameState:         gs,
+		resourceManager:   rm,
+		reanimSystem:      reanimSys,
+		particleSystem:    particleSys,
+		renderSystem:      renderSys, // 渲染系统用于绘制Reanim和粒子
+		rewardEntity:      0,
+		panelEntity:       0,
+		glowEntity:        0,
+		isActive:          false,
+		screenWidth:       800, // TODO: 从配置获取
+		screenHeight:      600,
+		panelRenderSystem: panelRenderSystem, // 内部封装
+		sunFont:           fontSource,
+		sunFontSize:       fontSize,
 	}
 }
 
@@ -211,6 +217,11 @@ func (ras *RewardAnimationSystem) TriggerReward(plantID string) {
 		ras.isActive = false
 		return
 	}
+
+	// 添加 RewardCardComponent 标记，区分奖励卡片和选择栏卡片
+	// 这样 RewardAnimationSystem 的 plantCardRenderSystem 只渲染奖励卡片
+	// 而验证工具的 plantCardRenderSystem 只渲染选择栏卡片
+	ecs.AddComponent(ras.entityManager, cardEntity, &components.RewardCardComponent{})
 
 	// 重要：使用卡片实体作为奖励实体
 	ras.entityManager.DestroyEntity(ras.rewardEntity)
@@ -867,7 +878,7 @@ func (ras *RewardAnimationSystem) isParticleEffectCompleted() bool {
 // 渲染顺序（从下到上）：
 // 1. Reanim 实体
 // 2. 粒子效果（装饰层）
-// 3. 植物卡片 / 奖励面板
+// 3. 植物卡片 / 奖励面板（最上层，不被粒子遮挡）
 //
 // 注意：奖励动画的粒子标记为 UIComponent（isUIParticle=true）
 // GameScene Layer 6 会过滤掉 UI 粒子，只渲染游戏世界粒子
@@ -885,12 +896,18 @@ func (ras *RewardAnimationSystem) Draw(screen *ebiten.Image) {
 	//    只渲染 UI 粒子（奖励动画的粒子），不渲染游戏世界粒子
 	ras.renderSystem.DrawParticles(screen, cameraOffsetX)
 
-	// 3a. Phase 1-3: 渲染植物卡片（appearing/waiting/expanding/pausing/disappearing）
+	// 3a. Phase 1-3: 渲染奖励植物卡片（appearing/waiting/expanding/pausing/disappearing）在最上层
+	// 直接渲染自己管理的卡片实体（符合 ECS 原则：系统负责自己的实体）
 	if ras.currentPhase != "showing" && ras.currentPhase != "closing" && ras.rewardEntity != 0 {
-		ras.plantCardRenderSystem.Draw(screen)
+		if card, ok := ecs.GetComponent[*components.PlantCardComponent](ras.entityManager, ras.rewardEntity); ok {
+			if pos, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.rewardEntity); ok {
+				// 使用统一的渲染函数
+				entities.RenderPlantCard(screen, card, pos.X, pos.Y, ras.sunFont, ras.sunFontSize)
+			}
+		}
 	}
 
-	// 3b. Phase 4: 渲染奖励面板（showing）
+	// 3b. Phase 4: 渲染奖励面板（showing）在最上层
 	if ras.currentPhase == "showing" || ras.panelEntity != 0 {
 		ras.panelRenderSystem.Draw(screen)
 	}

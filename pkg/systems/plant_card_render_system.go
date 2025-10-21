@@ -37,6 +37,8 @@ func NewPlantCardRenderSystem(em *ecs.EntityManager, sunFont *text.GoTextFace) *
 }
 
 // Draw 渲染所有植物卡片到屏幕
+// 自动过滤奖励卡片（有 RewardCardComponent 标记的卡片）
+// 奖励卡片由各自的系统（如 RewardAnimationSystem）自行渲染
 func (s *PlantCardRenderSystem) Draw(screen *ebiten.Image) {
 	// 查询所有拥有 PlantCardComponent, PositionComponent 的实体
 	cardEntities := ecs.GetEntitiesWith2[
@@ -45,6 +47,11 @@ func (s *PlantCardRenderSystem) Draw(screen *ebiten.Image) {
 	](s.entityManager)
 
 	for _, entityID := range cardEntities {
+		// 跳过奖励卡片（由 RewardAnimationSystem 自行渲染）
+		if _, isRewardCard := ecs.GetComponent[*components.RewardCardComponent](s.entityManager, entityID); isRewardCard {
+			continue
+		}
+
 		// 获取组件
 		card, ok := ecs.GetComponent[*components.PlantCardComponent](s.entityManager, entityID)
 		if !ok {

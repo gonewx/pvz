@@ -10,11 +10,11 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/systems"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
-	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
@@ -33,13 +33,14 @@ var (
 // VerifyRewardAnimationGame 完整奖励动画流程验证游戏
 // 包含卡片包动画（Phase 1-3）和面板显示（Phase 4）
 type VerifyRewardAnimationGame struct {
-	entityManager   *ecs.EntityManager
-	gameState       *game.GameState
-	resourceManager *game.ResourceManager
-	reanimSystem    *systems.ReanimSystem
-	particleSystem  *systems.ParticleSystem        // 粒子系统（用于光晕效果）
-	rewardSystem    *systems.RewardAnimationSystem // 奖励动画系统（Story 8.4重构：完全封装）
-	renderSystem    *systems.RenderSystem
+	entityManager         *ecs.EntityManager
+	gameState             *game.GameState
+	resourceManager       *game.ResourceManager
+	reanimSystem          *systems.ReanimSystem
+	particleSystem        *systems.ParticleSystem        // 粒子系统（用于光晕效果）
+	rewardSystem          *systems.RewardAnimationSystem // 奖励动画系统（Story 8.4重构：完全封装）
+	renderSystem          *systems.RenderSystem
+	plantCardRenderSystem *systems.PlantCardRenderSystem // 植物卡片渲染系统（测试用）
 
 	debugFont *text.GoTextFace // 中文调试字体
 
@@ -94,6 +95,18 @@ func NewVerifyRewardAnimationGame() (*VerifyRewardAnimationGame, error) {
 	// 内部自动创建和管理所有渲染系统（Reanim、粒子、卡片、面板）
 	rewardSystem := systems.NewRewardAnimationSystem(em, gs, rm, reanimSystem, particleSystem, renderSystem)
 
+	// 创建植物选择栏卡片（用于测试渲染顺序）
+	sunFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.PlantCardSunCostFontSize)
+	if err != nil {
+		log.Printf("Warning: Failed to load sun cost font: %v", err)
+		sunFont = nil
+	}
+	plantCardRenderSystem := systems.NewPlantCardRenderSystem(em, sunFont) // Draw() 会自动过滤奖励卡片
+
+	// 创建两张测试卡片（向日葵和豌豆射手）
+	entities.NewPlantCardEntity(em, rm, reanimSystem, components.PlantSunflower, 100, 10, config.PlantCardScale)
+	entities.NewPlantCardEntity(em, rm, reanimSystem, components.PlantPeashooter, 160, 10, config.PlantCardScale)
+
 	// 加载中文调试字体
 	debugFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 14)
 	if err != nil {
@@ -121,16 +134,17 @@ func NewVerifyRewardAnimationGame() (*VerifyRewardAnimationGame, error) {
 	log.Println("════════════════════════════════════════════════════════")
 
 	game := &VerifyRewardAnimationGame{
-		entityManager:   em,
-		gameState:       gs,
-		resourceManager: rm,
-		reanimSystem:    reanimSystem,
-		particleSystem:  particleSystem,
-		rewardSystem:    rewardSystem,
-		renderSystem:    renderSystem,
-		debugFont:       debugFont,
-		triggered:       false,
-		completed:       false,
+		entityManager:         em,
+		gameState:             gs,
+		resourceManager:       rm,
+		reanimSystem:          reanimSystem,
+		particleSystem:        particleSystem,
+		rewardSystem:          rewardSystem,
+		renderSystem:          renderSystem,
+		plantCardRenderSystem: plantCardRenderSystem,
+		debugFont:             debugFont,
+		triggered:             false,
+		completed:             false,
 	}
 
 	// 自动触发奖励动画（无需手动按T键）
@@ -215,15 +229,17 @@ func (vg *VerifyRewardAnimationGame) Draw(screen *ebiten.Image) {
 		screen.DrawImage(backgroundImg, opts)
 	}
 
-	// Story 8.4：完全封装的奖励动画渲染
-	// RewardAnimationSystem 内部自动处理所有渲染：
-	//   1. Reanim 实体
-	//   2. 粒子效果（SeedPacket 背景框 + Award 爆炸）
-	//   3. 植物卡片（Phase 1-3）/ 奖励面板（Phase 4）
-	vg.rewardSystem.Draw(screen)
-
-	// 绘制调试信息
-	vg.drawDebugInfo(screen)
+	// 渲染顺序（从下到上）：
+	// 1. 背景（已绘制）
+	// 2. 植物选择栏卡片（游戏世界元素）
+	// 3. 游戏世界粒子效果（过滤 UI 粒子）
+	// 4. 奖励动画（UI 元素，内部顺序：Reanim → 粒子 → 卡片）
+	//
+	// 最终渲染层级（从下到上）：
+	//   背景 → 选择栏卡片 → 游戏粒子 → 奖励Reanim → 奖励粒子 → 奖励卡片
+	vg.plantCardRenderSystem.Draw(screen)                                // 游戏世界卡片
+	vg.renderSystem.DrawGameWorldParticles(screen, vg.gameState.CameraX) // 游戏世界粒子
+	vg.rewardSystem.Draw(screen)                                         // 奖励动画（内部：Reanim → 粒子 → 卡片）
 }
 
 // Layout 设置屏幕布局
@@ -258,119 +274,10 @@ func (vg *VerifyRewardAnimationGame) reset() {
 	vg.triggered = true
 }
 
-// drawDebugInfo 绘制调试信息
+// drawDebugInfo 绘制调试信息（已禁用）
 func (vg *VerifyRewardAnimationGame) drawDebugInfo(screen *ebiten.Image) {
-	rewardEntity := vg.rewardSystem.GetEntity()
-
-	// Phase 4 (showing) 时不显示调试信息，避免遮挡奖励面板
-	if rewardEntity != 0 {
-		rewardComp, ok := ecs.GetComponent[*components.RewardAnimationComponent](vg.entityManager, rewardEntity)
-		if ok && rewardComp.Phase == "showing" {
-			// 只显示简短提示
-			if vg.debugFont != nil {
-				hintText := "Phase 4: 显示奖励面板 - 按 Space 关闭"
-				op := &text.DrawOptions{}
-				op.GeoM.Translate(10, 10)
-				op.ColorScale.ScaleWithColor(color.White)
-				text.Draw(screen, hintText, vg.debugFont, op)
-			}
-			return
-		}
-	}
-
-	var debugText string
-
-	if rewardEntity == 0 {
-		debugText = `完整奖励动画流程验证程序
-
-完整游戏场景已加载（背景 + 植物）
-
-验证流程:
-  Phase 1: appearing     - 卡片包弹出 (0.3s)
-  Phase 2: waiting       - 等待点击
-  Phase 3: expanding     - 移动+展开 (2s)
-  Phase 3.5: pausing     - 短暂停顿+粒子 (0.5s)
-  Phase 3.6: disappearing - 卡片包消失 (0.3s)
-  Phase 4: showing       - 显示面板
-
-快捷键:
-  T - 触发奖励动画
-  Space/Click - 展开卡片包
-  R - 重启
-  Q - 退出
-
-按 T 键开始验证...`
-	} else {
-		// 获取奖励组件信息
-		rewardComp, ok := ecs.GetComponent[*components.RewardAnimationComponent](vg.entityManager, rewardEntity)
-		if !ok {
-			return
-		}
-
-		posComp, _ := ecs.GetComponent[*components.PositionComponent](vg.entityManager, rewardEntity)
-
-		// 显示状态信息
-		debugText = fmt.Sprintf(`完整奖励动画流程验证 (Story 8.3 + 8.4)
-植物: %s
-当前阶段: %s (%.2fs)
-缩放: %.2f
-`, *plantID, rewardComp.Phase, rewardComp.ElapsedTime, rewardComp.Scale)
-
-		if posComp != nil {
-			debugText += fmt.Sprintf("位置: (%.1f, %.1f)\n", posComp.X, posComp.Y)
-		}
-
-		// 阶段说明
-		phaseDesc := map[string]string{
-			"appearing":    "Phase 1: 卡片包弹出 (0.3s) 🎁",
-			"waiting":      "Phase 2: 等待点击 - 按 Space ⏳",
-			"expanding":    "Phase 3: 移动+展开动画 (2s) ✨",
-			"pausing":      "Phase 3.5: 短暂停顿+粒子 (0.5s) 💫",
-			"disappearing": "Phase 3.6: 卡片包消失 (0.3s) 🌟",
-			"showing":      "Phase 4: 显示奖励面板 ✅",
-		}
-
-		if desc, exists := phaseDesc[rewardComp.Phase]; exists {
-			debugText += "\n" + desc + "\n"
-		}
-
-		// 完成状态
-		if vg.completed {
-			debugText += "\n【验证完成】所有阶段已完成！\n"
-		}
-
-		debugText += "\n快捷键: Space=展开 R=重启 Q=退出"
-	}
-
-	// 使用中文字体渲染调试信息
-	if vg.debugFont != nil {
-		// 分行渲染
-		lines := splitLines(debugText)
-
-		// 计算文本背景区域大小
-		textHeight := float64(len(lines)) * 18
-		textWidth := 500.0 // 固定宽度
-
-		// 绘制半透明黑色背景
-		bgImg := ebiten.NewImage(int(textWidth), int(textHeight)+10)
-		bgImg.Fill(color.RGBA{0, 0, 0, 180}) // 半透明黑色 (alpha=180)
-		bgOp := &ebiten.DrawImageOptions{}
-		bgOp.GeoM.Translate(5, 5)
-		screen.DrawImage(bgImg, bgOp)
-
-		// 绘制文字
-		y := 10.0
-		for _, line := range lines {
-			op := &text.DrawOptions{}
-			op.GeoM.Translate(10, y)
-			op.ColorScale.ScaleWithColor(color.White)
-			text.Draw(screen, line, vg.debugFont, op)
-			y += 18 // 行高
-		}
-	} else {
-		// 回退到默认字体（不支持中文）
-		ebitenutil.DebugPrint(screen, debugText)
-	}
+	// 为了专注测试渲染顺序，暂时禁用调试信息
+	// 如需启用，取消注释以下代码
 }
 
 // splitLines 将文本按换行符分割成行

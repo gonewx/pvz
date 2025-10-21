@@ -310,6 +310,11 @@ func (s *InputSystem) handlePlantCardClick(mouseX, mouseY int, cameraX float64) 
 
 	// 遍历卡片实体，检测点击
 	for _, entityID := range entities {
+		// 跳过奖励卡片（奖励卡片不应被点击选择）
+		if _, isRewardCard := ecs.GetComponent[*components.RewardCardComponent](s.entityManager, entityID); isRewardCard {
+			continue
+		}
+
 		// 获取组件
 		card, _ := ecs.GetComponent[*components.PlantCardComponent](s.entityManager, entityID)
 		clickable, _ := ecs.GetComponent[*components.ClickableComponent](s.entityManager, entityID)

@@ -25,6 +25,7 @@ func NewPlantCardSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.Reso
 
 // Update 更新所有植物卡片的状态
 // 包括冷却时间递减、可用性判断、UI状态和图像更新
+// 跳过奖励卡片（有 RewardCardComponent 标记的卡片由 RewardAnimationSystem 管理）
 func (s *PlantCardSystem) Update(deltaTime float64) {
 	// 查询所有拥有 PlantCardComponent, UIComponent 的实体
 	entities := ecs.GetEntitiesWith2[
@@ -37,6 +38,11 @@ func (s *PlantCardSystem) Update(deltaTime float64) {
 
 	// 更新每个卡片实体
 	for _, entityID := range entities {
+		// 跳过奖励卡片（由 RewardAnimationSystem 管理）
+		if _, isRewardCard := ecs.GetComponent[*components.RewardCardComponent](s.entityManager, entityID); isRewardCard {
+			continue
+		}
+
 		// 获取组件
 		card, ok := ecs.GetComponent[*components.PlantCardComponent](s.entityManager, entityID)
 		if !ok {
