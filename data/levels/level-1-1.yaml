@@ -71,7 +71,7 @@ waves:
   - zombies:
       - type: "basic"
         lane: 3
-        count: 1
+        count: 10
         # count: 2
 
   # 第二波（最后一波）：第一波消灭后自动触发，3个普通僵尸

@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
@@ -39,6 +40,7 @@ type LevelSystem struct {
 	resourceManager      *game.ResourceManager   // 用于加载 FinalWave 音效
 	reanimSystem         *ReanimSystem           // 用于创建 FinalWave 动画实体
 	rewardSystem         *RewardAnimationSystem  // 用于触发奖励动画（Story 8.3）
+	lawnmowerSystem      *LawnmowerSystem        // 用于检查除草车状态（Story 10.2）
 	lastWaveWarningShown bool                    // 是否已显示最后一波提示
 }
 
@@ -52,7 +54,8 @@ type LevelSystem struct {
 //	rm - 资源管理器（用于加载音效）
 //	rs - Reanim系统（用于创建动画实体）
 //	rewardSystem - 奖励动画系统（可选，Story 8.3）
-func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *WaveSpawnSystem, rm *game.ResourceManager, rs *ReanimSystem, rewardSystem *RewardAnimationSystem) *LevelSystem {
+//	lawnmowerSystem - 除草车系统（可选，Story 10.2）
+func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *WaveSpawnSystem, rm *game.ResourceManager, rs *ReanimSystem, rewardSystem *RewardAnimationSystem, lawnmowerSystem *LawnmowerSystem) *LevelSystem {
 	return &LevelSystem{
 		entityManager:        em,
 		gameState:            gs,
@@ -60,6 +63,7 @@ func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *
 		resourceManager:      rm,
 		reanimSystem:         rs,
 		rewardSystem:         rewardSystem,
+		lawnmowerSystem:      lawnmowerSystem,
 		lastWaveWarningShown: false,
 	}
 }
@@ -131,10 +135,21 @@ func (s *LevelSystem) checkAndSpawnWaves() {
 
 // checkVictoryCondition 检查胜利条件
 //
-// 胜利条件：所有波次已生成 且 所有僵尸已消灭
+// 胜利条件：
+// 1. 所有波次已生成 且 所有僵尸已消灭（GameState.CheckVictory()）
+// 2. 没有活跃的（移动中的）除草车（Story 10.2）- 车完全消失后再显示胜利动画
+//
 // 如果达成胜利条件，设置游戏结果为 "win"
 func (s *LevelSystem) checkVictoryCondition() {
-	if s.gameState.CheckVictory() {
+	// Story 10.2: 检查是否有活跃的除草车
+	// 原版行为：除草车完全消失后，才显示胜利动画
+	hasActiveLawnmowers := false
+	if s.lawnmowerSystem != nil {
+		hasActiveLawnmowers = s.lawnmowerSystem.HasActiveLawnmowers()
+	}
+
+	// 只有在没有活跃除草车的情况下才能胜利
+	if s.gameState.CheckVictory() && !hasActiveLawnmowers {
 		s.gameState.SetGameResult("win")
 		log.Println("[LevelSystem] Victory! All zombies defeated!")
 
@@ -173,11 +188,37 @@ func (s *LevelSystem) triggerRewardIfNeeded() {
 
 // checkDefeatCondition 检查失败条件
 //
-// 失败条件：任意僵尸的X坐标 < DefeatBoundaryX（到达屏幕左侧边界）
-// 如果检测到失败，设置游戏结果为 "lose"
+// 失败条件（Story 10.2 增强）：
+// 1. 如果启用了除草车系统：僵尸到达左侧边界 && 该行除草车已使用 → 游戏失败
+// 2. 如果未启用除草车系统：僵尸到达左侧边界 → 游戏失败（原逻辑）
+//
+// 这样设计的原因：
+// - 除草车是每行的最后防线，只在僵尸到达左侧时触发一次
+// - 如果除���车未使用，僵尸到达左侧会触发除草车（不触发失败）
+// - 如果除草车已使用，僵尸再次到达左侧直接失败（无最后防线）
 func (s *LevelSystem) checkDefeatCondition() {
-	// 查询所有拥有 BehaviorComponent 和 PositionComponent 的实体
-	// 然后通过 BehaviorComponent 的 Type 字段筛选僵尸
+	// Story 10.2: 如果启用了除草车系统，检查除草车状态
+	if s.lawnmowerSystem != nil {
+		s.checkDefeatWithLawnmower()
+		return
+	}
+
+	// 原逻辑：未启用除草车系统，僵尸到达左侧直接失败
+	s.checkDefeatWithoutLawnmower()
+}
+
+// checkDefeatWithLawnmower 检查失败条件（有除草车）
+func (s *LevelSystem) checkDefeatWithLawnmower() {
+	// 获取除草车状态组件
+	stateEntityID := s.lawnmowerSystem.GetStateEntityID()
+	state, ok := ecs.GetComponent[*components.LawnmowerStateComponent](s.entityManager, stateEntityID)
+	if !ok {
+		log.Printf("[LevelSystem] Warning: LawnmowerStateComponent not found, falling back to original defeat logic")
+		s.checkDefeatWithoutLawnmower()
+		return
+	}
+
+	// 查询所有僵尸实体
 	zombieEntities := ecs.GetEntitiesWith2[
 		*components.BehaviorComponent,
 		*components.PositionComponent,
@@ -185,7 +226,6 @@ func (s *LevelSystem) checkDefeatCondition() {
 
 	// 检查是否有僵尸到达左边界
 	for _, entityID := range zombieEntities {
-		// 获取 BehaviorComponent
 		behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
 		if !ok {
 			continue
@@ -196,7 +236,48 @@ func (s *LevelSystem) checkDefeatCondition() {
 			continue
 		}
 
-		// 获取位置组件
+		pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+		if !ok {
+			continue
+		}
+
+		// 僵尸到达左边界
+		if pos.X < DefeatBoundaryX {
+			// 计算僵尸所在行
+			lane := s.getEntityLane(pos.Y)
+
+			// 检查该行除草车是否已使用
+			if state.UsedLanes[lane] {
+				// 除草车已使用，游戏失败
+				s.gameState.SetGameResult("lose")
+				log.Printf("[LevelSystem] Defeat! Zombie (ID:%d) reached the left boundary on lane %d (lawnmower used)", entityID, lane)
+				return
+			} else {
+				// 除草车未使用，不触发失败（让除草车触发）
+				log.Printf("[LevelSystem] Zombie (ID:%d) reached left boundary on lane %d, waiting for lawnmower to trigger", entityID, lane)
+				// 注意：不 return，继续检查其他行是否有除草车用完的情况
+			}
+		}
+	}
+}
+
+// checkDefeatWithoutLawnmower 检查失败条件（无除草车，原逻辑）
+func (s *LevelSystem) checkDefeatWithoutLawnmower() {
+	zombieEntities := ecs.GetEntitiesWith2[
+		*components.BehaviorComponent,
+		*components.PositionComponent,
+	](s.entityManager)
+
+	for _, entityID := range zombieEntities {
+		behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
+		if !ok {
+			continue
+		}
+
+		if !isZombieType(behavior.Type) {
+			continue
+		}
+
 		pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
 		if !ok {
 			continue
@@ -206,9 +287,27 @@ func (s *LevelSystem) checkDefeatCondition() {
 		if pos.X < DefeatBoundaryX {
 			s.gameState.SetGameResult("lose")
 			log.Printf("[LevelSystem] Defeat! Zombie (ID:%d) reached the left boundary at X=%.0f", entityID, pos.X)
-			return // 只需检测到一个即可
+			return
 		}
 	}
+}
+
+// getEntityLane 根据实体的Y坐标计算所在行（1-5）
+func (s *LevelSystem) getEntityLane(y float64) int {
+	// 使用与 LawnmowerSystem 相同的计算方法
+	offsetY := y - config.GridWorldStartY
+	row := int(offsetY / config.CellHeight)
+	lane := row + 1
+
+	// 限制范围
+	if lane < 1 {
+		lane = 1
+	}
+	if lane > 5 {
+		lane = 5
+	}
+
+	return lane
 }
 
 // isZombieType 判断行为类型是否是僵尸

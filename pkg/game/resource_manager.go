@@ -569,6 +569,12 @@ func (rm *ResourceManager) LoadReanimResources() error {
 		return fmt.Errorf("failed to load SodRoll reanim: %w", err)
 	}
 
+	// Story 10.2: 加载除草车 Reanim 资源
+	// LawnMower.reanim 包含除草车的行驶动画
+	if err := rm.loadEffectReanim("LawnMower"); err != nil {
+		return fmt.Errorf("failed to load LawnMower reanim: %w", err)
+	}
+
 	return nil
 }
 

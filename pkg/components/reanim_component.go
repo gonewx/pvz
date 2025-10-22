@@ -47,6 +47,11 @@ type ReanimComponent struct {
 	// For looping animations, this is always false.
 	IsFinished bool
 
+	// IsPaused determines whether the animation should update.
+	// If true, ReanimSystem will skip updating CurrentFrame and FrameAccumulator.
+	// Used for entities that should remain static (e.g., lawnmowers before trigger).
+	IsPaused bool
+
 	// AnimVisibles is the visibility array for the current animation.
 	// Each element corresponds to a frame: 0 = visible, -1 = hidden.
 	// Built from the animation definition track when PlayAnimation is called.

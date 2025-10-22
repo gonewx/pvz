@@ -63,6 +63,11 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 			continue
 		}
 
+		// Skip if animation is paused (e.g., lawnmower before trigger)
+		if reanimComp.IsPaused {
+			continue
+		}
+
 		// Get FPS from Reanim data, default to 12 if not set
 		fps := float64(reanimComp.Reanim.FPS)
 		if fps == 0 {

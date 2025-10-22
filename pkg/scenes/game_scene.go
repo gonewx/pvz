@@ -167,6 +167,9 @@ type GameScene struct {
 
 	// Story 10.1: Pause Menu Systems (暂停菜单系统)
 	pauseMenuModule *modules.PauseMenuModule // 暂停菜单模块（Story 10.1）
+
+	// Story 10.2: Lawnmower System (除草车系统)
+	lawnmowerSystem *systems.LawnmowerSystem // 除草车系统（最后防线）
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -352,8 +355,15 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 		log.Printf("[GameScene] Skipping opening animation system (tutorial/skip/special level)")
 	}
 
-	// 2. Create LevelSystem (需要 RewardAnimationSystem)
-	scene.levelSystem = systems.NewLevelSystem(scene.entityManager, scene.gameState, scene.waveSpawnSystem, rm, scene.reanimSystem, scene.rewardSystem)
+	// Story 10.2: Create LawnmowerSystem (除草车系统 - 最后防线)
+	scene.lawnmowerSystem = systems.NewLawnmowerSystem(scene.entityManager, rm, scene.gameState)
+	log.Printf("[GameScene] Initialized lawnmower system")
+
+	// Story 10.2: 除草车实体将在铺草皮动画完成后创建（见铺草皮回调）
+	// 原版行为：草皮铺完后才显示除草车
+
+	// 2. Create LevelSystem (需要 RewardAnimationSystem 和 LawnmowerSystem)
+	scene.levelSystem = systems.NewLevelSystem(scene.entityManager, scene.gameState, scene.waveSpawnSystem, rm, scene.reanimSystem, scene.rewardSystem, scene.lawnmowerSystem)
 	log.Printf("[GameScene] Initialized level system")
 
 	// 3. Create ZombieLaneTransitionSystem (僵尸行转换系统)
@@ -780,6 +790,8 @@ func (s *GameScene) Update(deltaTime float64) {
 			if s.tutorialSystem != nil {
 				s.tutorialSystem.OnSoddingComplete()
 			}
+			// Story 10.2: 铺草皮完成后创建除草车（原版行为）
+			s.initLawnmowers()
 		}, enabledLanes, s.sodOverlayX, float64(s.sodHeight))
 
 		s.soddingAnimStarted = true
@@ -811,6 +823,8 @@ func (s *GameScene) Update(deltaTime float64) {
 				if s.tutorialSystem != nil {
 					s.tutorialSystem.OnSoddingComplete()
 				}
+				// Story 10.2: 铺草皮完成后创建除草车（原版行为）
+				s.initLawnmowers()
 			}, enabledLanes, s.sodOverlayX, float64(s.sodHeight))
 
 			s.soddingAnimStarted = true
@@ -859,7 +873,11 @@ func (s *GameScene) Update(deltaTime float64) {
 	s.sunMovementSystem.Update(deltaTime)   // 4. Move suns (includes collection animation)
 	s.sunCollectionSystem.Update(deltaTime) // 5. Check if collection is complete
 	s.behaviorSystem.Update(deltaTime)      // 6. Update plant behaviors (Story 3.4)
-	s.physicsSystem.Update(deltaTime)       // 7. Check collisions (Story 4.3)
+	// Story 10.2: Update lawnmower system (除草车系统)
+	if s.lawnmowerSystem != nil {
+		s.lawnmowerSystem.Update(deltaTime) // 6.5. Check lawnmower triggers and move lawnmowers
+	}
+	s.physicsSystem.Update(deltaTime) // 7. Check collisions (Story 4.3)
 	// Story 6.3: Reanim 动画系统（替代旧的 AnimationSystem）
 	s.reanimSystem.Update(deltaTime)   // 8. Update Reanim animation frames
 	s.particleSystem.Update(deltaTime) // 9. Update particle effects (Story 7.2)
@@ -1687,4 +1705,44 @@ func (s *GameScene) drawProgressBar(screen *ebiten.Image) {
 		op.ColorScale.ScaleWithColor(color.RGBA{R: 255, G: 255, B: 255, A: 255}) // 白色
 		text.Draw(screen, levelText, s.sunCounterFont, op)
 	}
+}
+
+// initLawnmowers 初始化除草车实体
+// Story 10.2: 在每个启用的行上创建一台除草车
+//
+// 除草车是每行的最后防线：
+// - 僵尸到达左侧边界时自动触发
+// - 沿该行向右快速移动，消灭路径上的所有僵尸
+// - 每行只有一台除草车，使用后不可恢复
+func (s *GameScene) initLawnmowers() {
+	if s.gameState.CurrentLevel == nil {
+		log.Printf("[GameScene] Warning: No current level, skipping lawnmower initialization")
+		return
+	}
+
+	// 获取关卡启用的行
+	enabledLanes := s.gameState.CurrentLevel.EnabledLanes
+	if len(enabledLanes) == 0 {
+		// 如果未配置EnabledLanes，默认启用所有5行
+		enabledLanes = []int{1, 2, 3, 4, 5}
+	}
+
+	// 为每个启用的行创建除草车
+	for _, lane := range enabledLanes {
+		lawnmowerID, err := entities.NewLawnmowerEntity(
+			s.entityManager,
+			s.resourceManager,
+			s.reanimSystem,
+			lane,
+		)
+
+		if err != nil {
+			log.Printf("[GameScene] ERROR: Failed to create lawnmower for lane %d: %v", lane, err)
+			continue
+		}
+
+		log.Printf("[GameScene] Created lawnmower for lane %d (Entity ID: %d)", lane, lawnmowerID)
+	}
+
+	log.Printf("[GameScene] Initialized %d lawnmowers for enabled lanes: %v", len(enabledLanes), enabledLanes)
 }

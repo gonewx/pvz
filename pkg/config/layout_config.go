@@ -36,7 +36,7 @@ const (
 
 	// GridWorldStartY 是草坪网格在背景图片中的起始Y坐标（世界坐标）
 	// Y轴不受摄像机水平移动影响，因此世界坐标等于屏幕坐标
-	GridWorldStartY = 76.0
+	GridWorldStartY = 78.0
 
 	// GridColumns 是草坪的列数（横向格子数）
 	GridColumns = 9
@@ -217,6 +217,45 @@ const (
 	// PauseMenuInnerButtonWidth 墓碑内部按钮总宽度（像素）
 	// 包含左右边框，中间部分宽度 = 总宽度 - 左右边框宽度
 	PauseMenuInnerButtonWidth = 180.0
+
+	// ========== 除草车配置参数（Story 10.2）（可手工调节） ==========
+
+	// LawnmowerStartX 除草车初始X位置（世界坐标，像素）
+	// 除草车放置在草坪左侧台阶上
+	// 注意：必须在摄像机视野内（worldX >= GameCameraX = 220）
+	// 设置为 230，屏幕坐标 = 230 - 220 = 10（刚好在屏幕左边缘）
+	// 原建议值范围：30.0 - 100.0（错误，会在视野外）
+	// 正确范围：220.0 - 260.0（在摄像机视野内，草坪左侧）
+	LawnmowerStartX = 225.0
+
+	// LawnmowerSpeed 除草车移动速度（像素/秒）
+	// 原版除草车快速向右移动的速度
+	// 建议值范围：200.0 - 400.0
+	LawnmowerSpeed = 300.0
+
+	// LawnmowerTriggerBoundary 除草车触发边界（世界坐标，像素）
+	// 僵尸X坐标小于此值时触发除草车
+	// 应该在除草车右侧，当僵尸靠近除草车时触发
+	// 设置为 240（比除草车位置 230 稍右），给除草车留出启动空间
+	LawnmowerTriggerBoundary = 240.0
+
+	// LawnmowerDeletionBoundary 除草车删除边界（世界坐标，像素）
+	// 除草车X坐标超过此值时删除实体
+	// 通常设置为背景宽度
+	LawnmowerDeletionBoundary = BackgroundWidth
+
+	// LawnmowerWidth 除草车宽度（像素）
+	// 用于碰撞检测和渲染
+	LawnmowerWidth = 80.0
+
+	// LawnmowerHeight 除草车高度（像素）
+	// 用于碰撞检测和渲染
+	LawnmowerHeight = 60.0
+
+	// LawnmowerCollisionRange 除草车碰撞检测范围（像素）
+	// 僵尸在除草车前后此范围内时视为碰撞
+	// 建议值范围：30.0 - 80.0
+	LawnmowerCollisionRange = 50.0
 )
 
 // GetGridWorldBounds 返回草坪网格的世界坐标边界
