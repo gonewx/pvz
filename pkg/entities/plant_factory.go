@@ -129,11 +129,11 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 
 		// Story 6.3: 使用 ReanimComponent 替代 AnimationComponent
 		// 从 ResourceManager 获取豌豆射手的 Reanim 数据和部件图片
-		reanimXML := rm.GetReanimXML("PeaShooter")
-		partImages := rm.GetReanimPartImages("PeaShooter")
+		reanimXML := rm.GetReanimXML("PeaShooterSingle")
+		partImages := rm.GetReanimPartImages("PeaShooterSingle")
 
 		if reanimXML == nil || partImages == nil {
-			return 0, fmt.Errorf("failed to load PeaShooter Reanim resources")
+			return 0, fmt.Errorf("failed to load PeaShooterSingle Reanim resources")
 		}
 
 		// 添加 ReanimComponent

@@ -100,9 +100,9 @@ func TestCollectImageReferences(t *testing.T) {
 // TestLoadReanimImages_Success tests successful image loading
 func TestLoadReanimImages_Success(t *testing.T) {
 	// Parse a real reanim file
-	reanimData, err := reanim.ParseReanimFile("../../assets/effect/reanim/PeaShooter.reanim")
+	reanimData, err := reanim.ParseReanimFile("../../assets/effect/reanim/PeaShooterSingle.reanim")
 	if err != nil {
-		t.Fatalf("Failed to parse PeaShooter.reanim: %v", err)
+		t.Fatalf("Failed to parse PeaShooterSingle.reanim: %v", err)
 	}
 
 	// Load images

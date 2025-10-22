@@ -1148,6 +1148,28 @@ LoadResourceGroup("init")                            ← 加载初始资源
 使用 GetImageByID/GetAudioPlayer 获取缓存资源       ← 快速访问
 ```
 
+### 植物 Reanim 资源命名规范
+
+**重要**: 不同植物类型使用不同的 Reanim 文件
+
+#### 豌豆射手系列
+- **普通豌豆射手** (`PlantPeashooter`):
+  - 资源ID: `PeaShooterSingle`
+  - 文件: `assets/effect/reanim/PeaShooterSingle.reanim`
+  - 特征: 一次发射 1 发子弹
+
+- **双发射手/重复射手** (`PlantRepeater`, 未来实现):
+  - 资源ID: `PeaShooter`
+  - 文件: `assets/effect/reanim/PeaShooter.reanim`
+  - 特征: 一次连续发射 2 发子弹
+
+#### 其他植物
+- 向日葵: `SunFlower` → `SunFlower.reanim`
+- 坚果墙: `Wallnut` → `Wallnut.reanim`
+- 樱桃炸弹: `CherryBomb` → `CherryBomb.reanim`
+
+**规则**: 资源ID 必须与文件名（不含扩展名）完全匹配（区分大小写）
+
 
 ### 故障排查
 

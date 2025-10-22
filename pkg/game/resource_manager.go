@@ -539,7 +539,10 @@ func (rm *ResourceManager) GetFont(path string, size float64) *text.GoTextFace {
 func (rm *ResourceManager) LoadReanimResources() error {
 	// 加载植物 Reanim 资源
 	// 注意：文件名使用 PascalCase（与实际文件名匹配）
-	plants := []string{"PeaShooter", "SunFlower", "Wallnut", "CherryBomb"}
+	// 资源命名规范:
+	// - PeaShooterSingle.reanim - 普通豌豆射手（1发/次）
+	// - PeaShooter.reanim - 双发射手（2发/次，未来使用）
+	plants := []string{"PeaShooterSingle", "SunFlower", "Wallnut", "CherryBomb"}
 	for _, plantName := range plants {
 		log.Printf("[ResourceManager] Loading plant reanim: %s", plantName)
 		if err := rm.loadPlantReanim(plantName); err != nil {
