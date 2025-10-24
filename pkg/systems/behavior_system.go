@@ -493,9 +493,17 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 				plant.AttackAnimState = components.AttackAnimAttacking
 			}
 
-			// 计算子弹起始位置：豌豆射手口部位置（世界坐标）
-			bulletStartX := peashooterPos.X + config.PeaBulletOffsetX
-			bulletStartY := peashooterPos.Y + config.PeaBulletOffsetY
+			// 计算子弹起始位置：从 anim_stem 轨道读取精确位置
+			// anim_stem 是变换轨道，用于定位子弹发射点（不用于渲染）
+			bulletStartX, bulletStartY, err := s.reanimSystem.GetTrackPosition(entityID, "anim_stem")
+			if err != nil {
+				// 如果读取失败，使用备用固定偏移
+				log.Printf("[BehaviorSystem] 无法读取 anim_stem 位置: %v，使用固定偏移", err)
+				bulletStartX = peashooterPos.X + config.PeaBulletOffsetX
+				bulletStartY = peashooterPos.Y + config.PeaBulletOffsetY
+			} else {
+				log.Printf("[BehaviorSystem] 从 anim_stem 读取子弹位置: (%.1f, %.1f)", bulletStartX, bulletStartY)
+			}
 
 			// 播放发射音效（如果配置了音效路径）
 			s.playShootSound()

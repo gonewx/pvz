@@ -139,14 +139,14 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 		}
 
 		// 添加 ReanimComponent
-		// 豌豆射手：使用 VisibleTracks 白名单，确保攻击时茎干可见
-		// 原因：茎干轨道 (stalk_bottom/stalk_top) 在 frame 0-3 是 f=-1，导致攻击动画开始时不可见
-		// 解决方案：将茎干添加到 VisibleTracks，配合 RenderSystem 修改，白名单轨道忽略 f=-1
+		// 豌豆射手：使用 VisibleTracks 白名单，控制部件可见性
+		// 原因：某些轨道（如 anim_blink）在超出范围后仍有继承的图片引用和 f=-1
+		// 白名单轨道会忽略 f=-1，强制渲染（用于茎干在攻击时显示）
 		em.AddComponent(entityID, &components.ReanimComponent{
 			Reanim:     reanimXML,
 			PartImages: partImages,
 			VisibleTracks: map[string]bool{
-				// 茎干部件（Story 10.3: 攻击时必须显示）
+				// 茎干部件（攻击时必须显示，即使 f=-1）
 				"stalk_bottom": true,
 				"stalk_top":    true,
 
@@ -158,15 +158,13 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 				"frontleaf_right_tip":  true,
 				"frontleaf_tip_left":   true,
 
-				// 头部动画轨道（包含头部图片）
-				"anim_head_idle": true,
-				"anim_face":      true,
-				"idle_mouth":     true,
+				// 头部部件
+				"anim_head_idle": true, // 头部动画轨道（包含头部图片）
+				"anim_face":      true, // 脸部
+				"idle_mouth":     true, // 嘴巴
 
-				// 动画定义轨道（控制可见性）
-				"anim_idle":      true,
-				"anim_full_idle": true,
-				"anim_shooting":  true,
+				// 注意：不包含 anim_blink, idle_shoot_blink（眨眼轨道）
+				// 这些轨道不在白名单中，会遵守 f=-1，避免错误显示
 			},
 		})
 

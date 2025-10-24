@@ -764,9 +764,17 @@ func (s *ReanimSystem) calculateCenterOffset(comp *components.ReanimComponent) {
 
 		frame := mergedFrames[physicalIndex]
 
-		// Skip hidden frames
+		// Skip hidden frames (f=-1), UNLESS in VisibleTracks whitelist
 		if frame.FrameNum != nil && *frame.FrameNum == -1 {
-			continue
+			// 检查是否在白名单中
+			inVisibleTracks := false
+			if comp.VisibleTracks != nil && len(comp.VisibleTracks) > 0 {
+				inVisibleTracks = comp.VisibleTracks[track.Name]
+			}
+			if !inVisibleTracks {
+				continue // 非白名单轨道，遵守 f=-1，跳过
+			}
+			// 白名单轨道，忽略 f=-1，继续计算边界
 		}
 
 		// Skip frames without images
@@ -1084,4 +1092,75 @@ func (s *ReanimSystem) RenderToTexture(entityID ecs.EntityID, target *ebiten.Ima
 	tempRenderSystem.renderReanimEntity(target, entityID, 0)
 
 	return nil
+}
+
+// GetTrackPosition 获取指定轨道在当前帧的世界坐标位置
+// 用于定位游戏逻辑需要的特殊点位（如子弹发射点）
+//
+// Parameters:
+//   - entityID: the ID of the entity
+//   - trackName: the name of the track (e.g., "anim_stem")
+//
+// Returns:
+//   - x, y: 轨道在世界坐标系中的位置（已应用实体位置和中心偏移）
+//   - error: if the entity doesn't have required components or track doesn't exist
+func (s *ReanimSystem) GetTrackPosition(entityID ecs.EntityID, trackName string) (float64, float64, error) {
+	// 获取必要的组件
+	pos, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+	reanim, hasReanim := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+
+	if !hasPos || !hasReanim {
+		return 0, 0, fmt.Errorf("entity %d missing required components", entityID)
+	}
+
+	// 将逻辑帧映射到物理帧索引
+	physicalIndex := s.findPhysicalFrameIndex(reanim, reanim.CurrentFrame)
+	if physicalIndex < 0 {
+		return 0, 0, fmt.Errorf("invalid frame index")
+	}
+
+	// 获取轨道的累积帧数据
+	mergedFrames, ok := reanim.MergedTracks[trackName]
+	if !ok || physicalIndex >= len(mergedFrames) {
+		return 0, 0, fmt.Errorf("track '%s' not found or frame out of range", trackName)
+	}
+
+	frame := mergedFrames[physicalIndex]
+
+	// 获取轨道的局部位置（相对于动画原点）
+	localX, localY := 0.0, 0.0
+	if frame.X != nil {
+		localX = *frame.X
+	}
+	if frame.Y != nil {
+		localY = *frame.Y
+	}
+
+	// 转换为世界坐标
+	// worldPos = entityPos + (trackLocalPos - centerOffset)
+	worldX := pos.X + (localX - reanim.CenterOffsetX)
+	worldY := pos.Y + (localY - reanim.CenterOffsetY)
+
+	return worldX, worldY, nil
+}
+
+// findPhysicalFrameIndex 将逻辑帧号映射到物理帧索引
+// 这是 RenderSystem 中同名方法的复制，因为需要在 ReanimSystem 中使用
+func (s *ReanimSystem) findPhysicalFrameIndex(reanim *components.ReanimComponent, logicalFrameNum int) int {
+	if len(reanim.AnimVisibles) == 0 {
+		return -1
+	}
+
+	// 逻辑帧按区间映射：从第一个0开始到下一个非0之前
+	logicalIndex := 0
+	for i := 0; i < len(reanim.AnimVisibles); i++ {
+		if reanim.AnimVisibles[i] == 0 {
+			if logicalIndex == logicalFrameNum {
+				return i
+			}
+			logicalIndex++
+		}
+	}
+
+	return -1
 }

@@ -365,10 +365,19 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		// 获取累积后的帧数据
 		mergedFrame := mergedFrames[physicalIndex]
 
-		// Story 10.3 修复：部件轨道的 f=-1 不表示"不可见"
-		// f=-1 只表示"这一帧没有新的变换数据"（帧继承）
-		// 可见性完全由 AnimVisibles（从动画定义轨道构建）控制
-		// 因此不检查 FrameNum，只检查是否有图片引用
+		// 如果该帧标记为隐藏（f == -1），跳过绘制
+		// 除非该轨道在 VisibleTracks 白名单中（白名单强制可见）
+		if mergedFrame.FrameNum != nil && *mergedFrame.FrameNum == -1 {
+			// 检查是否在白名单中
+			inVisibleTracks := false
+			if reanim.VisibleTracks != nil && len(reanim.VisibleTracks) > 0 {
+				inVisibleTracks = reanim.VisibleTracks[track.Name]
+			}
+			if !inVisibleTracks {
+				continue // 非白名单轨道，遵守 f=-1，跳过绘制
+			}
+			// 白名单轨道，忽略 f=-1，继续渲染
+		}
 
 		// 必须有图片引用才能绘制
 		if mergedFrame.ImagePath == "" {
