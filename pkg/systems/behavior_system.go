@@ -409,14 +409,9 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 // handlePeashooterBehavior 处理豌豆射手的行为逻辑
 // 豌豆射手会周期性扫描同行僵尸并发射豌豆子弹
 func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTime float64, zombieEntityList []ecs.EntityID) {
-	// Story 10.3: 检查植物是否正在播放攻击动画
+	// 获取植物组件（用于状态管理）
 	plant, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, entityID)
 	if !ok {
-		return
-	}
-
-	// Story 10.3: 如果正在播放攻击动画，跳过发射逻辑
-	if plant.AttackAnimState == components.AttackAnimAttacking {
 		return
 	}
 
@@ -428,6 +423,12 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 
 	// 更新计时器
 	timer.CurrentTime += deltaTime
+
+	// Story 10.3: 只有在空闲状态时才能触发新的攻击
+	// 确保攻击动画播放完毕后，才能进行下一次攻击
+	if plant.AttackAnimState != components.AttackAnimIdle {
+		return // 攻击动画正在播放，跳过攻击逻辑
+	}
 
 	// 检查计时器是否就绪（达到攻击间隔）
 	if timer.CurrentTime >= timer.TargetTime {
@@ -484,26 +485,24 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 		if hasZombieInLine {
 			// Story 10.3: 使用简单动画切换实现攻击动画
 			// anim_shooting 包含所有需要的部件（通过 VisibleTracks 机制）
-			err := s.reanimSystem.PlayAnimation(entityID, "anim_shooting")
+			// 使用 PlayAnimationNoLoop 确保动画单次播放，完成后自动切换回 idle
+			err := s.reanimSystem.PlayAnimationNoLoop(entityID, "anim_shooting")
 			if err != nil {
 				log.Printf("[BehaviorSystem] 切换到攻击动画失败: %v", err)
 			} else {
-				log.Printf("[BehaviorSystem] 豌豆射手 %d 切换到攻击动画", entityID)
+				log.Printf("[BehaviorSystem] 豌豆射手 %d 切换到攻击动画（单次播放）", entityID)
 				// 设置攻击动画状态，用于动画完成后切换回 idle
 				plant.AttackAnimState = components.AttackAnimAttacking
 			}
 
-			// 计算子弹起始位置：从 anim_stem 轨道读取精确位置
-			// anim_stem 是变换轨道，用于定位子弹发射点（不用于渲染）
-			bulletStartX, bulletStartY, err := s.reanimSystem.GetTrackPosition(entityID, "anim_stem")
-			if err != nil {
-				// 如果读取失败，使用备用固定偏移
-				log.Printf("[BehaviorSystem] 无法读取 anim_stem 位置: %v，使用固定偏移", err)
-				bulletStartX = peashooterPos.X + config.PeaBulletOffsetX
-				bulletStartY = peashooterPos.Y + config.PeaBulletOffsetY
-			} else {
-				log.Printf("[BehaviorSystem] 从 anim_stem 读取子弹位置: (%.1f, %.1f)", bulletStartX, bulletStartY)
-			}
+			// 计算子弹起始位置：使用固定偏移
+			// 注意：anim_stem 轨道的位置在攻击动画中会变化（从头部移动到射击位置）
+			// 原版游戏在特定帧生成子弹，此处简化为使用固定偏移
+			// 未来优化：监听动画帧事件，在发射帧（约 frame 60-67）创建子弹并使用 anim_stem 位置
+			bulletStartX := peashooterPos.X + config.PeaBulletOffsetX
+			bulletStartY := peashooterPos.Y + config.PeaBulletOffsetY
+			log.Printf("[BehaviorSystem] 豌豆射手 %d 发射子弹，位置: (%.1f, %.1f)，使用固定偏移(%.1f, %.1f)",
+				entityID, bulletStartX, bulletStartY, config.PeaBulletOffsetX, config.PeaBulletOffsetY)
 
 			// 播放发射音效（如果配置了音效路径）
 			s.playShootSound()

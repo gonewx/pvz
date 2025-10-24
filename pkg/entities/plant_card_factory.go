@@ -43,7 +43,7 @@ func NewPlantCardEntity(em *ecs.EntityManager, rm *game.ResourceManager, rs Rean
 		cooldownTime = config.SunflowerRechargeTime // 7.5
 	case components.PlantPeashooter:
 		sunCost = config.PeashooterSunCost // 100
-		reanimName = "PeaShooter"
+		reanimName = "PeaShooterSingle"    // Story 10.3: 修正为普通豌豆射手资源
 		cooldownTime = config.PeashooterRechargeTime // 7.5
 	case components.PlantWallnut:
 		sunCost = config.WallnutCost // 50
@@ -149,6 +149,7 @@ func RenderPlantIcon(em *ecs.EntityManager, rm *game.ResourceManager, rs ReanimS
 	partImages := rm.GetReanimPartImages(reanimName)
 
 	if reanimXML == nil || partImages == nil {
+		log.Printf("[PlantCardFactory] Failed to load Reanim resources for %s", reanimName)
 		return nil, fmt.Errorf("failed to load Reanim resources for %s", reanimName)
 	}
 
@@ -165,20 +166,57 @@ func RenderPlantIcon(em *ecs.EntityManager, rm *game.ResourceManager, rs ReanimS
 		Y: float64(iconHeight) / 2, // 纹理中心 Y (45)
 	})
 
+	// 为预览图标添加 VisibleTracks 白名单
+	// 原因：某些轨道在第一帧有 f=-1，需要强制显示以生成完整预览
+	visibleTracks := make(map[string]bool)
+	if reanimName == "PeaShooterSingle" {
+		// 豌豆射手：使用与游戏实体相同的白名单
+		visibleTracks = map[string]bool{
+			"stalk_bottom":         true,
+			"stalk_top":            true,
+			"backleaf":             true,
+			"backleaf_left_tip":    true,
+			"backleaf_right_tip":   true,
+			"frontleaf":            true,
+			"frontleaf_right_tip":  true,
+			"frontleaf_tip_left":   true,
+			"anim_sprout":          true, // 头后的小嫩叶
+			"anim_head_idle":       true,
+			"anim_face":            true,
+			"idle_mouth":           true,
+		}
+	} else {
+		// 其他植物：默认忽略所有 f=-1，强制渲染所有部件
+		// 遍历所有轨道并添加到白名单
+		for _, track := range reanimXML.Tracks {
+			visibleTracks[track.Name] = true
+		}
+	}
+
 	ecs.AddComponent(em, tempEntity, &components.ReanimComponent{
-		Reanim:     reanimXML,
-		PartImages: partImages,
+		Reanim:        reanimXML,
+		PartImages:    partImages,
+		VisibleTracks: visibleTracks, // Story 10.3: 添加白名单确保预览完整显示
 	})
 
 	// 5. 播放 idle 动画（取第一帧作为预览）
 	animName := "anim_idle"
-	if reanimName == "PeaShooter" {
+	if reanimName == "PeaShooterSingle" { // Story 10.3: 修正资源名称
 		animName = "anim_full_idle" // 豌豆射手使用完整待机动画
 	}
 
 	if err := rs.PlayAnimation(tempEntity, animName); err != nil {
 		log.Printf("[PlantCardFactory] Warning: Failed to play animation %s for %s: %v", animName, reanimName, err)
 		// 继续执行，使用默认姿态
+	}
+
+	// Story 10.3 修复：使用预计算的最佳预览帧
+	// 原因：某些植物（如向日葵）的前几帧可能是空的或不完整的
+	// 解决方案：PlayAnimation 已经计算并存储了可见部件最多的帧索引
+	if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](em, tempEntity); ok {
+		if reanimComp.BestPreviewFrame > 0 {
+			reanimComp.CurrentFrame = reanimComp.BestPreviewFrame
+		}
 	}
 
 	// 6. 创建渲染目标纹理
@@ -188,6 +226,7 @@ func RenderPlantIcon(em *ecs.EntityManager, rm *game.ResourceManager, rs ReanimS
 	// 注意：需要临时调用 ReanimSystem 的渲染逻辑
 	// 这里使用一个辅助方法来渲染单个实体
 	if err := rs.RenderToTexture(tempEntity, iconTexture); err != nil {
+		log.Printf("[PlantCardFactory] Failed to render %s to texture: %v", reanimName, err)
 		return nil, fmt.Errorf("failed to render plant to texture: %w", err)
 	}
 

@@ -157,6 +157,7 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 				"frontleaf":            true,
 				"frontleaf_right_tip":  true,
 				"frontleaf_tip_left":   true,
+				"anim_sprout":          true, // Story 10.3: 头后的小嫩叶
 
 				// 头部部件
 				"anim_head_idle": true, // 头部动画轨道（包含头部图片）
