@@ -18,6 +18,8 @@ type ReanimSystemInterface interface {
 	PlayAnimationNoLoop(entityID ecs.EntityID, animName string) error
 	// RenderToTexture 将指定实体的 Reanim 渲染到目标纹理（离屏渲染）
 	RenderToTexture(entityID ecs.EntityID, target *ebiten.Image) error
+	// PrepareStaticPreview prepares a Reanim entity for static preview (Story 11.1)
+	PrepareStaticPreview(entityID ecs.EntityID, reanimName string) error
 }
 
 // NewPlantEntity 创建植物实体
@@ -151,13 +153,13 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 				"stalk_top":    true,
 
 				// 叶子部件
-				"backleaf":             true,
-				"backleaf_left_tip":    true,
-				"backleaf_right_tip":   true,
-				"frontleaf":            true,
-				"frontleaf_right_tip":  true,
-				"frontleaf_tip_left":   true,
-				"anim_sprout":          true, // Story 10.3: 头后的小嫩叶
+				"backleaf":            true,
+				"backleaf_left_tip":   true,
+				"backleaf_right_tip":  true,
+				"frontleaf":           true,
+				"frontleaf_right_tip": true,
+				"frontleaf_tip_left":  true,
+				"anim_sprout":         true, // Story 10.3: 头后的小嫩叶
 
 				// 头部部件
 				"anim_head_idle": true, // 头部动画轨道（包含头部图片）

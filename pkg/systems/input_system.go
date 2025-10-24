@@ -393,7 +393,7 @@ func (s *InputSystem) createPlantPreview(plantType components.PlantType, x, y fl
 	case components.PlantSunflower:
 		reanimName = "SunFlower"
 	case components.PlantPeashooter:
-		reanimName = "PeaShooter"
+		reanimName = "PeaShooterSingle" // Story 10.3: 修正为普通豌豆射手资源
 	case components.PlantWallnut:
 		reanimName = "Wallnut"
 	case components.PlantCherryBomb:

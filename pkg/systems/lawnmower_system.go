@@ -7,6 +7,7 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
 )
 
@@ -20,6 +21,7 @@ import (
 type LawnmowerSystem struct {
 	entityManager   *ecs.EntityManager
 	resourceManager *game.ResourceManager // 用于播放音效
+	reanimSystem    *ReanimSystem         // Story 10.3: 用于播放僵尸死亡动画
 	gameState       *game.GameState       // 用于增加消灭僵尸计数
 	stateEntityID   ecs.EntityID          // 全局状态实体ID
 }
@@ -27,12 +29,13 @@ type LawnmowerSystem struct {
 // NewLawnmowerSystem 创建除草车系统
 // 参数:
 //   - em: EntityManager 实例
-//   - rm: ResourceManager 实例（用于播放音效）
+//   - rm: ResourceManager 实例（用于播放音效和粒子效果）
+//   - rs: ReanimSystem 实例（Story 10.3: 用于播放僵尸死亡动画）
 //   - gs: GameState 实例（用于记录游戏统计）
 //
 // 返回:
 //   - *LawnmowerSystem: 除草车系统实例
-func NewLawnmowerSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.GameState) *LawnmowerSystem {
+func NewLawnmowerSystem(em *ecs.EntityManager, rm *game.ResourceManager, rs *ReanimSystem, gs *game.GameState) *LawnmowerSystem {
 	// 创建全局状态实体
 	stateEntity := em.CreateEntity()
 	ecs.AddComponent(em, stateEntity, &components.LawnmowerStateComponent{
@@ -42,6 +45,7 @@ func NewLawnmowerSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *gam
 	return &LawnmowerSystem{
 		entityManager:   em,
 		resourceManager: rm,
+		reanimSystem:    rs,
 		gameState:       gs,
 		stateEntityID:   stateEntity,
 	}
@@ -207,8 +211,8 @@ func (s *LawnmowerSystem) checkZombieCollisions() {
 			// 碰撞检测：僵尸 X 坐标在除草车 X ± CollisionRange 范围内
 			distance := math.Abs(zombiePos.X - lawnmowerPos.X)
 			if distance < config.LawnmowerCollisionRange {
-				// 原版行为：除草车碾压僵尸时，僵尸立即被删除（不播放死亡动画）
-				// 这样除草车看起来是"直接压过"，不会"停下来"
+				// Story 10.3: 除草车碾压僵尸，触发死亡动画
+				// 不再直接删除，而是播放死亡动画和粒子效果
 
 				// 增加已消灭僵尸计数
 				if s.gameState != nil {
@@ -218,8 +222,8 @@ func (s *LawnmowerSystem) checkZombieCollisions() {
 				log.Printf("[LawnmowerSystem] Lawnmower on lane %d killed zombie at (%.1f, %.1f)",
 					lawnmower.Lane, zombiePos.X, zombiePos.Y)
 
-				// 立即删除僵尸实体（原版行为：除草车碾压的僵尸不播放死亡动画）
-				s.entityManager.DestroyEntity(zombieID)
+				// 触发僵尸死亡（播放动画和粒子效果）
+				s.triggerZombieDeath(zombieID)
 			}
 		}
 	}
@@ -303,4 +307,72 @@ func (s *LawnmowerSystem) HasActiveLawnmowers() bool {
 	}
 
 	return false
+}
+
+// triggerZombieDeath 触发僵尸死亡动画和粒子效果
+// Story 10.3: 除草车碾压僵尸时调用此方法，不再直接删除
+func (s *LawnmowerSystem) triggerZombieDeath(zombieID ecs.EntityID) {
+	// 1. 切换行为类型为 BehaviorZombieDying
+	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
+	if !ok {
+		log.Printf("[LawnmowerSystem] 僵尸 %d 缺少 BehaviorComponent，无法触发死亡", zombieID)
+		return
+	}
+	behavior.Type = components.BehaviorZombieDying
+	log.Printf("[LawnmowerSystem] 僵尸 %d 行为切换为 BehaviorZombieDying", zombieID)
+
+	// 2. 移除速度组件（僵尸停止移动）
+	if ecs.HasComponent[*components.VelocityComponent](s.entityManager, zombieID) {
+		ecs.RemoveComponent[*components.VelocityComponent](s.entityManager, zombieID)
+		log.Printf("[LawnmowerSystem] 僵尸 %d 移除 VelocityComponent（停止移动）", zombieID)
+	}
+
+	// 3. 播放死亡动画（单次播放，不循环）
+	if s.reanimSystem != nil {
+		err := s.reanimSystem.PlayAnimationNoLoop(zombieID, "anim_death")
+		if err != nil {
+			log.Printf("[LawnmowerSystem] 僵尸 %d 播放死亡动画失败: %v", zombieID, err)
+		} else {
+			log.Printf("[LawnmowerSystem] 僵尸 %d 开始播放死亡动画 anim_death", zombieID)
+		}
+	}
+
+	// 4. 触发粒子效果（手臂和头部掉落）
+	// 这与 BehaviorSystem 的逻辑一致
+	position, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
+	if !ok {
+		log.Printf("[LawnmowerSystem] 警告：僵尸 %d 缺少 PositionComponent，无法触发粒子效果", zombieID)
+		return
+	}
+
+	// Story 7.6: 除草车碾压的僵尸通常向左走，需要翻转粒子方向
+	angleOffset := 180.0 // 默认翻转（适合僵尸向左走）
+
+	// 触发僵尸手臂掉落粒子效果
+	_, err := entities.CreateParticleEffect(
+		s.entityManager,
+		s.resourceManager,
+		"MoweredZombieArm",
+		position.X, position.Y,
+		angleOffset,
+	)
+	if err != nil {
+		log.Printf("[LawnmowerSystem] 警告：创建僵尸手臂掉落粒子效果失败: %v", err)
+	} else {
+		log.Printf("[LawnmowerSystem] 僵尸 %d 触发手臂掉落粒子效果", zombieID)
+	}
+
+	// 触发僵尸头部掉落粒子效果
+	_, err = entities.CreateParticleEffect(
+		s.entityManager,
+		s.resourceManager,
+		"MoweredZombieHead",
+		position.X, position.Y,
+		angleOffset,
+	)
+	if err != nil {
+		log.Printf("[LawnmowerSystem] 警告：创建僵尸头部掉落粒子效果失败: %v", err)
+	} else {
+		log.Printf("[LawnmowerSystem] 僵尸 %d 触发头部掉落粒子效果", zombieID)
+	}
 }

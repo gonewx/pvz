@@ -6,6 +6,7 @@ import (
 
 	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -481,6 +482,34 @@ func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) err
 
 	// Calculate center offset based on the bounding box of visible parts in the first frame
 	s.calculateCenterOffset(reanimComp)
+
+	// Story 10.3: Calculate best preview frame (frame with most visible parts)
+	// This is used by RenderPlantIcon to ensure preview shows the most complete representation
+	bestFrame := 0
+	maxVisibleParts := 0
+
+	for frameIdx := 0; frameIdx < reanimComp.VisibleFrameCount; frameIdx++ {
+		// Skip invisible frames
+		if frameIdx < len(reanimComp.AnimVisibles) && reanimComp.AnimVisibles[frameIdx] == -1 {
+			continue
+		}
+
+		// Count visible parts in this frame
+		visiblePartsCount := 0
+		for _, mergedFrames := range reanimComp.MergedTracks {
+			if frameIdx < len(mergedFrames) && mergedFrames[frameIdx].ImagePath != "" {
+				visiblePartsCount++
+			}
+		}
+
+		// Update best frame if this frame has more visible parts
+		if visiblePartsCount > maxVisibleParts {
+			maxVisibleParts = visiblePartsCount
+			bestFrame = frameIdx
+		}
+	}
+
+	reanimComp.BestPreviewFrame = bestFrame
 
 	return nil
 }
@@ -1163,4 +1192,417 @@ func (s *ReanimSystem) findPhysicalFrameIndex(reanim *components.ReanimComponent
 	}
 
 	return -1
+}
+
+// PrepareStaticPreview prepares a Reanim entity for static preview (e.g., plant card icons).
+//
+// This method is specifically designed for static preview scenarios (plant cards, almanac, shop),
+// as opposed to PlayAnimation which is for dynamic playback.
+//
+// Key differences from PlayAnimation:
+// - PlayAnimation: requires animation definition tracks, used for dynamic playback
+// - PrepareStaticPreview: works with part tracks only, used for static rendering
+//
+// Strategy:
+// 1. Does not depend on animation definition tracks, directly analyzes all part tracks
+// 2. Finds the "first complete visible frame" (all parts have images and f>=0)
+// 3. If not found, uses heuristic strategy (middle of animation, ~40% position)
+// 4. Checks config.PlantPreviewFrameOverride for manual override (Story 11.1 - Strategy 3)
+// 5. Sets static preview state (IsLooping=false, IsFinished=true)
+//
+// Parameters:
+//   - entityID: the ID of the entity to prepare for static preview
+//   - reanimName: the Reanim resource name (e.g., "SunFlower", "PeaShooterSingle")
+//
+// Returns:
+//   - An error if the entity doesn't have a ReanimComponent
+func (s *ReanimSystem) PrepareStaticPreview(entityID ecs.EntityID, reanimName string) error {
+	// Get the ReanimComponent
+	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !exists {
+		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
+	}
+
+	// Check if Reanim data is present
+	if reanimComp.Reanim == nil {
+		return fmt.Errorf("entity %d has a ReanimComponent but no Reanim data", entityID)
+	}
+
+	// 1. Build merged tracks for preview (does not depend on animation definition track)
+	reanimComp.MergedTracks = s.buildMergedTracksForPreview(reanimComp)
+
+	// Store all part tracks for rendering
+	reanimComp.AnimTracks = s.getPartTracks(reanimComp)
+
+	// 2. Strategy 1: Find the first complete visible frame
+	bestFrame := s.findFirstCompleteVisibleFrame(reanimComp)
+
+	// 3. Strategy 2: If not found, use heuristic fallback
+	if bestFrame < 0 {
+		bestFrame = s.findPreviewFrameHeuristic(reanimComp)
+		log.Printf("[ReanimSystem] No complete frame found, using heuristic frame %d", bestFrame)
+	}
+
+	// 4. Strategy 3: Check config override (manual frame specification)
+	if overrideFrame, hasOverride := config.PlantPreviewFrameOverride[reanimName]; hasOverride {
+		log.Printf("[ReanimSystem] Using config override frame %d for %s (auto-selected was %d)",
+			overrideFrame, reanimName, bestFrame)
+		bestFrame = overrideFrame
+	}
+
+	// 5. Apply preview frame
+	reanimComp.CurrentFrame = bestFrame
+	reanimComp.BestPreviewFrame = bestFrame
+
+	// 6. Calculate center offset for this specific frame
+	s.calculateCenterOffsetForFrame(reanimComp, bestFrame)
+
+	// 6. Build AnimVisibles array for static preview
+	// For static preview, all frames should be visible (value = 0)
+	// This is required by RenderSystem.findPhysicalFrameIndex to map logical frames to physical frames
+	maxFrames := 0
+	for _, frames := range reanimComp.MergedTracks {
+		if len(frames) > maxFrames {
+			maxFrames = len(frames)
+		}
+	}
+
+	// Create AnimVisibles array with all frames marked as visible (0)
+	reanimComp.AnimVisibles = make([]int, maxFrames)
+	for i := 0; i < maxFrames; i++ {
+		reanimComp.AnimVisibles[i] = 0 // All frames are visible
+	}
+	reanimComp.VisibleFrameCount = maxFrames
+
+	// 7. Set static preview state (do not start animation loop)
+	reanimComp.IsLooping = false
+	reanimComp.IsFinished = true
+	reanimComp.CurrentAnim = "static_preview" // Marker for static preview mode
+
+	log.Printf("[ReanimSystem] PrepareStaticPreview: bestFrame=%d, totalFrames=%d, visibleCount=%d",
+		bestFrame, maxFrames, reanimComp.VisibleFrameCount)
+
+	return nil
+}
+
+// getPartTracks returns all part tracks (tracks with images).
+//
+// This excludes pure animation definition tracks (only FrameNum, no images/transforms).
+// Part tracks include:
+// - Part tracks with images: backleaf, stalk_bottom, head, etc.
+// - Hybrid tracks with images + transforms: some anim_* tracks in certain plants
+//
+// Parameters:
+//   - reanimComp: the ReanimComponent containing the Reanim data
+//
+// Returns:
+//   - A slice of tracks that have at least one frame with an image
+func (s *ReanimSystem) getPartTracks(reanimComp *components.ReanimComponent) []reanim.Track {
+	if reanimComp.Reanim == nil {
+		return nil
+	}
+
+	var result []reanim.Track
+	for _, track := range reanimComp.Reanim.Tracks {
+		// Check if this track has at least one frame with an image
+		hasImage := false
+		for _, frame := range track.Frames {
+			if frame.ImagePath != "" {
+				hasImage = true
+				break
+			}
+		}
+
+		if hasImage {
+			result = append(result, track)
+		}
+	}
+	return result
+}
+
+// buildMergedTracksForPreview builds merged frame arrays for all part tracks WITHOUT depending on animation definition tracks.
+//
+// This differs from buildMergedTracks in that:
+// - buildMergedTracks: used for dynamic playback, depends on animation definition track visibility
+// - buildMergedTracksForPreview: used for static preview, directly processes all part tracks with frame inheritance
+//
+// Parameters:
+//   - reanimComp: the ReanimComponent containing the Reanim data
+//
+// Returns:
+//   - A map of track name to merged frame array
+//
+// Design Decision (Story 11.1 - QA Feedback):
+// This method directly calls buildMergedTracks, which is SAFE and CORRECT because:
+//
+// 1. buildMergedTracks processes ALL tracks in the Reanim file, not just animation definition tracks
+// 2. For each track, it applies frame inheritance (cumulative transformations) to build merged frames
+// 3. The merged frames include all part tracks (with images) AND animation definition tracks (frame numbers only)
+// 4. Static preview only USES the part tracks (filtered by VisibleTracks whitelist during rendering)
+// 5. Animation definition tracks in merged data are harmless - they are simply ignored during rendering
+//
+// The alternative (implementing a separate buildMergedTracksForPreview that filters out animation
+// definition tracks) would be UNNECESSARY complexity because:
+// - It duplicates ~50 lines of frame inheritance logic
+// - The filtering already happens at render time via VisibleTracks whitelist
+// - Performance impact is negligible (few extra map entries)
+//
+// This design follows the DRY principle and maintains consistency with the existing animation system.
+func (s *ReanimSystem) buildMergedTracksForPreview(reanimComp *components.ReanimComponent) map[string][]reanim.Frame {
+	// Reuse the existing buildMergedTracks logic, which already processes ALL tracks
+	// including part tracks, regardless of animation definition tracks
+	return s.buildMergedTracks(reanimComp)
+}
+
+// findFirstCompleteVisibleFrame finds the first frame where all parts are visible.
+//
+// A "complete visible frame" is defined as:
+// - All part tracks have data at this frame
+// - Each part has an image (ImagePath != "")
+// - Each part is not hidden (f >= 0)
+//
+// Parameters:
+//   - reanimComp: the ReanimComponent containing the merged tracks
+//
+// Returns:
+//   - The frame index of the first complete frame, or -1 if not found
+func (s *ReanimSystem) findFirstCompleteVisibleFrame(reanimComp *components.ReanimComponent) int {
+	if len(reanimComp.MergedTracks) == 0 {
+		return -1
+	}
+
+	// Determine max frame count
+	maxFrames := 0
+	for _, frames := range reanimComp.MergedTracks {
+		if len(frames) > maxFrames {
+			maxFrames = len(frames)
+		}
+	}
+
+	if maxFrames == 0 {
+		return -1
+	}
+
+	// Get all part track names (exclude empty tracks)
+	var partTrackNames []string
+	for trackName, frames := range reanimComp.MergedTracks {
+		if len(frames) > 0 {
+			partTrackNames = append(partTrackNames, trackName)
+		}
+	}
+
+	// Iterate through frames to find the first complete one
+	for frameIdx := 0; frameIdx < maxFrames; frameIdx++ {
+		allPartsVisible := true
+
+		for _, trackName := range partTrackNames {
+			mergedFrames := reanimComp.MergedTracks[trackName]
+			if frameIdx >= len(mergedFrames) {
+				allPartsVisible = false
+				break
+			}
+
+			frame := mergedFrames[frameIdx]
+
+			// Check if part has an image
+			if frame.ImagePath == "" {
+				allPartsVisible = false
+				break
+			}
+
+			// Check if part is not hidden (f != -1)
+			if frame.FrameNum != nil && *frame.FrameNum == -1 {
+				allPartsVisible = false
+				break
+			}
+		}
+
+		if allPartsVisible {
+			return frameIdx
+		}
+	}
+
+	return -1
+}
+
+// findPreviewFrameHeuristic selects a preview frame using heuristic strategy.
+//
+// Strategy: Choose the frame at ~40% of the animation length.
+//
+// Rationale:
+// - Animation structure pattern:
+//   - First 10%: fade-in/preparation (some parts may be invisible)
+//   - Middle 30-60%: core action (relatively stable)
+//   - Last part: fade-out/transition
+//
+// - 40% position is usually in the stable region of the core action
+//
+// Parameters:
+//   - reanimComp: the ReanimComponent containing the merged tracks
+//
+// Returns:
+//   - The frame index at ~40% of the animation length, or 0 if no frames exist
+func (s *ReanimSystem) findPreviewFrameHeuristic(reanimComp *components.ReanimComponent) int {
+	if len(reanimComp.MergedTracks) == 0 {
+		return 0
+	}
+
+	// Determine max frame count
+	maxFrames := 0
+	for _, frames := range reanimComp.MergedTracks {
+		if len(frames) > maxFrames {
+			maxFrames = len(frames)
+		}
+	}
+
+	if maxFrames == 0 {
+		return 0
+	}
+
+	// Choose frame at 40% position
+	heuristicFrame := int(float64(maxFrames) * 0.4)
+
+	// Ensure frame is within bounds
+	if heuristicFrame >= maxFrames {
+		heuristicFrame = maxFrames - 1
+	}
+	if heuristicFrame < 0 {
+		heuristicFrame = 0
+	}
+
+	return heuristicFrame
+}
+
+// calculateCenterOffsetForFrame calculates the center offset for a specific frame.
+//
+// This is similar to calculateCenterOffset, but allows specifying which frame to use
+// instead of always using the first frame. This is needed for static previews where
+// we want to center based on the selected preview frame.
+//
+// Parameters:
+//   - comp: the ReanimComponent containing the merged tracks
+//   - frameIndex: the frame index to calculate center offset for
+func (s *ReanimSystem) calculateCenterOffsetForFrame(comp *components.ReanimComponent, frameIndex int) {
+	// Calculate bounding box of all visible parts in the specified frame
+	minX, maxX := 9999.0, -9999.0
+	minY, maxY := 9999.0, -9999.0
+	hasVisibleParts := false
+
+	for _, track := range comp.AnimTracks {
+		// If VisibleTracks is set, only calculate for whitelisted tracks
+		if comp.VisibleTracks != nil && len(comp.VisibleTracks) > 0 {
+			if !comp.VisibleTracks[track.Name] {
+				continue
+			}
+		}
+
+		mergedFrames, ok := comp.MergedTracks[track.Name]
+		if !ok || frameIndex >= len(mergedFrames) {
+			continue
+		}
+
+		frame := mergedFrames[frameIndex]
+
+		// Skip hidden frames (f=-1), UNLESS in VisibleTracks whitelist
+		if frame.FrameNum != nil && *frame.FrameNum == -1 {
+			// Check if in whitelist
+			inVisibleTracks := false
+			if comp.VisibleTracks != nil && len(comp.VisibleTracks) > 0 {
+				inVisibleTracks = comp.VisibleTracks[track.Name]
+			}
+			if !inVisibleTracks {
+				continue // Non-whitelisted track, respect f=-1, skip
+			}
+			// Whitelisted track, ignore f=-1, continue calculation
+		}
+
+		// Skip frames without images
+		if frame.ImagePath == "" {
+			continue
+		}
+
+		// Get part position
+		x, y := 0.0, 0.0
+		if frame.X != nil {
+			x = *frame.X
+		}
+		if frame.Y != nil {
+			y = *frame.Y
+		}
+
+		// Get part scale (default to 1.0)
+		scaleX, scaleY := 1.0, 1.0
+		if frame.ScaleX != nil {
+			scaleX = *frame.ScaleX
+		}
+		if frame.ScaleY != nil {
+			scaleY = *frame.ScaleY
+		}
+
+		// Get image dimensions
+		img, exists := comp.PartImages[frame.ImagePath]
+		if !exists || img == nil {
+			// If image not found, fall back to position-only calculation
+			if x < minX {
+				minX = x
+			}
+			if x > maxX {
+				maxX = x
+			}
+			if y < minY {
+				minY = y
+			}
+			if y > maxY {
+				maxY = y
+			}
+			hasVisibleParts = true
+			continue
+		}
+
+		// Calculate actual bounding box including image dimensions
+		bounds := img.Bounds()
+		imgWidth := float64(bounds.Dx()) * scaleX
+		imgHeight := float64(bounds.Dy()) * scaleY
+
+		// Calculate bounding box corners
+		// IMPORTANT: Reanim images have anchor point at TOP-LEFT corner (0,0)
+		// NOT at center! (See render_system.go line 400-404)
+		left := x
+		right := x + imgWidth
+		top := y
+		bottom := y + imgHeight
+
+		// Update bounding box
+		if left < minX {
+			minX = left
+		}
+		if right > maxX {
+			maxX = right
+		}
+		if top < minY {
+			minY = top
+		}
+		if bottom > maxY {
+			maxY = bottom
+		}
+
+		hasVisibleParts = true
+	}
+
+	if !hasVisibleParts {
+		// No visible parts, use zero offset
+		comp.CenterOffsetX = 0
+		comp.CenterOffsetY = 0
+		return
+	}
+
+	// Calculate center offset
+	centerX := (minX + maxX) / 2
+	centerY := (minY + maxY) / 2
+
+	comp.CenterOffsetX = centerX
+	comp.CenterOffsetY = centerY
+
+	log.Printf("[ReanimSystem] 计算中心偏移（帧%d） - 边界框: X[%.1f, %.1f], Y[%.1f, %.1f], 中心偏移: (%.1f, %.1f)",
+		frameIndex, minX, maxX, minY, maxY, centerX, centerY)
 }

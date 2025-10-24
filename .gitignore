@@ -24,3 +24,4 @@ main.go.backup
 .meta/v.md
 
 pvz.log
+*.log

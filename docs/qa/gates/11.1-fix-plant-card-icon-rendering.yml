@@ -1,0 +1,136 @@
+# Quality Gate Decision
+# Story 11.1: 修复植物卡片图标渲染通用性问题
+
+schema: 1
+story: "11.1"
+story_title: "修复植物卡片图标渲染通用性问题 - Brownfield Fix"
+gate: PASS
+status_reason: "所有质量要求已满足。开发人员出色地响应了之前的审查建议，添加了完整的单元测试（8个测试用例），改进了代码注释，并提供了详细的测试证据。质量分数从70提升到95。"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-10-24T14:02:00Z"
+
+waiver:
+  active: false
+
+# 所有问题已解决 - 无当前问题
+top_issues: []
+
+# 风险已解决
+risk_summary:
+  totals:
+    critical: 0
+    high: 0      # 从 1 → 0 (单元测试已添加)
+    medium: 0    # 从 1 → 0 (测试证据已提供)
+    low: 0       # 从 1 → 0 (注释已改进)
+  recommendations:
+    must_fix: []      # 所有必须修复的问题已解决
+    monitor: []       # 无需监控的问题
+
+quality_score: 95
+# 计算: 100 - (20 × 0 FAILs) - (10 × 0 CONCERNS) - 5 (小扣分：测试文件行数可以更精简) = 95
+# 显著提升: 从 70 → 95 (+25分)
+
+evidence:
+  tests_reviewed: 8  # 从 5 → 8 (新增单元测试)
+  risks_identified: 0  # 从 3 → 0 (所有风险已解决)
+  code_files_reviewed: 5  # 包含测试文件
+  lines_changed: 666  # 包含测试代码
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9]  # 所有 AC 已覆盖
+    ac_gaps: []  # 无缺口
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "无安全问题 - 纯渲染逻辑,无外部输入、网络通信或敏感数据处理"
+  performance:
+    status: PASS
+    notes: "性能影响可忽略 - 只在卡片创建时执行一次离屏渲染,不在游戏主循环中调用。实测耗时 < 1ms"
+  reliability:
+    status: PASS  # 从 CONCERNS → PASS (单元测试已添加)
+    notes: "单元测试覆盖充分（8个测试用例），防止未来回归问题。可靠性显著提升。"
+  maintainability:
+    status: PASS
+    notes: "代码结构清晰,注释完整详细（包含设计决策说明）,遵循ECS架构原则。配置驱动设计良好。测试代码使用Given-When-Then模式,易于理解和维护。"
+
+recommendations:
+  immediate: []  # 无需立即修复的问题
+
+  future:  # 可在后续Story中改进（非阻塞）
+    - action: "考虑将verify_reward_animation集成到自动化测试套件(go test)中,实现CI/CD流程中的自动化回归测试"
+      refs: ["cmd/verify_reward_animation/"]
+    - action: "为植物卡片渲染添加视觉回归测试(golden image testing),确保图标渲染的像素级正确性"
+      refs: ["pkg/entities/plant_card_factory.go"]
+    - action: "考虑将测试辅助方法提取到shared test helpers,方便其他Reanim相关测试复用"
+      refs: ["pkg/systems/reanim_system_test.go:540-666"]
+
+compliance_check:
+  coding_standards: PASS
+  project_structure: PASS
+  ecs_architecture: PASS
+  comment_quality: PASS
+  error_handling: PASS
+  test_coverage: PASS  # 从 FAIL → PASS (关键改进)
+
+# 审查历史 - 追加式记录
+history:
+  - at: "2025-10-24T12:30:00Z"
+    gate: CONCERNS
+    reviewer: "Quinn (Test Architect)"
+    note: "初次审查 - 实现质量良好但缺少单元测试覆盖。质量分数: 70/100"
+    issues_count:
+      high: 1     # 缺少单元测试
+      medium: 1   # 缺少测试证据
+      low: 1      # 注释不足
+
+  - at: "2025-10-24T14:02:00Z"
+    gate: PASS
+    reviewer: "Quinn (Test Architect)"
+    note: "跟进审查 - 所有问题已解决。开发人员添加了8个单元测试用例,改进了注释,提供了完整的测试证据。质量分数: 95/100 (+25分)"
+    issues_count:
+      high: 0
+      medium: 0
+      low: 0
+
+notes: |
+  **跟进审查摘要** (2025-10-24):
+
+  开发人员出色地响应了初次审查中提出的所有建议,在同一天内完成了以下改进:
+
+  ✅ **单元测试已添加** (解决 TEST-001 高严重性问题):
+     - TestPrepareStaticPreview_NormalPath - 正常路径测试
+     - TestPrepareStaticPreview_HeuristicFallback - 启发式回退测试
+     - TestPrepareStaticPreview_EmptyReanim - 边界情况测试
+     - TestFindFirstCompleteVisibleFrame - 完整帧查找测试（3个子测试）
+     - TestFindPreviewFrameHeuristic - 启发式计算测试（4个子测试）
+     - 所有测试通过 (PASS in 0.026s)
+
+  ✅ **测试证据已记录** (解决 TEST-002 中等严重性问题):
+     - 创建了 `.ai/qa-test-evidence-story-11.1.md` 文档
+     - 详细记录了 verify_reward_animation 测试结果
+     - 包含向日葵、豌豆射手、樱桃炸弹、坚果墙的测试日志
+
+  ✅ **代码注释已改进** (解决 DOCS-001 低严重性问题):
+     - buildMergedTracksForPreview 添加了详细的设计决策说明 (line 1335-1350)
+     - 明确解释了为何直接调用 buildMergedTracks 是正确的（DRY原则）
+     - 注释包含了设计理由和性能考虑
+
+  **质量提升**:
+  - 质量分数: 70 → 95 (+25分)
+  - 测试覆盖: 5个集成测试 → 8个单元测试 + 集成测试
+  - 可靠性: CONCERNS → PASS
+  - 测试覆盖: FAIL → PASS
+
+  **表扬**:
+  - 快速响应: 同一天内完成所有改进
+  - 测试质量: 使用 Given-When-Then 模式和子测试,代码清晰易懂
+  - 文档完整: 测试证据文档详细,便于审查和追溯
+  - 注释详细: 设计决策说明清晰,方便未来维护
+
+  **建议**:
+  Story 11.1 的开发模式（实现 → QA审查 → 快速改进 → 再审查 → PASS）展示了
+  良好的质量反馈循环。建议其他Story采用类似的模式,在开发阶段就同步编写测试,
+  避免事后补充。
+
+  **结论**:
+  所有验收标准已满足,质量要求已达标。建议 Story Owner 将状态更新为 Done。

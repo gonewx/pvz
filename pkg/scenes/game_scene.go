@@ -356,7 +356,8 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	}
 
 	// Story 10.2: Create LawnmowerSystem (除草车系统 - 最后防线)
-	scene.lawnmowerSystem = systems.NewLawnmowerSystem(scene.entityManager, rm, scene.gameState)
+	// Story 10.3: 传递 ReanimSystem 用于播放僵尸死亡动画
+	scene.lawnmowerSystem = systems.NewLawnmowerSystem(scene.entityManager, rm, scene.reanimSystem, scene.gameState)
 	log.Printf("[GameScene] Initialized lawnmower system")
 
 	// Story 10.2: 除草车实体将在铺草皮动画完成后创建（见铺草皮回调）

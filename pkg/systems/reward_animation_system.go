@@ -191,6 +191,7 @@ func (ras *RewardAnimationSystem) TriggerReward(plantID string) {
 	// Story 8.4: 使用 NewPlantCardEntity 创建卡片包
 	// 这样可以自动获得：背景图、植物图标、阳光数字等完整渲染
 	plantType := ras.plantIDToType(plantID)
+
 	if plantType == components.PlantUnknown {
 		log.Printf("[RewardAnimationSystem] Unknown plant ID: %s, aborting", plantID)
 		ras.entityManager.DestroyEntity(ras.rewardEntity)
@@ -758,7 +759,7 @@ func (ras *RewardAnimationSystem) getReanimName(plantID string) string {
 	case "sunflower":
 		return "SunFlower"
 	case "peashooter":
-		return "PeaShooter"
+		return "PeaShooterSingle" // Story 10.3: 修正为普通豌豆射手资源
 	case "cherrybomb":
 		return "CherryBomb"
 	case "wallnut":

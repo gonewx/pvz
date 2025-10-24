@@ -34,3 +34,109 @@ const (
 	// 渲染时会乘以 PlantCardScale，确保字体大小随卡片整体缩放
 	PlantCardSunCostFontSize = 20
 )
+
+// PlantPreviewVisibleTracks 植物卡片预览图标的可见轨道白名单配置
+// Story 11.1: 用于控制静态预览中哪些轨道应该显示
+//
+// 设计原则：
+// - 排除眨眼动画轨道（anim_blink, idle_shoot_blink 等）
+// - 排除动画定义轨道（只有 FrameNum，无图像）
+// - 只包含构成植物"标准姿态"的部件轨道
+var PlantPreviewVisibleTracks = map[string]map[string]bool{
+	// 豌豆射手预览轨道
+	"PeaShooterSingle": {
+		"stalk_bottom":        true,
+		"stalk_top":           true,
+		"backleaf":            true,
+		"backleaf_left_tip":   true,
+		"backleaf_right_tip":  true,
+		"frontleaf":           true,
+		"frontleaf_right_tip": true,
+		"frontleaf_tip_left":  true,
+		"anim_sprout":         true, // 头后的小嫩叶
+		"anim_head_idle":      true,
+		"anim_face":           true,
+		"idle_mouth":          true,
+		// 注意：不包含 anim_blink, idle_shoot_blink（眨眼轨道）
+	},
+
+	// 向日葵预览轨道
+	"SunFlower": {
+		"anim_idle":           true,
+		"backleaf":            true,
+		"backleaf_left_tip":   true,
+		"backleaf_right_tip":  true,
+		"stalk_bottom":        true,
+		"stalk_top":           true,
+		"frontleaf":           true,
+		"frontleaf_right_tip": true,
+		"frontleaf_left_tip":  true,
+		// 花瓣轨道（按 Z-order 顺序）
+		"SunFlower_leftpetal8":       true,
+		"SunFlower_leftpetal7":       true,
+		"SunFlower_leftpetal6":       true,
+		"SunFlower_leftpetal5":       true,
+		"SunFlower_leftpetal4":       true,
+		"SunFlower_leftpetal3":       true,
+		"SunFlower_leftpetal2":       true,
+		"SunFlower_leftpetal1":       true,
+		"SunFlower_bottompetals":     true,
+		"SunFlower_rightpetal9":      true,
+		"SunFlower_rightpetal8":      true,
+		"SunFlower_rightpetal7":      true,
+		"SunFlower_rightpetal6":      true,
+		"SunFlower_rightpetal5":      true,
+		"SunFlower_rightpetal4":      true,
+		"SunFlower_rightpetal3":      true,
+		"SunFlower_rightpetal2":      true,
+		"SunFlower_rightpetal1":      true,
+		"SunFlower_toppetals":        true,
+		"SunFlower_center":           true,
+		"SunFlower_face":             true,
+		"SunFlower_facehappy":        true,
+		"SunFlower_facehappytalking": true,
+		// 注意：不包含 anim_blink（眨眼轨道）
+	},
+
+	// 坚果墙预览轨道
+	"Wallnut": {
+		"_ground":   true,
+		"anim_face": true,
+		// 注意：不包含 anim_blink_twitch, anim_blink_twice, anim_blink_thrice
+	},
+
+	// 樱桃炸弹预览轨道
+	"CherryBomb": {
+		"CherryBomb_leftstem":    true,
+		"CherryBomb_left1":       true,
+		"CherryBomb_left3":       true,
+		"CherryBomb_lefteye11":   true,
+		"CherryBomb_lefteye21":   true,
+		"CherryBomb_leftmouth1":  true,
+		"CherryBomb_rightstem":   true,
+		"CherryBomb_right1":      true,
+		"CherryBomb_right3":      true,
+		"CherryBomb_righteye11":  true,
+		"CherryBomb_righteye21":  true,
+		"CherryBomb_rightmouth1": true,
+		// 根据实际 reanim 文件补充其他轨道
+	},
+}
+
+// PlantPreviewFrameOverride 植物卡片预览图标的手工指定帧配置
+// Story 11.1 - 策略 3：可选配置覆盖
+//
+// 用途：当 PrepareStaticPreview 的自动选择算法（第一个完整帧 + 启发式 fallback）
+// 选择的帧不理想时，可以手工指定使用特定的帧索引
+//
+// 使用方式：
+// - 如果某个植物在此 map 中有配置，优先使用配置的帧索引
+// - 否则使用自动选择算法
+//
+// 示例：
+// - "SunFlower": 10 表示向日葵使用第 10 帧作为预览
+var PlantPreviewFrameOverride = map[string]int{
+	// 当前所有植物都使用自动选择，如果发现某个植物预览不理想，在此添加配置
+	// 例如：
+	// "SunFlower": 10,  // 手工指定向日葵使用第10帧
+}

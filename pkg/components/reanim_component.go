@@ -134,6 +134,13 @@ type ReanimComponent struct {
 	CenterOffsetX float64
 	CenterOffsetY float64
 
+	// BestPreviewFrame is the optimal frame index for generating preview icons (Story 10.3).
+	// This frame is automatically calculated when PlayAnimation is called by finding the frame
+	// with the most visible parts (highest count of ImagePath != "").
+	// Used by RenderPlantIcon to ensure preview shows the most complete representation of the entity.
+	// Default: 0 (first frame)
+	BestPreviewFrame int
+
 	// VisibleTracks is a whitelist of track names that should be rendered.
 	// If this map is not nil and not empty, ONLY tracks in this map will be rendered.
 	// This provides a clear "opt-in" approach for complex entities like zombies.

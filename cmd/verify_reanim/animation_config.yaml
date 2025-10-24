@@ -1,0 +1,74 @@
+# animation_config.yaml
+# Reanim 动画配置文件 - 定义叠加层轨道（Overlay Tracks）
+#
+# 叠加层轨道是在基础动画之上短暂播放的视觉效果，如眨眼、受击闪烁等。
+# 这些轨道会覆盖基础动画的同名轨道，实现更丰富的视觉表现。
+#
+# 配置规则：
+# - 叠加轨道必须在 .reanim 文件中存在
+# - 叠加轨道通常是短暂的（2-5帧）
+# - 通过 ReanimSystem.PlayAnimationOverlay() 触发播放
+#
+# 参考文档：.meta/reanim/reanim.md
+
+version: "1.0"
+
+# 植物动画配置
+plants:
+  # 豌豆射手（普通）
+  PeaShooterSingle:
+    overlay_tracks:
+      - anim_blink          # 眨眼动画（待机时随机播放）
+
+  # 豌豆射手（双发）- 未来使用
+  PeaShooter:
+    overlay_tracks:
+      - anim_blink
+
+  # 向日葵
+  SunFlower:
+    overlay_tracks:
+      - anim_blink          # 眨眼动画
+
+  # 坚果墙
+  Wallnut:
+    overlay_tracks: []      # 坚果墙没有叠加动画
+
+  # 樱桃炸弹
+  CherryBomb:
+    overlay_tracks:
+      - anim_fuse_spark     # 导火索火花效果（叠加在身体摇摆上）
+
+# 僵尸动画配置
+zombies:
+  Zombie:
+    overlay_tracks: []      # 基础僵尸暂无叠加动画
+
+  ZombieConehead:
+    overlay_tracks: []      # 路障僵尸暂无叠加动画
+
+  ZombieBuckethead:
+    overlay_tracks: []      # 铁桶僵尸暂无叠加动画
+
+# 特效动画配置
+effects:
+  Sun:
+    overlay_tracks: []      # 阳光没有叠加动画
+
+  SodRoll:
+    overlay_tracks: []      # 铺草皮动画没有叠加动画
+
+  LawnMower:
+    overlay_tracks: []      # 除草车没有叠加动画
+
+# 未来扩展示例（注释）
+#
+# IceShooter:
+#   overlay_tracks:
+#     - anim_blink
+#     - anim_ice_effect    # 冰冻特效
+#
+# Chomper:
+#   overlay_tracks:
+#     - anim_blink
+#     - anim_chew          # 咀嚼动画

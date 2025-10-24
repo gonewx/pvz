@@ -369,7 +369,7 @@ func (rprs *RewardPanelRenderSystem) getReanimName(plantType components.PlantTyp
 	case components.PlantSunflower:
 		return "SunFlower" // 修复：与资源加载时的名称一致
 	case components.PlantPeashooter:
-		return "PeaShooter" // 修复：与资源加载时的名称一致
+		return "PeaShooterSingle" // Story 10.3: 修正为普通豌豆射手资源
 	case components.PlantCherryBomb:
 		return "CherryBomb"
 	case components.PlantWallnut:

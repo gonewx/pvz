@@ -51,6 +51,21 @@ func (m *mockReanimSystem) RenderToTexture(entityID ecs.EntityID, target *ebiten
 	return nil
 }
 
+func (m *mockReanimSystem) PrepareStaticPreview(entityID ecs.EntityID, reanimName string) error {
+	// Mock implementation - 用于静态预览准备（Story 11.1）
+	// 在测试中，设置基本的静态预览状态
+	if m.em != nil {
+		if reanimComp, ok := m.em.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{})); ok {
+			reanim := reanimComp.(*components.ReanimComponent)
+			reanim.CurrentAnim = "static_preview"
+			reanim.CurrentFrame = 0
+			reanim.IsLooping = false
+			reanim.IsFinished = true
+		}
+	}
+	return nil
+}
+
 // ResourceLoader 定义测试中需要的资源加载接口
 // 这允许我们在测试中使用 mock 实现，而在生产代码中使用真实的 ResourceManager
 type ResourceLoader interface {

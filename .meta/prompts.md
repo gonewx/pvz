@@ -24,6 +24,14 @@
 
 /mnt/disk0/project/game/pvz/ck/pvzwine_reverse 这个项目是对原版游戏资源数据的研究与解析， 请结合测试程序，将我们之前实现的基于动画帧的动画系统，改为使用和原版游戏同样的动画系统。 解析后的资源已经放在 assets/reanim， assets/effect/reanim。
 
+
+- @.meta/reanim/peashootersingle.md 这是定义文件格式的猜想,不一定完全 
+正确,请参考并独立思考后,评估我们的实现是否有潜在的问题
+
+@.meta/reanim/reanim.md  为了验证这个文档是否正确，请写一个单独的文件，按这个的说明实现2个动画场景，一个是空闲时，一个是攻击时的全身动画。
+注意，是一个独立执行文件，不要基于我们之前实现的reanim模块。 这是动画定义文件 assets/effect/reanim/PeaShooterSingle.reanim.  
+需要用到的第三方库要与我们项目的一致。
+
 ## 粒子效果
 
 现在要全面支持粒子效果， 例如：僵尸的手臂掉落、头掉落的效果等等，请全面分析粒子系统的配置格式，优雅的实现粒子系统。实现方案要优先使用Ebitengine 引擎，有必要的话先使用 `mcp__deepwiki` 工具的`ask_question`方法，查阅最新的文档，以找到最正确的方法

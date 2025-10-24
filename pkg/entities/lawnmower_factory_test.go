@@ -65,6 +65,11 @@ func (m *MockLawnmowerReanimSystem) RenderToTexture(entityID ecs.EntityID, targe
 	return nil
 }
 
+func (m *MockLawnmowerReanimSystem) PrepareStaticPreview(entityID ecs.EntityID, reanimName string) error {
+	// Mock implementation for testing (Story 11.1)
+	return nil
+}
+
 // TestNewLawnmowerEntity 测试除草车实体创建
 func TestNewLawnmowerEntity(t *testing.T) {
 	em := ecs.NewEntityManager()

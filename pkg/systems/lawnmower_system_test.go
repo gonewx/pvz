@@ -15,7 +15,7 @@ func TestNewLawnmowerSystem(t *testing.T) {
 	rm := &game.ResourceManager{}
 	gs := game.GetGameState()
 
-	system := NewLawnmowerSystem(em, rm, gs)
+	system := NewLawnmowerSystem(em, rm, nil, gs)
 
 	if system == nil {
 		t.Fatal("NewLawnmowerSystem should return non-nil")
@@ -49,7 +49,7 @@ func TestNewLawnmowerSystem(t *testing.T) {
 // TestLawnmowerSystemGetEntityLane 测试计算实体所在行
 func TestLawnmowerSystemGetEntityLane(t *testing.T) {
 	em := ecs.NewEntityManager()
-	system := NewLawnmowerSystem(em, nil, nil)
+	system := NewLawnmowerSystem(em, nil, nil, nil)
 
 	tests := []struct {
 		y        float64
@@ -76,7 +76,7 @@ func TestLawnmowerSystemGetEntityLane(t *testing.T) {
 // TestLawnmowerSystemUpdatePosition 测试除草车位置更新
 func TestLawnmowerSystemUpdatePosition(t *testing.T) {
 	em := ecs.NewEntityManager()
-	system := NewLawnmowerSystem(em, nil, nil)
+	system := NewLawnmowerSystem(em, nil, nil, nil)
 
 	// 创建一个移动中的除草车
 	lawnmowerID := em.CreateEntity()
@@ -105,7 +105,7 @@ func TestLawnmowerSystemUpdatePosition(t *testing.T) {
 // TestLawnmowerSystemCompletion 测试除草车离开屏幕检测
 func TestLawnmowerSystemCompletion(t *testing.T) {
 	em := ecs.NewEntityManager()
-	system := NewLawnmowerSystem(em, nil, nil)
+	system := NewLawnmowerSystem(em, nil, nil, nil)
 
 	// 创建一个移动中的除草车（已经离开屏幕）
 	lawnmowerID := em.CreateEntity()
@@ -165,7 +165,7 @@ func TestIsZombieType(t *testing.T) {
 func TestLawnmowerSystemZombieCollision(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
-	system := NewLawnmowerSystem(em, nil, gs)
+	system := NewLawnmowerSystem(em, nil, nil, gs)
 
 	// 创建移动中的除草车（第3行）
 	lawnmowerID := em.CreateEntity()
@@ -222,7 +222,7 @@ func TestLawnmowerSystemZombieCollision(t *testing.T) {
 func TestLawnmowerSystemZombieNoCollision(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
-	system := NewLawnmowerSystem(em, nil, gs)
+	system := NewLawnmowerSystem(em, nil, nil, gs)
 
 	// 创建移动中的除草车（第3行）
 	lawnmowerID := em.CreateEntity()

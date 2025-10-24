@@ -49,10 +49,14 @@ type Frame struct {
 	// ScaleY is the Y-axis scale factor (1.0 = normal size)
 	ScaleY *float64 `xml:"sy,omitempty"`
 
-	// SkewX is the X-axis skew angle in radians
+	// SkewX is the X-axis skew angle in degrees (NOT radians).
+	// FlashReanimExport script exports angles in degrees after converting from radians.
+	// When rendering, convert to radians: kxRad = kx * π / 180
 	SkewX *float64 `xml:"kx,omitempty"`
 
-	// SkewY is the Y-axis skew angle in radians
+	// SkewY is the Y-axis skew angle in degrees (NOT radians).
+	// Note: FlashReanimExport applies a negation when exporting (degreesKY = -RadToDeg(skewY)).
+	// When rendering, apply: c = -sin(ky * π / 180) * scaleY to compensate.
 	SkewY *float64 `xml:"ky,omitempty"`
 
 	// ImagePath is the sprite part image reference, e.g., "IMAGE_REANIM_PEASHOOTER_HEAD"
