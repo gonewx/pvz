@@ -6,6 +6,7 @@ import (
 	"math"
 	"sort"
 
+	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
@@ -364,10 +365,10 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		// 获取累积后的帧数据
 		mergedFrame := mergedFrames[physicalIndex]
 
-		// 如果该帧标记为隐藏（f == -1），跳过绘制
-		if mergedFrame.FrameNum != nil && *mergedFrame.FrameNum == -1 {
-			continue
-		}
+		// Story 10.3 修复：部件轨道的 f=-1 不表示"不可见"
+		// f=-1 只表示"这一帧没有新的变换数据"（帧继承）
+		// 可见性完全由 AnimVisibles（从动画定义轨道构建）控制
+		// 因此不检查 FrameNum，只检查是否有图片引用
 
 		// 必须有图片引用才能绘制
 		if mergedFrame.ImagePath == "" {
@@ -415,11 +416,15 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		// Matrix = [a c tx]
 		//          [b d ty]
 		//          [0 0  1]
+		//
+		// 矩阵公式来源：FlashReanimExport.jsfl (文档 FlashReanimExport分析.md 第226-237行)
 		// 其中：
 		// a = cos(kx) * scaleX
 		// b = sin(kx) * scaleX
-		// c = -sin(ky) * scaleY
+		// c = -sin(ky) * scaleY  ← 注意：负号是因为导出时ky已取反（文档第245行）
 		// d = cos(ky) * scaleY
+		//
+		// 注意：kx 和 ky 的单位是度（degrees），需要转换为弧度
 		a := math.Cos(kx*math.Pi/180.0) * scaleX
 		b := math.Sin(kx*math.Pi/180.0) * scaleX
 		c := -math.Sin(ky*math.Pi/180.0) * scaleY
@@ -468,6 +473,241 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		is := []uint16{0, 1, 2, 1, 3, 2}
 		screen.DrawTriangles(vs, is, img, nil)
 	}
+
+	// Story 6.4: Render overlay animations
+	// Overlay animations are rendered after the base animation, allowing them to override specific tracks
+	for _, layer := range reanim.OverlayAnims {
+		// Map logical frame to physical frame index for this overlay layer
+		overlayPhysicalIndex := s.findPhysicalFrameIndexForLayer(&layer, layer.CurrentFrame)
+		if overlayPhysicalIndex < 0 {
+			continue
+		}
+
+		// Build merged tracks for the overlay animation
+		// We need to temporarily switch the component state to calculate overlay tracks
+		savedCurrentAnim := reanim.CurrentAnim
+		reanim.CurrentAnim = layer.AnimName
+		overlayMergedTracks := s.buildMergedTracksForOverlay(reanim, layer.AnimName)
+		reanim.CurrentAnim = savedCurrentAnim
+
+		// Render each track in the overlay animation
+		for _, track := range layer.AnimTracks {
+			// Check if the overlay has data for this track
+			mergedFrames, ok := overlayMergedTracks[track.Name]
+			if !ok || len(mergedFrames) == 0 {
+				continue
+			}
+
+			// Ensure physical index is within range
+			if overlayPhysicalIndex >= len(mergedFrames) {
+				continue
+			}
+
+			// Get the accumulated frame data
+			mergedFrame := mergedFrames[overlayPhysicalIndex]
+
+			// Skip if this frame is hidden (f == -1)
+			if mergedFrame.FrameNum != nil && *mergedFrame.FrameNum == -1 {
+				continue
+			}
+
+			// Must have an image reference to draw
+			if mergedFrame.ImagePath == "" {
+				continue
+			}
+
+			// Look up the image using the IMAGE reference
+			img, exists := reanim.PartImages[mergedFrame.ImagePath]
+			if !exists || img == nil {
+				continue
+			}
+
+			// Get image dimensions
+			bounds := img.Bounds()
+			w := bounds.Dx()
+			h := bounds.Dy()
+			fw := float64(w)
+			fh := float64(h)
+
+			// Apply transformations (same as base animation)
+			scaleX := 1.0
+			scaleY := 1.0
+			if mergedFrame.ScaleX != nil {
+				scaleX = *mergedFrame.ScaleX
+			}
+			if mergedFrame.ScaleY != nil {
+				scaleY = *mergedFrame.ScaleY
+			}
+
+			kx := 0.0
+			ky := 0.0
+			if mergedFrame.SkewX != nil {
+				kx = *mergedFrame.SkewX
+			}
+			if mergedFrame.SkewY != nil {
+				ky = *mergedFrame.SkewY
+			}
+
+			// Build transformation matrix
+			a := math.Cos(kx*math.Pi/180.0) * scaleX
+			b := math.Sin(kx*math.Pi/180.0) * scaleX
+			c := -math.Sin(ky*math.Pi/180.0) * scaleY
+			d := math.Cos(ky*math.Pi/180.0) * scaleY
+
+			// Translation component
+			tx := 0.0
+			ty := 0.0
+			if mergedFrame.X != nil {
+				tx = *mergedFrame.X
+			}
+			if mergedFrame.Y != nil {
+				ty = *mergedFrame.Y
+			}
+			tx += screenX
+			ty += screenY
+
+			// Apply transformation matrix to the four corners
+			x0 := tx
+			y0 := ty
+			x1 := a*fw + tx
+			y1 := b*fw + ty
+			x2 := c*fh + tx
+			y2 := d*fh + ty
+			x3 := a*fw + c*fh + tx
+			y3 := b*fw + d*fh + ty
+
+			// Build vertex array
+			colorR := float32(1.0 + flashIntensity)
+			colorG := float32(1.0 + flashIntensity)
+			colorB := float32(1.0 + flashIntensity)
+			colorA := float32(1.0)
+
+			vs := []ebiten.Vertex{
+				{DstX: float32(x0), DstY: float32(y0), SrcX: 0, SrcY: 0, ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
+				{DstX: float32(x1), DstY: float32(y1), SrcX: float32(w), SrcY: 0, ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
+				{DstX: float32(x2), DstY: float32(y2), SrcX: 0, SrcY: float32(h), ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
+				{DstX: float32(x3), DstY: float32(y3), SrcX: float32(w), SrcY: float32(h), ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
+			}
+			is := []uint16{0, 1, 2, 1, 3, 2}
+			screen.DrawTriangles(vs, is, img, nil)
+		}
+	}
+}
+
+// findPhysicalFrameIndexForLayer maps logical frame number to physical frame index for an overlay layer.
+// This is similar to findPhysicalFrameIndex but uses the layer's AnimVisibles array.
+func (s *RenderSystem) findPhysicalFrameIndexForLayer(layer *components.AnimLayer, logicalFrameNum int) int {
+	if len(layer.AnimVisibles) == 0 {
+		return -1
+	}
+
+	logicalIndex := 0
+	for i := 0; i < len(layer.AnimVisibles); i++ {
+		if layer.AnimVisibles[i] == 0 {
+			if logicalIndex == logicalFrameNum {
+				return i
+			}
+			logicalIndex++
+		}
+	}
+
+	return -1
+}
+
+// buildMergedTracksForOverlay builds accumulated frame arrays for an overlay animation.
+// This is similar to buildMergedTracks but for a specific animation name.
+func (s *RenderSystem) buildMergedTracksForOverlay(comp *components.ReanimComponent, animName string) map[string][]reanim.Frame {
+	// This is a simplified version that reuses the ReanimSystem's buildMergedTracks logic
+	// Since we're in RenderSystem, we need to access ReanimSystem's private method
+	// For now, we'll duplicate the logic here (not ideal, but works)
+
+	if comp.Reanim == nil {
+		return map[string][]reanim.Frame{}
+	}
+
+	// Determine the standard frame count
+	standardFrameCount := 0
+	for _, track := range comp.Reanim.Tracks {
+		if len(track.Frames) > standardFrameCount {
+			standardFrameCount = len(track.Frames)
+		}
+	}
+
+	if standardFrameCount == 0 {
+		return map[string][]reanim.Frame{}
+	}
+
+	mergedTracks := make(map[string][]reanim.Frame)
+
+	// Process ALL tracks
+	for _, track := range comp.Reanim.Tracks {
+		// Initialize accumulated state
+		accX := 0.0
+		accY := 0.0
+		accSX := 1.0
+		accSY := 1.0
+		accKX := 0.0
+		accKY := 0.0
+		accF := 0
+		accImg := ""
+
+		// Build merged frames array for this track
+		mergedFrames := make([]reanim.Frame, standardFrameCount)
+
+		for i := 0; i < standardFrameCount; i++ {
+			if i < len(track.Frames) {
+				frame := track.Frames[i]
+
+				if frame.X != nil {
+					accX = *frame.X
+				}
+				if frame.Y != nil {
+					accY = *frame.Y
+				}
+				if frame.ScaleX != nil {
+					accSX = *frame.ScaleX
+				}
+				if frame.ScaleY != nil {
+					accSY = *frame.ScaleY
+				}
+				if frame.SkewX != nil {
+					accKX = *frame.SkewX
+				}
+				if frame.SkewY != nil {
+					accKY = *frame.SkewY
+				}
+				if frame.FrameNum != nil {
+					accF = *frame.FrameNum
+				}
+				if frame.ImagePath != "" {
+					accImg = frame.ImagePath
+				}
+			}
+
+			x := accX
+			y := accY
+			sx := accSX
+			sy := accSY
+			kx := accKX
+			ky := accKY
+			f := accF
+
+			mergedFrames[i] = reanim.Frame{
+				X:         &x,
+				Y:         &y,
+				ScaleX:    &sx,
+				ScaleY:    &sy,
+				SkewX:     &kx,
+				SkewY:     &ky,
+				FrameNum:  &f,
+				ImagePath: accImg,
+			}
+		}
+
+		mergedTracks[track.Name] = mergedFrames
+	}
+
+	return mergedTracks
 }
 
 // DrawParticles 渲染所有粒子效果

@@ -139,30 +139,34 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 		}
 
 		// 添加 ReanimComponent
-		// 豌豆射手：使用白名单方式明确控制可见部件（与僵尸架构保持一致）
+		// 豌豆射手：使用 VisibleTracks 白名单，确保攻击时茎干可见
+		// 原因：茎干轨道 (stalk_bottom/stalk_top) 在 frame 0-3 是 f=-1，导致攻击动画开始时不可见
+		// 解决方案：将茎干添加到 VisibleTracks，配合 RenderSystem 修改，白名单轨道忽略 f=-1
 		em.AddComponent(entityID, &components.ReanimComponent{
 			Reanim:     reanimXML,
 			PartImages: partImages,
 			VisibleTracks: map[string]bool{
-				// 茎干部件（必须显示，否则攻击时只有头部）
-				"stalk_bottom": true, // 茎干下部
-				"stalk_top":    true, // 茎干上部
+				// 茎干部件（Story 10.3: 攻击时必须显示）
+				"stalk_bottom": true,
+				"stalk_top":    true,
+
 				// 叶子部件
-				"backleaf":            true, // 后叶子
-				"backleaf_left_tip":   true, // 后叶子左尖端
-				"backleaf_right_tip":  true, // 后叶子右尖端
-				"frontleaf":           true, // 前叶子
-				"frontleaf_right_tip": true, // 前叶子右尖端
-				"frontleaf_tip_left":  true, // 前叶子左尖端
-				// 头部部件
-				"anim_face":      true, // 头部脸部（重要！缺少会导致头部不显示）
-				"anim_head_idle": true, // 头部空闲动画（anim_full_idle 使用）
-				"anim_shooting":  true, // 射击头部动画（anim_shooting 使用）
-				// 嘴部动画
-				"idle_mouth":       true, // 空闲嘴部
-				"idle_shoot_blink": true, // 射击眨眼
-				// 眨眼动画（可选）
-				"anim_blink": true, // 眨眼动画
+				"backleaf":             true,
+				"backleaf_left_tip":    true,
+				"backleaf_right_tip":   true,
+				"frontleaf":            true,
+				"frontleaf_right_tip":  true,
+				"frontleaf_tip_left":   true,
+
+				// 头部动画轨道（包含头部图片）
+				"anim_head_idle": true,
+				"anim_face":      true,
+				"idle_mouth":     true,
+
+				// 动画定义轨道（控制可见性）
+				"anim_idle":      true,
+				"anim_full_idle": true,
+				"anim_shooting":  true,
 			},
 		})
 
