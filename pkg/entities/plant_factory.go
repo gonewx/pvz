@@ -58,9 +58,11 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 
 	// 添加植物组件
 	em.AddComponent(entityID, &components.PlantComponent{
-		PlantType: plantType,
-		GridRow:   row,
-		GridCol:   col,
+		PlantType:       plantType,
+		GridRow:         row,
+		GridCol:         col,
+		AttackAnimState: components.AttackAnimIdle, // Story 10.3: 初始化为空闲状态
+		BlinkTimer:      3.0,                       // Story 6.4: 初始化眨眼计时器为3秒
 	})
 
 	// 为向日葵添加特定组件
@@ -137,9 +139,31 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 		}
 
 		// 添加 ReanimComponent
+		// 豌豆射手：使用白名单方式明确控制可见部件（与僵尸架构保持一致）
 		em.AddComponent(entityID, &components.ReanimComponent{
 			Reanim:     reanimXML,
 			PartImages: partImages,
+			VisibleTracks: map[string]bool{
+				// 茎干部件（必须显示，否则攻击时只有头部）
+				"stalk_bottom": true, // 茎干下部
+				"stalk_top":    true, // 茎干上部
+				// 叶子部件
+				"backleaf":            true, // 后叶子
+				"backleaf_left_tip":   true, // 后叶子左尖端
+				"backleaf_right_tip":  true, // 后叶子右尖端
+				"frontleaf":           true, // 前叶子
+				"frontleaf_right_tip": true, // 前叶子右尖端
+				"frontleaf_tip_left":  true, // 前叶子左尖端
+				// 头部部件
+				"anim_face":      true, // 头部脸部（重要！缺少会导致头部不显示）
+				"anim_head_idle": true, // 头部空闲动画（anim_full_idle 使用）
+				"anim_shooting":  true, // 射击头部动画（anim_shooting 使用）
+				// 嘴部动画
+				"idle_mouth":       true, // 空闲嘴部
+				"idle_shoot_blink": true, // 射击眨眼
+				// 眨眼动画（可选）
+				"anim_blink": true, // 眨眼动画
+			},
 		})
 
 		// 使用 ReanimSystem 初始化动画（播放完整待机动画，包括头部）
@@ -193,9 +217,10 @@ func NewWallnutEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameSta
 
 	// 添加植物组件（用于碰撞检测和网格位置追踪）
 	em.AddComponent(entityID, &components.PlantComponent{
-		PlantType: components.PlantWallnut,
-		GridRow:   row,
-		GridCol:   col,
+		PlantType:       components.PlantWallnut,
+		GridRow:         row,
+		GridCol:         col,
+		AttackAnimState: components.AttackAnimIdle, // Story 10.3: 初始化为空闲状态
 	})
 
 	// 添加生命值组件（坚果墙拥有极高的生命值）
@@ -281,9 +306,10 @@ func NewCherryBombEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.Game
 
 	// 添加植物组件（用于碰撞检测和网格位置追踪）
 	em.AddComponent(entityID, &components.PlantComponent{
-		PlantType: components.PlantCherryBomb,
-		GridRow:   row,
-		GridCol:   col,
+		PlantType:       components.PlantCherryBomb,
+		GridRow:         row,
+		GridCol:         col,
+		AttackAnimState: components.AttackAnimIdle, // Story 10.3: 初始化为空闲状态
 	})
 
 	// 添加行为组件（樱桃炸弹行为）
