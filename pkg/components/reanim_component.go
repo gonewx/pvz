@@ -5,6 +5,66 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
+// AnimLayer represents a single overlay animation layer (Story 6.4 - 已废弃).
+//
+// ⚠️ Deprecated (2025-10-24): 此结构体当前不使用，保留以备未来扩展。
+//
+// 经验证，原版游戏不使用动画叠加机制。所有动画通过简单的 PlayAnimation() 切换实现。
+// 请勿在业务代码中使用此结构体。
+//
+// 相关文档：
+//   - Sprint Change Proposal: docs/qa/sprint-change-proposal-story-6.4-animation-mechanism.md
+//   - Story 6.4: docs/stories/6.4.story.md (标记为 Deprecated)
+//
+// ---
+//
+// 原始说明（历史记录，仅供参考）：
+//
+// Overlay animations are short-lived animations that play on top of the base animation,
+// allowing for effects like blinking eyes, damage flashes, or attack effects.
+//
+// Example:
+//
+//	Base animation: "anim_idle" (continuous loop, controls body movement)
+//	Overlay animation: "anim_blink" (one-shot, overrides mouth/eye tracks for 2-3 frames)
+//
+// This is a pure data structure with no methods, following ECS architecture principles.
+type AnimLayer struct {
+	// AnimName is the name of the overlay animation (e.g., "anim_blink").
+	AnimName string
+
+	// CurrentFrame is the current logical frame number for this layer (0-based).
+	CurrentFrame int
+
+	// FrameAccumulator is the frame accumulator for precise FPS control.
+	// Accumulates deltaTime until it reaches the time for one animation frame (1.0/fps).
+	FrameAccumulator float64
+
+	// IsOneShot determines whether the animation plays once and is automatically removed.
+	// If true, the layer will be removed from OverlayAnims when it completes.
+	// If false, the animation loops continuously.
+	IsOneShot bool
+
+	// IsFinished indicates whether a one-shot animation has completed.
+	// Set to true when CurrentFrame >= VisibleFrameCount for one-shot animations.
+	// The layer will be removed in the next Update cycle.
+	IsFinished bool
+
+	// VisibleFrameCount is the number of visible frames in this overlay animation.
+	// Built from the animation definition track when PlayAnimationOverlay is called.
+	VisibleFrameCount int
+
+	// AnimVisibles is the visibility array for this overlay animation.
+	// Each element corresponds to a frame: 0 = visible, -1 = hidden.
+	// Built from the animation definition track when PlayAnimationOverlay is called.
+	AnimVisibles []int
+
+	// AnimTracks is the list of part tracks to render for this overlay animation.
+	// These tracks override the base animation's tracks with the same name.
+	// Built when PlayAnimationOverlay is called.
+	AnimTracks []reanim.Track
+}
+
 // ReanimComponent is a Reanim animation component (pure data, no methods).
 // It stores the animation data, part images, and current animation state
 // for entities using skeletal animations.
@@ -90,4 +150,34 @@ type ReanimComponent struct {
 	//   }
 	// Use ReanimSystem.HidePartGroup() and ShowPartGroup() to manage part group visibility.
 	PartGroups map[string][]string
+
+	// ====================================================================
+	// Animation Overlay System (Story 6.4 - 已废弃，保留以备未来扩展)
+	// ====================================================================
+	//
+	// ⚠️ 注意：以下字段当前不使用，所有动画通过简单的 PlayAnimation() 切换
+	//
+	// ⚠️ 原因：经验证，原版游戏不使用叠加机制，使用 VisibleTracks 控制部件显示
+	//   - 原版通过动画定义中的 VisibleTracks（可见轨道列表）控制部件显示
+	//   - 例如：anim_shooting 包含 stalk_bottom, stalk_top, anim_head_idle 所有需要的部件
+	//   - 无需手动控制部件显示，也无需使用动画叠加
+	//
+	// ⚠️ 保留：避免大规模代码删除，为未来可能的扩展（Mod、特殊效果）保留
+	//
+	// ⚠️ 不应在业务代码中使用：请使用 PlayAnimation() 代替 PlayAnimationOverlay()
+	//
+	// 相关文档：
+	//   - Sprint Change Proposal: docs/qa/sprint-change-proposal-story-6.4-animation-mechanism.md
+	//   - Story 6.4: docs/stories/6.4.story.md (标记为 Deprecated)
+	//   - Story 10.3: docs/stories/10.3.story.md (使用正确的简单切换方法)
+	//
+	// ====================================================================
+
+	// BaseAnimName [未使用] 基础动画名称（如 "anim_idle"）
+	// Deprecated: 使用 CurrentAnim 字段代替
+	BaseAnimName string
+
+	// OverlayAnims [未使用] 叠加动画列表
+	// Deprecated: 使用 PlayAnimation() 简单切换代替 PlayAnimationOverlay()
+	OverlayAnims []AnimLayer
 }

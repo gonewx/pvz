@@ -102,6 +102,11 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 		}
 	}
 
+	// Story 10.3: 更新植物攻击动画状态（在所有行为处理之后）
+	for _, entityID := range plantEntityList {
+		s.updatePlantAttackAnimation(entityID, deltaTime)
+	}
+
 	// 遍历所有移动中的僵尸实体，根据行为类型分发处理
 	for _, entityID := range zombieEntityList {
 		behaviorComp, _ := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
@@ -170,6 +175,7 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 			s.handleHitEffectBehavior(entityID, deltaTime)
 		}
 	}
+
 }
 
 // handleSunflowerBehavior 处理向日葵的行为逻辑
@@ -403,6 +409,17 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 // handlePeashooterBehavior 处理豌豆射手的行为逻辑
 // 豌豆射手会周期性扫描同行僵尸并发射豌豆子弹
 func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTime float64, zombieEntityList []ecs.EntityID) {
+	// Story 10.3: 检查植物是否正在播放攻击动画
+	plant, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, entityID)
+	if !ok {
+		return
+	}
+
+	// Story 10.3: 如果正在播放攻击动画，跳过发射逻辑
+	if plant.AttackAnimState == components.AttackAnimAttacking {
+		return
+	}
+
 	// 获取计时器组件
 	timer, ok := ecs.GetComponent[*components.TimerComponent](s.entityManager, entityID)
 	if !ok {
@@ -465,6 +482,17 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 
 		// 如果有僵尸在同一行，发射子弹
 		if hasZombieInLine {
+			// Story 10.3: 使用简单动画切换实现攻击动画
+			// anim_shooting 包含所有需要的部件（通过 VisibleTracks 机制）
+			err := s.reanimSystem.PlayAnimation(entityID, "anim_shooting")
+			if err != nil {
+				log.Printf("[BehaviorSystem] 切换到攻击动画失败: %v", err)
+			} else {
+				log.Printf("[BehaviorSystem] 豌豆射手 %d 切换到攻击动画", entityID)
+				// 设置攻击动画状态，用于动画完成后切换回 idle
+				plant.AttackAnimState = components.AttackAnimAttacking
+			}
+
 			// 计算子弹起始位置：豌豆射手口部位置（世界坐标）
 			bulletStartX := peashooterPos.X + config.PeaBulletOffsetX
 			bulletStartY := peashooterPos.Y + config.PeaBulletOffsetY
@@ -1408,5 +1436,51 @@ func (s *BehaviorSystem) isZombieBehaviorType(behaviorType components.BehaviorTy
 		return true
 	default:
 		return false
+	}
+}
+
+// ============================================================================
+// Story 10.3: 植物攻击动画系统（重新激活 - 2025-10-24）
+// ============================================================================
+//
+// 正确实现：使用简单的 PlayAnimation() 切换，依赖 VisibleTracks 机制显示完整身体
+//
+// 核心逻辑：
+// - ✅ 发射子弹时切换到 anim_shooting
+// - ✅ 攻击动画完成后自动切换回 anim_idle
+// - ✅ 与僵尸动画实现保持一致（所有实体使用简单切换）
+//
+
+// updatePlantAttackAnimation 检测攻击动画是否完成，自动切换回 idle
+// Story 10.3: 实现攻击动画状态机（Idle ↔ Attacking）
+func (s *BehaviorSystem) updatePlantAttackAnimation(entityID ecs.EntityID, deltaTime float64) {
+	plant, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, entityID)
+	if !ok || plant.AttackAnimState != components.AttackAnimAttacking {
+		return
+	}
+
+	// 获取 ReanimComponent 检查动画是否完成
+	reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !ok {
+		return
+	}
+
+	// 检查攻击动画是否播放完毕
+	if reanim.IsFinished {
+		// 切换回空闲动画
+		// 根据植物类型选择正确的空闲动画
+		idleAnimName := "anim_idle"
+		if plant.PlantType == components.PlantPeashooter {
+			// 豌豆射手使用 anim_full_idle（包含头部）
+			idleAnimName = "anim_full_idle"
+		}
+
+		err := s.reanimSystem.PlayAnimation(entityID, idleAnimName)
+		if err != nil {
+			log.Printf("[BehaviorSystem] 切换回空闲动画失败: %v", err)
+		} else {
+			plant.AttackAnimState = components.AttackAnimIdle
+			log.Printf("[BehaviorSystem] 植物 %d 攻击动画完成，切换回空闲动画 '%s'", entityID, idleAnimName)
+		}
 	}
 }

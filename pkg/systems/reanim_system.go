@@ -103,6 +103,42 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 				}
 			}
 		}
+
+		// Story 6.4: Update overlay animations
+		for i := 0; i < len(reanimComp.OverlayAnims); i++ {
+			layer := &reanimComp.OverlayAnims[i]
+
+			// Accumulate deltaTime for the overlay layer
+			layer.FrameAccumulator += deltaTime
+
+			// Advance frames for the overlay layer
+			if layer.FrameAccumulator >= timePerFrame {
+				layer.FrameAccumulator -= timePerFrame
+				layer.CurrentFrame++
+
+				// Check if the overlay animation has finished
+				if layer.CurrentFrame >= layer.VisibleFrameCount {
+					if layer.IsOneShot {
+						// Mark as finished (will be removed in the next step)
+						layer.IsFinished = true
+					} else {
+						// Loop the overlay animation
+						layer.CurrentFrame = 0
+					}
+				}
+			}
+		}
+
+		// Story 6.4: Remove finished overlay animations
+		// Use the filter pattern to safely remove elements from the slice
+		i := 0
+		for _, layer := range reanimComp.OverlayAnims {
+			if !layer.IsFinished {
+				reanimComp.OverlayAnims[i] = layer
+				i++
+			}
+		}
+		reanimComp.OverlayAnims = reanimComp.OverlayAnims[:i]
 	}
 }
 
@@ -111,12 +147,16 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 // Animation definition tracks are tracks whose names start with "anim_" (e.g., "anim_idle", "anim_shooting").
 // These tracks control the overall animation visibility and timing.
 //
+// Important: This method validates that the found track is actually an animation definition track
+// (has FrameNum but no image/transform data). This prevents accidentally using part tracks or
+// transform tracks as animation definitions.
+//
 // Parameters:
 //   - comp: the ReanimComponent containing the Reanim data
 //   - animName: the name of the animation to find (e.g., "anim_idle")
 //
 // Returns:
-//   - A pointer to the Track if found, nil otherwise
+//   - A pointer to the Track if found and valid, nil otherwise
 func (s *ReanimSystem) getAnimDefinitionTrack(comp *components.ReanimComponent, animName string) *reanim.Track {
 	if comp.Reanim == nil {
 		return nil
@@ -124,12 +164,56 @@ func (s *ReanimSystem) getAnimDefinitionTrack(comp *components.ReanimComponent, 
 
 	// Iterate through all tracks to find the one with the matching name
 	for i := range comp.Reanim.Tracks {
-		if comp.Reanim.Tracks[i].Name == animName {
-			return &comp.Reanim.Tracks[i]
+		track := &comp.Reanim.Tracks[i]
+		if track.Name == animName {
+			// Validate that this is actually an animation definition track
+			// Animation definition tracks should only have FrameNum, no images or transforms
+			if !s.isAnimationDefinitionTrack(track) {
+				log.Printf("[ReanimSystem] WARNING: Track '%s' is not a valid animation definition track (has images or transforms)", animName)
+				return nil
+			}
+			return track
 		}
 	}
 
 	return nil
+}
+
+// isAnimationDefinitionTrack validates if a track is an animation definition track.
+//
+// Reanim files have multiple track types:
+//  1. Animation definition tracks: only FrameNum, no images, no transforms
+//     Examples: anim_idle, anim_shooting, anim_full_idle
+//  2. Part tracks: have images and transforms
+//     Examples: backleaf, frontleaf, stalk_bottom, anim_face
+//  3. Transform tracks: have transforms but no images (for bone transforms)
+//     Examples: anim_stem
+//  4. Hybrid tracks: have images + transforms + FrameNum (overlay animations)
+//     Examples: anim_blink, idle_shoot_blink
+//
+// This method returns true only for type 1 (animation definition tracks).
+func (s *ReanimSystem) isAnimationDefinitionTrack(track *reanim.Track) bool {
+	hasImageRef := false
+	hasTransform := false
+	hasFrameNum := false
+
+	for _, frame := range track.Frames {
+		// Check for image references
+		if frame.ImagePath != "" {
+			hasImageRef = true
+		}
+		// Check for transform data
+		if frame.X != nil || frame.Y != nil || frame.ScaleX != nil || frame.ScaleY != nil {
+			hasTransform = true
+		}
+		// Check for FrameNum
+		if frame.FrameNum != nil {
+			hasFrameNum = true
+		}
+	}
+
+	// Animation definition track: has FrameNum, but no images or transforms
+	return hasFrameNum && !hasImageRef && !hasTransform
 }
 
 // buildVisiblesArray builds the visibility array for the given animation.
@@ -372,6 +456,11 @@ func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) err
 	reanimComp.IsLooping = true   // Default: animations loop
 	reanimComp.IsFinished = false // Reset finished flag
 
+	// Story 6.4: Set base animation name and clear overlay animations
+	// When switching base animations, all overlay animations are cleared
+	reanimComp.BaseAnimName = animName
+	reanimComp.OverlayAnims = []components.AnimLayer{} // Clear all overlay animations
+
 	// Build visibility array
 	reanimComp.AnimVisibles = s.buildVisiblesArray(reanimComp, animName)
 
@@ -419,6 +508,109 @@ func (s *ReanimSystem) PlayAnimationNoLoop(entityID ecs.EntityID, animName strin
 		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
 	}
 	reanimComp.IsLooping = false
+
+	return nil
+}
+
+// PlayAnimationOverlay starts playing an overlay animation on top of the base animation (Story 6.4).
+//
+// ⚠️ Deprecated (2025-10-24): 此方法当前不使用，所有动画通过简单的 PlayAnimation() 切换实现。
+//
+// 经验证，原版《植物大战僵尸》不使用动画叠加机制。所有动画（包括攻击、眨眼、状态切换）
+// 都通过简单的 PlayAnimation() 切换实现，部件显示由 VisibleTracks 机制控制。
+//
+// 保留此方法以备未来可能的扩展（如 Mod 支持、特殊效果），但当前不应在业务代码中调用。
+//
+// 推荐使用：
+//   - PlayAnimation(entityID, "anim_shooting")  // 切换到攻击动画
+//   - PlayAnimation(entityID, "anim_idle")      // 切换回空闲动画
+//
+// VisibleTracks 机制说明：
+//   - 原版游戏通过动画定义中的 VisibleTracks（可见轨道列表）控制部件显示
+//   - 例如：anim_shooting 包含 stalk_bottom, stalk_top, anim_head_idle 所有需要的部件
+//   - 渲染系统自动根据轨道定义渲染所有可见部件
+//   - 无需手动控制部件显示，也无需使用动画叠加
+//
+// 相关文档：
+//   - Sprint Change Proposal: docs/qa/sprint-change-proposal-story-6.4-animation-mechanism.md
+//   - Story 6.4: docs/stories/6.4.story.md (标记为 Deprecated)
+//   - Story 10.3: docs/stories/10.3.story.md (使用正确的简单切换方法)
+//
+// ---
+//
+// 原始说明（历史记录，仅供参考）：
+//
+// Overlay animations are rendered after the base animation and can override specific tracks.
+// This is used for effects like blinking eyes, damage flashes, or attack effects.
+//
+// Example:
+//
+//	Base animation: "anim_idle" (continuous, controls body)
+//	Overlay animation: "anim_blink" (one-shot, overrides mouth/eye tracks)
+//
+// Parameters:
+//   - entityID: the entity to play the overlay animation on
+//   - animName: the name of the overlay animation (e.g., "anim_blink")
+//   - playOnce: if true, the animation plays once and is automatically removed;
+//     if false, the animation loops continuously
+//
+// Returns:
+//   - An error if the entity doesn't have a ReanimComponent or the animation doesn't exist
+//
+// Deprecated: 使用 PlayAnimation() 代替
+func (s *ReanimSystem) PlayAnimationOverlay(entityID ecs.EntityID, animName string, playOnce bool) error {
+	// Get the ReanimComponent
+	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !exists {
+		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
+	}
+
+	// Check if Reanim data is present
+	if reanimComp.Reanim == nil {
+		return fmt.Errorf("entity %d has a ReanimComponent but no Reanim data", entityID)
+	}
+
+	// Check if the overlay animation exists
+	animTrack := s.getAnimDefinitionTrack(reanimComp, animName)
+	if animTrack == nil {
+		return fmt.Errorf("overlay animation '%s' not found in Reanim data for entity %d", animName, entityID)
+	}
+
+	// Build visibility array for the overlay animation
+	animVisibles := s.buildVisiblesArray(reanimComp, animName)
+
+	// Calculate visible frame count
+	visibleCount := 0
+	for _, v := range animVisibles {
+		if v == 0 {
+			visibleCount++
+		}
+	}
+
+	// Get animation tracks for the overlay animation
+	// Note: getAnimationTracks() returns ALL tracks with images, not just those for a specific animation.
+	// For overlay animations, we use the same tracks as the base animation, because overlay animations
+	// typically override specific tracks (like mouth/eyes) rather than defining completely new tracks.
+	// The rendering system will check each track to see if the overlay has data for it.
+	animTracks := s.getAnimationTracks(reanimComp)
+
+	// Create a new overlay animation layer
+	newLayer := components.AnimLayer{
+		AnimName:          animName,
+		CurrentFrame:      0,
+		FrameAccumulator:  0.0,
+		IsOneShot:         playOnce,
+		IsFinished:        false,
+		VisibleFrameCount: visibleCount,
+		AnimVisibles:      animVisibles,
+		AnimTracks:        animTracks,
+	}
+
+	// Add the overlay layer to the list
+	reanimComp.OverlayAnims = append(reanimComp.OverlayAnims, newLayer)
+
+	log.Printf("[ReanimSystem] PlayAnimationOverlay: Entity=%d, Overlay=%s, PlayOnce=%v, VisibleFrames=%d",
+		entityID, animName, playOnce, visibleCount)
 
 	return nil
 }

@@ -957,6 +957,242 @@ screenX, screenY := utils.GridToScreenCoords(col, row, gs.CameraX, ...)
 - `assets/reanim/particles/` 目录下的 XML 文件 (如 `Award.xml`, `Splash.xml`)
 - 配置包含：发射规则、粒子属性、动画曲线、力场效果
 
+## Reanim 动画叠加机制（Story 6.4 - 已废弃）
+
+### ⚠️ 重要说明
+
+**此功能已废弃（2025-10-24）**。经过对原版游戏机制的深入研究，确认原版《植物大战僵尸》不使用动画叠加机制。所有动画（包括攻击、眨眼、状态切换）都通过简单的 `PlayAnimation()` 切换实现。
+
+**正确的动画实现方式**：
+```go
+// ✅ 正确：简单切换
+reanimSystem.PlayAnimation(entityID, "anim_shooting")  // 切换到攻击动画
+// 攻击动画完成后
+reanimSystem.PlayAnimation(entityID, "anim_idle")      // 切换回空闲
+
+// ❌ 错误：动画叠加（不符合原版机制）
+reanimSystem.PlayAnimationOverlay(entityID, "anim_shooting", true)
+```
+
+**VisibleTracks 机制（正确方法）**：
+原版游戏通过动画定义中的 **VisibleTracks**（可见轨道列表）控制哪些部件在特定动画中显示。例如：
+- `anim_shooting` 包含轨道：`stalk_bottom`, `stalk_top`, `anim_head_idle`（射击头部）
+- Reanim 渲染系统自动根据轨道定义渲染所有可见部件
+- 无需手动控制部件显示
+
+**代码保留说明**：
+- `PlayAnimationOverlay()` 方法和 `AnimLayer` 结构仍保留在代码中
+- 标记为"未使用/实验性功能"（Deprecated）
+- **不应在业务代码中调用**
+- 保留是为了避免大规模删除，并为未来可能的扩展留下空间（如 Mod 支持）
+
+**相关决策文档**：
+- Sprint Change Proposal: `docs/qa/sprint-change-proposal-story-6.4-animation-mechanism.md`
+- Story 6.4: `docs/stories/6.4.story.md`（标记为 Deprecated）
+- Story 10.3: `docs/stories/10.3.story.md`（使用正确的简单切换方法）
+
+---
+
+### 历史背景（保留作为参考）
+
+以下内容为 Story 6.4 原始设计的历史记录，仅供参考。**请勿在新代码中使用这些模式。**
+
+### 概述
+
+动画叠加机制允许在基础动画之上播放额外的动画效果，实现更丰富的视觉表现。这是原版《植物大战僵尸》动画系统的高级特性。
+
+**典型应用场景：**
+- 🔄 **待机眨眼** - 植物/僵尸在 `anim_idle` 时随机播放 `anim_blink`
+- 💥 **受击闪烁** - 在任何动画时叠加受击特效
+- ~~✨ **攻击特效** - 攻击动画叠加光效、粒子效果~~（已废弃：攻击动画本身包含所有部件）
+
+### 核心概念
+
+#### 1. 基础动画（Base Animation）
+
+持续循环播放的主动画，控制实体的主要运动（如身体、四肢）。
+
+```go
+// 播放基础动画（与之前相同）
+reanimSystem.PlayAnimation(entityID, "anim_idle")
+```
+
+#### 2. 叠加动画（Overlay Animation）
+
+短暂播放的辅助动画，覆盖特定轨道（如嘴部、眼睛）。
+
+```go
+// 在基础动画之上叠加播放眨眼动画（单次播放）
+reanimSystem.PlayAnimationOverlay(entityID, "anim_blink", true)
+```
+
+#### 3. 轨道覆盖规则
+
+叠加动画的轨道会**覆盖**基础动画的同名轨道：
+
+```
+基础动画 (anim_idle):           叠加动画 (anim_blink):      最终渲染:
+- backleaf                      (无)                       backleaf (基础)
+- stalk_bottom                  (无)                       stalk_bottom (基础)
+- idle_mouth                    idle_shoot_blink           idle_shoot_blink (叠加)
+- anim_blink                    anim_blink                 anim_blink (叠加)
+```
+
+### API 使用指南
+
+#### PlayAnimationOverlay 方法
+
+```go
+// PlayAnimationOverlay 在基础动画之上播放叠加动画
+//
+// Parameters:
+//   - entityID: 实体 ID
+//   - animName: 叠加动画名称（如 "anim_blink"）
+//   - playOnce: true = 播放一次后自动移除；false = 持续循环
+//
+// Returns:
+//   - error: 如果实体不存在或动画不存在
+func (s *ReanimSystem) PlayAnimationOverlay(entityID ecs.EntityID, animName string, playOnce bool) error
+```
+
+#### 典型使用场景
+
+##### 场景 1：随机眨眼
+
+```go
+// 在 BehaviorSystem.Update() 中实现
+if plant.PlantType == components.PlantPeashooter {
+    // 更新眨眼计时器
+    plant.BlinkTimer -= deltaTime
+    if plant.BlinkTimer <= 0 {
+        // 触发眨眼（播放一次，完成后自动移除）
+        reanimSystem.PlayAnimationOverlay(entityID, "anim_blink", true)
+
+        // 重置计时器（随机 3-5 秒）
+        plant.BlinkTimer = 3.0 + rand.Float64()*2.0
+    }
+}
+```
+
+##### 场景 2：受击闪烁效果
+
+```go
+// 当植物/僵尸受到伤害时
+func OnDamage(entityID ecs.EntityID) {
+    // 叠加受击闪烁动画（播放一次）
+    reanimSystem.PlayAnimationOverlay(entityID, "anim_damage_flash", true)
+}
+```
+
+##### 场景 3：持续特效
+
+```go
+// 为僵尸添加持续的燃烧特效
+reanimSystem.PlayAnimationOverlay(zombieID, "anim_fire_effect", false) // 持续播放
+
+// 燃烧结束后移除特效
+reanimSystem.RemoveAnimationOverlay(zombieID, "anim_fire_effect")
+```
+
+### 数据结构说明
+
+#### AnimLayer 结构
+
+```go
+// AnimLayer 表示一个叠加动画层（纯数据结构）
+type AnimLayer struct {
+    AnimName          string              // 动画名称（如 "anim_blink"）
+    CurrentFrame      int                 // 当前逻辑帧号
+    FrameAccumulator  float64             // 帧累加器（用于精确 FPS 控制）
+    IsOneShot         bool                // 是否只播放一次
+    IsFinished        bool                // 是否已完成（完成后自动移除）
+    VisibleFrameCount int                 // 可见帧数
+    AnimVisibles      []int               // 可见性数组（从动画定义构建）
+    AnimTracks        []reanim.Track      // 该层的渲染轨道列表
+}
+```
+
+#### ReanimComponent 扩展
+
+```go
+type ReanimComponent struct {
+    // ... 现有字段
+
+    // 动画叠加机制字段（Story 6.4）
+    BaseAnimName string       // 基础动画名称（如 "anim_idle"）
+    OverlayAnims []AnimLayer  // 叠加动画列表（可同时多个）
+}
+```
+
+### 系统行为
+
+#### 1. Update 阶段
+
+`ReanimSystem.Update()` 会：
+1. 更新基础动画的帧号（`CurrentFrame`）
+2. 遍历 `OverlayAnims` 列表，更新每个叠加动画的帧号
+3. 对于 `IsOneShot=true` 的叠加动画：
+   - 检查是否完成（`CurrentFrame >= VisibleFrameCount`）
+   - 标记为 `IsFinished=true`
+   - 从列表中自动移除
+
+#### 2. Render 阶段
+
+`RenderSystem.renderReanimEntity()` 会：
+1. **阶段 1**：渲染基础动画的所有轨道
+2. **阶段 2**：渲染叠加动画的轨道（覆盖同名轨道）
+
+**渲染优先级**：叠加动画 > 基础动画
+
+### 性能考虑
+
+**内存开销**：
+- 每个实体 +40-80 字节（`OverlayAnims` 列表）
+- 大多数实体同时只有 0-1 个叠加动画
+
+**CPU 开销**：
+- Update 时间 +5-10%（需要遍历叠加动画列表）
+- 叠加动画通常很短（2-5 帧），完成后立即移除
+
+**渲染开销**：
+- +0-5%（渲染轨道数量不变，仅覆盖）
+
+**总体评估**：✅ **性能影响可忽略不计**
+
+### 注意事项
+
+1. **动画必须存在**
+   - 调用 `PlayAnimationOverlay()` 前，确保动画在 `.reanim` 文件中存在
+   - 否则会返回错误：`animation 'xxx' not found`
+
+2. **帧号映射**
+   - 叠加动画的 `CurrentFrame` 是逻辑帧号
+   - 渲染时通过 `findPhysicalFrameIndex()` 映射到物理帧
+
+3. **多个叠加动画**
+   - 可以同时播放多个叠加动画
+   - 后添加的会覆盖先添加的（如果轨道名相同）
+
+4. **基础动画切换**
+   - 调用 `PlayAnimation()` 会清空所有叠加动画
+   - 如果需要保留叠加动画，需要重新调用 `PlayAnimationOverlay()`
+
+### 相关文件
+
+**核心实现**：
+- `pkg/components/reanim_component.go` - 组件定义（`AnimLayer`, `OverlayAnims`）
+- `pkg/systems/reanim_system.go` - 系统逻辑（`PlayAnimationOverlay`, `Update`）
+- `pkg/systems/render_system.go` - 渲染逻辑（多层渲染）
+
+**示例实现**：
+- `pkg/systems/behavior_system.go` - 眨眼逻辑示例
+
+**测试**：
+- `pkg/systems/reanim_system_test.go` - 单元测试
+
+**详细文档**：
+- `docs/stories/6.4.story.md` - Story 6.4 完整实现文档
+
 ## 数据驱动设计
 
 ### 关卡配置增强 (Story 8.1)
