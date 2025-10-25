@@ -278,12 +278,14 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 
 	// Story 5.1: 检测植物碰撞（在移动之前）
 	// 计算僵尸所在格子
+	// 注意：需要减去 ZombieVerticalOffset，因为僵尸Y坐标包含了偏移
 	zombieCol := int((position.X - config.GridWorldStartX) / config.CellWidth)
-	zombieRow := int((position.Y - config.GridWorldStartY) / config.CellHeight)
+	zombieRow := int((position.Y - config.GridWorldStartY - config.ZombieVerticalOffset - config.CellHeight/2.0) / config.CellHeight)
 
 	// 检测是否与植物在同一格子
 	plantID, hasCollision := s.detectPlantCollision(zombieRow, zombieCol)
 	if hasCollision {
+		log.Printf("[BehaviorSystem] ✅ 僵尸 %d 检测到植物 %d，位置(%d,%d)，开始啃食！", entityID, plantID, zombieRow, zombieCol)
 		// 进入啃食状态
 		s.startEatingPlant(entityID, plantID)
 		return // 跳过移动逻辑
@@ -292,6 +294,7 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 	// 获取速度组件
 	velocity, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID)
 	if !ok {
+		log.Printf("[BehaviorSystem] ⚠️ 僵尸 %d 缺少 VelocityComponent（可能已进入啃食状态）", entityID)
 		return
 	}
 
@@ -833,6 +836,9 @@ func (s *BehaviorSystem) stopEatingAndResume(zombieID ecs.EntityID) {
 //   - entityID: 僵尸实体ID
 //   - deltaTime: 帧间隔时间
 func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, deltaTime float64) {
+	// DEBUG: 添加日志确认函数被调用
+	log.Printf("[BehaviorSystem] 🍴 处理僵尸 %d 啃食行为", entityID)
+
 	// 检查生命值并更新受伤状态（掉手臂、掉头）
 	health, ok := ecs.GetComponent[*components.HealthComponent](s.entityManager, entityID)
 	if ok {
@@ -896,8 +902,9 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 		}
 
 		// 计算僵尸所在格子
+		// 注意：需要减去 ZombieVerticalOffset，因为僵尸Y坐标包含了偏移
 		zombieCol := int((pos.X - config.GridWorldStartX) / config.CellWidth)
-		zombieRow := int((pos.Y - config.GridWorldStartY) / config.CellHeight)
+		zombieRow := int((pos.Y - config.GridWorldStartY - config.ZombieVerticalOffset - config.CellHeight/2.0) / config.CellHeight)
 
 		// 检测植物
 		plantID, hasPlant := s.detectPlantCollision(zombieRow, zombieCol)

@@ -118,6 +118,16 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 			MaxHealth:     config.PeashooterDefaultHealth,
 		})
 
+		// Story 10.3: 添加植物组件（用于攻击动画状态管理）
+		em.AddComponent(entityID, &components.PlantComponent{
+			PlantType:         components.PlantPeashooter,
+			GridRow:           row, // ✅ 添加缺失的 GridRow
+			GridCol:           col, // ✅ 添加缺失的 GridCol
+			AttackAnimState:   components.AttackAnimIdle,
+			PendingProjectile: false,
+			LastMouthX:        0,
+		})
+
 		// 添加行为组件
 		em.AddComponent(entityID, &components.BehaviorComponent{
 			Type: components.BehaviorPeashooter,
@@ -147,6 +157,7 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 		em.AddComponent(entityID, &components.ReanimComponent{
 			Reanim:     reanimXML,
 			PartImages: partImages,
+			// FixedCenterOffset 在第一次 PlayAnimation 后手动设置为 true
 			VisibleTracks: map[string]bool{
 				// 茎干部件（攻击时必须显示，即使 f=-1）
 				"stalk_bottom": true,
@@ -164,7 +175,7 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 				// 头部部件
 				"anim_head_idle": true, // 头部动画轨道（包含头部图片）
 				"anim_face":      true, // 脸部
-				"idle_mouth":     true, // 嘴巴
+				"idle_mouth":     true, // 嘴巴（Story 10.3: 用于子弹发射位置检测）
 
 				// 注意：不包含 anim_blink, idle_shoot_blink（眨眼轨道）
 				// 这些轨道不在白名单中，会遵守 f=-1，避免错误显示
@@ -175,6 +186,12 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 		// 注意：豌豆射手的 anim_idle 只显示茎和叶子，anim_full_idle 才显示完整植物
 		if err := rs.PlayAnimation(entityID, "anim_full_idle"); err != nil {
 			return 0, fmt.Errorf("failed to play PeaShooter idle animation: %w", err)
+		}
+
+		// 第一次 PlayAnimation 后，固定中心偏移量（避免动画切换时的位置跳动）
+		if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](em, entityID); ok {
+			reanimComp.FixedCenterOffset = true
+			log.Printf("[PlantFactory] 豌豆射手 %d 固定中心偏移为: (%.1f, %.1f)", entityID, reanimComp.CenterOffsetX, reanimComp.CenterOffsetY)
 		}
 		log.Printf("[PlantFactory] 豌豆射手 %d: 成功添加 ReanimComponent 并初始化动画", entityID)
 	}

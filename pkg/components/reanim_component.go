@@ -134,6 +134,12 @@ type ReanimComponent struct {
 	CenterOffsetX float64
 	CenterOffsetY float64
 
+	// FixedCenterOffset 是否使用固定的中心偏移量（避免动画切换时的位置跳动）
+	// 如果为 true，则 CenterOffsetX/Y 在实体创建时计算一次后固定不变
+	// 如果为 false，则每次 PlayAnimation 时重新计算 CenterOffset
+	// 用于解决不同动画包围盒大小不同导致的位置跳动问题
+	FixedCenterOffset bool
+
 	// BestPreviewFrame is the optimal frame index for generating preview icons (Story 10.3).
 	// This frame is automatically calculated when PlayAnimation is called by finding the frame
 	// with the most visible parts (highest count of ImagePath != "").

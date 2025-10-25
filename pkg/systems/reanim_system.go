@@ -481,7 +481,13 @@ func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) err
 	reanimComp.AnimTracks = s.getAnimationTracks(reanimComp)
 
 	// Calculate center offset based on the bounding box of visible parts in the first frame
-	s.calculateCenterOffset(reanimComp)
+	// 如果 FixedCenterOffset 为 true，则跳过重新计算（保持创建时的值）
+	// 这样可以避免不同动画包围盒大小不同导致的位置跳动
+	if !reanimComp.FixedCenterOffset {
+		s.calculateCenterOffset(reanimComp)
+	} else {
+		log.Printf("[ReanimSystem] 动画 '%s' 使用固定中心偏移，跳过重新计算", animName)
+	}
 
 	// Story 10.3: Calculate best preview frame (frame with most visible parts)
 	// This is used by RenderPlantIcon to ensure preview shows the most complete representation
@@ -887,9 +893,9 @@ func (s *ReanimSystem) calculateCenterOffset(comp *components.ReanimComponent) {
 	comp.CenterOffsetX = (minX + maxX) / 2
 	comp.CenterOffsetY = (minY + maxY) / 2
 
-	// 调试输出：打印中心偏移计算结果
-	log.Printf("[ReanimSystem] 计算中心偏移 - 边界框: X[%.1f, %.1f], Y[%.1f, %.1f], 中心偏移: (%.1f, %.1f)",
-		minX, maxX, minY, maxY, comp.CenterOffsetX, comp.CenterOffsetY)
+	// DEBUG: 输出中心偏移量（用于调试动画切换时的位置跳动问题）
+	log.Printf("[ReanimSystem] 动画 '%s' 中心偏移: (%.1f, %.1f), 包围盒: [%.1f, %.1f] -> [%.1f, %.1f]",
+		comp.CurrentAnim, comp.CenterOffsetX, comp.CenterOffsetY, minX, minY, maxX, maxY)
 }
 
 // HideTrack hides a specific animation track (part) for the given entity.
@@ -1156,6 +1162,18 @@ func (s *ReanimSystem) GetTrackPosition(entityID ecs.EntityID, trackName string)
 
 	frame := mergedFrames[physicalIndex]
 
+	// 检查轨道在当前帧是否可见
+	// 如果 frame.FrameNum 不为 nil 且值为 -1，表示轨道隐藏
+	// 但是：如果轨道在 VisibleTracks 白名单中，跳过 f=-1 检查（强制可见）
+	isInWhitelist := false
+	if reanim.VisibleTracks != nil {
+		isInWhitelist = reanim.VisibleTracks[trackName]
+	}
+
+	if !isInWhitelist && frame.FrameNum != nil && *frame.FrameNum == -1 {
+		return 0, 0, fmt.Errorf("track '%s' is hidden at current frame %d", trackName, reanim.CurrentFrame)
+	}
+
 	// 获取轨道的局部位置（相对于动画原点）
 	localX, localY := 0.0, 0.0
 	if frame.X != nil {
@@ -1165,10 +1183,22 @@ func (s *ReanimSystem) GetTrackPosition(entityID ecs.EntityID, trackName string)
 		localY = *frame.Y
 	}
 
+	// 如果X或Y为nil，说明轨道没有位置数据（可能是定位器轨道在未初始化状态）
+	if frame.X == nil || frame.Y == nil {
+		return 0, 0, fmt.Errorf("track '%s' has no position data at current frame %d", trackName, reanim.CurrentFrame)
+	}
+
+	// DEBUG: 输出世界坐标计算过程
+	// log.Printf("[DEBUG] GetTrackPosition 坐标计算: localX=%.1f, pos.X=%.1f, CenterOffsetX=%.1f",
+	// 	localX, pos.X, reanim.CenterOffsetX)
+
 	// 转换为世界坐标
 	// worldPos = entityPos + (trackLocalPos - centerOffset)
 	worldX := pos.X + (localX - reanim.CenterOffsetX)
 	worldY := pos.Y + (localY - reanim.CenterOffsetY)
+
+	// log.Printf("[DEBUG] GetTrackPosition 结果: worldX = %.1f + (%.1f - %.1f) = %.1f",
+	// 	pos.X, localX, reanim.CenterOffsetX, worldX)
 
 	return worldX, worldY, nil
 }

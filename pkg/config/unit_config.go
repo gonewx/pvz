@@ -71,13 +71,9 @@ const (
 	PeaBulletDamage = 20
 
 	// PeaBulletOffsetX 子弹相对豌豆射手中心的水平偏移量（像素）
-	// 建议值范围：40.0 - 60.0
-	// 50像素使子弹从豌豆射手嘴部发射（豌豆射手朝右，嘴在右侧）
-	PeaBulletOffsetX = 25.0
+	PeaBulletOffsetX = 35.0
 
 	// PeaBulletOffsetY 子弹相对豌豆射手中心的垂直偏移量（像素）
-	// 建议值范围：-10.0 - 10.0
-	// 0像素使子弹与豌豆射手在同一水平线，确保能击中同行僵尸
 	PeaBulletOffsetY = -18.0
 
 	// PeaBulletWidth 豌豆子弹碰撞盒宽度（像素）
