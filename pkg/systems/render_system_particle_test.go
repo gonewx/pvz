@@ -20,13 +20,13 @@ func TestBuildParticleVertices_BasicPositionMapping(t *testing.T) {
 	// 创建测试粒子组件
 	particle := &components.ParticleComponent{
 		Image:      testImage,
-		Rotation:   0,    // 无旋转
-		Scale:      1.0,  // 无缩放
-		Red:        1.0,  // 白色
+		Rotation:   0,   // 无旋转
+		Scale:      1.0, // 无缩放
+		Red:        1.0, // 白色
 		Green:      1.0,
 		Blue:       1.0,
-		Alpha:      1.0,  // 完全不透明
-		Brightness: 1.0,  // 无亮度调整
+		Alpha:      1.0, // 完全不透明
+		Brightness: 1.0, // 无亮度调整
 		Additive:   false,
 	}
 

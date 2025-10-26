@@ -28,10 +28,10 @@ type LevelConfig struct {
 	RewardPlant string `yaml:"rewardPlant"` // 完成本关后奖励的植物ID，如 "sunflower"，默认为空（无奖励）
 
 	// Story 8.2 QA改进：背景和草皮配置
-	BackgroundImage   string `yaml:"backgroundImage"`   // 背景图片ID，如 \"IMAGE_BACKGROUND1_UNSODDED\"，默认 \"IMAGE_BACKGROUND1\"
-	SodRowImage       string `yaml:"sodRowImage"`       // 草皮叠加图片ID，如 \"IMAGE_SOD1ROW\"，空表示无草皮
-	ShowSoddingAnim   bool   `yaml:"showSoddingAnim"`   // 是否播放铺草皮动画，默认 false
-	SoddingAnimDelay  float64 `yaml:"soddingAnimDelay"` // 铺草皮动画延迟（秒），默认 0
+	BackgroundImage  string  `yaml:"backgroundImage"`  // 背景图片ID，如 \"IMAGE_BACKGROUND1_UNSODDED\"，默认 \"IMAGE_BACKGROUND1\"
+	SodRowImage      string  `yaml:"sodRowImage"`      // 草皮叠加图片ID，如 \"IMAGE_SOD1ROW\"，空表示无草皮
+	ShowSoddingAnim  bool    `yaml:"showSoddingAnim"`  // 是否播放铺草皮动画，默认 false
+	SoddingAnimDelay float64 `yaml:"soddingAnimDelay"` // 铺草皮动画延迟（秒），默认 0
 }
 
 // TutorialStep 教学步骤配置（Story 8.2）

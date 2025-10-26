@@ -1287,7 +1287,7 @@ func (s *GameScene) drawParticleTestInstructions(screen *ebiten.Image) {
 
 	// 测试说明（屏幕左下角）
 	instructions := []string{
-		"[粒子测试] P=豌豆溅射 | B=爆炸 | A=奖励光效 | Z=僵尸头",
+		"[粒子测试] P=豌豆溅射 | B=爆炸 | A=奖励光效 | Z=僵尸头 | L=种植土粒",
 	}
 
 	// 绘制半透明背景
@@ -1356,11 +1356,11 @@ func (s *GameScene) drawGridDebug(screen *ebiten.Image) {
 		sodScreenX := sodOverlayX - s.cameraX
 		sodScreenY := sodOverlayY
 
-		// Story 8.2 QA：调试可视化（已禁用）
-		/*
+		// Story 8.2 QA：调试可视化（临时启用以调试粒子）
+
 			// 绘制草皮边界（红色矩形框，不填充）
-			sodColor := color.RGBA{R: 255, G: 0, B: 0, A: 255}
-			thickness := 3.0
+			sodColor := color.RGBA{R: 255, G: 0, B: 0, A: 128} // 半透明红色
+			thickness := 2.0
 			// 顶边
 			ebitenutil.DrawRect(screen, sodScreenX, sodScreenY, sodWidth, thickness, sodColor)
 			// 底边
@@ -1384,7 +1384,7 @@ func (s *GameScene) drawGridDebug(screen *ebiten.Image) {
 				midY := sodScreenY + sodHeight/2.0
 				ebitenutil.DrawRect(screen, sodRollScreenX-crossSize, midY-1, crossSize*2, 2, crossColor)
 			}
-		*/
+
 
 		// 详细调试信息
 		debugInfo := fmt.Sprintf("Sod: world(%.0f,%.0f) screen(%.0f,%.0f) size(%.0fx%.0f) cam(%.0f)",

@@ -37,11 +37,11 @@ type LevelSystem struct {
 	entityManager        *ecs.EntityManager
 	gameState            *game.GameState
 	waveSpawnSystem      *WaveSpawnSystem
-	resourceManager      *game.ResourceManager   // 用于加载 FinalWave 音效
-	reanimSystem         *ReanimSystem           // 用于创建 FinalWave 动画实体
-	rewardSystem         *RewardAnimationSystem  // 用于触发奖励动画（Story 8.3）
-	lawnmowerSystem      *LawnmowerSystem        // 用于检查除草车状态（Story 10.2）
-	lastWaveWarningShown bool                    // 是否已显示最后一波提示
+	resourceManager      *game.ResourceManager  // 用于加载 FinalWave 音效
+	reanimSystem         *ReanimSystem          // 用于创建 FinalWave 动画实体
+	rewardSystem         *RewardAnimationSystem // 用于触发奖励动画（Story 8.3）
+	lawnmowerSystem      *LawnmowerSystem       // 用于检查除草车状态（Story 10.2）
+	lastWaveWarningShown bool                   // 是否已显示最后一波提示
 }
 
 // NewLevelSystem 创建关卡管理系统

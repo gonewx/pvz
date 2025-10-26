@@ -61,8 +61,8 @@ func TestCameraSystem_NewCameraSystem(t *testing.T) {
 func TestCameraSystem_MoveTo(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
-	initialCameraX := gs.CameraX // 保存初始值
-	gs.CameraX = 0               // 重置为 0 用于测试
+	initialCameraX := gs.CameraX                   // 保存初始值
+	gs.CameraX = 0                                 // 重置为 0 用于测试
 	defer func() { gs.CameraX = initialCameraX }() // 测试结束后恢复
 
 	cs := NewCameraSystem(em, gs)
@@ -302,11 +302,11 @@ func TestCameraSystem_EasingFunction(t *testing.T) {
 			t        float64
 			expected float64
 		}{
-			{0.0, 0.0},     // 起点
-			{0.25, 0.125},  // 前半段加速
-			{0.5, 0.5},     // 中点
-			{0.75, 0.875},  // 后半段减速
-			{1.0, 1.0},     // 终点
+			{0.0, 0.0},    // 起点
+			{0.25, 0.125}, // 前半段加速
+			{0.5, 0.5},    // 中点
+			{0.75, 0.875}, // 后半段减速
+			{1.0, 1.0},    // 终点
 		}
 
 		for _, tc := range testCases {
@@ -323,9 +323,9 @@ func TestCameraSystem_EasingFunction(t *testing.T) {
 			t        float64
 			expected float64
 		}{
-			{0.0, 0.0},   // 起点
-			{0.5, 0.75},  // 快速减速
-			{1.0, 1.0},   // 终点
+			{0.0, 0.0},  // 起点
+			{0.5, 0.75}, // 快速减速
+			{1.0, 1.0},  // 终点
 		}
 
 		for _, tc := range testCases {

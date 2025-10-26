@@ -147,9 +147,9 @@ func (m *PlantSelectionModule) createPlantCards(levelConfig *config.LevelConfig,
 
 	// 卡片布局配置（与 GameScene 保持一致）
 	const (
-		PlantCardStartOffsetX = 84  // 第一张卡片相对于 SeedBank 的 X 偏移量
-		PlantCardOffsetY      = 8   // 卡片相对于 SeedBank 的 Y 偏移量
-		PlantCardSpacing      = 60  // 卡片槽之间的间距
+		PlantCardStartOffsetX = 84                    // 第一张卡片相对于 SeedBank 的 X 偏移量
+		PlantCardOffsetY      = 8                     // 卡片相对于 SeedBank 的 Y 偏移量
+		PlantCardSpacing      = 60                    // 卡片槽之间的间距
 		PlantCardScale        = config.PlantCardScale // 卡片缩放因子（0.54）
 	)
 

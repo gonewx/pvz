@@ -14,10 +14,10 @@ import (
 
 const (
 	// 开场动画常量
-	OpeningIdleDuration      = 0.5    // Idle 状态持续时间（秒）
-	OpeningShowZombieTime    = 2.0    // 展示僵尸时间（秒）
-	OpeningCameraSpeed       = 300.0  // 镜头移动速度（像素/秒）
-	OpeningCameraRightTarget = 600.0  // 镜头右移目标位置（背景最右边）
+	OpeningIdleDuration      = 0.5   // Idle 状态持续时间（秒）
+	OpeningShowZombieTime    = 2.0   // 展示僵尸时间（秒）
+	OpeningCameraSpeed       = 300.0 // 镜头移动速度（像素/秒）
+	OpeningCameraRightTarget = 600.0 // 镜头右移目标位置（背景最右边）
 )
 
 // OpeningAnimationSystem 管理关卡开场动画流程。

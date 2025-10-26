@@ -122,8 +122,8 @@ func TestTutorialSteps_AllTextKeysExist(t *testing.T) {
 		"ADVICE_CLICK_SEED_PACKET",
 		"ADVICE_CLICK_ON_GRASS",
 		"ADVICE_PLANTED_PEASHOOTER",
-		"ADVICE_CLICK_PEASHOOTER",    // 方案A+ 新增
-		"ADVICE_ENOUGH_SUN",          // 方案A+ 新增
+		"ADVICE_CLICK_PEASHOOTER", // 方案A+ 新增
+		"ADVICE_ENOUGH_SUN",       // 方案A+ 新增
 		"ADVICE_ZOMBIE_ONSLAUGHT",
 	}
 
@@ -140,18 +140,3 @@ func TestTutorialSteps_AllTextKeysExist(t *testing.T) {
 		}
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

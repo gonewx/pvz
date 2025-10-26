@@ -60,9 +60,9 @@ func TestLawnmowerSystemGetEntityLane(t *testing.T) {
 		{config.GridWorldStartY + 2*config.CellHeight + config.CellHeight/2, 3},
 		{config.GridWorldStartY + 3*config.CellHeight + config.CellHeight/2, 4},
 		{config.GridWorldStartY + 4*config.CellHeight + config.CellHeight/2, 5},
-		{0.0, 1},                       // 超出下界
+		{0.0, 1},                         // 超出下界
 		{config.GridWorldStartY - 10, 1}, // 负偏移
-		{1000.0, 5},                    // 超出上界
+		{1000.0, 5},                      // 超出上界
 	}
 
 	for _, tt := range tests {

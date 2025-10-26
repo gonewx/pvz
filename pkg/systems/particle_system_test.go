@@ -523,9 +523,9 @@ func TestParticleSystem_NoMemoryLeak(t *testing.T) {
 			NextSpawnTime:    0,
 			ActiveParticles:  make([]ecs.EntityID, 0),
 			TotalLaunched:    0,
-			SpawnRate:        10,   // 10 particles/second
-			SpawnMaxActive:   100,  // Allow many active
-			SpawnMaxLaunched: 5,    // Only spawn 5 particles total per emitter
+			SpawnRate:        10,  // 10 particles/second
+			SpawnMaxActive:   100, // Allow many active
+			SpawnMaxLaunched: 5,   // Only spawn 5 particles total per emitter
 		}
 		posComp := &components.PositionComponent{X: 100, Y: 100}
 		em.AddComponent(emitterID, emitterComp)
@@ -637,13 +637,13 @@ func TestParticleSystem_GroundCollision(t *testing.T) {
 	// Create particle with downward velocity and ground constraint
 	particleID := em.CreateEntity()
 	particleComp := &components.ParticleComponent{
-		VelocityX:             100,
-		VelocityY:             165, // Moving downward
-		Age:                   0,
-		Lifetime:              2.0,
-		GroundY:               390.0,               // Ground at Y=390
-		CollisionReflectX:     0.3,                 // 30% bounce
-		CollisionReflectY:     0.3,                 // 30% bounce
+		VelocityX:         100,
+		VelocityY:         165, // Moving downward
+		Age:               0,
+		Lifetime:          2.0,
+		GroundY:           390.0, // Ground at Y=390
+		CollisionReflectX: 0.3,   // 30% bounce
+		CollisionReflectY: 0.3,   // 30% bounce
 		CollisionReflectCurve: []particle.Keyframe{
 			{Time: 0.0, Value: 0.3},
 			{Time: 0.4, Value: 0.3},
@@ -712,7 +712,7 @@ func TestParticleSystem_GroundCollision_NoGroundConstraint(t *testing.T) {
 		VelocityY:         100, // Moving downward
 		Age:               0,
 		Lifetime:          2.0,
-		GroundY:           0,   // No ground constraint
+		GroundY:           0, // No ground constraint
 		CollisionReflectY: 0.3,
 	}
 	posComp := &components.PositionComponent{X: 512, Y: 300}
@@ -794,8 +794,8 @@ func TestParticleSystem_GroundCollision_ReflectCurveDecay(t *testing.T) {
 		GroundY:           390.0,
 		CollisionReflectY: 0.3,
 		CollisionReflectCurve: []particle.Keyframe{
-			{Time: 0.0, Value: 0.3},  // 30% bounce at start
-			{Time: 0.5, Value: 0.0},  // No bounce at 50% lifetime
+			{Time: 0.0, Value: 0.3}, // 30% bounce at start
+			{Time: 0.5, Value: 0.0}, // No bounce at 50% lifetime
 		},
 	}
 	posComp := &components.PositionComponent{X: 512, Y: 350}
@@ -898,8 +898,8 @@ func TestParticleSystem_EmitterInstantBurst(t *testing.T) {
 		NextSpawnTime:    0,
 		ActiveParticles:  make([]ecs.EntityID, 0),
 		TotalLaunched:    0,
-		SpawnRate:        0,   // Instant burst
-		SpawnMinActive:   5,   // Spawn 5 particles immediately
+		SpawnRate:        0, // Instant burst
+		SpawnMinActive:   5, // Spawn 5 particles immediately
 		SpawnMaxActive:   100,
 		SpawnMaxLaunched: 0,
 	}
@@ -973,9 +973,9 @@ func TestParticleSystem_SystemAlpha(t *testing.T) {
 		Age:      0,
 		Lifetime: 2.0,
 		SystemAlphaKeyframes: []particle.Keyframe{
-			{Time: 0.0, Value: 1.0},   // Opaque at start
-			{Time: 0.95, Value: 1.0},  // Stay opaque
-			{Time: 1.0, Value: 0.0},   // Fade out at end
+			{Time: 0.0, Value: 1.0},  // Opaque at start
+			{Time: 0.95, Value: 1.0}, // Stay opaque
+			{Time: 1.0, Value: 0.0},  // Fade out at end
 		},
 		SystemAlphaInterp: "Linear",
 		EmitterAge:        0,
@@ -1113,7 +1113,7 @@ func TestParticleSystem_MissingParticleDuration(t *testing.T) {
 	emitterPos := &components.PositionComponent{X: 100, Y: 100}
 	emitterComp := &components.EmitterComponent{
 		Config: &particle.EmitterConfig{
-			Name:         "TestEmitter",
+			Name: "TestEmitter",
 			// ParticleDuration: "",  // 故意省略，模拟 ZombieNewspaper.xml
 			SystemDuration: "40", // 0.4 秒
 			LaunchSpeed:    "200",

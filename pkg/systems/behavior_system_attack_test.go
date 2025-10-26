@@ -329,8 +329,8 @@ func TestPeashooterAttackAnimationCycle(t *testing.T) {
 func TestNonShooterPlantsUnaffected(t *testing.T) {
 	// Given: Various plant types
 	testCases := []struct {
-		plantType    components.PlantType
-		name         string
+		plantType     components.PlantType
+		name          string
 		expectShooter bool
 	}{
 		{components.PlantPeashooter, "Peashooter", true},

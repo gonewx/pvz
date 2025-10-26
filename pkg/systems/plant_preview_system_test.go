@@ -36,7 +36,7 @@ func TestPlantPreviewSystemCreation(t *testing.T) {
 func TestPlantPreviewUpdate(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
-	gs.CameraX = 215 // 设置摄像机位置
+	gs.CameraX = 215                             // 设置摄像机位置
 	lawnGridSystem := NewLawnGridSystem(em, nil) // Story 8.1: 传递 LawnGridSystem
 
 	system := NewPlantPreviewSystem(em, gs, lawnGridSystem)

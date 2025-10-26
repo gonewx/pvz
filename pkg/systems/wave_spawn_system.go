@@ -25,8 +25,8 @@ import (
 //   - 遵循数据驱动原则：根据配置文件生成僵尸
 //
 // 预生成机制：
-//   1. PreSpawnAllWaves() 在关卡开始时调用，预生成所有僵尸
-//   2. ActivateWave(waveIndex) 在波次时间到达时调用，激活指定波次的僵尸
+//  1. PreSpawnAllWaves() 在关卡开始时调用，预生成所有僵尸
+//  2. ActivateWave(waveIndex) 在波次时间到达时调用，激活指定波次的僵尸
 type WaveSpawnSystem struct {
 	entityManager   *ecs.EntityManager
 	resourceManager *game.ResourceManager
@@ -421,7 +421,7 @@ func (s *WaveSpawnSystem) addTargetLaneComponent(entityID ecs.EntityID, targetRo
 	} else {
 		// 创建新的速度组件
 		ecs.AddComponent(s.entityManager, entityID, &components.VelocityComponent{
-			VX: 0,  // X轴速度暂时为0，到达目标行后才开始向左移动
+			VX: 0, // X轴速度暂时为0，到达目标行后才开始向左移动
 			VY: vySpeed,
 		})
 	}
@@ -551,7 +551,7 @@ func (s *WaveSpawnSystem) randomEnabledLane() int {
 	// 从 EnabledLanes 中随机选择一个（注意：EnabledLanes 是 1-based）
 	randomIndex := rand.Intn(len(s.levelConfig.EnabledLanes))
 	selectedLane := s.levelConfig.EnabledLanes[randomIndex] // 1-5
-	return selectedLane - 1                                  // 转换为 0-4
+	return selectedLane - 1                                 // 转换为 0-4
 }
 
 // validateLaneConfig 验证行是否在关卡配置的 EnabledLanes 中 (Story 8.1)

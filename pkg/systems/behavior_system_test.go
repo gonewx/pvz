@@ -267,8 +267,8 @@ func TestParticleEffectErrorHandling(t *testing.T) {
 		VX: -20.0,
 	})
 	em.AddComponent(zombieID, &components.ReanimComponent{
-		Reanim: nil, //  "Zombie",
-		PartImages:     make(map[string]*ebiten.Image),
+		Reanim:     nil, //  "Zombie",
+		PartImages: make(map[string]*ebiten.Image),
 	})
 
 	// 触发僵尸死亡（粒子配置未加载，应该失败但不阻塞）
@@ -313,8 +313,8 @@ func TestZombieDeathNoPosition(t *testing.T) {
 		VX: -20.0,
 	})
 	em.AddComponent(zombieID, &components.ReanimComponent{
-		Reanim: nil, //  "Zombie",
-		PartImages:     make(map[string]*ebiten.Image),
+		Reanim:     nil, //  "Zombie",
+		PartImages: make(map[string]*ebiten.Image),
 	})
 
 	// 触发僵尸死亡（应该记录警告但不崩溃）
