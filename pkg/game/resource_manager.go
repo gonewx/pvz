@@ -897,7 +897,41 @@ func (rm *ResourceManager) GetImageByID(resourceID string) *ebiten.Image {
 	}
 
 	// Get from cache
-	return rm.GetImage(filePath)
+	return rm.imageCache[filePath]
+}
+
+// GetImageMetadata retrieves sprite sheet metadata (cols, rows) for an image resource.
+// Returns (cols, rows, true) if the resource exists and has metadata, or (0, 0, false) otherwise.
+//
+// Parameters:
+//   - resourceID: The resource ID (e.g., "IMAGE_DIRTSMALL")
+//
+// Returns:
+//   - cols: Number of columns in the sprite sheet (0 if not a sprite sheet)
+//   - rows: Number of rows in the sprite sheet (0 if not a sprite sheet)
+//   - ok: true if the resource was found, false otherwise
+//
+// Example:
+//
+//	cols, rows, ok := rm.GetImageMetadata("IMAGE_DIRTSMALL")
+//	if ok {
+//	    log.Printf("Sprite sheet: %d cols × %d rows", cols, rows)
+//	}
+func (rm *ResourceManager) GetImageMetadata(resourceID string) (cols int, rows int, ok bool) {
+	if rm.config == nil {
+		return 0, 0, false
+	}
+
+	// Search for the image resource in all groups
+	for _, group := range rm.config.Groups {
+		for _, img := range group.Images {
+			if img.ID == resourceID {
+				return img.Cols, img.Rows, true
+			}
+		}
+	}
+
+	return 0, 0, false
 }
 
 // LoadResourceGroup loads all resources in a specified group.
