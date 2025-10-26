@@ -9,21 +9,34 @@ package config
 //   - 某些粒子效果的"视觉中心"不在锚点上（如 SeedPacket 的光晕中心在锚点下方62px）
 //
 // 用法：
-//   调用者只需提供期望的"视觉中心"位置（如卡片中心），
-//   通过 GetParticleAnchorOffset 获取偏移量，计算实际锚点位置
+//
+//	调用者只需提供期望的"视觉中心"位置（如卡片中心），
+//	通过 GetParticleAnchorOffset 获取偏移量，计算实际锚点位置
 //
 // 示例：
-//   // 期望光晕中心对齐卡片中心
-//   offsetX, offsetY := config.GetParticleAnchorOffset("SeedPacket")
-//   anchorX := cardCenterX + offsetX  // 0
-//   anchorY := cardCenterY + offsetY  // -62，锚点上移62px
-//   CreateParticleEffect(..., anchorX, anchorY, ...)
-//   // 结果：箭头在锚点处（卡片上方），光晕中心在锚点下方62px（卡片中心）
+//
+//	// 期望光晕中心对齐卡片中心
+//	offsetX, offsetY := config.GetParticleAnchorOffset("SeedPacket")
+//	anchorX := cardCenterX + offsetX  // 0
+//	anchorY := cardCenterY + offsetY  // -62，锚点上移62px
+//	CreateParticleEffect(..., anchorX, anchorY, ...)
+//	// 结果：箭头在锚点处（卡片上方），光晕中心在锚点下方62px（卡片中心）
 type ParticleAnchorOffset struct {
 	OffsetX float64 // X轴偏移（正数向右）
 	OffsetY float64 // Y轴偏移（正数向下，负数向上）
 	Comment string  // 视觉效果说明
 }
+
+// Story 10.4: 植物种植粒子效果配置
+const (
+	// PlantingParticleEffect 种植粒子效果名称（原版配置）
+	// 使用 Planting.xml 配置：地面土粒飞溅效果
+	PlantingParticleEffect = "Planting"
+
+	// PlantingParticleBackup 备用粒子效果名称
+	// 当主配置加载失败时使用
+	PlantingParticleBackup = "SodRoll"
+)
 
 // ParticleAnchorOffsets 粒子效果锚点偏移配置表
 //
@@ -76,10 +89,11 @@ var ParticleAnchorOffsets = map[string]ParticleAnchorOffset{
 //   - offsetY: Y轴偏移量（应用于调用者期望的视觉中心Y坐标）
 //
 // 示例：
-//   offsetX, offsetY := GetParticleAnchorOffset("SeedPacket")
-//   anchorX := visualCenterX + offsetX
-//   anchorY := visualCenterY + offsetY
-//   CreateParticleEffect(em, rm, "SeedPacket", anchorX, anchorY, ...)
+//
+//	offsetX, offsetY := GetParticleAnchorOffset("SeedPacket")
+//	anchorX := visualCenterX + offsetX
+//	anchorY := visualCenterY + offsetY
+//	CreateParticleEffect(em, rm, "SeedPacket", anchorX, anchorY, ...)
 func GetParticleAnchorOffset(effectName string) (offsetX, offsetY float64) {
 	if anchor, exists := ParticleAnchorOffsets[effectName]; exists {
 		return anchor.OffsetX, anchor.OffsetY

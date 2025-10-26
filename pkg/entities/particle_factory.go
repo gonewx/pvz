@@ -96,7 +96,8 @@ func CreateParticleEffect(em *ecs.EntityManager, rm *game.ResourceManager, effec
 		em.AddComponent(emitterID, sharedPosition)
 
 		// Parse emitter parameters from string-based configuration
-		spawnRateMin, spawnRateMax, _, _ := particle.ParseValue(emitterConfig.SpawnRate)
+		// Story 7.x: SpawnRate 支持关键帧动画（修复 GraveStoneRise 等粒子效果）
+		spawnRateMin, spawnRateMax, spawnRateKeyframes, spawnRateInterp := particle.ParseValue(emitterConfig.SpawnRate)
 		spawnRate := particle.RandomInRange(spawnRateMin, spawnRateMax)
 
 		// Parse spawn constraints (支持关键帧动画)
@@ -104,9 +105,25 @@ func CreateParticleEffect(em *ecs.EntityManager, rm *game.ResourceManager, effec
 		spawnMaxActiveVal, _, spawnMaxActiveKeyframes, spawnMaxActiveInterp := particle.ParseValue(emitterConfig.SpawnMaxActive)
 		spawnMaxLaunchedVal, _, spawnMaxLaunchedKeyframes, spawnMaxLaunchedInterp := particle.ParseValue(emitterConfig.SpawnMaxLaunched)
 
-		emitterBoxXVal, _, _, _ := particle.ParseValue(emitterConfig.EmitterBoxX)
-		emitterBoxYVal, _, _, _ := particle.ParseValue(emitterConfig.EmitterBoxY)
+		// Story 10.4: 解析 EmitterBox 关键帧（支持动态发射区域变化）
+		// 使用 ParseRangeValue 专门处理范围类型，保留负数和非对称范围信息
+		// 例如：SodRoll.xml 的 EmitterBoxY="[-130 0] [-100 0]"
+		//   → initialMin=-130, initialMax=0
+		//   → minKeyframes=[{0,-130}, {1,-100}], widthKeyframes=[{0,130}, {1,100}]
+		emitterBoxXMin, emitterBoxXMax, emitterBoxXMinKf, emitterBoxXWidthKf, emitterBoxXInterp := particle.ParseRangeValue(emitterConfig.EmitterBoxX)
+		emitterBoxYMin, emitterBoxYMax, emitterBoxYMinKf, emitterBoxYWidthKf, emitterBoxYInterp := particle.ParseRangeValue(emitterConfig.EmitterBoxY)
 		emitterRadiusVal, _, _, _ := particle.ParseValue(emitterConfig.EmitterRadius)
+
+		// DEBUG: 输出 EmitterBox 关键帧解析结果
+		if len(emitterBoxXWidthKf) > 0 || len(emitterBoxYWidthKf) > 0 {
+			log.Printf("[ParticleFactory] EmitterBox 关键帧解析:")
+			if len(emitterBoxXWidthKf) > 0 {
+				log.Printf("  X: min=%v, width关键帧=%v", emitterBoxXMinKf, emitterBoxXWidthKf)
+			}
+			if len(emitterBoxYWidthKf) > 0 {
+				log.Printf("  Y: min=%v, width关键帧=%v", emitterBoxYMinKf, emitterBoxYWidthKf)
+			}
+		}
 
 		// 解析发射器位置偏移量
 		emitterOffsetXVal, _, _, _ := particle.ParseValue(emitterConfig.EmitterOffsetX)
@@ -118,6 +135,22 @@ func CreateParticleEffect(em *ecs.EntityManager, rm *game.ResourceManager, effec
 		// Story 7.5: Parse SystemAlpha (ZombieHead 系统级透明度)
 		_, _, systemAlphaKeyframes, systemAlphaInterp := particle.ParseValue(emitterConfig.SystemAlpha)
 
+		// Story 10.4: Parse SystemFields (SystemPosition 等系统级力场)
+		// 例如：SodRoll.xml 中的 <SystemField><FieldType>SystemPosition</FieldType><X>0 740</X><Y>30 0</Y></SystemField>
+		var systemPosXKeyframes, systemPosYKeyframes []particle.Keyframe
+		var systemPosXInterp, systemPosYInterp string
+
+		for _, field := range emitterConfig.SystemFields {
+			if field.FieldType == "SystemPosition" {
+				// 解析 X 和 Y 的关键帧
+				_, _, systemPosXKeyframes, systemPosXInterp = particle.ParseValue(field.X)
+				_, _, systemPosYKeyframes, systemPosYInterp = particle.ParseValue(field.Y)
+				log.Printf("[ParticleFactory] SystemPosition 解析成功: X=%d个关键帧, Y=%d个关键帧",
+					len(systemPosXKeyframes), len(systemPosYKeyframes))
+				break // 只处理第一个 SystemPosition
+			}
+		}
+
 		// Create EmitterComponent
 		emitterComp := &components.EmitterComponent{
 			Config:           &emitterConfig, // Story 7.4: 取地址
@@ -128,24 +161,42 @@ func CreateParticleEffect(em *ecs.EntityManager, rm *game.ResourceManager, effec
 			ActiveParticles:  make([]ecs.EntityID, 0),
 			TotalLaunched:    0,
 			SpawnRate:        spawnRate,
-			SpawnMinActive:   int(spawnMinActiveVal),
-			SpawnMaxActive:   int(spawnMaxActiveVal),
-			SpawnMaxLaunched: int(spawnMaxLaunchedVal),
-			// 保存关键帧数据（用于动态粒子数量控制）
+			// 保存 SpawnRate 关键帧数据（用于动态生成率控制）
+			SpawnRateKeyframes: spawnRateKeyframes,
+			SpawnRateInterp:    spawnRateInterp,
+			// 保存 Spawn 约束关键帧数据（用于动态粒子数量控制）
+			SpawnMinActive:            int(spawnMinActiveVal),
 			SpawnMinActiveKeyframes:   spawnMinActiveKeyframes,
 			SpawnMinActiveInterp:      spawnMinActiveInterp,
+			SpawnMaxActive:            int(spawnMaxActiveVal),
 			SpawnMaxActiveKeyframes:   spawnMaxActiveKeyframes,
 			SpawnMaxActiveInterp:      spawnMaxActiveInterp,
+			SpawnMaxLaunched:          int(spawnMaxLaunchedVal),
 			SpawnMaxLaunchedKeyframes: spawnMaxLaunchedKeyframes,
 			SpawnMaxLaunchedInterp:    spawnMaxLaunchedInterp,
-			EmitterBoxX:               emitterBoxXVal,
-			EmitterBoxY:               emitterBoxYVal,
-			EmitterRadius:             emitterRadiusVal,
-			EmitterOffsetX:            emitterOffsetXVal,
-			EmitterOffsetY:            emitterOffsetYVal,
+			// EmitterBox: 初始范围宽度（用于单范围格式和双范围初始值）
+			EmitterBoxX:    emitterBoxXMax - emitterBoxXMin,
+			EmitterBoxY:    emitterBoxYMax - emitterBoxYMin,
+			EmitterBoxXMin: emitterBoxXMin,
+			EmitterBoxYMin: emitterBoxYMin,
+			EmitterRadius:  emitterRadiusVal,
+			// Story 10.4: EmitterBox 关键帧（动态发射区域）
+			EmitterBoxXKeyframes:    emitterBoxXWidthKf,
+			EmitterBoxXInterp:       emitterBoxXInterp,
+			EmitterBoxYKeyframes:    emitterBoxYWidthKf,
+			EmitterBoxYInterp:       emitterBoxYInterp,
+			EmitterBoxXMinKeyframes: emitterBoxXMinKf,
+			EmitterBoxYMinKeyframes: emitterBoxYMinKf,
+			EmitterOffsetX:          emitterOffsetXVal,
+			EmitterOffsetY:          emitterOffsetYVal,
 			// Story 7.5: SystemAlpha
 			SystemAlphaKeyframes: systemAlphaKeyframes,
 			SystemAlphaInterp:    systemAlphaInterp,
+			// Story 10.4: SystemPosition (发射器位置插值)
+			SystemPositionXKeyframes: systemPosXKeyframes,
+			SystemPositionXInterp:    systemPosXInterp,
+			SystemPositionYKeyframes: systemPosYKeyframes,
+			SystemPositionYInterp:    systemPosYInterp,
 			// Angle offset
 			AngleOffset: offset,
 		}
@@ -157,8 +208,14 @@ func CreateParticleEffect(em *ecs.EntityManager, rm *game.ResourceManager, effec
 			em.AddComponent(emitterID, &components.UIComponent{})
 		}
 
-		log.Printf("[ParticleFactory] 发射器实体创建成功: ID=%d, Name='%s', SpawnRate=%.2f, SystemDuration=%.2f, isUI=%v",
-			emitterID, emitterConfig.Name, spawnRate, systemDuration, isUIParticle)
+		// Story 10.4: 改进日志，显示 SpawnRate 关键帧信息
+		if len(spawnRateKeyframes) > 0 {
+			log.Printf("[ParticleFactory] 发射器实体创建成功: ID=%d, Name='%s', SpawnRate=动态(%d个关键帧), SystemDuration=%.2f, isUI=%v",
+				emitterID, emitterConfig.Name, len(spawnRateKeyframes), systemDuration, isUIParticle)
+		} else {
+			log.Printf("[ParticleFactory] 发射器实体创建成功: ID=%d, Name='%s', SpawnRate=%.2f, SystemDuration=%.2f, isUI=%v",
+				emitterID, emitterConfig.Name, spawnRate, systemDuration, isUIParticle)
+		}
 	}
 
 	return firstEmitterID, nil

@@ -16,6 +16,94 @@ type Keyframe struct {
 	Value float64 // Value at this keyframe
 }
 
+// ParseRangeValue 解析范围类型的配置值（用于 EmitterBoxX/Y 等）
+// 支持格式：
+//   - 固定值: "100" → min=100, max=100
+//   - 单范围: "[min max]" → min=min, max=max
+//   - 双范围: "[min1 max1] [min2 max2]" → 返回最小值和宽度的关键帧
+//
+// 返回:
+//   - initialMin, initialMax: 初始范围
+//   - minKeyframes: 最小值的关键帧（如果有）
+//   - widthKeyframes: 宽度的关键帧（如果有）
+//   - interpolation: 插值模式
+func ParseRangeValue(s string) (initialMin, initialMax float64, minKeyframes, widthKeyframes []Keyframe, interpolation string) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, 0, nil, nil, ""
+	}
+
+	// 检查双范围格式 "[min1 max1] [min2 max2]"
+	if strings.Count(s, "[") == 2 && strings.Count(s, "]") == 2 {
+		parts := strings.Split(s, "]")
+		if len(parts) >= 2 {
+			// 解析第一个范围
+			range1Str := strings.TrimPrefix(strings.TrimSpace(parts[0]), "[")
+			range1Parts := strings.Fields(range1Str)
+
+			// 解析第二个范围
+			range2Str := strings.TrimPrefix(strings.TrimSpace(parts[1]), "[")
+			range2Str = strings.TrimSuffix(range2Str, "]")
+			range2Parts := strings.Fields(range2Str)
+
+			if len(range1Parts) == 2 && len(range2Parts) == 2 {
+				startMin, err1 := strconv.ParseFloat(range1Parts[0], 64)
+				startMax, err2 := strconv.ParseFloat(range1Parts[1], 64)
+				endMin, err3 := strconv.ParseFloat(range2Parts[0], 64)
+				endMax, err4 := strconv.ParseFloat(range2Parts[1], 64)
+
+				if err1 == nil && err2 == nil && err3 == nil && err4 == nil {
+					// 双范围格式：返回完整的范围插值信息
+					// 例如：[-130 0] [-100 0]
+					//   → initialMin = -130, initialMax = 0
+					//   → minKeyframes = [{0, -130}, {1, -100}]（最小值从 -130 插值到 -100）
+					//   → widthKeyframes = [{0, 130}, {1, 100}]（宽度从 130 插值到 100）
+					startWidth := startMax - startMin
+					endWidth := endMax - endMin
+
+					minKf := []Keyframe{
+						{Time: 0, Value: startMin},
+						{Time: 1, Value: endMin},
+					}
+
+					widthKf := []Keyframe{
+						{Time: 0, Value: startWidth},
+						{Time: 1, Value: endWidth},
+					}
+
+					return startMin, startMax, minKf, widthKf, "Linear"
+				}
+			}
+		}
+	}
+
+	// 单范围格式: "[min max]"
+	if strings.HasPrefix(s, "[") && strings.HasSuffix(s, "]") {
+		rangeStr := strings.TrimPrefix(s, "[")
+		rangeStr = strings.TrimSuffix(rangeStr, "]")
+		parts := strings.Fields(rangeStr)
+		if len(parts) == 2 {
+			min, _ := strconv.ParseFloat(parts[0], 64)
+			max, _ := strconv.ParseFloat(parts[1], 64)
+			return min, max, nil, nil, ""
+		} else if len(parts) == 1 {
+			val, err := strconv.ParseFloat(parts[0], 64)
+			if err == nil {
+				return val, val, nil, nil, ""
+			}
+		}
+	}
+
+	// 固定值格式
+	value, err := strconv.ParseFloat(s, 64)
+	if err == nil {
+		return value, value, nil, nil, ""
+	}
+
+	return 0, 0, nil, nil, ""
+}
+
+
 // ParseValue parses a value string from particle configuration.
 // Supports multiple formats:
 //   - Fixed value: "1500" → min=1500, max=1500, keyframes=nil
@@ -41,8 +129,9 @@ func ParseValue(s string) (min, max float64, keyframes []Keyframe, interpolation
 		closeBracketIdx := strings.Index(s, "]")
 		if closeBracketIdx > 0 && closeBracketIdx < len(s)-1 {
 			afterBracket := strings.TrimSpace(s[closeBracketIdx+1:])
-			// 检查右括号后是否还有内容（关键帧部分）
-			if afterBracket != "" {
+			// Story 10.4 修复：排除双范围格式 "[min1 max1] [min2 max2]"
+			// 检查右括号后是否还有内容（关键帧部分），且不是另一个范围
+			if afterBracket != "" && !strings.HasPrefix(afterBracket, "[") {
 				// 分离范围部分和关键帧部分
 				rangeStr := s[:closeBracketIdx+1]
 				keyframeStr := afterBracket
@@ -114,9 +203,15 @@ func ParseValue(s string) (min, max float64, keyframes []Keyframe, interpolation
 				endMax, err4 := strconv.ParseFloat(range2Parts[1], 64)
 
 				if err1 == nil && err2 == nil && err3 == nil && err4 == nil {
-					// 随机生成初始值和结束值
-					startValue := RandomInRange(startMin, startMax)
-					endValue := RandomInRange(endMin, endMax)
+					// Story 10.4 修复：双范围格式应该计算宽度（绝对值）
+					// 例如：[-130 0] → width = abs(0 - (-130)) = 130
+					//      [-100 0] → width = abs(0 - (-100)) = 100
+					// 这样 EmitterBox 从 130 插值到 100（宽度缩小）
+					//
+					// 注意：EmitterBox 应该使用 ParseRangeValue() 而不是 ParseValue()
+					// ParseRangeValue() 会保留完整的范围信息（min + width）
+					startValue := math.Abs(startMax - startMin)
+					endValue := math.Abs(endMax - endMin)
 
 					// 创建从 0 到 1 的 keyframes
 					keyframes = []Keyframe{
@@ -169,7 +264,7 @@ func ParseValue(s string) (min, max float64, keyframes []Keyframe, interpolation
 
 		// Story 7.5 修复：处理混合格式 ".3 .3,39.999996 0,50"
 		// 这种格式包含：初始值 + 多个"value,timePercent"对
-		var initialValue *float64 // 初始值（如果存在）
+		var initialValue *float64              // 初始值（如果存在）
 		processedIndices := make(map[int]bool) // 标记已处理的索引
 
 		for i, part := range parts {
@@ -247,28 +342,27 @@ func ParseValue(s string) (min, max float64, keyframes []Keyframe, interpolation
 							// 尝试解析后续值
 							nextVal, err := strconv.ParseFloat(parts[i+1], 64)
 							if err == nil {
-							// PopCap 保持-插值格式: "initialValue,holdPercent finalValue"
-							// 动画行为：
-							// 1. 从 0% 到 holdPercent：保持 initialValue 不变
-							// 2. 从 holdPercent 到 100%：从 initialValue 插值到 finalValue
-							// 例如：".2,50 0" -> 前50%保持0.2亮度，后50%淡出到0
-							initialValuePop := val1
-							holdPercent := val2
-							finalValue := nextVal
+								// PopCap 保持-插值格式: "initialValue,holdPercent finalValue"
+								// 动画行为：
+								// 1. 从 0% 到 holdPercent：保持 initialValue 不变
+								// 2. 从 holdPercent 到 100%：从 initialValue 插值到 finalValue
+								// 例如：".2,50 0" -> 前50%保持0.2亮度，后50%淡出到0
+								initialValuePop := val1
+								holdPercent := val2
+								finalValue := nextVal
 
-							// 添加初始关键帧（t=0，值为 initialValue）
-							keyframes = append(keyframes, Keyframe{Time: 0, Value: initialValuePop})
-							// 添加保持关键帧（t=holdPercent%，值仍为 initialValue）
-							keyframes = append(keyframes, Keyframe{Time: holdPercent / 100.0, Value: initialValuePop})
-							// 添加最终关键帧（t=100%，值为 finalValue）
-							keyframes = append(keyframes, Keyframe{Time: 1.0, Value: finalValue})
-							// 标记下一个值已处理
-							processedIndices[i+1] = true
-							initialValue = &initialValuePop // 标记已有初始值
+								// 添加初始关键帧（t=0，值为 initialValue）
+								keyframes = append(keyframes, Keyframe{Time: 0, Value: initialValuePop})
+								// 添加保持关键帧（t=holdPercent%，值仍为 initialValue）
+								keyframes = append(keyframes, Keyframe{Time: holdPercent / 100.0, Value: initialValuePop})
+								// 添加最终关键帧（t=100%，值为 finalValue）
+								keyframes = append(keyframes, Keyframe{Time: 1.0, Value: finalValue})
+								// 标记下一个值已处理
+								processedIndices[i+1] = true
+								initialValue = &initialValuePop // 标记已有初始值
 								continue
 							}
 						}
-
 
 						// 检查这是否是最后一个逗号对（后面没有其他逗号对）
 						isLastKeyframePair := true
@@ -278,7 +372,6 @@ func ParseValue(s string) (min, max float64, keyframes []Keyframe, interpolation
 								break
 							}
 						}
-
 
 						// Story 7.5 新增："value,timePercent" 格式（用于 CollisionReflect 等）
 						// 条件：有初始值 且 val2看起来像百分比（>10）
@@ -327,6 +420,24 @@ func ParseValue(s string) (min, max float64, keyframes []Keyframe, interpolation
 
 		if len(keyframes) > 0 {
 			return 0, 0, keyframes, interpolation
+		}
+	}
+
+	// Story 10.4 修复：检查简单的"两个数字"格式 "value1 value2"（时间插值）
+	// 例如："200 100" 表示从 200 插值到 100（t=0 到 t=1）
+	// 这种格式常见于 SpawnRate, ParticleScale 等配置
+	// 注意：此检查必须在固定值格式之前，因为固定值格式也会匹配单个数字
+	parts := strings.Fields(s)
+	if len(parts) == 2 && !strings.Contains(s, ",") && !strings.Contains(s, "[") {
+		val1, err1 := strconv.ParseFloat(parts[0], 64)
+		val2, err2 := strconv.ParseFloat(parts[1], 64)
+		if err1 == nil && err2 == nil {
+			// 创建从 t=0 到 t=1 的线性插值关键帧
+			keyframes = []Keyframe{
+				{Time: 0, Value: val1},
+				{Time: 1, Value: val2},
+			}
+			return 0, 0, keyframes, "Linear" // 默认线性插值
 		}
 	}
 

@@ -37,6 +37,9 @@ type EmitterComponent struct {
 
 	// SpawnRate: Particles spawned per second
 	SpawnRate float64
+	// SpawnRate keyframes (for dynamic spawn rate over time)
+	SpawnRateKeyframes []particle.Keyframe
+	SpawnRateInterp    string
 
 	// SpawnMinActive: Minimum number of particles to keep active
 	SpawnMinActive int
@@ -57,9 +60,23 @@ type EmitterComponent struct {
 	SpawnMaxLaunchedInterp    string
 
 	// Emitter area properties (发射区域)
-	EmitterBoxX   float64 // Horizontal spawn area size (random position within box)
-	EmitterBoxY   float64 // Vertical spawn area size
+	EmitterBoxX   float64 // Horizontal spawn area size (width, max - min)
+	EmitterBoxY   float64 // Vertical spawn area size (height, max - min)
+	EmitterBoxXMin float64 // Horizontal spawn area minimum (for asymmetric ranges)
+	EmitterBoxYMin float64 // Vertical spawn area minimum (for asymmetric ranges)
 	EmitterRadius float64 // Circular spawn radius (alternative to box)
+
+	// Story 10.4: EmitterBox 关键帧支持（动态发射区域变化）
+	// 例如：SodRoll.xml 的 EmitterBoxY 从 [-130, 0] 过渡到 [-100, 0]
+	EmitterBoxXKeyframes []particle.Keyframe // EmitterBoxX 宽度关键帧
+	EmitterBoxXInterp    string              // 插值模式
+	EmitterBoxYKeyframes []particle.Keyframe // EmitterBoxY 宽度关键帧
+	EmitterBoxYInterp    string              // 插值模式
+
+	// 最小值关键帧（用于非对称范围的插值）
+	// 例如：[-130 0] → [-100 0] 需要最小值从 -130 插值到 -100
+	EmitterBoxXMinKeyframes []particle.Keyframe // EmitterBoxX 最小值关键帧
+	EmitterBoxYMinKeyframes []particle.Keyframe // EmitterBoxY 最小值关键帧
 
 	// Emitter position offset (发射器位置偏移)
 	// 相对于发射器实体位置的偏移量，用于将粒子生成位置微调到特定位置
@@ -78,4 +95,11 @@ type EmitterComponent struct {
 	// 如果非零，将覆盖粒子的初始旋转角度（ParticleSpinAngle）
 	// 用于教学箭头等需要特定方向的粒子效果
 	ParticleRotationOverride float64
+
+	// Story 10.4: SystemField 支持 (系统级力场效果)
+	// SystemPosition: 控制发射器位置随时间变化（如 SodRoll 从左往右滚动）
+	SystemPositionXKeyframes []particle.Keyframe // X轴位置关键帧
+	SystemPositionXInterp    string              // X轴插值模式
+	SystemPositionYKeyframes []particle.Keyframe // Y轴位置关键帧
+	SystemPositionYInterp    string              // Y轴插值模式
 }

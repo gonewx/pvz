@@ -412,3 +412,192 @@ func TestParseValue_ZombieHeadFormats(t *testing.T) {
 		}
 	})
 }
+
+// TestParseRangeValue 测试 ParseRangeValue 函数的各种格式
+func TestParseRangeValue(t *testing.T) {
+	tests := []struct {
+		name              string
+		input             string
+		expectInitialMin  float64
+		expectInitialMax  float64
+		expectMinKeyframe bool // 是否期望有最小值关键帧
+		expectWidthKeyframe bool // 是否期望有宽度关键帧
+	}{
+		{
+			name:             "固定值",
+			input:            "100",
+			expectInitialMin: 100,
+			expectInitialMax: 100,
+			expectMinKeyframe: false,
+			expectWidthKeyframe: false,
+		},
+		{
+			name:             "单范围 - 对称",
+			input:            "[10 20]",
+			expectInitialMin: 10,
+			expectInitialMax: 20,
+			expectMinKeyframe: false,
+			expectWidthKeyframe: false,
+		},
+		{
+			name:             "单范围 - 负数",
+			input:            "[-130 0]",
+			expectInitialMin: -130,
+			expectInitialMax: 0,
+			expectMinKeyframe: false,
+			expectWidthKeyframe: false,
+		},
+		{
+			name:             "双范围 - 对称范围",
+			input:            "[0 25] [0 1]",
+			expectInitialMin: 0,
+			expectInitialMax: 25,
+			expectMinKeyframe: true,
+			expectWidthKeyframe: true,
+		},
+		{
+			name:             "双范围 - 负数非对称范围（SodRoll.xml 实际案例）",
+			input:            "[-130 0] [-100 0]",
+			expectInitialMin: -130,
+			expectInitialMax: 0,
+			expectMinKeyframe: true,
+			expectWidthKeyframe: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			initialMin, initialMax, minKf, widthKf, _ := ParseRangeValue(tt.input)
+
+			// 验证初始范围
+			if math.Abs(initialMin-tt.expectInitialMin) > 0.01 {
+				t.Errorf("initialMin = %.2f, 期望 %.2f", initialMin, tt.expectInitialMin)
+			}
+			if math.Abs(initialMax-tt.expectInitialMax) > 0.01 {
+				t.Errorf("initialMax = %.2f, 期望 %.2f", initialMax, tt.expectInitialMax)
+			}
+
+			// 验证关键帧
+			hasMinKf := len(minKf) > 0
+			hasWidthKf := len(widthKf) > 0
+
+			if hasMinKf != tt.expectMinKeyframe {
+				t.Errorf("最小值关键帧存在性 = %v, 期望 %v", hasMinKf, tt.expectMinKeyframe)
+			}
+			if hasWidthKf != tt.expectWidthKeyframe {
+				t.Errorf("宽度关键帧存在性 = %v, 期望 %v", hasWidthKf, tt.expectWidthKeyframe)
+			}
+		})
+	}
+}
+
+// TestParseRangeValue_NegativeRange 专门测试负数范围的解析
+func TestParseRangeValue_NegativeRange(t *testing.T) {
+	// 测试 SodRoll.xml 的实际配置
+	input := "[-130 0] [-100 0]"
+	initialMin, initialMax, minKf, widthKf, interp := ParseRangeValue(input)
+
+	// 验证初始范围
+	if initialMin != -130 {
+		t.Errorf("initialMin = %.2f, 期望 -130", initialMin)
+	}
+	if initialMax != 0 {
+		t.Errorf("initialMax = %.2f, 期望 0", initialMax)
+	}
+
+	// 验证最小值关键帧
+	if len(minKf) != 2 {
+		t.Fatalf("最小值关键帧数量 = %d, 期望 2", len(minKf))
+	}
+	if minKf[0].Time != 0 || minKf[0].Value != -130 {
+		t.Errorf("最小值关键帧[0] = {%.2f, %.2f}, 期望 {0, -130}", minKf[0].Time, minKf[0].Value)
+	}
+	if minKf[1].Time != 1 || minKf[1].Value != -100 {
+		t.Errorf("最小值关键帧[1] = {%.2f, %.2f}, 期望 {1, -100}", minKf[1].Time, minKf[1].Value)
+	}
+
+	// 验证宽度关键帧
+	if len(widthKf) != 2 {
+		t.Fatalf("宽度关键帧数量 = %d, 期望 2", len(widthKf))
+	}
+	if widthKf[0].Time != 0 || widthKf[0].Value != 130 {
+		t.Errorf("宽度关键帧[0] = {%.2f, %.2f}, 期望 {0, 130}", widthKf[0].Time, widthKf[0].Value)
+	}
+	if widthKf[1].Time != 1 || widthKf[1].Value != 100 {
+		t.Errorf("宽度关键帧[1] = {%.2f, %.2f}, 期望 {1, 100}", widthKf[1].Time, widthKf[1].Value)
+	}
+
+	// 验证插值模式
+	if interp != "Linear" {
+		t.Errorf("插值模式 = %s, 期望 Linear", interp)
+	}
+
+	// 验证插值效果
+	t.Run("插值验证", func(t *testing.T) {
+		// t=0 时：范围应该是 [-130, 0]
+		minAt0 := EvaluateKeyframes(minKf, 0, interp)
+		widthAt0 := EvaluateKeyframes(widthKf, 0, interp)
+		if minAt0 != -130 || widthAt0 != 130 {
+			t.Errorf("t=0: min=%.1f, width=%.1f, 期望 min=-130, width=130", minAt0, widthAt0)
+		}
+
+		// t=1 时：范围应该是 [-100, 0]
+		minAt1 := EvaluateKeyframes(minKf, 1, interp)
+		widthAt1 := EvaluateKeyframes(widthKf, 1, interp)
+		if minAt1 != -100 || widthAt1 != 100 {
+			t.Errorf("t=1: min=%.1f, width=%.1f, 期望 min=-100, width=100", minAt1, widthAt1)
+		}
+
+		// t=0.5 时：范围应该是 [-115, 0]（线性插值）
+		minAt05 := EvaluateKeyframes(minKf, 0.5, interp)
+		widthAt05 := EvaluateKeyframes(widthKf, 0.5, interp)
+		if math.Abs(minAt05-(-115)) > 0.1 || math.Abs(widthAt05-115) > 0.1 {
+			t.Errorf("t=0.5: min=%.1f, width=%.1f, 期望 min=-115, width=115", minAt05, widthAt05)
+		}
+	})
+}
+
+// TestParseRangeValue_EmitterBoxX 测试 EmitterBoxX 的实际配置
+func TestParseRangeValue_EmitterBoxX(t *testing.T) {
+	// 测试 SodRoll.xml 的 EmitterBoxX 配置
+	input := "[0 25] [0 1]"
+	initialMin, initialMax, minKf, widthKf, _ := ParseRangeValue(input)
+
+	// 验证初始范围
+	if initialMin != 0 || initialMax != 25 {
+		t.Errorf("初始范围 = [%.2f, %.2f], 期望 [0, 25]", initialMin, initialMax)
+	}
+
+	// 验证关键帧
+	if len(minKf) != 2 || len(widthKf) != 2 {
+		t.Fatalf("关键帧数量错误: min=%d, width=%d, 期望都是2", len(minKf), len(widthKf))
+	}
+
+	// 验证最小值关键帧（都是0，不变）
+	if minKf[0].Value != 0 || minKf[1].Value != 0 {
+		t.Errorf("最小值关键帧 = [%.2f, %.2f], 期望 [0, 0]", minKf[0].Value, minKf[1].Value)
+	}
+
+	// 验证宽度关键帧（从25缩小到1）
+	if widthKf[0].Value != 25 || widthKf[1].Value != 1 {
+		t.Errorf("宽度关键帧 = [%.2f, %.2f], 期望 [25, 1]", widthKf[0].Value, widthKf[1].Value)
+	}
+}
+
+// TestParseRangeValue_AllNegative 测试全负数范围
+func TestParseRangeValue_AllNegative(t *testing.T) {
+	// 测试全负数范围（如某些粒子的 EmitterBoxY）
+	input := "[-18 -12]"
+	initialMin, initialMax, minKf, widthKf, _ := ParseRangeValue(input)
+
+	// 验证初始范围
+	if initialMin != -18 || initialMax != -12 {
+		t.Errorf("初始范围 = [%.2f, %.2f], 期望 [-18, -12]", initialMin, initialMax)
+	}
+
+	// 单范围不应该有关键帧
+	if len(minKf) > 0 || len(widthKf) > 0 {
+		t.Errorf("单范围不应该有关键帧，但得到 min=%d, width=%d", len(minKf), len(widthKf))
+	}
+}
+

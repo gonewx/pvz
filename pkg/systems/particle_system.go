@@ -43,6 +43,26 @@ func (ps *ParticleSystem) Update(dt float64) {
 	ps.updateParticles(dt)
 }
 
+// GetDynamicSpawnRate 计算当前时刻的 SpawnRate（支持关键帧动画）
+// 导出为公开方法以便测试使用
+func (ps *ParticleSystem) GetDynamicSpawnRate(emitter *components.EmitterComponent) float64 {
+	// 如果有关键帧，使用动态计算
+	if len(emitter.SpawnRateKeyframes) > 0 {
+		// SpawnRate 的关键帧使用绝对时间（厘秒），而不是归一化时间
+		// 例如："50,70 0,90" 表示在 50 厘秒时 SpawnRate=70，在 0 厘秒时 SpawnRate=90
+		t := emitter.Age * 100.0 // 转换为厘秒
+		value := particlePkg.EvaluateKeyframes(emitter.SpawnRateKeyframes, t, emitter.SpawnRateInterp)
+		return value
+	}
+	// 否则返回静态值
+	return emitter.SpawnRate
+}
+
+// getDynamicSpawnRate 私有方法（内部使用）
+func (ps *ParticleSystem) getDynamicSpawnRate(emitter *components.EmitterComponent) float64 {
+	return ps.GetDynamicSpawnRate(emitter)
+}
+
 // GetDynamicSpawnMinActive 计算当前时刻的 SpawnMinActive（支持关键帧动画）
 // 导出为公开方法以便测试使用
 func (ps *ParticleSystem) GetDynamicSpawnMinActive(emitter *components.EmitterComponent) int {
@@ -149,6 +169,28 @@ func (ps *ParticleSystem) updateEmitters(dt float64) {
 		// Update emitter age
 		emitter.Age += dt
 
+		// Story 10.4: 应用 SystemPosition (发射器位置插值)
+		// 例如：SodRoll.xml 配置 <X>0 740</X><Y>30 0</Y>，发射器从 (0, 30) 滚动到 (740, 0)
+		if len(emitter.SystemPositionXKeyframes) > 0 || len(emitter.SystemPositionYKeyframes) > 0 {
+			// 归一化时间 t（0-1），基于发射器年龄和系统持续时间
+			t := 0.0
+			if emitter.SystemDuration > 0 {
+				t = emitter.Age / emitter.SystemDuration
+			}
+
+			// 插值计算 X 位置
+			if len(emitter.SystemPositionXKeyframes) > 0 {
+				offsetX := particlePkg.EvaluateKeyframes(emitter.SystemPositionXKeyframes, t, emitter.SystemPositionXInterp)
+				position.X = offsetX // 直接设置为插值后的绝对位置
+			}
+
+			// 插值计算 Y 位置
+			if len(emitter.SystemPositionYKeyframes) > 0 {
+				offsetY := particlePkg.EvaluateKeyframes(emitter.SystemPositionYKeyframes, t, emitter.SystemPositionYInterp)
+				position.Y = offsetY // 直接设置为插值后的绝对位置
+			}
+		}
+
 		// Check system duration (0 = infinite)
 		if emitter.SystemDuration > 0 && emitter.Age >= emitter.SystemDuration {
 			emitter.Active = false
@@ -157,6 +199,7 @@ func (ps *ParticleSystem) updateEmitters(dt float64) {
 		// Spawn particles if emitter is active
 		if emitter.Active && emitter.Config != nil {
 			// 动态计算当前时刻的 Spawn 约束参数（支持关键帧动画）
+			spawnRate := ps.getDynamicSpawnRate(emitter)
 			spawnMinActive := ps.getDynamicSpawnMinActive(emitter)
 			spawnMaxActive := ps.getDynamicSpawnMaxActive(emitter)
 			spawnMaxLaunched := ps.getDynamicSpawnMaxLaunched(emitter)
@@ -166,7 +209,7 @@ func (ps *ParticleSystem) updateEmitters(dt float64) {
 
 			// SpawnRate=0: 不按时间间隔生成，而是持续保持 SpawnMinActive 数量的粒子活跃
 			// 这是 Award.xml 等复合粒子效果的核心机制
-			if emitter.SpawnRate == 0 {
+			if spawnRate == 0 {
 				// 持续补充模式：如果活跃粒子数 < SpawnMinActive，就补充到目标数量
 				for activeCount < spawnMinActive {
 					// Check spawn constraints
@@ -188,7 +231,7 @@ func (ps *ParticleSystem) updateEmitters(dt float64) {
 						break
 					}
 				}
-			} else if emitter.SpawnRate > 0 {
+			} else if spawnRate > 0 {
 				// Continuous spawn mode: spawn particles at regular intervals
 				for emitter.Age >= emitter.NextSpawnTime {
 					// Check spawn constraints (使用动态计算的值)
@@ -208,8 +251,8 @@ func (ps *ParticleSystem) updateEmitters(dt float64) {
 						activeCount++ // Update local count
 					}
 
-					// Update next spawn time
-					emitter.NextSpawnTime += 1.0 / emitter.SpawnRate
+					// Update next spawn time (使用动态 SpawnRate)
+					emitter.NextSpawnTime += 1.0 / spawnRate
 
 					// Safety check to avoid infinite loop
 					if emitter.NextSpawnTime > emitter.Age+10 {
@@ -393,31 +436,47 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 	// Launch speed and angle
 	speedMin, speedMax, _, _ := particlePkg.ParseValue(config.LaunchSpeed)
 	angleMin, angleMax, _, _ := particlePkg.ParseValue(config.LaunchAngle)
+
+	// DEBUG: 输出解析结果（帮助诊断 LaunchAngle 是否被正确应用）
+	log.Printf("[LaunchAngle] 配置='%s' → 解析: min=%.1f, max=%.1f",
+		config.LaunchAngle, angleMin, angleMax)
+
 	speed := particlePkg.RandomInRange(speedMin, speedMax)
 	angle := particlePkg.RandomInRange(angleMin, angleMax)
 
 	// Story 7.4 修复：如果 LaunchAngle 未定义且发射器类型是 Circle，使用随机 360° 角度
 	if angleMin == 0 && angleMax == 0 && config.LaunchAngle == "" && config.EmitterType == "Circle" {
 		angle = rand.Float64() * 360.0 // 0-360 度随机
+		log.Printf("[LaunchAngle] 检测到 Circle 类型，使用360°随机: %.1f°", angle)
 	}
+
+	// DEBUG: 输出最终使用的角度
+	log.Printf("[LaunchAngle] 最终角度=%.1f° (范围 [%.1f, %.1f])", angle, angleMin, angleMax)
 
 	// Story 7.6: Apply emitter's angle offset (e.g., 180° to flip direction)
 	// This keeps particle system decoupled from business logic (zombie direction)
 	// Business logic (BehaviorSystem) calculates offset based on entity direction
 	angle += emitter.AngleOffset
 
-	// Story 7.6 修正：PvZ 使用标准屏幕坐标系
-	// 0° = 向右，90° = 向下，180° = 向左，270° = 向上
-	// 与数学/物理标准一致，无需复杂转换
-	// 例如：
-	//   - SodRoll [90-180°] → 向下和向左 ⬋ (割草机从左向右，泥土向后飞)
-	//   - ZombieHead [150-185°] → 向左下 ⬋ (僵尸向右走时，头向左后方飞)
+	// Story 10.4 修正：PvZ 使用数学标准坐标系（Y轴向上）
+	// 角度定义（基于数学坐标系）：
+	//   0° = 向右，90° = 向上，180° = 向左，270° = 向下
+	// 证据：SodRoll.md 明确说 "90度（正上方）到180度（正左方）"
+	//
+	// 转换到屏幕坐标（Y轴向下）：
+	//   - velocityX = speed * cos(angle) （无需转换）
+	//   - velocityY = -speed * sin(angle) （取反！因为屏幕Y轴向下）
+	//
+	// 验证示例：
+	//   - SodRoll [90-180°]：90°→上，135°→左上，180°→左 ✓ "向上和向左"
+	//   - Planting [110-250°]：110°→左上，180°→左，250°→左下 ✓ "向上和两侧"
+	//   - ZombieHead [150-185°]：150°→左上，185°→左 ✓ "向左后方"
 
 	// Convert angle to radians and calculate velocity components
 	// LaunchSpeed is in pixels/second, use directly (no conversion needed)
 	angleRad := angle * math.Pi / 180.0
 	velocityX := speed * math.Cos(angleRad)
-	velocityY := speed * math.Sin(angleRad) // Y轴向下为正，与屏幕坐标系一致
+	velocityY := -speed * math.Sin(angleRad) // Y轴取反：数学坐标系→屏幕坐标系
 
 	// Initial rotation and spin speed
 	spinAngleMin, spinAngleMax, _, _ := particlePkg.ParseValue(config.ParticleSpinAngle)
@@ -491,6 +550,50 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 	// 应用发射器偏移量（EmitterOffsetX/Y）
 	spawnX := emitterPos.X + emitter.EmitterOffsetX
 	spawnY := emitterPos.Y + emitter.EmitterOffsetY
+
+	// Story 10.4: 动态计算 EmitterBox（支持关键帧插值）
+	// 修复：正确处理非对称范围和负数偏移
+	// 例如：SodRoll.xml 的 EmitterBoxY="[-130 0] [-100 0]"
+	//   → minY 从 -130 插值到 -100
+	//   → widthY 从 130 插值到 100
+	//   → spawnY = minY + rand() * widthY
+	dynamicEmitterBoxXMin := emitter.EmitterBoxXMin
+	dynamicEmitterBoxYMin := emitter.EmitterBoxYMin
+	dynamicEmitterBoxXWidth := emitter.EmitterBoxX
+	dynamicEmitterBoxYWidth := emitter.EmitterBoxY
+
+	if len(emitter.EmitterBoxXKeyframes) > 0 || len(emitter.EmitterBoxYKeyframes) > 0 ||
+		len(emitter.EmitterBoxXMinKeyframes) > 0 || len(emitter.EmitterBoxYMinKeyframes) > 0 {
+		// 归一化时间 t（0-1），基于发射器年龄和系统持续时间
+		t := 0.0
+		if emitter.SystemDuration > 0 {
+			t = emitter.Age / emitter.SystemDuration
+		}
+
+		// 插值计算 EmitterBoxX 的最小值和宽度
+		if len(emitter.EmitterBoxXMinKeyframes) > 0 {
+			dynamicEmitterBoxXMin = particlePkg.EvaluateKeyframes(emitter.EmitterBoxXMinKeyframes, t, emitter.EmitterBoxXInterp)
+		}
+		if len(emitter.EmitterBoxXKeyframes) > 0 {
+			dynamicEmitterBoxXWidth = particlePkg.EvaluateKeyframes(emitter.EmitterBoxXKeyframes, t, emitter.EmitterBoxXInterp)
+		}
+
+		// 插值计算 EmitterBoxY 的最小值和宽度
+		if len(emitter.EmitterBoxYMinKeyframes) > 0 {
+			dynamicEmitterBoxYMin = particlePkg.EvaluateKeyframes(emitter.EmitterBoxYMinKeyframes, t, emitter.EmitterBoxYInterp)
+		}
+		if len(emitter.EmitterBoxYKeyframes) > 0 {
+			dynamicEmitterBoxYWidth = particlePkg.EvaluateKeyframes(emitter.EmitterBoxYKeyframes, t, emitter.EmitterBoxYInterp)
+		}
+
+		// DEBUG: 输出前3次的插值结果
+		if emitter.TotalLaunched < 3 {
+			log.Printf("[EmitterBox] t=%.3f, Y: min=%.1f, width=%.1f, 范围=[%.1f, %.1f]",
+				t, dynamicEmitterBoxYMin, dynamicEmitterBoxYWidth,
+				dynamicEmitterBoxYMin, dynamicEmitterBoxYMin+dynamicEmitterBoxYWidth)
+		}
+	}
+
 	if emitter.EmitterRadius > 0 {
 		// 均匀分布在圆形区域内：半径使用 sqrt 随机，角度均匀
 		r := math.Sqrt(rand.Float64()) * emitter.EmitterRadius
@@ -498,11 +601,14 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 		spawnX += r * math.Cos(ang)
 		spawnY += r * math.Sin(ang)
 	} else {
-		if emitter.EmitterBoxX > 0 {
-			spawnX += rand.Float64()*emitter.EmitterBoxX - emitter.EmitterBoxX/2
+		// 修复：使用非对称范围生成
+		// 对于范围 [min, max]，使用 min + rand() * (max - min)
+		// 而不是对称的 center ± width/2
+		if dynamicEmitterBoxXWidth > 0 {
+			spawnX += dynamicEmitterBoxXMin + rand.Float64()*dynamicEmitterBoxXWidth
 		}
-		if emitter.EmitterBoxY > 0 {
-			spawnY += rand.Float64()*emitter.EmitterBoxY - emitter.EmitterBoxY/2
+		if dynamicEmitterBoxYWidth > 0 {
+			spawnY += dynamicEmitterBoxYMin + rand.Float64()*dynamicEmitterBoxYWidth
 		}
 	}
 
@@ -797,7 +903,17 @@ func (ps *ParticleSystem) applyFields(p *components.ParticleComponent, dt float6
 				frictionY = particlePkg.RandomInRange(yMin, yMax)
 			}
 
-			// Friction coefficient per second (use directly)
+			// Story 10.4 修正：摩擦力单位转换（与加速度一致）
+			// 配置值基于原版引擎的固定时间步长（0.01秒/tick）
+			// 例如：Friction=0.08 表示每 tick 衰减 8% 的速度
+			//       转换为标准系数：0.08 / 0.01 = 8.0 (每秒衰减800%)
+			//
+			// 验证：Planting 配置 Friction=0.08
+			//   - 转换前：0.3秒内仅衰减2.5% ❌ 不符合"非常迅速地减速"
+			//   - 转换后：0.3秒内衰减93.4% ✅ 符合文档描述
+			frictionX = frictionX / OriginalTimeStep
+			frictionY = frictionY / OriginalTimeStep
+
 			// Apply friction (velocity decay)
 			p.VelocityX *= (1 - frictionX*dt)
 			p.VelocityY *= (1 - frictionY*dt)
@@ -844,7 +960,8 @@ func (ps *ParticleSystem) applyFields(p *components.ParticleComponent, dt float6
 // IsParticleEffectCompleted 检查指定的粒子特效是否播放完成
 //
 // 判断标准（优雅且系统化）：
-//   发射器年龄 >= MAX(关键帧最后时间点, SystemDuration) + MAX(ParticleDuration)
+//
+//	发射器年龄 >= MAX(关键帧最后时间点, SystemDuration) + MAX(ParticleDuration)
 //
 // 原理：
 //   - 发射器在最后时间点停止生成新粒子
