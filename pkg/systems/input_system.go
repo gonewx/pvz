@@ -143,6 +143,20 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 		}
 	}
 
+	// DEBUG: 按 L 键在鼠标位置生成 Planting 粒子效果（测试种植粒子）
+	if inpututil.IsKeyJustPressed(ebiten.KeyL) {
+		mouseScreenX, mouseScreenY := ebiten.CursorPosition()
+		mouseWorldX := float64(mouseScreenX) + cameraX
+		mouseWorldY := float64(mouseScreenY)
+
+		_, err := entities.NewPlantingParticleEffect(s.entityManager, s.resourceManager, mouseWorldX, mouseWorldY)
+		if err != nil {
+			log.Printf("[InputSystem] DEBUG: 生成种植粒子效果失败: %v", err)
+		} else {
+			log.Printf("[InputSystem] DEBUG: 在位置 (%.1f, %.1f) 生成种植粒子效果", mouseWorldX, mouseWorldY)
+		}
+	}
+
 	// 检测鼠标右键取消种植模式
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight) {
 		if s.gameState.IsPlantingMode {
@@ -526,6 +540,20 @@ func (s *InputSystem) handleLawnClick(mouseX, mouseY int) bool {
 	}
 
 	log.Printf("[InputSystem] 成功创建植物实体 (ID: %d, Type: %v) 在 (%d, %d)", plantID, plantType, col, row)
+
+	// Story 10.4: 触发种植粒子效果
+	worldX, worldY := utils.GridToWorldCoords(
+		col, row,
+		config.GridWorldStartX, config.GridWorldStartY,
+		config.CellWidth, config.CellHeight,
+	)
+	_, err = entities.NewPlantingParticleEffect(s.entityManager, s.resourceManager, worldX, worldY)
+	if err != nil {
+		log.Printf("[InputSystem] 警告：创建种植粒子效果失败: %v", err)
+		// 不阻塞游戏逻辑，继续进行
+	} else {
+		log.Printf("[InputSystem] 触发种植粒子效果，位置: (%.1f, %.1f)", worldX, worldY)
+	}
 
 	// 标记格子为占用
 	err = s.lawnGridSystem.OccupyCell(s.lawnGridEntityID, col, row, plantID)

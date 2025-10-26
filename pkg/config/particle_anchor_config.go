@@ -36,6 +36,15 @@ const (
 	// PlantingParticleBackup 备用粒子效果名称
 	// 当主配置加载失败时使用
 	PlantingParticleBackup = "SodRoll"
+
+	// PlantingParticleAngleOffset 种植粒子效果的角度偏移（度）
+	// 用于调整粒子发射方向，例如：
+	//   -90: 向左偏转 90 度
+	//     0: 不偏转（使用 XML 原始角度）
+	//    90: 向右偏转 90 度
+	//   180: 反向（上下翻转）
+	// 注：原版 Planting.xml 的 LaunchAngle 为 [110 250]（向上飞溅）
+	PlantingParticleAngleOffset = -90.0
 )
 
 // ParticleAnchorOffsets 粒子效果锚点偏移配置表
@@ -73,6 +82,19 @@ var ParticleAnchorOffsets = map[string]ParticleAnchorOffset{
 		OffsetX: 0,
 		OffsetY: -62,
 		Comment: "光晕中心对齐奖励中心，箭头在奖励上方",
+	},
+
+	// Planting: 植物种植土粒飞溅效果
+	// 调用者提供格子中心坐标（GridToWorldCoords 返回值）
+	// 粒子效果应该在植物根部（格子底部）显示
+	// 计算：
+	//   - 格子中心 = GridWorldStartY + row * CellHeight + CellHeight/2
+	//   - 植物根部 = 格子中心 + CellHeight/2 = 格子中心 + 50.0
+	//   - OffsetY = +50.0（向下移动到根部）
+	"Planting": {
+		OffsetX: 0,
+		OffsetY: 30.0, // CellHeight / 2，从格子中心移动到底部（根部）
+		Comment: "土粒从植物根部（格子底部）飞溅",
 	},
 
 	// 注：其他未列出的粒子效果使用默认值（OffsetX=0, OffsetY=0）

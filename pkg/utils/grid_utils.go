@@ -91,6 +91,29 @@ func GridToScreenCoords(
 	return centerX, centerY
 }
 
+// GridToWorldCoords 将草坪网格坐标转换为世界坐标（格子中心）
+// Story 10.4: 用于计算粒子效果位置
+//
+// 参数:
+//   - col: 列索引 (0 到 columns-1)
+//   - row: 行索引 (0 到 rows-1)
+//   - gridWorldStartX, gridWorldStartY: 网格在背景图片中的起始位置（世界坐标）
+//   - cellWidth, cellHeight: 每个格子的宽度和高度（像素）
+//
+// 返回:
+//   - centerX, centerY: 格子中心的世界坐标
+func GridToWorldCoords(
+	col, row int,
+	gridWorldStartX, gridWorldStartY float64,
+	cellWidth, cellHeight float64,
+) (centerX, centerY float64) {
+	// 计算格子中心的世界坐标
+	centerX = gridWorldStartX + float64(col)*cellWidth + cellWidth/2
+	centerY = gridWorldStartY + float64(row)*cellHeight + cellHeight/2
+
+	return centerX, centerY
+}
+
 // GetEntityRow 根据实体的世界Y坐标计算其所在的行索引
 //
 // 此函数用于判断豌豆射手和僵尸是否在同一行，以决定是否发射子弹
