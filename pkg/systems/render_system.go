@@ -1037,23 +1037,40 @@ func (s *RenderSystem) buildParticleVertices(particle *components.ParticleCompon
 	var srcX0, srcY0, srcX1, srcY1 float32
 
 	if particle.ImageFrames > 1 {
-		// 多帧精灵图：水平排列
-		frameWidth := fullWidth / particle.ImageFrames
-		frameHeight := fullHeight
+		// BUG修复：多帧/多行精灵图的正确处理
+		// 精灵图布局：cols × rows（例如：IMAGE_DIRTSMALL 是 8 cols × 2 rows）
+		//
+		// 计算单个帧的尺寸
+		cols := particle.ImageFrames
+		rows := particle.ImageRows
+		if rows == 0 {
+			rows = 1 // 默认单行（向后兼容）
+		}
+
+		frameWidth := fullWidth / cols
+		frameHeight := fullHeight / rows  // ✅ 修复：除以行数，而不是使用完整高度
+
+		// 计算当前帧在精灵图中的行列位置
+		// frameNum 是 0-based 索引，按行优先顺序（从左到右，从上到下）
+		// 例如：8 cols × 2 rows，frameNum=0 → (0,0)，frameNum=7 → (7,0)，frameNum=8 → (0,1)
+		frameCol := particle.FrameNum % cols
+		frameRow := particle.FrameNum / cols
 
 		// 计算纹理坐标（相对于原始图片）
-		frameX := particle.FrameNum * frameWidth
+		frameX := frameCol * frameWidth
+		frameY := frameRow * frameHeight  // ✅ 修复：考虑行偏移
+
 		srcX0 = float32(fullBounds.Min.X + frameX)
-		srcY0 = float32(fullBounds.Min.Y)
+		srcY0 = float32(fullBounds.Min.Y + frameY)      // ✅ 修复：从对应行开始
 		srcX1 = float32(fullBounds.Min.X + frameX + frameWidth)
-		srcY1 = float32(fullBounds.Min.Y + frameHeight)
+		srcY1 = float32(fullBounds.Min.Y + frameY + frameHeight)  // ✅ 修复：正确的单帧高度
 
 		w = float64(frameWidth)
 		h = float64(frameHeight)
 
 		// DEBUG: 多帧精灵图日志（每个粒子每帧都打印会刷屏，已禁用）
-		// log.Printf("[RenderSystem] 多帧精灵图: 总尺寸=%dx%d, 帧数=%d, 当前帧=%d, 纹理坐标=(%.0f,%.0f)-(%.0f,%.0f), 帧尺寸=%.0fx%.0f",
-		// 	fullWidth, fullHeight, particle.ImageFrames, particle.FrameNum, srcX0, srcY0, srcX1, srcY1, w, h)
+		// log.Printf("[RenderSystem] 精灵图: 总尺寸=%dx%d, 帧数=%dx%d, 当前帧=%d(col=%d,row=%d), 纹理坐标=(%.0f,%.0f)-(%.0f,%.0f), 帧尺寸=%.0fx%.0f",
+		// 	fullWidth, fullHeight, cols, rows, particle.FrameNum, frameCol, frameRow, srcX0, srcY0, srcX1, srcY1, w, h)
 	} else {
 		// 单帧图片：使用整个图片
 		srcX0 = float32(fullBounds.Min.X)

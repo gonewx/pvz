@@ -64,7 +64,12 @@ type EmitterComponent struct {
 	EmitterBoxY   float64 // Vertical spawn area size (height, max - min)
 	EmitterBoxXMin float64 // Horizontal spawn area minimum (for asymmetric ranges)
 	EmitterBoxYMin float64 // Vertical spawn area minimum (for asymmetric ranges)
-	EmitterRadius float64 // Circular spawn radius (alternative to box)
+	EmitterRadius  float64 // Deprecated: Use EmitterRadiusMin/Max instead (保留用于向后兼容)
+
+	// EmitterRadius 范围支持（修复 Bug：支持 [min max] 格式）
+	// 例如：Planting.xml 的 EmitterRadius="[0 10]" 表示粒子在半径 0-10 之间随机生成
+	EmitterRadiusMin float64 // Minimum spawn radius
+	EmitterRadiusMax float64 // Maximum spawn radius
 
 	// Story 10.4: EmitterBox 关键帧支持（动态发射区域变化）
 	// 例如：SodRoll.xml 的 EmitterBoxY 从 [-130, 0] 过渡到 [-100, 0]

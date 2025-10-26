@@ -55,6 +55,10 @@ func CreateParticleEffect(em *ecs.EntityManager, rm *game.ResourceManager, effec
 		}
 	}
 
+	// IMPORTANT: 调试种植粒子数量问题 - 监控 Planting 效果创建次数
+	if effectName == "Planting" {
+		log.Printf("🌱 [PLANTING DEBUG] CreateParticleEffect 被调用: 位置=(%.1f, %.1f), angleOffset=%.1f°", worldX, worldY, offset)
+	}
 	log.Printf("[ParticleFactory] CreateParticleEffect 被调用: effectName='%s', 位置=(%.1f, %.1f), angleOffset=%.1f°, isUIParticle=%v",
 		effectName, worldX, worldY, offset, isUIParticle)
 
@@ -112,7 +116,10 @@ func CreateParticleEffect(em *ecs.EntityManager, rm *game.ResourceManager, effec
 		//   → minKeyframes=[{0,-130}, {1,-100}], widthKeyframes=[{0,130}, {1,100}]
 		emitterBoxXMin, emitterBoxXMax, emitterBoxXMinKf, emitterBoxXWidthKf, emitterBoxXInterp := particle.ParseRangeValue(emitterConfig.EmitterBoxX)
 		emitterBoxYMin, emitterBoxYMax, emitterBoxYMinKf, emitterBoxYWidthKf, emitterBoxYInterp := particle.ParseRangeValue(emitterConfig.EmitterBoxY)
-		emitterRadiusVal, _, _, _ := particle.ParseValue(emitterConfig.EmitterRadius)
+
+		// 修复：EmitterRadius 支持范围格式 [min max]
+		// 例如：Planting.xml 的 "<EmitterRadius>[0 10]</EmitterRadius>" 表示半径在 0-10 之间随机
+		emitterRadiusMin, emitterRadiusMax, _, _ := particle.ParseValue(emitterConfig.EmitterRadius)
 
 		// DEBUG: 输出 EmitterBox 关键帧解析结果
 		if len(emitterBoxXWidthKf) > 0 || len(emitterBoxYWidthKf) > 0 {
@@ -179,7 +186,10 @@ func CreateParticleEffect(em *ecs.EntityManager, rm *game.ResourceManager, effec
 			EmitterBoxY:    emitterBoxYMax - emitterBoxYMin,
 			EmitterBoxXMin: emitterBoxXMin,
 			EmitterBoxYMin: emitterBoxYMin,
-			EmitterRadius:  emitterRadiusVal,
+			// 修复：EmitterRadius 保存 min/max（支持范围格式）
+			EmitterRadius:    emitterRadiusMin,    // Deprecated: 保留用于向后兼容（旧代码可能使用）
+			EmitterRadiusMin: emitterRadiusMin,
+			EmitterRadiusMax: emitterRadiusMax,
 			// Story 10.4: EmitterBox 关键帧（动态发射区域）
 			EmitterBoxXKeyframes:    emitterBoxXWidthKf,
 			EmitterBoxXInterp:       emitterBoxXInterp,
@@ -209,12 +219,18 @@ func CreateParticleEffect(em *ecs.EntityManager, rm *game.ResourceManager, effec
 		}
 
 		// Story 10.4: 改进日志，显示 SpawnRate 关键帧信息
+		plantingDebugMsg := ""
+		if effectName == "Planting" {
+			plantingDebugMsg = fmt.Sprintf(" 🌱 [种植土粒] SpawnMinActive=%d, SpawnMaxLaunched=%d (默认=%d)",
+				emitterComp.SpawnMinActive, emitterComp.SpawnMaxLaunched, emitterComp.SpawnMinActive)
+		}
+
 		if len(spawnRateKeyframes) > 0 {
-			log.Printf("[ParticleFactory] 发射器实体创建成功: ID=%d, Name='%s', SpawnRate=动态(%d个关键帧), SystemDuration=%.2f, isUI=%v",
-				emitterID, emitterConfig.Name, len(spawnRateKeyframes), systemDuration, isUIParticle)
+			log.Printf("[ParticleFactory] 发射器实体创建成功: ID=%d, Name='%s', SpawnRate=动态(%d个关键帧), SystemDuration=%.2f, isUI=%v%s",
+				emitterID, emitterConfig.Name, len(spawnRateKeyframes), systemDuration, isUIParticle, plantingDebugMsg)
 		} else {
-			log.Printf("[ParticleFactory] 发射器实体创建成功: ID=%d, Name='%s', SpawnRate=%.2f, SystemDuration=%.2f, isUI=%v",
-				emitterID, emitterConfig.Name, spawnRate, systemDuration, isUIParticle)
+			log.Printf("[ParticleFactory] 发射器实体创建成功: ID=%d, Name='%s', SpawnRate=%.2f, SystemDuration=%.2f, isUI=%v%s",
+				emitterID, emitterConfig.Name, spawnRate, systemDuration, isUIParticle, plantingDebugMsg)
 		}
 	}
 

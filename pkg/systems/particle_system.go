@@ -196,6 +196,10 @@ func (ps *ParticleSystem) updateEmitters(dt float64) {
 			emitter.Active = false
 		}
 
+		// 修复：在计算 activeCount 之前先清理已删除的粒子
+		// 这样 activeCount 才能反映真实的活跃粒子数量
+		ps.cleanupDestroyedParticles(emitter)
+
 		// Spawn particles if emitter is active
 		if emitter.Active && emitter.Config != nil {
 			// 动态计算当前时刻的 Spawn 约束参数（支持关键帧动画）
@@ -204,21 +208,28 @@ func (ps *ParticleSystem) updateEmitters(dt float64) {
 			spawnMaxActive := ps.getDynamicSpawnMaxActive(emitter)
 			spawnMaxLaunched := ps.getDynamicSpawnMaxLaunched(emitter)
 
-			// 获取当前活跃粒子数量
+			// 获取当前活跃粒子数量（已清理已删除粒子，准确）
 			activeCount := len(emitter.ActiveParticles)
 
-			// SpawnRate=0: 不按时间间隔生成，而是持续保持 SpawnMinActive 数量的粒子活跃
-			// 这是 Award.xml 等复合粒子效果的核心机制
+			// SpawnRate=0: 不按时间间隔生成
+			// 区分两种模式：
+			// 1. 如果 SpawnMaxLaunched=0（未配置），默认等于 SpawnMinActive → 一次性发射
+			//    例如：Planting.xml (种植土粒) → 一次性发射 8 个粒子
+			// 2. 如果 SpawnMaxLaunched>0，持续补充到 SpawnMinActive 个粒子活跃
+			//    例如：Award.xml (奖励动画) → 持续保持粒子数量
 			if spawnRate == 0 {
-				// 持续补充模式：如果活跃粒子数 < SpawnMinActive，就补充到目标数量
-				for activeCount < spawnMinActive {
+				// 确定最大发射数量
+				effectiveMaxLaunched := spawnMaxLaunched
+				if effectiveMaxLaunched == 0 {
+					// 未配置 SpawnMaxLaunched：默认等于 SpawnMinActive（一次性发射模式）
+					effectiveMaxLaunched = spawnMinActive
+				}
+
+				// 补充粒子到目标数量（受 SpawnMaxLaunched 限制）
+				for activeCount < spawnMinActive && emitter.TotalLaunched < effectiveMaxLaunched {
 					// Check spawn constraints
 					canSpawn := true
 					if spawnMaxActive > 0 && activeCount >= spawnMaxActive {
-						canSpawn = false
-						break
-					}
-					if spawnMaxLaunched > 0 && emitter.TotalLaunched >= spawnMaxLaunched {
 						canSpawn = false
 						break
 					}
@@ -261,9 +272,6 @@ func (ps *ParticleSystem) updateEmitters(dt float64) {
 				}
 			}
 		}
-
-		// Clean up destroyed particles from active list
-		ps.cleanupDestroyedParticles(emitter)
 
 		// Story 7.4: Auto-cleanup emitter entities when finished
 		// Delete emitter if it's inactive and has no active particles
@@ -514,6 +522,10 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 		initialScale = 1.0 // Default scale
 	}
 
+	// DEBUG: 输出解析结果（帮助诊断 ParticleScale 是否被正确应用）
+	log.Printf("[ParticleScale] 配置='%s' → 解析: min=%.2f, max=%.2f, initialScale=%.2f",
+		config.ParticleScale, scaleMin, scaleMax, initialScale)
+
 	// Alpha (transparency)
 	alphaMin, alphaMax, alphaKeyframes, alphaInterp := particlePkg.ParseValue(config.ParticleAlpha)
 	var initialAlpha float64
@@ -550,6 +562,13 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 	// 应用发射器偏移量（EmitterOffsetX/Y）
 	spawnX := emitterPos.X + emitter.EmitterOffsetX
 	spawnY := emitterPos.Y + emitter.EmitterOffsetY
+
+	// DEBUG: 输出基础生成位置
+	if emitter.TotalLaunched < 3 {
+		log.Printf("[DEBUG SpawnBase] 粒子#%d: emitterPos=(%.1f, %.1f), offset=(%.1f, %.1f), spawnBase=(%.1f, %.1f)",
+			emitter.TotalLaunched+1, emitterPos.X, emitterPos.Y,
+			emitter.EmitterOffsetX, emitter.EmitterOffsetY, spawnX, spawnY)
+	}
 
 	// Story 10.4: 动态计算 EmitterBox（支持关键帧插值）
 	// 修复：正确处理非对称范围和负数偏移
@@ -594,12 +613,27 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 		}
 	}
 
-	if emitter.EmitterRadius > 0 {
+	if emitter.EmitterRadiusMax > 0 {
+		// 修复：EmitterRadius 支持范围格式 [min max]
+		// 每个粒子随机选择 min-max 之间的半径
+		// 例如：Planting.xml 的 "[0 10]" → 粒子在半径 0-10 之间随机分布
+		radius := particlePkg.RandomInRange(emitter.EmitterRadiusMin, emitter.EmitterRadiusMax)
+
 		// 均匀分布在圆形区域内：半径使用 sqrt 随机，角度均匀
-		r := math.Sqrt(rand.Float64()) * emitter.EmitterRadius
+		// 使用 sqrt 确保粒子在圆内均匀分布（而不是聚集在中心）
+		r := math.Sqrt(rand.Float64()) * radius
 		ang := rand.Float64() * 2 * math.Pi
-		spawnX += r * math.Cos(ang)
-		spawnY += r * math.Sin(ang)
+		offsetX := r * math.Cos(ang)
+		offsetY := r * math.Sin(ang)
+
+		// DEBUG: 输出前3个粒子的圆形分布参数
+		if emitter.TotalLaunched < 3 {
+			log.Printf("[DEBUG EmitterRadius] 粒子#%d: radius=%.2f, r=%.2f, angle=%.2f°, offset=(%.2f, %.2f)",
+				emitter.TotalLaunched+1, radius, r, ang*180/math.Pi, offsetX, offsetY)
+		}
+
+		spawnX += offsetX
+		spawnY += offsetY
 	} else {
 		// 修复：使用非对称范围生成
 		// 对于范围 [min, max]，使用 min + rand() * (max - min)
@@ -622,6 +656,7 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 	// config.Image 包含资源 ID（如 "IMAGE_ZOMBIEARM"）
 	var particleImage *ebiten.Image
 	imageFrames := 1 // 默认单帧
+	imageRows := 1   // 默认单行
 	frameNum := 0    // 默认第 0 帧
 
 	if config.Image != "" && ps.ResourceManager != nil {
@@ -644,6 +679,20 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 				}
 				if parsedFrames > 0 {
 					imageFrames = parsedFrames
+				}
+			}
+
+			// BUG修复：从资源配置读取精灵图的 rows 信息
+			// 例如：IMAGE_DIRTSMALL 配置为 cols=8, rows=2
+			// 这样才能正确渲染 40x40 的土粒，而不是拉伸为 40x80
+			if cols, rows, ok := ps.ResourceManager.GetImageMetadata(config.Image); ok {
+				if rows > 0 {
+					imageRows = rows
+				}
+				// 验证 ImageFrames 与配置的 cols 是否一致
+				if cols > 0 && imageFrames != cols {
+					log.Printf("[ParticleSystem] 警告：ImageFrames(%d) 与资源配置 cols(%d) 不一致，使用配置值", imageFrames, cols)
+					imageFrames = cols
 				}
 			}
 
@@ -703,8 +752,8 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 	}
 
 	// DEBUG: 粒子创建日志
-	log.Printf("[DEBUG] 创建粒子: pos=(%.1f,%.1f), velocity=(%.1f,%.1f), angle=%.1f°, speed=%.1f, groundY=%.1f, image=%v",
-		spawnX, spawnY, velocityX, velocityY, angle, speed, groundY, particleImage != nil)
+	log.Printf("[DEBUG] 创建粒子: pos=(%.1f,%.1f), velocity=(%.1f,%.1f), angle=%.1f°, speed=%.1f, scale=%.2f, groundY=%.1f, image=%v",
+		spawnX, spawnY, velocityX, velocityY, angle, speed, initialScale, groundY, particleImage != nil)
 
 	// Create ParticleComponent
 	particleComp := &components.ParticleComponent{
@@ -729,7 +778,8 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 		SpinInterpolation:  spinInterp,
 
 		Image:       particleImage, // Story 7.4: Loaded from ResourceManager
-		ImageFrames: imageFrames,   // Story 7.4: 精灵图帧数
+		ImageFrames: imageFrames,   // Story 7.4: 精灵图帧数（列数）
+		ImageRows:   imageRows,     // BUG修复：精灵图行数（用于正确计算单帧高度）
 		FrameNum:    frameNum,      // Story 7.4: 当前帧编号
 		Additive:    additive,
 		Fields:      config.Fields, // Copy force fields from config

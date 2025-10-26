@@ -56,7 +56,8 @@ type ParticleComponent struct {
 
 	// Rendering properties
 	Image       *ebiten.Image // Particle texture/sprite image (full sprite sheet or single frame)
-	ImageFrames int           // Number of frames in the sprite sheet (1 = single image, >1 = sprite sheet)
+	ImageFrames int           // Number of frames (columns) in the sprite sheet (1 = single image, >1 = sprite sheet)
+	ImageRows   int           // Number of rows in the sprite sheet (1 = single row, >1 = multi-row sprite sheet)
 	FrameNum    int           // Current frame number (0-based index, used for sprite sheets)
 	Additive    bool          // Use additive blending when rendering
 
