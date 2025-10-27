@@ -1065,6 +1065,10 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 		s.renderSystem.DrawTutorialText(screen, s.tutorialFont)
 	}
 
+	// Layer 8.6: Draw UI particles (教学箭头、奖励粒子等)
+	// UI 粒子不受摄像机影响，渲染在教学文本之后
+	s.renderSystem.DrawParticles(screen, 0)
+
 	// Layer 9: Draw level progress bar (Story 5.5 - 正式版本)
 	// 右下角图形化进度条
 	s.drawProgressBar(screen)

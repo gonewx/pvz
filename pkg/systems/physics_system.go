@@ -95,9 +95,11 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 			bullets = append(bullets, entityID)
 		} else if behavior.Type == components.BehaviorZombieBasic ||
 			behavior.Type == components.BehaviorZombieEating ||
+			behavior.Type == components.BehaviorZombieDying || // 死亡动画期间仍然检测碰撞
 			behavior.Type == components.BehaviorZombieConehead ||
 			behavior.Type == components.BehaviorZombieBuckethead {
-			// 包括移动中的僵尸和啃食中的僵尸（普通、路障、铁桶）
+			// 包括移动中的僵尸、啃食中的僵尸、死亡中的僵尸（普通、路障、铁桶）
+			// 死亡中的僵尸仍然需要碰撞检测，以便子弹不会穿透尸体
 			zombies = append(zombies, entityID)
 		}
 	}

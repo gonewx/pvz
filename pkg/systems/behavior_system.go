@@ -322,7 +322,8 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 
 // triggerZombieDeath 触发僵尸死亡状态转换
 // 当僵尸生命值 <= 0 时调用，将僵尸从正常行为状态切换到死亡动画播放状态
-// Story 7.4: 添加僵尸死亡粒子效果触发（手臂掉落、头部掉落）
+// Story 7.4: 添加僵尸死亡粒子效果触发（头部掉落）
+// 注意：手臂掉落粒子效果在 updateZombieDamageState 中触发（受伤时）
 func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 	// 1. 切换行为类型为 BehaviorZombieDying
 	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
@@ -360,23 +361,8 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 			log.Printf("[BehaviorSystem] 僵尸 %d 方向: VX=%.1f → 粒子角度偏移=%.0f°", entityID, velocity.VX, angleOffset)
 		}
 
-		// Story 7.4: 触发僵尸手臂掉落粒子效果
-		_, err := entities.CreateParticleEffect(
-			s.entityManager,
-			s.resourceManager,
-			"MoweredZombieArm", // 粒子效果名称（不带.xml后缀）
-			position.X, position.Y,
-			angleOffset, // Story 7.6: 传递角度偏移
-		)
-		if err != nil {
-			log.Printf("[BehaviorSystem] 警告：创建僵尸手臂掉落粒子效果失败: %v", err)
-			// 不阻塞游戏逻辑，游戏继续运行
-		} else {
-			log.Printf("[BehaviorSystem] 僵尸 %d 触发手臂掉落粒子效果，位置: (%.1f, %.1f)", entityID, position.X, position.Y)
-		}
-
 		// Story 7.4: 触发僵尸头部掉落粒子效果
-		_, err = entities.CreateParticleEffect(
+		_, err := entities.CreateParticleEffect(
 			s.entityManager,
 			s.resourceManager,
 			"MoweredZombieHead", // 粒子效果名称（不带.xml后缀）
@@ -602,16 +588,52 @@ func (s *BehaviorSystem) updateZombieDamageState(entityID ecs.EntityID, health *
 	// 生命值阈值：90（33%，根据原版游戏数据）
 	const armLostThreshold = 90
 
-	// 检查是否应该掉手臂（生命值 <= 90）
-	if health.CurrentHealth <= armLostThreshold {
+	// 检查是否应该掉手臂（生命值 <= 90 且手臂尚未掉落）
+	if health.CurrentHealth <= armLostThreshold && !health.ArmLost {
+		// 标记手臂已掉落，防止重复触发
+		health.ArmLost = true
+
 		// 使用 ReanimSystem 通用接口隐藏 "arm" 部件组
 		// 部件组映射在实体创建时配置（zombie_factory.go），BehaviorSystem 不需要知道具体轨道名
 		if err := s.reanimSystem.HidePartGroup(entityID, "arm"); err != nil {
 			// 如果实体没有配置 PartGroups（非僵尸实体），静默忽略
 			return
 		}
-		// log.Printf("[BehaviorSystem] 僵尸 %d 手臂掉落 (HP=%d/%d)",
-		// entityID, health.CurrentHealth, health.MaxHealth)
+
+		log.Printf("[BehaviorSystem] 僵尸 %d 手臂掉落 (HP=%d/%d)",
+			entityID, health.CurrentHealth, health.MaxHealth)
+
+		// 获取僵尸位置，用于触发粒子效果
+		position, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+		if !ok {
+			log.Printf("[BehaviorSystem] 警告：僵尸 %d 缺少 PositionComponent，无法触发手臂掉落粒子", entityID)
+			return
+		}
+
+		// 检测僵尸行进方向，计算粒子角度偏移
+		angleOffset := 180.0 // 默认翻转（适合僵尸向左走）
+		velocity, hasVelocity := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID)
+		if hasVelocity {
+			if velocity.VX > 0 {
+				angleOffset = 0.0 // 僵尸向右走
+			} else {
+				angleOffset = 180.0 // 僵尸向左走
+			}
+		}
+
+		// 触发僵尸手臂掉落粒子效果
+		_, err := entities.CreateParticleEffect(
+			s.entityManager,
+			s.resourceManager,
+			"MoweredZombieArm", // 粒子效果名称（不带.xml后缀）
+			position.X, position.Y,
+			angleOffset, // 角度偏移
+		)
+		if err != nil {
+			log.Printf("[BehaviorSystem] 警告：创建僵尸手臂掉落粒子效果失败: %v", err)
+		} else {
+			log.Printf("[BehaviorSystem] 僵尸 %d 触发手臂掉落粒子效果，位置: (%.1f, %.1f)", entityID, position.X, position.Y)
+		}
 	}
 }
 
