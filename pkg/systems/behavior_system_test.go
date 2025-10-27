@@ -39,6 +39,20 @@ func init() {
 	}
 }
 
+// createTestBehaviorSystem 创建测试用的 BehaviorSystem（包含必需的依赖）
+// Bug Fix: 所有测试需要传入 LawnGridSystem 和 lawnGridEntityID
+func createTestBehaviorSystem(em *ecs.EntityManager, rm *game.ResourceManager, rs *ReanimSystem, gs *game.GameState) *BehaviorSystem {
+	// 创建测试用的 LawnGridSystem
+	lgs := NewLawnGridSystem(em, []int{1, 2, 3, 4, 5})
+
+	// 创建草坪网格实体
+	gridID := em.CreateEntity()
+	ecs.AddComponent(em, gridID, &components.LawnGridComponent{})
+
+	// 返回完整的 BehaviorSystem
+	return NewBehaviorSystem(em, rm, rs, gs, lgs, gridID)
+}
+
 // TestZombieDeathParticleEffect 测试僵尸死亡时是否正确触发粒子效果
 // AC 9: 验证僵尸死亡时创建粒子发射器实体（MoweredZombieArm, MoweredZombieHead）
 func TestZombieDeathParticleEffect(t *testing.T) {
@@ -53,7 +67,7 @@ func TestZombieDeathParticleEffect(t *testing.T) {
 		t.Skipf("跳过测试：无法加载粒子资源: %v", err)
 	}
 
-	bs := NewBehaviorSystem(em, rm, rs, gs)
+	bs := createTestBehaviorSystem(em, rm, rs, gs)
 
 	// 创建测试僵尸实体
 	zombieID := em.CreateEntity()
@@ -157,7 +171,7 @@ func TestCherryBombExplosionParticleEffect(t *testing.T) {
 		t.Skipf("跳过测试：无法加载粒子资源: %v", err)
 	}
 
-	bs := NewBehaviorSystem(em, rm, rs, gs)
+	bs := createTestBehaviorSystem(em, rm, rs, gs)
 
 	// 创建测试樱桃炸弹实体
 	cherryBombID := em.CreateEntity()
@@ -248,7 +262,7 @@ func TestParticleEffectErrorHandling(t *testing.T) {
 	rs := NewReanimSystem(em)
 	gs := game.GetGameState()
 
-	bs := NewBehaviorSystem(em, rm, rs, gs)
+	bs := createTestBehaviorSystem(em, rm, rs, gs)
 
 	// 创建测试僵尸实体
 	zombieID := em.CreateEntity()
@@ -302,7 +316,7 @@ func TestZombieDeathNoPosition(t *testing.T) {
 	rs := NewReanimSystem(em)
 	gs := game.GetGameState()
 
-	bs := NewBehaviorSystem(em, rm, rs, gs)
+	bs := createTestBehaviorSystem(em, rm, rs, gs)
 
 	// 创建测试僵尸实体（故意不添加 PositionComponent）
 	zombieID := em.CreateEntity()
@@ -345,7 +359,7 @@ func TestCherryBombExplosionNoPosition(t *testing.T) {
 		t.Skipf("跳过测试：无法加载粒子资源: %v", err)
 	}
 
-	bs := NewBehaviorSystem(em, rm, rs, gs)
+	bs := createTestBehaviorSystem(em, rm, rs, gs)
 
 	// 创建测试樱桃炸弹实体（有 PlantComponent 但无 PositionComponent）
 	cherryBombID := em.CreateEntity()

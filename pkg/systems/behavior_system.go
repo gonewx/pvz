@@ -15,11 +15,13 @@ import (
 // BehaviorSystem 处理实体的行为逻辑
 // 根据实体的 BehaviorComponent 类型执行相应的行为（如向日葵生产阳光、豌豆射手攻击等）
 type BehaviorSystem struct {
-	entityManager   *ecs.EntityManager
-	resourceManager *game.ResourceManager
-	reanimSystem    *ReanimSystem   // Story 6.3: 用于切换僵尸动画状态
-	gameState       *game.GameState // Story 5.5: 用于僵尸死亡计数
-	logFrameCounter int             // 日志输出计数器（避免全局变量）
+	entityManager    *ecs.EntityManager
+	resourceManager  *game.ResourceManager
+	reanimSystem     *ReanimSystem   // Story 6.3: 用于切换僵尸动画状态
+	gameState        *game.GameState // Story 5.5: 用于僵尸死亡计数
+	logFrameCounter  int             // 日志输出计数器（避免全局变量）
+	lawnGridSystem   *LawnGridSystem // Bug Fix: 用于植物死亡时释放网格占用
+	lawnGridEntityID ecs.EntityID    // Bug Fix: 草坪网格实体ID
 }
 
 // 阳光生产位置偏移常量
@@ -37,12 +39,16 @@ const (
 //   - rm: ResourceManager 实例
 //   - rs: ReanimSystem 实例 (Story 6.3: 用于切换僵尸动画)
 //   - gs: GameState 实例 (Story 5.5: 用于僵尸死亡计数)
-func NewBehaviorSystem(em *ecs.EntityManager, rm *game.ResourceManager, rs *ReanimSystem, gs *game.GameState) *BehaviorSystem {
+//   - lgs: LawnGridSystem 实例 (Bug Fix: 用于植物死亡时释放网格占用)
+//   - lawnGridID: 草坪网格实体ID (Bug Fix)
+func NewBehaviorSystem(em *ecs.EntityManager, rm *game.ResourceManager, rs *ReanimSystem, gs *game.GameState, lgs *LawnGridSystem, lawnGridID ecs.EntityID) *BehaviorSystem {
 	return &BehaviorSystem{
-		entityManager:   em,
-		resourceManager: rm,
-		reanimSystem:    rs,
-		gameState:       gs,
+		entityManager:    em,
+		resourceManager:  rm,
+		reanimSystem:     rs,
+		gameState:        gs,
+		lawnGridSystem:   lgs,
+		lawnGridEntityID: lawnGridID,
 	}
 }
 
@@ -924,6 +930,17 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 				// 检查植物是否死亡
 				if plantHealth.CurrentHealth <= 0 {
 					log.Printf("[BehaviorSystem] 植物 %d 被吃掉，删除实体", plantID)
+
+					// Bug Fix: 释放网格占用状态，允许重新种植
+					if plantComp, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, plantID); ok {
+						err := s.lawnGridSystem.ReleaseCell(s.lawnGridEntityID, plantComp.GridCol, plantComp.GridRow)
+						if err != nil {
+							log.Printf("[BehaviorSystem] 警告：释放网格占用失败: %v", err)
+						} else {
+							log.Printf("[BehaviorSystem] 网格 (%d, %d) 已释放", plantComp.GridCol, plantComp.GridRow)
+						}
+					}
+
 					s.entityManager.DestroyEntity(plantID)
 					// 恢复僵尸移动
 					s.stopEatingAndResume(entityID)

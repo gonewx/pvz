@@ -40,7 +40,7 @@ func TestTriggerPlantAttackAnimation(t *testing.T) {
 	rm := game.NewResourceManager(getTestAudioContext())
 	rs := NewReanimSystem(em)
 	gs := game.GetGameState()
-	bs := NewBehaviorSystem(em, rm, rs, gs)
+	bs := createTestBehaviorSystem(em, rm, rs, gs)
 
 	// Create peashooter entity
 	peashooterID := createTestPeashooter(em, rs)
@@ -95,7 +95,7 @@ func TestUpdatePlantAttackAnimation(t *testing.T) {
 	rm := game.NewResourceManager(getTestAudioContext())
 	rs := NewReanimSystem(em)
 	gs := game.GetGameState()
-	bs := NewBehaviorSystem(em, rm, rs, gs)
+	bs := createTestBehaviorSystem(em, rm, rs, gs)
 
 	peashooterID := createTestPeashooter(em, rs)
 
@@ -137,7 +137,7 @@ func TestUpdatePlantAttackAnimation_OtherPlants(t *testing.T) {
 	rm := game.NewResourceManager(getTestAudioContext())
 	rs := NewReanimSystem(em)
 	gs := game.GetGameState()
-	bs := NewBehaviorSystem(em, rm, rs, gs)
+	bs := createTestBehaviorSystem(em, rm, rs, gs)
 
 	// Create a generic plant entity (not peashooter)
 	plantID := em.CreateEntity()
@@ -181,7 +181,7 @@ func TestAttackAnimationNoRetrigger(t *testing.T) {
 	rm := game.NewResourceManager(getTestAudioContext())
 	rs := NewReanimSystem(em)
 	gs := game.GetGameState()
-	bs := NewBehaviorSystem(em, rm, rs, gs)
+	bs := createTestBehaviorSystem(em, rm, rs, gs)
 
 	peashooterID := createTestPeashooter(em, rs)
 
@@ -234,7 +234,7 @@ func TestPeashooterAttackAnimationCycle(t *testing.T) {
 	rm := game.NewResourceManager(getTestAudioContext())
 	rs := NewReanimSystem(em)
 	gs := game.GetGameState()
-	bs := NewBehaviorSystem(em, rm, rs, gs)
+	bs := createTestBehaviorSystem(em, rm, rs, gs)
 
 	peashooterID := createTestPeashooter(em, rs)
 	zombieID := createTestZombie(em, 500.0, 300.0)
@@ -357,7 +357,7 @@ func TestNonShooterPlantsUnaffected(t *testing.T) {
 	rm := game.NewResourceManager(getTestAudioContext())
 	rs := NewReanimSystem(em)
 	gs := game.GetGameState()
-	bs := NewBehaviorSystem(em, rm, rs, gs)
+	bs := createTestBehaviorSystem(em, rm, rs, gs)
 
 	sunflowerID := em.CreateEntity()
 	ecs.AddComponent(em, sunflowerID, &components.PlantComponent{

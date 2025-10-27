@@ -170,6 +170,10 @@ type GameScene struct {
 
 	// Story 10.2: Lawnmower System (除草车系统)
 	lawnmowerSystem *systems.LawnmowerSystem // 除草车系统（最后防线）
+
+	// Story 11.2: Level Progress Bar (关卡进度条)
+	levelProgressBarRenderSystem *systems.LevelProgressBarRenderSystem // 进度条渲染系统
+	levelProgressBarEntity       ecs.EntityID                          // 进度条实体ID
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -310,7 +314,15 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	// Story 3.4: Initialize behavior system (sunflower sun production, etc.)
 	// Story 6.3: Pass ReanimSystem for zombie animation state changes
 	// Story 5.5: Pass GameState for zombie death counting
-	scene.behaviorSystem = systems.NewBehaviorSystem(scene.entityManager, rm, scene.reanimSystem, scene.gameState)
+	// Bug Fix: Pass LawnGridSystem for plant death grid release
+	scene.behaviorSystem = systems.NewBehaviorSystem(
+		scene.entityManager,
+		rm,
+		scene.reanimSystem,
+		scene.gameState,
+		scene.lawnGridSystem,
+		scene.lawnGridEntityID,
+	)
 	log.Printf("[GameScene] Initialized behavior system for plant behaviors")
 
 	// Story 4.3: Initialize physics system (collision detection)
@@ -411,6 +423,9 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 
 	// Story 10.1: 初始化暂停菜单系统
 	scene.initPauseMenuModule(rm)
+
+	// Story 11.2: 初始化关卡进度条系统
+	scene.initProgressBar(rm)
 
 	return scene
 }
@@ -533,6 +548,39 @@ func (s *GameScene) initPauseMenuModule(rm *game.ResourceManager) {
 	} else {
 		log.Printf("[GameScene] Pause menu module initialized")
 	}
+}
+
+// initProgressBar 初始化关卡进度条（Story 11.2）
+// 创建进度条实体和渲染系统，关联到 LevelSystem
+func (s *GameScene) initProgressBar(rm *game.ResourceManager) {
+	// 加载字体（用于关卡文本）
+	font, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.LevelTextFontSize)
+	if err != nil {
+		log.Printf("[GameScene] ERROR: Failed to load progress bar font: %v", err)
+		return
+	}
+	log.Printf("[GameScene] Loaded progress bar font: SimHei.ttf (%.0fpx)", config.LevelTextFontSize)
+
+	// 创建进度条渲染系统
+	s.levelProgressBarRenderSystem = systems.NewLevelProgressBarRenderSystem(s.entityManager, font)
+	log.Printf("[GameScene] Created progress bar render system")
+
+	// 创建进度条实体（位置会在渲染时根据右对齐动态计算）
+	progressBarEntity, err := entities.NewLevelProgressBarEntity(
+		s.entityManager,
+		rm,
+	)
+	if err != nil {
+		log.Printf("[GameScene] ERROR: Failed to create progress bar entity: %v", err)
+		return
+	}
+
+	s.levelProgressBarEntity = progressBarEntity
+
+	// 关联到 LevelSystem（让 LevelSystem 初始化进度条数据）
+	s.levelSystem.SetProgressBarEntity(progressBarEntity)
+
+	log.Printf("[GameScene] Level progress bar initialized (Entity ID: %d)", progressBarEntity)
 }
 
 // loadResources loads all UI images required for the game scene.
@@ -1627,84 +1675,9 @@ func (s *GameScene) drawLawnFlash(screen *ebiten.Image) {
 // drawProgressBar 渲染右下角的进度条（使用原版资源）
 // 显示当前关卡进度和已消灭的僵尸波次
 func (s *GameScene) drawProgressBar(screen *ebiten.Image) {
-	// 只在关卡加载后且有进度条资源时显示
-	if s.gameState.CurrentLevel == nil || s.flagMeter == nil {
-		return
-	}
-
-	// 进度条位置：右下角（从配置读取）
-	progressX := float64(WindowWidth) - config.ProgressBarOffsetFromRight
-	progressY := float64(WindowHeight) - config.ProgressBarOffsetFromBottom
-
-	// 绘制背景（FlagMeter第1行 - 正常状态）
-	bgBounds := s.flagMeter.Bounds()
-	bgHeight := bgBounds.Dy() / 2 // 2行切片，每行高度27像素
-	bgRect := image.Rect(0, 0, bgBounds.Dx(), bgHeight)
-	bgImage := s.flagMeter.SubImage(bgRect).(*ebiten.Image)
-
-	bgOp := &ebiten.DrawImageOptions{}
-	bgOp.GeoM.Translate(progressX, progressY)
-	screen.DrawImage(bgImage, bgOp)
-
-	// 绘制僵尸头图标（FlagMeterParts第1列）
-	if s.flagMeterFlag != nil {
-		partsBounds := s.flagMeterFlag.Bounds()
-		partWidth := partsBounds.Dx() / 3 // 3列切片
-		zombieHeadRect := image.Rect(0, 0, partWidth, partsBounds.Dy())
-		zombieHeadImage := s.flagMeterFlag.SubImage(zombieHeadRect).(*ebiten.Image)
-
-		// 僵尸头位置：进度条左侧（从配置读取偏移）
-		headOp := &ebiten.DrawImageOptions{}
-		headOp.GeoM.Translate(
-			progressX+config.ProgressBarZombieHeadOffsetX,
-			progressY+config.ProgressBarZombieHeadOffsetY,
-		)
-		screen.DrawImage(zombieHeadImage, headOp)
-	}
-
-	// 计算进度（已击杀僵尸数 / 总僵尸数）
-	totalZombies := s.gameState.TotalZombiesSpawned
-	killedZombies := s.gameState.ZombiesKilled
-	progress := 0.0
-	if totalZombies > 0 {
-		progress = float64(killedZombies) / float64(totalZombies)
-	}
-
-	// 绘制进度条填充（从左到右）
-	if s.flagMeterProg != nil && progress > 0 {
-		progBounds := s.flagMeterProg.Bounds()
-		fillWidth := int(float64(progBounds.Dx()) * progress)
-		if fillWidth > progBounds.Dx() {
-			fillWidth = progBounds.Dx()
-		}
-
-		if fillWidth > 0 {
-			// 裁剪进度条图片
-			fillRect := image.Rect(0, 0, fillWidth, progBounds.Dy())
-			fillImage := s.flagMeterProg.SubImage(fillRect).(*ebiten.Image)
-
-			// 进度条位置：在背景内部，僵尸头右侧（从配置读取偏移）
-			fillOp := &ebiten.DrawImageOptions{}
-			fillOp.GeoM.Translate(
-				progressX+config.ProgressBarFillOffsetX,
-				progressY+config.ProgressBarFillOffsetY,
-			)
-			screen.DrawImage(fillImage, fillOp)
-		}
-	}
-
-	// 绘制关卡编号文字（如"关卡 1-1"）
-	if s.sunCounterFont != nil && s.gameState.CurrentLevel != nil {
-		levelText := fmt.Sprintf("关卡 %s", s.gameState.CurrentLevel.ID)
-
-		// 文字位置：进度条右侧（从配置读取偏移）
-		textX := progressX + float64(bgBounds.Dx()) + config.ProgressBarLevelTextOffsetX
-		textY := progressY + config.ProgressBarLevelTextOffsetY
-
-		op := &text.DrawOptions{}
-		op.GeoM.Translate(textX, textY)
-		op.ColorScale.ScaleWithColor(color.RGBA{R: 255, G: 255, B: 255, A: 255}) // 白色
-		text.Draw(screen, levelText, s.sunCounterFont, op)
+	// Story 11.2: 使用 ECS 进度条渲染系统
+	if s.levelProgressBarRenderSystem != nil {
+		s.levelProgressBarRenderSystem.Draw(screen)
 	}
 }
 
