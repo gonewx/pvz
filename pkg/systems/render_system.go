@@ -759,8 +759,21 @@ func (s *RenderSystem) DrawParticles(screen *ebiten.Image, cameraX float64) {
 		return
 	}
 
+	// 过滤出只有 UI 粒子（避免与 DrawGameWorldParticles 重复渲染）
+	uiParticleEntities := make([]ecs.EntityID, 0)
+	for _, id := range entities {
+		_, isUIParticle := ecs.GetComponent[*components.UIComponent](s.entityManager, id)
+		if isUIParticle {
+			uiParticleEntities = append(uiParticleEntities, id)
+		}
+	}
+
+	if len(uiParticleEntities) == 0 {
+		return
+	}
+
 	// DEBUG: 粒子数量日志（每帧打印会刷屏，已注释）
-	// log.Printf("[RenderSystem] DrawParticles: 找到 %d 个粒子实体", len(entities))
+	// log.Printf("[RenderSystem] DrawParticles (UI only): 找到 %d 个 UI 粒子实体", len(uiParticleEntities))
 
 	// 按图片和混合模式分组粒子（用于批量渲染）
 	// 以 (image 指针, 混合模式) 作为批次键，避免不同贴图被错误混用
@@ -777,7 +790,7 @@ func (s *RenderSystem) DrawParticles(screen *ebiten.Image, cameraX float64) {
 
 	batches := make(map[batchKey]*renderBatch)
 
-	for _, id := range entities {
+	for _, id := range uiParticleEntities {
 		particle, hasParticle := ecs.GetComponent[*components.ParticleComponent](s.entityManager, id)
 		if !hasParticle {
 			continue
