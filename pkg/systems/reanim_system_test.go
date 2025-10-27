@@ -664,3 +664,185 @@ func intPtr(i int) *int {
 func floatPtr(f float64) *float64 {
 	return &f
 }
+
+// TestGetTrackTransform tests the GetTrackTransform method
+// Story 10.5: 测试获取轨道实时坐标的API
+func TestGetTrackTransform(t *testing.T) {
+	// 创建 EntityManager
+	em := ecs.NewEntityManager()
+
+	// 创建 ReanimSystem
+	rs := NewReanimSystem(em)
+
+	// 测试用例 1: 正常获取轨道坐标
+	t.Run("Normal track transform", func(t *testing.T) {
+		// 创建测试实体
+		entityID := em.CreateEntity()
+
+		// 创建测试用的 Reanim 组件
+		reanimComp := &components.ReanimComponent{
+			CurrentAnim: "test_anim",
+			CurrentFrame: 2, // 使用第3帧（0-based）
+			MergedTracks: map[string][]reanim.Frame{
+				"idle_mouth": {
+					// Frame 0
+					{X: floatPtr(10.0), Y: floatPtr(20.0)},
+					// Frame 1
+					{X: floatPtr(15.0), Y: floatPtr(25.0)},
+					// Frame 2 (当前帧)
+					{X: floatPtr(20.0), Y: floatPtr(30.0)},
+					// Frame 3
+					{X: floatPtr(25.0), Y: floatPtr(35.0)},
+				},
+			},
+		}
+		ecs.AddComponent(em, entityID, reanimComp)
+
+		// 调用 GetTrackTransform
+		x, y, err := rs.GetTrackTransform(entityID, "idle_mouth")
+
+		// 验证结果
+		if err != nil {
+			t.Fatalf("Expected no error, got %v", err)
+		}
+		if x != 20.0 {
+			t.Errorf("Expected x=20.0, got %f", x)
+		}
+		if y != 30.0 {
+			t.Errorf("Expected y=30.0, got %f", y)
+		}
+	})
+
+	// 测试用例 2: 轨道不存在
+	t.Run("Track not found", func(t *testing.T) {
+		entityID := em.CreateEntity()
+		reanimComp := &components.ReanimComponent{
+			CurrentAnim: "test_anim",
+			CurrentFrame: 0,
+			MergedTracks: map[string][]reanim.Frame{
+				"other_track": {
+					{X: floatPtr(10.0), Y: floatPtr(20.0)},
+				},
+			},
+		}
+		ecs.AddComponent(em, entityID, reanimComp)
+
+		_, _, err := rs.GetTrackTransform(entityID, "nonexistent_track")
+
+		if err == nil {
+			t.Fatal("Expected error for nonexistent track, got nil")
+		}
+		expectedErrMsg := "track 'nonexistent_track' not found"
+		if !containsString(err.Error(), expectedErrMsg) {
+			t.Errorf("Expected error message to contain '%s', got '%s'", expectedErrMsg, err.Error())
+		}
+	})
+
+	// 测试用例 3: 实体无 ReanimComponent
+	t.Run("Entity without ReanimComponent", func(t *testing.T) {
+		entityID := em.CreateEntity()
+
+		_, _, err := rs.GetTrackTransform(entityID, "idle_mouth")
+
+		if err == nil {
+			t.Fatal("Expected error for entity without ReanimComponent, got nil")
+		}
+		expectedErrMsg := "does not have ReanimComponent"
+		if !containsString(err.Error(), expectedErrMsg) {
+			t.Errorf("Expected error message to contain '%s', got '%s'", expectedErrMsg, err.Error())
+		}
+	})
+
+	// 测试用例 4: 帧号越界（使用最后一帧）
+	t.Run("Frame index out of bounds", func(t *testing.T) {
+		entityID := em.CreateEntity()
+		reanimComp := &components.ReanimComponent{
+			CurrentAnim: "test_anim",
+			CurrentFrame: 100, // 超出范围
+			MergedTracks: map[string][]reanim.Frame{
+				"idle_mouth": {
+					{X: floatPtr(10.0), Y: floatPtr(20.0)},
+					{X: floatPtr(15.0), Y: floatPtr(25.0)},
+				},
+			},
+		}
+		ecs.AddComponent(em, entityID, reanimComp)
+
+		x, y, err := rs.GetTrackTransform(entityID, "idle_mouth")
+
+		// 应该使用最后一帧（Frame 1）
+		if err != nil {
+			t.Fatalf("Expected no error, got %v", err)
+		}
+		if x != 15.0 {
+			t.Errorf("Expected x=15.0 (last frame), got %f", x)
+		}
+		if y != 25.0 {
+			t.Errorf("Expected y=25.0 (last frame), got %f", y)
+		}
+	})
+
+	// 测试用例 5: 坐标为 nil（默认 0, 0）
+	t.Run("Nil coordinates", func(t *testing.T) {
+		entityID := em.CreateEntity()
+		reanimComp := &components.ReanimComponent{
+			CurrentAnim: "test_anim",
+			CurrentFrame: 0,
+			MergedTracks: map[string][]reanim.Frame{
+				"idle_mouth": {
+					{X: nil, Y: nil}, // 坐标为 nil
+				},
+			},
+		}
+		ecs.AddComponent(em, entityID, reanimComp)
+
+		x, y, err := rs.GetTrackTransform(entityID, "idle_mouth")
+
+		if err != nil {
+			t.Fatalf("Expected no error, got %v", err)
+		}
+		if x != 0.0 {
+			t.Errorf("Expected x=0.0 (default), got %f", x)
+		}
+		if y != 0.0 {
+			t.Errorf("Expected y=0.0 (default), got %f", y)
+		}
+	})
+
+	// 测试用例 6: 轨道无帧数据
+	t.Run("Track with no frames", func(t *testing.T) {
+		entityID := em.CreateEntity()
+		reanimComp := &components.ReanimComponent{
+			CurrentAnim: "test_anim",
+			CurrentFrame: 0,
+			MergedTracks: map[string][]reanim.Frame{
+				"idle_mouth": {}, // 空轨道
+			},
+		}
+		ecs.AddComponent(em, entityID, reanimComp)
+
+		_, _, err := rs.GetTrackTransform(entityID, "idle_mouth")
+
+		if err == nil {
+			t.Fatal("Expected error for track with no frames, got nil")
+		}
+		expectedErrMsg := "has no frames"
+		if !containsString(err.Error(), expectedErrMsg) {
+			t.Errorf("Expected error message to contain '%s', got '%s'", expectedErrMsg, err.Error())
+		}
+	})
+}
+
+// containsString checks if a string contains a substring
+func containsString(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
+		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
+		func() bool {
+			for i := 0; i <= len(s)-len(substr); i++ {
+				if s[i:i+len(substr)] == substr {
+					return true
+				}
+			}
+			return false
+		}()))
+}

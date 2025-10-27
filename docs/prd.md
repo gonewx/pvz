@@ -18,6 +18,8 @@
 | 2025-10-15 | 1.2 | Added Epic 7: Particle Effect System - Brownfield Enhancement. | Sarah (PO) |
 | 2025-10-16 | 1.3 | Added Epic 8: Chapter 1 Level Implementation - Day Levels 1-1 to 1-10. | Sarah (PO) |
 | 2025-10-16 | 1.4 | Added Epic 9: ECS Generics Refactor - Brownfield Enhancement. | Sarah (PO) |
+| 2025-10-20 | 1.5 | Added Epic 10: Game Experience Polish - Brownfield Enhancement. | Sarah (PO) |
+| 2025-10-26 | 1.6 | Added Epic 11: Level UI Enhancement (进度条完善、最后一波提示、铺草皮特效). | Bob (Scrum Master) |
 
 ## **2. Requirements (需求)**
 
@@ -124,6 +126,8 @@
     *   **目标:** 将当前基于反射的 ECS 框架迁移到 Go 泛型实现，通过编译时类型检查和性能优化，消除运行时反射开销，提升代码可读性和类型安全性，为后续开发提供更高效的开发体验。详见 [Epic 9 详细文档](prd/epic-9-ecs-generics-refactor.md)。
 *   **Epic 10: 游戏体验完善 (Game Experience Polish) - Brownfield Enhancement**
     *   **目标:** 完善核心游戏体验，实现暂停菜单、植物攻击动画、粒子特效和除草车防线系统，提升游戏的完整性和可玩性，确保所有核心机制符合原版游戏标准。详见 [Epic 10 详细文档](prd/epic-10-game-experience-polish.md)。
+*   **Epic 11: 关卡 UI 增强 (Level UI Enhancement)**
+    *   **目标:** 完善《植物大战僵尸》关卡界面的视觉体验和信息展示，实现铺草皮土粒飞溅特效、最后一波僵尸提示动画和完整的关卡进度条系统，提升游戏的沉浸感和信息可读性，确保关卡 UI 符合原版游戏标准。详见 [Epic 11 详细文档](prd/epic-11-level-ui-enhancement.md)。
 
 ## **Epic 1: 游戏基础框架与主循环 (Game Foundation & Main Loop)**
 **史诗目标:** 搭建整个Go+Ebitengine项目的基本结构，创建一个可以运行的空窗口，并实现游戏的核心状态管理和主菜单。这是所有后续功能的基础。

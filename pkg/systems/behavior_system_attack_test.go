@@ -259,10 +259,18 @@ func TestPeashooterAttackAnimationCycle(t *testing.T) {
 		t.Errorf("Phase 1: Expected state Attacking, got %v", plant.AttackAnimState)
 	}
 
-	// 2. Bullet should be created (AC 7: doesn't affect bullet firing logic)
+	// Story 10.5: Simulate animation advancing to keyframe 10 to trigger bullet creation
+	// The bullet is created at config.PeashooterShootingFireFrame (Frame 10), not immediately
+	reanim, _ := ecs.GetComponent[*components.ReanimComponent](em, peashooterID)
+	for i := 0; i <= 10; i++ {
+		reanim.CurrentFrame = i
+		bs.updatePlantAttackAnimation(peashooterID, 0.016)
+	}
+
+	// 2. Bullet should be created (AC 1: bullet created at keyframe, not at animation start)
 	currentBulletCount := countBullets(em)
 	if currentBulletCount != initialBulletCount+1 {
-		t.Errorf("Phase 1: Expected 1 bullet created. Before: %d, After: %d",
+		t.Errorf("Phase 1: Expected 1 bullet created at keyframe 10. Before: %d, After: %d",
 			initialBulletCount, currentBulletCount)
 	}
 
@@ -284,7 +292,7 @@ func TestPeashooterAttackAnimationCycle(t *testing.T) {
 	}
 
 	// When: Phase 3 - Animation finishes
-	reanim, _ := ecs.GetComponent[*components.ReanimComponent](em, peashooterID)
+	reanim, _ = ecs.GetComponent[*components.ReanimComponent](em, peashooterID)
 	reanim.IsFinished = true
 	bs.updatePlantAttackAnimation(peashooterID, 0.016)
 
@@ -308,10 +316,18 @@ func TestPeashooterAttackAnimationCycle(t *testing.T) {
 	beforePhase4Bullets := countBullets(em)
 	bs.handlePeashooterBehavior(peashooterID, 0.016, []ecs.EntityID{zombieID})
 
+	// Story 10.5: Simulate animation advancing to keyframe 10 for second shot
+	reanim, _ = ecs.GetComponent[*components.ReanimComponent](em, peashooterID)
+	for i := 0; i <= 10; i++ {
+		reanim.CurrentFrame = i
+		bs.updatePlantAttackAnimation(peashooterID, 0.016)
+	}
+
 	// Then: Phase 4 verification
 	afterPhase4Bullets := countBullets(em)
 	if afterPhase4Bullets != beforePhase4Bullets+1 {
-		t.Error("Phase 4: Should be able to shoot again after animation completes")
+		t.Errorf("Phase 4: Should be able to shoot again after animation completes. Before: %d, After: %d",
+			beforePhase4Bullets, afterPhase4Bullets)
 	}
 
 	plant, _ = ecs.GetComponent[*components.PlantComponent](em, peashooterID)

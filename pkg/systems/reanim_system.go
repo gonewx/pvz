@@ -1636,3 +1636,62 @@ func (s *ReanimSystem) calculateCenterOffsetForFrame(comp *components.ReanimComp
 	log.Printf("[ReanimSystem] 计算中心偏移（帧%d） - 边界框: X[%.1f, %.1f], Y[%.1f, %.1f], 中心偏移: (%.1f, %.1f)",
 		frameIndex, minX, maxX, minY, maxY, centerX, centerY)
 }
+
+// GetTrackTransform 获取指定轨道的当前变换矩阵（局部坐标）
+//
+// Story 10.5: 用于动画帧事件监听，获取部件实时位置
+//
+// 参数：
+//   - entityID: 实体 ID
+//   - trackName: 轨道名称（如 "idle_mouth", "anim_stem"）
+//
+// 返回：
+//   - x, y: 轨道当前帧的局部坐标（相对于实体中心）
+//   - error: 如果实体无动画组件或轨道不存在
+//
+// 使用场景：
+//   - 子弹发射：在关键帧获取嘴部位置，精确创建子弹
+//   - 特效锚点：在动画特定帧创建粒子效果
+//   - 碰撞检测：获取部件实时位置进行精确碰撞判定
+//
+// 注意：
+//   - 返回的是局部坐标，需要加上实体世界坐标才能得到最终位置
+//   - 如果轨道在当前动画中不存在，返回错误
+func (rs *ReanimSystem) GetTrackTransform(entityID ecs.EntityID, trackName string) (x, y float64, err error) {
+	// 获取 Reanim 组件
+	reanim, ok := ecs.GetComponent[*components.ReanimComponent](rs.entityManager, entityID)
+	if !ok {
+		return 0, 0, fmt.Errorf("entity %d does not have ReanimComponent", entityID)
+	}
+
+	// 使用 MergedTracks（已合并帧继承的轨道）
+	mergedFrames, ok := reanim.MergedTracks[trackName]
+	if !ok {
+		return 0, 0, fmt.Errorf("track '%s' not found in animation '%s'", trackName, reanim.CurrentAnim)
+	}
+
+	// 获取当前逻辑帧号
+	currentFrame := reanim.CurrentFrame
+	if currentFrame < 0 || currentFrame >= len(mergedFrames) {
+		// 帧号越界，使用最后一帧
+		currentFrame = len(mergedFrames) - 1
+		if currentFrame < 0 {
+			return 0, 0, fmt.Errorf("track '%s' has no frames", trackName)
+		}
+	}
+
+	// 获取当前帧的变换
+	frame := mergedFrames[currentFrame]
+
+	// 提取坐标（默认为 0, 0）
+	x = 0.0
+	y = 0.0
+	if frame.X != nil {
+		x = *frame.X
+	}
+	if frame.Y != nil {
+		y = *frame.Y
+	}
+
+	return x, y, nil
+}

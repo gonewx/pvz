@@ -118,9 +118,16 @@ func NewOpeningVerifyGame() (*OpeningVerifyGame, error) {
 	gs.LevelTime = 0
 	gs.CameraX = 0
 
+	// Create lawn grid entity (required by BehaviorSystem)
+	// Use all lanes since verify_opening doesn't restrict lanes
+	enabledLanes := []int{1, 2, 3, 4, 5}
+	lawnGridEntity := em.CreateEntity()
+	em.AddComponent(lawnGridEntity, &components.LawnGridComponent{})
+	lawnGridSystem := systems.NewLawnGridSystem(em, enabledLanes)
+
 	// Create systems
 	reanimSystem := systems.NewReanimSystem(em)
-	behaviorSystem := systems.NewBehaviorSystem(em, rm, reanimSystem, gs)
+	behaviorSystem := systems.NewBehaviorSystem(em, rm, reanimSystem, gs, lawnGridSystem, lawnGridEntity)
 	renderSystem := systems.NewRenderSystem(em)
 	cameraSystem := systems.NewCameraSystem(em, gs)
 

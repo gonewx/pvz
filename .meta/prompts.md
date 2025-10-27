@@ -71,3 +71,11 @@ assets/effect/particles/ZombieHead.xml 从实际运行 cmd/particles/main.go 看
     - 植物种植时，地面上有土粒飞溅的效果（请在资源路径下 assets 查找合适的动画效果）
     - 每行有效的草坪左边台阶上需要增加除草车，是最后一道防线，可以一次从左到右除草，消灭所在行的所有僵尸。（正确显示除草车，能正确触发除草车动画效果，能消灭所在行所有僵尸）
     - 进度条上的旗帜标记显示（当前只显示背景和进度填充）
+
+- @assets/effect/particles/SodRoll.xml 应该铺草皮时土粒飞溅的效果. 添加最后一波僵尸的提示动画: 
+assets/effect/reanim/FinalWave.reanim. 完善进度条显示: 1.位置 
+2.正确显示当前进度,僵尸头的位置要匹配进度，僵尸头开始在右边,随着进度条移动,而且进度条要有绿色的进度显示. FlagMeter.png: 背景框和绿色进度填充,一张图有2行, 根据进度百分比从左到右裁剪显示. 绿色进度填充从右到左增长.关卡文字有黑色描边效果. 文字位置要在进度条左面的外侧.  FlagMeterLevelProgress.png（装饰条）：垂直对齐：图片的Y轴中点对齐背景框的下边沿，水平居中在背景框， FlagMeterParts.png  是3部分,1 僵尸头 2: 竖线 3: 旗帜: 
+assets/images/FlagMeter.png
+assets/images/FlagMeterLevelProgress.png
+assets/images/FlagMeterParts.png 
+3. 图片前要有当前关卡的文本显示:  关卡 1-1 , 进度条和文本显示要右对齐，可以手工配置距离右边缘的位置.  开始进攻前, 只有文本显示,开始进攻时,显示完整的文本加图片进度条,文字位置要在进度条左面的外侧， 进度条不显示时,不要占位,文本要右对齐.

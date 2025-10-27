@@ -504,26 +504,11 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 				plant.AttackAnimState = components.AttackAnimAttacking
 			}
 
-			// 计算子弹起始位置：使用固定偏移
-			// 注意：anim_stem 轨道的位置在攻击动画中会变化（从头部移动到射击位置）
-			// 原版游戏在特定帧生成子弹，此处简化为使用固定偏移
-			// 未来优化：监听动画帧事件，在发射帧（约 frame 60-67）创建子弹并使用 anim_stem 位置
-			bulletStartX := peashooterPos.X + config.PeaBulletOffsetX
-			bulletStartY := peashooterPos.Y + config.PeaBulletOffsetY
-			log.Printf("[BehaviorSystem] 豌豆射手 %d 发射子弹，位置: (%.1f, %.1f)，使用固定偏移(%.1f, %.1f)",
-				entityID, bulletStartX, bulletStartY, config.PeaBulletOffsetX, config.PeaBulletOffsetY)
-
-			// 播放发射音效（如果配置了音效路径）
-			s.playShootSound()
-
-			// 创建豌豆子弹实体
-			bulletID, err := entities.NewPeaProjectile(s.entityManager, s.resourceManager, bulletStartX, bulletStartY)
-			if err != nil {
-				log.Printf("[BehaviorSystem] 创建豌豆子弹失败: %v", err)
-			} else {
-				log.Printf("[BehaviorSystem] 豌豆射手 %d 发射子弹 %d，位置: (%.1f, %.1f)",
-					entityID, bulletID, bulletStartX, bulletStartY)
-			}
+			// Story 10.5: 设置"等待发射"状态，但不立即创建子弹
+			// 子弹将在攻击动画的关键帧（Frame 5）创建
+			plant.PendingProjectile = true
+			log.Printf("[BehaviorSystem] 豌豆射手 %d 进入攻击状态，等待关键帧(%d)发射子弹",
+				entityID, config.PeashooterShootingFireFrame)
 
 			// 重置计时器
 			timer.CurrentTime = 0
@@ -1484,6 +1469,7 @@ func (s *BehaviorSystem) isZombieBehaviorType(behaviorType components.BehaviorTy
 
 // updatePlantAttackAnimation 检测攻击动画是否完成，自动切换回 idle
 // Story 10.3: 实现攻击动画状态机（Idle ↔ Attacking）
+// Story 10.5: 添加关键帧事件监听，在精确时刻发射子弹
 func (s *BehaviorSystem) updatePlantAttackAnimation(entityID ecs.EntityID, deltaTime float64) {
 	plant, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, entityID)
 	if !ok || plant.AttackAnimState != components.AttackAnimAttacking {
@@ -1496,7 +1482,52 @@ func (s *BehaviorSystem) updatePlantAttackAnimation(entityID ecs.EntityID, delta
 		return
 	}
 
-	// 检查攻击动画是否播放完毕
+	// Story 10.5: 关键帧事件监听 - 子弹发射时机同步
+	if plant.PendingProjectile {
+		// 精确匹配发射帧（零延迟）
+		if reanim.CurrentFrame == config.PeashooterShootingFireFrame {
+			log.Printf("[BehaviorSystem] 豌豆射手 %d 到达关键帧(%d)，发射子弹！",
+				entityID, reanim.CurrentFrame)
+
+			// Story 10.5: 使用固定偏移值计算子弹发射位置
+			// 注意：经过测试，Reanim 轨道坐标（如 idle_mouth, anim_stem）不直接提供嘴部位置
+			// - idle_mouth 轨道坐标为 (0, 0)（无运动数据）
+			// - anim_stem 轨道坐标为茎部中心，不是嘴部
+			// 因此使用固定偏移值（相对于格子中心）来计算子弹起始位置
+			bulletOffsetX := config.PeaBulletOffsetX
+			bulletOffsetY := config.PeaBulletOffsetY
+
+			// 获取植物世界坐标
+			pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+			if !ok {
+				return
+			}
+
+			// 子弹起始位置 = 植物位置 + 固定偏移
+			// 这个偏移是经过调优的，相对于格子中心的偏移
+			bulletStartX := pos.X + bulletOffsetX
+			bulletStartY := pos.Y + bulletOffsetY
+
+			log.Printf("[BehaviorSystem] 豌豆射手 %d 在关键帧发射子弹，位置: (%.1f, %.1f)",
+				entityID, bulletStartX, bulletStartY)
+
+			// 播放发射音效
+			s.playShootSound()
+
+			// 创建豌豆子弹实体
+			bulletID, err := entities.NewPeaProjectile(s.entityManager, s.resourceManager, bulletStartX, bulletStartY)
+			if err != nil {
+				log.Printf("[BehaviorSystem] 创建豌豆子弹失败: %v", err)
+			} else {
+				log.Printf("[BehaviorSystem] 豌豆射手 %d 发射子弹 %d（零延迟帧同步）", entityID, bulletID)
+			}
+
+			// 清除"等待发射"状态
+			plant.PendingProjectile = false
+		}
+	}
+
+	// Story 10.3: 检查攻击动画是否播放完毕，切换回 idle
 	if reanim.IsFinished {
 		// 切换回空闲动画
 		// 根据植物类型选择正确的空闲动画
