@@ -41,10 +41,14 @@ type LevelSystem struct {
 	reanimSystem         *ReanimSystem          // 用于创建 FinalWave 动画实体
 	rewardSystem         *RewardAnimationSystem // 用于触发奖励动画（Story 8.3）
 	lawnmowerSystem      *LawnmowerSystem       // 用于检查除草车状态（Story 10.2）
-	lastWaveWarningShown bool                   // 是否已显示最后一波提示
+	lastWaveWarningShown bool                   // 已废弃：使用 finalWaveWarningTriggered 代替
 
 	// Story 11.2: 关卡进度条支持
 	progressBarEntityID ecs.EntityID // 进度条实体ID（如果存在）
+
+	// Story 11.3: 最后一波提示相关
+	finalWaveWarningTriggered bool    // 是否已触发提示（防止重复）
+	finalWaveWarningLeadTime  float64 // 提前触发时间（秒，默认 3.0）
 }
 
 // NewLevelSystem 创建关卡管理系统
@@ -60,14 +64,16 @@ type LevelSystem struct {
 //	lawnmowerSystem - 除草车系统（可选，Story 10.2）
 func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *WaveSpawnSystem, rm *game.ResourceManager, rs *ReanimSystem, rewardSystem *RewardAnimationSystem, lawnmowerSystem *LawnmowerSystem) *LevelSystem {
 	return &LevelSystem{
-		entityManager:        em,
-		gameState:            gs,
-		waveSpawnSystem:      waveSpawnSystem,
-		resourceManager:      rm,
-		reanimSystem:         rs,
-		rewardSystem:         rewardSystem,
-		lawnmowerSystem:      lawnmowerSystem,
-		lastWaveWarningShown: false,
+		entityManager:             em,
+		gameState:                 gs,
+		waveSpawnSystem:           waveSpawnSystem,
+		resourceManager:           rm,
+		reanimSystem:              rs,
+		rewardSystem:              rewardSystem,
+		lawnmowerSystem:           lawnmowerSystem,
+		lastWaveWarningShown:      false, // 已废弃，保留向后兼容
+		finalWaveWarningTriggered: false, // Story 11.3: 新标志位
+		finalWaveWarningLeadTime:  3.0,   // Story 11.3: 提前 3 秒
 	}
 }
 
@@ -101,8 +107,8 @@ func (s *LevelSystem) Update(deltaTime float64) {
 	// 检查并生成僵尸波次
 	s.checkAndSpawnWaves()
 
-	// 检查是否需要显示最后一波提示
-	s.checkLastWaveWarning()
+	// Story 11.3: 检查是否需要显示最后一波提示（基于时间提前量）
+	s.checkFinalWaveWarning(deltaTime)
 
 	// 检查失败条件（必须在胜利条件之前，优先级更高）
 	s.checkDefeatCondition()
@@ -340,10 +346,156 @@ func isZombieType(behaviorType components.BehaviorType) bool {
 		behaviorType == components.BehaviorZombieBuckethead
 }
 
-// checkLastWaveWarning 检查是否需要显示最后一波提示
+// ========================================
+// Story 11.3: 最后一波提示系统
+// ========================================
+
+// checkFinalWaveWarning 检查是否需要触发最后一波提示
+//
+// 基于时间的精确提示：
+//   - 在最后一波到来前 3 秒触发提示
+//   - 只触发一次（通过 finalWaveWarningTriggered 标志）
+//   - 教学关卡同样适用（不受特殊规则影响）
+//
+// 参数：
+//   deltaTime - 未使用（保留用于未来扩展）
+func (s *LevelSystem) checkFinalWaveWarning(deltaTime float64) {
+	// 如果已触发，直接返回
+	if s.finalWaveWarningTriggered {
+		return
+	}
+
+	// 检测是否接近最后一波
+	if s.isFinalWaveApproaching() {
+		s.triggerFinalWaveWarning()
+		s.finalWaveWarningTriggered = true
+	}
+}
+
+// isFinalWaveApproaching 检测最后一波是否即将到来
+//
+// 判断条件：
+//   1. CurrentWaveIndex 指向最后一波（len-1）或者已经触发完所有波次（len）
+//   2. 最后一波尚未被激活
+//   3. 正在等待下一波（IsWaitingForNextWave = true）
+//   4. 距离触发还剩 <= 3 秒
+//
+// 注意：CurrentWaveIndex 在 MarkWaveSpawned 后会变成 waveIndex+1，
+// 所以最后一波激活后 CurrentWaveIndex 会变成 len（超出索引范围）
+//
+// 返回：
+//   true - 最后一波即将到来，应触发提示
+//   false - 不应触发提示
+func (s *LevelSystem) isFinalWaveApproaching() bool {
+	// 检查关卡配置是否存在
+	if s.gameState.CurrentLevel == nil || len(s.gameState.CurrentLevel.Waves) == 0 {
+		return false
+	}
+
+	totalWaves := len(s.gameState.CurrentLevel.Waves)
+	lastWaveIndex := totalWaves - 1
+
+	// 检查当前是否正在等待最后一波
+	// 情况1: CurrentWaveIndex == lastWaveIndex（第一波刚消灭完，等待第二波）
+	// 情况2: CurrentWaveIndex == totalWaves（最后一波已标记，但可能在等待激活）
+	isWaitingForFinalWave := s.gameState.CurrentWaveIndex == lastWaveIndex
+
+	if !isWaitingForFinalWave {
+		return false // 不是在等待最后一波
+	}
+
+	// 检查最后一波是否已经激活
+	if s.gameState.IsWaveSpawned(lastWaveIndex) {
+		return false // 最后一波已经激活，不需要提示
+	}
+
+	// 必须处于等待下一波的状态（上一波已消灭完毕）
+	if !s.gameState.IsWaitingForNextWave {
+		return false
+	}
+
+	// 计算自上一波完成以来经过的时间
+	lastWave := s.gameState.CurrentLevel.Waves[lastWaveIndex]
+	elapsedSinceCompletion := s.gameState.LevelTime - s.gameState.LastWaveCompletedTime
+	timeUntilFinalWave := lastWave.MinDelay - elapsedSinceCompletion
+
+	// 兼容两种情况：
+	// 1. MinDelay > 0: 在剩余时间 <= 3 秒时触发
+	// 2. MinDelay = 0: 刚进入等待状态时触发（elapsed <= 0.5秒）
+	var shouldTrigger bool
+	if lastWave.MinDelay > 0 {
+		// 标准情况：检查剩余时间
+		shouldTrigger = timeUntilFinalWave <= s.finalWaveWarningLeadTime && timeUntilFinalWave > 0
+	} else {
+		// MinDelay=0 情况：刚进入等待状态时触发
+		shouldTrigger = elapsedSinceCompletion <= 0.5
+	}
+
+	return shouldTrigger
+}
+
+// triggerFinalWaveWarning 触发最后一波提示
+//
+// 执行步骤：
+//   1. 设置 GameState 标志 ShowingFinalWave = true
+//   2. 播放音效 SOUND_AWOOGA
+//   3. 创建 FinalWave.reanim 动画实体（调用工厂函数）
+//
+// 注意：
+//   - 音效使用 SOUND_AWOOGA（原版 "僵尸来袭" 音效）
+//   - 动画实体由 FinalWaveWarningSystem 自动管理生命周期
+func (s *LevelSystem) triggerFinalWaveWarning() {
+	log.Printf("[LevelSystem] Triggering final wave warning!")
+
+	// 设置 GameState 标志
+	s.gameState.ShowingFinalWave = true
+
+	// 播放音效：SOUND_AWOOGA（僵尸来袭音效）
+	if audioPlayer := s.resourceManager.GetAudioPlayer("SOUND_AWOOGA"); audioPlayer != nil {
+		audioPlayer.Rewind()
+		audioPlayer.Play()
+		log.Printf("[LevelSystem] Playing SOUND_AWOOGA")
+	} else {
+		log.Printf("[LevelSystem] WARNING: SOUND_AWOOGA not loaded")
+	}
+
+	// 创建提示动画实体（屏幕中央）
+	// 使用配置常量确保位置正确
+	centerX := float64(config.ScreenWidth) / 2
+	centerY := float64(config.ScreenHeight) / 2
+
+	warningEntity, err := entities.NewFinalWaveWarningEntity(
+		s.entityManager,
+		s.resourceManager,
+		centerX,
+		centerY,
+	)
+
+	if err != nil {
+		log.Printf("[LevelSystem] ERROR: Failed to create FinalWave warning entity: %v", err)
+		return
+	}
+
+	// 播放动画（FinalWave.reanim 中的动画名称为 "FinalWave"）
+	if err := s.reanimSystem.PlayAnimation(warningEntity, "FinalWave"); err != nil {
+		log.Printf("[LevelSystem] WARNING: Failed to play FinalWave animation: %v", err)
+	}
+
+	log.Printf("[LevelSystem] Created FinalWave warning entity (ID: %d)", warningEntity)
+}
+
+// ========================================
+// 已废弃方法（保留向后兼容）
+// ========================================
+
+// checkLastWaveWarning 已废弃：请使用 checkFinalWaveWarning
 //
 // 在最后一波即将生成时显示提示（倒数第二波消灭完毕后）
 // 提示只显示一次
+//
+// 废弃原因：
+//   - Story 11.3 需要基于时间的精确提示（提前 3 秒）
+//   - 新方法 checkFinalWaveWarning 提供更准确的时机控制
 func (s *LevelSystem) checkLastWaveWarning() {
 	// 如果已经显示过，不再显示
 	if s.lastWaveWarningShown {
@@ -368,10 +520,14 @@ func (s *LevelSystem) checkLastWaveWarning() {
 	}
 }
 
-// showLastWaveWarning 显示最后一波提示
+// showLastWaveWarning 已废弃：请使用 triggerFinalWaveWarning
 //
 // 创建 FinalWave.reanim 动画实体，播放最后一波警告动画和音效
 // 动画在屏幕中心显示，从大到小缩放并淡出
+//
+// 废弃原因：
+//   - Story 11.3 统一使用 triggerFinalWaveWarning 方法
+//   - 新方法使用 SOUND_AWOOGA 而不是 SOUND_FINALWAVE
 func (s *LevelSystem) showLastWaveWarning() {
 	// 设置 GameState 标志
 	s.gameState.ShowingFinalWave = true

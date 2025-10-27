@@ -68,3 +68,92 @@ func NewLevelProgressBarEntity(
 
 	return entityID, nil
 }
+
+// NewFinalWaveWarningEntity 创建最后一波提示动画实体
+//
+// Story 11.3: 最后一波僵尸提示动画
+//
+// 参数：
+//   - em: 实体管理器
+//   - rm: 资源管理器（用于加载 FinalWave.reanim）
+//   - centerX: 屏幕中央 X 坐标（通常是 ScreenWidth/2）
+//   - centerY: 屏幕中央 Y 坐标（通常是 ScreenHeight/2）
+//
+// 返回：
+//   - ecs.EntityID: 提示动画实体ID
+//   - error: 如果资源加载失败返回错误
+//
+// 注意：
+//   - 调用者需要在创建后调用 ReanimSystem.PlayAnimation(entityID, "FinalWave")
+func NewFinalWaveWarningEntity(
+	em *ecs.EntityManager,
+	rm *game.ResourceManager,
+	centerX, centerY float64,
+) (ecs.EntityID, error) {
+	// 加载 FinalWave.reanim 动画
+	reanimComp, err := createReanimComponent(rm, "FinalWave")
+	if err != nil {
+		return 0, fmt.Errorf("failed to load FinalWave.reanim: %w", err)
+	}
+
+	// 创建实体
+	entityID := em.CreateEntity()
+
+	// 设置位置（屏幕中央）
+	posComp := &components.PositionComponent{
+		X: centerX,
+		Y: centerY,
+	}
+
+	// 创建提示组件
+	warningComp := &components.FinalWaveWarningComponent{
+		AnimEntity:  entityID,
+		DisplayTime: 2.5, // 显示 2.5 秒
+		ElapsedTime: 0.0,
+		IsPlaying:   true,
+	}
+
+	// 添加 UI 组件（标记为 UI 元素，最上层渲染）
+	uiComp := &components.UIComponent{
+		State: components.UINormal,
+	}
+
+	// 添加所有组件
+	ecs.AddComponent(em, entityID, reanimComp)
+	ecs.AddComponent(em, entityID, posComp)
+	ecs.AddComponent(em, entityID, warningComp)
+	ecs.AddComponent(em, entityID, uiComp)
+
+	log.Printf("[UI Factory] Created final wave warning entity (ID: %d) at (%.2f, %.2f)", entityID, centerX, centerY)
+
+	return entityID, nil
+}
+
+// createReanimComponent 创建 Reanim 组件（辅助函数）
+//
+// 参数：
+//   - rm: 资源管理器
+//   - unitName: 单位名称（如 "FinalWave"）
+//
+// 返回：
+//   - *components.ReanimComponent: 创建的组件
+//   - error: 如果资源加载失败
+func createReanimComponent(rm *game.ResourceManager, unitName string) (*components.ReanimComponent, error) {
+	// 获取 Reanim XML 定义
+	reanimXML := rm.GetReanimXML(unitName)
+	if reanimXML == nil {
+		return nil, fmt.Errorf("reanim XML not found for %s", unitName)
+	}
+
+	// 获取 Reanim 图片资源
+	partImages := rm.GetReanimPartImages(unitName)
+	if len(partImages) == 0 {
+		return nil, fmt.Errorf("reanim images not found for %s", unitName)
+	}
+
+	// 创建组件
+	return &components.ReanimComponent{
+		Reanim:     reanimXML,
+		PartImages: partImages,
+	}, nil
+}

@@ -578,6 +578,12 @@ func (rm *ResourceManager) LoadReanimResources() error {
 		return fmt.Errorf("failed to load LawnMower reanim: %w", err)
 	}
 
+	// Story 11.3: 加载最后一波提示动画 Reanim 资源
+	// FinalWave.reanim 包含最后一波僵尸来袭的提示动画
+	if err := rm.loadEffectReanim("FinalWave"); err != nil {
+		return fmt.Errorf("failed to load FinalWave reanim: %w", err)
+	}
+
 	return nil
 }
 

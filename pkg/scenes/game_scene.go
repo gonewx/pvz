@@ -174,6 +174,9 @@ type GameScene struct {
 	// Story 11.2: Level Progress Bar (关卡进度条)
 	levelProgressBarRenderSystem *systems.LevelProgressBarRenderSystem // 进度条渲染系统
 	levelProgressBarEntity       ecs.EntityID                          // 进度条实体ID
+
+	// Story 11.3: Final Wave Warning System (最后一波提示系统)
+	finalWaveWarningSystem *systems.FinalWaveWarningSystem // 最后一波提示动画系统
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -378,6 +381,10 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager) *GameScene {
 	// 2. Create LevelSystem (需要 RewardAnimationSystem 和 LawnmowerSystem)
 	scene.levelSystem = systems.NewLevelSystem(scene.entityManager, scene.gameState, scene.waveSpawnSystem, rm, scene.reanimSystem, scene.rewardSystem, scene.lawnmowerSystem)
 	log.Printf("[GameScene] Initialized level system")
+
+	// Story 11.3: Create FinalWaveWarningSystem (最后一波提示系统)
+	scene.finalWaveWarningSystem = systems.NewFinalWaveWarningSystem(scene.entityManager)
+	log.Printf("[GameScene] Initialized final wave warning system")
 
 	// 3. Create ZombieLaneTransitionSystem (僵尸行转换系统)
 	scene.zombieLaneTransitionSystem = systems.NewZombieLaneTransitionSystem(scene.entityManager)
@@ -905,6 +912,7 @@ func (s *GameScene) Update(deltaTime float64) {
 	// Update all ECS systems in order (order matters for correct game logic)
 	s.levelSystem.Update(deltaTime)                // 0. Update level system (Story 5.5: wave spawning, victory/defeat)
 	s.rewardSystem.Update(deltaTime)               // 0.1. Update reward animation system (Story 8.3: 卡片包动画)
+	s.finalWaveWarningSystem.Update(deltaTime)     // 0.2. Update final wave warning (Story 11.3: 自动清理提示动画)
 	s.zombieLaneTransitionSystem.Update(deltaTime) // 0.5. Update zombie lane transitions (move to target lane before attacking)
 
 	// Story 3.1 架构优化：使用模块化方式更新植物选择栏
