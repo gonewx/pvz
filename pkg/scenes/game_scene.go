@@ -1076,11 +1076,6 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	// DEBUG: Draw grid boundaries (Story 3.3 debugging)
 	s.drawGridDebug(screen)
 
-	// DEBUG: Draw FPS counter to check performance
-	fps := ebiten.ActualFPS()
-	fpsText := fmt.Sprintf("FPS: %.1f", fps)
-	ebitenutil.DebugPrintAt(screen, fpsText, WindowWidth-100, 10)
-
 	// Story 10.1: Draw pause menu (最顶层 - 在所有其他元素之上)
 	if s.pauseMenuModule != nil {
 		s.pauseMenuModule.Draw(screen)
