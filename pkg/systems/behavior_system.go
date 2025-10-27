@@ -365,7 +365,7 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 		_, err := entities.CreateParticleEffect(
 			s.entityManager,
 			s.resourceManager,
-			"MoweredZombieHead", // 粒子效果名称（不带.xml后缀）
+			"ZombieHead", // 粒子效果名称（不带.xml后缀）
 			position.X, position.Y,
 			angleOffset, // Story 7.6: 传递角度偏移
 		)
@@ -625,7 +625,7 @@ func (s *BehaviorSystem) updateZombieDamageState(entityID ecs.EntityID, health *
 		_, err := entities.CreateParticleEffect(
 			s.entityManager,
 			s.resourceManager,
-			"MoweredZombieArm", // 粒子效果名称（不带.xml后缀）
+			"ZombieArm", // 粒子效果名称（不带.xml后缀）
 			position.X, position.Y,
 			angleOffset, // 角度偏移
 		)
