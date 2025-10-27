@@ -276,16 +276,23 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		return
 	}
 
+	// 检查是否是 UI 元素（UI 元素不受摄像机影响）
+	_, isUI := ecs.GetComponent[*components.UIComponent](s.entityManager, id)
+	effectiveCameraX := cameraX
+	if isUI {
+		effectiveCameraX = 0 // UI 元素使用屏幕坐标，不应用摄像机偏移
+	}
+
 	// 将世界坐标转换为屏幕坐标，并应用 Reanim 的中心偏移
 	//
 	// 坐标系统说明：
-	// - PositionComponent(X,Y) 表示格子中心的世界坐标
+	// - PositionComponent(X,Y) 表示格子中心的世界坐标（游戏世界实体）或屏幕坐标（UI元素）
 	// - Reanim 的部件坐标以"原点"为基准，部件图片锚点在左上角
 	// - CenterOffset 将绘制原点从 Position 向左上平移，使视觉中心对齐到 Position
 	//
 	// 例如：豌豆射手的 CenterOffset = (39, 47.7)
 	//      渲染时原点 = Position - (39, 47.7)，使得植物视觉上居中显示
-	screenX := pos.X - cameraX - reanim.CenterOffsetX
+	screenX := pos.X - effectiveCameraX - reanim.CenterOffsetX
 	screenY := pos.Y - reanim.CenterOffsetY
 
 	// 方案A+：检查是否有闪烁效果组件

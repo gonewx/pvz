@@ -167,13 +167,21 @@ func (s *ReanimSystem) getAnimDefinitionTrack(comp *components.ReanimComponent, 
 	for i := range comp.Reanim.Tracks {
 		track := &comp.Reanim.Tracks[i]
 		if track.Name == animName {
-			// Validate that this is actually an animation definition track
-			// Animation definition tracks should only have FrameNum, no images or transforms
-			if !s.isAnimationDefinitionTrack(track) {
-				log.Printf("[ReanimSystem] WARNING: Track '%s' is not a valid animation definition track (has images or transforms)", animName)
-				return nil
+			// 检查是否是标准动画定义轨道（只包含 FrameNum）
+			if s.isAnimationDefinitionTrack(track) {
+				return track
 			}
-			return track
+
+			// 如果不是标准动画定义轨道，检查是否是简单动画（只有一个轨道）
+			// 像 FinalWave.reanim 这样的文件，轨道既是动画定义又是部件渲染
+			if len(comp.Reanim.Tracks) == 1 {
+				log.Printf("[ReanimSystem] Using simple animation track '%s' (single track with images/transforms)", animName)
+				return track
+			}
+
+			// 多轨道文件中的非标准轨道，不允许作为动画定义
+			log.Printf("[ReanimSystem] WARNING: Track '%s' is not a valid animation definition track (has images or transforms)", animName)
+			return nil
 		}
 	}
 

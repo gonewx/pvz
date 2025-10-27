@@ -764,23 +764,25 @@ func (s *TutorialSystem) showFinalWaveWarning() {
 	finalWaveEntity := s.entityManager.CreateEntity()
 
 	// 添加位置组件（屏幕中央）
+	centerX := float64(config.ScreenWidth) / 2
+	centerY := float64(config.ScreenHeight) / 2
 	ecs.AddComponent(s.entityManager, finalWaveEntity, &components.PositionComponent{
-		X: 400, // 屏幕中央X（800宽度 / 2）
-		Y: 300, // 屏幕中央Y（600高度 / 2）
+		X: centerX,
+		Y: centerY,
 	})
 
 	// 添加 Reanim 组件
 	ecs.AddComponent(s.entityManager, finalWaveEntity, &components.ReanimComponent{
 		Reanim:      reanimXML,
 		PartImages:  partImages,
-		CurrentAnim: "anim", // FinalWave 动画名称
-		IsLooping:   false,  // 播放一次后自动停止
+		CurrentAnim: "FinalWave", // FinalWave.reanim 中的轨道名称
+		IsLooping:   false,       // 播放一次后自动停止（会被 PlayAnimation 覆盖）
 	})
 
-	// 添加计时器组件（2秒后自动删除）
-	ecs.AddComponent(s.entityManager, finalWaveEntity, &components.TimerComponent{
-		CurrentTime: 0,
-		TargetTime:  2.0,
+	// 添加 FinalWaveWarningComponent（用于自动删除）
+	ecs.AddComponent(s.entityManager, finalWaveEntity, &components.FinalWaveWarningComponent{
+		DisplayTime: 2.0, // 显示 2 秒后自动删除
+		ElapsedTime: 0.0,
 	})
 
 	// 标记为UI元素（不受摄像机影响）
@@ -788,5 +790,10 @@ func (s *TutorialSystem) showFinalWaveWarning() {
 		State: components.UINormal,
 	})
 
-	log.Printf("[TutorialSystem] Final wave warning displayed")
+	// 使用 PlayAnimationNoLoop 播放动画（只播放一次）
+	if err := s.reanimSystem.PlayAnimationNoLoop(finalWaveEntity, "FinalWave"); err != nil {
+		log.Printf("[TutorialSystem] WARNING: Failed to play FinalWave animation: %v", err)
+	} else {
+		log.Printf("[TutorialSystem] Final wave warning displayed at (%.1f, %.1f)", centerX, centerY)
+	}
 }
