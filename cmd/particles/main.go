@@ -429,8 +429,10 @@ func (g *ParticleViewerGame) Draw(screen *ebiten.Image) {
 	// Clear screen with dark background
 	screen.Fill(color.RGBA{25, 25, 38, 255})
 
-	// Draw particles
-	g.renderSystem.DrawParticles(screen, 0) // cameraX = 0 for centered view
+	// Draw particles (both game world and UI particles)
+	// 大多数粒子效果是游戏世界粒子，需要使用 DrawGameWorldParticles
+	g.renderSystem.DrawGameWorldParticles(screen, 0) // cameraX = 0 for centered view
+	g.renderSystem.DrawParticles(screen, 0)          // 同时渲染 UI 粒子(如果有)
 
 	// Draw UI overlay
 	g.drawUI(screen)
