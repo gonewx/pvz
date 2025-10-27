@@ -144,10 +144,17 @@ func (ps *ParticleSystem) updateEmitters(dt float64) {
 		*components.PositionComponent,
 	](ps.EntityManager)
 
-	// DEBUG: 发射器数量日志（每帧打印会刷屏，已禁用）
-	// if len(emitterEntities) > 0 {
-	// 	log.Printf("[ParticleSystem] updateEmitters: 找到 %d 个发射器实体", len(emitterEntities))
-	// }
+	// Story 11.4 DEBUG: 跟踪 SodRoll 发射器（前2秒）
+	sodRollCount := 0
+	for _, emitterID := range emitterEntities {
+		emitter, ok := ecs.GetComponent[*components.EmitterComponent](ps.EntityManager, emitterID)
+		if ok && emitter.Config != nil && emitter.Config.Image == "IMAGE_DIRTSMALL" {
+			sodRollCount++
+			if emitter.Age < 2.0 {
+				log.Printf("[ParticleSystem] SodRoll 发射器存在: Age=%.3f, Active=%v, TotalLaunched=%d", emitter.Age, emitter.Active, emitter.TotalLaunched)
+			}
+		}
+	}
 
 	for _, emitterID := range emitterEntities {
 		// Get emitter component
@@ -170,7 +177,8 @@ func (ps *ParticleSystem) updateEmitters(dt float64) {
 		emitter.Age += dt
 
 		// Story 10.4: 应用 SystemPosition (发射器位置插值)
-		// 例如：SodRoll.xml 配置 <X>0 740</X><Y>30 0</Y>，发射器从 (0, 30) 滚动到 (740, 0)
+		// Story 11.4: 修复 - SystemPosition 应该是相对于初始位置的偏移，而不是绝对位置
+		// 例如：SodRoll.xml 配置 <X>0 740</X><Y>30 0</Y>，发射器从初始位置(228, 320)移动到(228+740, 320+0)
 		if len(emitter.SystemPositionXKeyframes) > 0 || len(emitter.SystemPositionYKeyframes) > 0 {
 			// 归一化时间 t（0-1），基于发射器年龄和系统持续时间
 			t := 0.0
@@ -178,21 +186,35 @@ func (ps *ParticleSystem) updateEmitters(dt float64) {
 				t = emitter.Age / emitter.SystemDuration
 			}
 
-			// 插值计算 X 位置
+			// Story 11.4 DEBUG: 记录前3帧的位置变化
+			oldX, oldY := position.X, position.Y
+
+			// 插值计算 X 位置偏移
 			if len(emitter.SystemPositionXKeyframes) > 0 {
 				offsetX := particlePkg.EvaluateKeyframes(emitter.SystemPositionXKeyframes, t, emitter.SystemPositionXInterp)
-				position.X = offsetX // 直接设置为插值后的绝对位置
+				position.X = emitter.InitialX + offsetX // 初始位置 + 偏移量
 			}
 
-			// 插值计算 Y 位置
+			// 插值计算 Y 位置偏移
 			if len(emitter.SystemPositionYKeyframes) > 0 {
 				offsetY := particlePkg.EvaluateKeyframes(emitter.SystemPositionYKeyframes, t, emitter.SystemPositionYInterp)
-				position.Y = offsetY // 直接设置为插值后的绝对位置
+				position.Y = emitter.InitialY + offsetY // 初始位置 + 偏移量
+			}
+
+			// Story 11.4 DEBUG: 前5帧打印位置变化
+			if emitter.Config.Image == "IMAGE_DIRTSMALL" && emitter.TotalLaunched < 10 {
+				log.Printf("[ParticleSystem] SystemPosition 应用: t=%.3f, InitialXY=(%.1f,%.1f), 偏移前=(%.1f,%.1f), 偏移后=(%.1f,%.1f)",
+					t, emitter.InitialX, emitter.InitialY, oldX, oldY, position.X, position.Y)
 			}
 		}
 
 		// Check system duration (0 = infinite)
 		if emitter.SystemDuration > 0 && emitter.Age >= emitter.SystemDuration {
+			// Story 11.4 DEBUG: 记录发射器停止
+			if emitter.Config.Image == "IMAGE_DIRTSMALL" {
+				log.Printf("[ParticleSystem] 停止 SodRoll 发射器: Age=%.3f >= SystemDuration=%.3f",
+					emitter.Age, emitter.SystemDuration)
+			}
 			emitter.Active = false
 		}
 
@@ -207,6 +229,14 @@ func (ps *ParticleSystem) updateEmitters(dt float64) {
 			spawnMinActive := ps.getDynamicSpawnMinActive(emitter)
 			spawnMaxActive := ps.getDynamicSpawnMaxActive(emitter)
 			spawnMaxLaunched := ps.getDynamicSpawnMaxLaunched(emitter)
+
+			// Story 11.4 DEBUG: 跟踪 SodRoll 发射器状态
+			if emitter.Config.Image == "IMAGE_DIRTSMALL" && emitter.TotalLaunched < 5 {
+				log.Printf("[ParticleSystem DEBUG] SodRoll 发射器状态: Active=%v, Age=%.3f, NextSpawnTime=%.3f, TotalLaunched=%d",
+					emitter.Active, emitter.Age, emitter.NextSpawnTime, emitter.TotalLaunched)
+				log.Printf("[ParticleSystem DEBUG] SpawnRate=%.1f, SpawnMinActive=%d, SpawnMaxActive=%d, SpawnMaxLaunched=%d",
+					spawnRate, spawnMinActive, spawnMaxActive, spawnMaxLaunched)
+			}
 
 			// 获取当前活跃粒子数量（已清理已删除粒子，准确）
 			activeCount := len(emitter.ActiveParticles)
@@ -244,15 +274,24 @@ func (ps *ParticleSystem) updateEmitters(dt float64) {
 				}
 			} else if spawnRate > 0 {
 				// Continuous spawn mode: spawn particles at regular intervals
+				// Story 11.4 DEBUG: 跟踪发射循环
+				loopCount := 0
 				for emitter.Age >= emitter.NextSpawnTime {
+					loopCount++
 					// Check spawn constraints (使用动态计算的值)
 					canSpawn := true
 					if spawnMaxActive > 0 && activeCount >= spawnMaxActive {
 						canSpawn = false
+						if emitter.Config.Image == "IMAGE_DIRTSMALL" && loopCount == 1 {
+							log.Printf("[ParticleSystem DEBUG] SodRoll 无法发射: SpawnMaxActive 限制 (activeCount=%d >= max=%d)", activeCount, spawnMaxActive)
+						}
 						break // Can't spawn more this frame
 					}
 					if spawnMaxLaunched > 0 && emitter.TotalLaunched >= spawnMaxLaunched {
 						canSpawn = false
+						if emitter.Config.Image == "IMAGE_DIRTSMALL" && loopCount == 1 {
+							log.Printf("[ParticleSystem DEBUG] SodRoll 无法发射: SpawnMaxLaunched 限制 (launched=%d >= max=%d)", emitter.TotalLaunched, spawnMaxLaunched)
+						}
 						break // Reached total launch limit
 					}
 
@@ -269,6 +308,12 @@ func (ps *ParticleSystem) updateEmitters(dt float64) {
 					if emitter.NextSpawnTime > emitter.Age+10 {
 						break
 					}
+				}
+
+				// Story 11.4 DEBUG: 报告发射情况
+				if emitter.Config.Image == "IMAGE_DIRTSMALL" && emitter.TotalLaunched <= 10 && loopCount > 0 {
+					log.Printf("[ParticleSystem DEBUG] SodRoll 本帧发射: loopCount=%d, TotalLaunched=%d, NextSpawnTime=%.3f",
+						loopCount, emitter.TotalLaunched, emitter.NextSpawnTime)
 				}
 			}
 		}

@@ -840,6 +840,8 @@ func (s *GameScene) Update(deltaTime float64) {
 
 		// 启动动画，传递启用的行列表、草皮位置和图片高度
 		enabledLanes := s.gameState.CurrentLevel.EnabledLanes
+		// Story 11.4: 读取粒子特效配置
+		enableParticles := s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.SodRollParticles
 		s.soddingSystem.StartAnimation(func() {
 			// 动画完成回调：通知教学系统可以开始了
 			log.Printf("[GameScene] 铺草皮动画完成")
@@ -848,7 +850,7 @@ func (s *GameScene) Update(deltaTime float64) {
 			}
 			// Story 10.2: 铺草皮完成后创建除草车（原版行为）
 			s.initLawnmowers()
-		}, enabledLanes, s.sodOverlayX, float64(s.sodHeight))
+		}, enabledLanes, s.sodOverlayX, float64(s.sodHeight), enableParticles)
 
 		s.soddingAnimStarted = true
 		// 标记开场动画系统为 nil，避免重复检查
@@ -860,7 +862,8 @@ func (s *GameScene) Update(deltaTime float64) {
 	if s.soddingSystem != nil && s.soddingSystem.IsPlaying() {
 		// 铺草皮动画期间，只更新铺草皮系统、镜头系统和 Reanim 系统（草皮卷动画需要）
 		s.cameraSystem.Update(deltaTime)
-		s.reanimSystem.Update(deltaTime) // 更新草皮卷动画帧
+		s.reanimSystem.Update(deltaTime)   // 更新草皮卷动画帧
+		s.particleSystem.Update(deltaTime) // Story 11.4: 更新粒子系统（土粒飞溅特效）
 		s.cameraX = s.gameState.CameraX
 		return // 暂停其他游戏系统（包括僵尸激活）
 	}
@@ -873,6 +876,8 @@ func (s *GameScene) Update(deltaTime float64) {
 
 			// 启动动画，传递启用的行列表、草皮位置和图片高度
 			enabledLanes := s.gameState.CurrentLevel.EnabledLanes
+			// Story 11.4: 读取粒子特效配置
+			enableParticles := s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.SodRollParticles
 			s.soddingSystem.StartAnimation(func() {
 				// 动画完成回调：通知教学系统可以开始了
 				log.Printf("[GameScene] 铺草皮动画完成")
@@ -881,7 +886,7 @@ func (s *GameScene) Update(deltaTime float64) {
 				}
 				// Story 10.2: 铺草皮完成后创建除草车（原版行为）
 				s.initLawnmowers()
-			}, enabledLanes, s.sodOverlayX, float64(s.sodHeight))
+			}, enabledLanes, s.sodOverlayX, float64(s.sodHeight), enableParticles)
 
 			s.soddingAnimStarted = true
 		}

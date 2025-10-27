@@ -35,6 +35,10 @@ type LevelConfig struct {
 
 	// Story 11.2：关卡进度条配置
 	FlagWaves []int `yaml:"flagWaves"` // 旗帜波次索引列表（从0开始），如 [9, 19] 表示第10波和第20波有旗帜，默认为空
+
+	// Story 11.4：铺草皮粒子特效配置
+	SodRollAnimation bool `yaml:"sodRollAnimation"` // 是否启用铺草皮动画，默认 false
+	SodRollParticles bool `yaml:"sodRollParticles"` // 是否启用土粒飞溅特效，默认 false
 }
 
 // TutorialStep 教学步骤配置（Story 8.2）

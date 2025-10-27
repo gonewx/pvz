@@ -107,4 +107,9 @@ type EmitterComponent struct {
 	SystemPositionXInterp    string              // X轴插值模式
 	SystemPositionYKeyframes []particle.Keyframe // Y轴位置关键帧
 	SystemPositionYInterp    string              // Y轴插值模式
+
+	// Story 11.4: 初始位置（用于 SystemPosition 相对偏移计算）
+	// 当 SystemPosition 关键帧非空时，SystemPosition 的值是相对于初始位置的偏移
+	InitialX float64 // 发射器初始X坐标
+	InitialY float64 // 发射器初始Y坐标
 }

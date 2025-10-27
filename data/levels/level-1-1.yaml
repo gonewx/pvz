@@ -17,6 +17,10 @@ sodRowImage: "IMAGE_SOD1ROW"                  # 铺草皮后叠加1行草地图�
 showSoddingAnim: true                         # 播放铺草皮动画
 soddingAnimDelay: 1.0                         # 游戏开始1秒后播放动画
 
+# Story 11.4：铺草皮粒子特效配置
+sodRollAnimation: true                        # 启用铺草皮动画
+sodRollParticles: true                        # 启用土粒飞溅特效
+
 # Story 8.2: 教学步骤配置（符合原版1-1流程）
 tutorialSteps:
   # 步骤1：游戏开始 → 直接提示种植（因为阳光已经150）

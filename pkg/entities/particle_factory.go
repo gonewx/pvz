@@ -207,6 +207,9 @@ func CreateParticleEffect(em *ecs.EntityManager, rm *game.ResourceManager, effec
 			SystemPositionXInterp:    systemPosXInterp,
 			SystemPositionYKeyframes: systemPosYKeyframes,
 			SystemPositionYInterp:    systemPosYInterp,
+			// Story 11.4: 初始位置（用于 SystemPosition 相对偏移计算）
+			InitialX: worldX,
+			InitialY: worldY,
 			// Angle offset
 			AngleOffset: offset,
 		}

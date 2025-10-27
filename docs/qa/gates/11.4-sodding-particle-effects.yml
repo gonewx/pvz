@@ -1,0 +1,111 @@
+# Quality Gate Decision: Story 11.4 - 铺草皮土粒飞溅特效
+schema: 1
+story: "11.4"
+story_title: "铺草皮土粒飞溅特效"
+gate: CONCERNS
+status_reason: "实现质量优秀,所有核心功能已完成且有测试覆盖。唯一的关注点是缺少低端设备性能测试,建议在发布前补充。"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-10-27T17:10:12Z"
+
+# Issues identified
+top_issues:
+  - id: "PERF-001"
+    severity: medium
+    finding: "缺少低端设备性能测试"
+    suggested_action: "在低端设备或 CPU 降频模式下测试,验证帧率≥50 FPS"
+    suggested_owner: dev
+    refs:
+      - "pkg/systems/particle_system.go"
+      - "pkg/systems/sodding_system.go"
+
+# Waiver (not active)
+waiver:
+  active: false
+
+# Risk summary
+risk_summary:
+  totals:
+    critical: 0
+    high: 1    # PERF-001
+    medium: 2  # TECH-001, DATA-001
+    low: 2     # OPS-001, TECH-002
+  highest:
+    id: "PERF-001"
+    score: 6
+    title: "粒子性能在低端设备上的影响"
+  recommendations:
+    must_fix: []
+    monitor:
+      - "在低端设备上进行性能测试"
+      - "添加性能监控日志(粒子计数、帧时间)"
+
+# Quality metrics
+quality_score: 90  # 100 - (10 * 1 CONCERN)
+expires: "2025-11-10T00:00:00Z"  # 2 weeks validity
+
+# Evidence
+evidence:
+  tests_reviewed: 3
+  risks_identified: 5
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 7, 8]  # 完全覆盖
+    ac_partial: [6]  # 部分覆盖(缺少低端设备性能测试)
+    ac_gaps: []  # 无完全缺失的 AC
+
+# NFR validation
+nfr_validation:
+  security:
+    status: PASS
+    notes: "无安全风险。粒子系统不涉及用户输入或敏感数据。"
+  performance:
+    status: CONCERNS
+    notes: "开发环境验证60 FPS通过,但缺少低端设备测试。SpawnRate=200粒子/秒可能在低端设备上造成性能压力。建议补充性能测试。"
+  reliability:
+    status: PASS
+    notes: "资源加载失败有日志记录,生命周期管理正确,单元测试覆盖关键逻辑。"
+  maintainability:
+    status: PASS
+    notes: "代码注释清晰,Dev Notes详细记录调试过程,配置驱动设计便于后续维护。建议清理调试日志后更优。"
+
+# Detailed recommendations
+recommendations:
+  immediate:
+    - action: "在低端设备或 CPU 降频模式下进行性能测试"
+      priority: P1
+      refs: ["pkg/systems/particle_system.go", "pkg/systems/sodding_system.go"]
+      rationale: "验证 AC6 性能要求在真实环境中达标"
+
+  future:
+    - action: "清理或移除调试日志(发布前)"
+      priority: P2
+      refs: ["pkg/systems/sodding_system.go:189-192", "pkg/systems/particle_system.go:205-208"]
+      rationale: "减少日志噪音,提高可读性"
+
+    - action: "添加性能监控日志(可选 --verbose 启用)"
+      priority: P2
+      refs: ["pkg/systems/particle_system.go"]
+      rationale: "便于后续性能优化和问题定位"
+
+    - action: "考虑简化 SystemPosition 偏移机制"
+      priority: P3
+      refs: ["pkg/components/emitter_component.go", "pkg/config/sodding_config.go"]
+      rationale: "当前双重偏移机制略复杂,未来维护者可能需要参考 Dev Notes"
+
+# Audit trail
+history:
+  - at: "2025-10-27T17:10:12Z"
+    gate: CONCERNS
+    note: "初始审查 - 实现质量优秀,建议补充低端设备性能测试"
+
+# Supporting documentation
+assessment_refs:
+  risk_profile: "docs/qa/assessments/11.4-risk-20251027.md"
+  trace_matrix: "docs/qa/assessments/11.4-trace-20251027.md"
+
+# Key strengths (for learning)
+strengths:
+  - "优秀的调试和问题解决能力 - Dev Notes 记录了 4 个关键问题的根本原因和解决方案"
+  - "全面的测试覆盖 - 3 个单元测试 + 集成测试 + 视觉验证"
+  - "清晰的文档和注释 - 代码注释详细,Dev Notes 完整"
+  - "遵循项目原则 - 不修改原版配置,常量配置化,ECS 架构"
+  - "系统化调试 - 特别是问题 3(粒子系统未更新)的发现展示了出色的系统思维"
