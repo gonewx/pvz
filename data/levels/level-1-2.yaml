@@ -10,6 +10,7 @@ availablePlants:              # 可用植物
   - "sunflower"
 skipOpening: false            # 不跳过开场
 initialSun: 50                # 初始阳光50（标准值）
+flagWaves: [2]                # Story 11.2: 第3波（索引2）是旗帜波
 
 # 草皮配置（三行）
 backgroundImage: "IMAGE_BACKGROUND1UNSODDED"  # 使用未铺草皮的背景

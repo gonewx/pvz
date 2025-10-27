@@ -42,6 +42,9 @@ type LevelSystem struct {
 	rewardSystem         *RewardAnimationSystem // 用于触发奖励动画（Story 8.3）
 	lawnmowerSystem      *LawnmowerSystem       // 用于检查除草车状态（Story 10.2）
 	lastWaveWarningShown bool                   // 是否已显示最后一波提示
+
+	// Story 11.2: 关卡进度条支持
+	progressBarEntityID ecs.EntityID // 进度条实体ID（如果存在）
 }
 
 // NewLevelSystem 创建关卡管理系统
@@ -106,6 +109,21 @@ func (s *LevelSystem) Update(deltaTime float64) {
 
 	// 检查胜利条件
 	s.checkVictoryCondition()
+
+	// Story 11.2: 检测第一波是否已激活（教学关卡）
+	// 教学关卡的第一波由 TutorialSystem 激活，需要手动检测并显示进度条
+	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.OpeningType == "tutorial" {
+		if s.gameState.IsWaveSpawned(0) && s.progressBarEntityID != 0 {
+			progressBar, ok := ecs.GetComponent[*components.LevelProgressBarComponent](s.entityManager, s.progressBarEntityID)
+			if ok && progressBar.ShowLevelTextOnly {
+				// 第一波已激活，但进度条还在文本模式，切换到完整模式
+				s.ShowProgressBar()
+			}
+		}
+	}
+
+	// Story 11.2: 更新进度条
+	s.UpdateProgressBar()
 }
 
 // checkAndSpawnWaves 检查并激活到期的僵尸波次
@@ -129,6 +147,11 @@ func (s *LevelSystem) checkAndSpawnWaves() {
 
 	// 标记波次已激活
 	s.gameState.MarkWaveSpawned(waveIndex)
+
+	// Story 11.2: 第一波僵尸生成后显示完整进度条
+	if waveIndex == 0 {
+		s.ShowProgressBar()
+	}
 
 	log.Printf("[LevelSystem] Wave %d activated: %d zombies", waveIndex+1, zombieCount)
 }
@@ -380,3 +403,142 @@ func (s *LevelSystem) showLastWaveWarning() {
 		log.Printf("[LevelSystem] Created FinalWave warning entity (ID: %d)", finalWaveEntityID)
 	}
 }
+
+// ========================================
+// Story 11.2: 关卡进度条支持
+// ========================================
+
+// SetProgressBarEntity 设置关卡进度条实体ID（由 GameScene 初始化时调用）
+func (s *LevelSystem) SetProgressBarEntity(entityID ecs.EntityID) {
+	s.progressBarEntityID = entityID
+	s.initializeProgressBar()
+}
+
+// initializeProgressBar 初始化进度条（计算总僵尸数、旗帜位置）
+func (s *LevelSystem) initializeProgressBar() {
+	if s.progressBarEntityID == 0 {
+		return
+	}
+
+	progressBar, ok := ecs.GetComponent[*components.LevelProgressBarComponent](s.entityManager, s.progressBarEntityID)
+	if !ok {
+		log.Printf("[LevelSystem] WARNING: LevelProgressBarComponent not found for entity %d", s.progressBarEntityID)
+		return
+	}
+
+	// 1. 计算总僵尸数
+	totalZombies := s.calculateTotalZombies()
+	progressBar.TotalZombies = totalZombies
+	progressBar.KilledZombies = 0
+	progressBar.ProgressPercent = 0.0
+
+	// 2. 计算旗帜位置百分比
+	if s.gameState.CurrentLevel != nil && len(s.gameState.CurrentLevel.FlagWaves) > 0 {
+		progressBar.FlagPositions = s.calculateFlagPositions()
+	} else {
+		progressBar.FlagPositions = []float64{} // 无旗帜
+	}
+
+	// 3. 设置关卡文本
+	if s.gameState.CurrentLevel != nil {
+		progressBar.LevelText = "关卡 " + s.gameState.CurrentLevel.ID
+	}
+
+	// 4. 默认只显示文本（第一波生成前）
+	progressBar.ShowLevelTextOnly = true
+
+	log.Printf("[LevelSystem] Progress bar initialized: total zombies=%d, flags=%v", totalZombies, progressBar.FlagPositions)
+}
+
+// calculateTotalZombies 计算关卡总僵尸数
+func (s *LevelSystem) calculateTotalZombies() int {
+	if s.gameState.CurrentLevel == nil {
+		return 0
+	}
+
+	total := 0
+	for _, wave := range s.gameState.CurrentLevel.Waves {
+		for _, zombie := range wave.Zombies {
+			total += zombie.Count
+		}
+	}
+
+	return total
+}
+
+// calculateFlagPositions 计算旗帜在进度条上的位置百分比
+func (s *LevelSystem) calculateFlagPositions() []float64 {
+	if s.gameState.CurrentLevel == nil {
+		return []float64{}
+	}
+
+	totalZombies := s.calculateTotalZombies()
+	if totalZombies == 0 {
+		return []float64{}
+	}
+
+	flagWaves := s.gameState.CurrentLevel.FlagWaves
+	positions := make([]float64, 0, len(flagWaves))
+
+	// 计算每个旗帜波次前已经出现的僵尸数
+	for _, flagWaveIndex := range flagWaves {
+		if flagWaveIndex < 0 || flagWaveIndex >= len(s.gameState.CurrentLevel.Waves) {
+			continue
+		}
+
+		// 计算旗帜波次前的僵尸总数
+		zombiesBeforeFlag := 0
+		for i := 0; i < flagWaveIndex; i++ {
+			for _, zombie := range s.gameState.CurrentLevel.Waves[i].Zombies {
+				zombiesBeforeFlag += zombie.Count
+			}
+		}
+
+		// 旗帜位置 = 旗帜波次前的僵尸数 / 总僵尸数
+		flagPercent := float64(zombiesBeforeFlag) / float64(totalZombies)
+		positions = append(positions, flagPercent)
+	}
+
+	return positions
+}
+
+// UpdateProgressBar 更新进度条进度（僵尸死亡时调用）
+func (s *LevelSystem) UpdateProgressBar() {
+	if s.progressBarEntityID == 0 {
+		return
+	}
+
+	progressBar, ok := ecs.GetComponent[*components.LevelProgressBarComponent](s.entityManager, s.progressBarEntityID)
+	if !ok {
+		return
+	}
+
+	// 统计当前击杀的僵尸数（通过 GameState.ZombiesKilled）
+	killedZombies := s.gameState.ZombiesKilled
+	progressBar.KilledZombies = killedZombies
+
+	// 更新进度百分比
+	if progressBar.TotalZombies > 0 {
+		progressBar.ProgressPercent = float64(killedZombies) / float64(progressBar.TotalZombies)
+		if progressBar.ProgressPercent > 1.0 {
+			progressBar.ProgressPercent = 1.0
+		}
+	}
+}
+
+// ShowProgressBar 显示完整进度条（第一波僵尸生成后调用）
+func (s *LevelSystem) ShowProgressBar() {
+	if s.progressBarEntityID == 0 {
+		return
+	}
+
+	progressBar, ok := ecs.GetComponent[*components.LevelProgressBarComponent](s.entityManager, s.progressBarEntityID)
+	if !ok {
+		return
+	}
+
+	// 切换到完整显示模式
+	progressBar.ShowLevelTextOnly = false
+	log.Println("[LevelSystem] Progress bar now showing full display (background + progress + flags)")
+}
+

@@ -71,12 +71,12 @@ waves:
   - zombies:
       - type: "basic"
         lane: 3
-        count: 10
+        count: 2
         # count: 2
 
   # 第二波（最后一波）：第一波消灭后自动触发，3个普通僵尸
-  # - minDelay: 5  # 等待5秒后触发
-  #   zombies:
-  #     - type: "basic"
-  #       lane: 3
-  #       count: 3
+  - minDelay: 1  
+    zombies:
+      - type: "basic"
+        lane: 3
+        count: 3

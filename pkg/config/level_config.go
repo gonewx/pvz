@@ -32,6 +32,9 @@ type LevelConfig struct {
 	SodRowImage      string  `yaml:"sodRowImage"`      // 草皮叠加图片ID，如 \"IMAGE_SOD1ROW\"，空表示无草皮
 	ShowSoddingAnim  bool    `yaml:"showSoddingAnim"`  // 是否播放铺草皮动画，默认 false
 	SoddingAnimDelay float64 `yaml:"soddingAnimDelay"` // 铺草皮动画延迟（秒），默认 0
+
+	// Story 11.2：关卡进度条配置
+	FlagWaves []int `yaml:"flagWaves"` // 旗帜波次索引列表（从0开始），如 [9, 19] 表示第10波和第20波有旗帜，默认为空
 }
 
 // TutorialStep 教学步骤配置（Story 8.2）
