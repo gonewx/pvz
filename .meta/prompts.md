@@ -20,11 +20,13 @@
 - ✅ [FIXED] 僵尸死亡时，头和手臂一起掉落了 - 原因：手臂掉落应在受伤时触发，而不是死亡时。手臂掉落的粒子文件是 assets/effect/particles/ZombieArm.xml 。 头掉落的是：assets/effect/particles/ZombieHead.xml
 - ✅ [FIXED] 子弹与僵尸的碰撞检测要优化 - 原因：physics_system.go 碰撞检测遗漏了 BehaviorZombieDying
 
+- 豌豆射手的动画效果之前一直不知道 anim_stem 轨道的作用，通过实际运行后，发现原版效果在攻击时，茎干的摇晃一直没停，只是头部换成了攻击轨道的动画，所以大胆猜想 anim_stem 轨道是定位茎干位移的，请尝试修复攻击时的动画效果。
+
 ## 5.3
 
 - 还有2个问题，卡片会渲染在植物和僵尸上面。坚果墙一放，帽子僵尸帽子就会消失，是被攻击了吗？
 
-## aniamtion migration
+## aniamtion 
 
 /mnt/disk0/project/game/pvz/ck/pvzwine_reverse 这个项目是对原版游戏资源数据的研究与解析， 请结合测试程序，将我们之前实现的基于动画帧的动画系统，改为使用和原版游戏同样的动画系统。 解析后的资源已经放在 assets/reanim， assets/effect/reanim。
 
