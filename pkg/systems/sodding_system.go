@@ -29,15 +29,15 @@ type SoddingSystem struct {
 	reanimSystem    *ReanimSystem
 
 	// 动画实体ID
-	sodRollEntityID    ecs.EntityID // 主草皮卷实体
-	isAnimationPlaying bool         // 是否正在播放动画
-	animationTimer     float64      // 动画计时器
-	animationDuration  float64      // 动画总时长（秒）
-	animationStarted   bool         // 动画是否已经启动过（包括已完成的）
+	sodRollEntityIDs   []ecs.EntityID // Story 8.6 QA修正: 每行一个草皮卷实体
+	isAnimationPlaying bool           // 是否正在播放动画
+	animationTimer     float64        // 动画计时器
+	animationDuration  float64        // 动画总时长（秒）
+	animationStarted   bool           // 动画是否已经启动过（包括已完成的）
 
 	// 动画定位参数（基于网格坐标 + 可配置偏移）
 	animStartX float64 // 动画起点X（世界坐标）- 从配置计算
-	animStartY float64 // 动画起点Y（世界坐标）- 从配置计算
+	animLanes  []int   // Story 8.6 QA修正: 需要播放动画的行列表
 
 	// 缓存最后一帧的中心位置（避免动画完成后跳跃）
 	lastFrameCenterX float64 // 动画结束时的实际中心X
@@ -46,8 +46,8 @@ type SoddingSystem struct {
 	onAnimationComplete func() // 动画完成时调用
 
 	// Story 11.4: 粒子发射器相关
-	sodRollEmitterID ecs.EntityID // 粒子发射器实体ID
-	particlesEnabled bool          // 是否启用粒子特效
+	sodRollEmitterIDs []ecs.EntityID // Story 8.6 QA修正: 每行一个粒子发射器
+	particlesEnabled  bool            // 是否启用粒子特效
 }
 
 // NewSoddingSystem 创建铺草皮动画系统
@@ -63,23 +63,30 @@ func NewSoddingSystem(entityManager *ecs.EntityManager, rm *game.ResourceManager
 }
 
 // StartAnimation 开始播放铺草皮动画
-// 参数：
+// 参数:
 //   - onComplete: 动画完成时的回调函数
-//   - enabledLanes: 启用的行列表，如 [3] 或 [2,3,4]（用于计算动画位置）
-//   - sodOverlayX: 草皮叠加图的世界X坐标（左边缘）- 未使用，保留接口兼容性
-//   - sodImageHeight: 草皮图片的实际高度（sod1row=127, sod3row=355）- 用于Y坐标计算
-//   - enableParticles: 是否启用土粒飞溅粒子特效（Story 11.4）
-func (s *SoddingSystem) StartAnimation(onComplete func(), enabledLanes []int, sodOverlayX, sodImageHeight float64, enableParticles bool) {
+//   - enabledLanes: 启用的行列表(如 [2,3,4])
+//   - animLanes: 播放动画的行列表(如 [2,4],空表示使用 enabledLanes) - Story 8.6 QA修正
+//   - sodOverlayX: 草皮叠加图的世界X坐标(左边缘)
+//   - sodImageHeight: 草皮图片的实际高度
+//   - enableParticles: 是否启用土粒飞溅粒子特效
+func (s *SoddingSystem) StartAnimation(onComplete func(), enabledLanes, animLanes []int, sodOverlayX, sodImageHeight float64, enableParticles bool) {
 	if s.isAnimationPlaying {
 		log.Printf("[SoddingSystem] Animation already playing, ignoring")
 		return
 	}
 
-	log.Printf("[SoddingSystem] Starting SodRoll animation for lanes %v", enabledLanes)
+	// Story 8.6 QA修正: 如果未指定动画行,使用所有启用的行
+	if len(animLanes) == 0 {
+		animLanes = enabledLanes
+	}
+
+	log.Printf("[SoddingSystem] Starting SodRoll animation for lanes %v (enabled lanes: %v)", animLanes, enabledLanes)
 	s.onAnimationComplete = onComplete
 	s.isAnimationPlaying = true
 	s.animationStarted = true // 标记动画已经启动
 	s.animationTimer = 0
+	s.animLanes = animLanes // 保存动画行列表
 
 	// 加载 SodRoll Reanim 资源
 	reanimXML := s.resourceManager.GetReanimXML("SodRoll")
@@ -105,55 +112,122 @@ func (s *SoddingSystem) StartAnimation(onComplete func(), enabledLanes []int, so
 	// log.Printf("[SoddingSystem] 从 reanim 读取: 帧数=%d, FPS=%d, 时长=%.2f秒",
 	// 	maxFrames, fps, s.animationDuration)
 
-	// 从配置计算动画起点位置
-	// X坐标：基于网格坐标 + 可配置偏移（手工调节）
-	// Y坐标：自动对齐到目标行中心（读取 reanim 包围盒）
-	s.animStartX, s.animStartY = config.CalculateSodRollPosition(enabledLanes, sodImageHeight, reanimXML)
+	// Story 8.6 QA修正: 计算动画起点X坐标(所有行共用)
+	s.animStartX = config.GridWorldStartX + config.SodRollStartOffsetX
 
-	// log.Printf("[SoddingSystem] ========== 草皮动画坐标配置 ==========")
-	// log.Printf("[SoddingSystem] 目标行: %v", enabledLanes)
-	// log.Printf("[SoddingSystem] 网格起点X: %.1f", config.GridWorldStartX)
-	// log.Printf("[SoddingSystem] 配置偏移X: %.1f", config.SodRollStartOffsetX)
-	// log.Printf("[SoddingSystem] 动画起点（计算）: (%.1f, %.1f)", s.animStartX, s.animStartY)
-	// log.Printf("[SoddingSystem] ===========================================")
+	// Story 8.6 QA修正: 为每个动画行创建独立的草皮卷实体
+	s.sodRollEntityIDs = make([]ecs.EntityID, 0, len(animLanes))
 
-	// 创建 SodRoll 草皮卷实体
-	s.createSodRollEntity(s.animStartX, s.animStartY)
+	// 计算 reanim 动画的包围盒（用于Y坐标对齐）
+	// 从 reanim 数据计算包围盒中心
+	var minY, maxY *float64
+	for _, track := range reanimXML.Tracks {
+		for _, frame := range track.Frames {
+			if frame.Y != nil {
+				y := *frame.Y
+				if minY == nil || y < *minY {
+					minY = &y
+				}
+				if maxY == nil || y > *maxY {
+					maxY = &y
+				}
+			}
+		}
+	}
 
-	// Story 11.4: 如果启用粒子特效,创建粒子发射器
+	var animCenterY float64
+	if minY != nil && maxY != nil {
+		animCenterY = (*minY + *maxY) / 2.0
+		log.Printf("[SoddingSystem] Reanim包围盒: minY=%.1f, maxY=%.1f, centerY=%.1f", *minY, *maxY, animCenterY)
+	} else {
+		animCenterY = 0
+		log.Printf("[SoddingSystem] Warning: 无法从reanim计算包围盒,使用默认centerY=0")
+	}
+
+	for _, lane := range animLanes {
+		// 验证行号合法性（1-5）
+		if lane < 1 || lane > 5 {
+			log.Printf("[SoddingSystem] Warning: 动画行 %d 超出范围 [1,5],跳过", lane)
+			continue
+		}
+
+		// 验证行是否在启用列表中
+		found := false
+		for _, enabledLane := range enabledLanes {
+			if enabledLane == lane {
+				found = true
+				break
+			}
+		}
+		if !found {
+			log.Printf("[SoddingSystem] Warning: 动画行 %d 不在启用行列表 %v 中,跳过", lane, enabledLanes)
+			continue
+		}
+
+		// Story 8.6 QA修正: 计算此行的Y坐标（使用与CalculateSodRollPosition相同的逻辑）
+		// 1. 计算目标行的中心Y坐标（绝对行号）
+		targetCenterY := config.GridWorldStartY + float64(lane-1)*config.CellHeight + config.CellHeight/2.0
+
+		// 2. 对齐 reanim 动画包围盒中心到目标行中心
+		laneY := targetCenterY - animCenterY + config.SodRollOffsetY
+
+		log.Printf("[SoddingSystem] 计算第 %d 行草皮卷位置: targetCenterY=%.1f, animCenterY=%.1f, offsetY=%.1f → laneY=%.1f",
+			lane, targetCenterY, animCenterY, config.SodRollOffsetY, laneY)
+
+		// 创建草皮卷实体
+		entityID := s.createSodRollEntity(s.animStartX, laneY, lane)
+		if entityID != 0 {
+			s.sodRollEntityIDs = append(s.sodRollEntityIDs, entityID)
+		}
+	}
+
+	log.Printf("[SoddingSystem] Created %d SodRoll entities for lanes %v", len(s.sodRollEntityIDs), animLanes)
+
+	// Story 11.4: 如果启用粒子特效,为每个草皮卷创建独立的粒子发射器
+	// Story 8.6 QA修正: 每行一个粒子发射器
 	if enableParticles {
-		s.createSodRollParticleEmitter()
+		s.sodRollEmitterIDs = make([]ecs.EntityID, 0, len(s.sodRollEntityIDs))
+		for i, entityID := range s.sodRollEntityIDs {
+			emitterID := s.createSodRollParticleEmitterForEntity(entityID, animLanes[i])
+			if emitterID != 0 {
+				s.sodRollEmitterIDs = append(s.sodRollEmitterIDs, emitterID)
+			}
+		}
 	}
 }
 
 // createSodRollEntity 创建草皮卷动画实体
-// 参数：
+// Story 8.6 QA修正: 为每个行创建独立的草皮卷
+// 参数:
 //   - posX: 实体的世界X坐标
-//   - posY: 实体的世界Y坐标（动态调整，让动画Y中心对齐目标行）
-func (s *SoddingSystem) createSodRollEntity(posX, posY float64) {
+//   - posY: 实体的世界Y坐标(对齐到行中心)
+//   - lane: 行号(用于日志)
+//
+// 返回: 创建的实体ID,失败返回0
+func (s *SoddingSystem) createSodRollEntity(posX, posY float64, lane int) ecs.EntityID {
 	// 加载 SodRoll Reanim 资源
 	reanimXML := s.resourceManager.GetReanimXML("SodRoll")
 	partImages := s.resourceManager.GetReanimPartImages("SodRoll")
 
 	if reanimXML == nil || partImages == nil {
-		log.Printf("[SoddingSystem] ERROR: Failed to load SodRoll reanim resources")
+		log.Printf("[SoddingSystem] ERROR: Failed to load SodRoll reanim resources for lane %d", lane)
 		log.Printf("[SoddingSystem] ReanimXML: %v, PartImages: %v", reanimXML != nil, partImages != nil)
-		return
+		return 0
 	}
 
-	log.Printf("[SoddingSystem] Creating SodRoll entity with %d parts", len(partImages))
+	log.Printf("[SoddingSystem] Creating SodRoll entity for lane %d at (%.1f, %.1f)", lane, posX, posY)
 
 	// 创建实体
-	s.sodRollEntityID = s.entityManager.CreateEntity()
+	entityID := s.entityManager.CreateEntity()
 
 	// 添加位置组件
-	ecs.AddComponent(s.entityManager, s.sodRollEntityID, &components.PositionComponent{
+	ecs.AddComponent(s.entityManager, entityID, &components.PositionComponent{
 		X: posX,
 		Y: posY,
 	})
 
 	// 添加 ReanimComponent
-	ecs.AddComponent(s.entityManager, s.sodRollEntityID, &components.ReanimComponent{
+	ecs.AddComponent(s.entityManager, entityID, &components.ReanimComponent{
 		Reanim:       reanimXML,
 		PartImages:   partImages,
 		CurrentAnim:  "", // 初始为空，等待初始化
@@ -163,7 +237,7 @@ func (s *SoddingSystem) createSodRollEntity(posX, posY float64) {
 	})
 
 	// 添加生命周期组件（动画持续约2.2秒）
-	ecs.AddComponent(s.entityManager, s.sodRollEntityID, &components.LifetimeComponent{
+	ecs.AddComponent(s.entityManager, entityID, &components.LifetimeComponent{
 		MaxLifetime:     s.animationDuration + 0.1, // 略长于动画时间
 		CurrentLifetime: 0,
 		IsExpired:       false,
@@ -171,12 +245,14 @@ func (s *SoddingSystem) createSodRollEntity(posX, posY float64) {
 
 	// 初始化场景动画（使用 InitializeSceneAnimation 不计算 CenterOffset）
 	// SodRoll 是场景动画，坐标在 reanim 文件中已经定义好，不需要自动居中
-	if err := s.reanimSystem.InitializeSceneAnimation(s.sodRollEntityID); err != nil {
-		log.Printf("[SoddingSystem] ERROR: Failed to initialize SodRoll scene animation: %v", err)
+	if err := s.reanimSystem.InitializeSceneAnimation(entityID); err != nil {
+		log.Printf("[SoddingSystem] ERROR: Failed to initialize SodRoll scene animation for lane %d: %v", lane, err)
 		log.Printf("[SoddingSystem] Animation may not display correctly")
 	} else {
-		log.Printf("[SoddingSystem] SodRoll scene animation initialized successfully")
+		log.Printf("[SoddingSystem] SodRoll scene animation initialized successfully for lane %d", lane)
 	}
+
+	return entityID
 }
 
 // Update 更新铺草皮动画
@@ -212,38 +288,43 @@ func (s *SoddingSystem) completeAnimation() {
 
 	// 保存最后一帧的中心位置（避免完成后跳跃）
 	// 在标记实体过期之前读取位置
-	if s.sodRollEntityID != 0 {
+	if len(s.sodRollEntityIDs) > 0 {
 		s.lastFrameCenterX = s.calculateCurrentCenterX()
 		log.Printf("[SoddingSystem] 缓存最后一帧中心位置: %.1f", s.lastFrameCenterX)
 
-		// 标记草皮卷实体为过期（LifetimeSystem 会自动清理）
-		if lifetime, ok := ecs.GetComponent[*components.LifetimeComponent](s.entityManager, s.sodRollEntityID); ok {
-			lifetime.IsExpired = true
+		// Story 8.6 QA修正: 标记所有草皮卷实体为过期
+		for _, entityID := range s.sodRollEntityIDs {
+			if lifetime, ok := ecs.GetComponent[*components.LifetimeComponent](s.entityManager, entityID); ok {
+				lifetime.IsExpired = true
+			}
 		}
-		s.sodRollEntityID = 0
+		s.sodRollEntityIDs = nil
 	}
 
 	// Story 11.4: 停止粒子发射器(但不立即销毁,等粒子自然消失)
-	if s.particlesEnabled && s.sodRollEmitterID != 0 {
-		if emitterComp, ok := ecs.GetComponent[*components.EmitterComponent](s.entityManager, s.sodRollEmitterID); ok {
-			emitterComp.Active = false
-			log.Printf("[SoddingSystem] Stopped particle emitter")
-		}
+	// Story 8.6 QA修正: 停止所有粒子发射器
+	if s.particlesEnabled && len(s.sodRollEmitterIDs) > 0 {
+		for _, emitterID := range s.sodRollEmitterIDs {
+			if emitterComp, ok := ecs.GetComponent[*components.EmitterComponent](s.entityManager, emitterID); ok {
+				emitterComp.Active = false
+			}
 
-		// 添加延迟清理(粒子最大生命周期 = 0.25秒)
-		if lifetime, ok := ecs.GetComponent[*components.LifetimeComponent](s.entityManager, s.sodRollEmitterID); ok {
-			lifetime.MaxLifetime = 0.25 + 0.1 // 粒子最大生命周期 + 缓冲
-			lifetime.CurrentLifetime = 0
-		} else {
-			// 如果没有 LifetimeComponent,添加一个
-			ecs.AddComponent(s.entityManager, s.sodRollEmitterID, &components.LifetimeComponent{
-				MaxLifetime:     0.35,
-				CurrentLifetime: 0,
-				IsExpired:       false,
-			})
+			// 添加延迟清理(粒子最大生命周期 = 0.25秒)
+			if lifetime, ok := ecs.GetComponent[*components.LifetimeComponent](s.entityManager, emitterID); ok {
+				lifetime.MaxLifetime = 0.25 + 0.1 // 粒子最大生命周期 + 缓冲
+				lifetime.CurrentLifetime = 0
+			} else {
+				// 如果没有 LifetimeComponent,添加一个
+				ecs.AddComponent(s.entityManager, emitterID, &components.LifetimeComponent{
+					MaxLifetime:     0.35,
+					CurrentLifetime: 0,
+					IsExpired:       false,
+				})
+			}
 		}
+		log.Printf("[SoddingSystem] Stopped %d particle emitters", len(s.sodRollEmitterIDs))
 
-		s.sodRollEmitterID = 0
+		s.sodRollEmitterIDs = nil
 		s.particlesEnabled = false
 	}
 
@@ -260,6 +341,12 @@ func (s *SoddingSystem) completeAnimation() {
 // IsPlaying 返回动画是否正在播放
 func (s *SoddingSystem) IsPlaying() bool {
 	return s.isAnimationPlaying
+}
+
+// HasStarted 返回动画是否已经启动过(包括正在播放和已完成)
+// Story 8.6 QA修正: 用于判断预渲染草皮是否应该显示
+func (s *SoddingSystem) HasStarted() bool {
+	return s.animationStarted
 }
 
 // GetProgress 返回动画播放进度（0-1）
@@ -303,16 +390,25 @@ func (s *SoddingSystem) GetAnimStartX() float64 {
 }
 
 // calculateCurrentCenterX 计算草皮卷当前帧的中心X坐标（世界坐标）
+// Story 8.6 QA修正: 使用第一个草皮卷实体(所有行X坐标相同)
 func (s *SoddingSystem) calculateCurrentCenterX() float64 {
+	// Story 8.6 QA修正: 检查是否有草皮卷实体
+	if len(s.sodRollEntityIDs) == 0 {
+		return s.animStartX
+	}
+
+	// 使用第一个草皮卷实体(所有行的X坐标相同)
+	entityID := s.sodRollEntityIDs[0]
+
 	// 获取 ReanimComponent
-	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, s.sodRollEntityID)
+	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 	if !ok {
 		// 降级：返回起点
 		return s.animStartX
 	}
 
 	// 获取实体Position
-	posComp, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, s.sodRollEntityID)
+	posComp, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
 	if !ok {
 		// 降级：返回起点
 		return s.animStartX
@@ -367,47 +463,46 @@ func (s *SoddingSystem) calculateCurrentCenterX() float64 {
 	return worldCenterX
 }
 
-// Story 11.4: createSodRollParticleEmitter 创建铺草皮粒子发射器
-func (s *SoddingSystem) createSodRollParticleEmitter() {
+// Story 11.4: createSodRollParticleEmitterForEntity 为指定草皮卷实体创建粒子发射器
+// Story 8.6 QA修正: 每行一个粒子发射器
+// 参数:
+//   - entityID: 草皮卷实体ID
+//   - lane: 行号（用于日志）
+// 返回: 粒子发射器实体ID，失败返回0
+func (s *SoddingSystem) createSodRollParticleEmitterForEntity(entityID ecs.EntityID, lane int) ecs.EntityID {
 	// 计算粒子发射器位置
 	// 注意：粒子发射器需要使用草皮卷的视觉中心Y坐标，而不是动画实体的锚点Y坐标
-	// animStartY 是动画实体的锚点（经过包围盒对齐计算），而粒子应该在草皮卷的实际中心
-
-	// 获取草皮卷的实际中心位置（从 SodRollEntityID 的 ReanimComponent 读取）
-	// 如果无法读取，则使用 animStartX 和目标行中心Y作为降级方案
 	particleX := s.animStartX
-	particleY := s.animStartY
+	particleY := 0.0
 
-	// 尝试从草皮卷实体读取当前视觉中心位置
-	if s.sodRollEntityID != 0 {
-		if posComp, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, s.sodRollEntityID); ok {
-			particleX = posComp.X
-			particleY = posComp.Y
+	// 从草皮卷实体读取当前视觉中心位置
+	if posComp, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID); ok {
+		particleX = posComp.X
+		particleY = posComp.Y
 
-			// 读取 reanim 的包围盒中心偏移
-			if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, s.sodRollEntityID); ok {
-				if reanimComp.Reanim != nil {
-					// 计算 reanim 的 Y 包围盒中心
-					var minY, maxY *float64
-					for _, track := range reanimComp.Reanim.Tracks {
-						for _, frame := range track.Frames {
-							if frame.Y != nil {
-								y := *frame.Y
-								if minY == nil || y < *minY {
-									minY = &y
-								}
-								if maxY == nil || y > *maxY {
-									maxY = &y
-								}
+		// 读取 reanim 的包围盒中心偏移
+		if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
+			if reanimComp.Reanim != nil {
+				// 计算 reanim 的 Y 包围盒中心
+				var minY, maxY *float64
+				for _, track := range reanimComp.Reanim.Tracks {
+					for _, frame := range track.Frames {
+						if frame.Y != nil {
+							y := *frame.Y
+							if minY == nil || y < *minY {
+								minY = &y
+							}
+							if maxY == nil || y > *maxY {
+								maxY = &y
 							}
 						}
 					}
+				}
 
-					if minY != nil && maxY != nil {
-						// 粒子发射器的Y坐标 = 实体锚点Y + 包围盒中心偏移
-						animCenterOffsetY := (*minY + *maxY) / 2.0
-						particleY = posComp.Y + animCenterOffsetY
-					}
+				if minY != nil && maxY != nil {
+					// 粒子发射器的Y坐标 = 实体锚点Y + 包围盒中心偏移
+					animCenterOffsetY := (*minY + *maxY) / 2.0
+					particleY = posComp.Y + animCenterOffsetY
 				}
 			}
 		}
@@ -417,25 +512,23 @@ func (s *SoddingSystem) createSodRollParticleEmitter() {
 	particleX += config.SodRollParticleOffsetX
 	particleY += config.SodRollParticleOffsetY
 
-	log.Printf("[SoddingSystem] 粒子发射器初始位置: X=%.1f, Y=%.1f (草皮卷实体Y=%.1f, 包围盒中心偏移=%.1f)",
-		particleX, particleY, s.animStartY, particleY-s.animStartY)
+	log.Printf("[SoddingSystem] 第 %d 行粒子发射器初始位置: X=%.1f, Y=%.1f", lane, particleX, particleY)
 
 	// 使用粒子工厂创建发射器
 	emitterID, err := entities.CreateParticleEffect(
 		s.entityManager,
 		s.resourceManager,
-		"SodRoll",     // 粒子配置名称
-		particleX,     // 起始位置X
-		particleY,     // 起始位置Y（草皮卷视觉中心）
+		"SodRoll",  // 粒子配置名称
+		particleX,  // 起始位置X
+		particleY,  // 起始位置Y（草皮卷视觉中心）
 	)
 
 	if err != nil {
-		log.Printf("[SoddingSystem] Failed to create SodRoll particle emitter: %v", err)
-		return
+		log.Printf("[SoddingSystem] Failed to create SodRoll particle emitter for lane %d: %v", lane, err)
+		return 0
 	}
 
-	s.sodRollEmitterID = emitterID
 	s.particlesEnabled = true
-
-	log.Printf("[SoddingSystem] SodRoll particle emitter created at (%.1f, %.1f)", particleX, particleY)
+	log.Printf("[SoddingSystem] SodRoll particle emitter created for lane %d at (%.1f, %.1f)", lane, particleX, particleY)
+	return emitterID
 }

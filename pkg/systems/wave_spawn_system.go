@@ -51,7 +51,10 @@ func NewWaveSpawnSystem(em *ecs.EntityManager, rm *game.ResourceManager, rs *Rea
 	}
 }
 
-// SpawnWave 生成一波僵尸
+// SpawnWave 生成一波僵尸（已废弃）
+//
+// 该方法已被 PreSpawnAllWaves + ActivateWave 取代
+// 保留以向后兼容，但不推荐使用
 //
 // 根据波次配置，遍历所有僵尸生成配置，调用对应的僵尸工厂函数
 //
@@ -65,16 +68,18 @@ func NewWaveSpawnSystem(em *ecs.EntityManager, rm *game.ResourceManager, rs *Rea
 func (s *WaveSpawnSystem) SpawnWave(waveConfig config.WaveConfig) int {
 	totalSpawned := 0
 
-	// 遍历波次中的所有僵尸生成配置
-	for _, zombieSpawn := range waveConfig.Zombies {
-		// 根据 Count 生成多个僵尸
-		for i := 0; i < zombieSpawn.Count; i++ {
-			// 生成单个僵尸，传递索引以计算额外的X偏移（避免重叠）
-			entityID := s.spawnZombieWithOffset(zombieSpawn.Type, zombieSpawn.Lane, i)
-			if entityID != 0 {
-				totalSpawned++
-				log.Printf("[WaveSpawnSystem] Spawned zombie: type=%s, lane=%d, index=%d, entityID=%d",
-					zombieSpawn.Type, zombieSpawn.Lane, i, entityID)
+	// 支持旧格式 OldZombies
+	if len(waveConfig.OldZombies) > 0 {
+		for _, zombieSpawn := range waveConfig.OldZombies {
+			// 根据 Count 生成多个僵尸
+			for i := 0; i < zombieSpawn.Count; i++ {
+				// 生成单个僵尸，传递索引以计算额外的X偏移（避免重叠）
+				entityID := s.spawnZombieWithOffset(zombieSpawn.Type, zombieSpawn.Lane, i)
+				if entityID != 0 {
+					totalSpawned++
+					log.Printf("[WaveSpawnSystem] Spawned zombie: type=%s, lane=%d, index=%d, entityID=%d",
+						zombieSpawn.Type, zombieSpawn.Lane, i, entityID)
+				}
 			}
 		}
 	}
@@ -86,6 +91,8 @@ func (s *WaveSpawnSystem) SpawnWave(waveConfig config.WaveConfig) int {
 //
 // 在关卡开始时调用，一次性生成所有僵尸并放置在屏幕右侧站位
 // 僵尸初始状态为"待命"（不移动），等待 ActivateWave() 激活
+//
+// Story 8.6: 支持新的 ZombieGroup 格式（随机行选择）
 //
 // 返回：
 //
@@ -101,13 +108,33 @@ func (s *WaveSpawnSystem) PreSpawnAllWaves() int {
 
 	// 遍历所有波次
 	for waveIndex, waveConfig := range s.levelConfig.Waves {
-		// 遍历本波的所有僵尸配置
-		for _, zombieSpawn := range waveConfig.Zombies {
-			// 生成多个僵尸
-			for i := 0; i < zombieSpawn.Count; i++ {
-				entityID := s.spawnZombieForWave(zombieSpawn.Type, zombieSpawn.Lane, waveIndex, i)
-				if entityID != 0 {
-					totalSpawned++
+		// Story 8.6: 支持新格式 ZombieGroup
+		if len(waveConfig.Zombies) > 0 {
+			// 遍历本波的所有僵尸组配置
+			for groupIndex, zombieGroup := range waveConfig.Zombies {
+				// 为组内每个僵尸预选一个随机行（从 lanes 列表中选择）
+				for i := 0; i < zombieGroup.Count; i++ {
+					// 从配置的 lanes 列表中随机选择一行
+					randomLaneIndex := rand.Intn(len(zombieGroup.Lanes))
+					selectedLane := zombieGroup.Lanes[randomLaneIndex] // 1-5
+
+					entityID := s.spawnZombieForWave(zombieGroup.Type, selectedLane, waveIndex, groupIndex*100+i)
+					if entityID != 0 {
+						totalSpawned++
+					}
+				}
+			}
+		}
+
+		// 向后兼容：支持旧格式 OldZombies
+		if len(waveConfig.OldZombies) > 0 {
+			for _, zombieSpawn := range waveConfig.OldZombies {
+				// 生成多个僵尸
+				for i := 0; i < zombieSpawn.Count; i++ {
+					entityID := s.spawnZombieForWave(zombieSpawn.Type, zombieSpawn.Lane, waveIndex, i)
+					if entityID != 0 {
+						totalSpawned++
+					}
 				}
 			}
 		}

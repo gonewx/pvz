@@ -182,11 +182,18 @@ func (s *LevelSystem) checkVictoryCondition() {
 		s.gameState.SetGameResult("win")
 		log.Println("[LevelSystem] Victory! All zombies defeated!")
 
-		// Story 8.3: 从关卡配置读取奖励植物（如果配置了）
-		if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.RewardPlant != "" {
+		// Story 8.6: 保存关卡进度
+		if s.gameState.CurrentLevel != nil {
+			levelID := s.gameState.CurrentLevel.ID
 			rewardPlant := s.gameState.CurrentLevel.RewardPlant
-			s.gameState.GetPlantUnlockManager().UnlockPlant(rewardPlant)
-			log.Printf("[LevelSystem] Unlocked plant: %s (completed level %s)", rewardPlant, s.gameState.CurrentLevel.ID)
+			unlockTools := s.gameState.CurrentLevel.UnlockTools
+
+			// 保存进度（包括关卡完成、植物解锁、工具解锁）
+			if err := s.gameState.CompleteLevel(levelID, rewardPlant, unlockTools); err != nil {
+				log.Printf("[LevelSystem] Warning: Failed to save progress: %v", err)
+			} else {
+				log.Printf("[LevelSystem] Progress saved: level=%s, plant=%s, tools=%v", levelID, rewardPlant, unlockTools)
+			}
 		}
 
 		// Story 8.3: 检查是否有新植物解锁，触发奖励动画

@@ -167,21 +167,22 @@ func (s *ReanimSystem) getAnimDefinitionTrack(comp *components.ReanimComponent, 
 	for i := range comp.Reanim.Tracks {
 		track := &comp.Reanim.Tracks[i]
 		if track.Name == animName {
-			// 检查是否是标准动画定义轨道（只包含 FrameNum）
+			// Story 8.6 QA修正: 移除多余的动画定义轨道限制
+			// 原因: 某些植物（如向日葵）的 reanim 文件中，动画轨道同时包含动画定义和部件渲染数据
+			// 这是原版游戏的正常结构，不应该被限制
+			// 只要轨道名称匹配，就认为是有效的动画定义
+
+			// 对于标准动画定义轨道（只包含 FrameNum），直接返回
 			if s.isAnimationDefinitionTrack(track) {
 				return track
 			}
 
-			// 如果不是标准动画定义轨道，检查是否是简单动画（只有一个轨道）
-			// 像 FinalWave.reanim 这样的文件，轨道既是动画定义又是部件渲染
-			if len(comp.Reanim.Tracks) == 1 {
-				log.Printf("[ReanimSystem] Using simple animation track '%s' (single track with images/transforms)", animName)
-				return track
-			}
-
-			// 多轨道文件中的非标准轨道，不允许作为动画定义
-			log.Printf("[ReanimSystem] WARNING: Track '%s' is not a valid animation definition track (has images or transforms)", animName)
-			return nil
+			// 对于包含图片/变换的轨道，也允许作为动画定义使用
+			// 这种情况在原版游戏中很常见，例如：
+			// - SunFlower.reanim 的 anim_idle 轨道
+			// - FinalWave.reanim 的单轨道动画
+			log.Printf("[ReanimSystem] Using animation track '%s' (contains images/transforms, valid for animation definition)", animName)
+			return track
 		}
 	}
 

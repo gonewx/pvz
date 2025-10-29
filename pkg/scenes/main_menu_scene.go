@@ -252,8 +252,22 @@ func (m *MainMenuScene) initButtons() {
 // It switches the current scene to the GameScene.
 func (m *MainMenuScene) onStartAdventureClicked() {
 	log.Println("Start Adventure button clicked")
-	// Pass ResourceManager and SceneManager to GameScene (fixes architectural inconsistency)
-	gameScene := NewGameScene(m.resourceManager, m.sceneManager)
+
+	// Story 8.6: Load level from save file or default to 1-1
+	levelToLoad := "1-1" // Default to first level
+	gameState := game.GetGameState()
+	saveManager := gameState.GetSaveManager()
+	if err := saveManager.Load(); err == nil {
+		// Save file exists, get highest level
+		highestLevel := saveManager.GetHighestLevel()
+		if highestLevel != "" {
+			levelToLoad = highestLevel
+			log.Printf("[MainMenu] Loading from save: highest level = %s", highestLevel)
+		}
+	}
+
+	// Pass ResourceManager, SceneManager, and levelID to GameScene
+	gameScene := NewGameScene(m.resourceManager, m.sceneManager, levelToLoad)
 	m.sceneManager.SwitchTo(gameScene)
 }
 

@@ -39,9 +39,16 @@ func TestLevel1_1_Specification(t *testing.T) {
 				if zombie.Type != "basic" {
 					t.Errorf("Expected only basic zombies in 1-1, got %s", zombie.Type)
 				}
-				// 验证所有僵尸都在第3行
-				if zombie.Lane != 3 {
-					t.Errorf("Expected all zombies in lane 3, got lane %d", zombie.Lane)
+				// 验证所有僵尸都在第3行（检查 Lanes 数组）
+				validLane := false
+				for _, lane := range zombie.Lanes {
+					if lane == 3 {
+						validLane = true
+						break
+					}
+				}
+				if !validLane {
+					t.Errorf("Expected all zombies in lane 3, got lanes %v", zombie.Lanes)
 				}
 				totalZombies += zombie.Count
 			}
@@ -113,17 +120,19 @@ func TestLevel1_2_Specification(t *testing.T) {
 					t.Errorf("Wave %d, zombie %d: Expected only basic zombies in 1-2, got %s",
 						i, j, zombie.Type)
 				}
-				// 验证所有僵尸都在启用的行中
-				validLane := false
-				for _, lane := range config.EnabledLanes {
-					if zombie.Lane == lane {
-						validLane = true
-						break
+				// 验证所有僵尸都在启用的行中（检查 Lanes 数组）
+				for _, zombieLane := range zombie.Lanes {
+					validLane := false
+					for _, enabledLane := range config.EnabledLanes {
+						if zombieLane == enabledLane {
+							validLane = true
+							break
+						}
 					}
-				}
-				if !validLane {
-					t.Errorf("Wave %d, zombie %d: Zombie in lane %d, but only lanes %v are enabled",
-						i, j, zombie.Lane, config.EnabledLanes)
+					if !validLane {
+						t.Errorf("Wave %d, zombie %d: Zombie in lane %d, but only lanes %v are enabled",
+							i, j, zombieLane, config.EnabledLanes)
+					}
 				}
 			}
 		}

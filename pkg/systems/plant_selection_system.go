@@ -81,11 +81,16 @@ func (s *PlantSelectionSystem) SelectPlant(plantID string) error {
 		return fmt.Errorf("selection slots are full (max %d)", selectionComp.MaxSlots)
 	}
 
-	// 检查植物是否已解锁
-	unlockManager := s.gameState.GetPlantUnlockManager()
-	if unlockManager != nil && !unlockManager.IsUnlocked(plantID) {
-		return fmt.Errorf("plant %s is not unlocked", plantID)
-	}
+	// Story 8.6 QA修正: 移除解锁状态检查
+	// 原因: 关卡配置的 availablePlants 应该直接控制可用植物（方案 A）
+	// 卡片创建时已经根据 availablePlants 过滤，这里不需要再检查解锁状态
+	// 这允许教学关卡强制使用特定植物，不受解锁状态限制
+	//
+	// 注释掉的代码（保留供参考）:
+	// unlockManager := s.gameState.GetPlantUnlockManager()
+	// if unlockManager != nil && !unlockManager.IsUnlocked(plantID) {
+	//     return fmt.Errorf("plant %s is not unlocked", plantID)
+	// }
 
 	// 添加到选择列表
 	selectionComp.SelectedPlants = append(selectionComp.SelectedPlants, plantID)

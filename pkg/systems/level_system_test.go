@@ -19,14 +19,14 @@ func TestCalculateTotalZombies(t *testing.T) {
 		{
 			name: "单波次单僵尸",
 			waves: []config.WaveConfig{
-				{Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
+				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
 			},
 			expected: 1,
 		},
 		{
 			name: "单波次多僵尸",
 			waves: []config.WaveConfig{
-				{Zombies: []config.ZombieSpawn{
+				{OldZombies: []config.ZombieSpawn{
 					{Type: "basic", Lane: 1, Count: 2},
 					{Type: "basic", Lane: 2, Count: 3},
 				}},
@@ -36,14 +36,14 @@ func TestCalculateTotalZombies(t *testing.T) {
 		{
 			name: "多波次多僵尸",
 			waves: []config.WaveConfig{
-				{Zombies: []config.ZombieSpawn{
+				{OldZombies: []config.ZombieSpawn{
 					{Type: "basic", Lane: 1, Count: 2},
 					{Type: "basic", Lane: 2, Count: 1},
 				}},
-				{Zombies: []config.ZombieSpawn{
+				{OldZombies: []config.ZombieSpawn{
 					{Type: "basic", Lane: 3, Count: 3},
 				}},
-				{Zombies: []config.ZombieSpawn{
+				{OldZombies: []config.ZombieSpawn{
 					{Type: "basic", Lane: 1, Count: 1},
 					{Type: "basic", Lane: 2, Count: 1},
 					{Type: "basic", Lane: 3, Count: 1},
@@ -87,8 +87,8 @@ func TestCalculateFlagPositions(t *testing.T) {
 		{
 			name: "单旗帜在中间",
 			waves: []config.WaveConfig{
-				{Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 5}}},
-				{Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 5}}},
+				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 5}}},
+				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 5}}},
 			},
 			flagWaves: []int{1}, // 第2波是旗帜波
 			expected:  []float64{0.5},
@@ -96,9 +96,9 @@ func TestCalculateFlagPositions(t *testing.T) {
 		{
 			name: "单旗帜在最后",
 			waves: []config.WaveConfig{
-				{Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 3}}},
-				{Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 2}}},
-				{Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 5}}},
+				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 3}}},
+				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 2}}},
+				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 5}}},
 			},
 			flagWaves: []int{2}, // 第3波是旗帜波
 			expected:  []float64{0.5},
@@ -106,10 +106,10 @@ func TestCalculateFlagPositions(t *testing.T) {
 		{
 			name: "多旗帜",
 			waves: []config.WaveConfig{
-				{Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 2}}},
-				{Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 3}}},
-				{Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 2}}},
-				{Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 3}}},
+				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 2}}},
+				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 3}}},
+				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 2}}},
+				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 3}}},
 			},
 			flagWaves: []int{1, 3}, // 第2波和第4波是旗帜波
 			expected:  []float64{0.2, 0.7},
@@ -117,7 +117,7 @@ func TestCalculateFlagPositions(t *testing.T) {
 		{
 			name: "无旗帜",
 			waves: []config.WaveConfig{
-				{Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 5}}},
+				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 5}}},
 			},
 			flagWaves: []int{},
 			expected:  []float64{},

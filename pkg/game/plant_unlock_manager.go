@@ -14,7 +14,7 @@ type PlantUnlockManager struct {
 }
 
 // NewPlantUnlockManager 创建一个新的植物解锁管理器
-// 初始化时解锁列表为空（Story 8.3 方案 A）
+// 初始化时包含默认解锁的植物（Story 8.6）
 //
 // 返回:
 //   - *PlantUnlockManager: 新创建的植物解锁管理器实例
@@ -26,12 +26,13 @@ type PlantUnlockManager struct {
 func NewPlantUnlockManager() *PlantUnlockManager {
 	return &PlantUnlockManager{
 		unlockedPlants: map[string]bool{
-			// 初始无解锁植物
-			// 各关卡通过 availablePlants 直接控制可用植物
+			// Story 8.6: 默认解锁植物
+			"peashooter": true, // 默认解锁（1-1 起始植物）
 			// 通过完成关卡解锁（rewardPlant）：
 			// "sunflower"  - 1-1 完成后解锁
-			// "cherrybomb" - 1-3 完成后解锁
-			// "wallnut"    - 1-4 完成后解锁
+			// "cherrybomb" - 1-2 完成后解锁
+			// "wallnut"    - 1-3 完成后解锁
+			// "potatomine" - 1-4 完成后解锁
 			// ...
 		},
 	}

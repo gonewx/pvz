@@ -44,6 +44,7 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 func main() {
 	// Flags
 	verboseFlag := flag.Bool("verbose", false, "Enable verbose logging (default off)")
+	levelFlag := flag.String("level", "", "Specify which level to load (e.g., '1-2', '1-3'). If not set, loads from save or defaults to 1-1")
 	flag.Parse()
 
 	// Initialize audio context with 48000 Hz sample rate
@@ -72,9 +73,42 @@ func main() {
 	// Create scene manager
 	sceneManager := game.NewSceneManager()
 
-	// TEMPORARY: 直接启动教学关卡（Story 8.2 测试）
+	// Determine which level to load:
+	// 1. Command line --level flag (highest priority)
+	// 2. Highest completed level from save file (default)
+	// 3. Fallback to 1-1 (new game)
+	levelToLoad := *levelFlag
+	if levelToLoad == "" {
+		// No --level flag, try to load from save
+		gameState := game.GetGameState()
+		saveManager := gameState.GetSaveManager()
+		if err := saveManager.Load(); err == nil {
+			// Save file exists, get highest level
+			highestLevel := saveManager.GetHighestLevel()
+			if highestLevel != "" {
+				levelToLoad = highestLevel
+				if *verboseFlag {
+					log.Printf("[main] Loading from save: highest level = %s", highestLevel)
+				}
+			}
+		}
+	}
+
+	// Fallback to 1-1 if still empty
+	if levelToLoad == "" {
+		levelToLoad = "1-1"
+		if *verboseFlag {
+			log.Printf("[main] No save found, starting new game at level 1-1")
+		}
+	}
+
+	if *verboseFlag {
+		log.Printf("[main] Starting level: %s", levelToLoad)
+	}
+
+	// TEMPORARY: 直接启动游戏场景（Story 8.6: 支持根据存档或参数加载关卡）
 	// 正式版本应该从主菜单进入
-	gameScene := scenes.NewGameScene(resourceManager, sceneManager)
+	gameScene := scenes.NewGameScene(resourceManager, sceneManager, levelToLoad)
 	sceneManager.SwitchTo(gameScene)
 
 	// 原版启动代码（测试完成后恢复）：

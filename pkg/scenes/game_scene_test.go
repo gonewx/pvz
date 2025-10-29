@@ -19,7 +19,7 @@ func TestNewGameScene(t *testing.T) {
 	sm := game.NewSceneManager()
 
 	// Create a new GameScene
-	scene := NewGameScene(rm, sm)
+	scene := NewGameScene(rm, sm, "1-1")
 
 	// Verify the scene is not nil
 	if scene == nil {
@@ -46,7 +46,7 @@ func TestGameSceneImplementsSceneInterface(t *testing.T) {
 	sm := game.NewSceneManager()
 
 	// Create a new GameScene
-	scene := NewGameScene(rm, sm)
+	scene := NewGameScene(rm, sm, "1-1")
 
 	// Type assertion to verify GameScene implements Scene interface
 	var _ game.Scene = scene
@@ -67,7 +67,7 @@ func TestGameSceneUpdateMethod(t *testing.T) {
 	sm := game.NewSceneManager()
 
 	// Create a new GameScene
-	scene := NewGameScene(rm, sm)
+	scene := NewGameScene(rm, sm, "1-1")
 
 	// Call Update with a sample deltaTime
 	// This should not panic
@@ -91,7 +91,7 @@ func TestGameSceneDrawMethodDoesNotPanic(t *testing.T) {
 	sm := game.NewSceneManager()
 
 	// Create a new GameScene
-	scene := NewGameScene(rm, sm)
+	scene := NewGameScene(rm, sm, "1-1")
 
 	// We cannot create a real screen image in a unit test,
 	// but we can verify the scene structure is valid
@@ -121,7 +121,7 @@ func TestGameSceneResourceLoadingFallback(t *testing.T) {
 		}
 	}()
 
-	scene := NewGameScene(rm, sm)
+	scene := NewGameScene(rm, sm, "1-1")
 
 	// Verify scene was created despite resource loading failures
 	if scene == nil {
@@ -188,7 +188,7 @@ func TestEaseOutQuad(t *testing.T) {
 	// Create a scene to access the easing method
 	rm := game.NewResourceManager(testAudioContext)
 	sm := game.NewSceneManager()
-	scene := NewGameScene(rm, sm)
+	scene := NewGameScene(rm, sm, "1-1")
 
 	tests := []struct {
 		name      string
@@ -221,7 +221,7 @@ func TestGameSceneMaxCameraXCalculation(t *testing.T) {
 	// Create a GameScene with mock dependencies
 	rm := game.NewResourceManager(testAudioContext)
 	sm := game.NewSceneManager()
-	scene := NewGameScene(rm, sm)
+	scene := NewGameScene(rm, sm, "1-1")
 
 	// Since we're in a test environment without actual assets,
 	// maxCameraX should be 0 (background loading fails)

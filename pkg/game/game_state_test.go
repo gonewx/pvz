@@ -216,8 +216,8 @@ func TestLoadLevel(t *testing.T) {
 		ID:   "test-1",
 		Name: "Test Level",
 		Waves: []config.WaveConfig{
-			{MinDelay: 0, Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
-			{MinDelay: 5, Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 2, Count: 2}}},
+			{MinDelay: 0, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
+			{MinDelay: 5, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 2, Count: 2}}},
 		},
 	}
 
@@ -260,7 +260,7 @@ func TestUpdateLevelTime(t *testing.T) {
 	levelConfig := &config.LevelConfig{
 		ID:    "test-1",
 		Name:  "Test Level",
-		Waves: []config.WaveConfig{{MinDelay: 0, Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}}},
+		Waves: []config.WaveConfig{{MinDelay: 0, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}}},
 	}
 	gs.LoadLevel(levelConfig)
 
@@ -283,9 +283,9 @@ func TestGetCurrentWave(t *testing.T) {
 		ID:   "test-1",
 		Name: "Test Level",
 		Waves: []config.WaveConfig{
-			{MinDelay: 0, Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
-			{MinDelay: 5, Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 2, Count: 2}}},
-			{MinDelay: 3, Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 3, Count: 1}}},
+			{MinDelay: 0, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
+			{MinDelay: 5, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 2, Count: 2}}},
+			{MinDelay: 3, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 3, Count: 1}}},
 		},
 	}
 	gs.LoadLevel(levelConfig)
@@ -358,8 +358,8 @@ func TestMarkWaveSpawned(t *testing.T) {
 		ID:   "test-1",
 		Name: "Test Level",
 		Waves: []config.WaveConfig{
-			{MinDelay: 0, Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
-			{MinDelay: 5, Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 2, Count: 2}}},
+			{MinDelay: 0, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
+			{MinDelay: 5, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 2, Count: 2}}},
 		},
 	}
 	gs.LoadLevel(levelConfig)
@@ -390,8 +390,8 @@ func TestIsWaveSpawned(t *testing.T) {
 		ID:   "test-1",
 		Name: "Test Level",
 		Waves: []config.WaveConfig{
-			{MinDelay: 0, Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
-			{MinDelay: 5, Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 2, Count: 2}}},
+			{MinDelay: 0, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
+			{MinDelay: 5, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 2, Count: 2}}},
 		},
 	}
 	gs.LoadLevel(levelConfig)
@@ -428,7 +428,7 @@ func TestIncrementZombiesSpawned(t *testing.T) {
 	levelConfig := &config.LevelConfig{
 		ID:    "test-1",
 		Name:  "Test Level",
-		Waves: []config.WaveConfig{{MinDelay: 0, Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}}},
+		Waves: []config.WaveConfig{{MinDelay: 0, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}}},
 	}
 	gs.LoadLevel(levelConfig)
 
@@ -455,7 +455,7 @@ func TestIncrementZombiesKilled(t *testing.T) {
 	levelConfig := &config.LevelConfig{
 		ID:    "test-1",
 		Name:  "Test Level",
-		Waves: []config.WaveConfig{{MinDelay: 0, Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}}},
+		Waves: []config.WaveConfig{{MinDelay: 0, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}}},
 	}
 	gs.LoadLevel(levelConfig)
 
@@ -484,8 +484,8 @@ func TestCheckVictory(t *testing.T) {
 		ID:   "test-1",
 		Name: "Test Level",
 		Waves: []config.WaveConfig{
-			{MinDelay: 10, Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 2}}},
-			{MinDelay: 30, Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 2, Count: 3}}},
+			{MinDelay: 10, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 2}}},
+			{MinDelay: 30, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 2, Count: 3}}},
 		},
 	}
 	gs.LoadLevel(levelConfig)
@@ -529,7 +529,7 @@ func TestSetGameResult(t *testing.T) {
 	levelConfig := &config.LevelConfig{
 		ID:    "test-1",
 		Name:  "Test Level",
-		Waves: []config.WaveConfig{{MinDelay: 0, Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}}},
+		Waves: []config.WaveConfig{{MinDelay: 0, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}}},
 	}
 
 	t.Run("win result", func(t *testing.T) {
@@ -568,9 +568,9 @@ func TestGetLevelProgress(t *testing.T) {
 		ID:   "test-1",
 		Name: "Test Level",
 		Waves: []config.WaveConfig{
-			{MinDelay: 10, Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
-			{MinDelay: 30, Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 2, Count: 2}}},
-			{MinDelay: 50, Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 3, Count: 1}}},
+			{MinDelay: 10, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
+			{MinDelay: 30, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 2, Count: 2}}},
+			{MinDelay: 50, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 3, Count: 1}}},
 		},
 	}
 	gs.LoadLevel(levelConfig)
@@ -624,7 +624,7 @@ func TestLoadLevel_InitialSun(t *testing.T) {
 				ID:   "test-level",
 				Name: tc.name,
 				Waves: []config.WaveConfig{
-					{MinDelay: 10, Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
+					{MinDelay: 10, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
 				},
 				InitialSun: tc.initialSun,
 			}

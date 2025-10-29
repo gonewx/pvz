@@ -67,11 +67,12 @@ const (
 
 	// 草皮叠加图X偏移（相对于网格起点）
 	// 调整此值可以改变草皮显示的水平位置
-	SodOverlayOffsetX = -26.0 // 相对于 GridWorldStartX 的偏移量
+	// SodOverlayOffsetX = -26.0 // 相对于 GridWorldStartX 的偏移量
+	SodOverlayOffsetX = -29.0 // 相对于 GridWorldStartX 的偏移量
 
 	// 草皮叠加图Y偏移（相对于目标行中心）
 	// 调整此值可以改变草皮显示的垂直位置
-	SodOverlayOffsetY = 0.0 // 相对于行中心的Y偏移量
+	SodOverlayOffsetY = -3.0 // 相对于行中心的Y偏移量
 
 	// ========== 教学文本UI配置参数（可手工调节） ==========
 

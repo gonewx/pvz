@@ -17,7 +17,7 @@
 - 我将原图片目录备份到了 assets/imagesold， 现在的资源目录 assets 收集了完整的原版资源，请先根据 assets/properties/resources.xml 结合我们调整后的实际目录，创建我们的资源映射文件（由原来的 xml 改为yaml格式） ，并创新新的资源引用与管理模块，然后将代码原有引用旧资源的逻辑改为使用新的资源管理方式。
 
 - ✅ [FIXED] 教学关卡时，指向植物卡片的箭头不显示了 - 原因：GameScene.Draw() 缺少 UI 粒子渲染调用
-- ✅ [FIXED] 僵尸死亡时，头和手臂一起掉落了 - 原因：手臂掉落应在受伤时触发，而不是死亡时
+- ✅ [FIXED] 僵尸死亡时，头和手臂一起掉落了 - 原因：手臂掉落应在受伤时触发，而不是死亡时。手臂掉落的粒子文件是 assets/effect/particles/ZombieArm.xml 。 头掉落的是：assets/effect/particles/ZombieHead.xml
 - ✅ [FIXED] 子弹与僵尸的碰撞检测要优化 - 原因：physics_system.go 碰撞检测遗漏了 BehaviorZombieDying
 
 ## 5.3
@@ -83,3 +83,9 @@ assets/images/FlagMeter.png
 assets/images/FlagMeterLevelProgress.png
 assets/images/FlagMeterParts.png 
 3. 图片前要有当前关卡的文本显示:  关卡 1-1 , 进度条和文本显示要右对齐，可以手工配置距离右边缘的位置.  开始进攻前, 只有文本显示,开始进攻时,显示完整的文本加图片进度条,文字位置要在进度条左面的外侧， 进度条不显示时,不要占位,文本要右对齐.
+
+
+### level 1-2
+
+- 本关也没有解锁铲子
+- 为什么配置了有效植物有向日葵，但是向日葵无法种植

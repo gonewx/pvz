@@ -59,7 +59,7 @@ func TestOpeningAnimationSystem_NewOpeningAnimationSystem(t *testing.T) {
 				OpeningType:  tt.openingType,
 				SpecialRules: tt.specialRules,
 				Waves: []config.WaveConfig{
-					{Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 3}}},
+					{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 3}}},
 				},
 			}
 
@@ -117,7 +117,7 @@ func TestOpeningAnimationSystem_StateMachine(t *testing.T) {
 		OpeningType:  "standard",
 		SpecialRules: "",
 		Waves: []config.WaveConfig{
-			{Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 3}}},
+			{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 3}}},
 		},
 	}
 
@@ -224,7 +224,7 @@ func TestOpeningAnimationSystem_Skip(t *testing.T) {
 		OpeningType:  "standard",
 		SpecialRules: "",
 		Waves: []config.WaveConfig{
-			{Zombies: []config.ZombieSpawn{
+			{OldZombies: []config.ZombieSpawn{
 				{Type: "basic", Lane: 3},
 				{Type: "conehead", Lane: 2},
 			}},
@@ -310,7 +310,7 @@ func TestOpeningAnimationSystem_IsCompleted(t *testing.T) {
 		OpeningType:  "standard",
 		SpecialRules: "",
 		Waves: []config.WaveConfig{
-			{Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 3}}},
+			{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 3}}},
 		},
 	}
 
@@ -346,14 +346,14 @@ func TestOpeningAnimationSystem_GetUniqueZombieTypes(t *testing.T) {
 		{
 			name: "单一类型",
 			waves: []config.WaveConfig{
-				{Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 3}}},
+				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 3}}},
 			},
 			expectedTypes: []string{"basic"},
 		},
 		{
 			name: "多类型去重",
 			waves: []config.WaveConfig{
-				{Zombies: []config.ZombieSpawn{
+				{OldZombies: []config.ZombieSpawn{
 					{Type: "basic", Lane: 3},
 					{Type: "basic", Lane: 2},
 					{Type: "conehead", Lane: 1},
@@ -364,9 +364,9 @@ func TestOpeningAnimationSystem_GetUniqueZombieTypes(t *testing.T) {
 		{
 			name: "跨波次去重",
 			waves: []config.WaveConfig{
-				{Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 3}}},
-				{Zombies: []config.ZombieSpawn{{Type: "basic", Lane: 2}}},
-				{Zombies: []config.ZombieSpawn{{Type: "conehead", Lane: 1}}},
+				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 3}}},
+				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 2}}},
+				{OldZombies: []config.ZombieSpawn{{Type: "conehead", Lane: 1}}},
 			},
 			expectedTypes: []string{"basic", "conehead"},
 		},

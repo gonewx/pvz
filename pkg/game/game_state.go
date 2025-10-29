@@ -1,6 +1,7 @@
 package game
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/decker502/pvz/pkg/components"
@@ -40,6 +41,9 @@ type GameState struct {
 	// Story 8.2: 教学系统
 	LawnStrings *LawnStrings // 游戏文本字符串管理器（从 LawnStrings.txt 加载）
 
+	// Story 8.6: 关卡进度保存系统
+	saveManager *SaveManager // 保存管理器（关卡进度、植物解锁、工具解锁）
+
 	// Story 10.1: 暂停菜单系统
 	IsPaused bool // 游戏是否暂停
 }
@@ -59,11 +63,20 @@ func GetGameState() *GameState {
 			lawnStrings = nil
 		}
 
+		// Story 8.6: 初始化保存管理器
+		saveManager, err := NewSaveManager("data/saves")
+		if err != nil {
+			log.Printf("[GameState] Warning: Failed to initialize SaveManager: %v", err)
+			// 如果保存管理器初始化失败，使用 nil（游戏可以运行，但无法保存进度）
+			saveManager = nil
+		}
+
 		globalGameState = &GameState{
 			Sun:                50, // 默认阳光值（加载关卡后会被 levelConfig.InitialSun 覆盖）
 			plantUnlockManager: NewPlantUnlockManager(),
 			SelectedPlants:     []string{},
 			LawnStrings:        lawnStrings,
+			saveManager:        saveManager,
 		}
 	}
 	return globalGameState
@@ -298,4 +311,84 @@ func (gs *GameState) SetPaused(paused bool) {
 // Story 10.1: ESC 快捷键使用
 func (gs *GameState) TogglePause() {
 	gs.IsPaused = !gs.IsPaused
+}
+
+// ========================================
+// Story 8.6: 关卡进度保存系统
+// ========================================
+
+// GetSaveManager 获取保存管理器
+//
+// 返回：
+//   - *SaveManager: 保存管理器实例，如果未初始化返回 nil
+func (gs *GameState) GetSaveManager() *SaveManager {
+	return gs.saveManager
+}
+
+// SaveProgress 保存当前游戏进度
+//
+// 在关卡完成时调用，保存关卡进度、解锁植物和工具
+//
+// 返回：
+//   - error: 如果保存失败返回错误
+func (gs *GameState) SaveProgress() error {
+	if gs.saveManager == nil {
+		return fmt.Errorf("save manager not initialized")
+	}
+
+	// 保存到文件
+	return gs.saveManager.Save()
+}
+
+// CompleteLevel 完成关卡，更新进度并保存
+//
+// Story 8.6: 关卡完成时调用
+//
+// 参数：
+//   - levelID: 完成的关卡ID，如 "1-2"
+//   - rewardPlant: 奖励的植物ID（可为空）
+//   - unlockTools: 解锁的工具列表（可为空）
+//
+// 返回：
+//   - error: 如果保存失败返回错误
+func (gs *GameState) CompleteLevel(levelID string, rewardPlant string, unlockTools []string) error {
+	if gs.saveManager == nil {
+		return fmt.Errorf("save manager not initialized")
+	}
+
+	// 更新最高完成关卡
+	gs.saveManager.SetHighestLevel(levelID)
+
+	// 解锁奖励植物
+	if rewardPlant != "" {
+		gs.saveManager.UnlockPlant(rewardPlant)
+		// 同时更新 PlantUnlockManager
+		if gs.plantUnlockManager != nil {
+			gs.plantUnlockManager.UnlockPlant(rewardPlant)
+		}
+		log.Printf("[GameState] Unlocked plant: %s (reward for completing %s)", rewardPlant, levelID)
+	}
+
+	// 解锁工具
+	for _, tool := range unlockTools {
+		gs.saveManager.UnlockTool(tool)
+		log.Printf("[GameState] Unlocked tool: %s (reward for completing %s)", tool, levelID)
+	}
+
+	// 保存进度
+	return gs.SaveProgress()
+}
+
+// IsToolUnlocked 检查工具是否已解锁
+//
+// 参数：
+//   - toolID: 工具ID，如 "shovel"
+//
+// 返回：
+//   - bool: true 表示已解锁，false 表示未解锁
+func (gs *GameState) IsToolUnlocked(toolID string) bool {
+	if gs.saveManager == nil {
+		return false
+	}
+	return gs.saveManager.IsToolUnlocked(toolID)
 }

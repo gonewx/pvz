@@ -39,6 +39,11 @@ type LevelConfig struct {
 	// Story 11.4：铺草皮粒子特效配置
 	SodRollAnimation bool `yaml:"sodRollAnimation"` // 是否启用铺草皮动画，默认 false
 	SodRollParticles bool `yaml:"sodRollParticles"` // 是否启用土粒飞溅特效，默认 false
+	SoddingAnimLanes []int `yaml:"soddingAnimLanes"` // 指定播放动画的行列表（如 [2,4]），空表示所有启用的行
+	PreSoddedLanes   []int `yaml:"preSoddedLanes"`   // 预先渲染草皮的行列表（如 [3]），初始化时直接显示草皮
+
+	// Story 8.6 新增字段
+	UnlockTools []string `yaml:"unlockTools"` // 完成本关解锁的工具列表，如 ["shovel"]，默认为空
 }
 
 // TutorialStep 教学步骤配置（Story 8.2）
@@ -52,12 +57,26 @@ type TutorialStep struct {
 
 // WaveConfig 单个僵尸波次配置
 // 定义了僵尸波次的触发条件和生成的僵尸列表
+// Story 8.6 扩展：支持旗帜波次和混合僵尸生成
 type WaveConfig struct {
-	MinDelay float64       `yaml:"minDelay"` // 可选：距离上一波结束的最小延迟（秒），默认 0（立即触发）
-	Zombies  []ZombieSpawn `yaml:"zombies"`  // 本波次要生成的僵尸列表
+	Delay         float64        `yaml:"delay"`         // 游戏开始后延迟（第1波使用），单位：秒
+	MinDelay      float64        `yaml:"minDelay"`      // 上一波消灭后最小延迟（秒），默认 0（立即触发）
+	IsFlag        bool           `yaml:"isFlag"`        // 是否为旗帜波次（Story 8.6）
+	FlagIndex     int            `yaml:"flagIndex"`     // 旗帜索引（第几面旗帜），从1开始（Story 8.6）
+	Zombies       []ZombieGroup  `yaml:"zombies"`       // 本波次要生成的僵尸组列表（Story 8.6 使用 ZombieGroup）
+	OldZombies    []ZombieSpawn  `yaml:"oldZombies"`    // 兼容旧格式：单个僵尸生成配置（已废弃，向后兼容）
 }
 
-// ZombieSpawn 单个僵尸生成配置
+// ZombieGroup 僵尸组配置（Story 8.6 新增）
+// 支持随机行选择和逐个生成
+type ZombieGroup struct {
+	Type          string   `yaml:"type"`          // 僵尸类型："basic", "conehead", "buckethead"
+	Lanes         []int    `yaml:"lanes"`         // 可出现的行列表（随机选择），如 [2,3,4]
+	Count         int      `yaml:"count"`         // 数量
+	SpawnInterval float64  `yaml:"spawnInterval"` // 生成间隔（秒），逐个生成
+}
+
+// ZombieSpawn 单个僵尸生成配置（旧格式，向后兼容）
 // 定义了僵尸的类型、出现行数和生成数量
 type ZombieSpawn struct {
 	Type  string `yaml:"type"`  // 僵尸类型："basic", "conehead", "buckethead"
@@ -145,27 +164,63 @@ func validateLevelConfig(config *LevelConfig) error {
 
 	// 验证每个波次的配置
 	for i, wave := range config.Waves {
+		if wave.Delay < 0 {
+			return fmt.Errorf("wave %d: delay cannot be negative", i)
+		}
+
 		if wave.MinDelay < 0 {
 			return fmt.Errorf("wave %d: minDelay cannot be negative", i)
 		}
 
-		if len(wave.Zombies) == 0 {
-			return fmt.Errorf("wave %d: at least one zombie spawn is required", i)
+		// Story 8.6: 支持 ZombieGroup 和旧格式 ZombieSpawn
+		if len(wave.Zombies) == 0 && len(wave.OldZombies) == 0 {
+			return fmt.Errorf("wave %d: at least one zombie group or spawn is required", i)
 		}
 
-		// 验证每个僵尸生成配置
-		for j, zombie := range wave.Zombies {
+		// 验证新格式 ZombieGroup
+		for j, zombieGroup := range wave.Zombies {
+			if zombieGroup.Type == "" {
+				return fmt.Errorf("wave %d, zombie group %d: type is required", i, j)
+			}
+
+			if len(zombieGroup.Lanes) == 0 {
+				return fmt.Errorf("wave %d, zombie group %d: at least one lane is required", i, j)
+			}
+
+			// 验证所有 lanes 必须在 1-5 范围内
+			for k, lane := range zombieGroup.Lanes {
+				if lane < 1 || lane > 5 {
+					return fmt.Errorf("wave %d, zombie group %d, lane %d: lane must be between 1 and 5, got %d", i, j, k, lane)
+				}
+			}
+
+			if zombieGroup.Count < 1 {
+				return fmt.Errorf("wave %d, zombie group %d: count must be at least 1, got %d", i, j, zombieGroup.Count)
+			}
+
+			if zombieGroup.SpawnInterval < 0 {
+				return fmt.Errorf("wave %d, zombie group %d: spawnInterval cannot be negative", i, j)
+			}
+		}
+
+		// 验证旧格式 ZombieSpawn（向后兼容）
+		for j, zombie := range wave.OldZombies {
 			if zombie.Type == "" {
-				return fmt.Errorf("wave %d, zombie %d: type is required", i, j)
+				return fmt.Errorf("wave %d, old zombie %d: type is required", i, j)
 			}
 
 			if zombie.Lane < 1 || zombie.Lane > 5 {
-				return fmt.Errorf("wave %d, zombie %d: lane must be between 1 and 5, got %d", i, j, zombie.Lane)
+				return fmt.Errorf("wave %d, old zombie %d: lane must be between 1 and 5, got %d", i, j, zombie.Lane)
 			}
 
 			if zombie.Count < 1 {
-				return fmt.Errorf("wave %d, zombie %d: count must be at least 1, got %d", i, j, zombie.Count)
+				return fmt.Errorf("wave %d, old zombie %d: count must be at least 1, got %d", i, j, zombie.Count)
 			}
+		}
+
+		// 验证旗帜波次配置
+		if wave.IsFlag && wave.FlagIndex < 1 {
+			return fmt.Errorf("wave %d: flagIndex must be at least 1 for flag waves", i)
 		}
 	}
 
@@ -193,6 +248,24 @@ func validateLevelConfig(config *LevelConfig) error {
 	}
 	if config.SpecialRules != "" && !validSpecialRules[config.SpecialRules] {
 		return fmt.Errorf("specialRules must be one of: bowling, conveyor, got %q", config.SpecialRules)
+	}
+
+	// Story 8.6 QA修正: 验证 SoddingAnimLanes（如果配置了）
+	if len(config.SoddingAnimLanes) > 0 {
+		for _, lane := range config.SoddingAnimLanes {
+			if lane < 1 || lane > 5 {
+				return fmt.Errorf("invalid sodding animation lane %d (must be 1-5)", lane)
+			}
+		}
+	}
+
+	// Story 8.6 QA修正: 验证 PreSoddedLanes（如果配置了）
+	if len(config.PreSoddedLanes) > 0 {
+		for _, lane := range config.PreSoddedLanes {
+			if lane < 1 || lane > 5 {
+				return fmt.Errorf("invalid pre-sodded lane %d (must be 1-5)", lane)
+			}
+		}
 	}
 
 	return nil

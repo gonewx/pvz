@@ -92,8 +92,16 @@ func TestLevel1_1_TutorialConfig(t *testing.T) {
 	// 验证所有僵尸都在第3行
 	for i, wave := range config.Waves {
 		for j, zombie := range wave.Zombies {
-			if zombie.Lane != 3 {
-				t.Errorf("Wave %d, zombie %d: expected lane 3, got %d", i, j, zombie.Lane)
+			// 验证 Lanes 数组包含第3行
+			validLane := false
+			for _, lane := range zombie.Lanes {
+				if lane == 3 {
+					validLane = true
+					break
+				}
+			}
+			if !validLane {
+				t.Errorf("Wave %d, zombie %d: expected lane 3 in lanes %v", i, j, zombie.Lanes)
 			}
 			if zombie.Type != "basic" {
 				t.Errorf("Wave %d, zombie %d: expected type 'basic', got %q", i, j, zombie.Type)
