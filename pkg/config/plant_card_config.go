@@ -139,4 +139,5 @@ var PlantPreviewFrameOverride = map[string]int{
 	// 当前所有植物都使用自动选择，如果发现某个植物预览不理想，在此添加配置
 	// 例如：
 	// "SunFlower": 10,  // 手工指定向日葵使用第10帧
+	"CherryBomb": 0,
 }
