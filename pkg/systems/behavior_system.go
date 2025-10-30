@@ -234,7 +234,8 @@ func (s *BehaviorSystem) handleSunflowerBehavior(entityID ecs.EntityID, deltaTim
 		// 创建阳光实体
 		// 注意：NewSunEntity 会将 Y 坐标重置为 -50（屏幕顶部），这是为天降阳光设计的
 		// 向日葵生产的阳光需要特殊处理
-		sunID := entities.NewSunEntity(s.entityManager, s.resourceManager, sunStartX, position.Y)
+		// 传递 sunStartY 作为 targetY，确保位置一致
+		sunID := entities.NewSunEntity(s.entityManager, s.resourceManager, sunStartX, sunStartY)
 
 		// 修正阳光的起始位置为向日葵位置（覆盖 NewSunEntity 中的 Y=-50）
 		sunPos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, sunID)
