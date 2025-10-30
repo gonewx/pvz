@@ -1398,6 +1398,23 @@ func (s *ReanimSystem) PrepareStaticPreview(entityID ecs.EntityID, reanimName st
 	// 2. Strategy 1: Find the first complete visible frame
 	bestFrame := s.findFirstCompleteVisibleFrame(reanimComp)
 
+	log.Printf("[ReanimSystem] findFirstCompleteVisibleFrame for %s: bestFrame=%d", reanimName, bestFrame)
+
+	// DEBUG: 输出所有轨道在 bestFrame 的状态
+	if bestFrame >= 0 {
+		log.Printf("[ReanimSystem] Tracks at bestFrame %d:", bestFrame)
+		for trackName, frames := range reanimComp.MergedTracks {
+			if bestFrame < len(frames) {
+				frame := frames[bestFrame]
+				fValue := -999
+				if frame.FrameNum != nil {
+					fValue = *frame.FrameNum
+				}
+				log.Printf("  - %s: ImagePath=%s, f=%d", trackName, frame.ImagePath, fValue)
+			}
+		}
+	}
+
 	// 3. Strategy 2: If not found, use heuristic fallback
 	if bestFrame < 0 {
 		bestFrame = s.findPreviewFrameHeuristic(reanimComp)
@@ -1549,12 +1566,39 @@ func (s *ReanimSystem) findFirstCompleteVisibleFrame(reanimComp *components.Rean
 		return -1
 	}
 
-	// Get all part track names (exclude empty tracks)
+	// Get all RENDERABLE part track names (exclude empty tracks, logical tracks, and definition tracks)
+	// Also consider VisibleTracks whitelist if set
 	var partTrackNames []string
 	for trackName, frames := range reanimComp.MergedTracks {
-		if len(frames) > 0 {
-			partTrackNames = append(partTrackNames, trackName)
+		if len(frames) == 0 {
+			continue
 		}
+
+		// Skip logical tracks (no images, like anim_stem, _ground)
+		if LogicalTracks[trackName] {
+			continue
+		}
+
+		// Check if track has at least one frame with an image
+		hasImage := false
+		for _, frame := range frames {
+			if frame.ImagePath != "" {
+				hasImage = true
+				break
+			}
+		}
+		if !hasImage {
+			continue // Skip tracks without images (pure animation definition tracks)
+		}
+
+		// If VisibleTracks is set, only include whitelisted tracks
+		if reanimComp.VisibleTracks != nil && len(reanimComp.VisibleTracks) > 0 {
+			if !reanimComp.VisibleTracks[trackName] {
+				continue // Not in whitelist, skip
+			}
+		}
+
+		partTrackNames = append(partTrackNames, trackName)
 	}
 
 	// Iterate through frames to find the first complete one
@@ -1570,16 +1614,25 @@ func (s *ReanimSystem) findFirstCompleteVisibleFrame(reanimComp *components.Rean
 
 			frame := mergedFrames[frameIdx]
 
-			// Check if part has an image
+			// Check if part has an image (should always be true due to filtering above, but double-check)
 			if frame.ImagePath == "" {
 				allPartsVisible = false
 				break
 			}
 
 			// Check if part is not hidden (f != -1)
+			// Exception: if track is in VisibleTracks whitelist, ignore f=-1
 			if frame.FrameNum != nil && *frame.FrameNum == -1 {
-				allPartsVisible = false
-				break
+				// Check if in whitelist
+				inWhitelist := false
+				if reanimComp.VisibleTracks != nil && len(reanimComp.VisibleTracks) > 0 {
+					inWhitelist = reanimComp.VisibleTracks[trackName]
+				}
+				if !inWhitelist {
+					allPartsVisible = false
+					break
+				}
+				// In whitelist, ignore f=-1, continue
 			}
 		}
 

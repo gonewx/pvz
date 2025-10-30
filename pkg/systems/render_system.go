@@ -731,11 +731,13 @@ func (s *RenderSystem) shouldRenderTrack(
 ) bool {
 	// 0. VisibleTracks whitelist check (for entities like zombies with explicit part control)
 	// If VisibleTracks is set, ONLY render tracks in the whitelist
+	// IMPORTANT: If track is in whitelist, it bypasses all other checks (including f=-1)
+	isInWhitelist := false
 	if reanimComp.VisibleTracks != nil && len(reanimComp.VisibleTracks) > 0 {
 		if !reanimComp.VisibleTracks[trackName] {
-			return false
+			return false // Not in whitelist, skip immediately
 		}
-		// Track is in whitelist, continue with other checks
+		isInWhitelist = true // Track is in whitelist
 	}
 
 	// 1. Skip logical tracks (no images, only transforms)
@@ -750,7 +752,13 @@ func (s *RenderSystem) shouldRenderTrack(
 		return false
 	}
 
-	// 3. Check hybrid tracks (have f values): check their own f value
+	// 3. If track is in VisibleTracks whitelist, render it regardless of f value
+	// This is critical for static preview where we want to show all whitelisted parts
+	if isInWhitelist {
+		return true // Whitelist overrides f value check
+	}
+
+	// 4. Check hybrid tracks (have f values): check their own f value
 	// Hybrid tracks control their own visibility through f values
 	// Important: Some tracks named "anim_idle" are actually hybrid tracks with images!
 	if mergedFrame.FrameNum != nil {
@@ -758,7 +766,7 @@ func (s *RenderSystem) shouldRenderTrack(
 		return *mergedFrame.FrameNum == 0
 	}
 
-	// 4. Pure visual tracks (no f values): always render if they have images
+	// 5. Pure visual tracks (no f values): always render if they have images
 	// This is rare (<1% of tracks), but we need to handle it
 	return true
 }
