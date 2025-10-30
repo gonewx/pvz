@@ -98,19 +98,21 @@ func (s *SunSpawnSystem) Update(deltaTime float64) {
 		}
 
 		// 边界检查（AC10）：确保阳光完整显示在屏幕内
-		// 屏幕尺寸800x600，阳光尺寸80x80，有效范围[0,720]x[0,520]
+		// 屏幕尺寸800x600，阳光尺寸80x80（半径40）
+		// PositionComponent 存储中心坐标，中心有效范围：[40, 760] x [40, 560]
 		originalX, originalY := startX, targetY
-		if startX < 0 {
-			startX = 0
+		sunRadius := 40.0 // 阳光半径（SunOffsetCenterX）
+		if startX < sunRadius {
+			startX = sunRadius
 		}
-		if startX > 720 {
-			startX = 720
+		if startX > 800-sunRadius {
+			startX = 800 - sunRadius
 		}
-		if targetY < 0 {
-			targetY = 0
+		if targetY < sunRadius {
+			targetY = sunRadius
 		}
-		if targetY > 520 {
-			targetY = 520
+		if targetY > 600-sunRadius {
+			targetY = 600 - sunRadius
 		}
 
 		// 记录边界调整（仅当位置被修改时）
@@ -124,8 +126,8 @@ func (s *SunSpawnSystem) Update(deltaTime float64) {
 		sunID := entities.NewSunEntity(s.entityManager, s.resourceManager, startX, targetY)
 		log.Printf("[SunSpawnSystem] Created sun entity ID: %d", sunID)
 
-		// Story 8.2 QA修复：初始化阳光动画（Sun.reanim 无 anim 定义，使用直接渲染模式）
-		if err := s.reanimSystem.InitializeDirectRender(sunID); err != nil {
+		// Story 8.2 QA修复：初始化阳光动画（Sun.reanim 是效果动画，不计算 CenterOffset）
+		if err := s.reanimSystem.InitializeSceneAnimation(sunID); err != nil {
 			log.Printf("[SunSpawnSystem] WARNING: Failed to initialize sun animation: %v", err)
 		}
 	}
