@@ -115,13 +115,56 @@ type ReanimComponent struct {
 	// AnimVisibles is the visibility array for the current animation.
 	// Each element corresponds to a frame: 0 = visible, -1 = hidden.
 	// Built from the animation definition track when PlayAnimation is called.
+	// DEPRECATED: Use AnimVisiblesMap instead for multi-animation support (Story 6.5).
 	AnimVisibles []int
+
+	// AnimVisiblesMap stores time windows for multiple animations (Story 6.5).
+	// Key: animation name (e.g., "anim_idle", "anim_shooting")
+	// Value: array mapping physical frame index to visibility (0 = visible, -1 = hidden)
+	// This supports dual-animation blending where different parts use different animations.
+	AnimVisiblesMap map[string][]int
 
 	// MergedTracks is the accumulated frame array for each part track.
 	// Key: track name (e.g., "head", "body")
 	// Value: array of frames with accumulated transformations (frame inheritance applied)
 	// Built by buildMergedTracks when PlayAnimation is called.
 	MergedTracks map[string][]reanim.Frame
+
+	// ==================================================================
+	// Story 6.5: Dual Animation Blending System (双动画叠加系统)
+	// ==================================================================
+	//
+	// 用于修复豌豆射手攻击动画问题：
+	// - 问题：攻击时只显示头部，身体消失，且头部不随身体摆动
+	// - 原因：误解了 Reanim 格式，错误地对混合轨道的 f=-1 进行隐藏
+	// - 解决：实现双动画叠加 + 父子层级关系
+	//
+	// 双动画叠加原理：
+	// - 攻击时同时播放两个动画：anim_idle（身体）+ anim_shooting（头部）
+	// - 身体部件使用 anim_idle 的物理帧
+	// - 头部部件使用 anim_shooting 的物理帧
+	// - 头部部件叠加 anim_stem 的偏移量（父子层级）
+	//
+	// 参考文档：
+	// - docs/reanim/reanim-fix-guide.md
+	// - docs/reanim/reanim-format-guide.md
+	// - docs/qa/sprint-change-proposal-reanim-system-fix.md
+	//
+	// ==================================================================
+
+	// IsBlending indicates whether dual-animation blending is active.
+	// When true, the entity renders using two animations simultaneously:
+	// - PrimaryAnimation for body parts (e.g., "anim_idle")
+	// - SecondaryAnimation for head parts (e.g., "anim_shooting")
+	IsBlending bool
+
+	// PrimaryAnimation is the base animation for body parts (e.g., "anim_idle").
+	// Used when IsBlending is true.
+	PrimaryAnimation string
+
+	// SecondaryAnimation is the overlay animation for head parts (e.g., "anim_shooting").
+	// Used when IsBlending is true.
+	SecondaryAnimation string
 
 	// AnimTracks is the list of part tracks to render for the current animation, in rendering order.
 	// This preserves the Z-order from the Reanim file.

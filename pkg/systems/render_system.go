@@ -349,13 +349,79 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		}
 	}
 
+	// ==================================================================
+	// Story 6.5: Dual-Animation Rendering
+	// ==================================================================
+	//
+	// Check if entity is using dual-animation blending mode.
+	// If so, render body parts using primary animation (e.g., anim_idle)
+	// and head parts using secondary animation (e.g., anim_shooting).
+	//
+	// This fixes the bug where only the head was visible during shooting.
+
+	// Determine physical frame indices based on blending mode
+	primaryPhysicalIndex := physicalIndex
+	secondaryPhysicalIndex := physicalIndex
+	stemOffsetX, stemOffsetY := 0.0, 0.0
+
+	if reanim.IsBlending {
+		// Dual-animation mode: get separate physical frames for each animation
+
+		// Primary animation (body parts, e.g., anim_idle)
+		if primaryVisibles, ok := reanim.AnimVisiblesMap[reanim.PrimaryAnimation]; ok && len(primaryVisibles) > 0 {
+			// Map logical frame to physical frame for primary animation
+			logicalIdx := 0
+			for i := 0; i < len(primaryVisibles) && logicalIdx <= reanim.CurrentFrame; i++ {
+				if primaryVisibles[i] == 0 {
+					if logicalIdx == reanim.CurrentFrame {
+						primaryPhysicalIndex = i
+						break
+					}
+					logicalIdx++
+				}
+			}
+		}
+
+		// Secondary animation (head parts, e.g., anim_shooting)
+		if secondaryVisibles, ok := reanim.AnimVisiblesMap[reanim.SecondaryAnimation]; ok && len(secondaryVisibles) > 0 {
+			// Map logical frame to physical frame for secondary animation
+			logicalIdx := 0
+			for i := 0; i < len(secondaryVisibles) && logicalIdx <= reanim.CurrentFrame; i++ {
+				if secondaryVisibles[i] == 0 {
+					if logicalIdx == reanim.CurrentFrame {
+						secondaryPhysicalIndex = i
+						break
+					}
+					logicalIdx++
+				}
+			}
+		}
+
+		// Get anim_stem offset for head parts (parent-child hierarchy)
+		stemOffsetX, stemOffsetY = s.getStemOffset(reanim, primaryPhysicalIndex)
+
+		if !s.debugPrinted[id] {
+			log.Printf("[RenderSystem] Entity %d dual-animation: primary_frame=%d, secondary_frame=%d, stem_offset=(%.1f, %.1f)",
+				id, primaryPhysicalIndex, secondaryPhysicalIndex, stemOffsetX, stemOffsetY)
+		}
+	}
+
 	// 按 AnimTracks 顺序渲染部件（保证 Z-order 正确）
 	for _, track := range reanim.AnimTracks {
-		// 如果设置了 VisibleTracks，只渲染白名单中的轨道
-		if reanim.VisibleTracks != nil && len(reanim.VisibleTracks) > 0 {
-			if !reanim.VisibleTracks[track.Name] {
-				continue
-			}
+		// ==================================================================
+		// Story 6.5: Determine which physical frame to use for this track
+		// ==================================================================
+		//
+		// - Body parts (non-head): use primary animation frame (e.g., anim_idle)
+		// - Head parts: use secondary animation frame (e.g., anim_shooting)
+		var trackPhysicalIndex int
+		applyStemOffset := false
+
+		if reanim.IsBlending && HeadTracks[track.Name] {
+			trackPhysicalIndex = secondaryPhysicalIndex
+			applyStemOffset = true // Head parts inherit anim_stem offset
+		} else {
+			trackPhysicalIndex = primaryPhysicalIndex
 		}
 
 		// 获取该轨道的累积帧数组
@@ -365,29 +431,25 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		}
 
 		// 确保物理索引在范围内
-		if physicalIndex >= len(mergedFrames) {
+		if trackPhysicalIndex >= len(mergedFrames) {
 			continue
 		}
 
 		// 获取累积后的帧数据
-		mergedFrame := mergedFrames[physicalIndex]
+		mergedFrame := mergedFrames[trackPhysicalIndex]
 
-		// 如果该帧标记为隐藏（f == -1），跳过绘制
-		// 除非该轨道在 VisibleTracks 白名单中（白名单强制可见）
-		if mergedFrame.FrameNum != nil && *mergedFrame.FrameNum == -1 {
-			// 检查是否在白名单中
-			inVisibleTracks := false
-			if reanim.VisibleTracks != nil && len(reanim.VisibleTracks) > 0 {
-				inVisibleTracks = reanim.VisibleTracks[track.Name]
-			}
-			if !inVisibleTracks {
-				continue // 非白名单轨道，遵守 f=-1，跳过绘制
-			}
-			// 白名单轨道，忽略 f=-1，继续渲染
-		}
-
-		// 必须有图片引用才能绘制
-		if mergedFrame.ImagePath == "" {
+		// ==================================================================
+		// Story 6.5: New rendering judgment logic
+		// ==================================================================
+		//
+		// Use shouldRenderTrack() to implement correct rendering rules:
+		// - Skip animation definition tracks (no images)
+		// - Skip logical tracks (no images)
+		// - For hybrid tracks: check their own f value
+		// - For pure visual tracks: check time window
+		//
+		// This replaces the old incorrect f=-1 check that hid body parts.
+		if !s.shouldRenderTrack(track.Name, mergedFrame, reanim, reanim.CurrentAnim) {
 			continue
 		}
 
@@ -405,11 +467,6 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		fh := float64(h)
 
 		// 使用 Transform2D 等价矩阵，通过 DrawTriangles 精确绘制
-		// 这与参考实现完全一致（test_animation_viewer.go 第 799-856 行）
-		//
-		// 关键点：Reanim 的变换矩阵假设图片锚点在左上角（0,0）
-		// 不需要先移动到中心，直接应用变换即可
-
 		scaleX := 1.0
 		scaleY := 1.0
 		if mergedFrame.ScaleX != nil {
@@ -428,19 +485,7 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 			ky = *mergedFrame.SkewY
 		}
 
-		// 构建变换矩阵（列主序，与 PopStudio/Godot 一致）
-		// Matrix = [a c tx]
-		//          [b d ty]
-		//          [0 0  1]
-		//
-		// 矩阵公式来源：FlashReanimExport.jsfl (文档 FlashReanimExport分析.md 第226-237行)
-		// 其中：
-		// a = cos(kx) * scaleX
-		// b = sin(kx) * scaleX
-		// c = -sin(ky) * scaleY  ← 注意：负号是因为导出时ky已取反（文档第245行）
-		// d = cos(ky) * scaleY
-		//
-		// 注意：kx 和 ky 的单位是度（degrees），需要转换为弧度
+		// 构建变换矩阵
 		a := math.Cos(kx*math.Pi/180.0) * scaleX
 		b := math.Sin(kx*math.Pi/180.0) * scaleX
 		c := -math.Sin(ky*math.Pi/180.0) * scaleY
@@ -455,26 +500,29 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		if mergedFrame.Y != nil {
 			ty = *mergedFrame.Y
 		}
+
+		// ==================================================================
+		// Story 6.5: Apply anim_stem offset to head parts
+		// ==================================================================
+		if applyStemOffset {
+			tx += stemOffsetX
+			ty += stemOffsetY
+		}
+
 		tx += screenX
 		ty += screenY
 
 		// 应用变换矩阵到图片的四个角
-		// 左上角 (0, 0)
 		x0 := tx
 		y0 := ty
-		// 右上角 (w, 0)
 		x1 := a*fw + tx
 		y1 := b*fw + ty
-		// 左下角 (0, h)
 		x2 := c*fh + tx
 		y2 := d*fh + ty
-		// 右下角 (w, h)
 		x3 := a*fw + c*fh + tx
 		y3 := b*fw + d*fh + ty
 
-		// 构建顶点数组（两个三角形组成矩形）
-		// 方案A+：应用闪烁效果（白色叠加）
-		// 公式：最终颜色 = 原始颜色 + flashIntensity（白色闪烁强度）
+		// 构建顶点数组
 		colorR := float32(1.0 + flashIntensity)
 		colorG := float32(1.0 + flashIntensity)
 		colorB := float32(1.0 + flashIntensity)
@@ -608,6 +656,111 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 			screen.DrawTriangles(vs, is, img, nil)
 		}
 	}
+}
+
+// ==================================================================
+// Story 6.5: Dual-Animation Rendering Helper Functions
+// ==================================================================
+
+// getStemOffset calculates the offset of anim_stem from its initial position.
+// This offset is applied to head parts to implement parent-child hierarchy.
+//
+// The anim_stem track defines the attachment point for the head. In anim_idle,
+// it sways with the body. In anim_shooting, it stays static. By applying the
+// stem offset to head parts, we make the head follow the body movement.
+//
+// Parameters:
+//   - reanim: the ReanimComponent containing merged tracks
+//   - physicalFrame: the physical frame index for the idle animation
+//
+// Returns:
+//   - offsetX, offsetY: the offset from the initial anim_stem position
+func (s *RenderSystem) getStemOffset(
+	reanim *components.ReanimComponent,
+	physicalFrame int,
+) (float64, float64) {
+	// Get anim_stem merged frames
+	stemFrames, ok := reanim.MergedTracks["anim_stem"]
+	if !ok || physicalFrame >= len(stemFrames) {
+		return 0, 0
+	}
+
+	stemFrame := stemFrames[physicalFrame]
+
+	// Get current stem position
+	currentX := ReanimStemInitX
+	currentY := ReanimStemInitY
+
+	if stemFrame.X != nil {
+		currentX = *stemFrame.X
+	}
+	if stemFrame.Y != nil {
+		currentY = *stemFrame.Y
+	}
+
+	// Calculate offset from initial position
+	offsetX := currentX - ReanimStemInitX
+	offsetY := currentY - ReanimStemInitY
+
+	return offsetX, offsetY
+}
+
+// shouldRenderTrack determines whether a track should be rendered at a given frame.
+//
+// Story 6.5: Implements the correct rendering rules based on track types:
+// - Animation definition tracks (anim_idle, anim_shooting): NOT rendered (no images)
+// - Logical tracks (anim_stem, _ground): NOT rendered (no images)
+// - Hybrid tracks (76%): Check their OWN f value (f=0: visible, f=-1: hidden)
+// - Pure visual tracks (<1%): Check animation definition track's time window
+//
+// This replaces the old incorrect logic that checked f=-1 for all tracks.
+//
+// Parameters:
+//   - trackName: the name of the track
+//   - mergedFrame: the merged frame data for this track
+//   - reanim: the ReanimComponent (for checking hybrid vs pure visual)
+//   - currentAnim: the current animation name (for time window check)
+//
+// Returns:
+//   - bool: true if the track should be rendered, false otherwise
+func (s *RenderSystem) shouldRenderTrack(
+	trackName string,
+	mergedFrame reanim.Frame,
+	reanimComp *components.ReanimComponent,
+	currentAnim string,
+) bool {
+	// 0. VisibleTracks whitelist check (for entities like zombies with explicit part control)
+	// If VisibleTracks is set, ONLY render tracks in the whitelist
+	if reanimComp.VisibleTracks != nil && len(reanimComp.VisibleTracks) > 0 {
+		if !reanimComp.VisibleTracks[trackName] {
+			return false
+		}
+		// Track is in whitelist, continue with other checks
+	}
+
+	// 1. Skip logical tracks (no images, only transforms)
+	// These are attachment points like anim_stem, _ground
+	if LogicalTracks[trackName] {
+		return false
+	}
+
+	// 2. Must have an image to render
+	// This naturally filters out pure animation definition tracks (they have no images)
+	if mergedFrame.ImagePath == "" {
+		return false
+	}
+
+	// 3. Check hybrid tracks (have f values): check their own f value
+	// Hybrid tracks control their own visibility through f values
+	// Important: Some tracks named "anim_idle" are actually hybrid tracks with images!
+	if mergedFrame.FrameNum != nil {
+		// f=0: visible, f=-1 or other: hidden
+		return *mergedFrame.FrameNum == 0
+	}
+
+	// 4. Pure visual tracks (no f values): always render if they have images
+	// This is rare (<1% of tracks), but we need to handle it
+	return true
 }
 
 // findPhysicalFrameIndexForLayer maps logical frame number to physical frame index for an overlay layer.
@@ -1068,7 +1221,7 @@ func (s *RenderSystem) buildParticleVertices(particle *components.ParticleCompon
 		}
 
 		frameWidth := fullWidth / cols
-		frameHeight := fullHeight / rows  // ✅ 修复：除以行数，而不是使用完整高度
+		frameHeight := fullHeight / rows // ✅ 修复：除以行数，而不是使用完整高度
 
 		// 计算当前帧在精灵图中的行列位置
 		// frameNum 是 0-based 索引，按行优先顺序（从左到右，从上到下）
@@ -1078,12 +1231,12 @@ func (s *RenderSystem) buildParticleVertices(particle *components.ParticleCompon
 
 		// 计算纹理坐标（相对于原始图片）
 		frameX := frameCol * frameWidth
-		frameY := frameRow * frameHeight  // ✅ 修复：考虑行偏移
+		frameY := frameRow * frameHeight // ✅ 修复：考虑行偏移
 
 		srcX0 = float32(fullBounds.Min.X + frameX)
-		srcY0 = float32(fullBounds.Min.Y + frameY)      // ✅ 修复：从对应行开始
+		srcY0 = float32(fullBounds.Min.Y + frameY) // ✅ 修复：从对应行开始
 		srcX1 = float32(fullBounds.Min.X + frameX + frameWidth)
-		srcY1 = float32(fullBounds.Min.Y + frameY + frameHeight)  // ✅ 修复：正确的单帧高度
+		srcY1 = float32(fullBounds.Min.Y + frameY + frameHeight) // ✅ 修复：正确的单帧高度
 
 		w = float64(frameWidth)
 		h = float64(frameHeight)

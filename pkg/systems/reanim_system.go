@@ -11,6 +11,56 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
+// ==================================================================
+// Story 6.5: Reanim Track Type Constants (轨道类型常量)
+// ==================================================================
+//
+// These constants define the track types used in the Reanim system.
+// Based on analysis of 5 Reanim files (87 tracks total):
+// - 76% are hybrid tracks (images + f values + transforms)
+// - 23% are animation definition tracks (only f values)
+// - <1% are pure visual tracks (only images)
+// - <1% are logical tracks (no images, only transforms)
+//
+// Reference: docs/reanim/reanim-hybrid-track-discovery.md
+
+// AnimationDefinitionTracks are tracks that only define time windows.
+// They have FrameNum values but no images or transforms.
+// Example: anim_idle, anim_shooting, anim_head_idle, anim_full_idle
+var AnimationDefinitionTracks = map[string]bool{
+	"anim_idle":      true,
+	"anim_shooting":  true,
+	"anim_head_idle": true,
+	"anim_full_idle": true,
+}
+
+// LogicalTracks are tracks that define attachment points or parent transforms.
+// They have position/transform data but no images.
+// Example: anim_stem (parent bone for head parts), _ground (ground attachment point)
+var LogicalTracks = map[string]bool{
+	"anim_stem": true,
+	"_ground":   true,
+}
+
+// HeadTracks are tracks that belong to the head part group.
+// These tracks use the secondary animation (e.g., anim_shooting) in dual-animation mode.
+// Head tracks also inherit anim_stem offsets for parent-child hierarchy.
+var HeadTracks = map[string]bool{
+	"anim_face":        true,
+	"idle_mouth":       true,
+	"anim_blink":       true,
+	"idle_shoot_blink": true,
+	"anim_sprout":      true,
+}
+
+// ReanimStemInitX and ReanimStemInitY are the initial position of anim_stem.
+// These values are extracted from PeaShooterSingle.reanim at frame 4 (first visible frame).
+// Used to calculate stem offset for head parts: offset = current_pos - init_pos
+const (
+	ReanimStemInitX = 37.6
+	ReanimStemInitY = 48.7
+)
+
 // ReanimSystem is the Reanim animation system that manages skeletal animations
 // for entities with ReanimComponent.
 //
@@ -18,6 +68,7 @@ import (
 // - Advancing animation frames based on FPS
 // - Implementing frame inheritance (cumulative transformations)
 // - Managing animation loops
+// - Supporting dual-animation blending (Story 6.5)
 //
 // All animation logic is centralized in this system, following the ECS
 // architecture principle of data-behavior separation.
@@ -224,6 +275,39 @@ func (s *ReanimSystem) isAnimationDefinitionTrack(track *reanim.Track) bool {
 
 	// Animation definition track: has FrameNum, but no images or transforms
 	return hasFrameNum && !hasImageRef && !hasTransform
+}
+
+// ==================================================================
+// Story 6.5: Track Type Helper Functions (轨道类型辅助函数)
+// ==================================================================
+
+// isAnimationDefinitionTrackByName checks if a track is an animation definition track by name.
+// This is a fast check using the hardcoded list of known animation definition tracks.
+func (s *ReanimSystem) isAnimationDefinitionTrackByName(trackName string) bool {
+	return AnimationDefinitionTracks[trackName]
+}
+
+// isLogicalTrack checks if a track is a logical track (no images, only transforms).
+// Logical tracks like anim_stem define attachment points or parent bones.
+func (s *ReanimSystem) isLogicalTrack(trackName string) bool {
+	return LogicalTracks[trackName]
+}
+
+// isHeadTrack checks if a track belongs to the head part group.
+// Head tracks use the secondary animation in dual-animation mode.
+func (s *ReanimSystem) isHeadTrack(trackName string) bool {
+	return HeadTracks[trackName]
+}
+
+// hasFrameNumValues checks if a track has any FrameNum values.
+// Used to distinguish hybrid tracks (with f values) from pure visual tracks (without f values).
+func (s *ReanimSystem) hasFrameNumValues(track *reanim.Track) bool {
+	for _, frame := range track.Frames {
+		if frame.FrameNum != nil {
+			return true
+		}
+	}
+	return false
 }
 
 // buildVisiblesArray builds the visibility array for the given animation.
@@ -434,6 +518,7 @@ func (s *ReanimSystem) getAnimationTracks(comp *components.ReanimComponent) []re
 // - Builds the merged tracks with frame inheritance
 // - Stores the animation tracks in rendering order
 // - Updates the component with the new animation state
+// - Story 6.5: Enables dual-animation blending for anim_shooting
 //
 // Parameters:
 //   - entityID: the ID of the entity to play the animation on
@@ -471,8 +556,36 @@ func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) err
 	reanimComp.BaseAnimName = animName
 	reanimComp.OverlayAnims = []components.AnimLayer{} // Clear all overlay animations
 
-	// Build visibility array
+	// ==================================================================
+	// Story 6.5: Dual-Animation Blending (双动画叠加)
+	// ==================================================================
+	//
+	// When playing anim_shooting, enable dual-animation mode:
+	// - PrimaryAnimation: anim_idle (body parts continue swaying)
+	// - SecondaryAnimation: anim_shooting (head parts shoot)
+	//
+	// This fixes the bug where only the head was visible during shooting.
+	if animName == "anim_shooting" {
+		reanimComp.IsBlending = true
+		reanimComp.PrimaryAnimation = "anim_idle"
+		reanimComp.SecondaryAnimation = "anim_shooting"
+
+		log.Printf("[ReanimSystem] Entity %d: Enabling dual-animation blending (idle + shooting)", entityID)
+	} else {
+		// Single animation mode
+		reanimComp.IsBlending = false
+		reanimComp.PrimaryAnimation = animName
+		reanimComp.SecondaryAnimation = ""
+	}
+
+	// Initialize AnimVisiblesMap if needed
+	if reanimComp.AnimVisiblesMap == nil {
+		reanimComp.AnimVisiblesMap = make(map[string][]int)
+	}
+
+	// Build visibility array for the current animation
 	reanimComp.AnimVisibles = s.buildVisiblesArray(reanimComp, animName)
+	reanimComp.AnimVisiblesMap[animName] = reanimComp.AnimVisibles
 
 	// Calculate visible frame count (number of frames with visibility 0)
 	visibleCount := 0
@@ -482,6 +595,15 @@ func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) err
 		}
 	}
 	reanimComp.VisibleFrameCount = visibleCount
+
+	// Story 6.5: If dual-animation mode, also build visibility for the primary animation
+	if reanimComp.IsBlending && reanimComp.PrimaryAnimation != animName {
+		primaryVisibles := s.buildVisiblesArray(reanimComp, reanimComp.PrimaryAnimation)
+		reanimComp.AnimVisiblesMap[reanimComp.PrimaryAnimation] = primaryVisibles
+
+		log.Printf("[ReanimSystem] Built visibility for primary animation '%s': %d visible frames",
+			reanimComp.PrimaryAnimation, len(primaryVisibles))
+	}
 
 	// Build merged tracks with frame inheritance
 	reanimComp.MergedTracks = s.buildMergedTracks(reanimComp)
@@ -1290,15 +1412,15 @@ func (s *ReanimSystem) PrepareStaticPreview(entityID ecs.EntityID, reanimName st
 	}
 
 	// 5. Apply preview frame
-	reanimComp.CurrentFrame = bestFrame
 	reanimComp.BestPreviewFrame = bestFrame
 
 	// 6. Calculate center offset for this specific frame
 	s.calculateCenterOffsetForFrame(reanimComp, bestFrame)
 
-	// 6. Build AnimVisibles array for static preview
-	// For static preview, all frames should be visible (value = 0)
-	// This is required by RenderSystem.findPhysicalFrameIndex to map logical frames to physical frames
+	// 7. Build AnimVisibles array for static preview
+	// IMPORTANT: We need to ensure that CurrentFrame (logical) maps to bestFrame (physical).
+	// Strategy: Mark all frames as hidden (-1) except the bestFrame as visible (0).
+	// This way, logical frame 0 will map to physical frame bestFrame.
 	maxFrames := 0
 	for _, frames := range reanimComp.MergedTracks {
 		if len(frames) > maxFrames {
@@ -1306,20 +1428,25 @@ func (s *ReanimSystem) PrepareStaticPreview(entityID ecs.EntityID, reanimName st
 		}
 	}
 
-	// Create AnimVisibles array with all frames marked as visible (0)
+	// Create AnimVisibles array with only bestFrame marked as visible
 	reanimComp.AnimVisibles = make([]int, maxFrames)
 	for i := 0; i < maxFrames; i++ {
-		reanimComp.AnimVisibles[i] = 0 // All frames are visible
+		if i == bestFrame {
+			reanimComp.AnimVisibles[i] = 0 // Best frame is visible
+		} else {
+			reanimComp.AnimVisibles[i] = -1 // Other frames are hidden
+		}
 	}
-	reanimComp.VisibleFrameCount = maxFrames
+	reanimComp.VisibleFrameCount = 1 // Only one frame is visible
 
-	// 7. Set static preview state (do not start animation loop)
+	// 8. Set static preview state (do not start animation loop)
 	reanimComp.IsLooping = false
 	reanimComp.IsFinished = true
 	reanimComp.CurrentAnim = "static_preview" // Marker for static preview mode
+	reanimComp.CurrentFrame = 0               // Logical frame 0 maps to physical frame bestFrame
 
-	log.Printf("[ReanimSystem] PrepareStaticPreview: bestFrame=%d, totalFrames=%d, visibleCount=%d",
-		bestFrame, maxFrames, reanimComp.VisibleFrameCount)
+	log.Printf("[ReanimSystem] PrepareStaticPreview: bestFrame=%d (physical), logicalFrame=0, totalFrames=%d",
+		bestFrame, maxFrames)
 
 	return nil
 }
