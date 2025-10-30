@@ -31,12 +31,12 @@ type SunSpawnSystem struct {
 //   - minX, maxX: 阳光生成的水平范围
 //   - minTargetY, maxTargetY: 阳光落地的垂直范围
 func NewSunSpawnSystem(em *ecs.EntityManager, rm *game.ResourceManager, rs *ReanimSystem, minX, maxX, minTargetY, maxTargetY float64) *SunSpawnSystem {
-	// 基础间隔: 8秒 ±1秒随机变化
+	// 基础间隔: 8秒 ±2秒随机变化
 	baseInterval := 8.0
-	randomOffset := -1.0 + rand.Float64()*2.0 // -1 到 +1 秒
+	randomOffset := -2.0 + rand.Float64()*4.0 // -2 到 +2 秒
 	initialInterval := baseInterval + randomOffset
 
-	log.Printf("[SunSpawnSystem] Initialized with interval=%.1fs (base 8±1s), area=(%.0f-%.0f, %.0f-%.0f)",
+	log.Printf("[SunSpawnSystem] Initialized with interval=%.1fs (base 8±2s), area=(%.0f-%.0f, %.0f-%.0f)",
 		initialInterval, minX, maxX, minTargetY, maxTargetY)
 	return &SunSpawnSystem{
 		entityManager:   em,
@@ -72,12 +72,12 @@ func (s *SunSpawnSystem) Update(deltaTime float64) {
 		// 重置计时器并重新随机化下次间隔
 		s.spawnTimer = 0
 		baseInterval := 8.0
-		randomOffset := -1.0 + rand.Float64()*2.0 // -1 到 +1 秒
+		randomOffset := -2.0 + rand.Float64()*4.0 // -2 到 +2 秒
 		s.spawnInterval = baseInterval + randomOffset
 
-		// 生成随机起始X坐标（增加±50像素的随机偏移）
+		// 生成随机起始X坐标（增加±80像素的随机偏移）
 		baseX := s.minX + rand.Float64()*(s.maxX-s.minX)
-		xRandomOffset := -50.0 + rand.Float64()*100.0 // ±50像素
+		xRandomOffset := -80.0 + rand.Float64()*160.0 // ±80像素
 		startX := baseX + xRandomOffset
 		if startX < s.minX {
 			startX = s.minX
@@ -86,15 +86,37 @@ func (s *SunSpawnSystem) Update(deltaTime float64) {
 			startX = s.maxX
 		}
 
-		// 生成随机落地Y坐标（增加±30像素的随机偏移）
+		// 生成随机落地Y坐标（增加±50像素的随机偏移）
 		baseY := s.minTargetY + rand.Float64()*(s.maxTargetY-s.minTargetY)
-		yRandomOffset := -30.0 + rand.Float64()*60.0 // ±30像素
+		yRandomOffset := -50.0 + rand.Float64()*100.0 // ±50像素
 		targetY := baseY + yRandomOffset
 		if targetY < s.minTargetY {
 			targetY = s.minTargetY
 		}
 		if targetY > s.maxTargetY {
 			targetY = s.maxTargetY
+		}
+
+		// 边界检查（AC10）：确保阳光完整显示在屏幕内
+		// 屏幕尺寸800x600，阳光尺寸80x80，有效范围[0,720]x[0,520]
+		originalX, originalY := startX, targetY
+		if startX < 0 {
+			startX = 0
+		}
+		if startX > 720 {
+			startX = 720
+		}
+		if targetY < 0 {
+			targetY = 0
+		}
+		if targetY > 520 {
+			targetY = 520
+		}
+
+		// 记录边界调整（仅当位置被修改时）
+		if startX != originalX || targetY != originalY {
+			log.Printf("[SunSpawnSystem] 边界检查: (%.1f, %.1f) -> (%.1f, %.1f)",
+				originalX, originalY, startX, targetY)
 		}
 
 		// 创建阳光实体

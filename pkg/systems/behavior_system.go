@@ -213,7 +213,22 @@ func (s *BehaviorSystem) handleSunflowerBehavior(entityID ecs.EntityID, deltaTim
 		sunStartX := position.X - SunOffsetCenterX + randomOffsetX // 向左偏移居中，加上随机偏移
 		sunStartY := position.Y - SunOffsetBaseY + randomOffsetY   // 向日葵上方，加上随机偏移
 
-		log.Printf("[BehaviorSystem] 创建阳光实体，位置: (%.0f, %.0f), 随机偏移: (%.1f, %.1f)",
+		// 边界检查（AC10）：确保阳光完整显示在屏幕内
+		// 屏幕尺寸800x600，阳光尺寸80x80，有效范围[0,720]x[0,520]
+		if sunStartX < 0 {
+			sunStartX = 0
+		}
+		if sunStartX > 720 {
+			sunStartX = 720
+		}
+		if sunStartY < 0 {
+			sunStartY = 0
+		}
+		if sunStartY > 520 {
+			sunStartY = 520
+		}
+
+		log.Printf("[BehaviorSystem] 创建阳光实体，边界检查后位置: (%.0f, %.0f), 随机偏移: (%.1f, %.1f)",
 			sunStartX, sunStartY, randomOffsetX, randomOffsetY)
 
 		// 创建阳光实体
