@@ -702,6 +702,13 @@ func (s *RenderSystem) getStemOffset(
 	offsetX := currentX - ReanimStemInitX
 	offsetY := currentY - ReanimStemInitY
 
+	// DEBUG: Log stem offset calculation (only shown with --verbose)
+	// Useful for debugging head-body synchronization issues
+	if offsetX != 0 || offsetY != 0 {
+		log.Printf("[RenderSystem] Stem offset at frame %d: (%.2f, %.2f) - Current: (%.2f, %.2f), Init: (%.2f, %.2f)",
+			physicalFrame, offsetX, offsetY, currentX, currentY, ReanimStemInitX, ReanimStemInitY)
+	}
+
 	return offsetX, offsetY
 }
 

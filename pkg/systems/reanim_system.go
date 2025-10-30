@@ -363,22 +363,51 @@ func (s *ReanimSystem) buildVisiblesArray(comp *components.ReanimComponent, anim
 	return visibles
 }
 
-// buildMergedTracks builds accumulated frame arrays for all part tracks.
+// buildMergedTracks builds accumulated frame arrays for each track by applying frame inheritance.
 //
-// This is the core of the frame inheritance mechanism. For each part track (e.g., "head", "body"),
-// it creates an array of frames where each frame contains the accumulated transformations
-// from all previous frames.
+// Story 6.5: Frame Inheritance Mechanism (帧继承机制)
 //
-// Frame inheritance rules:
-// - If a field (X, Y, ScaleX, etc.) is nil in a frame, it inherits the value from the previous frame
-// - Each frame in the output array has independent pointers (no shared addresses)
-// - Initial values: X=0, Y=0, ScaleX=1, ScaleY=1, SkewX=0, SkewY=0, FrameNum=0, ImagePath=""
+// **Problem**: Reanim files use sparse keyframes to save space. Many frames are empty (nil values),
+// relying on the previous frame's values. Without frame inheritance, entities would disappear or jump around.
+//
+// **Solution**: Accumulate frame values across all physical frames:
+// - If a field is present (non-nil) at frame N, update the accumulated value
+// - If a field is absent (nil) at frame N, inherit the accumulated value from frame N-1
+// - Result: Every frame has complete data (no nil values)
+//
+// **Accumulated Fields**:
+// - Position: X, Y
+// - Scale: ScaleX, ScaleY
+// - Skew: SkewX, SkewY
+// - Frame Number: FrameNum (f value, controls visibility)
+// - Image: ImagePath (which sprite to draw)
+//
+// **Example**:
+//
+//	Original frames:
+//	Frame 0: X=10, Y=20, ImagePath="image.png"
+//	Frame 1: (empty - all nil)
+//	Frame 2: X=15 (Y is nil, ImagePath is "")
+//
+//	Merged frames (after inheritance):
+//	Frame 0: X=10, Y=20, ImagePath="image.png"
+//	Frame 1: X=10, Y=20, ImagePath="image.png" (inherited all from frame 0)
+//	Frame 2: X=15, Y=20, ImagePath="image.png" (X updated, Y and ImagePath inherited)
+//
+// **Why This Matters**:
+// Without frame inheritance, the entity would:
+// - Disappear at frame 1 (no image)
+// - Jump to wrong position at frame 2 (Y=0 instead of Y=20)
 //
 // Parameters:
 //   - comp: the ReanimComponent containing the Reanim data
 //
 // Returns:
-//   - A map of track name to array of accumulated frames (length = standard frame count)
+//   - A map of track name to merged frame array (all frames have complete data)
+//
+// Related:
+//   - Story 6.5 Phase 1: docs/stories/6.5.story.md
+//   - Fix Guide: docs/reanim/reanim-fix-guide.md Section 4.1
 func (s *ReanimSystem) buildMergedTracks(comp *components.ReanimComponent) map[string][]reanim.Frame {
 	if comp.Reanim == nil {
 		return map[string][]reanim.Frame{}

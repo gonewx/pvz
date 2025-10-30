@@ -90,7 +90,7 @@ SceneManager (场景管理器)
     ├── InputSystem (输入系统)
     ├── BehaviorSystem (行为系统)
     ├── PhysicsSystem (物理系统)
-    ├── AnimationSystem (动画系统)
+    ├── ReanimSystem (Reanim动画系统 - Story 6.5)
     ├── ParticleSystem (粒子系统 - Story 7.2)
     ├── UISystem (UI系统)
     └── RenderSystem (渲染系统)
@@ -256,6 +256,263 @@ entities := ecs.GetEntitiesWith3[
 | 网格定义 | 世界坐标 | `config.GridWorldStartX` |
 | 鼠标输入 | 屏幕坐标 | `ebiten.CursorPosition()` |
 | 渲染绘制 | 屏幕坐标 | `screen.DrawImage()` |
+
+## Reanim 动画系统使用指南
+
+### 概述
+
+Reanim 是原版《植物大战僵尸》使用的骨骼动画系统。本项目实现了完整的 Reanim 渲染支持，经过 Story 6.5 的修复，现已正确理解并实现了 Reanim 格式的三个核心机制。
+
+### 核心机制
+
+#### 1. 混合轨道机制（Hybrid Tracks）
+
+**发现**：统计 5 个 Reanim 文件（87 个轨道）发现，76% 的轨道是混合轨道。
+
+**定义**：混合轨道同时具有：
+- ✅ 图片资源（ImagePath）- 可以渲染
+- ✅ FrameNum 值（f 值）- 自我控制可见性
+- ✅ 变换数据（X, Y, ScaleX 等）- 独立运动
+
+**关键理解**：
+- ❌ **错误**：f=-1 表示隐藏该部件
+- ✅ **正确**：混合轨道通过**自己的 f 值**控制自己的可见性，不依赖动画定义轨道
+
+**示例**：`PeaShooterSingle.reanim` 中的 `stalk_bottom` 轨道
+```
+- 有 ImagePath: "IMAGE_REANIM_PEASHOOTER_STALKBOTTOM"
+- 有 f 值变化: -1, 0, 1, 2 (定义自己的时间窗口)
+- 有位置变化: X, Y 值在每帧变化
+```
+
+#### 2. 双动画叠加机制（Dual-Animation Blending）
+
+**问题**：豌豆射手攻击时，如果只播放 `anim_shooting`，身体会消失（因为 shooting 动画只包含头部关键帧）。
+
+**解决方案**：同时播放两个动画
+- **身体部件**（叶子、茎干）使用 `anim_idle` 的物理帧
+- **头部部件**（脸、嘴巴）使用 `anim_shooting` 的物理帧
+
+**实现**：
+```go
+// ReanimComponent 中的双动画字段
+IsBlending          bool     // 是否启用双动画模式
+PrimaryAnimation    string   // 主动画（如 "anim_idle"）
+SecondaryAnimation  string   // 次动画（如 "anim_shooting"）
+
+// 头部轨道列表
+HeadTracks = map[string]bool{
+    "anim_face":        true,
+    "idle_mouth":       true,
+    "anim_blink":       true,
+    "idle_shoot_blink": true,
+    "anim_sprout":      true,
+}
+```
+
+**效果**：
+- 攻击时身体继续摆动（使用 idle 动画）
+- 头部做射击动作（使用 shooting 动画）
+- 两个动画视觉上叠加，形成完整的攻击效果
+
+#### 3. 父子层级关系（Parent-Child Hierarchy）
+
+**问题**：即使双动画叠加，头部仍然僵硬不动，不随身体摆动。
+
+**原因**：`anim_stem`（茎干骨骼）作为父节点，头部应该继承它的偏移量。
+
+**解决方案**：
+```go
+// 定义 anim_stem 初始位置
+const (
+    ReanimStemInitX = 37.6  // 从 PeaShooterSingle.reanim 提取
+    ReanimStemInitY = 48.7
+)
+
+// 计算 stem 偏移
+func getStemOffset(reanim, physicalFrame) (offsetX, offsetY) {
+    currentX, currentY := getStemPosition(physicalFrame)
+    offsetX = currentX - ReanimStemInitX
+    offsetY = currentY - ReanimStemInitY
+    return offsetX, offsetY
+}
+
+// 渲染头部时叠加偏移
+if isHeadTrack(trackName) {
+    x = partX + stemOffsetX
+    y = partY + stemOffsetY
+}
+```
+
+**效果**：头部随身体摆动，动作自然流畅。
+
+### 轨道类型分类
+
+系统识别三种轨道类型：
+
+```go
+// 1. 动画定义轨道（只有 f 值，无图片）
+AnimationDefinitionTracks = map[string]bool{
+    "anim_idle":      true,
+    "anim_shooting":  true,
+    "anim_head_idle": true,
+    "anim_full_idle": true,
+}
+
+// 2. 逻辑轨道（定义附着点或父变换，无图片）
+LogicalTracks = map[string]bool{
+    "anim_stem": true,  // 父骨骼
+    "_ground":   true,  // 地面附着点
+}
+
+// 3. 混合轨道（有图片 + f 值 + 变换）
+// 大部分轨道，通过排除法识别
+```
+
+### 渲染判断逻辑
+
+**shouldRenderTrack** 函数实现了正确的渲染规则：
+
+```go
+func shouldRenderTrack(track, frame, animName) bool {
+    // 步骤 0: VisibleTracks 白名单（最高优先级）
+    if VisibleTracks != nil {
+        return VisibleTracks[trackName]
+    }
+
+    // 步骤 1: 跳过逻辑轨道（无图片）
+    if isLogicalTrack(trackName) {
+        return false
+    }
+
+    // 步骤 2: 检查是否有图片
+    if frame.ImagePath == "" {
+        return false
+    }
+
+    // 步骤 3: 检查时间窗口
+    if animVisibles := AnimVisiblesMap[animName]; animVisibles != nil {
+        if frame.FrameNum != nil && *frame.FrameNum == -1 {
+            return animVisibles[logicalFrame] == 0
+        }
+    }
+
+    // 步骤 4: 有图片就渲染
+    return true
+}
+```
+
+### 常见误区
+
+#### ❌ 误区 1：f=-1 表示隐藏部件
+
+**错误理解**：看到 `f=-1` 就不渲染该部件
+
+**正确理解**：
+- f=-1 表示该部件**使用动画定义轨道**的时间窗口
+- 只有当动画定义轨道标记该帧为隐藏时，部件才隐藏
+- 76% 的轨道都有 f=-1，如果全部隐藏，游戏将无法显示
+
+#### ❌ 误区 2：攻击时只播放 anim_shooting
+
+**错误实现**：
+```go
+// 攻击时
+PlayAnimation("anim_shooting")  // 只有头部，身体消失
+```
+
+**正确实现**：
+```go
+// 攻击时启用双动画叠加
+IsBlending = true
+PrimaryAnimation = "anim_idle"      // 身体继续摆动
+SecondaryAnimation = "anim_shooting" // 头部射击
+```
+
+#### ❌ 误区 3：头部位置 = 头部轨道的位置
+
+**错误实现**：
+```go
+x = headFrame.X  // 忽略父骨骼
+y = headFrame.Y
+```
+
+**正确实现**：
+```go
+stemOffsetX, stemOffsetY := getStemOffset(primaryFrame)
+x = headFrame.X + stemOffsetX  // 叠加父骨骼偏移
+y = headFrame.Y + stemOffsetY
+```
+
+### 调试技巧
+
+#### 1. 使用 verbose 日志
+
+```bash
+go run . --verbose
+```
+
+日志会输出：
+- 双动画启用通知
+- stem 偏移计算过程
+- 时间窗口构建信息
+
+#### 2. 使用对比测试程序
+
+```bash
+go run cmd/render_animation_comparison/main.go --verbose
+```
+
+显示三种渲染模式：
+- 左侧：严格遵守 f=-1（错误）
+- 中间：忽略 f=-1（部分正确）
+- 右侧：双动画叠加（正确）✅
+
+#### 3. 检查 MergedTracks
+
+```go
+// 验证帧继承是否正确
+for trackName, frames := range reanimComp.MergedTracks {
+    for i, frame := range frames {
+        if frame.X == nil || frame.Y == nil {
+            log.Printf("ERROR: Frame %d of track %s missing position", i, trackName)
+        }
+    }
+}
+```
+
+### API 使用示例
+
+#### 播放动画
+
+```go
+// 简单动画（单一模式）
+reanimSystem.PlayAnimation(entityID, "anim_idle")
+
+// 攻击动画（自动启用双动画叠加）
+reanimSystem.PlayAnimation(entityID, "anim_shooting")
+// -> 内部自动设置 IsBlending=true, Primary="anim_idle", Secondary="anim_shooting"
+```
+
+#### 控制部件显示（僵尸等）
+
+```go
+// 使用 VisibleTracks 白名单
+reanimComp.VisibleTracks = map[string]bool{
+    "Zombie_body":      true,
+    "Zombie_head":      true,
+    "Zombie_outerarm":  false,  // 隐藏手臂
+}
+```
+
+### 参考文档
+
+- **Reanim 格式指南**: `docs/reanim/reanim-format-guide.md`
+- **修复指南**: `docs/reanim/reanim-fix-guide.md`
+- **混合轨道分析**: `docs/reanim/reanim-hybrid-track-discovery.md`
+- **Story 6.5**: `docs/stories/6.5.story.md`
+
+---
 
 ## 资源管理
 

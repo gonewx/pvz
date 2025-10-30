@@ -23,7 +23,7 @@ const (
 
 	// GridScreenStartX 是草坪网格在屏幕坐标系中的起始X坐标
 	// 这是草坪相对于屏幕左侧的距离
-	GridScreenStartX = 43.0
+	GridScreenStartX = 35.0
 )
 
 // Lawn Grid Configuration (草坪网格配置)
@@ -68,7 +68,7 @@ const (
 	// 草皮叠加图X偏移（相对于网格起点）
 	// 调整此值可以改变草皮显示的水平位置
 	// SodOverlayOffsetX = -26.0 // 相对于 GridWorldStartX 的偏移量
-	SodOverlayOffsetX = -29.0 // 相对于 GridWorldStartX 的偏移量
+	SodOverlayOffsetX = -20.0 // 相对于 GridWorldStartX 的偏移量
 
 	// 草皮叠加图Y偏移（相对于目标行中心）
 	// 调整此值可以改变草皮显示的垂直位置
