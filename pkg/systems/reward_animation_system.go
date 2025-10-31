@@ -261,9 +261,22 @@ func (ras *RewardAnimationSystem) TriggerReward(rewardType string, rewardID stri
 
 		log.Printf("[RewardAnimationSystem] 植物卡片包已创建（使用 Story 8.4 统一工厂方法）")
 	} else if rewardType == "tool" {
-		// 工具奖励：只使用粒子效果，不显示图片
-		// 图片将在奖励面板阶段显示（更清晰、更大的高清图片）
-		log.Printf("[RewardAnimationSystem] 工具奖励实体已创建（类型: %s, ID: %s），使用粒子效果", rewardType, rewardID)
+		// 工具奖励：添加 SpriteComponent 显示工具图标
+		var toolImage *ebiten.Image
+		if rewardID == "shovel" {
+			toolImage = ras.resourceManager.GetImageByID("IMAGE_SHOVEL")
+		}
+
+		if toolImage != nil {
+			ecs.AddComponent(ras.entityManager, ras.rewardEntity, &components.SpriteComponent{
+				Image: toolImage,
+			})
+			// 添加 UIComponent 标记，表示这是 UI 实体（不需要相机偏移）
+			ecs.AddComponent(ras.entityManager, ras.rewardEntity, &components.UIComponent{})
+			log.Printf("[RewardAnimationSystem] 工具奖励实体已创建（类型: %s, ID: %s），使用 IMAGE_SHOVEL", rewardType, rewardID)
+		} else {
+			log.Printf("[RewardAnimationSystem] 警告：工具图片加载失败（ID: %s），只显示粒子效果", rewardID)
+		}
 	}
 
 	// TODO: Phase 2 粒子背景框效果（需要查找合适的粒子配置）

@@ -200,15 +200,62 @@ func (s *RenderSystem) DrawSuns(screen *ebiten.Image, cameraX float64) {
 //   - id: 实体ID
 //   - cameraX: 摄像机的世界坐标X位置
 func (s *RenderSystem) drawEntity(screen *ebiten.Image, id ecs.EntityID, cameraX float64) {
-	// Story 6.3: 所有实体都使用 ReanimComponent 渲染
+	// Story 6.3: 优先使用 ReanimComponent 渲染
 	_, hasReanimComp := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id)
 	if hasReanimComp {
 		s.renderReanimEntity(screen, id, cameraX)
 		return
 	}
 
-	// 如果没有 ReanimComponent，记录警告（不应该出现这种情况）
-	log.Printf("[RenderSystem] 警告: 实体 %d 没有 ReanimComponent，无法渲染", id)
+	// 支持简单的 SpriteComponent 渲染（用于工具图标等简单实体）
+	spriteComp, hasSpriteComp := ecs.GetComponent[*components.SpriteComponent](s.entityManager, id)
+	if hasSpriteComp {
+		s.renderSpriteEntity(screen, id, spriteComp, cameraX)
+		return
+	}
+
+	// 如果既没有 ReanimComponent 也没有 SpriteComponent，记录警告
+	log.Printf("[RenderSystem] 警告: 实体 %d 没有可渲染组件（ReanimComponent 或 SpriteComponent）", id)
+}
+
+// renderSpriteEntity 渲染简单的 SpriteComponent 实体
+func (s *RenderSystem) renderSpriteEntity(screen *ebiten.Image, id ecs.EntityID, sprite *components.SpriteComponent, cameraX float64) {
+	if sprite.Image == nil {
+		return
+	}
+
+	// 获取位置组件
+	pos, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, id)
+	if !hasPos {
+		return
+	}
+
+	// 检查是否是 UI 实体（不需要相机偏移）
+	_, isUI := ecs.GetComponent[*components.UIComponent](s.entityManager, id)
+
+	// 计算屏幕坐标
+	var screenX, screenY float64
+	if isUI {
+		// UI 实体使用屏幕坐标，不需要相机偏移
+		screenX = pos.X
+		screenY = pos.Y
+	} else {
+		// 游戏世界实体使用世界坐标，需要相机偏移
+		screenX = pos.X - cameraX
+		screenY = pos.Y
+	}
+
+	// 绘制选项
+	op := &ebiten.DrawImageOptions{}
+
+	// 居中图片
+	bounds := sprite.Image.Bounds()
+	op.GeoM.Translate(-float64(bounds.Dx())/2, -float64(bounds.Dy())/2)
+
+	// 移动到目标位置
+	op.GeoM.Translate(screenX, screenY)
+
+	screen.DrawImage(sprite.Image, op)
 }
 
 // getFloat 辅助函数：安全获取 float 指针的值
