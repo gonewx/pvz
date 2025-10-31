@@ -169,28 +169,28 @@ var PlantInfoMap = map[string]PlantInfo{
 		DescriptionKey: "SUNFLOWER_TOOLTIP",
 	},
 	"cherrybomb": {
-		NameKey:        "CHERRYBOMB",
-		DescriptionKey: "CHERRYBOMB_TOOLTIP",
+		NameKey:        "CHERRY_BOMB",
+		DescriptionKey: "CHERRY_BOMB_TOOLTIP",
 	},
 	"wallnut": {
-		NameKey:        "WALLNUT",
-		DescriptionKey: "WALLNUT_TOOLTIP",
+		NameKey:        "WALL_NUT",
+		DescriptionKey: "WALL_NUT_TOOLTIP",
 	},
 	"potatomine": {
-		NameKey:        "POTATOMINE_NAME",
-		DescriptionKey: "POTATOMINE_DESC",
+		NameKey:        "POTATO_MINE",
+		DescriptionKey: "POTATO_MINE_TOOLTIP",
 	},
 	"snowpea": {
-		NameKey:        "SNOWPEA_NAME",
-		DescriptionKey: "SNOWPEA_DESC",
+		NameKey:        "SNOW_PEA",
+		DescriptionKey: "SNOW_PEA_TOOLTIP",
 	},
 	"chomper": {
-		NameKey:        "CHOMPER_NAME",
-		DescriptionKey: "CHOMPER_DESC",
+		NameKey:        "CHOMPER",
+		DescriptionKey: "CHOMPER_TOOLTIP",
 	},
 	"repeater": {
-		NameKey:        "REPEATER_NAME",
-		DescriptionKey: "REPEATER_DESC",
+		NameKey:        "REPEATER",
+		DescriptionKey: "REPEATER_TOOLTIP",
 	},
 }
 

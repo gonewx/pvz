@@ -341,7 +341,7 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 
 	// Story 5.5: Initialize level management systems
 	// 1. Create WaveSpawnSystem (LevelSystem depends on it)
-	scene.waveSpawnSystem = systems.NewWaveSpawnSystem(scene.entityManager, rm, scene.reanimSystem, scene.gameState.CurrentLevel)
+	scene.waveSpawnSystem = systems.NewWaveSpawnSystem(scene.entityManager, rm, scene.reanimSystem, scene.gameState.CurrentLevel, scene.gameState)
 	log.Printf("[GameScene] Initialized wave spawn system")
 
 	// Pre-spawn all zombies for the level (they will be activated wave by wave)

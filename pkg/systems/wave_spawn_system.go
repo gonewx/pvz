@@ -32,6 +32,7 @@ type WaveSpawnSystem struct {
 	resourceManager *game.ResourceManager
 	reanimSystem    *ReanimSystem       // 用于初始化僵尸动画
 	levelConfig     *config.LevelConfig // Story 8.1: 关卡配置（用于验证行数限制）
+	gameState       *game.GameState     // 用于更新僵尸生成计数
 }
 
 // NewWaveSpawnSystem 创建波次生成系统
@@ -42,12 +43,14 @@ type WaveSpawnSystem struct {
 //	rm - 资源管理器
 //	rs - Reanim系统（用于初始化僵尸动画）
 //	lc - 关卡配置（Story 8.1: 用于验证行数限制）
-func NewWaveSpawnSystem(em *ecs.EntityManager, rm *game.ResourceManager, rs *ReanimSystem, lc *config.LevelConfig) *WaveSpawnSystem {
+//	gs - 游戏状态（用于更新僵尸生成计数）
+func NewWaveSpawnSystem(em *ecs.EntityManager, rm *game.ResourceManager, rs *ReanimSystem, lc *config.LevelConfig, gs *game.GameState) *WaveSpawnSystem {
 	return &WaveSpawnSystem{
 		entityManager:   em,
 		resourceManager: rm,
 		reanimSystem:    rs,
 		levelConfig:     lc,
+		gameState:       gs,
 	}
 }
 
@@ -219,6 +222,9 @@ func (s *WaveSpawnSystem) ActivateWave(waveIndex int) int {
 			}
 
 			activated++
+
+			// 增加已生成僵尸计数（用于胜利条件检测）
+			s.gameState.IncrementZombiesSpawned(1)
 		}
 	}
 
