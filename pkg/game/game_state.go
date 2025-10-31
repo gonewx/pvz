@@ -25,7 +25,8 @@ type GameState struct {
 	LevelTime             float64             // 关卡已进行时间（秒）
 	CurrentWaveIndex      int                 // 当前波次索引（0表示第一波）
 	SpawnedWaves          []bool              // 每一波是否已生成（用于避免重复生成）
-	TotalZombiesSpawned   int                 // 已生成的僵尸总数
+	TotalZombiesInLevel   int                 // 关卡配置中的总僵尸数（用于胜利条件）
+	TotalZombiesSpawned   int                 // 已激活的僵尸总数（用于计算场上僵尸数）
 	ZombiesKilled         int                 // 已消灭的僵尸数量
 	LastWaveCompletedTime float64             // 上一波完成时间（用于计算延迟）
 	IsWaitingForNextWave  bool                // 是否正在等待下一波（延迟中）
@@ -160,7 +161,19 @@ func (gs *GameState) LoadLevel(levelConfig *config.LevelConfig) {
 	gs.LevelTime = 0
 	gs.CurrentWaveIndex = 0
 	gs.SpawnedWaves = make([]bool, len(levelConfig.Waves))
-	gs.TotalZombiesSpawned = 0
+
+	// 计算关卡总僵尸数（从配置文件读取所有波次的僵尸数量）
+	// 用于胜利条件判断：必须消灭配置中的所有僵尸才算胜利
+	totalZombies := 0
+	for _, wave := range levelConfig.Waves {
+		for _, zombieGroup := range wave.Zombies {
+			totalZombies += zombieGroup.Count
+		}
+	}
+	gs.TotalZombiesInLevel = totalZombies // 关卡配置中的总僵尸数（固定不变）
+	gs.TotalZombiesSpawned = 0            // 已激活的僵尸数（激活时增加）
+	log.Printf("[GameState] LoadLevel: %s, Total zombies in config: %d", levelConfig.ID, totalZombies)
+
 	gs.ZombiesKilled = 0
 	gs.IsLevelComplete = false
 	gs.IsGameOver = false
@@ -244,11 +257,12 @@ func (gs *GameState) IsWaveSpawned(waveIndex int) bool {
 	return gs.SpawnedWaves[waveIndex]
 }
 
-// IncrementZombiesSpawned 增加已生成僵尸计数
-// 在僵尸生成时调用
+// IncrementZombiesSpawned 增加已激活僵尸计数
+// 在僵尸激活时调用（用于计算场上僵尸数 = TotalZombiesSpawned - ZombiesKilled）
 func (gs *GameState) IncrementZombiesSpawned(count int) {
 	gs.TotalZombiesSpawned += count
-	log.Printf("[GameState] IncrementZombiesSpawned: +%d, Total=%d", count, gs.TotalZombiesSpawned)
+	log.Printf("[GameState] IncrementZombiesSpawned: +%d, Activated=%d, Total=%d, Killed=%d, OnField=%d",
+		count, gs.TotalZombiesSpawned, gs.TotalZombiesInLevel, gs.ZombiesKilled, gs.TotalZombiesSpawned-gs.ZombiesKilled)
 }
 
 // IncrementZombiesKilled 增加已消灭僵尸计数
@@ -256,8 +270,8 @@ func (gs *GameState) IncrementZombiesSpawned(count int) {
 func (gs *GameState) IncrementZombiesKilled() {
 	gs.ZombiesKilled++
 	zombiesOnField := gs.TotalZombiesSpawned - gs.ZombiesKilled
-	log.Printf("[GameState] IncrementZombiesKilled: Killed=%d/%d, OnField=%d",
-		gs.ZombiesKilled, gs.TotalZombiesSpawned, zombiesOnField)
+	log.Printf("[GameState] IncrementZombiesKilled: Killed=%d/%d (config), Activated=%d, OnField=%d",
+		gs.ZombiesKilled, gs.TotalZombiesInLevel, gs.TotalZombiesSpawned, zombiesOnField)
 }
 
 // CheckVictory 检查是否达成胜利条件
@@ -277,8 +291,11 @@ func (gs *GameState) CheckVictory() bool {
 		}
 	}
 
-	// 胜利条件：所有波次已生成 且 已消灭的僵尸数量等于已生成的僵尸总数
-	return allWavesSpawned && gs.ZombiesKilled >= gs.TotalZombiesSpawned && gs.TotalZombiesSpawned > 0
+	// 胜利条件：
+	// 1. 所有波次已生成（allWavesSpawned = true）
+	// 2. 已消灭的僵尸数量 >= 关卡配置中的总僵尸数
+	// 注意：必须消灭配置中的所有僵尸，而不是已激活的僵尸
+	return allWavesSpawned && gs.ZombiesKilled >= gs.TotalZombiesInLevel && gs.TotalZombiesInLevel > 0
 }
 
 // SetGameResult 设置游戏结果

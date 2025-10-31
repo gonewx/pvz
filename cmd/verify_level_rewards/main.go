@@ -97,7 +97,8 @@ func main() {
 	}
 
 	gs.ZombiesKilled = totalZombies
-	gs.TotalZombiesSpawned = totalZombies
+	gs.TotalZombiesInLevel = totalZombies // 设置为关卡配置总数
+	gs.TotalZombiesSpawned = totalZombies // 假设所有僵尸都已激活
 
 	// 标记所有波次已生成
 	for i := range levelConfig.Waves {

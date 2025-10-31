@@ -223,7 +223,8 @@ func (s *WaveSpawnSystem) ActivateWave(waveIndex int) int {
 
 			activated++
 
-			// 增加已生成僵尸计数（用于胜利条件检测）
+			// 增加已激活僵尸计数（用于计算场上僵尸数）
+			// zombiesOnField = TotalZombiesSpawned - ZombiesKilled
 			s.gameState.IncrementZombiesSpawned(1)
 		}
 	}
