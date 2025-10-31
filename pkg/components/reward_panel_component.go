@@ -3,10 +3,16 @@ package components
 import "github.com/hajimehoshi/ebiten/v2"
 
 // RewardPanelComponent 管理奖励面板的显示状态和动画数据。
-// 用于展示新解锁的植物信息，包括植物名称、描述和卡片动画。
+// 用于展示新解锁的植物或工具信息，包括名称、描述和图标动画。
 type RewardPanelComponent struct {
-	// PlantID 解锁的植物ID（如 "sunflower"）
+	// RewardType 奖励类型："plant" 或 "tool"（默认为空，向后兼容）
+	RewardType string
+
+	// PlantID 解锁的植物ID（如 "sunflower"）- RewardType="plant" 时使用
 	PlantID string
+
+	// ToolID 解锁的工具ID（如 "shovel"）- RewardType="tool" 时使用
+	ToolID string
 
 	// PlantName 植物名称（从 LawnStrings 加载）
 	PlantName string

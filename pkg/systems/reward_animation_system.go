@@ -123,14 +123,23 @@ func NewRewardAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *gam
 }
 
 // TriggerReward 触发奖励动画，开始卡片包弹出流程。
-// plantID: 解锁的植物ID（如 "sunflower"）
-func (ras *RewardAnimationSystem) TriggerReward(plantID string) {
+// rewardType: 奖励类型（"plant" 或 "tool"）
+// rewardID: 奖励ID（植物ID如 "sunflower" 或工具ID如 "shovel"）
+func (ras *RewardAnimationSystem) TriggerReward(rewardType string, rewardID string) {
 	if ras.isActive {
 		log.Printf("[RewardAnimationSystem] 奖励动画已在播放，忽略新触发")
 		return
 	}
 
-	log.Printf("[RewardAnimationSystem] 触发奖励动画，植物ID: %s", plantID)
+	log.Printf("[RewardAnimationSystem] 触发奖励动画，类型: %s, ID: %s", rewardType, rewardID)
+
+	// 根据类型选择粒子效果
+	var particleEffect string
+	if rewardType == "tool" {
+		particleEffect = "AwardPickupArrow" // 工具使用向下箭头粒子效果
+	} else {
+		particleEffect = "Award" // 植物使用默认光芒粒子效果
+	}
 
 	// 创建奖励动画实体
 	ras.rewardEntity = ras.entityManager.CreateEntity()
@@ -174,14 +183,17 @@ func (ras *RewardAnimationSystem) TriggerReward(plantID string) {
 
 	// 添加 RewardAnimationComponent
 	ecs.AddComponent(ras.entityManager, ras.rewardEntity, &components.RewardAnimationComponent{
-		Phase:       "appearing",
-		ElapsedTime: 0,
-		StartX:      startX,
-		StartY:      startY,
-		TargetX:     targetX,
-		TargetY:     targetY,
-		Scale:       config.PlantCardScale, // 使用标准卡片缩放（0.50）
-		PlantID:     plantID,
+		Phase:          "appearing",
+		ElapsedTime:    0,
+		StartX:         startX,
+		StartY:         startY,
+		TargetX:        targetX,
+		TargetY:        targetY,
+		Scale:          config.PlantCardScale, // 使用标准卡片缩放（0.50）
+		RewardType:     rewardType,            // 新增：奖励类型
+		PlantID:        rewardID,              // 兼容性：植物ID或工具ID都存这里
+		ToolID:         rewardID,              // 新增：工具ID（如果是工具奖励）
+		ParticleEffect: particleEffect,        // 新增：粒子效果名称
 	})
 
 	// 添加 PositionComponent
@@ -190,61 +202,81 @@ func (ras *RewardAnimationSystem) TriggerReward(plantID string) {
 		Y: startY,
 	})
 
-	// Story 8.4: 使用 NewPlantCardEntity 创建卡片包
-	// 这样可以自动获得：背景图、植物图标、阳光数字等完整渲染
-	plantType := ras.plantIDToType(plantID)
+	// 根据奖励类型创建不同的实体
+	if rewardType == "plant" {
+		// Story 8.4: 使用 NewPlantCardEntity 创建卡片包
+		// 这样可以自动获得：背景图、植物图标、阳光数字等完整渲染
+		plantType := ras.plantIDToType(rewardID)
 
-	if plantType == components.PlantUnknown {
-		log.Printf("[RewardAnimationSystem] Unknown plant ID: %s, aborting", plantID)
+		if plantType == components.PlantUnknown {
+			log.Printf("[RewardAnimationSystem] Unknown plant ID: %s, aborting", rewardID)
+			ras.entityManager.DestroyEntity(ras.rewardEntity)
+			ras.entityManager.RemoveMarkedEntities()
+			ras.isActive = false
+			return
+		}
+
+		// 创建植物卡片实体作为卡片包（使用统一工厂方法）
+		// 注意：这里的位置会被 RewardAnimationComponent 覆盖更新
+		cardEntity, err := entities.NewPlantCardEntity(
+			ras.entityManager,
+			ras.resourceManager,
+			ras.reanimSystem,
+			plantType,
+			startX,
+			startY,
+			config.PlantCardScale, // 使用标准卡片缩放（0.50）
+		)
+		if err != nil {
+			log.Printf("[RewardAnimationSystem] Failed to create card pack entity: %v", err)
+			ras.entityManager.DestroyEntity(ras.rewardEntity)
+			ras.entityManager.RemoveMarkedEntities()
+			ras.isActive = false
+			return
+		}
+
+		// 添加 RewardCardComponent 标记，区分奖励卡片和选择栏卡片
+		// 这样 RewardAnimationSystem 的 plantCardRenderSystem 只渲染奖励卡片
+		// 而验证工具的 plantCardRenderSystem 只渲染选择栏卡片
+		ecs.AddComponent(ras.entityManager, cardEntity, &components.RewardCardComponent{})
+
+		// 重要：使用卡片实体作为奖励实体
 		ras.entityManager.DestroyEntity(ras.rewardEntity)
-		ras.entityManager.RemoveMarkedEntities()
-		ras.isActive = false
-		return
+		ras.rewardEntity = cardEntity
+
+		// 重新添加 RewardAnimationComponent（控制动画状态）
+		ecs.AddComponent(ras.entityManager, ras.rewardEntity, &components.RewardAnimationComponent{
+			Phase:          "appearing",
+			ElapsedTime:    0,
+			StartX:         startX,
+			StartY:         startY,
+			TargetX:        targetX,
+			TargetY:        targetY,
+			Scale:          config.PlantCardScale, // 使用标准卡片缩放（0.50）
+			RewardType:     rewardType,            // 新增：奖励类型
+			PlantID:        rewardID,              // 兼容性：植物ID或工具ID都存这里
+			ToolID:         rewardID,              // 新增：工具ID
+			ParticleEffect: particleEffect,        // 新增：粒子效果名称
+		})
+
+		log.Printf("[RewardAnimationSystem] 植物卡片包已创建（使用 Story 8.4 统一工厂方法）")
+	} else if rewardType == "tool" {
+		// 工具奖励：暂时只保留 RewardAnimationComponent，不创建植物卡片
+		// 在 Phase 4 面板显示时才渲染工具图标
+		log.Printf("[RewardAnimationSystem] 工具奖励卡片包已创建（类型: %s, ID: %s）", rewardType, rewardID)
 	}
-
-	// 创建植物卡片实体作为卡片包（使用统一工厂方法）
-	// 注意：这里的位置会被 RewardAnimationComponent 覆盖更新
-	cardEntity, err := entities.NewPlantCardEntity(
-		ras.entityManager,
-		ras.resourceManager,
-		ras.reanimSystem,
-		plantType,
-		startX,
-		startY,
-		config.PlantCardScale, // 使用标准卡片缩放（0.50）
-	)
-	if err != nil {
-		log.Printf("[RewardAnimationSystem] Failed to create card pack entity: %v", err)
-		ras.entityManager.DestroyEntity(ras.rewardEntity)
-		ras.entityManager.RemoveMarkedEntities()
-		ras.isActive = false
-		return
-	}
-
-	// 添加 RewardCardComponent 标记，区分奖励卡片和选择栏卡片
-	// 这样 RewardAnimationSystem 的 plantCardRenderSystem 只渲染奖励卡片
-	// 而验证工具的 plantCardRenderSystem 只渲染选择栏卡片
-	ecs.AddComponent(ras.entityManager, cardEntity, &components.RewardCardComponent{})
-
-	// 重要：使用卡片实体作为奖励实体
-	ras.entityManager.DestroyEntity(ras.rewardEntity)
-	ras.rewardEntity = cardEntity
-
-	// 重新添加 RewardAnimationComponent（控制动画状态）
-	ecs.AddComponent(ras.entityManager, ras.rewardEntity, &components.RewardAnimationComponent{
-		Phase:       "appearing",
-		ElapsedTime: 0,
-		StartX:      startX,
-		StartY:      startY,
-		TargetX:     targetX,
-		TargetY:     targetY,
-		Scale:       config.PlantCardScale, // 使用标准卡片缩放（0.50）
-		PlantID:     plantID,
-	})
-
-	log.Printf("[RewardAnimationSystem] 卡片包已创建（使用 Story 8.4 统一工厂方法）")
 
 	// TODO: Phase 2 粒子背景框效果（需要查找合适的粒子配置）
+}
+
+// TriggerPlantReward 触发植物奖励动画（向后兼容方法）
+func (ras *RewardAnimationSystem) TriggerPlantReward(plantID string) {
+	ras.TriggerReward("plant", plantID)
+}
+
+// TriggerToolReward 触发工具奖励动画
+func (ras *RewardAnimationSystem) TriggerToolReward(toolID string) {
+	ras.TriggerReward("tool", toolID)
 }
 
 // Update 更新奖励动画系统，处理各阶段的动画逻辑。
@@ -485,22 +517,33 @@ func (ras *RewardAnimationSystem) updateExpandingPhase(dt float64, rewardComp *c
 				particleY += cardHeight / 2.0 // Y：卡片垂直中心
 			}
 
-			// 创建 Award 粒子特效（12个光芒发射器）
+			// 确定使用的粒子效果名称
+		particleEffectName := rewardComp.ParticleEffect
+		if particleEffectName == "" {
+			// 向后兼容：如果未设置，根据类型自动选择
+			if rewardComp.RewardType == "tool" {
+				particleEffectName = "AwardPickupArrow"
+			} else {
+				particleEffectName = "Award"
+			}
+		}
+
+		// 创建粒子特效（Award 或 AwardPickupArrow）
 			awardID, err := entities.CreateParticleEffect(
 				ras.entityManager,
 				ras.resourceManager,
-				"Award",
+				particleEffectName,
 				particleX,
 				particleY,
 				0.0,  // angleOffset = 0
 				true, // isUIParticle = true
 			)
 			if err != nil {
-				log.Printf("[RewardAnimationSystem] 创建 Award 粒子特效失败: %v", err)
+				log.Printf("[RewardAnimationSystem] 创建粒子特效失败（%s）: %v", particleEffectName, err)
 			} else {
-				// 保存 Award 粒子ID
+				// 保存粒子ID
 				ras.glowEntity = awardID
-				log.Printf("[RewardAnimationSystem] 创建 Award 粒子特效成功: ID=%d（13个发射器：8光芒+1光晕+4闪光）", awardID)
+				log.Printf("[RewardAnimationSystem] 创建粒子特效成功: %s, ID=%d", particleEffectName, awardID)
 			}
 		}
 

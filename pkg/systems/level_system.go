@@ -201,25 +201,37 @@ func (s *LevelSystem) checkVictoryCondition() {
 	}
 }
 
-// triggerRewardIfNeeded 检查是否有新植物解锁，如果有则触发奖励动画
+// triggerRewardIfNeeded 检查是否有新植物或工具解锁，如果有则触发奖励动画
 func (s *LevelSystem) triggerRewardIfNeeded() {
 	if s.rewardSystem == nil {
 		return
 	}
 
-	// 获取最后解锁的植物
-	lastUnlocked := s.gameState.GetPlantUnlockManager().GetLastUnlocked()
-	if lastUnlocked == "" {
-		log.Println("[LevelSystem] No new plant unlocked, skipping reward animation")
-		return
+	hasReward := false
+
+	// 优先检查工具奖励（工具比植物更稀有，优先显示）
+	if s.gameState.CurrentLevel != nil && len(s.gameState.CurrentLevel.UnlockTools) > 0 {
+		toolID := s.gameState.CurrentLevel.UnlockTools[0] // 通常只解锁一个工具
+		log.Printf("[LevelSystem] Triggering reward animation for tool: %s", toolID)
+		s.rewardSystem.TriggerToolReward(toolID)
+		hasReward = true
 	}
 
-	// 触发奖励动画
-	log.Printf("[LevelSystem] Triggering reward animation for plant: %s", lastUnlocked)
-	s.rewardSystem.TriggerReward(lastUnlocked)
+	// 如果没有工具奖励，检查植物奖励
+	if !hasReward {
+		lastUnlocked := s.gameState.GetPlantUnlockManager().GetLastUnlocked()
+		if lastUnlocked != "" {
+			log.Printf("[LevelSystem] Triggering reward animation for plant: %s", lastUnlocked)
+			s.rewardSystem.TriggerPlantReward(lastUnlocked)
+			hasReward = true
+			// 清除最后解锁标记（避免重复触发）
+			s.gameState.GetPlantUnlockManager().ClearLastUnlocked()
+		}
+	}
 
-	// 清除最后解锁标记（避免重复触发）
-	s.gameState.GetPlantUnlockManager().ClearLastUnlocked()
+	if !hasReward {
+		log.Println("[LevelSystem] No new reward unlocked, skipping reward animation")
+	}
 }
 
 // checkDefeatCondition 检查失败条件

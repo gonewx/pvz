@@ -27,6 +27,22 @@ type RewardAnimationComponent struct {
 	// - Phase 3 (expanding): 1.0 → 2.0
 	Scale float64
 
+	// RewardType 奖励类型："plant" 或 "tool"（默认为空，向后兼容）
+	// - 空字符串：自动推断（如果 PlantID 非空则视为 "plant"）
+	// - "plant"：植物奖励
+	// - "tool"：工具奖励（如铲子）
+	RewardType string
+
 	// PlantID 解锁的植物ID（如 "sunflower"）
+	// 当 RewardType="plant" 时使用
 	PlantID string
+
+	// ToolID 解锁的工具ID（如 "shovel"）
+	// 当 RewardType="tool" 时使用
+	ToolID string
+
+	// ParticleEffect 粒子效果名称（如 "Award" 或 "AwardPickupArrow"）
+	// - 空字符串：自动选择（plant → "Award", tool → "AwardPickupArrow"）
+	// - 非空：使用指定的粒子效果
+	ParticleEffect string
 }
