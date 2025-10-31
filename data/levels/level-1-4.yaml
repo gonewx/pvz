@@ -38,47 +38,47 @@ waves:
     zombies:
       - type: "basic"
         lanes: [1, 2, 3, 4, 5]
-        count: 4
+        count: 2
         spawnInterval: 2.0
 
-  # 第2波：第1波消灭后15秒，5个僵尸（含1个路障）
-  - minDelay: 15
-    zombies:
-      - type: "basic"
-        lanes: [1, 2, 3, 4, 5]
-        count: 4
-        spawnInterval: 2.0
-      - type: "conehead"
-        lanes: [1, 2, 3, 4, 5]
-        count: 1
-        spawnInterval: 0
+  # # 第2波：第1波消灭后15秒，5个僵尸（含1个路障）
+  # - minDelay: 15
+  #   zombies:
+  #     - type: "basic"
+  #       lanes: [1, 2, 3, 4, 5]
+  #       count: 4
+  #       spawnInterval: 2.0
+  #     - type: "conehead"
+  #       lanes: [1, 2, 3, 4, 5]
+  #       count: 1
+  #       spawnInterval: 0
 
-  # 第3波：第2波消灭后12秒，6个僵尸（含2个路障）
-  - minDelay: 12
-    zombies:
-      - type: "basic"
-        lanes: [1, 2, 3, 4, 5]
-        count: 4
-        spawnInterval: 1.5
-      - type: "conehead"
-        lanes: [1, 2, 3, 4, 5]
-        count: 2
-        spawnInterval: 1.0
+  # # 第3波：第2波消灭后12秒，6个僵尸（含2个路障）
+  # - minDelay: 12
+  #   zombies:
+  #     - type: "basic"
+  #       lanes: [1, 2, 3, 4, 5]
+  #       count: 4
+  #       spawnInterval: 1.5
+  #     - type: "conehead"
+  #       lanes: [1, 2, 3, 4, 5]
+  #       count: 2
+  #       spawnInterval: 1.0
 
-  # 第1面旗帜波（第4波）：进度条结束位置，12个僵尸（含4个路障，2个铁桶）
-  - isFlag: true
-    flagIndex: 1
-    minDelay: 5
-    zombies:
-      - type: "basic"
-        lanes: [1, 2, 3, 4, 5]
-        count: 6
-        spawnInterval: 1.0
-      - type: "conehead"
-        lanes: [1, 2, 3, 4, 5]
-        count: 4
-        spawnInterval: 1.2
-      - type: "buckethead"  # 铁桶僵尸
-        lanes: [1, 2, 3, 4, 5]
-        count: 2
-        spawnInterval: 1.5
+  # # 第1面旗帜波（第4波）：进度条结束位置，12个僵尸（含4个路障，2个铁桶）
+  # - isFlag: true
+  #   flagIndex: 1
+  #   minDelay: 5
+  #   zombies:
+  #     - type: "basic"
+  #       lanes: [1, 2, 3, 4, 5]
+  #       count: 6
+  #       spawnInterval: 1.0
+  #     - type: "conehead"
+  #       lanes: [1, 2, 3, 4, 5]
+  #       count: 4
+  #       spawnInterval: 1.2
+  #     - type: "buckethead"  # 铁桶僵尸
+  #       lanes: [1, 2, 3, 4, 5]
+  #       count: 2
+  #       spawnInterval: 1.5

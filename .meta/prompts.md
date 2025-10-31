@@ -97,7 +97,7 @@ assets/images/FlagMeterParts.png
 
 ### level 1-4
 
-- 1-4 关卡胜利后，虽然解锁的是铲子，也需要有和前面关卡类似的奖励动画， 只是植物卡换成铲子图片， 卡包背景的粒子效果换成 assets/effect/particles/AwardPickupArrow.xml。
+- 1-4 关卡胜利后，虽然解锁的是铲子，也需要有和前面关卡类似的奖励动画， 只是植物卡包换成铲子图片， 卡包背景的粒子效果换成 assets/effect/particles/AwardPickupArrow.xml。
 
 ## bugs
 

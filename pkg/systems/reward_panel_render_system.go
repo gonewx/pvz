@@ -142,14 +142,15 @@ func (rprs *RewardPanelRenderSystem) drawTitle(screen *ebiten.Image, panel *comp
 		return
 	}
 
-	// 根据奖励类型选择标题文本
+	// 根据奖励类型��择标题文本
 	var titleText string
 	if panel.RewardType == "tool" {
-		titleText = "你得到了一个新工具！" // 工具奖励标题
+		// 工具奖励标题 - 从 LawnStrings 加载
+		titleText = "你得到一把铁铲！" // 默认文本
 		if rprs.gameState.LawnStrings != nil {
-			titleText = rprs.gameState.LawnStrings.GetString("NEW_TOOL")
+			titleText = rprs.gameState.LawnStrings.GetString("GOT_SHOVEL")
 			if titleText == "" {
-				titleText = "你得到了一个新工具！"
+				titleText = "你得到一把铁铲！"
 			}
 		}
 	} else {
@@ -157,7 +158,7 @@ func (rprs *RewardPanelRenderSystem) drawTitle(screen *ebiten.Image, panel *comp
 		if rprs.gameState.LawnStrings != nil {
 			titleText = rprs.gameState.LawnStrings.GetString("NEW_PLANT")
 			if titleText == "" {
-				titleText = "你得到了一株新植物！"
+				titleText = "你得���了一株新植物！"
 			}
 		}
 	}

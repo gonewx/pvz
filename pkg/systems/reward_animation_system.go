@@ -752,21 +752,24 @@ func (ras *RewardAnimationSystem) createRewardPanel(rewardType string, plantID s
 
 	// 根据奖励类型加载不同信息
 	if rewardType == "tool" {
-		// 工具奖励信息
-		toolDescriptions := map[string]struct {
-			Name string
-			Desc string
-		}{
-			"shovel": {
-				Name: "铲子",
-				Desc: "使用铲子可以移除草坪上的植物，重新规划你的防线！",
-			},
-		}
+		// 工具奖励信息 - 从 LawnStrings 加载
+		if toolID == "shovel" {
+			// 从 LawnStrings 加载铲子文本
+			rewardName = "铁铲" // 默认值
+			rewardDesc = "让你挖出一株植物，腾出空间给其他植物" // 默认值
 
-		if info, ok := toolDescriptions[toolID]; ok {
-			rewardName = info.Name
-			rewardDesc = info.Desc
+			if ras.gameState.LawnStrings != nil {
+				// 加载铲子名称
+				if name := ras.gameState.LawnStrings.GetString("SHOVEL"); name != "" {
+					rewardName = name
+				}
+				// 加载铲子描述
+				if desc := ras.gameState.LawnStrings.GetString("SHOVEL_DESCRIPTION"); desc != "" {
+					rewardDesc = desc
+				}
+			}
 		} else {
+			// 未知工具，使用默认文本
 			rewardName = "新工具"
 			rewardDesc = "一个实用的工具！"
 		}
