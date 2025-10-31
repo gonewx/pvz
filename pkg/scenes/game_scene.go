@@ -1268,11 +1268,11 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	// Layer 11: Draw game result overlay (Story 5.5) - DISABLED for Story 8.3
 	// s.drawGameResultOverlay(screen) // 已禁用：改为通过奖励面板的"下一关"按钮进入下一关
 
-	// DEBUG: Draw particle test instructions (Story 7.4 debugging)
-	s.drawParticleTestInstructions(screen)
+	// DEBUG: Draw particle test instructions (Story 7.4 debugging) - DISABLED
+	// s.drawParticleTestInstructions(screen)
 
-	// DEBUG: Draw grid boundaries (Story 3.3 debugging)
-	s.drawGridDebug(screen)
+	// DEBUG: Draw grid boundaries (Story 3.3 debugging) - DISABLED
+	// s.drawGridDebug(screen)
 
 	// Story 10.1: Draw pause menu (最顶层 - 在所有其他元素之上)
 	if s.pauseMenuModule != nil {
@@ -1595,9 +1595,16 @@ func (s *GameScene) drawSunCounter(screen *ebiten.Image) {
 // drawShovel renders the shovel slot and icon at the right side of the seed bank.
 // The shovel will be used in future stories for removing plants.
 // Story 8.5: 1-1关（教学关卡）不显示铲子
+// Story 8.6: 检查铲子是否已解锁（1-4关完成后才解锁）
 func (s *GameScene) drawShovel(screen *ebiten.Image) {
 	// 教学关卡不显示铲子（玩家还不需要学习移除植物）
 	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.OpeningType == "tutorial" {
+		return
+	}
+
+	// Story 8.6: 检查铲子是否已解锁
+	// 铲子在完成 1-4 关卡后解锁
+	if !s.gameState.IsToolUnlocked("shovel") {
 		return
 	}
 

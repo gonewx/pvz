@@ -9,6 +9,7 @@ import (
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
@@ -412,18 +413,33 @@ func (rprs *RewardPanelRenderSystem) drawPlantInfo(screen *ebiten.Image, panel *
 			text.Draw(screen, panel.PlantName, rprs.plantInfoFont, op)
 		}
 
-		// 绘制植物描述（使用配置中的颜色和位置，使用植物信息字体）
+		// 绘制植物描述（支持多行换行）
 		descX := offsetX + bgWidth/2                               // 背景中心X
 		descY := offsetY + bgHeight*config.RewardPanelDescriptionY // 使用配置的Y位置
 
 		if panel.PlantDescription != "" {
-			op := &text.DrawOptions{}
-			op.GeoM.Translate(descX, descY)
-			op.PrimaryAlign = text.AlignCenter                               // 水平居中
-			op.SecondaryAlign = text.AlignStart                              // 垂直从上开始
-			op.ColorScale.ScaleWithColor(config.RewardPanelDescriptionColor) // 使用配置的深蓝黑色
-			op.ColorScale.ScaleAlpha(float32(panel.FadeAlpha))
-			text.Draw(screen, panel.PlantDescription, rprs.plantInfoFont, op) // 使用植物信息字体（与植物名称一样大）
+			// 使用 WrapText 进行自动换行
+			lines := utils.WrapText(
+				panel.PlantDescription,
+				rprs.plantInfoFont,
+				config.RewardPanelDescriptionMaxWidth,
+			)
+
+			// 绘制每一行
+			currentY := descY
+			for _, line := range lines {
+				// 设置绘制选项
+				op := &text.DrawOptions{}
+				op.GeoM.Translate(descX, currentY)
+				op.PrimaryAlign = text.AlignCenter                               // 水平居中
+				op.SecondaryAlign = text.AlignStart                              // 垂直从上开始
+				op.ColorScale.ScaleWithColor(config.RewardPanelDescriptionColor) // 使用配置的深蓝黑色
+				op.ColorScale.ScaleAlpha(float32(panel.FadeAlpha))
+				text.Draw(screen, line, rprs.plantInfoFont, op)
+
+				// 移动到下一行
+				currentY += config.RewardPanelDescriptionLineSpacing
+			}
 		}
 	}
 }

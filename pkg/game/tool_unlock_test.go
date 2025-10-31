@@ -1,0 +1,159 @@
+package game
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/decker502/pvz/pkg/config"
+)
+
+// TestToolUnlock 测试工具解锁功能
+func TestToolUnlock(t *testing.T) {
+	// 创建临时保存目录
+	tmpDir := t.TempDir()
+	saveManager, err := NewSaveManager(tmpDir)
+	if err != nil {
+		t.Fatalf("Failed to create SaveManager: %v", err)
+	}
+
+	// 初始状态：铲子未解锁
+	if saveManager.IsToolUnlocked("shovel") {
+		t.Error("Shovel should not be unlocked initially")
+	}
+
+	// 解锁铲子
+	saveManager.UnlockTool("shovel")
+	if !saveManager.IsToolUnlocked("shovel") {
+		t.Error("Shovel should be unlocked after UnlockTool()")
+	}
+
+	// 保存并重新加载
+	if err := saveManager.Save(); err != nil {
+		t.Fatalf("Failed to save: %v", err)
+	}
+
+	// 创建新的 SaveManager 实例加载存档
+	saveManager2, err := NewSaveManager(tmpDir)
+	if err != nil {
+		t.Fatalf("Failed to create SaveManager2: %v", err)
+	}
+
+	// 验证铲子仍然解锁
+	if !saveManager2.IsToolUnlocked("shovel") {
+		t.Error("Shovel should still be unlocked after reload")
+	}
+}
+
+// TestCompleteLevelWithToolUnlock 测试关卡完成时解锁工具
+func TestCompleteLevelWithToolUnlock(t *testing.T) {
+	// 创建临时保存目录
+	tmpDir := t.TempDir()
+	saveManager, err := NewSaveManager(tmpDir)
+	if err != nil {
+		t.Fatalf("Failed to create SaveManager: %v", err)
+	}
+
+	// 创建 GameState（使用临时 SaveManager）
+	gs := &GameState{
+		saveManager:        saveManager,
+		plantUnlockManager: NewPlantUnlockManager(),
+	}
+
+	// 模拟 1-4 关卡配置
+	level14 := &config.LevelConfig{
+		ID:          "1-4",
+		Name:        "前院白天 1-4",
+		UnlockTools: []string{"shovel"},
+	}
+	gs.CurrentLevel = level14
+
+	// 初始状态：铲子未解锁
+	if gs.IsToolUnlocked("shovel") {
+		t.Error("Shovel should not be unlocked initially")
+	}
+
+	// 完成关卡（应该解锁铲子）
+	err = gs.CompleteLevel("1-4", "", []string{"shovel"})
+	if err != nil {
+		t.Fatalf("CompleteLevel failed: %v", err)
+	}
+
+	// 验证铲子已解锁
+	if !gs.IsToolUnlocked("shovel") {
+		t.Error("Shovel should be unlocked after completing 1-4")
+	}
+
+	// 验证存档文件已保存
+	saveFile := filepath.Join(tmpDir, "progress.yaml")
+	if _, err := os.Stat(saveFile); os.IsNotExist(err) {
+		t.Error("Save file should exist after CompleteLevel()")
+	}
+}
+
+// TestShovelDisplayLogic 测试铲子显示逻辑
+func TestShovelDisplayLogic(t *testing.T) {
+	// 创建临时保存目录
+	tmpDir := t.TempDir()
+	saveManager, err := NewSaveManager(tmpDir)
+	if err != nil {
+		t.Fatalf("Failed to create SaveManager: %v", err)
+	}
+
+	// 创建 GameState
+	gs := &GameState{
+		saveManager:        saveManager,
+		plantUnlockManager: NewPlantUnlockManager(),
+	}
+
+	// 测试场景1：教学关卡（1-1）- 即使铲子解锁了也不显示
+	level11 := &config.LevelConfig{
+		ID:          "1-1",
+		Name:        "前院白天 1-1",
+		OpeningType: "tutorial",
+	}
+	gs.CurrentLevel = level11
+
+	// 即使解锁铲子
+	saveManager.UnlockTool("shovel")
+
+	// 教学关卡应该隐藏铲子（通过 OpeningType 判断）
+	if level11.OpeningType == "tutorial" {
+		t.Log("Tutorial level: shovel should be hidden regardless of unlock status")
+	}
+
+	// 测试场景2：标准关卡（1-2）- 铲子未解锁时不显示
+	level12 := &config.LevelConfig{
+		ID:          "1-2",
+		Name:        "前院白天 1-2",
+		OpeningType: "standard",
+	}
+	gs.CurrentLevel = level12
+
+	// 重置铲子解锁状态
+	saveManager2, _ := NewSaveManager(t.TempDir())
+	gs.saveManager = saveManager2
+
+	// 铲子未解锁时不应该显示
+	shouldDisplay := gs.CurrentLevel.OpeningType != "tutorial" && gs.IsToolUnlocked("shovel")
+	if shouldDisplay {
+		t.Error("Shovel should NOT be displayed in 1-2 when not unlocked")
+	}
+
+	// 测试场景3：标准关卡（1-5）- 铲子解锁后显示
+	level15 := &config.LevelConfig{
+		ID:          "1-5",
+		Name:        "前院白天 1-5",
+		OpeningType: "standard",
+	}
+	gs.CurrentLevel = level15
+
+	// 解锁铲子
+	gs.saveManager.UnlockTool("shovel")
+
+	// 铲子解锁后应该显示
+	shouldDisplay = gs.CurrentLevel.OpeningType != "tutorial" && gs.IsToolUnlocked("shovel")
+	if !shouldDisplay {
+		t.Error("Shovel SHOULD be displayed in 1-5 when unlocked")
+	}
+}

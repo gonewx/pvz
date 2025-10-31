@@ -55,6 +55,14 @@ const (
 	RewardPanelTitleFontSize      = 30 // 标题字体大小
 	RewardPanelPlantInfoFontSize  = 22 // 植物名称和描述字体大小
 	RewardPanelButtonTextFontSize = 20 // 按钮文字字体大小
+
+	// 文本换行配置
+	// RewardPanelDescriptionMaxWidth 描述文本最大宽度（像素）
+	// 超过此宽度将自动换行
+	RewardPanelDescriptionMaxWidth = 500.0 // 相对于 800 宽度背景，留出左右边距
+
+	// RewardPanelDescriptionLineSpacing 描述文本行间距（像素）
+	RewardPanelDescriptionLineSpacing = 28.0 // 字体大小 22 + 行间距 6
 )
 
 // 文本颜色配置（根据原版截图）
