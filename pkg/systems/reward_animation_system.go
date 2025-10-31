@@ -400,8 +400,9 @@ func (ras *RewardAnimationSystem) updateAppearingPhase(dt float64, rewardComp *c
 		rewardComp.Phase = "waiting"
 		rewardComp.ElapsedTime = 0
 
-		// 创建光晕粒子效果（包含光晕 + 向下箭头）
-		if ras.glowEntity == 0 {
+		// 只为植物奖励创建光晕粒子效果（SeedPacket 包含光晕 + 向下箭头）
+		// 工具奖励跳过此粒子，只在 expanding 结束时显示 AwardPickupArrow
+		if ras.glowEntity == 0 && rewardComp.RewardType != "tool" {
 			// 验证猜想：有Name的发射器是"主粒子"
 			// SeedPacketGlow 有 EmitterOffsetY=62，如果它应该在卡片中心
 			// 那么基准位置应该是：卡片中心 - 62
@@ -431,6 +432,8 @@ func (ras *RewardAnimationSystem) updateAppearingPhase(dt float64, rewardComp *c
 				ras.glowEntity = glowID
 				log.Printf("[RewardAnimationSystem] 创建光晕粒子成功: ID=%d（验证主粒子假设，基准位置=(%.1f, %.1f)）", glowID, particleX, particleY)
 			}
+		} else if rewardComp.RewardType == "tool" {
+			log.Printf("[RewardAnimationSystem] 工具奖励跳过 SeedPacket 粒子，waiting 阶段无粒子效果")
 		}
 	}
 }

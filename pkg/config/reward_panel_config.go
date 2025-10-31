@@ -47,15 +47,38 @@ const (
 	// RewardPanelButtonY 按钮的Y位置比例（"下一关"按钮）
 	RewardPanelButtonY = 0.88 // 在面板底部
 
+	// ========== 植物卡片显示区域坐标范围配置 ==========
+	// 用于显示奖励植物卡片或工具图标的区域
+	// 坐标为绝对像素值（相对于 800x600 背景）
+	// 卡片/图标将在此区域内居中显示
+
+	// RewardPanelCardBoxLeft 卡片显示区域左边界 X 坐标
+	RewardPanelCardBoxLeft = 300.0
+
+	// RewardPanelCardBoxTop 卡片显示区域顶部 Y 坐标
+	RewardPanelCardBoxTop = 120.0
+
+	// RewardPanelCardBoxRight 卡片显示区域右边界 X 坐标
+	RewardPanelCardBoxRight = 500.0
+
+	// RewardPanelCardBoxBottom 卡片显示区域底部 Y 坐标
+	RewardPanelCardBoxBottom = 290.0
+
+	// RewardPanelCardBoxWidth 卡片显示区域宽度（自动计算）
+	RewardPanelCardBoxWidth = RewardPanelCardBoxRight - RewardPanelCardBoxLeft // 200 像素
+
+	// RewardPanelCardBoxHeight 卡片显示区域高度（自动计算）
+	RewardPanelCardBoxHeight = RewardPanelCardBoxBottom - RewardPanelCardBoxTop // 180 像素
+
 	// ========== 文字描述框坐标范围配置 ==========
 	// 用于显示植物/工具名称和描述的文本框区域
 	// 坐标为绝对像素值（相对于 800x600 背景）
 
 	// RewardPanelDescBoxLeft 描述框左边界 X 坐标
-	RewardPanelDescBoxLeft = 360.0
+	RewardPanelDescBoxLeft = 260.0
 
 	// RewardPanelDescBoxTop 描述框顶部 Y 坐标
-	RewardPanelDescBoxTop = 260.0
+	RewardPanelDescBoxTop = 360.0
 
 	// RewardPanelDescBoxRight 描述框右边界 X 坐标
 	RewardPanelDescBoxRight = 540.0

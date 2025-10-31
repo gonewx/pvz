@@ -322,8 +322,9 @@ func (rprs *RewardPanelRenderSystem) ensurePlantCardEntity(panelEntity ecs.Entit
 		cardEntity, panelEntity, panel.PlantID)
 }
 
-// calculateCardPosition 计算卡片的居中位置
-// 返回: (cardX, cardY) 屏幕坐标
+// calculateCardPosition 计算卡片在显示区域内的居中位置
+// 使用配置的卡片显示区域坐标，让卡片在区域内水平和垂直居中
+// 返回: (cardX, cardY) 屏幕坐标（卡片左上角）
 func (rprs *RewardPanelRenderSystem) calculateCardPosition(cardScale float64) (float64, float64) {
 	// 背景在屏幕上的偏移
 	bgWidth := config.RewardPanelBackgroundWidth
@@ -331,16 +332,22 @@ func (rprs *RewardPanelRenderSystem) calculateCardPosition(cardScale float64) (f
 	offsetX := (rprs.screenWidth - bgWidth) / 2
 	offsetY := (rprs.screenHeight - bgHeight) / 2
 
-	// 获取卡片原始尺寸（假设为固定值，可从资源获取）
+	// 获取配置的卡片显示区域（相对于背景图片）
+	boxLeft := offsetX + config.RewardPanelCardBoxLeft
+	boxTop := offsetY + config.RewardPanelCardBoxTop
+	boxWidth := config.RewardPanelCardBoxWidth
+	boxHeight := config.RewardPanelCardBoxHeight
+
+	// 获取卡片缩放后的尺寸
 	// SeedPacket_Larger.png 原始尺寸约为 100x140
 	cardOriginalWidth := 100.0
+	cardOriginalHeight := 140.0
 	cardWidth := cardOriginalWidth * cardScale
+	cardHeight := cardOriginalHeight * cardScale
 
-	// 自动计算水平居中位置
-	cardX := offsetX + (bgWidth-cardWidth)/2
-
-	// 从配置读取垂直位置比例
-	cardY := offsetY + bgHeight*config.RewardPanelCardYRatio
+	// 在显示区域内居中
+	cardX := boxLeft + (boxWidth-cardWidth)/2
+	cardY := boxTop + (boxHeight-cardHeight)/2
 
 	return cardX, cardY
 }
@@ -409,10 +416,10 @@ func (rprs *RewardPanelRenderSystem) drawToolIcon(screen *ebiten.Image, panel *c
 		return // 透明度太低时不绘制
 	}
 
-	// 加载铲子图片（使用高清版本）
-	shovelImage := rprs.resourceManager.GetImageByID("IMAGE_SHOVEL_HI_RES")
+	// 加载铲子图片（使用标准版本）
+	shovelImage := rprs.resourceManager.GetImageByID("IMAGE_SHOVEL")
 	if shovelImage == nil {
-		log.Printf("[RewardPanelRenderSystem] Warning: Failed to load IMAGE_SHOVEL_HI_RES")
+		log.Printf("[RewardPanelRenderSystem] Warning: Failed to load IMAGE_SHOVEL")
 		return
 	}
 
@@ -440,35 +447,60 @@ func (rprs *RewardPanelRenderSystem) drawToolIcon(screen *ebiten.Image, panel *c
 }
 
 // drawPlantInfo 绘制植物名称和描述。
-// 使用配置的描述框坐标范围 (360,260)-(540,470)，支持多行文本垂直居中。
+// 名称使用 RewardPanelPlantNameY 配置的位置（在卡片正下方）
+// 描述使用描述框坐标范围 (360,260)-(540,470)，支持多行文本垂直居中。
 func (rprs *RewardPanelRenderSystem) drawPlantInfo(screen *ebiten.Image, panel *components.RewardPanelComponent) {
-	if panel.FadeAlpha > 0.5 && rprs.plantInfoFont != nil {
-		// 使用配置的描述框坐标范围
-		boxLeft := config.RewardPanelDescBoxLeft
-		boxTop := config.RewardPanelDescBoxTop
+	if panel.FadeAlpha < 0.5 || rprs.plantInfoFont == nil {
+		return
+	}
+
+	// 使用配置中的背景尺寸和位置比例
+	bgWidth := config.RewardPanelBackgroundWidth
+	bgHeight := config.RewardPanelBackgroundHeight
+
+	// 计算背景在屏幕上的位置偏移
+	offsetX := (rprs.screenWidth - bgWidth) / 2
+	offsetY := (rprs.screenHeight - bgHeight) / 2
+
+	// 1. 绘制植物名称（在卡片正下方，使用 RewardPanelPlantNameY）
+	if panel.PlantName != "" {
+		nameX := offsetX + bgWidth/2                             // 背景中心X
+		nameY := offsetY + bgHeight*config.RewardPanelPlantNameY // 使用配置的Y位置
+
+		// 1.1 先绘制阴影（黑色，稍微偏移）
+		shadowOp := &text.DrawOptions{}
+		shadowOp.GeoM.Translate(nameX+2, nameY+2) // 阴影偏移2像素
+		shadowOp.PrimaryAlign = text.AlignCenter
+		shadowOp.SecondaryAlign = text.AlignStart
+		shadowOp.ColorScale.ScaleWithColor(color.RGBA{0, 0, 0, 128}) // 半透明黑色
+		shadowOp.ColorScale.ScaleAlpha(float32(panel.FadeAlpha))
+		text.Draw(screen, panel.PlantName, rprs.plantInfoFont, shadowOp)
+
+		// 1.2 再绘制主文字（金黄色）
+		nameOp := &text.DrawOptions{}
+		nameOp.GeoM.Translate(nameX, nameY)
+		nameOp.PrimaryAlign = text.AlignCenter                         // 水平居中
+		nameOp.SecondaryAlign = text.AlignStart                        // 垂直从上开始
+		nameOp.ColorScale.ScaleWithColor(config.RewardPanelPlantNameColor) // 金黄色
+		nameOp.ColorScale.ScaleAlpha(float32(panel.FadeAlpha))
+		text.Draw(screen, panel.PlantName, rprs.plantInfoFont, nameOp)
+	}
+
+	// 2. 绘制植物描述（在描述框内，垂直居中）
+	if panel.PlantDescription != "" {
+		// 使用配置的描述框坐标范围（相对于背景图片）
+		// 需要加上背景在屏幕上的偏移量
+		boxLeft := offsetX + config.RewardPanelDescBoxLeft
+		boxTop := offsetY + config.RewardPanelDescBoxTop
 		boxWidth := config.RewardPanelDescBoxWidth
 		boxHeight := config.RewardPanelDescBoxHeight
 
 		// 计算描述框中心X坐标（用于水平居中）
 		boxCenterX := boxLeft + boxWidth/2
 
-		// 合并名称和描述为完整文本（用换行分隔）
-		var fullText string
-		if panel.PlantName != "" && panel.PlantDescription != "" {
-			fullText = panel.PlantName + "\n" + panel.PlantDescription
-		} else if panel.PlantName != "" {
-			fullText = panel.PlantName
-		} else {
-			fullText = panel.PlantDescription
-		}
-
-		if fullText == "" {
-			return
-		}
-
 		// 使用 WrapText 进行自动换行（基于描述框宽度）
 		lines := utils.WrapText(
-			fullText,
+			panel.PlantDescription,
 			rprs.plantInfoFont,
 			boxWidth-20, // 留出左右边距各10像素
 		)
@@ -485,17 +517,8 @@ func (rprs *RewardPanelRenderSystem) drawPlantInfo(screen *ebiten.Image, panel *
 
 		// 绘制每一行
 		currentY := startY
-		for i, line := range lines {
-			// 判断是否是第一行（植物名称）
-			isName := i == 0 && panel.PlantName != ""
-
-			// 根据是否是名称选择不同颜色
-			textColor := config.RewardPanelDescriptionColor
-			if isName {
-				textColor = config.RewardPanelPlantNameColor
-			}
-
-			// 1. 先绘制阴影（黑色，稍微偏移）
+		for _, line := range lines {
+			// 2.1 先绘制阴影（黑色，稍微偏移）
 			shadowOp := &text.DrawOptions{}
 			shadowOp.GeoM.Translate(boxCenterX+2, currentY+2) // 阴影偏移2像素
 			shadowOp.PrimaryAlign = text.AlignCenter
@@ -504,14 +527,14 @@ func (rprs *RewardPanelRenderSystem) drawPlantInfo(screen *ebiten.Image, panel *
 			shadowOp.ColorScale.ScaleAlpha(float32(panel.FadeAlpha))
 			text.Draw(screen, line, rprs.plantInfoFont, shadowOp)
 
-			// 2. 再绘制主文字
-			op := &text.DrawOptions{}
-			op.GeoM.Translate(boxCenterX, currentY)
-			op.PrimaryAlign = text.AlignCenter  // 水平居中
-			op.SecondaryAlign = text.AlignStart // 垂直从上开始
-			op.ColorScale.ScaleWithColor(textColor)
-			op.ColorScale.ScaleAlpha(float32(panel.FadeAlpha))
-			text.Draw(screen, line, rprs.plantInfoFont, op)
+			// 2.2 再绘制主文字（深蓝黑色）
+			descOp := &text.DrawOptions{}
+			descOp.GeoM.Translate(boxCenterX, currentY)
+			descOp.PrimaryAlign = text.AlignCenter                              // 水平居中
+			descOp.SecondaryAlign = text.AlignStart                             // 垂直从上开始
+			descOp.ColorScale.ScaleWithColor(config.RewardPanelDescriptionColor) // 深蓝黑色
+			descOp.ColorScale.ScaleAlpha(float32(panel.FadeAlpha))
+			text.Draw(screen, line, rprs.plantInfoFont, descOp)
 
 			// 移动到下一行
 			currentY += config.RewardPanelDescriptionLineSpacing
