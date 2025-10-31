@@ -1051,25 +1051,20 @@ func (ras *RewardAnimationSystem) Draw(screen *ebiten.Image) {
 			}
 		}
 
-		// 工具奖励：渲染工具图标
+		// 工具奖励：渲染工具图标（不应用缩放）
 		if sprite, ok := ecs.GetComponent[*components.SpriteComponent](ras.entityManager, ras.rewardEntity); ok {
 			if pos, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.rewardEntity); ok {
-				if rewardComp, ok := ecs.GetComponent[*components.RewardAnimationComponent](ras.entityManager, ras.rewardEntity); ok {
-					if sprite.Image != nil {
-						op := &ebiten.DrawImageOptions{}
+				if sprite.Image != nil {
+					op := &ebiten.DrawImageOptions{}
 
-						// 居中图片
-						bounds := sprite.Image.Bounds()
-						op.GeoM.Translate(-float64(bounds.Dx())/2, -float64(bounds.Dy())/2)
+					// 居中图片
+					bounds := sprite.Image.Bounds()
+					op.GeoM.Translate(-float64(bounds.Dx())/2, -float64(bounds.Dy())/2)
 
-						// 应用缩放（与植物卡片相同的缩放逻辑）
-						op.GeoM.Scale(rewardComp.Scale, rewardComp.Scale)
+					// 移动到位置（屏幕坐标，不应用缩放）
+					op.GeoM.Translate(pos.X, pos.Y)
 
-						// 移动到位置（屏幕坐标）
-						op.GeoM.Translate(pos.X, pos.Y)
-
-						screen.DrawImage(sprite.Image, op)
-					}
+					screen.DrawImage(sprite.Image, op)
 				}
 			}
 		}
