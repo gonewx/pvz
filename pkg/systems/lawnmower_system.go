@@ -221,10 +221,9 @@ func (s *LawnmowerSystem) checkZombieCollisions() {
 				// Story 10.3: 除草车碾压僵尸，触发死亡动画
 				// 不再直接删除，而是播放死亡动画和粒子效果
 
-				// 增加已消灭僵尸计数
-				if s.gameState != nil {
-					s.gameState.IncrementZombiesKilled()
-				}
+				// 注意：不在这里调用 IncrementZombiesKilled()
+				// 计数统一在 BehaviorSystem.handleZombieDyingBehavior() 中进行
+				// 避免重复计数（除草车触发一次 + 死亡动画完成一次）
 
 				log.Printf("[LawnmowerSystem] Lawnmower on lane %d killed zombie at (%.1f, %.1f)",
 					lawnmower.Lane, zombiePos.X, zombiePos.Y)
