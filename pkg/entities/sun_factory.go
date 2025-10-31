@@ -29,6 +29,18 @@ func NewSunEntityStatic(manager *ecs.EntityManager, rm *game.ResourceManager, x,
 	return newSunEntityInternal(manager, rm, x, y, y, components.SunLanded)
 }
 
+// NewPlantSunEntity 创建向日葵生产的阳光实体（抛物线运动）
+// 参数:
+//   - manager: EntityManager 实例
+//   - rm: ResourceManager 实例
+//   - startX, startY: 起始位置（向日葵中心）
+//   - targetX, targetY: 目标位置（落地点）
+//
+// 返回: 创建的实体ID
+func NewPlantSunEntity(manager *ecs.EntityManager, rm *game.ResourceManager, startX, startY, targetX, targetY float64) ecs.EntityID {
+	return newSunEntityInternal(manager, rm, startX, startY, targetY, components.SunRising)
+}
+
 // newSunEntityInternal 内部函数，创建阳光实体
 func newSunEntityInternal(manager *ecs.EntityManager, rm *game.ResourceManager, startX, startY, targetY float64, initialState components.SunState) ecs.EntityID {
 	// 创建实体

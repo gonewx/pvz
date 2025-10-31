@@ -416,51 +416,51 @@ func TestParseValue_ZombieHeadFormats(t *testing.T) {
 // TestParseRangeValue 测试 ParseRangeValue 函数的各种格式
 func TestParseRangeValue(t *testing.T) {
 	tests := []struct {
-		name              string
-		input             string
-		expectInitialMin  float64
-		expectInitialMax  float64
-		expectMinKeyframe bool // 是否期望有最小值关键帧
+		name                string
+		input               string
+		expectInitialMin    float64
+		expectInitialMax    float64
+		expectMinKeyframe   bool // 是否期望有最小值关键帧
 		expectWidthKeyframe bool // 是否期望有宽度关键帧
 	}{
 		{
-			name:             "固定值",
-			input:            "100",
-			expectInitialMin: 100,
-			expectInitialMax: 100,
-			expectMinKeyframe: false,
+			name:                "固定值",
+			input:               "100",
+			expectInitialMin:    100,
+			expectInitialMax:    100,
+			expectMinKeyframe:   false,
 			expectWidthKeyframe: false,
 		},
 		{
-			name:             "单范围 - 对称",
-			input:            "[10 20]",
-			expectInitialMin: 10,
-			expectInitialMax: 20,
-			expectMinKeyframe: false,
+			name:                "单范围 - 对称",
+			input:               "[10 20]",
+			expectInitialMin:    10,
+			expectInitialMax:    20,
+			expectMinKeyframe:   false,
 			expectWidthKeyframe: false,
 		},
 		{
-			name:             "单范围 - 负数",
-			input:            "[-130 0]",
-			expectInitialMin: -130,
-			expectInitialMax: 0,
-			expectMinKeyframe: false,
+			name:                "单范围 - 负数",
+			input:               "[-130 0]",
+			expectInitialMin:    -130,
+			expectInitialMax:    0,
+			expectMinKeyframe:   false,
 			expectWidthKeyframe: false,
 		},
 		{
-			name:             "双范围 - 对称范围",
-			input:            "[0 25] [0 1]",
-			expectInitialMin: 0,
-			expectInitialMax: 25,
-			expectMinKeyframe: true,
+			name:                "双范围 - 对称范围",
+			input:               "[0 25] [0 1]",
+			expectInitialMin:    0,
+			expectInitialMax:    25,
+			expectMinKeyframe:   true,
 			expectWidthKeyframe: true,
 		},
 		{
-			name:             "双范围 - 负数非对称范围（SodRoll.xml 实际案例）",
-			input:            "[-130 0] [-100 0]",
-			expectInitialMin: -130,
-			expectInitialMax: 0,
-			expectMinKeyframe: true,
+			name:                "双范围 - 负数非对称范围（SodRoll.xml 实际案例）",
+			input:               "[-130 0] [-100 0]",
+			expectInitialMin:    -130,
+			expectInitialMax:    0,
+			expectMinKeyframe:   true,
 			expectWidthKeyframe: true,
 		},
 	}
@@ -600,4 +600,3 @@ func TestParseRangeValue_AllNegative(t *testing.T) {
 		t.Errorf("单范围不应该有关键帧，但得到 min=%d, width=%d", len(minKf), len(widthKf))
 	}
 }
-

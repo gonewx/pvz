@@ -60,8 +60,8 @@ type EmitterComponent struct {
 	SpawnMaxLaunchedInterp    string
 
 	// Emitter area properties (发射区域)
-	EmitterBoxX   float64 // Horizontal spawn area size (width, max - min)
-	EmitterBoxY   float64 // Vertical spawn area size (height, max - min)
+	EmitterBoxX    float64 // Horizontal spawn area size (width, max - min)
+	EmitterBoxY    float64 // Vertical spawn area size (height, max - min)
 	EmitterBoxXMin float64 // Horizontal spawn area minimum (for asymmetric ranges)
 	EmitterBoxYMin float64 // Vertical spawn area minimum (for asymmetric ranges)
 	EmitterRadius  float64 // Deprecated: Use EmitterRadiusMin/Max instead (保留用于向后兼容)

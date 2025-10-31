@@ -43,17 +43,17 @@ func TestSpawnRate0_OneShotMode(t *testing.T) {
 	}
 
 	emitterComp := &components.EmitterComponent{
-		Config:          &emitterConfig,
-		Active:          true,
-		Age:             0,
-		SystemDuration:  0.3,  // 0.3 秒
-		NextSpawnTime:   0,
-		ActiveParticles: make([]ecs.EntityID, 0),
-		TotalLaunched:   0,
-		SpawnRate:       0,    // SpawnRate=0
-		SpawnMinActive:  8,    // 保持 8 个粒子活跃
-		SpawnMaxActive:  0,    // 未配置
-		SpawnMaxLaunched: 0,   // 未配置（关键：这个字段应该默认等于 SpawnMinActive）
+		Config:           &emitterConfig,
+		Active:           true,
+		Age:              0,
+		SystemDuration:   0.3, // 0.3 秒
+		NextSpawnTime:    0,
+		ActiveParticles:  make([]ecs.EntityID, 0),
+		TotalLaunched:    0,
+		SpawnRate:        0, // SpawnRate=0
+		SpawnMinActive:   8, // 保持 8 个粒子活跃
+		SpawnMaxActive:   0, // 未配置
+		SpawnMaxLaunched: 0, // 未配置（关键：这个字段应该默认等于 SpawnMinActive）
 	}
 	em.AddComponent(emitterID, emitterComp)
 
@@ -141,10 +141,10 @@ func TestSpawnRate0_ContinuousMode(t *testing.T) {
 		NextSpawnTime:    0,
 		ActiveParticles:  make([]ecs.EntityID, 0),
 		TotalLaunched:    0,
-		SpawnRate:        0,   // SpawnRate=0
-		SpawnMinActive:   8,   // 保持 8 个粒子活跃
-		SpawnMaxActive:   0,   // 未配置
-		SpawnMaxLaunched: 20,  // 总共最多发射 20 个
+		SpawnRate:        0,  // SpawnRate=0
+		SpawnMinActive:   8,  // 保持 8 个粒子活跃
+		SpawnMaxActive:   0,  // 未配置
+		SpawnMaxLaunched: 20, // 总共最多发射 20 个
 	}
 	em.AddComponent(emitterID, emitterComp)
 

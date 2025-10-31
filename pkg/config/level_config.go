@@ -37,13 +37,25 @@ type LevelConfig struct {
 	FlagWaves []int `yaml:"flagWaves"` // 旗帜波次索引列表（从0开始），如 [9, 19] 表示第10波和第20波有旗帜，默认为空
 
 	// Story 11.4：铺草皮粒子特效配置
-	SodRollAnimation bool `yaml:"sodRollAnimation"` // 是否启用铺草皮动画，默认 false
-	SodRollParticles bool `yaml:"sodRollParticles"` // 是否启用土粒飞溅特效，默认 false
+	SodRollAnimation bool  `yaml:"sodRollAnimation"` // 是否启用铺草皮动画，默认 false
+	SodRollParticles bool  `yaml:"sodRollParticles"` // 是否启用土粒飞溅特效，默认 false
 	SoddingAnimLanes []int `yaml:"soddingAnimLanes"` // 指定播放动画的行列表（如 [2,4]），空表示所有启用的行
 	PreSoddedLanes   []int `yaml:"preSoddedLanes"`   // 预先渲染草皮的行列表（如 [3]），初始化时直接显示草皮
 
 	// Story 8.6 新增字段
 	UnlockTools []string `yaml:"unlockTools"` // 完成本关解锁的工具列表，如 ["shovel"]，默认为空
+
+	// Story 8.7 新增字段：僵尸行转换模式
+	// 取值："instant" (瞬间) 或 "gradual" (渐变)，默认 "instant"
+	//
+	// 控制僵尸从非有效行转移到目标有效行时的转换方式：
+	//   - "instant": 瞬间模式 - 僵尸立即调整Y坐标到目标行（无动画）
+	//   - "gradual": 渐变模式 - 僵尸通过Y轴速度平滑移动到目标行（约3秒）
+	//
+	// 适用场景：
+	//   - "instant": 标准关卡（推荐）
+	//   - "gradual": 需要视觉过渡效果的特殊关卡
+	LaneTransitionMode string `yaml:"laneTransitionMode"`
 }
 
 // TutorialStep 教学步骤配置（Story 8.2）
@@ -59,21 +71,21 @@ type TutorialStep struct {
 // 定义了僵尸波次的触发条件和生成的僵尸列表
 // Story 8.6 扩展：支持旗帜波次和混合僵尸生成
 type WaveConfig struct {
-	Delay         float64        `yaml:"delay"`         // 游戏开始后延迟（第1波使用），单位：秒
-	MinDelay      float64        `yaml:"minDelay"`      // 上一波消灭后最小延迟（秒），默认 0（立即触发）
-	IsFlag        bool           `yaml:"isFlag"`        // 是否为旗帜波次（Story 8.6）
-	FlagIndex     int            `yaml:"flagIndex"`     // 旗帜索引（第几面旗帜），从1开始（Story 8.6）
-	Zombies       []ZombieGroup  `yaml:"zombies"`       // 本波次要生成的僵尸组列表（Story 8.6 使用 ZombieGroup）
-	OldZombies    []ZombieSpawn  `yaml:"oldZombies"`    // 兼容旧格式：单个僵尸生成配置（已废弃，向后兼容）
+	Delay      float64       `yaml:"delay"`      // 游戏开始后延迟（第1波使用），单位：秒
+	MinDelay   float64       `yaml:"minDelay"`   // 上一波消灭后最小延迟（秒），默认 0（立即触发）
+	IsFlag     bool          `yaml:"isFlag"`     // 是否为旗帜波次（Story 8.6）
+	FlagIndex  int           `yaml:"flagIndex"`  // 旗帜索引（第几面旗帜），从1开始（Story 8.6）
+	Zombies    []ZombieGroup `yaml:"zombies"`    // 本波次要生成的僵尸组列表（Story 8.6 使用 ZombieGroup）
+	OldZombies []ZombieSpawn `yaml:"oldZombies"` // 兼容旧格式：单个僵尸生成配置（已废弃，向后兼容）
 }
 
 // ZombieGroup 僵尸组配置（Story 8.6 新增）
 // 支持随机行选择和逐个生成
 type ZombieGroup struct {
-	Type          string   `yaml:"type"`          // 僵尸类型："basic", "conehead", "buckethead"
-	Lanes         []int    `yaml:"lanes"`         // 可出现的行列表（随机选择），如 [2,3,4]
-	Count         int      `yaml:"count"`         // 数量
-	SpawnInterval float64  `yaml:"spawnInterval"` // 生成间隔（秒），逐个生成
+	Type          string  `yaml:"type"`          // 僵尸类型："basic", "conehead", "buckethead"
+	Lanes         []int   `yaml:"lanes"`         // 可出现的行列表（随机选择），如 [2,3,4]
+	Count         int     `yaml:"count"`         // 数量
+	SpawnInterval float64 `yaml:"spawnInterval"` // 生成间隔（秒），逐个生成
 }
 
 // ZombieSpawn 单个僵尸生成配置（旧格式，向后兼容）

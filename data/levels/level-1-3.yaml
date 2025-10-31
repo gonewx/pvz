@@ -12,6 +12,9 @@ availablePlants:              # 可用植物
 skipOpening: false            # 不跳过开场
 initialSun: 50                # 初始阳光50
 
+# Story 8.7: 僵尸行转换模式
+laneTransitionMode: "instant" # 瞬间模式：僵尸立即调整到有效行（无动画）
+
 # Story 8.3: 奖励配置
 rewardPlant: "wallnut"        # 完成后解锁坚果墙
 

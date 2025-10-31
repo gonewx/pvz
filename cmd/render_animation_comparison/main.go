@@ -28,11 +28,11 @@ const (
 )
 
 type Game struct {
-	reanimXML              *reanim.ReanimXML
-	partImages             map[string]*ebiten.Image
-	mergedTracks           map[string][]reanim.Frame
-	visualTracks           []string
-	visibleFrameIndices    []int // anim_shooting 时间窗口
+	reanimXML               *reanim.ReanimXML
+	partImages              map[string]*ebiten.Image
+	mergedTracks            map[string][]reanim.Frame
+	visualTracks            []string
+	visibleFrameIndices     []int // anim_shooting 时间窗口
 	idleVisibleFrameIndices []int // anim_idle 时间窗口
 
 	currentFrame int
@@ -51,21 +51,21 @@ func NewGame() (*Game, error) {
 	// 加载部件图片 - 使用 reanim 文件中实际的键名
 	partImages := make(map[string]*ebiten.Image)
 	imageFiles := map[string]string{
-		"IMAGE_REANIM_PEASHOOTER_BACKLEAF":            "assets/reanim/PeaShooter_backleaf.png",
-		"IMAGE_REANIM_PEASHOOTER_BACKLEAF_LEFTTIP":    "assets/reanim/PeaShooter_backleaf_lefttip.png",
-		"IMAGE_REANIM_PEASHOOTER_BACKLEAF_RIGHTTIP":   "assets/reanim/PeaShooter_backleaf_righttip.png",
-		"IMAGE_REANIM_PEASHOOTER_FRONTLEAF":           "assets/reanim/PeaShooter_frontleaf.png",
-		"IMAGE_REANIM_PEASHOOTER_FRONTLEAF_LEFTTIP":   "assets/reanim/PeaShooter_frontleaf_lefttip.png",
-		"IMAGE_REANIM_PEASHOOTER_FRONTLEAF_RIGHTTIP":  "assets/reanim/PeaShooter_frontleaf_righttip.png",
-		"IMAGE_REANIM_PEASHOOTER_STALK_BOTTOM":        "assets/reanim/PeaShooter_stalk_bottom.png",
-		"IMAGE_REANIM_PEASHOOTER_STALK_TOP":           "assets/reanim/PeaShooter_stalk_top.png",
-		"IMAGE_REANIM_PEASHOOTER_HEAD":                "assets/reanim/PeaShooter_Head.png",
-		"IMAGE_REANIM_PEASHOOTER_MOUTH":               "assets/reanim/PeaShooter_mouth.png",
-		"IMAGE_REANIM_PEASHOOTER_BLINK1":              "assets/reanim/PeaShooter_blink1.png",
-		"IMAGE_REANIM_PEASHOOTER_BLINK2":              "assets/reanim/PeaShooter_blink2.png",
-		"IMAGE_REANIM_ANIM_SPROUT":                    "assets/reanim/PeaShooter_sprout.png",
-		"IMAGE_REANIM_PEASHOOTER_HEADLEAF_NEAREST":    "assets/reanim/PeaShooter_headleaf_nearest.png",
-		"IMAGE_REANIM_PEASHOOTER_HEADLEAF_FARTHEST":   "assets/reanim/PeaShooter_headleaf_farthest.png",
+		"IMAGE_REANIM_PEASHOOTER_BACKLEAF":             "assets/reanim/PeaShooter_backleaf.png",
+		"IMAGE_REANIM_PEASHOOTER_BACKLEAF_LEFTTIP":     "assets/reanim/PeaShooter_backleaf_lefttip.png",
+		"IMAGE_REANIM_PEASHOOTER_BACKLEAF_RIGHTTIP":    "assets/reanim/PeaShooter_backleaf_righttip.png",
+		"IMAGE_REANIM_PEASHOOTER_FRONTLEAF":            "assets/reanim/PeaShooter_frontleaf.png",
+		"IMAGE_REANIM_PEASHOOTER_FRONTLEAF_LEFTTIP":    "assets/reanim/PeaShooter_frontleaf_lefttip.png",
+		"IMAGE_REANIM_PEASHOOTER_FRONTLEAF_RIGHTTIP":   "assets/reanim/PeaShooter_frontleaf_righttip.png",
+		"IMAGE_REANIM_PEASHOOTER_STALK_BOTTOM":         "assets/reanim/PeaShooter_stalk_bottom.png",
+		"IMAGE_REANIM_PEASHOOTER_STALK_TOP":            "assets/reanim/PeaShooter_stalk_top.png",
+		"IMAGE_REANIM_PEASHOOTER_HEAD":                 "assets/reanim/PeaShooter_Head.png",
+		"IMAGE_REANIM_PEASHOOTER_MOUTH":                "assets/reanim/PeaShooter_mouth.png",
+		"IMAGE_REANIM_PEASHOOTER_BLINK1":               "assets/reanim/PeaShooter_blink1.png",
+		"IMAGE_REANIM_PEASHOOTER_BLINK2":               "assets/reanim/PeaShooter_blink2.png",
+		"IMAGE_REANIM_ANIM_SPROUT":                     "assets/reanim/PeaShooter_sprout.png",
+		"IMAGE_REANIM_PEASHOOTER_HEADLEAF_NEAREST":     "assets/reanim/PeaShooter_headleaf_nearest.png",
+		"IMAGE_REANIM_PEASHOOTER_HEADLEAF_FARTHEST":    "assets/reanim/PeaShooter_headleaf_farthest.png",
 		"IMAGE_REANIM_PEASHOOTER_HEADLEAF_2RDFARTHEST": "assets/reanim/PeaShooter_headleaf_2rdfarthest.png",
 		"IMAGE_REANIM_PEASHOOTER_HEADLEAF_3RDFARTHEST": "assets/reanim/PeaShooter_headleaf_3rdfarthest.png",
 	}
@@ -167,14 +167,14 @@ func NewGame() (*Game, error) {
 		idleVisibleFrameIndices[0], idleVisibleFrameIndices[len(idleVisibleFrameIndices)-1], len(idleVisibleFrameIndices))
 
 	return &Game{
-		reanimXML:              reanimXML,
-		partImages:             partImages,
-		mergedTracks:           mergedTracks,
-		visualTracks:           visualTracks,
-		visibleFrameIndices:    visibleFrameIndices,
+		reanimXML:               reanimXML,
+		partImages:              partImages,
+		mergedTracks:            mergedTracks,
+		visualTracks:            visualTracks,
+		visibleFrameIndices:     visibleFrameIndices,
 		idleVisibleFrameIndices: idleVisibleFrameIndices,
-		currentFrame:           0,
-		totalFrames:            len(visibleFrameIndices),
+		currentFrame:            0,
+		totalFrames:             len(visibleFrameIndices),
 	}, nil
 }
 
@@ -303,11 +303,11 @@ func (g *Game) renderWithDualAnimation(canvas *ebiten.Image, physicalIndex int) 
 
 	// 定义哪些轨道属于"头部动画"（应该使用 anim_shooting）
 	headTracks := map[string]bool{
-		"anim_face":         true,
-		"idle_mouth":        true,
-		"anim_blink":        true, // 眨眼动画
-		"idle_shoot_blink":  true, // 射击时眨眼
-		"anim_sprout":       true,
+		"anim_face":        true,
+		"idle_mouth":       true,
+		"anim_blink":       true, // 眨眼动画
+		"idle_shoot_blink": true, // 射击时眨眼
+		"anim_sprout":      true,
 	}
 
 	// 计算 anim_idle 对应的物理帧（循环播放）

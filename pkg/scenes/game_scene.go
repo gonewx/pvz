@@ -1703,33 +1703,32 @@ func (s *GameScene) drawGridDebug(screen *ebiten.Image) {
 
 		// Story 8.2 QA：调试可视化（临时启用以调试粒子）
 
-			// 绘制草皮边界（红色矩形框，不填充）
-			sodColor := color.RGBA{R: 255, G: 0, B: 0, A: 128} // 半透明红色
-			thickness := 2.0
-			// 顶边
-			ebitenutil.DrawRect(screen, sodScreenX, sodScreenY, sodWidth, thickness, sodColor)
-			// 底边
-			ebitenutil.DrawRect(screen, sodScreenX, sodScreenY+sodHeight-thickness, sodWidth, thickness, sodColor)
-			// 左边
-			ebitenutil.DrawRect(screen, sodScreenX, sodScreenY, thickness, sodHeight, sodColor)
-			// 右边
-			ebitenutil.DrawRect(screen, sodScreenX+sodWidth-thickness, sodScreenY, thickness, sodHeight, sodColor)
+		// 绘制草皮边界（红色矩形框，不填充）
+		sodColor := color.RGBA{R: 255, G: 0, B: 0, A: 128} // 半透明红色
+		thickness := 2.0
+		// 顶边
+		ebitenutil.DrawRect(screen, sodScreenX, sodScreenY, sodWidth, thickness, sodColor)
+		// 底边
+		ebitenutil.DrawRect(screen, sodScreenX, sodScreenY+sodHeight-thickness, sodWidth, thickness, sodColor)
+		// 左边
+		ebitenutil.DrawRect(screen, sodScreenX, sodScreenY, thickness, sodHeight, sodColor)
+		// 右边
+		ebitenutil.DrawRect(screen, sodScreenX+sodWidth-thickness, sodScreenY, thickness, sodHeight, sodColor)
 
-			// 绘制草皮卷中心位置标记（绿色十字）
-			if s.soddingSystem != nil && s.soddingSystem.IsPlaying() {
-				sodRollCenterX := s.soddingSystem.GetSodRollCenterX()
-				sodRollScreenX := sodRollCenterX - s.cameraX
+		// 绘制草皮卷中心位置标记（绿色十字）
+		if s.soddingSystem != nil && s.soddingSystem.IsPlaying() {
+			sodRollCenterX := s.soddingSystem.GetSodRollCenterX()
+			sodRollScreenX := sodRollCenterX - s.cameraX
 
-				// 绘制绿色十字标记（中心位置）
-				crossSize := 10.0
-				crossColor := color.RGBA{R: 0, G: 255, B: 0, A: 255}
-				// 竖线
-				ebitenutil.DrawRect(screen, sodRollScreenX-1, sodScreenY-crossSize, 2, sodHeight+crossSize*2, crossColor)
-				// 横线（在草皮中间）
-				midY := sodScreenY + sodHeight/2.0
-				ebitenutil.DrawRect(screen, sodRollScreenX-crossSize, midY-1, crossSize*2, 2, crossColor)
-			}
-
+			// 绘制绿色十字标记（中心位置）
+			crossSize := 10.0
+			crossColor := color.RGBA{R: 0, G: 255, B: 0, A: 255}
+			// 竖线
+			ebitenutil.DrawRect(screen, sodRollScreenX-1, sodScreenY-crossSize, 2, sodHeight+crossSize*2, crossColor)
+			// 横线（在草皮中间）
+			midY := sodScreenY + sodHeight/2.0
+			ebitenutil.DrawRect(screen, sodRollScreenX-crossSize, midY-1, crossSize*2, 2, crossColor)
+		}
 
 		// 详细调试信息
 		debugInfo := fmt.Sprintf("Sod: world(%.0f,%.0f) screen(%.0f,%.0f) size(%.0fx%.0f) cam(%.0f)",

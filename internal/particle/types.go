@@ -69,7 +69,7 @@ type EmitterConfig struct {
 
 	// Story 10.4 修复：SystemField 应该是 Field 结构体，而不是 string
 	// SystemPosition 控制发射器位置随时间变化（如 SodRoll 从左往右滚动）
-	SystemFields   []Field `xml:"SystemField"`              // System-wide field effects (如 SystemPosition)
+	SystemFields []Field `xml:"SystemField"` // System-wide field effects (如 SystemPosition)
 
 	// Image properties (贴图配置)
 	Image         string `xml:"Image,omitempty"`         // Resource ID of the particle texture

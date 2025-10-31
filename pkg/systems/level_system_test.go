@@ -169,7 +169,7 @@ func TestIsFinalWaveApproaching(t *testing.T) {
 		{
 			name:                  "最后一波前 2 秒（应触发）",
 			currentWaveIndex:      2,
-			levelTime:             53.0,  // 上一波完成于 50 秒
+			levelTime:             53.0, // 上一波完成于 50 秒
 			lastWaveCompletedTime: 50.0,
 			isWaitingForNextWave:  true,
 			waves: []config.WaveConfig{
@@ -290,7 +290,7 @@ func TestCheckFinalWaveWarningTriggerOnce(t *testing.T) {
 	// 创建 GameState
 	gs := &game.GameState{
 		CurrentWaveIndex:      2,
-		LevelTime:             53.0,  // 恰好满足触发条件
+		LevelTime:             53.0, // 恰好满足触发条件
 		LastWaveCompletedTime: 50.0,
 		IsWaitingForNextWave:  true,
 		CurrentLevel: &config.LevelConfig{
@@ -341,4 +341,3 @@ func TestCheckFinalWaveWarningTriggerOnce(t *testing.T) {
 		t.Errorf("第二次检查后，finalWaveWarningTriggered 应该仍为 true 且不变")
 	}
 }
-

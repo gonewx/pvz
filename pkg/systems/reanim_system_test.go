@@ -681,7 +681,7 @@ func TestGetTrackTransform(t *testing.T) {
 
 		// 创建测试用的 Reanim 组件
 		reanimComp := &components.ReanimComponent{
-			CurrentAnim: "test_anim",
+			CurrentAnim:  "test_anim",
 			CurrentFrame: 2, // 使用第3帧（0-based）
 			MergedTracks: map[string][]reanim.Frame{
 				"idle_mouth": {
@@ -717,7 +717,7 @@ func TestGetTrackTransform(t *testing.T) {
 	t.Run("Track not found", func(t *testing.T) {
 		entityID := em.CreateEntity()
 		reanimComp := &components.ReanimComponent{
-			CurrentAnim: "test_anim",
+			CurrentAnim:  "test_anim",
 			CurrentFrame: 0,
 			MergedTracks: map[string][]reanim.Frame{
 				"other_track": {
@@ -757,7 +757,7 @@ func TestGetTrackTransform(t *testing.T) {
 	t.Run("Frame index out of bounds", func(t *testing.T) {
 		entityID := em.CreateEntity()
 		reanimComp := &components.ReanimComponent{
-			CurrentAnim: "test_anim",
+			CurrentAnim:  "test_anim",
 			CurrentFrame: 100, // 超出范围
 			MergedTracks: map[string][]reanim.Frame{
 				"idle_mouth": {
@@ -786,7 +786,7 @@ func TestGetTrackTransform(t *testing.T) {
 	t.Run("Nil coordinates", func(t *testing.T) {
 		entityID := em.CreateEntity()
 		reanimComp := &components.ReanimComponent{
-			CurrentAnim: "test_anim",
+			CurrentAnim:  "test_anim",
 			CurrentFrame: 0,
 			MergedTracks: map[string][]reanim.Frame{
 				"idle_mouth": {
@@ -813,7 +813,7 @@ func TestGetTrackTransform(t *testing.T) {
 	t.Run("Track with no frames", func(t *testing.T) {
 		entityID := em.CreateEntity()
 		reanimComp := &components.ReanimComponent{
-			CurrentAnim: "test_anim",
+			CurrentAnim:  "test_anim",
 			CurrentFrame: 0,
 			MergedTracks: map[string][]reanim.Frame{
 				"idle_mouth": {}, // 空轨道
@@ -837,12 +837,12 @@ func TestGetTrackTransform(t *testing.T) {
 func containsString(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
 		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-		func() bool {
-			for i := 0; i <= len(s)-len(substr); i++ {
-				if s[i:i+len(substr)] == substr {
-					return true
+			func() bool {
+				for i := 0; i <= len(s)-len(substr); i++ {
+					if s[i:i+len(substr)] == substr {
+						return true
+					}
 				}
-			}
-			return false
-		}()))
+				return false
+			}()))
 }

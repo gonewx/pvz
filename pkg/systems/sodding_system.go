@@ -47,7 +47,7 @@ type SoddingSystem struct {
 
 	// Story 11.4: 粒子发射器相关
 	sodRollEmitterIDs []ecs.EntityID // Story 8.6 QA修正: 每行一个粒子发射器
-	particlesEnabled  bool            // 是否启用粒子特效
+	particlesEnabled  bool           // 是否启用粒子特效
 }
 
 // NewSoddingSystem 创建铺草皮动画系统
@@ -468,6 +468,7 @@ func (s *SoddingSystem) calculateCurrentCenterX() float64 {
 // 参数:
 //   - entityID: 草皮卷实体ID
 //   - lane: 行号（用于日志）
+//
 // 返回: 粒子发射器实体ID，失败返回0
 func (s *SoddingSystem) createSodRollParticleEmitterForEntity(entityID ecs.EntityID, lane int) ecs.EntityID {
 	// 计算粒子发射器位置
@@ -518,9 +519,9 @@ func (s *SoddingSystem) createSodRollParticleEmitterForEntity(entityID ecs.Entit
 	emitterID, err := entities.CreateParticleEffect(
 		s.entityManager,
 		s.resourceManager,
-		"SodRoll",  // 粒子配置名称
-		particleX,  // 起始位置X
-		particleY,  // 起始位置Y（草皮卷视觉中心）
+		"SodRoll", // 粒子配置名称
+		particleX, // 起始位置X
+		particleY, // 起始位置Y（草皮卷视觉中心）
 	)
 
 	if err != nil {

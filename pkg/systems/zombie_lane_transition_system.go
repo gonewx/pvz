@@ -88,33 +88,114 @@ func (s *ZombieLaneTransitionSystem) Update(deltaTime float64) {
 		// 必须与僵尸工厂函数的Y坐标计算公式保持一致
 		targetY := config.GridWorldStartY + float64(targetLaneComp.TargetRow)*config.CellHeight + config.CellHeight/2.0 + config.ZombieVerticalOffset
 
-		// Story 8.3: 如果僵尸还没有Y轴速度（刚激活），计算并设置Y轴速度
-		vel, hasVel := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID)
-		if hasVel && vel.VY == 0 && math.Abs(pos.Y-targetY) > LaneTransitionTolerance {
-			// 计算到达目标行所需的Y轴速度
-			// 假设需要在3秒内到达目标行
-			deltaY := targetY - pos.Y
-			vySpeed := deltaY / 3.0
-			vel.VY = vySpeed
-			log.Printf("[ZombieLaneTransitionSystem] Initialized zombie %d VY speed: %.2f (deltaY=%.2f)",
-				entityID, vySpeed, deltaY)
-		}
+		// Story 8.7: 根据转换模式选择不同的处理逻辑
+		switch targetLaneComp.TransitionMode {
+		case components.TransitionModeInstant:
+			// 瞬间调整模式：立即设置Y坐标
+			s.handleInstantTransition(entityID, targetLaneComp, pos, targetY)
 
-		// 检查是否已到达目标行（Y坐标在容差范围内）
-		deltaY := math.Abs(pos.Y - targetY)
-		if deltaY <= LaneTransitionTolerance {
-			// 到达目标行
-			s.onReachedTargetLane(entityID, targetLaneComp, pos, targetY)
-			continue
-		}
+		case components.TransitionModeGradual:
+			// 渐变动画模式：保留原有逻辑
+			s.handleGradualTransition(entityID, targetLaneComp, pos, targetY)
 
-		// 还未到达，继续移动
-		// 这里只需要记录日志
-		if deltaY > 50 { // 只在距离较远时记录日志，避免刷屏
-			log.Printf("[ZombieLaneTransitionSystem] Zombie %d moving to target lane %d, current Y=%.2f, target Y=%.2f, delta=%.2f",
-				entityID, targetLaneComp.TargetRow+1, pos.Y, targetY, deltaY)
+		default:
+			// 默认使用瞬间模式（向后兼容）
+			s.handleInstantTransition(entityID, targetLaneComp, pos, targetY)
 		}
 	}
+}
+
+// handleGradualTransition 处理渐变行转换模式
+//
+// Story 8.7: 此方法完全保留 Story 8.3 的原有渐变动画逻辑
+//
+// 僵尸通过Y轴速度平滑移动到目标行（约3秒）
+//
+// 参数：
+//
+//	entityID - 僵尸实体ID
+//	targetLaneComp - 目标行组件
+//	pos - 位置组件
+//	targetY - 目标行的中心Y坐标
+func (s *ZombieLaneTransitionSystem) handleGradualTransition(
+	entityID ecs.EntityID,
+	targetLaneComp *components.ZombieTargetLaneComponent,
+	pos *components.PositionComponent,
+	targetY float64,
+) {
+	// Story 8.3 原逻辑：如果僵尸还没有Y轴速度（刚激活），计算并设置Y轴速度
+	vel, hasVel := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID)
+	if hasVel && vel.VY == 0 && math.Abs(pos.Y-targetY) > LaneTransitionTolerance {
+		// 计算到达目标行所需的Y轴速度
+		// 假设需要在3秒内到达目标行
+		deltaY := targetY - pos.Y
+		vySpeed := deltaY / 3.0
+		vel.VY = vySpeed
+		log.Printf("[ZombieLaneTransitionSystem] Initialized zombie %d VY speed: %.2f (mode=gradual, deltaY=%.2f)",
+			entityID, vySpeed, deltaY)
+	}
+
+	// 检查是否已到达目标行（Y坐标在容差范围内）
+	deltaY := math.Abs(pos.Y - targetY)
+	if deltaY <= LaneTransitionTolerance {
+		// 到达目标行
+		s.onReachedTargetLane(entityID, targetLaneComp, pos, targetY)
+		return
+	}
+
+	// 还未到达，继续移动
+	// 这里只需要记录日志
+	if deltaY > 50 { // 只在距离较远时记录日志，避免刷屏
+		log.Printf("[ZombieLaneTransitionSystem] Zombie %d moving to target lane %d (mode=gradual), current Y=%.2f, target Y=%.2f, delta=%.2f",
+			entityID, targetLaneComp.TargetRow+1, pos.Y, targetY, deltaY)
+	}
+}
+
+// handleInstantTransition 处理瞬间行转换模式
+//
+// Story 8.7: 僵尸立即调整Y坐标到目标行，无过渡动画
+//
+// 参数：
+//
+//	entityID - 僵尸实体ID
+//	targetLaneComp - 目标行组件
+//	pos - 位置组件
+//	targetY - 目标行的中心Y坐标
+func (s *ZombieLaneTransitionSystem) handleInstantTransition(
+	entityID ecs.EntityID,
+	targetLaneComp *components.ZombieTargetLaneComponent,
+	pos *components.PositionComponent,
+	targetY float64,
+) {
+	// 1. 瞬间调整Y坐标到目标行
+	pos.Y = targetY
+
+	log.Printf("[ZombieLaneTransitionSystem] Zombie %d instantly moved to target lane %d (mode=instant, Y=%.2f)",
+		entityID, targetLaneComp.TargetRow+1, targetY)
+
+	// 2. 标记已到达目标行
+	targetLaneComp.HasReachedTargetLane = true
+
+	// 3. 启动X轴移动（清除Y轴速度，设置X轴速度）
+	if vel, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID); ok {
+		vel.VY = 0
+
+		// 如果僵尸还没有X轴速度（说明之前暂停移动等待到达目标行）
+		// 启动向左移动
+		if vel.VX == 0 {
+			// 获取僵尸行为组件，确定僵尸类型
+			if behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID); ok {
+				// 根据僵尸类型设置移动速度
+				// 所有僵尸的基础速度都是 -23.0（向左移动）
+				vel.VX = -23.0
+				log.Printf("[ZombieLaneTransitionSystem] Started zombie %d movement (VX=-23.0, behavior=%d)",
+					entityID, behavior.Type)
+			}
+		}
+	}
+
+	// (可选) 移除 ZombieTargetLaneComponent 以节省内存（已完成任务）
+	// ecs.RemoveComponent[*components.ZombieTargetLaneComponent](s.entityManager, entityID)
 }
 
 // onReachedTargetLane 僵尸到达目标行时的处理

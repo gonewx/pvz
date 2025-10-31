@@ -653,9 +653,9 @@ func (s *TutorialSystem) spawnSkyFallingSun() {
 	sunID := entities.NewSunEntity(s.entityManager, s.resourceManager, startX, targetY)
 	log.Printf("[TutorialSystem] Created tutorial sun entity ID=%d at X=%.1f, targetY=%.1f", sunID, startX, targetY)
 
-	// 初始化阳光动画
+	// 初始化阳光动画（Sun.reanim 是效果动画，不计算 CenterOffset）
 	if s.reanimSystem != nil {
-		if err := s.reanimSystem.InitializeDirectRender(sunID); err != nil {
+		if err := s.reanimSystem.InitializeSceneAnimation(sunID); err != nil {
 			log.Printf("[TutorialSystem] WARNING: Failed to initialize sun animation: %v", err)
 		}
 	}

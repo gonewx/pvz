@@ -24,14 +24,8 @@ type BehaviorSystem struct {
 	lawnGridEntityID ecs.EntityID    // Bug Fix: 草坪网格实体ID
 }
 
-// 阳光生产位置偏移常量
-const (
-	SunOffsetCenterX       = 40.0 // 阳光图像居中偏移（阳光约80px宽）
-	SunOffsetBaseY         = 80.0 // 阳光基础向上偏移（向日葵上方）
-	SunRandomOffsetRangeX  = 40.0 // 随机水平偏移范围（-20 到 +20）
-	SunRandomOffsetRangeY  = 20.0 // 随机垂直偏移范围（-10 到 +10）
-	LogOutputFrameInterval = 100  // 日志输出间隔（每N帧输出一次）
-)
+// 日志输出间隔常量
+const LogOutputFrameInterval = 100 // 日志输出间隔（每N帧输出一次）
 
 // NewBehaviorSystem 创建一个新的行为系统
 // 参数:
@@ -199,62 +193,81 @@ func (s *BehaviorSystem) handleSunflowerBehavior(entityID ecs.EntityID, deltaTim
 
 		// 获取位置组件，计算阳光生成位置
 		position, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+		plant, _ := ecs.GetComponent[*components.PlantComponent](s.entityManager, entityID)
+
+		log.Printf("[BehaviorSystem] 向日葵位置: (%.0f, %.0f), 网格: (col=%d, row=%d)",
+			position.X, position.Y, plant.GridCol, plant.GridRow)
 
 		// 阳光生成位置：向日葵位置附近随机偏移
-		// 向日葵生产的阳光应该从向日葵中心附近弹出
-		// 添加随机偏移使其更自然，不总是在正上方
-		// 注意：阳光图像是左上角对齐，尺寸约80x80
+		// 向日葵生产的阳光应该从向日葵中心弹出，然后落到附近随机位置
+		// position.X, position.Y 是向日葵中心的世界坐标
 
-		// 随机水平偏移：-20 到 +20 像素
-		randomOffsetX := (rand.Float64() - 0.5) * SunRandomOffsetRangeX // -20 ~ +20
-		// 随机垂直偏移：-10 到 +10 像素
-		randomOffsetY := (rand.Float64() - 0.5) * SunRandomOffsetRangeY // -10 ~ +10
+		// 阳光生成逻辑：
+		// position.X, position.Y 是向日葵的中心位置（Reanim 的 CenterOffset 已经处理了对齐）
+		// 阳光的 PositionComponent 也表示阳光的中心位置（阳光的 CenterOffset 会自动处理渲染）
 
-		sunStartX := position.X - SunOffsetCenterX + randomOffsetX // 向左偏移居中，加上随机偏移
-		sunStartY := position.Y - SunOffsetBaseY + randomOffsetY   // 向日葵上方，加上随机偏移
+		// 随机目标偏移：决定阳光落地位置相对于向日葵的偏移
+		randomOffsetX := (rand.Float64() - 0.5) * config.SunRandomOffsetRangeX // -30 ~ +30
+		randomOffsetY := (rand.Float64() - 0.5) * config.SunRandomOffsetRangeY // -20 ~ +20
 
-		// 边界检查（AC10）：确保阳光完整显示在屏幕内
-		// 屏幕尺寸800x600，阳光尺寸80x80，有效范围[0,720]x[0,520]
-		if sunStartX < 0 {
-			sunStartX = 0
+		// 阳光起始位置（中心）：从向日葵中心开始
+		sunStartX := position.X
+		sunStartY := position.Y
+
+		// 阳光目标位置（中心）：向日葵下方 + 随机偏移
+		// config.SunDropBelowPlantOffset: 阳光落在向日葵下方约50像素的位置（视觉上自然）
+		sunTargetX := position.X + randomOffsetX
+		sunTargetY := position.Y + config.SunDropBelowPlantOffset + randomOffsetY
+
+		log.Printf("[BehaviorSystem] 向日葵中心: (%.1f, %.1f), 阳光起始中心: (%.1f, %.1f)",
+			position.X, position.Y, sunStartX, sunStartY)
+
+		// 边界检查（AC10）：确保阳光目标位置在屏幕内
+		// 屏幕尺寸800x600，阳光尺寸80x80（半径40）
+		// 中心坐标有效范围：[40, 760] x [40, 560]
+		sunRadius := config.SunOffsetCenterX // 40
+		if sunTargetX < sunRadius {
+			sunTargetX = sunRadius
 		}
-		if sunStartX > 720 {
-			sunStartX = 720
+		if sunTargetX > 800-sunRadius {
+			sunTargetX = 800 - sunRadius
 		}
-		if sunStartY < 0 {
-			sunStartY = 0
+		if sunTargetY < sunRadius {
+			sunTargetY = sunRadius
 		}
-		if sunStartY > 520 {
-			sunStartY = 520
+		if sunTargetY > 600-sunRadius {
+			sunTargetY = 600 - sunRadius
 		}
 
-		log.Printf("[BehaviorSystem] 创建阳光实体，边界检查后位置: (%.0f, %.0f), 随机偏移: (%.1f, %.1f)",
-			sunStartX, sunStartY, randomOffsetX, randomOffsetY)
+		log.Printf("[BehaviorSystem] 创建阳光实体，起始位置: (%.0f, %.0f), 目标位置: (%.0f, %.0f), 随机偏移: (%.1f, %.1f)",
+			sunStartX, sunStartY, sunTargetX, sunTargetY, randomOffsetX, randomOffsetY)
 
-		// 创建阳光实体
-		// 注意：NewSunEntity 会将 Y 坐标重置为 -50（屏幕顶部），这是为天降阳光设计的
-		// 向日葵生产的阳光需要特殊处理
-		// 传递 sunStartY 作为 targetY，确保位置一致
-		sunID := entities.NewSunEntity(s.entityManager, s.resourceManager, sunStartX, sunStartY)
+		// 创建向日葵生产的阳光实体
+		sunID := entities.NewPlantSunEntity(s.entityManager, s.resourceManager, sunStartX, sunStartY, sunTargetX, sunTargetY)
 
-		// 修正阳光的起始位置为向日葵位置（覆盖 NewSunEntity 中的 Y=-50）
-		sunPos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, sunID)
-		sunPos.Y = sunStartY
-
-		// 修正阳光的速度：向日葵生产的阳光应该是静止的
+		// 设置阳光的速度：抛物线运动
+		// 阳光先向上弹起，然后在重力作用下落到目标位置
 		sunVel, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, sunID)
 		if ok {
-			sunVel.VX = 0
-			sunVel.VY = 0 // 静止，不下落
+			// 使用固定的向上初速度，让阳光弹起
+			initialUpwardSpeed := -100.0 // 向上初速度（负值表示向上）
+
+			// 水平速度：匀速运动到目标X位置
+			duration := 1.5 // 预计运动时间（秒）
+			sunVel.VX = (sunTargetX - sunStartX) / duration
+
+			// 垂直初速度：固定向上弹起
+			// 重力会自然地将阳光拉向目标位置
+			sunVel.VY = initialUpwardSpeed
 		}
 
-		// 修正阳光的状态：向日葵生产的阳光直接是已落地状态（可以点击）
-		sunComp, ok := ecs.GetComponent[*components.SunComponent](s.entityManager, sunID)
-		if ok {
-			sunComp.State = components.SunLanded // 直接设置为已落地状态
-		}
+		log.Printf("[BehaviorSystem] 阳光实体创建完成，ID=%d, 状态: Rising, 速度: (%.1f, %.1f)",
+			sunID, sunVel.VX, sunVel.VY)
 
-		log.Printf("[BehaviorSystem] 修正阳光位置为: (%.0f, %.0f), 状态: Landed", sunPos.X, sunPos.Y)
+		// 初始化阳光动画（Sun.reanim 是效果动画，使用场景动画模式，不计算 CenterOffset）
+		if err := s.reanimSystem.InitializeSceneAnimation(sunID); err != nil {
+			log.Printf("[BehaviorSystem] WARNING: 初始化阳光动画失败: %v", err)
+		}
 
 		// 重置计时器
 		timer.CurrentTime = 0

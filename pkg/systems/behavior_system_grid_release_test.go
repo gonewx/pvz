@@ -65,7 +65,7 @@ func TestPlantDeathReleasesGrid(t *testing.T) {
 		IsReady:     true,
 	})
 	ecs.AddComponent(em, zombieID, &components.PositionComponent{
-		X: config.GridWorldStartX + 2*config.CellWidth + config.CellWidth/2, // 与植物同列
+		X: config.GridWorldStartX + 2*config.CellWidth + config.CellWidth/2,   // 与植物同列
 		Y: config.GridWorldStartY + 3*config.CellHeight + config.CellHeight/2, // 与植物同行
 	})
 

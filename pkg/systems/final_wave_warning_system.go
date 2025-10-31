@@ -38,9 +38,9 @@ func NewFinalWaveWarningSystem(em *ecs.EntityManager) *FinalWaveWarningSystem {
 // Update 更新提示动画，播放完成后自动销毁
 //
 // 执行流程：
-//   1. 查询所有带有 FinalWaveWarningComponent 的实体
-//   2. 更新每个实体的 ElapsedTime
-//   3. 如果 ElapsedTime >= DisplayTime，则销毁实体
+//  1. 查询所有带有 FinalWaveWarningComponent 的实体
+//  2. 更新每个实体的 ElapsedTime
+//  3. 如果 ElapsedTime >= DisplayTime，则销毁实体
 //
 // 参数：
 //   - deltaTime: 自上一帧以来经过的时间（秒）

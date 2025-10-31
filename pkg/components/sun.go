@@ -5,6 +5,7 @@ type SunState int
 
 const (
 	SunFalling    SunState = iota // 正在下落
+	SunRising                     // 正在上升（向日葵生产的阳光）
 	SunLanded                     // 已落地,静止
 	SunCollecting                 // 正在被收集(Story 2.4)
 )

@@ -5,6 +5,9 @@ import (
 	"github.com/decker502/pvz/pkg/ecs"
 )
 
+// 重力加速度常量（像素/秒²）
+const SunGravity = 200.0
+
 // SunMovementSystem 管理阳光的移动逻辑
 type SunMovementSystem struct {
 	entityManager *ecs.EntityManager
@@ -52,6 +55,25 @@ func (s *SunMovementSystem) Update(deltaTime float64) {
 				// 落地:设置为精确的目标位置
 				pos.Y = sun.TargetY
 				sun.State = components.SunLanded
+				vel.VY = 0 // 停止移动
+			}
+
+		case components.SunRising:
+			// 上升中（向日葵生产的阳光）：抛物线运动，受重力影响
+			// 更新速度：重力加速度向下
+			vel.VY += SunGravity * deltaTime // 重力向下（正方向）
+
+			// 更新位置
+			pos.X += vel.VX * deltaTime
+			pos.Y += vel.VY * deltaTime
+
+			// 检查是否到达或超过目标位置
+			// 判断条件：Y坐标超过目标且速度向下（VY > 0）
+			if pos.Y >= sun.TargetY && vel.VY > 0 {
+				// 到达目标位置：设置为精确的目标位置
+				pos.Y = sun.TargetY
+				sun.State = components.SunLanded
+				vel.VX = 0
 				vel.VY = 0 // 停止移动
 			}
 

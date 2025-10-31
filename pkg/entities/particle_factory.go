@@ -160,14 +160,14 @@ func CreateParticleEffect(em *ecs.EntityManager, rm *game.ResourceManager, effec
 
 		// Create EmitterComponent
 		emitterComp := &components.EmitterComponent{
-			Config:           &emitterConfig, // Story 7.4: 取地址
-			Active:           true,
-			Age:              0,
-			SystemDuration:   systemDuration,
-			NextSpawnTime:    0, // Spawn immediately
-			ActiveParticles:  make([]ecs.EntityID, 0),
-			TotalLaunched:    0,
-			SpawnRate:        spawnRate,
+			Config:          &emitterConfig, // Story 7.4: 取地址
+			Active:          true,
+			Age:             0,
+			SystemDuration:  systemDuration,
+			NextSpawnTime:   0, // Spawn immediately
+			ActiveParticles: make([]ecs.EntityID, 0),
+			TotalLaunched:   0,
+			SpawnRate:       spawnRate,
 			// 保存 SpawnRate 关键帧数据（用于动态生成率控制）
 			SpawnRateKeyframes: spawnRateKeyframes,
 			SpawnRateInterp:    spawnRateInterp,
@@ -187,7 +187,7 @@ func CreateParticleEffect(em *ecs.EntityManager, rm *game.ResourceManager, effec
 			EmitterBoxXMin: emitterBoxXMin,
 			EmitterBoxYMin: emitterBoxYMin,
 			// 修复：EmitterRadius 保存 min/max（支持范围格式）
-			EmitterRadius:    emitterRadiusMin,    // Deprecated: 保留用于向后兼容（旧代码可能使用）
+			EmitterRadius:    emitterRadiusMin, // Deprecated: 保留用于向后兼容（旧代码可能使用）
 			EmitterRadiusMin: emitterRadiusMin,
 			EmitterRadiusMax: emitterRadiusMax,
 			// Story 10.4: EmitterBox 关键帧（动态发射区域）

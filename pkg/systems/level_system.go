@@ -365,7 +365,8 @@ func isZombieType(behaviorType components.BehaviorType) bool {
 //   - 教学关卡同样适用（不受特殊规则影响）
 //
 // 参数：
-//   deltaTime - 未使用（保留用于未来扩展）
+//
+//	deltaTime - 未使用（保留用于未来扩展）
 func (s *LevelSystem) checkFinalWaveWarning(deltaTime float64) {
 	// 如果已触发，直接返回
 	if s.finalWaveWarningTriggered {
@@ -382,17 +383,18 @@ func (s *LevelSystem) checkFinalWaveWarning(deltaTime float64) {
 // isFinalWaveApproaching 检测最后一波是否即将到来
 //
 // 判断条件：
-//   1. CurrentWaveIndex 指向最后一波（len-1）或者已经触发完所有波次（len）
-//   2. 最后一波尚未被激活
-//   3. 正在等待下一波（IsWaitingForNextWave = true）
-//   4. 距离触发还剩 <= 3 秒
+//  1. CurrentWaveIndex 指向最后一波（len-1）或者已经触发完所有波次（len）
+//  2. 最后一波尚未被激活
+//  3. 正在等待下一波（IsWaitingForNextWave = true）
+//  4. 距离触发还剩 <= 3 秒
 //
 // 注意：CurrentWaveIndex 在 MarkWaveSpawned 后会变成 waveIndex+1，
 // 所以最后一波激活后 CurrentWaveIndex 会变成 len（超出索引范围）
 //
 // 返回：
-//   true - 最后一波即将到来，应触发提示
-//   false - 不应触发提示
+//
+//	true - 最后一波即将到来，应触发提示
+//	false - 不应触发提示
 func (s *LevelSystem) isFinalWaveApproaching() bool {
 	// 检查关卡配置是否存在
 	if s.gameState.CurrentLevel == nil || len(s.gameState.CurrentLevel.Waves) == 0 {
@@ -444,9 +446,9 @@ func (s *LevelSystem) isFinalWaveApproaching() bool {
 // triggerFinalWaveWarning 触发最后一波提示
 //
 // 执行步骤：
-//   1. 设置 GameState 标志 ShowingFinalWave = true
-//   2. 播放音效 SOUND_AWOOGA
-//   3. 创建 FinalWave.reanim 动画实体（调用工厂函数）
+//  1. 设置 GameState 标志 ShowingFinalWave = true
+//  2. 播放音效 SOUND_AWOOGA
+//  3. 创建 FinalWave.reanim 动画实体（调用工厂函数）
 //
 // 注意：
 //   - 音效使用 SOUND_AWOOGA（原版 "僵尸来袭" 音效）
@@ -704,4 +706,3 @@ func (s *LevelSystem) ShowProgressBar() {
 	progressBar.ShowLevelTextOnly = false
 	log.Println("[LevelSystem] Progress bar now showing full display (background + progress + flags)")
 }
-

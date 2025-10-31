@@ -36,3 +36,23 @@ const (
 	// RepeaterShootingFireFrame1  = 5  // 双发射手（第一发）
 	// RepeaterShootingFireFrame2  = 8  // 双发射手（第二发，延迟约 0.25秒）
 )
+
+// 向日葵阳光生产位置配置
+// Story 12.1: 向日葵阳光生产动画效果
+const (
+	// SunOffsetCenterX 阳光图像居中偏移（阳光约80px宽，居中需要减去40px）
+	SunOffsetCenterX = 40.0
+
+	// SunRandomOffsetRangeX 随机水平偏移范围（阳光落点X轴随机偏移 ±30px）
+	// 实际偏移范围：[-30, +30] 像素
+	SunRandomOffsetRangeX = 60.0
+
+	// SunRandomOffsetRangeY 随机垂直偏移范围（阳光落点Y轴随机偏移 ±20px）
+	// 实际偏移范围：[-20, +20] 像素
+	SunRandomOffsetRangeY = 40.0
+
+	// SunDropBelowPlantOffset 阳光目标位置相对于向日葵视觉中心的垂直偏移（向下）
+	// 向日葵生产的阳光应该落在植物下方，这个值决定了阳光落点在视觉中心下方多少像素
+	// 建议值：40-60像素（视觉上自然，不会太远也不会太近）
+	SunDropBelowPlantOffset = 50.0
+)

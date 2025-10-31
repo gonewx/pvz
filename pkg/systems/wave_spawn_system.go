@@ -426,35 +426,22 @@ func (s *WaveSpawnSystem) spawnZombieWithOffset(zombieType string, lane int, ind
 //	targetRow - 目标行索引（0-4）
 //	currentY - 当前Y坐标
 func (s *WaveSpawnSystem) addTargetLaneComponent(entityID ecs.EntityID, targetRow int, currentY float64) {
+	// Story 8.7: 从关卡配置中读取行转换模式
+	transitionMode := s.getLaneTransitionMode()
+
 	// 添加目标行组件
 	ecs.AddComponent(s.entityManager, entityID, &components.ZombieTargetLaneComponent{
 		TargetRow:            targetRow,
 		HasReachedTargetLane: false,
+		TransitionMode:       transitionMode, // Story 8.7 新增字段
 	})
 
-	// 添加或更新速度组件，添加Y轴速度以移动到目标行
-	// 必须与僵尸工厂函数的Y坐标计算公式保持一致
-	targetY := config.GridWorldStartY + float64(targetRow)*config.CellHeight + config.CellHeight/2.0 + config.ZombieVerticalOffset
-	deltaY := targetY - currentY
+	log.Printf("[WaveSpawnSystem] Added TargetLaneComponent to zombie %d: targetRow=%d, mode=%d",
+		entityID, targetRow, transitionMode)
 
-	// 计算Y轴速度（每秒移动距离）
-	// 假设僵尸需要在3秒内到达目标行
-	vySpeed := deltaY / 3.0
-
-	// 获取或创建速度组件
-	if vel, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID); ok {
-		// 已有速度组件，添加Y轴速度
-		vel.VY = vySpeed
-	} else {
-		// 创建新的速度组件
-		ecs.AddComponent(s.entityManager, entityID, &components.VelocityComponent{
-			VX: 0, // X轴速度暂时为0，到达目标行后才开始向左移动
-			VY: vySpeed,
-		})
-	}
-
-	log.Printf("[WaveSpawnSystem] Added target lane component: targetRow=%d, deltaY=%.2f, vySpeed=%.2f",
-		targetRow, deltaY, vySpeed)
+	// Story 8.7: VY速度计算逻辑已移至 ZombieLaneTransitionSystem
+	// 根据不同的转换模式（instant/gradual），系统会自动处理Y轴移动
+	// 不再需要在这里设置VY速度
 }
 
 // getZombieSpawnX 获取僵尸生成X坐标
@@ -609,4 +596,40 @@ func (s *WaveSpawnSystem) validateLaneConfig(lane int) bool {
 	}
 
 	return false
+}
+
+// getLaneTransitionMode 从关卡配置中获取行转换模式
+//
+// Story 8.7: 读取关卡配置的 laneTransitionMode 字段，
+// 并将字符串解析为 LaneTransitionMode 枚举值
+//
+// 返回：
+//
+//	LaneTransitionMode - 行转换模式（渐变或瞬间）
+//
+// 规则：
+//   - 如果关卡配置了 laneTransitionMode="gradual"，返回渐变模式
+//   - 如果关卡配置了 laneTransitionMode="instant"，返回瞬间模式
+//   - 默认返回瞬间模式（向后兼容，不影响现有关卡）
+func (s *WaveSpawnSystem) getLaneTransitionMode() components.LaneTransitionMode {
+	// 如果没有关卡配置，使用默认瞬间模式
+	if s.levelConfig == nil {
+		return components.TransitionModeInstant
+	}
+
+	// 从配置字符串解析为枚举值
+	switch s.levelConfig.LaneTransitionMode {
+	case "gradual":
+		log.Printf("[WaveSpawnSystem] Lane transition mode: gradual (3-second smooth animation)")
+		return components.TransitionModeGradual
+
+	case "instant":
+		log.Printf("[WaveSpawnSystem] Lane transition mode: instant (no animation)")
+		return components.TransitionModeInstant
+
+	default:
+		// 默认瞬间模式（空字符串或未配置）
+		log.Printf("[WaveSpawnSystem] Lane transition mode: instant (default)")
+		return components.TransitionModeInstant
+	}
 }

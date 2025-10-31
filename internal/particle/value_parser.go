@@ -103,7 +103,6 @@ func ParseRangeValue(s string) (initialMin, initialMax float64, minKeyframes, wi
 	return 0, 0, nil, nil, ""
 }
 
-
 // ParseValue parses a value string from particle configuration.
 // Supports multiple formats:
 //   - Fixed value: "1500" → min=1500, max=1500, keyframes=nil
