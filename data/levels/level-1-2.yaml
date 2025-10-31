@@ -37,20 +37,20 @@ waves:
         count: 2
         spawnInterval: 2.0  # 每2秒生成1个
 
-  # 第2波：第1波消灭后15秒，3个普通僵尸
-  - minDelay: 15
-    zombies:
-      - type: "basic"
-        lanes: [2, 3, 4]
-        count: 3
-        spawnInterval: 2.0
+  # # 第2波：第1波消灭后15秒，3个普通僵尸
+  # - minDelay: 15
+  #   zombies:
+  #     - type: "basic"
+  #       lanes: [2, 3, 4]
+  #       count: 3
+  #       spawnInterval: 2.0
 
-  # 旗帜波（第3波）：进度条80%位置，5个普通僵尸
-  - isFlag: true
-    flagIndex: 1
-    minDelay: 5  # 显示"一大波僵尸即将到来"提示
-    zombies:
-      - type: "basic"
-        lanes: [2, 3, 4]
-        count: 5
-        spawnInterval: 1.5
+  # # 旗帜波（第3波）：进度条80%位置，5个普通僵尸
+  # - isFlag: true
+  #   flagIndex: 1
+  #   minDelay: 5  # 显示"一大波僵尸即将到来"提示
+  #   zombies:
+  #     - type: "basic"
+  #       lanes: [2, 3, 4]
+  #       count: 5
+  #       spawnInterval: 1.5

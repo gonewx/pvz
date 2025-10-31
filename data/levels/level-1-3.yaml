@@ -43,24 +43,24 @@ waves:
         count: 3
         spawnInterval: 2.0
 
-  # 第2波：第1波消灭后15秒，4个普通僵尸
-  - minDelay: 15
-    zombies:
-      - type: "basic"
-        lanes: [2, 3, 4]
-        count: 4
-        spawnInterval: 2.0
+  # # 第2波：第1波消灭后15秒，4个普通僵尸
+  # - minDelay: 15
+  #   zombies:
+  #     - type: "basic"
+  #       lanes: [2, 3, 4]
+  #       count: 4
+  #       spawnInterval: 2.0
 
-  # 第1面旗帜波（第3波）：进度条结束位置，8个僵尸（含2个路障）
-  - isFlag: true
-    flagIndex: 1
-    minDelay: 5
-    zombies:
-      - type: "basic"
-        lanes: [2, 3, 4]
-        count: 6
-        spawnInterval: 1.5
-      - type: "conehead"  # 路障僵尸
-        lanes: [2, 3, 4]
-        count: 2
-        spawnInterval: 1.2
+  # # 第1面旗帜波（第3波）：进度条结束位置，8个僵尸（含2个路障）
+  # - isFlag: true
+  #   flagIndex: 1
+  #   minDelay: 5
+  #   zombies:
+  #     - type: "basic"
+  #       lanes: [2, 3, 4]
+  #       count: 6
+  #       spawnInterval: 1.5
+  #     - type: "conehead"  # 路障僵尸
+  #       lanes: [2, 3, 4]
+  #       count: 2
+  #       spawnInterval: 1.2
