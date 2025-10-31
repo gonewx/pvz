@@ -200,6 +200,13 @@ func (s *LawnmowerSystem) checkZombieCollisions() {
 				continue
 			}
 
+			// 只杀死已激活的僵尸（跳过预生成但未激活的僵尸）
+			waveState, hasWaveState := ecs.GetComponent[*components.ZombieWaveStateComponent](s.entityManager, zombieID)
+			if hasWaveState && !waveState.IsActivated {
+				// 预生成的僵尸尚未激活，不应被除草车杀死
+				continue
+			}
+
 			// 计算僵尸所在行
 			zombieLane := s.getEntityLane(zombiePos.Y)
 
