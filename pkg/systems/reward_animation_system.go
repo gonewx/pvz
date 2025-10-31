@@ -400,12 +400,18 @@ func (ras *RewardAnimationSystem) updateAppearingPhase(dt float64, rewardComp *c
 		rewardComp.Phase = "waiting"
 		rewardComp.ElapsedTime = 0
 
-		// 只为植物奖励创建光晕粒子效果（SeedPacket 包含光晕 + 向下箭头）
-		// 工具奖励跳过此粒子，只在 expanding 结束时显示 AwardPickupArrow
-		if ras.glowEntity == 0 && rewardComp.RewardType != "tool" {
-			// 验证猜想：有Name的发射器是"主粒子"
-			// SeedPacketGlow 有 EmitterOffsetY=62，如果它应该在卡片中心
-			// 那么基准位置应该是：卡片中心 - 62
+		// 根据奖励类型创建不同的 waiting 阶段粒子效果
+		// - 植物奖励：SeedPacket（光晕 + 向下箭头）
+		// - 工具奖励：AwardPickupArrow（向下箭头）
+		if ras.glowEntity == 0 {
+			var particleEffectName string
+			if rewardComp.RewardType == "tool" {
+				particleEffectName = "AwardPickupArrow" // 工具使用向下箭头
+			} else {
+				particleEffectName = "SeedPacket" // 植物使用光晕+箭头
+			}
+
+			// 计算粒子位置（卡片中心）
 			cardComp, _ := ecs.GetComponent[*components.PlantCardComponent](ras.entityManager, ras.rewardEntity)
 			particleX := posComp.X
 			particleY := posComp.Y
@@ -414,26 +420,26 @@ func (ras *RewardAnimationSystem) updateAppearingPhase(dt float64, rewardComp *c
 				cardHeight := float64(cardComp.BackgroundImage.Bounds().Dy()) * cardComp.CardScale
 				particleX += cardWidth / 2.0  // X：卡片水平中心
 				particleY += cardHeight / 2.0 // Y：卡片垂直中心
-				particleY -= 62.0             // 减去主粒子的偏移量，使主粒子在中心
+				if particleEffectName == "SeedPacket" {
+					particleY -= 62.0 // SeedPacket 需要减去主粒子偏移量
+				}
 			}
 
 			glowID, err := entities.CreateParticleEffect(
 				ras.entityManager,
 				ras.resourceManager,
-				"SeedPacket",
+				particleEffectName,
 				particleX,
 				particleY,
 				0.0,  // angleOffset = 0
 				true, // isUIParticle = true
 			)
 			if err != nil {
-				log.Printf("[RewardAnimationSystem] 创建光晕粒子失败: %v", err)
+				log.Printf("[RewardAnimationSystem] 创建 waiting 粒子失败（%s）: %v", particleEffectName, err)
 			} else {
 				ras.glowEntity = glowID
-				log.Printf("[RewardAnimationSystem] 创建光晕粒子成功: ID=%d（验证主粒子假设，基准位置=(%.1f, %.1f)）", glowID, particleX, particleY)
+				log.Printf("[RewardAnimationSystem] 创建 waiting 粒子成功: %s, ID=%d", particleEffectName, glowID)
 			}
-		} else if rewardComp.RewardType == "tool" {
-			log.Printf("[RewardAnimationSystem] 工具奖励跳过 SeedPacket 粒子，waiting 阶段无粒子效果")
 		}
 	}
 }
@@ -521,17 +527,10 @@ func (ras *RewardAnimationSystem) updateExpandingPhase(dt float64, rewardComp *c
 			}
 
 			// 确定使用的粒子效果名称
-		particleEffectName := rewardComp.ParticleEffect
-		if particleEffectName == "" {
-			// 向后兼容：如果未设置，根据类型自动选择
-			if rewardComp.RewardType == "tool" {
-				particleEffectName = "AwardPickupArrow"
-			} else {
-				particleEffectName = "Award"
-			}
-		}
+		// expanding 结束时统一使用 Award（12个光芒），无论植物还是工具
+		particleEffectName := "Award"
 
-		// 创建粒子特效（Award 或 AwardPickupArrow）
+		// 创建粒子特效（Award）
 			awardID, err := entities.CreateParticleEffect(
 				ras.entityManager,
 				ras.resourceManager,

@@ -38,7 +38,7 @@ waves:
     zombies:
       - type: "basic"
         lanes: [1, 2, 3, 4, 5]
-        count: 2
+        count: 1
         spawnInterval: 2.0
 
   # # 第2波：第1波消灭后15秒，5个僵尸（含1个路障）

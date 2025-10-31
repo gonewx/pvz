@@ -416,10 +416,10 @@ func (rprs *RewardPanelRenderSystem) drawToolIcon(screen *ebiten.Image, panel *c
 		return // 透明度太低时不绘制
 	}
 
-	// 加载铲子图片（使用标准版本）
-	shovelImage := rprs.resourceManager.GetImageByID("IMAGE_SHOVEL")
+	// 加载铲子图片（奖励面板使用高清版本）
+	shovelImage := rprs.resourceManager.GetImageByID("IMAGE_SHOVEL_HI_RES")
 	if shovelImage == nil {
-		log.Printf("[RewardPanelRenderSystem] Warning: Failed to load IMAGE_SHOVEL")
+		log.Printf("[RewardPanelRenderSystem] Warning: Failed to load IMAGE_SHOVEL_HI_RES")
 		return
 	}
 
