@@ -409,10 +409,10 @@ func (rprs *RewardPanelRenderSystem) drawToolIcon(screen *ebiten.Image, panel *c
 		return // 透明度太低时不绘制
 	}
 
-	// 加载铲子图片
-	shovelImage := rprs.resourceManager.GetImageByID("IMAGE_SHOVEL")
+	// 加载铲子图片（使用高清版本）
+	shovelImage := rprs.resourceManager.GetImageByID("IMAGE_SHOVEL_HI_RES")
 	if shovelImage == nil {
-		log.Printf("[RewardPanelRenderSystem] Warning: Failed to load IMAGE_SHOVEL")
+		log.Printf("[RewardPanelRenderSystem] Warning: Failed to load IMAGE_SHOVEL_HI_RES")
 		return
 	}
 
@@ -440,65 +440,81 @@ func (rprs *RewardPanelRenderSystem) drawToolIcon(screen *ebiten.Image, panel *c
 }
 
 // drawPlantInfo 绘制植物名称和描述。
+// 使用配置的描述框坐标范围 (360,260)-(540,470)，支持多行文本垂直居中。
 func (rprs *RewardPanelRenderSystem) drawPlantInfo(screen *ebiten.Image, panel *components.RewardPanelComponent) {
 	if panel.FadeAlpha > 0.5 && rprs.plantInfoFont != nil {
-		// 使用配置中的背景尺寸
-		bgWidth := config.RewardPanelBackgroundWidth
-		bgHeight := config.RewardPanelBackgroundHeight
-		offsetX := (rprs.screenWidth - bgWidth) / 2
-		offsetY := (rprs.screenHeight - bgHeight) / 2
+		// 使用配置的描述框坐标范围
+		boxLeft := config.RewardPanelDescBoxLeft
+		boxTop := config.RewardPanelDescBoxTop
+		boxWidth := config.RewardPanelDescBoxWidth
+		boxHeight := config.RewardPanelDescBoxHeight
 
-		// 绘制植物名称（使用配置中的颜色和位置，带阴影效果）
-		nameX := offsetX + bgWidth/2                             // 背景中心X
-		nameY := offsetY + bgHeight*config.RewardPanelPlantNameY // 使用配置的Y位置
+		// 计算描述框中心X坐标（用于水平居中）
+		boxCenterX := boxLeft + boxWidth/2
 
-		if panel.PlantName != "" {
+		// 合并名称和描述为完整文本（用换行分隔）
+		var fullText string
+		if panel.PlantName != "" && panel.PlantDescription != "" {
+			fullText = panel.PlantName + "\n" + panel.PlantDescription
+		} else if panel.PlantName != "" {
+			fullText = panel.PlantName
+		} else {
+			fullText = panel.PlantDescription
+		}
+
+		if fullText == "" {
+			return
+		}
+
+		// 使用 WrapText 进行自动换行（基于描述框宽度）
+		lines := utils.WrapText(
+			fullText,
+			rprs.plantInfoFont,
+			boxWidth-20, // 留出左右边距各10像素
+		)
+
+		// 计算总文本高度
+		totalTextHeight := float64(len(lines)) * config.RewardPanelDescriptionLineSpacing
+		if len(lines) > 0 {
+			// 减去最后一行多余的行间距
+			totalTextHeight -= (config.RewardPanelDescriptionLineSpacing - float64(rprs.plantInfoFont.Size))
+		}
+
+		// 计算垂直居中的起始Y坐标
+		startY := boxTop + (boxHeight-totalTextHeight)/2
+
+		// 绘制每一行
+		currentY := startY
+		for i, line := range lines {
+			// 判断是否是第一行（植物名称）
+			isName := i == 0 && panel.PlantName != ""
+
+			// 根据是否是名称选择不同颜色
+			textColor := config.RewardPanelDescriptionColor
+			if isName {
+				textColor = config.RewardPanelPlantNameColor
+			}
+
 			// 1. 先绘制阴影（黑色，稍微偏移）
 			shadowOp := &text.DrawOptions{}
-			shadowOp.GeoM.Translate(nameX+2, nameY+2) // 阴影偏移2像素
+			shadowOp.GeoM.Translate(boxCenterX+2, currentY+2) // 阴影偏移2像素
 			shadowOp.PrimaryAlign = text.AlignCenter
 			shadowOp.SecondaryAlign = text.AlignStart
 			shadowOp.ColorScale.ScaleWithColor(color.RGBA{0, 0, 0, 128}) // 半透明黑色
 			shadowOp.ColorScale.ScaleAlpha(float32(panel.FadeAlpha))
-			text.Draw(screen, panel.PlantName, rprs.plantInfoFont, shadowOp)
+			text.Draw(screen, line, rprs.plantInfoFont, shadowOp)
 
-			// 2. 再绘制主文字（金黄色）
+			// 2. 再绘制主文字
 			op := &text.DrawOptions{}
-			op.GeoM.Translate(nameX, nameY)
-			op.PrimaryAlign = text.AlignCenter                             // 水平居中
-			op.SecondaryAlign = text.AlignStart                            // 垂直从上开始
-			op.ColorScale.ScaleWithColor(config.RewardPanelPlantNameColor) // 使用配置的金黄色
+			op.GeoM.Translate(boxCenterX, currentY)
+			op.PrimaryAlign = text.AlignCenter  // 水平居中
+			op.SecondaryAlign = text.AlignStart // 垂直从上开始
+			op.ColorScale.ScaleWithColor(textColor)
 			op.ColorScale.ScaleAlpha(float32(panel.FadeAlpha))
-			text.Draw(screen, panel.PlantName, rprs.plantInfoFont, op)
-		}
+			text.Draw(screen, line, rprs.plantInfoFont, op)
 
-		// 绘制植物描述（支持多行换行）
-		descX := offsetX + bgWidth/2                               // 背景中心X
-		descY := offsetY + bgHeight*config.RewardPanelDescriptionY // 使用配置的Y位置
-
-		if panel.PlantDescription != "" {
-			// 使用 WrapText 进行自动换行
-			lines := utils.WrapText(
-				panel.PlantDescription,
-				rprs.plantInfoFont,
-				config.RewardPanelDescriptionMaxWidth,
-			)
-
-			// 绘制每一行
-			currentY := descY
-			for _, line := range lines {
-				// 设置绘制选项
-				op := &text.DrawOptions{}
-				op.GeoM.Translate(descX, currentY)
-				op.PrimaryAlign = text.AlignCenter                               // 水平居中
-				op.SecondaryAlign = text.AlignStart                              // 垂直从上开始
-				op.ColorScale.ScaleWithColor(config.RewardPanelDescriptionColor) // 使用配置的深蓝黑色
-				op.ColorScale.ScaleAlpha(float32(panel.FadeAlpha))
-				text.Draw(screen, line, rprs.plantInfoFont, op)
-
-				// 移动到下一行
-				currentY += config.RewardPanelDescriptionLineSpacing
-			}
+			// 移动到下一行
+			currentY += config.RewardPanelDescriptionLineSpacing
 		}
 	}
 }

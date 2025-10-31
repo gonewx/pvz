@@ -11,7 +11,7 @@ availablePlants:              # 可用植物
   - "cherrybomb"
   - "wallnut"
 skipOpening: false            # 不跳过开场
-initialSun: 50                # 初始阳光50
+initialSun: 500               # 初始阳光50
 
 # Story 8.6: 工具解锁
 unlockTools: ["shovel"]       # 完成后解锁铲子工具
