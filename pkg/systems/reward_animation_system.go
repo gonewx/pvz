@@ -1040,13 +1040,37 @@ func (ras *RewardAnimationSystem) Draw(screen *ebiten.Image) {
 	//    只渲染 UI 粒子（奖励动画的粒子），不渲染游戏世界粒子
 	ras.renderSystem.DrawParticles(screen, cameraOffsetX)
 
-	// 3a. Phase 1-3: 渲染奖励植物卡片（appearing/waiting/expanding/pausing/disappearing）在最上层
+	// 3a. Phase 1-3: 渲染奖励卡片/工具图标（appearing/waiting/expanding/pausing/disappearing）在最上层
 	// 直接渲染自己管理的卡片实体（符合 ECS 原则：系统负责自己的实体）
 	if ras.currentPhase != "showing" && ras.currentPhase != "closing" && ras.rewardEntity != 0 {
+		// 植物奖励：渲染植物卡片
 		if card, ok := ecs.GetComponent[*components.PlantCardComponent](ras.entityManager, ras.rewardEntity); ok {
 			if pos, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.rewardEntity); ok {
 				// 使用统一的渲染函数
 				entities.RenderPlantCard(screen, card, pos.X, pos.Y, ras.sunFont, ras.sunFontSize)
+			}
+		}
+
+		// 工具奖励：渲染工具图标
+		if sprite, ok := ecs.GetComponent[*components.SpriteComponent](ras.entityManager, ras.rewardEntity); ok {
+			if pos, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.rewardEntity); ok {
+				if rewardComp, ok := ecs.GetComponent[*components.RewardAnimationComponent](ras.entityManager, ras.rewardEntity); ok {
+					if sprite.Image != nil {
+						op := &ebiten.DrawImageOptions{}
+
+						// 居中图片
+						bounds := sprite.Image.Bounds()
+						op.GeoM.Translate(-float64(bounds.Dx())/2, -float64(bounds.Dy())/2)
+
+						// 应用缩放（与植物卡片相同的缩放逻辑）
+						op.GeoM.Scale(rewardComp.Scale, rewardComp.Scale)
+
+						// 移动到位置（屏幕坐标）
+						op.GeoM.Translate(pos.X, pos.Y)
+
+						screen.DrawImage(sprite.Image, op)
+					}
+				}
 			}
 		}
 	}
