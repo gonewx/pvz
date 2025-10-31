@@ -588,8 +588,10 @@ func (ras *RewardAnimationSystem) updateDisappearingPhase(dt float64, rewardComp
 	if rewardComp.ElapsedTime >= config.RewardDisappearDuration {
 		log.Printf("[RewardAnimationSystem] 卡片包消失完成，进入面板显示阶段")
 
-		// 保存 PlantID（在删除组件前）
+		// 保存奖励信息（在删除组件前）
+		rewardType := rewardComp.RewardType
 		plantID := rewardComp.PlantID
+		toolID := rewardComp.ToolID
 
 		// 重要：先更新组件状态，避免下一帧重复进入此阶段
 		rewardComp.Phase = "showing"
@@ -615,10 +617,10 @@ func (ras *RewardAnimationSystem) updateDisappearingPhase(dt float64, rewardComp
 		// 直接设置系统内部状态
 		ras.currentPhase = "showing"
 		ras.phaseElapsed = 0
-		ras.currentPlantID = plantID // 保存植物ID
+		ras.currentPlantID = plantID // 保存植物ID（向后兼容）
 
-		// 创建奖励面板
-		ras.createRewardPanel(plantID)
+		// 创建奖励面板（传递完整奖励信息）
+		ras.createRewardPanel(rewardType, plantID, toolID)
 		log.Printf("[RewardAnimationSystem] 进入 Phase 4 (showing)，显示奖励面板")
 	}
 }
@@ -742,39 +744,67 @@ func (ras *RewardAnimationSystem) updateClosingPhaseInternal(dt float64) {
 }
 
 // createRewardPanel 创建奖励面板实体。
-func (ras *RewardAnimationSystem) createRewardPanel(plantID string) {
+func (ras *RewardAnimationSystem) createRewardPanel(rewardType string, plantID string, toolID string) {
 	ras.panelEntity = ras.entityManager.CreateEntity()
 
-	// 获取植物信息
-	plantInfo := ras.gameState.GetPlantUnlockManager().GetPlantInfo(plantID)
+	var rewardName, rewardDesc string
+	var sunCost int
 
-	// 从 LawnStrings 加载实际文本
-	plantName := ras.gameState.LawnStrings.GetString(plantInfo.NameKey)
-	plantDesc := ras.gameState.LawnStrings.GetString(plantInfo.DescriptionKey)
+	// 根据奖励类型加载不同信息
+	if rewardType == "tool" {
+		// 工具奖励信息
+		toolDescriptions := map[string]struct {
+			Name string
+			Desc string
+		}{
+			"shovel": {
+				Name: "铲子",
+				Desc: "使用铲子可以移除草坪上的植物，重新规划你的防线！",
+			},
+		}
 
-	// 硬编码阳光值（TODO: 从配置文件读取）
-	sunCostMap := map[string]int{
-		"sunflower":  50,
-		"peashooter": 100,
-		"cherrybomb": 150,
-		"wallnut":    50,
+		if info, ok := toolDescriptions[toolID]; ok {
+			rewardName = info.Name
+			rewardDesc = info.Desc
+		} else {
+			rewardName = "新工具"
+			rewardDesc = "一个实用的工具！"
+		}
+		sunCost = 0 // 工具无阳光消耗
+	} else {
+		// 植物奖励信息
+		plantInfo := ras.gameState.GetPlantUnlockManager().GetPlantInfo(plantID)
+
+		// 从 LawnStrings 加载实际文本
+		rewardName = ras.gameState.LawnStrings.GetString(plantInfo.NameKey)
+		rewardDesc = ras.gameState.LawnStrings.GetString(plantInfo.DescriptionKey)
+
+		// 硬编码阳光值（TODO: 从配置文件读取）
+		sunCostMap := map[string]int{
+			"sunflower":  50,
+			"peashooter": 100,
+			"cherrybomb": 150,
+			"wallnut":    50,
+		}
+		sunCost = sunCostMap[plantID]
 	}
-	sunCost := sunCostMap[plantID]
 
 	// 添加 RewardPanelComponent
 	ecs.AddComponent(ras.entityManager, ras.panelEntity, &components.RewardPanelComponent{
-		PlantID:          plantID, // 设置 PlantID，让渲染系统自动加载图标
-		PlantName:        plantName,
-		PlantDescription: plantDesc,
-		SunCost:          sunCost, // 设置阳光值
-		CardScale:        1.0,     // 卡片固定大小，不做动画
-		FadeAlpha:        0.0,     // Story 8.4: 初始完全透明，用于淡入动画
+		RewardType:       rewardType, // 新增：奖励类型
+		PlantID:          plantID,    // 设置 PlantID，让渲染系统自动加载图标
+		ToolID:           toolID,     // 新增：工具ID
+		PlantName:        rewardName, // 名称（植物或工具）
+		PlantDescription: rewardDesc, // 描述（植物或工具）
+		SunCost:          sunCost,    // 设置阳光值（工具为0）
+		CardScale:        1.0,        // 卡片固定大小，不做动画
+		FadeAlpha:        0.0,        // Story 8.4: 初始完全透明，用于淡入动画
 		// Story 8.4: 卡片位置由 RewardPanelRenderSystem 自动计算（水平居中）
 		IsVisible:     true,
 		AnimationTime: 0.0, // Story 8.4: 动画时间计数器，用于淡入效果
 	})
 
-	log.Printf("[RewardAnimationSystem] 奖励面板已创建：%s - %s", plantName, plantDesc)
+	log.Printf("[RewardAnimationSystem] 奖励面板已创建：%s - %s", rewardName, rewardDesc)
 }
 
 // IsActive 返回系统是否正在播放动画。

@@ -95,11 +95,11 @@ func (rprs *RewardPanelRenderSystem) drawPanel(screen *ebiten.Image, panelEntity
 	// 1. 绘制背景（AwardScreen_Back.jpg）
 	rprs.drawBackground(screen, panel.FadeAlpha)
 
-	// 2. 绘制标题文本："你得到了一株新植物！"
-	rprs.drawTitle(screen, panel.FadeAlpha)
+	// 2. 绘制标题文本："你得到了一株新植物！" 或 "你得到了一个新工具！"
+	rprs.drawTitle(screen, panel)
 
-	// 3. 绘制植物卡片（独立渲染，不依赖外部系统）
-	rprs.drawPlantCard(screen, panel)
+	// 3. 绘制奖励卡片/图标（根据类型选择）
+	rprs.drawRewardCard(screen, panel)
 
 	// 4. 绘制植物名称和描述
 	rprs.drawPlantInfo(screen, panel)
@@ -137,17 +137,28 @@ func (rprs *RewardPanelRenderSystem) drawBackground(screen *ebiten.Image, alpha 
 }
 
 // drawTitle 绘制标题文本。
-func (rprs *RewardPanelRenderSystem) drawTitle(screen *ebiten.Image, alpha float64) {
-	if alpha < 0.5 || rprs.titleFont == nil {
+func (rprs *RewardPanelRenderSystem) drawTitle(screen *ebiten.Image, panel *components.RewardPanelComponent) {
+	if panel.FadeAlpha < 0.5 || rprs.titleFont == nil {
 		return
 	}
 
-	// 从 LawnStrings 获取标题文本
-	titleText := "你得到了一株新植物！" // 默认文本
-	if rprs.gameState.LawnStrings != nil {
-		titleText = rprs.gameState.LawnStrings.GetString("NEW_PLANT")
-		if titleText == "" {
-			titleText = "你得到了一株新植物！"
+	// 根据奖励类型选择标题文本
+	var titleText string
+	if panel.RewardType == "tool" {
+		titleText = "你得到了一个新工具！" // 工具奖励标题
+		if rprs.gameState.LawnStrings != nil {
+			titleText = rprs.gameState.LawnStrings.GetString("NEW_TOOL")
+			if titleText == "" {
+				titleText = "你得到了一个新工具！"
+			}
+		}
+	} else {
+		titleText = "你得到了一株新植物！" // 植物奖励标题（默认）
+		if rprs.gameState.LawnStrings != nil {
+			titleText = rprs.gameState.LawnStrings.GetString("NEW_PLANT")
+			if titleText == "" {
+				titleText = "你得到了一株新植物！"
+			}
 		}
 	}
 
@@ -169,7 +180,7 @@ func (rprs *RewardPanelRenderSystem) drawTitle(screen *ebiten.Image, alpha float
 	shadowOp.PrimaryAlign = text.AlignCenter
 	shadowOp.SecondaryAlign = text.AlignStart
 	shadowOp.ColorScale.ScaleWithColor(color.RGBA{0, 0, 0, 128}) // 半透明黑色
-	shadowOp.ColorScale.ScaleAlpha(float32(alpha))
+	shadowOp.ColorScale.ScaleAlpha(float32(panel.FadeAlpha))
 	text.Draw(screen, titleText, rprs.titleFont, shadowOp)
 
 	// 2. 再绘制主文字（橙黄色）
@@ -178,8 +189,18 @@ func (rprs *RewardPanelRenderSystem) drawTitle(screen *ebiten.Image, alpha float
 	op.PrimaryAlign = text.AlignCenter                         // 水平居中
 	op.SecondaryAlign = text.AlignStart                        // 垂直从上开始
 	op.ColorScale.ScaleWithColor(config.RewardPanelTitleColor) // 使用配置的橙黄色
-	op.ColorScale.ScaleAlpha(float32(alpha))
+	op.ColorScale.ScaleAlpha(float32(panel.FadeAlpha))
 	text.Draw(screen, titleText, rprs.titleFont, op)
+}
+
+// drawRewardCard 绘制奖励卡片/图标（统一入口）
+// 根据 RewardType 选择绘制植物卡片或工具图标
+func (rprs *RewardPanelRenderSystem) drawRewardCard(screen *ebiten.Image, panel *components.RewardPanelComponent) {
+	if panel.RewardType == "tool" {
+		rprs.drawToolIcon(screen, panel)
+	} else {
+		rprs.drawPlantCard(screen, panel)
+	}
 }
 
 // drawPlantCard 绘制植物卡片（独立渲染，不依赖外部系统）。
@@ -378,6 +399,43 @@ func (rprs *RewardPanelRenderSystem) getReanimName(plantType components.PlantTyp
 	default:
 		return ""
 	}
+}
+
+// drawToolIcon 绘制工具图标（铲子）
+func (rprs *RewardPanelRenderSystem) drawToolIcon(screen *ebiten.Image, panel *components.RewardPanelComponent) {
+	// 降低透明度阈值，让图标更早显示（与面板淡入同步）
+	if panel.FadeAlpha < 0.01 {
+		return // 透明度太低时不绘制
+	}
+
+	// 加载铲子图片
+	shovelImage := rprs.resourceManager.GetImageByID("IMAGE_SHOVEL")
+	if shovelImage == nil {
+		log.Printf("[RewardPanelRenderSystem] Warning: Failed to load IMAGE_SHOVEL")
+		return
+	}
+
+	// 计算图标缩放因子和位置（与植物卡片使用相同的位置计算）
+	iconScale := panel.CardScale * config.RewardPanelCardScale
+	iconX, iconY := rprs.calculateCardPosition(iconScale)
+
+	// 应用缩放动画
+	op := &ebiten.DrawImageOptions{}
+
+	// 居中图片
+	bounds := shovelImage.Bounds()
+	op.GeoM.Translate(-float64(bounds.Dx())/2, -float64(bounds.Dy())/2)
+
+	// 缩放（随时间变化）
+	op.GeoM.Scale(iconScale, iconScale)
+
+	// 移动到目标位置
+	op.GeoM.Translate(iconX, iconY)
+
+	// 应用透明度
+	op.ColorScale.ScaleAlpha(float32(panel.FadeAlpha))
+
+	screen.DrawImage(shovelImage, op)
 }
 
 // drawPlantInfo 绘制植物名称和描述。
