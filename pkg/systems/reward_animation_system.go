@@ -66,16 +66,17 @@ type RewardAnimationSystem struct {
 	entityManager   *ecs.EntityManager
 	gameState       *game.GameState
 	resourceManager *game.ResourceManager
-	reanimSystem    *ReanimSystem   // Reanim系统用于创建和管理动画
-	particleSystem  *ParticleSystem // 粒子系统用于检查粒子特效完成状态
-	renderSystem    *RenderSystem   // 渲染系统用于绘制Reanim和粒子效果
-	rewardEntity    ecs.EntityID    // 奖励动画实体ID（卡片包）
-	panelEntity     ecs.EntityID    // 奖励面板实体ID
-	glowEntity      ecs.EntityID    // 光晕粒子发射器实体ID
-	isActive        bool            // 系统是否激活
-	currentPhase    string          // 当前阶段（flashing/showing/closing 时可能没有 rewardEntity）
-	currentPlantID  string          // 当前植物ID（保存用于面板创建）
-	phaseElapsed    float64         // 当前阶段经过时间
+	sceneManager    *game.SceneManager // 场景管理器，用于切换到下一关
+	reanimSystem    *ReanimSystem      // Reanim系统用于创建和管理动画
+	particleSystem  *ParticleSystem    // 粒子系统用于检查粒子特效完成状态
+	renderSystem    *RenderSystem      // 渲染系统用于绘制Reanim和粒子效果
+	rewardEntity    ecs.EntityID       // 奖励动画实体ID（卡片包）
+	panelEntity     ecs.EntityID       // 奖励面板实体ID
+	glowEntity      ecs.EntityID       // 光晕粒子发射器实体ID
+	isActive        bool               // 系统是否激活
+	currentPhase    string             // 当前阶段（flashing/showing/closing 时可能没有 rewardEntity）
+	currentPlantID  string             // 当前植物ID（保存用于面板创建）
+	phaseElapsed    float64            // 当前阶段经过时间
 	screenWidth     float64
 	screenHeight    float64
 
@@ -86,7 +87,7 @@ type RewardAnimationSystem struct {
 }
 
 // NewRewardAnimationSystem 创建新的奖励动画系统。
-func NewRewardAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.ResourceManager, reanimSys *ReanimSystem, particleSys *ParticleSystem, renderSys *RenderSystem) *RewardAnimationSystem {
+func NewRewardAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.ResourceManager, sm *game.SceneManager, reanimSys *ReanimSystem, particleSys *ParticleSystem, renderSys *RenderSystem) *RewardAnimationSystem {
 	// Story 8.4重构：内部创建所有渲染系统，调用者无需关心
 	panelRenderSystem := NewRewardPanelRenderSystem(em, gs, rm, reanimSys)
 
@@ -105,6 +106,7 @@ func NewRewardAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *gam
 		entityManager:     em,
 		gameState:         gs,
 		resourceManager:   rm,
+		sceneManager:      sm, // 保存场景管理器引用
 		reanimSystem:      reanimSys,
 		particleSystem:    particleSys,
 		renderSystem:      renderSys, // 渲染系统用于绘制Reanim和粒子
@@ -580,7 +582,7 @@ func (ras *RewardAnimationSystem) updateDisappearingPhase(dt float64, rewardComp
 
 // updateShowingPhaseInternal 处理显示奖励面板阶段（内部版本，不依赖rewardComp）。
 // - 面板淡入动画（透明度 0.0 → 1.0，持续 config.RewardPanelFadeInDuration）
-// - 淡入完成后，等待玩家点击关闭
+// - 淡入完成后，等待玩家点击"下一关"按钮
 func (ras *RewardAnimationSystem) updateShowingPhaseInternal(dt float64) {
 	ras.phaseElapsed += dt
 
@@ -602,21 +604,56 @@ func (ras *RewardAnimationSystem) updateShowingPhaseInternal(dt float64) {
 		}
 	}
 
-	// 检测玩家点击（鼠标或空格键）- 手动关闭
-	clicked := inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) ||
-		inpututil.IsKeyJustPressed(ebiten.KeySpace)
+	// 检测鼠标点击（只响应左键）
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+		// 获取鼠标点击位置
+		mouseX, mouseY := ebiten.CursorPosition()
 
-	if clicked {
-		log.Printf("[RewardAnimationSystem] 玩家关闭奖励面板，切换到 closing")
-		ras.currentPhase = "closing"
-		ras.phaseElapsed = 0
+		// 检查是否点击了"下一关"按钮
+		if ras.isNextLevelButtonClicked(float64(mouseX), float64(mouseY)) {
+			log.Printf("[RewardAnimationSystem] 玩家点击\"下一关\"按钮，准备切换场景")
+			ras.currentPhase = "closing"
+			ras.phaseElapsed = 0
+		}
+		// 注意：空格键不再触发关闭，只有点击按钮才能继续
 	}
+}
+
+// isNextLevelButtonClicked 检查鼠标点击是否在"下一关"按钮范围内
+func (ras *RewardAnimationSystem) isNextLevelButtonClicked(mouseX, mouseY float64) bool {
+	// 计算按钮位置（与 reward_panel_render_system.go 中的 drawNextLevelButton 逻辑一致）
+	bgWidth := config.RewardPanelBackgroundWidth
+	bgHeight := config.RewardPanelBackgroundHeight
+	offsetX := (ras.screenWidth - bgWidth) / 2
+	offsetY := (ras.screenHeight - bgHeight) / 2
+
+	// 按钮中心位置
+	buttonX := offsetX + bgWidth/2
+	buttonY := offsetY + bgHeight*config.RewardPanelButtonY
+
+	// 按钮尺寸（根据 IMAGE_SEEDCHOOSER_BUTTON 的尺寸）
+	// SeedChooser_Button.png 尺寸约为 155x38（需要验证）
+	// 为了更容易点击，使用稍大的点击区域
+	buttonWidth := 155.0
+	buttonHeight := 50.0 // 增大高度以提高可点击性
+
+	// AABB 碰撞检测
+	halfWidth := buttonWidth / 2
+	halfHeight := buttonHeight / 2
+
+	if mouseX >= buttonX-halfWidth && mouseX <= buttonX+halfWidth &&
+		mouseY >= buttonY-halfHeight && mouseY <= buttonY+halfHeight {
+		log.Printf("[RewardAnimationSystem] 按钮点击命中! 鼠标=(%.1f, %.1f), 按钮中心=(%.1f, %.1f)", mouseX, mouseY, buttonX, buttonY)
+		return true
+	}
+
+	return false
 }
 
 // updateClosingPhaseInternal 处理关闭奖励面板阶段（0.5秒，内部版本）。
 // - 淡出动画
 // - 清理实体
-// - TODO: 触发场景切换
+// - 切换到下一关（或返回主菜单）
 func (ras *RewardAnimationSystem) updateClosingPhaseInternal(dt float64) {
 	ras.phaseElapsed += dt
 
@@ -641,7 +678,22 @@ func (ras *RewardAnimationSystem) updateClosingPhaseInternal(dt float64) {
 		ras.isActive = false
 		ras.currentPhase = ""
 
-		// TODO: 触发场景切换（返回主菜单或进入下一关）
+		// 切换到下一关
+		nextLevelID := ras.gameState.GetNextLevelID()
+		if nextLevelID != "" {
+			log.Printf("[RewardAnimationSystem] 切换到下一关: %s", nextLevelID)
+			// 检查 sceneManager 是否存在（测试程序可能传入 nil）
+			if ras.sceneManager != nil {
+				ras.sceneManager.LoadLevel(nextLevelID)
+			} else {
+				log.Printf("[RewardAnimationSystem] SceneManager 为 nil，跳过场景切换（可能在测试环境）")
+			}
+		} else {
+			log.Printf("[RewardAnimationSystem] 没有下一关，返回主菜单")
+			// TODO: 切换到主菜单场景
+			// ras.sceneManager.SwitchToMainMenu()
+		}
+
 		log.Printf("[RewardAnimationSystem] 奖励动画完成")
 	}
 }

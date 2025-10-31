@@ -366,7 +366,7 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 
 	// Story 8.3 + 8.4重构: Create RewardAnimationSystem (完全封装，无需单独创建面板渲染系统)
 	// RewardAnimationSystem内部自动创建和管理RewardPanelRenderSystem
-	scene.rewardSystem = systems.NewRewardAnimationSystem(scene.entityManager, scene.gameState, rm, scene.reanimSystem, scene.particleSystem, scene.renderSystem)
+	scene.rewardSystem = systems.NewRewardAnimationSystem(scene.entityManager, scene.gameState, rm, scene.sceneManager, scene.reanimSystem, scene.particleSystem, scene.renderSystem)
 	log.Printf("[GameScene] Initialized reward animation system (fully encapsulated)")
 
 	// Story 8.3: Create OpeningAnimationSystem (conditionally, may return nil)

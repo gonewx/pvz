@@ -77,7 +77,7 @@ func main() {
 	reanimSys := systems.NewReanimSystem(em)
 	particleSys := systems.NewParticleSystem(em, rm)
 	renderSys := systems.NewRenderSystem(em)
-	rewardSys := systems.NewRewardAnimationSystem(em, gs, rm, reanimSys, particleSys, renderSys)
+	rewardSys := systems.NewRewardAnimationSystem(em, gs, rm, nil, reanimSys, particleSys, renderSys)
 
 	// 创建 LevelSystem（用于验证系统集成）
 	_ = systems.NewLevelSystem(em, gs, nil, rm, reanimSys, rewardSys, nil)

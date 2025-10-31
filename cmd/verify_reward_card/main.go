@@ -88,7 +88,7 @@ func NewVerifyGame() (*VerifyGame, error) {
 	reanimSystem := systems.NewReanimSystem(em)
 	particleSystem := systems.NewParticleSystem(em, rm) // 粒子系统用于光晕效果
 	renderSystem := systems.NewRenderSystem(em)
-	rewardSystem := systems.NewRewardAnimationSystem(em, gs, rm, reanimSystem, particleSystem, renderSystem)
+	rewardSystem := systems.NewRewardAnimationSystem(em, gs, rm, nil, reanimSystem, particleSystem, renderSystem)
 
 	// 创建植物卡片渲染系统（Story 8.4: 使用统一的植物卡片渲染）
 	// 加载阳光字体用于卡片渲染
@@ -237,6 +237,7 @@ func (vg *VerifyGame) reset() {
 		vg.entityManager,
 		vg.gameState,
 		vg.resourceManager,
+		nil, // sceneManager（测试程序不需要）
 		vg.reanimSystem,
 		vg.particleSystem,
 		vg.renderSystem,

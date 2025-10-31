@@ -93,7 +93,7 @@ func NewVerifyRewardAnimationGame() (*VerifyRewardAnimationGame, error) {
 
 	// Story 8.4重构：RewardAnimationSystem完全封装所有渲染逻辑
 	// 内部自动创建和管理所有渲染系统（Reanim、粒子、卡片、面板）
-	rewardSystem := systems.NewRewardAnimationSystem(em, gs, rm, reanimSystem, particleSystem, renderSystem)
+	rewardSystem := systems.NewRewardAnimationSystem(em, gs, rm, nil, reanimSystem, particleSystem, renderSystem)
 
 	// 创建植物选择栏卡片（用于测试渲染顺序）
 	sunFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.PlantCardSunCostFontSize)
@@ -260,6 +260,7 @@ func (vg *VerifyRewardAnimationGame) reset() {
 		vg.entityManager,
 		vg.gameState,
 		vg.resourceManager,
+		nil, // sceneManager（测试程序不需要）
 		vg.reanimSystem,
 		vg.particleSystem,
 		vg.renderSystem,

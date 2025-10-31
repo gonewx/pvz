@@ -73,6 +73,11 @@ func main() {
 	// Create scene manager
 	sceneManager := game.NewSceneManager()
 
+	// 设置场景工厂函数，用于在奖励动画完成后加载下一关
+	sceneManager.SetSceneFactory(func(levelID string) game.Scene {
+		return scenes.NewGameScene(resourceManager, sceneManager, levelID)
+	})
+
 	// Determine which level to load:
 	// 1. Command line --level flag (highest priority)
 	// 2. Highest completed level from save file (default)

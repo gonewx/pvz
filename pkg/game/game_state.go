@@ -125,6 +125,34 @@ func (gs *GameState) GetPlantingMode() (bool, components.PlantType) {
 	return gs.IsPlantingMode, gs.SelectedPlantType
 }
 
+// GetNextLevelID 获取下一关的关卡ID
+// 如果没有下一关，返回空字符串
+func (gs *GameState) GetNextLevelID() string {
+	if gs.CurrentLevel == nil {
+		return ""
+	}
+
+	// 解析当前关卡ID (格式: "1-1", "1-2", etc.)
+	var chapter, level int
+	_, err := fmt.Sscanf(gs.CurrentLevel.ID, "%d-%d", &chapter, &level)
+	if err != nil {
+		log.Printf("[GameState] Failed to parse level ID: %s", gs.CurrentLevel.ID)
+		return ""
+	}
+
+	// 简单递增关卡号（假设当前只有 1-1 到 1-4）
+	nextLevel := level + 1
+	nextLevelID := fmt.Sprintf("%d-%d", chapter, nextLevel)
+
+	// TODO: 未来可以从配置文件读取关卡顺序，支持章节切换
+	// 目前只支持第一章的 1-1 到 1-4
+	if chapter == 1 && nextLevel > 4 {
+		return "" // 没有下一关了
+	}
+
+	return nextLevelID
+}
+
 // LoadLevel 加载关卡配置
 // 初始化关卡状态，重置所有关卡相关的计数器和标志
 func (gs *GameState) LoadLevel(levelConfig *config.LevelConfig) {

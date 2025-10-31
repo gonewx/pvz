@@ -679,7 +679,8 @@ func (s *TutorialSystem) spawnTutorialZombies() {
 
 		// 标记波次已生成
 		s.gameState.MarkWaveSpawned(0)
-		s.gameState.IncrementZombiesSpawned(activatedCount)
+		// ❌ 移除重复计数：WaveSpawnSystem.ActivateWave() 内部已经调用了 IncrementZombiesSpawned()
+		// s.gameState.IncrementZombiesSpawned(activatedCount) // BUG: 导致僵尸计数重复增加
 	}
 
 	// 后续波次将由 manageWaveSpawning 自动处理
@@ -739,7 +740,8 @@ func (s *TutorialSystem) manageWaveSpawning(dt float64) {
 
 			// 标记波次已生成
 			s.gameState.MarkWaveSpawned(currentWaveIndex)
-			s.gameState.IncrementZombiesSpawned(activatedCount) // 使用实际激活的僵尸数量
+			// ❌ 移除重复计数：WaveSpawnSystem.ActivateWave() 内部已经调用了 IncrementZombiesSpawned()
+			// s.gameState.IncrementZombiesSpawned(activatedCount) // BUG: 导致僵尸计数重复增加
 
 			// 重置延迟计时器和标志
 			s.waveDelayTimer = 0
