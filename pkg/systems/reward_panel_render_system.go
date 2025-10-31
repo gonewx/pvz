@@ -423,22 +423,35 @@ func (rprs *RewardPanelRenderSystem) drawToolIcon(screen *ebiten.Image, panel *c
 		return
 	}
 
-	// 计算图标缩放因子和位置（与植物卡片使用相同的位置计算）
-	iconScale := panel.CardScale * config.RewardPanelCardScale
-	iconX, iconY := rprs.calculateCardPosition(iconScale)
+	// 计算显示区域的中心位置
+	bgWidth := config.RewardPanelBackgroundWidth
+	bgHeight := config.RewardPanelBackgroundHeight
+	offsetX := (rprs.screenWidth - bgWidth) / 2
+	offsetY := (rprs.screenHeight - bgHeight) / 2
+
+	// 获取配置的卡片显示区域（相对于背景图片）
+	boxLeft := offsetX + config.RewardPanelCardBoxLeft
+	boxTop := offsetY + config.RewardPanelCardBoxTop
+	boxWidth := config.RewardPanelCardBoxWidth
+	boxHeight := config.RewardPanelCardBoxHeight
+
+	// 计算显示区域的中心位置（这是图片的锚点）
+	centerX := boxLeft + boxWidth/2
+	centerY := boxTop + boxHeight/2
 
 	// 应用缩放动画
+	iconScale := panel.CardScale * config.RewardPanelCardScale
 	op := &ebiten.DrawImageOptions{}
 
-	// 居中图片
+	// 居中图片（将图片中心作为锚点）
 	bounds := shovelImage.Bounds()
 	op.GeoM.Translate(-float64(bounds.Dx())/2, -float64(bounds.Dy())/2)
 
 	// 缩放（随时间变化）
 	op.GeoM.Scale(iconScale, iconScale)
 
-	// 移动到目标位置
-	op.GeoM.Translate(iconX, iconY)
+	// 移动到显示区域中心位置
+	op.GeoM.Translate(centerX, centerY)
 
 	// 应用透明度
 	op.ColorScale.ScaleAlpha(float32(panel.FadeAlpha))

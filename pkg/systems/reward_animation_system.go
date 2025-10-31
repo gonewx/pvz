@@ -261,9 +261,9 @@ func (ras *RewardAnimationSystem) TriggerReward(rewardType string, rewardID stri
 
 		log.Printf("[RewardAnimationSystem] 植物卡片包已创建（使用 Story 8.4 统一工厂方法）")
 	} else if rewardType == "tool" {
-		// 工具奖励：暂时只保留 RewardAnimationComponent，不创建植物卡片
-		// 在 Phase 4 面板显示时才渲染工具图标
-		log.Printf("[RewardAnimationSystem] 工具奖励卡片包已创建（类型: %s, ID: %s）", rewardType, rewardID)
+		// 工具奖励：只使用粒子效果，不显示图片
+		// 图片将在奖励面板阶段显示（更清晰、更大的高清图片）
+		log.Printf("[RewardAnimationSystem] 工具奖励实体已创建（类型: %s, ID: %s），使用粒子效果", rewardType, rewardID)
 	}
 
 	// TODO: Phase 2 粒子背景框效果（需要查找合适的粒子配置）
