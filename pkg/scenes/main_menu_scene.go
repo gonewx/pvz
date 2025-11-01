@@ -400,6 +400,7 @@ func (m *MainMenuScene) updateButtonVisibility() {
 	visibleTracks["SelectorScreen_BG_Center"] = true
 	visibleTracks["SelectorScreen_BG_Left"] = true
 	visibleTracks["SelectorScreen_BG_Right"] = true
+	visibleTracks["anim_grass"] = true // Grass to fill the black area
 
 	// 2. Always show clouds (Note: actual track names are "Cloud1", not "SelectorScreen_Cloud1")
 	visibleTracks["Cloud1"] = true
@@ -424,6 +425,7 @@ func (m *MainMenuScene) updateButtonVisibility() {
 	visibleTracks["flower3"] = true
 
 	// 5. Always show wood signs
+	visibleTracks["anim_sign"] = true
 	visibleTracks["woodsign1"] = true
 	visibleTracks["woodsign2"] = true
 	visibleTracks["woodsign3"] = true
