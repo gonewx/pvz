@@ -80,6 +80,13 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 			log.Printf("Warning: Failed to play SelectorScreen anim_idle: %v", err)
 		} else {
 			log.Printf("[MainMenuScene] SelectorScreen entity created and anim_idle started")
+
+			// Skip to frame 20 to ensure background is fully in position
+			// (Background slides in during frames 0-20)
+			if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](scene.entityManager, selectorEntity); ok {
+				reanimComp.CurrentFrame = 20
+				log.Printf("[MainMenuScene] Skipped to frame 20 for background positioning")
+			}
 		}
 	}
 
