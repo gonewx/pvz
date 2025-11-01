@@ -202,6 +202,8 @@ func (m *MainMenuScene) Draw(screen *ebiten.Image) {
 		// RenderSystem will draw all visible tracks (background, clouds, flowers, buttons)
 		// No camera offset for main menu (cameraX = 0)
 		m.renderSystem.DrawGameWorld(screen, 0)
+
+		// Note: Old m.buttons drawing removed - SelectorScreen Reanim handles all button rendering
 	} else {
 		// Fallback: Draw background image if SelectorScreen failed to load
 		if m.backgroundImage != nil {
@@ -224,39 +226,39 @@ func (m *MainMenuScene) Draw(screen *ebiten.Image) {
 			// Fallback: Fill the screen with a dark blue color (midnight blue)
 			screen.Fill(color.RGBA{R: 25, G: 25, B: 112, A: 255})
 		}
-	}
 
-	// Draw old-style buttons (will be replaced by SelectorScreen buttons in later tasks)
-	for _, btn := range m.buttons {
-		// Skip drawing if button has no image
-		if btn.NormalImage == nil {
-			continue
+		// Fallback: Draw old-style buttons only if Reanim failed to load
+		for _, btn := range m.buttons {
+			// Skip drawing if button has no image
+			if btn.NormalImage == nil {
+				continue
+			}
+
+			// Select which image to draw based on button state
+			var img *ebiten.Image
+			if btn.State == components.UIHovered && btn.HoverImage != nil {
+				// Use hover image if available
+				img = btn.HoverImage
+			} else {
+				// Use normal image
+				img = btn.NormalImage
+			}
+
+			// Create draw options
+			op := &ebiten.DrawImageOptions{}
+
+			// Apply visual effects for hovered state (if no hover image available)
+			if btn.State == components.UIHovered && btn.HoverImage == nil {
+				// Make button brighter when hovered
+				op.ColorM.Scale(1.2, 1.2, 1.2, 1.0)
+			}
+
+			// Position the button
+			op.GeoM.Translate(btn.X, btn.Y)
+
+			// Draw the button
+			screen.DrawImage(img, op)
 		}
-
-		// Select which image to draw based on button state
-		var img *ebiten.Image
-		if btn.State == components.UIHovered && btn.HoverImage != nil {
-			// Use hover image if available
-			img = btn.HoverImage
-		} else {
-			// Use normal image
-			img = btn.NormalImage
-		}
-
-		// Create draw options
-		op := &ebiten.DrawImageOptions{}
-
-		// Apply visual effects for hovered state (if no hover image available)
-		if btn.State == components.UIHovered && btn.HoverImage == nil {
-			// Make button brighter when hovered
-			op.ColorM.Scale(1.2, 1.2, 1.2, 1.0)
-		}
-
-		// Position the button
-		op.GeoM.Translate(btn.X, btn.Y)
-
-		// Draw the button
-		screen.DrawImage(img, op)
 	}
 }
 
@@ -408,20 +410,34 @@ func (m *MainMenuScene) updateButtonVisibility() {
 	visibleTracks["Cloud7"] = true
 
 	// 3. Always show leaves (Note: actual track names vary)
-	visibleTracks["leaf3"] = true
+	visibleTracks["leaf1"] = true
 	visibleTracks["leaf2"] = true
+	visibleTracks["leaf3"] = true
+	visibleTracks["leaf4"] = true
+	visibleTracks["leaf5"] = true
 	visibleTracks["leaf22"] = true
 	visibleTracks["leaf_SelectorScreen_Leaves"] = true
-	visibleTracks["leaf4"] = true
 
-	// 4. Show buttons based on unlock status
+	// 4. Always show flowers
+	visibleTracks["flower1"] = true
+	visibleTracks["flower2"] = true
+	visibleTracks["flower3"] = true
+
+	// 5. Always show wood signs
+	visibleTracks["woodsign1"] = true
+	visibleTracks["woodsign2"] = true
+	visibleTracks["woodsign3"] = true
+
+	// 6. Show buttons based on unlock status
 	// FIX: Show normal button if unlocked, shadow button if locked
 
 	// Adventure mode (always unlocked)
 	if config.IsMenuModeUnlocked(config.MenuButtonAdventure, m.currentLevel) {
 		visibleTracks["SelectorScreen_Adventure_button"] = true
+		visibleTracks["SelectorScreen_StartAdventure_button"] = true // "Start Adventure" text/icon
 	} else {
 		visibleTracks["SelectorScreen_Adventure_shadow"] = true
+		visibleTracks["SelectorScreen_StartAdventure_shadow"] = true
 	}
 
 	// Challenges mode (unlocked at 3-2)

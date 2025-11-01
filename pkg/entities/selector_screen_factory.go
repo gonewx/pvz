@@ -57,6 +57,10 @@ func NewSelectorScreenEntity(em *ecs.EntityManager, rm *game.ResourceManager) (e
 		VisibleTracks:    nil, // Will be set by MainMenuScene based on unlock status
 		CurrentFrame:     0,
 		FrameAccumulator: 0,
+		// Scene animation: disable auto center offset calculation
+		FixedCenterOffset: true,
+		CenterOffsetX:     0,
+		CenterOffsetY:     0,
 	}
 	em.AddComponent(entityID, reanimComp)
 
