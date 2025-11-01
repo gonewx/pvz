@@ -995,6 +995,15 @@ func (s *GameScene) Update(deltaTime float64) {
 			s.soddingSystem.StartAnimation(func() {
 				// 动画完成回调：通知教学系统可以开始了
 				log.Printf("[GameScene] 铺草皮动画完成")
+
+				// Story 11.5 修复：Level 1-4 双背景叠加模式，动画完成后替换底层背景
+				// 原理：动画期间使用叠加层裁剪显示，完成后将底层背景完全替换为已铺草皮背景
+				if s.soddedBackground != nil {
+					log.Printf("[GameScene] 替换底层背景: IMAGE_BACKGROUND1UNSODDED → IMAGE_BACKGROUND1")
+					s.background = s.soddedBackground
+					s.soddedBackground = nil // 清空叠加层，停止叠加渲染
+				}
+
 				if s.tutorialSystem != nil {
 					s.tutorialSystem.OnSoddingComplete()
 				}
@@ -1051,6 +1060,15 @@ func (s *GameScene) Update(deltaTime float64) {
 				s.soddingSystem.StartAnimation(func() {
 					// 动画完成回调：通知教学系统可以开始了
 					log.Printf("[GameScene] 铺草皮动画完成")
+
+					// Story 11.5 修复：Level 1-4 双背景叠加模式，动画完成后替换底层背景
+					// 原理：动画期间使用叠加层裁剪显示，完成后将底层背景完全替换为已铺草皮背景
+					if s.soddedBackground != nil {
+						log.Printf("[GameScene] 替换底层背景: IMAGE_BACKGROUND1UNSODDED → IMAGE_BACKGROUND1")
+						s.background = s.soddedBackground
+						s.soddedBackground = nil // 清空叠加层，停止叠加渲染
+					}
+
 					if s.tutorialSystem != nil {
 						s.tutorialSystem.OnSoddingComplete()
 					}
