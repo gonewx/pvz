@@ -264,7 +264,7 @@ func (ras *RewardAnimationSystem) TriggerReward(rewardType string, rewardID stri
 		// 工具奖励：添加 SpriteComponent 显示工具图标
 		var toolImage *ebiten.Image
 		if rewardID == "shovel" {
-			toolImage = ras.resourceManager.GetImageByID("IMAGE_SHOVEL")
+			toolImage = ras.resourceManager.GetImageByID("IMAGE_SHOVEL_HI_RES")
 		}
 
 		if toolImage != nil {
@@ -273,7 +273,7 @@ func (ras *RewardAnimationSystem) TriggerReward(rewardType string, rewardID stri
 			})
 			// 添加 UIComponent 标记，表示这是 UI 实体（不需要相机偏移）
 			ecs.AddComponent(ras.entityManager, ras.rewardEntity, &components.UIComponent{})
-			log.Printf("[RewardAnimationSystem] 工具奖励实体已创建（类型: %s, ID: %s），使用 IMAGE_SHOVEL", rewardType, rewardID)
+			log.Printf("[RewardAnimationSystem] 工具奖励实体已创建（类型: %s, ID: %s），使用 IMAGE_SHOVEL_HI_RES", rewardType, rewardID)
 		} else {
 			log.Printf("[RewardAnimationSystem] 警告：工具图片加载失败（ID: %s），只显示粒子效果", rewardID)
 		}
@@ -1051,17 +1051,27 @@ func (ras *RewardAnimationSystem) Draw(screen *ebiten.Image) {
 			}
 		}
 
-		// 工具奖励：渲染工具图标（不应用缩放）
+		// 工具奖励：渲染工具图标（应用缩放，与植物卡包逻辑一致）
 		if sprite, ok := ecs.GetComponent[*components.SpriteComponent](ras.entityManager, ras.rewardEntity); ok {
 			if pos, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.rewardEntity); ok {
 				if sprite.Image != nil {
 					op := &ebiten.DrawImageOptions{}
 
+					// 获取当前缩放值（与植物卡包逻辑一致）
+					rewardComp, _ := ecs.GetComponent[*components.RewardAnimationComponent](ras.entityManager, ras.rewardEntity)
+					scale := config.PlantCardScale // 默认缩放 0.50
+					if rewardComp != nil {
+						scale = rewardComp.Scale // 使用动画缩放值
+					}
+
 					// 居中图片
 					bounds := sprite.Image.Bounds()
 					op.GeoM.Translate(-float64(bounds.Dx())/2, -float64(bounds.Dy())/2)
 
-					// 移动到位置（屏幕坐标，不应用缩放）
+					// 应用缩放变换（与植物卡包一致）
+					op.GeoM.Scale(scale, scale)
+
+					// 移动到位置（屏幕坐标）
 					op.GeoM.Translate(pos.X, pos.Y)
 
 					screen.DrawImage(sprite.Image, op)
