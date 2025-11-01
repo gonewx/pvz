@@ -537,57 +537,81 @@ func (rm *ResourceManager) GetFont(path string, size float64) *text.GoTextFace {
 // Returns:
 //   - An error if any resource fails to load.
 func (rm *ResourceManager) LoadReanimResources() error {
-	// 加载植物 Reanim 资源
-	// 注意：文件名使用 PascalCase（与实际文件名匹配）
-	// 资源命名规范:
-	// - PeaShooterSingle.reanim - 普通豌豆射手（1发/次）
-	// - PeaShooter.reanim - 双发射手（2发/次，未来使用）
-	plants := []string{"PeaShooterSingle", "SunFlower", "Wallnut", "CherryBomb"}
-	for _, plantName := range plants {
-		log.Printf("[ResourceManager] Loading plant reanim: %s", plantName)
-		if err := rm.loadPlantReanim(plantName); err != nil {
-			return fmt.Errorf("failed to load %s reanim: %w", plantName, err)
+	// 自动扫描并加载 assets/effect/reanim 目录下的所有 .reanim 文件
+	// 优点：
+	// - 无需手动维护加载列表
+	// - 自动发现新添加的动画文件
+	// - 避免遗漏资源（如之前的 SelectorScreen.reanim）
+
+	reanimDir := "assets/effect/reanim"
+	pattern := filepath.Join(reanimDir, "*.reanim")
+	files, err := filepath.Glob(pattern)
+	if err != nil {
+		return fmt.Errorf("failed to scan reanim directory: %w", err)
+	}
+
+	log.Printf("[ResourceManager] 发现 %d 个 reanim 文件，开始加载...", len(files))
+
+	successCount := 0
+	failedFiles := []string{}
+
+	for _, filePath := range files {
+		// 提取文件名（去掉路径和 .reanim 扩展名）
+		fileName := filepath.Base(filePath)
+		reanimName := strings.TrimSuffix(fileName, ".reanim") // 安全地去掉 ".reanim" 扩展名
+
+		// 加载 reanim 资源
+		if err := rm.loadReanimAuto(reanimName, filePath); err != nil {
+			log.Printf("[ResourceManager] ⚠️  跳过 %s: %v", reanimName, err)
+			failedFiles = append(failedFiles, reanimName)
+			continue
 		}
-		log.Printf("[ResourceManager] Successfully loaded %s reanim", plantName)
+
+		successCount++
 	}
 
-	// 加载僵尸 Reanim 资源
-	// 注意：路障和铁桶僵尸使用基础僵尸的动画
-	zombies := []string{"Zombie"}
-	for _, zombieName := range zombies {
-		if err := rm.loadZombieReanim(zombieName); err != nil {
-			return fmt.Errorf("failed to load %s reanim: %w", zombieName, err)
-		}
-	}
-
-	// Story 8.2 QA修复：加载阳光 Reanim 资源
-	// Sun.reanim 包含3个轨道（Sun1, Sun2, Sun3）的动画效果
-	if err := rm.loadEffectReanim("Sun"); err != nil {
-		return fmt.Errorf("failed to load Sun reanim: %w", err)
-	}
-
-	// Story 8.2 QA改进：加载铺草皮动画 Reanim 资源
-	// SodRoll.reanim 包含草皮滚动和旋转端盖的完整动画
-	if err := rm.loadEffectReanim("SodRoll"); err != nil {
-		return fmt.Errorf("failed to load SodRoll reanim: %w", err)
-	}
-
-	// Story 10.2: 加载除草车 Reanim 资源
-	// LawnMower.reanim 包含除草车的行驶动画
-	if err := rm.loadEffectReanim("LawnMower"); err != nil {
-		return fmt.Errorf("failed to load LawnMower reanim: %w", err)
-	}
-
-	// Story 11.3: 加载最后一波提示动画 Reanim 资源
-	// FinalWave.reanim 包含最后一波僵尸来袭的提示动画
-	if err := rm.loadEffectReanim("FinalWave"); err != nil {
-		return fmt.Errorf("failed to load FinalWave reanim: %w", err)
+	log.Printf("[ResourceManager] ✅ 成功加载 %d/%d 个 reanim 资源", successCount, len(files))
+	if len(failedFiles) > 0 {
+		log.Printf("[ResourceManager] ⚠️  失败 %d 个: %v", len(failedFiles), failedFiles)
 	}
 
 	return nil
 }
 
+// loadReanimAuto 自动加载任意 reanim 资源（植物、僵尸、特效等）
+// 这是一个统一的加载函数，取代了之前的 loadPlantReanim、loadZombieReanim、loadEffectReanim
+//
+// Parameters:
+//   - name: reanim 名称（如 "PeaShooterSingle", "Zombie", "SelectorScreen"）
+//   - filePath: reanim 文件的完整路径
+//
+// Returns:
+//   - 加载失败时返回 error
+func (rm *ResourceManager) loadReanimAuto(name string, filePath string) error {
+	// 1. 解析 .reanim 文件
+	reanimXML, err := reanim.ParseReanimFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to parse reanim file: %w", err)
+	}
+
+	// 2. 加载部件图片（所有图片统一从资源配置加载）
+	partImages, err := rm.loadReanimPartImages(name, reanimXML, "")
+	if err != nil {
+		return fmt.Errorf("failed to load part images: %w", err)
+	}
+
+	// 3. 存储到缓存
+	rm.reanimXMLCache[name] = reanimXML
+	rm.reanimImageCache[name] = partImages
+
+	log.Printf("[ResourceManager] ✅ 已加载 %s (FPS=%d, Tracks=%d, Images=%d)",
+		name, reanimXML.FPS, len(reanimXML.Tracks), len(partImages))
+
+	return nil
+}
+
 // loadPlantReanim loads Reanim resources for a specific plant.
+// 已废弃：请使用 loadReanimAuto
 // Parameters:
 //   - name: The plant name (e.g., "peashooter", "sunflower")
 //
