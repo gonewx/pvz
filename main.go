@@ -70,6 +70,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Load all Reanim resources (auto-scan assets/effect/reanim directory)
+	if err := resourceManager.LoadReanimResources(); err != nil {
+		if *verboseFlag {
+			log.Printf("Failed to load Reanim resources: %v", err)
+		} else {
+			fmt.Fprintln(os.Stderr, "Reanim 资源加载失败（使用 --verbose 查看详细日志）")
+		}
+		os.Exit(1)
+	}
+
 	// Create scene manager
 	sceneManager := game.NewSceneManager()
 
@@ -111,14 +121,14 @@ func main() {
 		log.Printf("[main] Starting level: %s", levelToLoad)
 	}
 
-	// TEMPORARY: 直接启动游戏场景（Story 8.6: 支持根据存档或参数加载关卡）
-	// 正式版本应该从主菜单进入
-	gameScene := scenes.NewGameScene(resourceManager, sceneManager, levelToLoad)
-	sceneManager.SwitchTo(gameScene)
+	// Story 12.1: 启动主菜单场景
+	mainMenuScene := scenes.NewMainMenuScene(resourceManager, sceneManager)
+	sceneManager.SwitchTo(mainMenuScene)
 
-	// 原版启动代码（测试完成后恢复）：
-	// mainMenuScene := scenes.NewMainMenuScene(resourceManager, sceneManager)
-	// sceneManager.SwitchTo(mainMenuScene)
+	// TEMPORARY: 直接启动游戏场景（用于快速测试关卡）
+	// 如果需要跳过主菜单直接进入游戏，取消下面两行注释：
+	// gameScene := scenes.NewGameScene(resourceManager, sceneManager, levelToLoad)
+	// sceneManager.SwitchTo(gameScene)
 
 	// Create a new game instance with the scene manager
 	gameInstance := &Game{
