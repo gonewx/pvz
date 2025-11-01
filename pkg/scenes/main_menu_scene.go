@@ -6,7 +6,11 @@ import (
 	"os"
 
 	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
+	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/decker502/pvz/pkg/systems"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 )
@@ -27,6 +31,17 @@ type MainMenuScene struct {
 	bgmPlayer       *audio.Player
 	buttons         []components.Button
 	wasMousePressed bool // Track mouse state from previous frame to detect click edges
+
+	// Story 12.1: SelectorScreen Reanim entity and systems
+	entityManager        *ecs.EntityManager
+	reanimSystem         *systems.ReanimSystem
+	renderSystem         *systems.RenderSystem
+	selectorScreenEntity ecs.EntityID
+
+	// Story 12.1: Button state management
+	buttonHitboxes []config.MenuButtonHitbox
+	hoveredButton  string // Current hovered button track name (empty = no hover)
+	currentLevel   string // Current highest level from save (format: "X-Y")
 }
 
 // NewMainMenuScene creates and returns a new MainMenuScene instance.
@@ -46,7 +61,49 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 		sceneManager:    sm,
 	}
 
-	// Load background image
+	// Story 12.1: Initialize ECS systems for SelectorScreen Reanim
+	scene.entityManager = ecs.NewEntityManager()
+	scene.reanimSystem = systems.NewReanimSystem(scene.entityManager)
+	scene.renderSystem = systems.NewRenderSystem(scene.entityManager)
+	log.Printf("[MainMenuScene] Initialized ECS systems")
+
+	// Story 12.1: Create SelectorScreen Reanim entity
+	selectorEntity, err := entities.NewSelectorScreenEntity(scene.entityManager, rm)
+	if err != nil {
+		log.Printf("Warning: Failed to create SelectorScreen entity: %v", err)
+		log.Printf("Main menu will use fallback rendering")
+		scene.selectorScreenEntity = 0
+	} else {
+		scene.selectorScreenEntity = selectorEntity
+		// Play idle animation
+		if err := scene.reanimSystem.PlayAnimation(selectorEntity, "anim_idle"); err != nil {
+			log.Printf("Warning: Failed to play SelectorScreen anim_idle: %v", err)
+		} else {
+			log.Printf("[MainMenuScene] SelectorScreen entity created and anim_idle started")
+		}
+	}
+
+	// Story 12.1: Initialize button hitboxes
+	scene.buttonHitboxes = config.MenuButtonHitboxes
+
+	// Story 12.1: Load current level from save
+	gameState := game.GetGameState()
+	saveManager := gameState.GetSaveManager()
+	if err := saveManager.Load(); err == nil {
+		scene.currentLevel = saveManager.GetHighestLevel()
+		if scene.currentLevel == "" {
+			scene.currentLevel = "1-1" // Default for new players
+		}
+		log.Printf("[MainMenuScene] Loaded highest level: %s", scene.currentLevel)
+	} else {
+		scene.currentLevel = "1-1" // Default for new players
+		log.Printf("[MainMenuScene] No save file, defaulting to level 1-1")
+	}
+
+	// Story 12.1: Update button visibility based on unlock status
+	scene.updateButtonVisibility()
+
+	// Load background image (fallback if SelectorScreen fails)
 	img, err := rm.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_BG")
 	if err != nil {
 		log.Printf("Warning: Failed to load main menu background: %v", err)
@@ -80,6 +137,11 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 		m.bgmPlayer.Play()
 	}
 
+	// Story 12.1: Update Reanim system (animate clouds, flowers, etc.)
+	if m.reanimSystem != nil {
+		m.reanimSystem.Update(deltaTime)
+	}
+
 	// Get mouse position
 	mouseX, mouseY := ebiten.CursorPosition()
 
@@ -89,7 +151,22 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 	// Detect click edge (button was just pressed this frame)
 	isMouseClicked := isMousePressed && !m.wasMousePressed
 
-	// Update button states based on mouse position and clicks
+	// Story 12.1: Check SelectorScreen button hitboxes
+	m.hoveredButton = "" // Reset hovered button
+	for _, hitbox := range m.buttonHitboxes {
+		// Check if mouse is in hitbox
+		if isPointInRect(float64(mouseX), float64(mouseY), hitbox.X, hitbox.Y, hitbox.Width, hitbox.Height) {
+			m.hoveredButton = hitbox.TrackName
+
+			if isMouseClicked {
+				// Button clicked
+				m.onMenuButtonClicked(hitbox.ButtonType)
+			}
+			break // Only one button can be hovered at a time
+		}
+	}
+
+	// Update old-style button states based on mouse position and clicks
 	for i := range m.buttons {
 		btn := &m.buttons[i]
 
@@ -120,29 +197,36 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 // If a background image is loaded, it draws the image.
 // Otherwise, it uses a dark blue fallback background.
 func (m *MainMenuScene) Draw(screen *ebiten.Image) {
-	// Draw background
-	if m.backgroundImage != nil {
-		// Scale background image to fit window size if needed
-		bounds := m.backgroundImage.Bounds()
-		bgWidth := float64(bounds.Dx())
-		bgHeight := float64(bounds.Dy())
-
-		// Calculate scale factors
-		scaleX := WindowWidth / bgWidth
-		scaleY := WindowHeight / bgHeight
-
-		// Create draw options with scaling
-		op := &ebiten.DrawImageOptions{}
-		op.GeoM.Scale(scaleX, scaleY)
-
-		// Draw the background image
-		screen.DrawImage(m.backgroundImage, op)
+	// Story 12.1: Draw SelectorScreen Reanim (contains background, buttons, decorations)
+	if m.renderSystem != nil && m.selectorScreenEntity != 0 {
+		// RenderSystem will draw all visible tracks (background, clouds, flowers, buttons)
+		// No camera offset for main menu (cameraX = 0)
+		m.renderSystem.DrawGameWorld(screen, 0)
 	} else {
-		// Fallback: Fill the screen with a dark blue color (midnight blue)
-		screen.Fill(color.RGBA{R: 25, G: 25, B: 112, A: 255})
+		// Fallback: Draw background image if SelectorScreen failed to load
+		if m.backgroundImage != nil {
+			// Scale background image to fit window size if needed
+			bounds := m.backgroundImage.Bounds()
+			bgWidth := float64(bounds.Dx())
+			bgHeight := float64(bounds.Dy())
+
+			// Calculate scale factors
+			scaleX := WindowWidth / bgWidth
+			scaleY := WindowHeight / bgHeight
+
+			// Create draw options with scaling
+			op := &ebiten.DrawImageOptions{}
+			op.GeoM.Scale(scaleX, scaleY)
+
+			// Draw the background image
+			screen.DrawImage(m.backgroundImage, op)
+		} else {
+			// Fallback: Fill the screen with a dark blue color (midnight blue)
+			screen.Fill(color.RGBA{R: 25, G: 25, B: 112, A: 255})
+		}
 	}
 
-	// Draw buttons
+	// Draw old-style buttons (will be replaced by SelectorScreen buttons in later tasks)
 	for _, btn := range m.buttons {
 		// Skip drawing if button has no image
 		if btn.NormalImage == nil {
@@ -282,4 +366,157 @@ func (m *MainMenuScene) onExitClicked() {
 // Returns true if the point is within the rectangle bounds (inclusive), false otherwise.
 func isPointInRect(px, py, x, y, width, height float64) bool {
 	return px >= x && px <= x+width && py >= y && py <= y+height
+}
+
+// updateButtonVisibility updates the visibility of SelectorScreen buttons based on unlock status.
+// This method controls which buttons are visible in the Reanim animation by setting the VisibleTracks whitelist.
+//
+// Unlock rules:
+//   - Adventure mode: Always visible
+//   - Challenges mode: Visible if level >= 3-2
+//   - Vasebreaker mode: Visible if level >= 5-10
+//   - Survival mode: Visible if level >= 5-10
+//
+// Story 12.1: Main Menu Tombstone System Enhancement
+func (m *MainMenuScene) updateButtonVisibility() {
+	if m.selectorScreenEntity == 0 {
+		return // SelectorScreen entity not created, skip
+	}
+
+	// Get ReanimComponent from SelectorScreen entity
+	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
+	if !ok {
+		log.Printf("[MainMenuScene] Warning: SelectorScreen entity has no ReanimComponent")
+		return
+	}
+
+	// Build VisibleTracks whitelist
+	visibleTracks := make(map[string]bool)
+
+	// 1. Always show background and decorations
+	visibleTracks["SelectorScreen_BG"] = true
+	visibleTracks["SelectorScreen_BG_Center"] = true
+	visibleTracks["SelectorScreen_BG_Left"] = true
+	visibleTracks["SelectorScreen_BG_Right"] = true
+
+	// 2. Always show clouds (Note: actual track names are "Cloud1", not "SelectorScreen_Cloud1")
+	visibleTracks["Cloud1"] = true
+	visibleTracks["Cloud2"] = true
+	visibleTracks["Cloud4"] = true
+	visibleTracks["Cloud5"] = true
+	visibleTracks["Cloud6"] = true
+	visibleTracks["Cloud7"] = true
+
+	// 3. Always show leaves (Note: actual track names vary)
+	visibleTracks["leaf3"] = true
+	visibleTracks["leaf2"] = true
+	visibleTracks["leaf22"] = true
+	visibleTracks["leaf_SelectorScreen_Leaves"] = true
+	visibleTracks["leaf4"] = true
+
+	// 4. Show buttons based on unlock status
+	// FIX: Show normal button if unlocked, shadow button if locked
+
+	// Adventure mode (always unlocked)
+	if config.IsMenuModeUnlocked(config.MenuButtonAdventure, m.currentLevel) {
+		visibleTracks["SelectorScreen_Adventure_button"] = true
+	} else {
+		visibleTracks["SelectorScreen_Adventure_shadow"] = true
+	}
+
+	// Challenges mode (unlocked at 3-2)
+	// Note: SelectorScreen_Survival_button track corresponds to Challenges mode
+	if config.IsMenuModeUnlocked(config.MenuButtonChallenges, m.currentLevel) {
+		visibleTracks["SelectorScreen_Survival_button"] = true
+	} else {
+		visibleTracks["SelectorScreen_Survival_shadow"] = true
+	}
+
+	// Vasebreaker mode (unlocked at 5-10)
+	// Note: SelectorScreen_Challenges_button track corresponds to Vasebreaker mode
+	if config.IsMenuModeUnlocked(config.MenuButtonVasebreaker, m.currentLevel) {
+		visibleTracks["SelectorScreen_Challenges_button"] = true
+	} else {
+		visibleTracks["SelectorScreen_Challenges_shadow"] = true
+	}
+
+	// Survival mode (unlocked at 5-10)
+	// Note: SelectorScreen_ZenGarden_button track corresponds to Survival mode
+	if config.IsMenuModeUnlocked(config.MenuButtonSurvival, m.currentLevel) {
+		visibleTracks["SelectorScreen_ZenGarden_button"] = true
+	} else {
+		visibleTracks["SelectorScreen_ZenGarden_shadow"] = true
+	}
+
+	// Apply VisibleTracks to ReanimComponent
+	reanimComp.VisibleTracks = visibleTracks
+
+	log.Printf("[MainMenuScene] Updated button visibility (level=%s): Adventure=%v, Challenges=%v, Vasebreaker=%v, Survival=%v",
+		m.currentLevel,
+		config.IsMenuModeUnlocked(config.MenuButtonAdventure, m.currentLevel),
+		config.IsMenuModeUnlocked(config.MenuButtonChallenges, m.currentLevel),
+		config.IsMenuModeUnlocked(config.MenuButtonVasebreaker, m.currentLevel),
+		config.IsMenuModeUnlocked(config.MenuButtonSurvival, m.currentLevel))
+}
+
+// onMenuButtonClicked handles clicks on SelectorScreen menu buttons.
+// Checks unlock status and routes to appropriate handler.
+//
+// Parameters:
+//   - buttonType: The type of button that was clicked
+//
+// Story 12.1: Main Menu Tombstone System Enhancement
+func (m *MainMenuScene) onMenuButtonClicked(buttonType config.MenuButtonType) {
+	log.Printf("[MainMenuScene] Button clicked: %v", buttonType)
+
+	// Check if button is unlocked
+	if !config.IsMenuModeUnlocked(buttonType, m.currentLevel) {
+		log.Printf("[MainMenuScene] Button is locked (requires higher level)")
+
+		// Play button click sound (shadow buttons also have click feedback)
+		player, err := m.resourceManager.LoadSoundEffect("assets/sounds/buttonclick.ogg")
+		if err != nil {
+			log.Printf("[MainMenuScene] Warning: Failed to load button click sound: %v", err)
+		} else {
+			player.Rewind()
+			player.Play()
+		}
+
+		// Show unlock dialog (Story 12.3 - temporarily use log)
+		log.Printf("[MainMenuScene] TODO Story 12.3: Show unlock dialog for mode %v", buttonType)
+		return
+	}
+
+	// Play button click sound
+	// Note: SOUND_BUTTONCLICK should be loaded in initialization
+	player, err := m.resourceManager.LoadSoundEffect("assets/sounds/buttonclick.ogg")
+	if err != nil {
+		log.Printf("[MainMenuScene] Warning: Failed to load button click sound: %v", err)
+	} else {
+		player.Rewind()
+		player.Play()
+	}
+
+	// Route to appropriate handler based on button type
+	switch buttonType {
+	case config.MenuButtonAdventure:
+		// Start adventure mode
+		log.Printf("[MainMenuScene] Starting Adventure mode")
+		m.onStartAdventureClicked()
+
+	case config.MenuButtonChallenges:
+		// TODO: Implement challenges/mini-games mode
+		log.Printf("[MainMenuScene] Challenges mode - Not yet implemented")
+
+	case config.MenuButtonVasebreaker:
+		// TODO: Implement vasebreaker/puzzle mode
+		log.Printf("[MainMenuScene] Vasebreaker mode - Not yet implemented")
+
+	case config.MenuButtonSurvival:
+		// TODO: Implement survival mode
+		log.Printf("[MainMenuScene] Survival mode - Not yet implemented")
+
+	default:
+		log.Printf("[MainMenuScene] Warning: Unknown button type: %v", buttonType)
+	}
 }
