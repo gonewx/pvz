@@ -342,39 +342,85 @@ func (ras *RewardAnimationSystem) Update(dt float64) {
 	//
 	// 设计说明：
 	//   - waiting 阶段：SeedPacket 粒子跟随卡片
-	//   - expanding 阶段：无粒子（SeedPacket已清理，Award未创建）
-	//   - showing 阶段：Award 粒子静止在目标位置
+	//   - expanding 阶段：Award 粒子跟随卡片移动
+	//   - pausing 阶段：Award 粒子静止在目标位置
 	//
 	// 流程：
 	//   1. 计算卡片中心坐标（视觉中心）
 	//   2. 从配置获取粒子效果的锚点偏移（根据当前阶段）
 	//   3. 锚点 = 视觉中心 + 锚点偏移
-	//   4. 粒子系统根据 XML 中的 EmitterOffset 自动计算各发射器位置
-	if ras.glowEntity != 0 && rewardComp.Phase == "waiting" {
-		// 只在 waiting 阶段更新 SeedPacket 粒子位置
-		rewardPos, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.rewardEntity)
-		if ok {
-			glowPos, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.glowEntity)
+	//   4. 更新发射器位置（影响新生成的粒子）
+	//   5. 更新所有已生成粒子位置（让它们跟随卡片移动）
+	if ras.glowEntity != 0 {
+		shouldUpdatePosition := false
+		var anchorOffsetX, anchorOffsetY float64
+
+		// waiting 阶段：更新 SeedPacket 粒子位置
+		if rewardComp.Phase == "waiting" {
+			shouldUpdatePosition = true
+			anchorOffsetX, anchorOffsetY = config.GetParticleAnchorOffset("SeedPacket")
+		}
+
+		// expanding 阶段：更新 Award 粒子位置（跟随卡片移动）
+		if rewardComp.Phase == "expanding" {
+			shouldUpdatePosition = true
+			anchorOffsetX, anchorOffsetY = config.GetParticleAnchorOffset("Award")
+		}
+
+		if shouldUpdatePosition {
+			rewardPos, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.rewardEntity)
 			if ok {
-				cardComp, _ := ecs.GetComponent[*components.PlantCardComponent](ras.entityManager, ras.rewardEntity)
+				glowPos, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.glowEntity)
+				if ok {
+					cardComp, _ := ecs.GetComponent[*components.PlantCardComponent](ras.entityManager, ras.rewardEntity)
 
-				// 计算卡片中心坐标（期望的视觉中心）
-				visualCenterX := rewardPos.X
-				visualCenterY := rewardPos.Y
-				if cardComp != nil && cardComp.BackgroundImage != nil {
-					cardWidth := float64(cardComp.BackgroundImage.Bounds().Dx()) * cardComp.CardScale
-					cardHeight := float64(cardComp.BackgroundImage.Bounds().Dy()) * cardComp.CardScale
-					visualCenterX += cardWidth / 2.0
-					visualCenterY += cardHeight / 2.0
+					// 计算卡片视觉中心坐标（基于当前缩放）
+					visualCenterX := rewardPos.X
+					visualCenterY := rewardPos.Y
+					if cardComp != nil && cardComp.BackgroundImage != nil {
+						cardWidth := float64(cardComp.BackgroundImage.Bounds().Dx()) * cardComp.CardScale
+						cardHeight := float64(cardComp.BackgroundImage.Bounds().Dy()) * cardComp.CardScale
+						visualCenterX += cardWidth / 2.0
+						visualCenterY += cardHeight / 2.0
+					}
+
+					// 应用锚点偏移
+					anchorX := visualCenterX + anchorOffsetX
+					anchorY := visualCenterY + anchorOffsetY
+
+					// 计算位置偏移量（相对于发射器当前位置）
+					deltaX := anchorX - glowPos.X
+					deltaY := anchorY - glowPos.Y
+
+					// 更新发射器位置（影响新生成的粒子）
+					// 注意：Award.xml 有13个发射器共享同一个 PositionComponent
+					glowPos.X = anchorX
+					glowPos.Y = anchorY
+
+					// 更新所有已生成粒子的位置（让它们跟随卡片移动）
+					// 需要遍历所有共享同一个 PositionComponent 的发射器
+					allEmitters := ecs.GetEntitiesWith2[
+						*components.EmitterComponent,
+						*components.PositionComponent,
+					](ras.entityManager)
+
+					for _, emitterID := range allEmitters {
+						emitterPos, _ := ecs.GetComponent[*components.PositionComponent](ras.entityManager, emitterID)
+						// 使用指针比较，共享同一个 PositionComponent 实例的发射器属于同一组
+						if emitterPos == glowPos {
+							emitter, ok := ecs.GetComponent[*components.EmitterComponent](ras.entityManager, emitterID)
+							if ok && len(emitter.ActiveParticles) > 0 {
+								for _, particleID := range emitter.ActiveParticles {
+									particlePos, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, particleID)
+									if ok {
+										particlePos.X += deltaX
+										particlePos.Y += deltaY
+									}
+								}
+							}
+						}
+					}
 				}
-
-				// SeedPacket 粒子有特殊的锚点偏移
-				offsetX, offsetY := config.GetParticleAnchorOffset("SeedPacket")
-				anchorX := visualCenterX + offsetX
-				anchorY := visualCenterY + offsetY
-
-				glowPos.X = anchorX
-				glowPos.Y = anchorY
 			}
 		}
 	}
@@ -424,18 +470,16 @@ func (ras *RewardAnimationSystem) updateAppearingPhase(dt float64, rewardComp *c
 				particleEffectName = "SeedPacket" // 植物使用光晕+箭头
 			}
 
-			// 计算粒子位置（卡片中心）
+			// 计算粒子位置（卡片视觉中心，基于当前缩放）
 			cardComp, _ := ecs.GetComponent[*components.PlantCardComponent](ras.entityManager, ras.rewardEntity)
 			particleX := posComp.X
 			particleY := posComp.Y
 			if cardComp != nil && cardComp.BackgroundImage != nil {
+				// 使用当前缩放计算视觉中心
 				cardWidth := float64(cardComp.BackgroundImage.Bounds().Dx()) * cardComp.CardScale
 				cardHeight := float64(cardComp.BackgroundImage.Bounds().Dy()) * cardComp.CardScale
-				particleX += cardWidth / 2.0  // X：卡片水平中心
-				particleY += cardHeight / 2.0 // Y：卡片垂直中心
-				if particleEffectName == "SeedPacket" {
-					particleY -= 62.0 // SeedPacket 需要减去主粒子偏移量
-				}
+				particleX += cardWidth / 2.0
+				particleY += cardHeight / 2.0
 			}
 
 			glowID, err := entities.CreateParticleEffect(
@@ -473,8 +517,8 @@ func (ras *RewardAnimationSystem) updateWaitingPhase(dt float64, rewardComp *com
 		// 清理 Phase 2 的光晕粒子（SeedPacket）
 		ras.cleanupGlowParticles()
 
-		// 注意：Award 粒子特效在 expanding 阶段结束时才触发
-		// 这样卡片先移动到目标位置，然后才显示光芒效果
+		// 立即创建 Award 粒子特效（点击后立即出现）
+		ras.createAwardParticle(rewardComp)
 	}
 }
 
@@ -522,45 +566,6 @@ func (ras *RewardAnimationSystem) updateExpandingPhase(dt float64, rewardComp *c
 		log.Printf("[RewardAnimationSystem] Phase 3 (expanding) 移动完成")
 		log.Printf("[RewardAnimationSystem] 最终位置: (%.1f, %.1f), 最终缩放: %.2f", posComp.X, posComp.Y, rewardComp.Scale)
 		log.Printf("[RewardAnimationSystem] 目标位置: (%.1f, %.1f)", rewardComp.TargetX, rewardComp.TargetY)
-		log.Printf("[RewardAnimationSystem] 触发 Award 粒子特效")
-
-		// 在移动完成后触发 Award.xml 粒子特效（12个光芒发射器）
-		posComp, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.rewardEntity)
-		if ok {
-			cardComp, _ := ecs.GetComponent[*components.PlantCardComponent](ras.entityManager, ras.rewardEntity)
-
-			// 计算卡片中心坐标（粒子效果的锚点）
-			particleX := posComp.X
-			particleY := posComp.Y
-			if cardComp != nil && cardComp.BackgroundImage != nil {
-				cardWidth := float64(cardComp.BackgroundImage.Bounds().Dx()) * cardComp.CardScale
-				cardHeight := float64(cardComp.BackgroundImage.Bounds().Dy()) * cardComp.CardScale
-				particleX += cardWidth / 2.0  // X：卡片水平中心
-				particleY += cardHeight / 2.0 // Y：卡片垂直中心
-			}
-
-			// 确定使用的粒子效果名称
-		// expanding 结束时统一使用 Award（12个光芒），无论植物还是工具
-		particleEffectName := "Award"
-
-		// 创建粒子特效（Award）
-			awardID, err := entities.CreateParticleEffect(
-				ras.entityManager,
-				ras.resourceManager,
-				particleEffectName,
-				particleX,
-				particleY,
-				0.0,  // angleOffset = 0
-				true, // isUIParticle = true
-			)
-			if err != nil {
-				log.Printf("[RewardAnimationSystem] 创建粒子特效失败（%s）: %v", particleEffectName, err)
-			} else {
-				// 保存粒子ID
-				ras.glowEntity = awardID
-				log.Printf("[RewardAnimationSystem] 创建粒子特效成功: %s, ID=%d", particleEffectName, awardID)
-			}
-		}
 
 		// Phase 3 完成，进入短暂停顿阶段（让玩家看清楚卡片包到达目标位置）
 		rewardComp.Phase = "pausing"
@@ -845,6 +850,54 @@ func (ras *RewardAnimationSystem) GetEntity() ecs.EntityID {
 // easeOutQuad 二次缓动函数（快速开始，缓慢结束）。
 func easeOutQuad(t float64) float64 {
 	return 1.0 - (1.0-t)*(1.0-t)
+}
+
+// createAwardParticle 创建 Award 粒子特效（在玩家点击卡包后立即触发）
+// 粒子效果会根据奖励类型自动选择：
+//   - 植物奖励：Award（12个光芒发射器，360°星爆效果）
+//   - 工具奖励：AwardPickupArrow（光晕 + 向下箭头）
+func (ras *RewardAnimationSystem) createAwardParticle(rewardComp *components.RewardAnimationComponent) {
+	// 获取卡片位置
+	posComp, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.rewardEntity)
+	if !ok {
+		log.Printf("[RewardAnimationSystem] Warning: Failed to get position for particle creation")
+		return
+	}
+
+	// 获取卡片组件（用于计算视觉中心）
+	cardComp, _ := ecs.GetComponent[*components.PlantCardComponent](ras.entityManager, ras.rewardEntity)
+
+	// 计算卡片视觉中心坐标（基于当前缩放）
+	particleX := posComp.X
+	particleY := posComp.Y
+	if cardComp != nil && cardComp.BackgroundImage != nil {
+		cardWidth := float64(cardComp.BackgroundImage.Bounds().Dx()) * cardComp.CardScale
+		cardHeight := float64(cardComp.BackgroundImage.Bounds().Dy()) * cardComp.CardScale
+		particleX += cardWidth / 2.0  // X：卡片水平中心
+		particleY += cardHeight / 2.0 // Y：卡片垂直中心
+	}
+
+	// 确定使用的粒子效果名称
+	// expanding 阶段统一使用 Award（12个光芒），无论植物还是工具
+	particleEffectName := "Award"
+
+	// 创建粒子特效（Award）
+	awardID, err := entities.CreateParticleEffect(
+		ras.entityManager,
+		ras.resourceManager,
+		particleEffectName,
+		particleX,
+		particleY,
+		0.0,  // angleOffset = 0
+		true, // isUIParticle = true
+	)
+	if err != nil {
+		log.Printf("[RewardAnimationSystem] 创建粒子特效失败（%s）: %v", particleEffectName, err)
+	} else {
+		// 保存粒子ID
+		ras.glowEntity = awardID
+		log.Printf("[RewardAnimationSystem] 创建粒子特效成功: %s, ID=%d（点击后立即出现）", particleEffectName, awardID)
+	}
 }
 
 // createCardPackReanim 创建卡片包的最小化 Reanim 定义。

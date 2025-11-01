@@ -149,7 +149,7 @@ func NewVerifyRewardAnimationGame() (*VerifyRewardAnimationGame, error) {
 
 	// 自动触发奖励动画（无需手动按T键）
 	log.Println("[VerifyRewardAnimation] 自动触发奖励动画")
-	rewardSystem.TriggerReward(*plantID)
+	rewardSystem.TriggerReward("plant", *plantID)
 	game.triggered = true
 
 	return game, nil
@@ -160,7 +160,7 @@ func (vg *VerifyRewardAnimationGame) Update() error {
 	// 快捷键：T 键手动触发奖励（如果未触发）
 	if inpututil.IsKeyJustPressed(ebiten.KeyT) && !vg.triggered {
 		log.Println("[VerifyRewardAnimation] 手动触发奖励动画")
-		vg.rewardSystem.TriggerReward(*plantID)
+		vg.rewardSystem.TriggerReward("plant", *plantID)
 		vg.triggered = true
 	}
 
@@ -271,7 +271,7 @@ func (vg *VerifyRewardAnimationGame) reset() {
 
 	// 自动触发
 	log.Println("[VerifyRewardAnimation] 重新触发奖励动画")
-	vg.rewardSystem.TriggerReward(*plantID)
+	vg.rewardSystem.TriggerReward("plant", *plantID)
 	vg.triggered = true
 }
 
