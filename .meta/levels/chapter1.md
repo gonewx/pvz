@@ -107,6 +107,8 @@
 
 - 背景图渲染：使用配置中的背景图，要延续上一关的场景 ，初始化时第2,3,4行的草皮就是铺好的，铺草皮动画是和level 1-1时一样的渲染方式，但是分别同时渲染第1行和第5行的草皮。注意资源中只有IMAGE_BACKGROUND1UNSODDED 和 IMAGE_BACKGROUND1, 并没有、IMAGE_BACKGROUND1_SODROW5和IMAGE_SOD5ROW， 需要通过初始化时使用图片IMAGE_SOD3ROW预先渲染草皮来实现。要实现第1,第5行边铺边看到全部5行草皮显现的效果。单行草皮图片（IMAGE_SOD1ROW）有上下边缘效果，不能简单的拼接，否则会看到明显的分界线，要叠加2个背景图才能实现想要的效果
 
+- 需要有和前面关卡类似的奖励动画， 只是植物卡包换成铲子图片， 卡包背景的粒子效果换成 assets/effect/particles/AwardPickupArrow.xml。奖励动画时图片为 Shovel_hi_res.png, 缩放改为和植物卡包一样的逻辑.
+
   实现方式：
   - 加载 IMAGE_BACKGROUND1 作为叠加背景
   - 根据草皮卷位置，裁剪 IMAGE_BACKGROUND1 的可见区域（从左向右展开）
