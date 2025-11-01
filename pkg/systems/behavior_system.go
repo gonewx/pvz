@@ -1207,40 +1207,29 @@ func (s *BehaviorSystem) handleCherryBombBehavior(entityID ecs.EntityID, deltaTi
 
 // triggerCherryBombExplosion 触发樱桃炸弹爆炸
 // 对以自身为中心的3x3范围内的所有僵尸造成1800点伤害，播放音效，删除樱桃炸弹实体
+// 修复: 使用世界坐标进行爆炸范围检测，确保边缘网格的爆炸范围可以覆盖网格外的僵尸
 func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 	log.Printf("[BehaviorSystem] 樱桃炸弹 %d: 开始爆炸！", entityID)
 
-	// 获取樱桃炸弹的位置和网格信息
-	plant, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, entityID)
+	// 获取樱桃炸弹的世界坐标位置
+	position, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
 	if !ok {
-		log.Printf("[BehaviorSystem] 警告：樱桃炸弹 %d 缺少 PlantComponent，无法确定爆炸位置", entityID)
+		log.Printf("[BehaviorSystem] 警告：樱桃炸弹 %d 缺少 PositionComponent，无法确定爆炸位置", entityID)
 		return
 	}
 
-	// 计算3x3爆炸范围的格子坐标
-	// 范围：[centerCol - 1, centerCol + 1] × [centerRow - 1, centerRow + 1]
-	centerCol := plant.GridCol
-	centerRow := plant.GridRow
-	minCol := centerCol - config.CherryBombRangeRadius
-	maxCol := centerCol + config.CherryBombRangeRadius
-	minRow := centerRow - config.CherryBombRangeRadius
-	maxRow := centerRow + config.CherryBombRangeRadius
+	// 计算基于世界坐标的3x3爆炸范围
+	// 3x3格子 = 横向和纵向各覆盖1.5个格子的距离
+	// 这样可以确保即使在边缘网格，爆炸范围也能扩展到网格外
+	explosionRadiusX := (float64(config.CherryBombRangeRadius) + 0.5) * config.CellWidth  // 1.5 * 80 = 120
+	explosionRadiusY := (float64(config.CherryBombRangeRadius) + 0.5) * config.CellHeight // 1.5 * 100 = 150
 
-	// 边界检查：确保范围在草坪内
-	if minCol < 0 {
-		minCol = 0
-	}
-	if maxCol > 8 {
-		maxCol = 8
-	}
-	if minRow < 0 {
-		minRow = 0
-	}
-	if maxRow > 4 {
-		maxRow = 4
-	}
+	minX := position.X - explosionRadiusX
+	maxX := position.X + explosionRadiusX
+	minY := position.Y - explosionRadiusY
+	maxY := position.Y + explosionRadiusY
 
-	log.Printf("[BehaviorSystem] 樱桃炸弹爆炸范围: 列[%d-%d], 行[%d-%d]", minCol, maxCol, minRow, maxRow)
+	log.Printf("[BehaviorSystem] 樱桃炸弹爆炸范围 (世界坐标): X[%.1f-%.1f], Y[%.1f-%.1f]", minX, maxX, minY, maxY)
 
 	// 查询所有僵尸实体（移动中和啃食中的僵尸）
 	allZombies := ecs.GetEntitiesWith2[*components.BehaviorComponent, *components.PositionComponent](s.entityManager)
@@ -1266,21 +1255,17 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 		}
 
 		// 获取僵尸的位置组件
-		pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
+		zombiePos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
 		if !ok {
 			continue
 		}
 
-		// 根据僵尸位置计算所在格子
-		zombieCol, zombieRow, valid := utils.WorldToGridCoords(pos.X, pos.Y)
-		if !valid {
-			continue
-		}
-
-		// 检查僵尸是否在爆炸范围内
-		if zombieCol >= minCol && zombieCol <= maxCol && zombieRow >= minRow && zombieRow <= maxRow {
+		// 使用世界坐标检查僵尸是否在爆炸范围内
+		// 这样可以覆盖网格边界外的僵尸
+		if zombiePos.X >= minX && zombiePos.X <= maxX &&
+			zombiePos.Y >= minY && zombiePos.Y <= maxY {
 			affectedZombies++
-			log.Printf("[BehaviorSystem] 僵尸 %d 在爆炸范围内（格子[%d,%d]），应用伤害", zombieID, zombieCol, zombieRow)
+			log.Printf("[BehaviorSystem] 僵尸 %d 在爆炸范围内（世界坐标: %.1f, %.1f），应用伤害", zombieID, zombiePos.X, zombiePos.Y)
 
 			// 应用伤害：先扣护甲，护甲不足或无护甲则扣生命值
 			damage := config.CherryBombDamage
@@ -1332,24 +1317,18 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 	}
 
 	// Story 7.4: 创建爆炸粒子效果
-	// 获取樱桃炸弹的世界坐标
-	position, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
-	if ok {
-		// 触发爆炸粒子效果
-		_, err := entities.CreateParticleEffect(
-			s.entityManager,
-			s.resourceManager,
-			"BossExplosion", // 粒子效果名称（不带.xml后缀）
-			position.X, position.Y,
-		)
-		if err != nil {
-			log.Printf("[BehaviorSystem] 警告：创建樱桃炸弹爆炸粒子效果失败: %v", err)
-			// 不阻塞游戏逻辑，游戏继续运行
-		} else {
-			log.Printf("[BehaviorSystem] 樱桃炸弹 %d 触发爆炸粒子效果，位置: (%.1f, %.1f)", entityID, position.X, position.Y)
-		}
+	// 触发爆炸粒子效果（使用已获取的position组件）
+	_, err := entities.CreateParticleEffect(
+		s.entityManager,
+		s.resourceManager,
+		"BossExplosion", // 粒子效果名称（不带.xml后缀）
+		position.X, position.Y,
+	)
+	if err != nil {
+		log.Printf("[BehaviorSystem] 警告：创建樱桃炸弹爆炸粒子效果失败: %v", err)
+		// 不阻塞游戏逻辑，游戏继续运行
 	} else {
-		log.Printf("[BehaviorSystem] 警告：樱桃炸弹 %d 缺少 PositionComponent，无法触发爆炸粒子效果", entityID)
+		log.Printf("[BehaviorSystem] 樱桃炸弹 %d 触发爆炸粒子效果，位置: (%.1f, %.1f)", entityID, position.X, position.Y)
 	}
 
 	// 删除樱桃炸弹实体
