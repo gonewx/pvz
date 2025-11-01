@@ -162,3 +162,77 @@ func TestMultiplePlantsDeathReleasesGrid(t *testing.T) {
 
 	t.Log("✅ All grids released correctly after multiple plant deaths")
 }
+
+// TestCherryBombExplosionReleasesGrid 验证樱桃炸弹爆炸后释放网格占用
+// Bug Fix: 确保樱桃炸弹爆炸后，玩家可以在该位置重新种植植物
+func TestCherryBombExplosionReleasesGrid(t *testing.T) {
+	// 创建测试环境
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(getTestAudioContext())
+	rs := NewReanimSystem(em)
+	gs := game.GetGameState()
+	lgs := NewLawnGridSystem(em, []int{1, 2, 3, 4, 5})
+
+	// 创建草坪网格实体
+	gridID := em.CreateEntity()
+	ecs.AddComponent(em, gridID, &components.LawnGridComponent{})
+
+	// 创建 BehaviorSystem
+	bs := NewBehaviorSystem(em, rm, rs, gs, lgs, gridID)
+
+	// 创建樱桃炸弹实体在网格 (4, 2)
+	cherryBombID := em.CreateEntity()
+	ecs.AddComponent(em, cherryBombID, &components.PlantComponent{
+		PlantType: components.PlantCherryBomb,
+		GridCol:   4,
+		GridRow:   2,
+	})
+	ecs.AddComponent(em, cherryBombID, &components.BehaviorComponent{
+		Type: components.BehaviorCherryBomb,
+	})
+	ecs.AddComponent(em, cherryBombID, &components.PositionComponent{
+		X: config.GridWorldStartX + 4*config.CellWidth + config.CellWidth/2,
+		Y: config.GridWorldStartY + 2*config.CellHeight + config.CellHeight/2,
+	})
+	ecs.AddComponent(em, cherryBombID, &components.TimerComponent{
+		Name:        "fuse",
+		TargetTime:  config.CherryBombFuseTime,
+		CurrentTime: config.CherryBombFuseTime, // 引信计时完成，准备爆炸
+		IsReady:     true,
+	})
+
+	// 标记网格为占用
+	err := lgs.OccupyCell(gridID, 4, 2, cherryBombID)
+	if err != nil {
+		t.Fatalf("Failed to occupy cell: %v", err)
+	}
+
+	// 验证网格已占用
+	if !lgs.IsOccupied(gridID, 4, 2) {
+		t.Fatal("Grid should be occupied before cherry bomb explosion")
+	}
+
+	// 创建僵尸用于测试爆炸范围（可选，不影响网格释放测试）
+	zombieID := em.CreateEntity()
+	ecs.AddComponent(em, zombieID, &components.BehaviorComponent{
+		Type: components.BehaviorZombieBasic,
+	})
+	ecs.AddComponent(em, zombieID, &components.HealthComponent{
+		CurrentHealth: 270,
+		MaxHealth:     270,
+	})
+	ecs.AddComponent(em, zombieID, &components.PositionComponent{
+		X: config.GridWorldStartX + 5*config.CellWidth,   // 樱桃炸弹右侧一格
+		Y: config.GridWorldStartY + 2*config.CellHeight + config.CellHeight/2,
+	})
+
+	// 触发更新，樱桃炸弹应该爆炸
+	bs.Update(0.1)
+
+	// 验证网格已释放（这是 Bug Fix 的核心验证）
+	if lgs.IsOccupied(gridID, 4, 2) {
+		t.Fatal("Grid should be released after cherry bomb explosion (Bug Fix failed)")
+	}
+
+	t.Log("✅ Bug Fix verified: Grid is released after cherry bomb explosion, allowing replanting")
+}

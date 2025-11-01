@@ -1331,6 +1331,16 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 		log.Printf("[BehaviorSystem] 樱桃炸弹 %d 触发爆炸粒子效果，位置: (%.1f, %.1f)", entityID, position.X, position.Y)
 	}
 
+	// Bug Fix: 释放樱桃炸弹占用的网格，允许重新种植
+	if plantComp, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, entityID); ok {
+		err := s.lawnGridSystem.ReleaseCell(s.lawnGridEntityID, plantComp.GridCol, plantComp.GridRow)
+		if err != nil {
+			log.Printf("[BehaviorSystem] 警告：释放樱桃炸弹网格占用失败: %v", err)
+		} else {
+			log.Printf("[BehaviorSystem] 樱桃炸弹网格 (%d, %d) 已释放", plantComp.GridCol, plantComp.GridRow)
+		}
+	}
+
 	// 删除樱桃炸弹实体
 	s.entityManager.DestroyEntity(entityID)
 	log.Printf("[BehaviorSystem] 樱桃炸弹 %d 已删除", entityID)
