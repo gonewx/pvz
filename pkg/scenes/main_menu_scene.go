@@ -166,17 +166,29 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 				if err := m.reanimSystem.PlayAnimation(m.selectorScreenEntity, "anim_idle"); err != nil {
 					log.Printf("[MainMenuScene] Warning: Failed to switch to anim_idle: %v", err)
 				} else {
-					// CRITICAL FIX: NOW override VisibleFrameCount to show all frames
-					// This MUST be done AFTER switching to anim_idle, not during anim_open
-					// SelectorScreen clouds/flowers appear in anim_idle frames 199-706
-					if reanimComp2, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity); ok {
-						standardFrameCount := len(reanimComp2.AnimVisibles) // 706
-						reanimComp2.VisibleFrameCount = standardFrameCount
-						log.Printf("[MainMenuScene] Override VisibleFrameCount=%d for anim_idle (to show clouds/flowers)", standardFrameCount)
+					// Story 12.1: SelectorScreen 特殊处理
+					// SelectorScreen 的 anim_idle 不应该使用动画定义轨道的时间窗口（只有 37 帧可见）
+					// 而应该让所有 706 帧都可见，每个轨道（云朵、叶子）根据自己的数据控制可见性
+					reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
+					if ok && reanimComp.Reanim != nil {
+						// 计算总帧数
+						standardFrameCount := 0
+						for _, track := range reanimComp.Reanim.Tracks {
+							if len(track.Frames) > standardFrameCount {
+								standardFrameCount = len(track.Frames)
+							}
+						}
+
+						// 将所有帧标记为可见
+						reanimComp.AnimVisibles = make([]int, standardFrameCount)
+						for i := 0; i < standardFrameCount; i++ {
+							reanimComp.AnimVisibles[i] = 0 // All frames visible
+						}
+						reanimComp.VisibleFrameCount = standardFrameCount
+
+						log.Printf("[MainMenuScene] SelectorScreen: Override AnimVisibles to show all %d frames", standardFrameCount)
 					}
 
-					// CRITICAL FIX 2: 重新应用 VisibleTracks 白名单
-					// 确保按钮和装饰元素仍然可见
 					m.updateButtonVisibility()
 					log.Printf("[MainMenuScene] Re-applied VisibleTracks after switching to anim_idle")
 				}
@@ -241,10 +253,9 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 func (m *MainMenuScene) Draw(screen *ebiten.Image) {
 	// Story 12.1: Draw SelectorScreen Reanim (contains background, buttons, decorations)
 	if m.renderSystem != nil && m.selectorScreenEntity != 0 {
-		// CRITICAL FIX: DrawGameWorld() 只渲染植物/僵尸/子弹，会跳过 SelectorScreen
-		// 需要直接调用 DrawEntity() 来渲染 SelectorScreen
+		// 使用 RenderSystem.Draw() 渲染所有实体（包括 SelectorScreen）
 		// 使用 cameraX = 0（主菜单没有摄像机偏移）
-		m.renderSystem.DrawEntity(screen, m.selectorScreenEntity, 0)
+		m.renderSystem.Draw(screen, 0)
 
 		// Note: Old m.buttons drawing removed - SelectorScreen Reanim handles all button rendering
 	} else {

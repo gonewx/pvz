@@ -63,6 +63,7 @@ assets/effect/particles/ZombieHead.xml 从实际运行 cmd/particles/main.go 看
 
 - 通过 .meta/screenshot/menu 下的所有图片, 描述主菜单界面的所有信息,以便于接下来实现这个界面和功能
 
+- 实现 .meta/data/data.md 和 docs/main-menu-spec.md 中 主菜单界面和功能。要重点查看 assets/effect/reanim/SelectorScreen.reanim 和  assets/effect/reanim/Zombie_hand.reanim,  以确定哪些是动画定义中就实现了的场景 ,哪些是需要我们二次加工实现的. 
 ### level1
 
 - @level1/ 中是本关卡中的关键截图，请参考
@@ -112,3 +113,5 @@ assets/images/FlagMeterParts.png
 - 优化僵尸不在有效行时的进攻逻辑，根据邻近的有效行，进攻时，保持X坐标不变，自动调整僵尸的Y坐标到有效行即可，不需要有移动的动画效果。
 
 - 桃炸弹的爆炸范围要考虑在边缘网格时候的情况, 如果种植在最右边网格, 爆炸范围应该包括网格右侧的范围,现在没法炸死右侧的僵尸.
+
+- 

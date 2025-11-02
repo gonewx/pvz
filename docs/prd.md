@@ -20,6 +20,7 @@
 | 2025-10-16 | 1.4 | Added Epic 9: ECS Generics Refactor - Brownfield Enhancement. | Sarah (PO) |
 | 2025-10-20 | 1.5 | Added Epic 10: Game Experience Polish - Brownfield Enhancement. | Sarah (PO) |
 | 2025-10-26 | 1.6 | Added Epic 11: Level UI Enhancement (进度条完善、最后一波提示、铺草皮特效). | Bob (Scrum Master) |
+| 2025-11-01 | 1.7 | Added Epic 12: Main Menu System (主菜单系统完整实现). | Sarah (PO) |
 
 ## **2. Requirements (需求)**
 

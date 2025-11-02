@@ -743,12 +743,38 @@ func (rm *ResourceManager) loadReanimPartImages(unitName string, reanimXML *rean
 		}
 	}
 
+	// Special handling for SelectorScreen background images (jpg + png overlay)
+	// These background images need compositing to remove black backgrounds
+	needsCompositing := map[string]string{
+		"IMAGE_REANIM_SELECTORSCREEN_BG_CENTER": "IMAGE_REANIM_SELECTORSCREEN_BG_CENTER_OVERLAY",
+		"IMAGE_REANIM_SELECTORSCREEN_BG_LEFT":   "IMAGE_REANIM_SELECTORSCREEN_BG_LEFT_OVERLAY",
+		"IMAGE_REANIM_SELECTORSCREEN_BG_RIGHT":  "IMAGE_REANIM_SELECTORSCREEN_BG_RIGHT_OVERLAY",
+	}
+
 	// 加载每个图片
 	for imageRef := range imageRefs {
-		// 直接使用资源 ID 从配置文件加载图片
-		// 例如：IMAGE_REANIM_PEASHOOTER_HEAD
-		// 资源配置文件中定义了正确的路径：reanim/PeaShooter_head.png
-		img, err := rm.LoadImageByID(imageRef)
+		var img *ebiten.Image
+		var err error
+
+		// Check if this image needs compositing (jpg base + png overlay)
+		if overlayID, needsComposite := needsCompositing[imageRef]; needsComposite {
+			// Load composited image (jpg + png mask)
+			log.Printf("[ResourceManager] Applying alpha mask to %s using %s", imageRef, overlayID)
+			img, err = rm.LoadCompositedImage(imageRef, overlayID)
+			if err != nil {
+				log.Printf("[ResourceManager] Warning: Failed to composite %s, falling back to base image: %v", imageRef, err)
+				// Fallback: load base image only
+				img, err = rm.LoadImageByID(imageRef)
+			} else {
+				log.Printf("[ResourceManager] ✅ Successfully applied alpha mask to %s", imageRef)
+			}
+		} else {
+			// 直接使用资源 ID 从配置文件加载图片
+			// 例如：IMAGE_REANIM_PEASHOOTER_HEAD
+			// 资源配置文件中定义了正确的路径：reanim/PeaShooter_head.png
+			img, err = rm.LoadImageByID(imageRef)
+		}
+
 		if err != nil {
 			return nil, fmt.Errorf("failed to load image %s: %w", imageRef, err)
 		}
@@ -928,6 +954,121 @@ func (rm *ResourceManager) GetImageByID(resourceID string) *ebiten.Image {
 
 	// Get from cache
 	return rm.imageCache[filePath]
+}
+
+// LoadCompositedImage loads a base image and its alpha mask, then applies the mask to remove background.
+// This is used for PVZ assets where a JPG base image (with black background) needs to be
+// combined with a PNG mask to create transparency.
+//
+// The PNG mask works as follows:
+//   - White pixels in mask = fully opaque (keep the JPG pixel)
+//   - Black pixels in mask = fully transparent (remove background)
+//   - Gray pixels = partial transparency
+//
+// Parameters:
+//   - baseResourceID: Resource ID of the base image (e.g., "IMAGE_REANIM_SELECTORSCREEN_BG_CENTER")
+//   - maskResourceID: Resource ID of the alpha mask (e.g., "IMAGE_REANIM_SELECTORSCREEN_BG_CENTER_OVERLAY")
+//
+// Returns:
+//   - A new image with mask applied, or error if loading fails
+//
+// Example:
+//
+//	bgCenter, err := rm.LoadCompositedImage(
+//	    "IMAGE_REANIM_SELECTORSCREEN_BG_CENTER",
+//	    "IMAGE_REANIM_SELECTORSCREEN_BG_CENTER_OVERLAY")
+//
+// Note: The composited image is NOT cached. If you need to reuse it, store it yourself.
+func (rm *ResourceManager) LoadCompositedImage(baseResourceID, maskResourceID string) (*ebiten.Image, error) {
+	// Get file paths from resource config
+	basePath, exists := rm.resourceMap[baseResourceID]
+	if !exists {
+		return nil, fmt.Errorf("base resource ID not found: %s", baseResourceID)
+	}
+	maskPath, exists := rm.resourceMap[maskResourceID]
+	if !exists {
+		return nil, fmt.Errorf("mask resource ID not found: %s", maskResourceID)
+	}
+
+	// resourceMap already contains the full path with BasePath prepended
+	// (constructed by buildResourceMap), so we can use it directly
+
+	// Load base image file
+	baseFile, err := os.Open(basePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open base image file %s: %w", basePath, err)
+	}
+	defer baseFile.Close()
+
+	baseImg, _, err := image.Decode(baseFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode base image %s: %w", basePath, err)
+	}
+
+	// Load mask image file
+	maskFile, err := os.Open(maskPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open mask image file %s: %w", maskPath, err)
+	}
+	defer maskFile.Close()
+
+	maskImg, format, err := image.Decode(maskFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode mask image %s: %w", maskPath, err)
+	}
+
+	log.Printf("[ResourceManager] Applying alpha mask: %s (format=%s)", maskResourceID, format)
+
+	// Apply alpha mask
+	bounds := baseImg.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+
+	// Create RGBA image for result
+	result := image.NewRGBA(bounds)
+
+	// Process each pixel
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// Get base pixel
+			br, bg, bb, _ := baseImg.At(x, y).RGBA()
+
+			// Get mask pixel and convert to alpha
+			mr, mg, mb, ma := maskImg.At(x, y).RGBA()
+
+			// Calculate alpha from mask
+			var alpha uint8
+			if ma < 65535 {
+				// PNG has alpha channel, use it directly
+				alpha = uint8(ma / 256)
+			} else {
+				// PNG is RGB only, use brightness as alpha
+				// White pixels in mask = fully opaque (keep the JPG pixel)
+				// Black pixels in mask = fully transparent (remove background)
+				// Gray pixels = partial transparency (anti-aliasing)
+				maskBrightness := (mr + mg + mb) / 3
+				alpha = uint8(maskBrightness / 256)
+			}
+
+			// Apply premultiplied alpha to reduce edge artifacts
+			// This ensures semi-transparent edges blend correctly
+			alphaF := float64(alpha) / 255.0
+			finalR := uint8(float64(br/256) * alphaF)
+			finalG := uint8(float64(bg/256) * alphaF)
+			finalB := uint8(float64(bb/256) * alphaF)
+
+			// Set result pixel
+			result.Set(x, y, color.RGBA{
+				R: finalR,
+				G: finalG,
+				B: finalB,
+				A: alpha,
+			})
+		}
+	}
+
+	// Convert to ebiten.Image
+	return ebiten.NewImageFromImage(result), nil
 }
 
 // GetImageMetadata retrieves sprite sheet metadata (cols, rows) for an image resource.

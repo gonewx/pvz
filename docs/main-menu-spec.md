@@ -126,13 +126,10 @@
 
 ### 背景动画
 - **云朵飘动**：缓慢横向移动
-- **树叶摆动**：轻微晃动效果（可选）
 
 ### 角色动画
-- **仙人掌待机动画**：
-  - 从石块底部升起
-  - 循环播放待机动作
-  - 位置：左下角石块区域
+- **僵尸手掌动画**：
+  - 从地下升起： assets/effect/reanim/Zombie_hand.reanim
 
 ### UI动画
 - **按钮高亮**：颜色渐变过渡（0.2秒）
@@ -141,77 +138,67 @@
 
 ---
 
-### 坐标系统
-
-**使用屏幕坐标系**（主菜单无需世界坐标）
-
-#### 关键位置参考（假设屏幕分辨率 1280x720）
-
-| 元素 | 位置 | 对齐方式 |
-|------|------|---------|
-| 石碑 | X: 800, Y: 360 | 右侧居中 |
-| 按钮组 | X: 1100, Y: 650 | 右下角 |
-| 对话框 | X: 640, Y: 360 | 屏幕中央 |
-| 仙人掌 | X: 150, Y: 600 | 左下角 |
-
-**注意**：实际坐标需根据资源图片大小和屏幕分辨率调整。
-
-### 状态管理
-
-#### GameProgressState（游戏进度状态）
-```go
-type GameProgressState struct {
-    CurrentLevel        int   // 当前关卡（如 1-4）
-    MinigameUnlocked    bool  // 小游戏是否解锁
-    PuzzleUnlocked      bool  // 解谜模式是否解锁
-    SurvivalUnlocked    bool  // 生存模式是否解锁
-}
-```
-
-#### MenuUIState（菜单UI状态）
-```go
-type MenuUIState struct {
-    HoveredButton       string  // 当前悬停按钮ID
-    DialogVisible       bool    // 对话框是否显示
-    DialogMessage       string  // 对话框消息内容
-}
-```
-
----
-
 ## 七、资源清单
 
-### 图片资源
+所有需要的动画资源都在这个文件定义了：
 
-| 资源ID | 文件路径 | 描述 |
-|--------|---------|------|
-| IMAGE_MENU_BACKGROUND | `assets/images/menu/background.png` | 完整背景（天空+房子+树） |
-| IMAGE_MENU_STONEPLATE | `assets/images/menu/stone_plate.png` | 石碑纹理 |
-| IMAGE_MENU_BUTTON_LEAF | `assets/images/menu/button_leaf.png` | 叶子按钮（正常态） |
-| IMAGE_MENU_BUTTON_LEAF_HIGHLIGHT | `assets/images/menu/button_leaf_highlight.png` | 叶子按钮（高亮态） |
-| IMAGE_MENU_DIALOG | `assets/images/menu/dialog_bg.png` | 对话框背景 |
-| IMAGE_MENU_DIALOG_SKULL | `assets/images/menu/dialog_skull.png` | 对话框骷髅装饰 |
-| IMAGE_MENU_SIGNS | `assets/images/menu/wooden_signs.png` | 木质告示牌 |
-| IMAGE_REANIM_CACTUS | `assets/reanim/cactus.png` | 仙人掌角色精灵 |
-| IMAGE_MENU_CLOUDS | `assets/images/menu/clouds.png` | 云朵精灵（动画用） |
+assets/effect/reanim/SelectorScreen.reanim
 
-### 字体资源
+## 墓碑按钮
 
-| 资源ID | 用途 |
-|--------|------|
-| FONT_MENU_TITLE | 菜单选项大标题 |
-| FONT_MENU_TEXT | 对话框文字 |
-| FONT_MENU_SMALL | "LEVEL 1-4"、版本号等 |
+冒险模式：SelectorScreen_Adventure_highlight
+生存模式的按钮对应的图片是：SelectorScreen_Vasebreaker_button.  
+玩玩小游戏: SelectorScreen_Survival_button. 
+解谜模式:  SelectorScreen_Challenges_highlight 
 
-### 音效资源
 
-| 资源ID | 文件路径 | 触发场景 |
-|--------|---------|---------|
-| SOUND_BUTTONCLICK | `assets/sounds/buttonclick.ogg` | 点击按钮 |
-| SOUND_MENU_BGM | `assets/music/menu_bgm.mp3` | 主菜单背景音乐 |
-| SOUND_DIALOG_OPEN | `assets/sounds/dialog_open.ogg` | 对话框打开 |
-| SOUND_DIALOG_CLOSE | `assets/sounds/dialog_close.ogg` | 对话框关闭 |
+reanim: 
+没解锁时，要显示类似轨道，而且点击后弹出未解锁的对话框
+<name>SelectorScreen_Challenges_shadow</name>
 
+### 对话框图片资源：
+
+
+assets/images/dialog_bigbottomleft.png
+assets/images/dialog_bigbottommiddle.png
+assets/images/dialog_bigbottomright.png
+assets/images/dialog_bottomleft.png
+assets/images/dialog_bottommiddle.png
+assets/images/dialog_bottomright.png
+assets/images/dialog_centerleft.png
+assets/images/dialog_centermiddle.png
+assets/images/dialog_centerright.png
+assets/images/dialog_header.png
+assets/images/dialog_topleft.png
+assets/images/dialog_topmiddle.png
+assets/images/dialog_topright.png
+
+### 花瓶样的按钮
+
+屏幕右下角有3个花瓶样的按钮，鼠标悬浮时：
+*   **选项 (Options)**
+*   **帮助 (Help)**
+*   **退出 (Quit)**
+
+assets/images/SelectorScreen_Help1.png
+assets/images/SelectorScreen_Help2.png
+assets/images/SelectorScreen_Options1.png
+assets/images/SelectorScreen_Options2.png
+assets/images/SelectorScreen_Quit1.png
+assets/images/SelectorScreen_Quit2.png
+
+### 蒙版图片
+
+PNG 文件是 8-bit 调色板模式，是用作 Alpha 蒙版的。使用 PNG 作为蒙版来抠出 JPG 中相应要显示的部分, 具体是让背景图片在蒙版的非白色部分透明，蒙版中有灰度值用于抗锯齿，添加预乘 alpha 处理来改善边缘质量。
+assets/reanim/SelectorScreen_BG_Left.jpg
+assets/reanim/SelectorScreen_BG_Right.jpg
+assets/reanim/SelectorScreen_BG_Center.jpg
+
+assets/reanim/SelectorScreen_BG_Left_.png
+assets/reanim/SelectorScreen_BG_Right_.png
+assets/reanim/SelectorScreen_BG_Center_.png
+
+### 
 ---
 
 ## 八、交互流程图
