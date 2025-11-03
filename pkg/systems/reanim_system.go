@@ -42,25 +42,6 @@ var LogicalTracks = map[string]bool{
 	"_ground":   true,
 }
 
-// HeadTracks are tracks that belong to the head part group.
-// These tracks use the secondary animation (e.g., anim_shooting) in dual-animation mode.
-// Head tracks also inherit anim_stem offsets for parent-child hierarchy.
-var HeadTracks = map[string]bool{
-	"anim_face":        true,
-	"idle_mouth":       true,
-	"anim_blink":       true,
-	"idle_shoot_blink": true,
-	"anim_sprout":      true,
-}
-
-// ReanimStemInitX and ReanimStemInitY are the initial position of anim_stem.
-// These values are extracted from PeaShooterSingle.reanim at frame 4 (first visible frame).
-// Used to calculate stem offset for head parts: offset = current_pos - init_pos
-const (
-	ReanimStemInitX = 37.6
-	ReanimStemInitY = 48.7
-)
-
 // ReanimSystem is the Reanim animation system that manages skeletal animations
 // for entities with ReanimComponent.
 //
@@ -68,12 +49,16 @@ const (
 // - Advancing animation frames based on FPS
 // - Implementing frame inheritance (cumulative transformations)
 // - Managing animation loops
-// - Supporting dual-animation blending (Story 6.5)
+// - Supporting 5 playback modes (Story 6.6)
 //
 // All animation logic is centralized in this system, following the ECS
 // architecture principle of data-behavior separation.
 type ReanimSystem struct {
 	entityManager *ecs.EntityManager
+
+	// Story 6.6: Playback strategy instances (策略实例)
+	// 每种播放模式对应一个策略实例，通过策略模式实现多态播放
+	strategies map[PlaybackMode]PlaybackStrategy
 }
 
 // NewReanimSystem creates a new Reanim animation system.
@@ -84,8 +69,18 @@ type ReanimSystem struct {
 // Returns:
 //   - A pointer to the newly created ReanimSystem
 func NewReanimSystem(em *ecs.EntityManager) *ReanimSystem {
+	// Story 6.6: Initialize playback strategies
+	strategies := map[PlaybackMode]PlaybackStrategy{
+		ModeSimple:       &SimplePlaybackStrategy{},
+		ModeSkeleton:     &SkeletonPlaybackStrategy{},
+		ModeSequence:     &SequencePlaybackStrategy{},
+		ModeComplexScene: &ComplexScenePlaybackStrategy{},
+		ModeBlended:      &BlendedPlaybackStrategy{},
+	}
+
 	return &ReanimSystem{
 		entityManager: em,
+		strategies:    strategies,
 	}
 }
 
@@ -155,42 +150,6 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 				}
 			}
 		}
-
-		// Story 6.4: Update overlay animations
-		for i := 0; i < len(reanimComp.OverlayAnims); i++ {
-			layer := &reanimComp.OverlayAnims[i]
-
-			// Accumulate deltaTime for the overlay layer
-			layer.FrameAccumulator += deltaTime
-
-			// Advance frames for the overlay layer
-			if layer.FrameAccumulator >= timePerFrame {
-				layer.FrameAccumulator -= timePerFrame
-				layer.CurrentFrame++
-
-				// Check if the overlay animation has finished
-				if layer.CurrentFrame >= layer.VisibleFrameCount {
-					if layer.IsOneShot {
-						// Mark as finished (will be removed in the next step)
-						layer.IsFinished = true
-					} else {
-						// Loop the overlay animation
-						layer.CurrentFrame = 0
-					}
-				}
-			}
-		}
-
-		// Story 6.4: Remove finished overlay animations
-		// Use the filter pattern to safely remove elements from the slice
-		i := 0
-		for _, layer := range reanimComp.OverlayAnims {
-			if !layer.IsFinished {
-				reanimComp.OverlayAnims[i] = layer
-				i++
-			}
-		}
-		reanimComp.OverlayAnims = reanimComp.OverlayAnims[:i]
 	}
 }
 
@@ -291,12 +250,6 @@ func (s *ReanimSystem) isAnimationDefinitionTrackByName(trackName string) bool {
 // Logical tracks like anim_stem define attachment points or parent bones.
 func (s *ReanimSystem) isLogicalTrack(trackName string) bool {
 	return LogicalTracks[trackName]
-}
-
-// isHeadTrack checks if a track belongs to the head part group.
-// Head tracks use the secondary animation in dual-animation mode.
-func (s *ReanimSystem) isHeadTrack(trackName string) bool {
-	return HeadTracks[trackName]
 }
 
 // hasFrameNumValues checks if a track has any FrameNum values.
@@ -430,6 +383,16 @@ func (s *ReanimSystem) buildMergedTracks(comp *components.ReanimComponent) map[s
 	// Process ALL tracks, including animation definition tracks
 	// Some plants (like SunFlower) have their head images in anim_* tracks
 	for _, track := range comp.Reanim.Tracks {
+		// Story 12.1 修复：检测轨道是否真正有 f 值
+		// 纯视觉轨道（如 leaf1）没有 f 值，不应该在 mergedFrame 中设置 FrameNum
+		hasFrameNum := false
+		for _, frame := range track.Frames {
+			if frame.FrameNum != nil {
+				hasFrameNum = true
+				break
+			}
+		}
+
 		// Initialize accumulated state
 		accX := 0.0
 		accY := 0.0
@@ -483,7 +446,14 @@ func (s *ReanimSystem) buildMergedTracks(comp *components.ReanimComponent) map[s
 			sy := accSY
 			kx := accKX
 			ky := accKY
-			f := accF
+
+			// Story 12.1 修复：只有轨道真正有 f 值时，才设置 FrameNum
+			// 否则保持 nil，让 shouldRenderTrack 能正确识别纯视觉轨道
+			var frameNumPtr *int
+			if hasFrameNum {
+				f := accF
+				frameNumPtr = &f
+			}
 
 			mergedFrames[i] = reanim.Frame{
 				X:         &x,
@@ -492,7 +462,7 @@ func (s *ReanimSystem) buildMergedTracks(comp *components.ReanimComponent) map[s
 				ScaleY:    &sy,
 				SkewX:     &kx,
 				SkewY:     &ky,
-				FrameNum:  &f,
+				FrameNum:  frameNumPtr,
 				ImagePath: accImg,
 			}
 		}
@@ -580,28 +550,28 @@ func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) err
 	reanimComp.IsLooping = true   // Default: animations loop
 	reanimComp.IsFinished = false // Reset finished flag
 
-	// Story 6.4: Set base animation name and clear overlay animations
-	// When switching base animations, all overlay animations are cleared
-	reanimComp.BaseAnimName = animName
-	reanimComp.OverlayAnims = []components.AnimLayer{} // Clear all overlay animations
+	// ==================================================================
+	// Story 6.6: Playback Mode Detection (播放模式检测)
+	// ==================================================================
+	//
+	// 自动检测 Reanim 文件的播放模式，替代之前的硬编码逻辑。
+	// 检测后设置对应的策略，无需调用者指定模式。
+	//
+	reanimComp.PlaybackMode = int(detectPlaybackMode(reanimComp.Reanim))
 
-	// ==================================================================
-	// Story 6.5: Dual-Animation Blending (双动画叠加)
-	// ==================================================================
-	//
-	// When playing anim_shooting, enable dual-animation mode:
-	// - PrimaryAnimation: anim_idle (body parts continue swaying)
-	// - SecondaryAnimation: anim_shooting (head parts shoot)
-	//
-	// This fixes the bug where only the head was visible during shooting.
-	if animName == "anim_shooting" {
+	log.Printf("[ReanimSystem] Entity %d: Detected playback mode: %s for animation '%s'",
+		entityID, PlaybackMode(reanimComp.PlaybackMode).String(), animName)
+
+	// 混合模式的特殊处理（向后兼容）
+	// 如果检测到混合模式，且当前动画是射击动画，启用双动画叠加
+	if PlaybackMode(reanimComp.PlaybackMode) == ModeBlended && animName == "anim_shooting" {
 		reanimComp.IsBlending = true
 		reanimComp.PrimaryAnimation = "anim_idle"
 		reanimComp.SecondaryAnimation = "anim_shooting"
 
 		log.Printf("[ReanimSystem] Entity %d: Enabling dual-animation blending (idle + shooting)", entityID)
 	} else {
-		// Single animation mode
+		// 单动画模式
 		reanimComp.IsBlending = false
 		reanimComp.PrimaryAnimation = animName
 		reanimComp.SecondaryAnimation = ""
@@ -613,12 +583,11 @@ func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) err
 	}
 
 	// Build visibility array for the current animation
-	reanimComp.AnimVisibles = s.buildVisiblesArray(reanimComp, animName)
-	reanimComp.AnimVisiblesMap[animName] = reanimComp.AnimVisibles
+	reanimComp.AnimVisiblesMap[animName] = s.buildVisiblesArray(reanimComp, animName)
 
 	// Calculate visible frame count (number of frames with visibility 0)
 	visibleCount := 0
-	for _, v := range reanimComp.AnimVisibles {
+	for _, v := range reanimComp.AnimVisiblesMap[animName] {
 		if v == 0 {
 			visibleCount++
 		}
@@ -656,7 +625,8 @@ func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) err
 
 	for frameIdx := 0; frameIdx < reanimComp.VisibleFrameCount; frameIdx++ {
 		// Skip invisible frames
-		if frameIdx < len(reanimComp.AnimVisibles) && reanimComp.AnimVisibles[frameIdx] == -1 {
+		animVisibles := reanimComp.AnimVisiblesMap[animName]
+		if frameIdx < len(animVisibles) && animVisibles[frameIdx] == -1 {
 			continue
 		}
 
@@ -703,109 +673,6 @@ func (s *ReanimSystem) PlayAnimationNoLoop(entityID ecs.EntityID, animName strin
 		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
 	}
 	reanimComp.IsLooping = false
-
-	return nil
-}
-
-// PlayAnimationOverlay starts playing an overlay animation on top of the base animation (Story 6.4).
-//
-// ⚠️ Deprecated (2025-10-24): 此方法当前不使用，所有动画通过简单的 PlayAnimation() 切换实现。
-//
-// 经验证，原版《植物大战僵尸》不使用动画叠加机制。所有动画（包括攻击、眨眼、状态切换）
-// 都通过简单的 PlayAnimation() 切换实现，部件显示由 VisibleTracks 机制控制。
-//
-// 保留此方法以备未来可能的扩展（如 Mod 支持、特殊效果），但当前不应在业务代码中调用。
-//
-// 推荐使用：
-//   - PlayAnimation(entityID, "anim_shooting")  // 切换到攻击动画
-//   - PlayAnimation(entityID, "anim_idle")      // 切换回空闲动画
-//
-// VisibleTracks 机制说明：
-//   - 原版游戏通过动画定义中的 VisibleTracks（可见轨道列表）控制部件显示
-//   - 例如：anim_shooting 包含 stalk_bottom, stalk_top, anim_head_idle 所有需要的部件
-//   - 渲染系统自动根据轨道定义渲染所有可见部件
-//   - 无需手动控制部件显示，也无需使用动画叠加
-//
-// 相关文档：
-//   - Sprint Change Proposal: docs/qa/sprint-change-proposal-story-6.4-animation-mechanism.md
-//   - Story 6.4: docs/stories/6.4.story.md (标记为 Deprecated)
-//   - Story 10.3: docs/stories/10.3.story.md (使用正确的简单切换方法)
-//
-// ---
-//
-// 原始说明（历史记录，仅供参考）：
-//
-// Overlay animations are rendered after the base animation and can override specific tracks.
-// This is used for effects like blinking eyes, damage flashes, or attack effects.
-//
-// Example:
-//
-//	Base animation: "anim_idle" (continuous, controls body)
-//	Overlay animation: "anim_blink" (one-shot, overrides mouth/eye tracks)
-//
-// Parameters:
-//   - entityID: the entity to play the overlay animation on
-//   - animName: the name of the overlay animation (e.g., "anim_blink")
-//   - playOnce: if true, the animation plays once and is automatically removed;
-//     if false, the animation loops continuously
-//
-// Returns:
-//   - An error if the entity doesn't have a ReanimComponent or the animation doesn't exist
-//
-// Deprecated: 使用 PlayAnimation() 代替
-func (s *ReanimSystem) PlayAnimationOverlay(entityID ecs.EntityID, animName string, playOnce bool) error {
-	// Get the ReanimComponent
-	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-	if !exists {
-		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
-	}
-
-	// Check if Reanim data is present
-	if reanimComp.Reanim == nil {
-		return fmt.Errorf("entity %d has a ReanimComponent but no Reanim data", entityID)
-	}
-
-	// Check if the overlay animation exists
-	animTrack := s.getAnimDefinitionTrack(reanimComp, animName)
-	if animTrack == nil {
-		return fmt.Errorf("overlay animation '%s' not found in Reanim data for entity %d", animName, entityID)
-	}
-
-	// Build visibility array for the overlay animation
-	animVisibles := s.buildVisiblesArray(reanimComp, animName)
-
-	// Calculate visible frame count
-	visibleCount := 0
-	for _, v := range animVisibles {
-		if v == 0 {
-			visibleCount++
-		}
-	}
-
-	// Get animation tracks for the overlay animation
-	// Note: getAnimationTracks() returns ALL tracks with images, not just those for a specific animation.
-	// For overlay animations, we use the same tracks as the base animation, because overlay animations
-	// typically override specific tracks (like mouth/eyes) rather than defining completely new tracks.
-	// The rendering system will check each track to see if the overlay has data for it.
-	animTracks := s.getAnimationTracks(reanimComp)
-
-	// Create a new overlay animation layer
-	newLayer := components.AnimLayer{
-		AnimName:          animName,
-		CurrentFrame:      0,
-		FrameAccumulator:  0.0,
-		IsOneShot:         playOnce,
-		IsFinished:        false,
-		VisibleFrameCount: visibleCount,
-		AnimVisibles:      animVisibles,
-		AnimTracks:        animTracks,
-	}
-
-	// Add the overlay layer to the list
-	reanimComp.OverlayAnims = append(reanimComp.OverlayAnims, newLayer)
-
-	log.Printf("[ReanimSystem] PlayAnimationOverlay: Entity=%d, Overlay=%s, PlayOnce=%v, VisibleFrames=%d",
-		entityID, animName, playOnce, visibleCount)
 
 	return nil
 }
@@ -880,11 +747,17 @@ func (s *ReanimSystem) initializeDirectRenderInternal(entityID ecs.EntityID, cal
 
 	log.Printf("[ReanimSystem] Standard frame count: %d", standardFrameCount)
 
-	// Build AnimVisibles: all frames are visible (all 0s)
-	reanimComp.AnimVisibles = make([]int, standardFrameCount)
-	for i := range reanimComp.AnimVisibles {
-		reanimComp.AnimVisibles[i] = 0 // 0 = visible
+	// Initialize AnimVisiblesMap if needed
+	if reanimComp.AnimVisiblesMap == nil {
+		reanimComp.AnimVisiblesMap = make(map[string][]int)
 	}
+
+	// Build AnimVisibles: all frames are visible (all 0s)
+	animVisibles := make([]int, standardFrameCount)
+	for i := range animVisibles {
+		animVisibles[i] = 0 // 0 = visible
+	}
+	reanimComp.AnimVisiblesMap["direct_render"] = animVisibles
 
 	// Set visible frame count
 	reanimComp.VisibleFrameCount = standardFrameCount
@@ -921,8 +794,9 @@ func (s *ReanimSystem) calculateCenterOffset(comp *components.ReanimComponent) {
 	// Find the first visible frame (physical frame index)
 	physicalIndex := -1
 	logicalFrame := 0
-	for i := 0; i < len(comp.AnimVisibles); i++ {
-		if comp.AnimVisibles[i] == 0 {
+	animVisibles := comp.AnimVisiblesMap[comp.CurrentAnim]
+	for i := 0; i < len(animVisibles); i++ {
+		if animVisibles[i] == 0 {
 			if logicalFrame == 0 {
 				physicalIndex = i
 				break
@@ -1366,14 +1240,15 @@ func (s *ReanimSystem) GetTrackPosition(entityID ecs.EntityID, trackName string)
 // findPhysicalFrameIndex 将逻辑帧号映射到物理帧索引
 // 这是 RenderSystem 中同名方法的复制，因为需要在 ReanimSystem 中使用
 func (s *ReanimSystem) findPhysicalFrameIndex(reanim *components.ReanimComponent, logicalFrameNum int) int {
-	if len(reanim.AnimVisibles) == 0 {
+	animVisibles := reanim.AnimVisiblesMap[reanim.CurrentAnim]
+	if len(animVisibles) == 0 {
 		return -1
 	}
 
 	// 逻辑帧按区间映射：从第一个0开始到下一个非0之前
 	logicalIndex := 0
-	for i := 0; i < len(reanim.AnimVisibles); i++ {
-		if reanim.AnimVisibles[i] == 0 {
+	for i := 0; i < len(animVisibles); i++ {
+		if animVisibles[i] == 0 {
 			if logicalIndex == logicalFrameNum {
 				return i
 			}
@@ -1474,15 +1349,21 @@ func (s *ReanimSystem) PrepareStaticPreview(entityID ecs.EntityID, reanimName st
 		}
 	}
 
+	// Initialize AnimVisiblesMap if needed
+	if reanimComp.AnimVisiblesMap == nil {
+		reanimComp.AnimVisiblesMap = make(map[string][]int)
+	}
+
 	// Create AnimVisibles array with only bestFrame marked as visible
-	reanimComp.AnimVisibles = make([]int, maxFrames)
+	animVisibles := make([]int, maxFrames)
 	for i := 0; i < maxFrames; i++ {
 		if i == bestFrame {
-			reanimComp.AnimVisibles[i] = 0 // Best frame is visible
+			animVisibles[i] = 0 // Best frame is visible
 		} else {
-			reanimComp.AnimVisibles[i] = -1 // Other frames are hidden
+			animVisibles[i] = -1 // Other frames are hidden
 		}
 	}
+	reanimComp.AnimVisiblesMap["static_preview"] = animVisibles
 	reanimComp.VisibleFrameCount = 1 // Only one frame is visible
 
 	// 8. Set static preview state (do not start animation loop)
@@ -1912,4 +1793,74 @@ func (rs *ReanimSystem) GetTrackTransform(entityID ecs.EntityID, trackName strin
 	}
 
 	return x, y, nil
+}
+
+// ==================================================================
+// Track-Level Playback Control (Story 12.1)
+// ==================================================================
+
+// SetTrackPlayOnce configures a track to play once and then lock at its final frame.
+// This is used for one-time animations like tombstone rising or sign dropping.
+//
+// Parameters:
+//   - entity: The entity ID with ReanimComponent
+//   - trackName: Name of the track (e.g., "SelectorScreen_Adventure_button")
+//
+// The track will play normally until it reaches its last visible frame, then lock.
+// Locked tracks will not update in subsequent frames.
+func (rs *ReanimSystem) SetTrackPlayOnce(entity ecs.EntityID, trackName string) error {
+	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](rs.entityManager, entity)
+	if !ok {
+		return fmt.Errorf("entity %d has no ReanimComponent", entity)
+	}
+
+	// Initialize TrackConfigs map if needed
+	if reanimComp.TrackConfigs == nil {
+		reanimComp.TrackConfigs = make(map[string]*components.TrackPlaybackConfig)
+	}
+
+	// Create or update config
+	if reanimComp.TrackConfigs[trackName] == nil {
+		reanimComp.TrackConfigs[trackName] = &components.TrackPlaybackConfig{}
+	}
+	reanimComp.TrackConfigs[trackName].PlayOnce = true
+
+	return nil
+}
+
+// PauseTrack pauses playback of a specific track.
+// The track will stop updating but can be resumed later.
+func (rs *ReanimSystem) PauseTrack(entity ecs.EntityID, trackName string) error {
+	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](rs.entityManager, entity)
+	if !ok {
+		return fmt.Errorf("entity %d has no ReanimComponent", entity)
+	}
+
+	// Initialize TrackConfigs map if needed
+	if reanimComp.TrackConfigs == nil {
+		reanimComp.TrackConfigs = make(map[string]*components.TrackPlaybackConfig)
+	}
+
+	// Create or update config
+	if reanimComp.TrackConfigs[trackName] == nil {
+		reanimComp.TrackConfigs[trackName] = &components.TrackPlaybackConfig{}
+	}
+	reanimComp.TrackConfigs[trackName].IsPaused = true
+
+	return nil
+}
+
+// ResumeTrack resumes playback of a paused track.
+func (rs *ReanimSystem) ResumeTrack(entity ecs.EntityID, trackName string) error {
+	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](rs.entityManager, entity)
+	if !ok {
+		return fmt.Errorf("entity %d has no ReanimComponent", entity)
+	}
+
+	if reanimComp.TrackConfigs == nil || reanimComp.TrackConfigs[trackName] == nil {
+		return nil // No config, track is already playing
+	}
+
+	reanimComp.TrackConfigs[trackName].IsPaused = false
+	return nil
 }

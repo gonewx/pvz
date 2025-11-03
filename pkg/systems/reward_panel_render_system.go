@@ -668,13 +668,15 @@ func (rprs *RewardPanelRenderSystem) drawFallbackButton(screen *ebiten.Image, al
 
 // findPhysicalFrameIndex 将逻辑帧号映射到物理帧索引（简化版）。
 func (rprs *RewardPanelRenderSystem) findPhysicalFrameIndex(reanim *components.ReanimComponent, logicalFrameNum int) int {
-	if len(reanim.AnimVisibles) == 0 {
+	// 获取当前动画的 AnimVisibles
+	animVisibles := reanim.AnimVisiblesMap[reanim.CurrentAnim]
+	if len(animVisibles) == 0 {
 		return -1
 	}
 
 	logicalIndex := 0
-	for i := 0; i < len(reanim.AnimVisibles); i++ {
-		if reanim.AnimVisibles[i] == 0 {
+	for i := 0; i < len(animVisibles); i++ {
+		if animVisibles[i] == 0 {
 			if logicalIndex == logicalFrameNum {
 				return i
 			}

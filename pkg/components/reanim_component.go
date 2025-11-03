@@ -5,64 +5,26 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// AnimLayer represents a single overlay animation layer (Story 6.4 - 已废弃).
-//
-// ⚠️ Deprecated (2025-10-24): 此结构体当前不使用，保留以备未来扩展。
-//
-// 经验证，原版游戏不使用动画叠加机制。所有动画通过简单的 PlayAnimation() 切换实现。
-// 请勿在业务代码中使用此结构体。
-//
-// 相关文档：
-//   - Sprint Change Proposal: docs/qa/sprint-change-proposal-story-6.4-animation-mechanism.md
-//   - Story 6.4: docs/stories/6.4.story.md (标记为 Deprecated)
-//
-// ---
-//
-// 原始说明（历史记录，仅供参考）：
-//
-// Overlay animations are short-lived animations that play on top of the base animation,
-// allowing for effects like blinking eyes, damage flashes, or attack effects.
-//
-// Example:
-//
-//	Base animation: "anim_idle" (continuous loop, controls body movement)
-//	Overlay animation: "anim_blink" (one-shot, overrides mouth/eye tracks for 2-3 frames)
-//
-// This is a pure data structure with no methods, following ECS architecture principles.
-type AnimLayer struct {
-	// AnimName is the name of the overlay animation (e.g., "anim_blink").
-	AnimName string
+// TrackPlaybackConfig defines playback behavior for an individual track (Story 12.1).
+// This allows fine-grained control over track behavior at the business logic level.
+type TrackPlaybackConfig struct {
+	// PlayOnce indicates the track should play once and then lock at the final frame.
+	// When true, the track will stop updating after reaching its last visible frame.
+	// Used for one-time animations like tombstone rising or sign dropping.
+	PlayOnce bool
 
-	// CurrentFrame is the current logical frame number for this layer (0-based).
-	CurrentFrame int
+	// IsLocked indicates the track has finished playing and is locked at a specific frame.
+	// When true, ReanimSystem will not update this track's frame index.
+	// Set automatically when PlayOnce track completes.
+	IsLocked bool
 
-	// FrameAccumulator is the frame accumulator for precise FPS control.
-	// Accumulates deltaTime until it reaches the time for one animation frame (1.0/fps).
-	FrameAccumulator float64
+	// LockedFrame is the frame number where the track is locked.
+	// Only used when IsLocked is true.
+	LockedFrame int
 
-	// IsOneShot determines whether the animation plays once and is automatically removed.
-	// If true, the layer will be removed from OverlayAnims when it completes.
-	// If false, the animation loops continuously.
-	IsOneShot bool
-
-	// IsFinished indicates whether a one-shot animation has completed.
-	// Set to true when CurrentFrame >= VisibleFrameCount for one-shot animations.
-	// The layer will be removed in the next Update cycle.
-	IsFinished bool
-
-	// VisibleFrameCount is the number of visible frames in this overlay animation.
-	// Built from the animation definition track when PlayAnimationOverlay is called.
-	VisibleFrameCount int
-
-	// AnimVisibles is the visibility array for this overlay animation.
-	// Each element corresponds to a frame: 0 = visible, -1 = hidden.
-	// Built from the animation definition track when PlayAnimationOverlay is called.
-	AnimVisibles []int
-
-	// AnimTracks is the list of part tracks to render for this overlay animation.
-	// These tracks override the base animation's tracks with the same name.
-	// Built when PlayAnimationOverlay is called.
-	AnimTracks []reanim.Track
+	// IsPaused indicates the track should temporarily stop updating.
+	// Unlike IsLocked, paused tracks can be resumed.
+	IsPaused bool
 }
 
 // ReanimComponent is a Reanim animation component (pure data, no methods).
@@ -71,7 +33,23 @@ type AnimLayer struct {
 //
 // This component follows the ECS architecture principle of data-behavior separation:
 // all animation logic is implemented in ReanimSystem.
+//
+// Fields are organized into three logical groups:
+// 1. Animation Definition - The animation data and playback mode
+// 2. Playback State - Current runtime state of the animation
+// 3. Advanced Features - Blending, caching, and control features
 type ReanimComponent struct {
+	// ==========================================================================
+	// Animation Definition (动画定义)
+	// ==========================================================================
+
+	// PlaybackMode is the auto-detected playback mode (Story 6.6).
+	// Automatically set by ReanimSystem when PlayAnimation is called.
+	// Five modes: Simple, Skeleton, Sequence, ComplexScene, Blended.
+	// Note: This is an int enum value, not an interface (preserves component purity).
+	// The actual strategy interface is managed in ReanimSystem.
+	PlaybackMode int
+
 	// Reanim is the parsed Reanim animation data (from internal/reanim package).
 	// Contains FPS and track definitions for the animation.
 	Reanim *reanim.ReanimXML
@@ -80,6 +58,10 @@ type ReanimComponent struct {
 	// Key: image reference name (e.g., "IMAGE_REANIM_PEASHOOTER_HEAD")
 	// Value: corresponding Ebitengine image object
 	PartImages map[string]*ebiten.Image
+
+	// ==========================================================================
+	// Playback State (播放状态)
+	// ==========================================================================
 
 	// CurrentAnim is the name of the currently playing animation (e.g., "anim_idle").
 	CurrentAnim string
@@ -112,11 +94,9 @@ type ReanimComponent struct {
 	// Used for entities that should remain static (e.g., lawnmowers before trigger).
 	IsPaused bool
 
-	// AnimVisibles is the visibility array for the current animation.
-	// Each element corresponds to a frame: 0 = visible, -1 = hidden.
-	// Built from the animation definition track when PlayAnimation is called.
-	// DEPRECATED: Use AnimVisiblesMap instead for multi-animation support (Story 6.5).
-	AnimVisibles []int
+	// ==========================================================================
+	// Advanced Features (高级特性)
+	// ==========================================================================
 
 	// AnimVisiblesMap stores time windows for multiple animations (Story 6.5).
 	// Key: animation name (e.g., "anim_idle", "anim_shooting")
@@ -130,27 +110,7 @@ type ReanimComponent struct {
 	// Built by buildMergedTracks when PlayAnimation is called.
 	MergedTracks map[string][]reanim.Frame
 
-	// ==================================================================
-	// Story 6.5: Dual Animation Blending System (双动画叠加系统)
-	// ==================================================================
-	//
-	// 用于修复豌豆射手攻击动画问题：
-	// - 问题：攻击时只显示头部，身体消失，且头部不随身体摆动
-	// - 原因：误解了 Reanim 格式，错误地对混合轨道的 f=-1 进行隐藏
-	// - 解决：实现双动画叠加 + 父子层级关系
-	//
-	// 双动画叠加原理：
-	// - 攻击时同时播放两个动画：anim_idle（身体）+ anim_shooting（头部）
-	// - 身体部件使用 anim_idle 的物理帧
-	// - 头部部件使用 anim_shooting 的物理帧
-	// - 头部部件叠加 anim_stem 的偏移量（父子层级）
-	//
-	// 参考文档：
-	// - docs/reanim/reanim-fix-guide.md
-	// - docs/reanim/reanim-format-guide.md
-	// - docs/qa/sprint-change-proposal-reanim-system-fix.md
-	//
-	// ==================================================================
+	// --- Dual Animation Blending (Story 6.5) ---
 
 	// IsBlending indicates whether dual-animation blending is active.
 	// When true, the entity renders using two animations simultaneously:
@@ -165,6 +125,8 @@ type ReanimComponent struct {
 	// SecondaryAnimation is the overlay animation for head parts (e.g., "anim_shooting").
 	// Used when IsBlending is true.
 	SecondaryAnimation string
+
+	// --- Rendering and Caching ---
 
 	// AnimTracks is the list of part tracks to render for the current animation, in rendering order.
 	// This preserves the Z-order from the Reanim file.
@@ -190,6 +152,8 @@ type ReanimComponent struct {
 	// Default: 0 (first frame)
 	BestPreviewFrame int
 
+	// --- Visibility Control ---
+
 	// VisibleTracks is a whitelist of track names that should be rendered.
 	// If this map is not nil and not empty, ONLY tracks in this map will be rendered.
 	// This provides a clear "opt-in" approach for complex entities like zombies.
@@ -207,33 +171,12 @@ type ReanimComponent struct {
 	// Use ReanimSystem.HidePartGroup() and ShowPartGroup() to manage part group visibility.
 	PartGroups map[string][]string
 
-	// ====================================================================
-	// Animation Overlay System (Story 6.4 - 已废弃，保留以备未来扩展)
-	// ====================================================================
-	//
-	// ⚠️ 注意：以下字段当前不使用，所有动画通过简单的 PlayAnimation() 切换
-	//
-	// ⚠️ 原因：经验证，原版游戏不使用叠加机制，使用 VisibleTracks 控制部件显示
-	//   - 原版通过动画定义中的 VisibleTracks（可见轨道列表）控制部件显示
-	//   - 例如：anim_shooting 包含 stalk_bottom, stalk_top, anim_head_idle 所有需要的部件
-	//   - 无需手动控制部件显示，也无需使用动画叠加
-	//
-	// ⚠️ 保留：避免大规模代码删除，为未来可能的扩展（Mod、特殊效果）保留
-	//
-	// ⚠️ 不应在业务代码中使用：请使用 PlayAnimation() 代替 PlayAnimationOverlay()
-	//
-	// 相关文档：
-	//   - Sprint Change Proposal: docs/qa/sprint-change-proposal-story-6.4-animation-mechanism.md
-	//   - Story 6.4: docs/stories/6.4.story.md (标记为 Deprecated)
-	//   - Story 10.3: docs/stories/10.3.story.md (使用正确的简单切换方法)
-	//
-	// ====================================================================
-
-	// BaseAnimName [未使用] 基础动画名称（如 "anim_idle"）
-	// Deprecated: 使用 CurrentAnim 字段代替
-	BaseAnimName string
-
-	// OverlayAnims [未使用] 叠加动画列表
-	// Deprecated: 使用 PlayAnimation() 简单切换代替 PlayAnimationOverlay()
-	OverlayAnims []AnimLayer
+	// TrackConfigs stores per-track playback configuration (Story 12.1).
+	// Key: track name (e.g., "SelectorScreen_Adventure_button", "Cloud1")
+	// Value: playback configuration for this track
+	// This allows business logic to control individual track behavior:
+	// - Some tracks play once and lock (e.g., tombstone rising)
+	// - Some tracks loop continuously (e.g., clouds, grass)
+	// - Some tracks can be paused/resumed
+	TrackConfigs map[string]*TrackPlaybackConfig
 }

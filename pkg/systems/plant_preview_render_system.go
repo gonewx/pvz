@@ -187,12 +187,14 @@ func (s *PlantPreviewRenderSystem) drawReanimPreview(screen *ebiten.Image, reani
 
 // findPhysicalFrameIndex 查找当前逻辑帧对应的物理帧索引
 func (s *PlantPreviewRenderSystem) findPhysicalFrameIndex(comp *components.ReanimComponent, logicalFrame int) int {
-	if logicalFrame < 0 || logicalFrame >= len(comp.AnimVisibles) {
+	// 获取当前动画的 AnimVisibles
+	animVisibles := comp.AnimVisiblesMap[comp.CurrentAnim]
+	if logicalFrame < 0 || logicalFrame >= len(animVisibles) {
 		return -1
 	}
 
 	visibleCount := 0
-	for i, visible := range comp.AnimVisibles {
+	for i, visible := range animVisibles {
 		if visible == 0 {
 			if visibleCount == logicalFrame {
 				return i

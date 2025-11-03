@@ -268,22 +268,32 @@ func getFloat(p *float64) float64 {
 
 // findPhysicalFrameIndex 将逻辑帧号映射到物理帧索引
 // 逻辑帧是可见帧的序号（0, 1, 2, ...），物理帧是 AnimVisibles 数组中的索引
+//
+// Story 12.1: 如果 AnimVisiblesMap 中当前动画的 AnimVisibles 为空，说明使用 PlayAllFrames 模式，
+// CurrentFrame 直接就是物理帧索引，无需映射。
+//
 // 参数:
-//   - reanim: ReanimComponent 包含 AnimVisibles 数组
+//   - reanim: ReanimComponent 包含 AnimVisiblesMap
 //   - logicalFrameNum: 逻辑帧号（从 0 开始）
 //
 // 返回:
 //   - 物理帧索引，如果找不到则返回 -1
 func (s *RenderSystem) findPhysicalFrameIndex(reanim *components.ReanimComponent, logicalFrameNum int) int {
-	if len(reanim.AnimVisibles) == 0 {
-		return -1
+	// 获取当前动画的 AnimVisibles
+	animVisibles := reanim.AnimVisiblesMap[reanim.CurrentAnim]
+
+	// Story 12.1: PlayAllFrames 模式 - CurrentFrame 直接是物理帧
+	// 这适用于 SelectorScreen 等不基于动画定义的复杂动画
+	if len(animVisibles) == 0 {
+		return logicalFrameNum // 直接返回，无需映射
 	}
 
+	// PlayAnimation 模式 - 映射逻辑帧到物理帧
 	// 逻辑帧按区间映射：从第一个0开始到下一个非0之前
 	// 如果当前逻辑帧号 n，则寻找第 n 个可见段的起点物理索引
 	logicalIndex := 0
-	for i := 0; i < len(reanim.AnimVisibles); i++ {
-		if reanim.AnimVisibles[i] == 0 {
+	for i := 0; i < len(animVisibles); i++ {
+		if animVisibles[i] == 0 {
 			if logicalIndex == logicalFrameNum {
 				return i
 			}
@@ -464,11 +474,58 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		var trackPhysicalIndex int
 		applyStemOffset := false
 
-		if reanim.IsBlending && HeadTracks[track.Name] {
+		// Check if this is a head track using PartGroups (generalized approach)
+		isHeadTrack := false
+		if reanim.PartGroups != nil {
+			if headTracks, ok := reanim.PartGroups["head"]; ok {
+				for _, headTrackName := range headTracks {
+					if headTrackName == track.Name {
+						isHeadTrack = true
+						break
+					}
+				}
+			}
+		}
+
+		if reanim.IsBlending && isHeadTrack {
 			trackPhysicalIndex = secondaryPhysicalIndex
 			applyStemOffset = true // Head parts inherit anim_stem offset
 		} else {
 			trackPhysicalIndex = primaryPhysicalIndex
+		}
+
+		// ==================================================================
+		// Story 12.1: Track-Level Playback Control
+		// ==================================================================
+		//
+		// Check if this track has playback configuration (e.g., PlayOnce, Paused).
+		// If configured to play once, lock the track at its last visible frame.
+		if reanim.TrackConfigs != nil {
+			if config, hasConfig := reanim.TrackConfigs[track.Name]; hasConfig && config.PlayOnce {
+				// 检查轨道是否已经锁定
+				if config.IsLocked {
+					// 已锁定，使用锁定的帧
+					trackPhysicalIndex = config.LockedFrame
+				} else {
+					// 未锁定，检查是否需要锁定
+					lastVisibleFrame := s.findLastVisibleFrame(reanim, track.Name)
+
+					// DEBUG: 只打印一次
+					if !s.debugPrinted[id] && track.Name == "SelectorScreen_Adventure_button" {
+						log.Printf("[RenderSystem] DEBUG: Track %s - lastVisibleFrame=%d, trackPhysicalIndex=%d",
+							track.Name, lastVisibleFrame, trackPhysicalIndex)
+					}
+
+					if lastVisibleFrame >= 0 && trackPhysicalIndex >= lastVisibleFrame {
+						// 到达最后可见帧，锁定轨道
+						config.IsLocked = true
+						config.LockedFrame = lastVisibleFrame
+						trackPhysicalIndex = lastVisibleFrame
+
+						log.Printf("[RenderSystem] Track '%s' locked at frame %d", track.Name, lastVisibleFrame)
+					}
+				}
+			}
 		}
 
 		// 获取该轨道的累积帧数组
@@ -584,125 +641,6 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		is := []uint16{0, 1, 2, 1, 3, 2}
 		screen.DrawTriangles(vs, is, img, nil)
 	}
-
-	// Story 6.4: Render overlay animations
-	// Overlay animations are rendered after the base animation, allowing them to override specific tracks
-	for _, layer := range reanim.OverlayAnims {
-		// Map logical frame to physical frame index for this overlay layer
-		overlayPhysicalIndex := s.findPhysicalFrameIndexForLayer(&layer, layer.CurrentFrame)
-		if overlayPhysicalIndex < 0 {
-			continue
-		}
-
-		// Build merged tracks for the overlay animation
-		// We need to temporarily switch the component state to calculate overlay tracks
-		savedCurrentAnim := reanim.CurrentAnim
-		reanim.CurrentAnim = layer.AnimName
-		overlayMergedTracks := s.buildMergedTracksForOverlay(reanim, layer.AnimName)
-		reanim.CurrentAnim = savedCurrentAnim
-
-		// Render each track in the overlay animation
-		for _, track := range layer.AnimTracks {
-			// Check if the overlay has data for this track
-			mergedFrames, ok := overlayMergedTracks[track.Name]
-			if !ok || len(mergedFrames) == 0 {
-				continue
-			}
-
-			// Ensure physical index is within range
-			if overlayPhysicalIndex >= len(mergedFrames) {
-				continue
-			}
-
-			// Get the accumulated frame data
-			mergedFrame := mergedFrames[overlayPhysicalIndex]
-
-			// Skip if this frame is hidden (f == -1)
-			if mergedFrame.FrameNum != nil && *mergedFrame.FrameNum == -1 {
-				continue
-			}
-
-			// Must have an image reference to draw
-			if mergedFrame.ImagePath == "" {
-				continue
-			}
-
-			// Look up the image using the IMAGE reference
-			img, exists := reanim.PartImages[mergedFrame.ImagePath]
-			if !exists || img == nil {
-				continue
-			}
-
-			// Get image dimensions
-			bounds := img.Bounds()
-			w := bounds.Dx()
-			h := bounds.Dy()
-			fw := float64(w)
-			fh := float64(h)
-
-			// Apply transformations (same as base animation)
-			scaleX := 1.0
-			scaleY := 1.0
-			if mergedFrame.ScaleX != nil {
-				scaleX = *mergedFrame.ScaleX
-			}
-			if mergedFrame.ScaleY != nil {
-				scaleY = *mergedFrame.ScaleY
-			}
-
-			kx := 0.0
-			ky := 0.0
-			if mergedFrame.SkewX != nil {
-				kx = *mergedFrame.SkewX
-			}
-			if mergedFrame.SkewY != nil {
-				ky = *mergedFrame.SkewY
-			}
-
-			// Build transformation matrix
-			a := math.Cos(kx*math.Pi/180.0) * scaleX
-			b := math.Sin(kx*math.Pi/180.0) * scaleX
-			c := -math.Sin(ky*math.Pi/180.0) * scaleY
-			d := math.Cos(ky*math.Pi/180.0) * scaleY
-
-			// Translation component
-			tx := 0.0
-			ty := 0.0
-			if mergedFrame.X != nil {
-				tx = *mergedFrame.X
-			}
-			if mergedFrame.Y != nil {
-				ty = *mergedFrame.Y
-			}
-			tx += screenX
-			ty += screenY
-
-			// Apply transformation matrix to the four corners
-			x0 := tx
-			y0 := ty
-			x1 := a*fw + tx
-			y1 := b*fw + ty
-			x2 := c*fh + tx
-			y2 := d*fh + ty
-			x3 := a*fw + c*fh + tx
-			y3 := b*fw + d*fh + ty
-
-			// Build vertex array
-			colorR := float32(1.0 + flashIntensity)
-			colorG := float32(1.0 + flashIntensity)
-			colorB := float32(1.0 + flashIntensity)
-			colorA := float32(1.0)
-
-			vs := []ebiten.Vertex{
-				{DstX: float32(x0), DstY: float32(y0), SrcX: 0, SrcY: 0, ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
-				{DstX: float32(x1), DstY: float32(y1), SrcX: float32(w), SrcY: 0, ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
-				{DstX: float32(x2), DstY: float32(y2), SrcX: 0, SrcY: float32(h), ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
-				{DstX: float32(x3), DstY: float32(y3), SrcX: float32(w), SrcY: float32(h), ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
-			}
-			is := []uint16{0, 1, 2, 1, 3, 2}
-			screen.DrawTriangles(vs, is, img, nil)
-		}
-	}
 }
 
 // ==================================================================
@@ -734,9 +672,17 @@ func (s *RenderSystem) getStemOffset(
 
 	stemFrame := stemFrames[physicalFrame]
 
+	// Get initial stem position from first frame (generalized approach)
+	// Instead of hardcoding ReanimStemInitX/Y, use the first frame as reference
+	initX, initY := 0.0, 0.0
+	if len(stemFrames) > 0 && stemFrames[0].X != nil && stemFrames[0].Y != nil {
+		initX = *stemFrames[0].X
+		initY = *stemFrames[0].Y
+	}
+
 	// Get current stem position
-	currentX := ReanimStemInitX
-	currentY := ReanimStemInitY
+	currentX := initX
+	currentY := initY
 
 	if stemFrame.X != nil {
 		currentX = *stemFrame.X
@@ -746,15 +692,8 @@ func (s *RenderSystem) getStemOffset(
 	}
 
 	// Calculate offset from initial position
-	offsetX := currentX - ReanimStemInitX
-	offsetY := currentY - ReanimStemInitY
-
-	// DEBUG: Log stem offset calculation (only shown with --verbose)
-	// Useful for debugging head-body synchronization issues
-	if offsetX != 0 || offsetY != 0 {
-		log.Printf("[RenderSystem] Stem offset at frame %d: (%.2f, %.2f) - Current: (%.2f, %.2f), Init: (%.2f, %.2f)",
-			physicalFrame, offsetX, offsetY, currentX, currentY, ReanimStemInitX, ReanimStemInitY)
-	}
+	offsetX := currentX - initX
+	offsetY := currentY - initY
 
 	return offsetX, offsetY
 }
@@ -812,133 +751,73 @@ func (s *RenderSystem) shouldRenderTrack(
 		return true // Whitelist overrides f value check
 	}
 
-	// 4. Check hybrid tracks (have f values): check their own f value
-	// Hybrid tracks control their own visibility through f values
-	// Important: Some tracks named "anim_idle" are actually hybrid tracks with images!
-	if mergedFrame.FrameNum != nil {
-		// f=0: visible, f=-1 or other: hidden
-		return *mergedFrame.FrameNum == 0
-	}
+	// 4. 渲染决策逻辑（Story 12.1 QA）：
+	//
+	// 两种播放模式有不同的渲染规则：
+	//
+	// **模式 A: PlayAllFrames（AnimVisibles 为空）**
+	// - 用于复杂场景动画（如 SelectorScreen）
+	// - 直接播放所有物理帧，不同部件有独立时间轴
+	// - 渲染规则：检查部件**自己的 f 值**
+	//   - f=0 或 f=nil：可见
+	//   - f=-1：隐藏
+	//
+	// **模式 B: PlayAnimation（有 AnimVisibles）**
+	// - 用于单一动画播放（如植物的 anim_idle, anim_shooting）
+	// - 逻辑帧映射到物理帧，统一的时间窗口
+	// - 渲染规则：检查**动画定义轨道的 f 值**，忽略部件自己的 f 值
+	//   - 任意动画定义轨道 f=0：所有部件可见
+	//   - 所有动画定义轨道 f=-1：所有部件隐藏
 
-	// 5. Pure visual tracks (no f values): always render if they have images
-	// This is rare (<1% of tracks), but we need to handle it
-	return true
-}
+	// 检测播放模式
+	animVisibles := reanimComp.AnimVisiblesMap[reanimComp.CurrentAnim]
+	isPlayAllFramesMode := len(animVisibles) == 0
+	currentPhysicalFrame := reanimComp.CurrentFrame // 默认：物理帧
 
-// findPhysicalFrameIndexForLayer maps logical frame number to physical frame index for an overlay layer.
-// This is similar to findPhysicalFrameIndex but uses the layer's AnimVisibles array.
-func (s *RenderSystem) findPhysicalFrameIndexForLayer(layer *components.AnimLayer, logicalFrameNum int) int {
-	if len(layer.AnimVisibles) == 0 {
-		return -1
-	}
-
-	logicalIndex := 0
-	for i := 0; i < len(layer.AnimVisibles); i++ {
-		if layer.AnimVisibles[i] == 0 {
-			if logicalIndex == logicalFrameNum {
-				return i
-			}
-			logicalIndex++
+	if !isPlayAllFramesMode {
+		// PlayAnimation 模式：映射逻辑帧到物理帧
+		logicalFrame := reanimComp.CurrentFrame
+		physicalFrame := s.findPhysicalFrameIndex(reanimComp, logicalFrame)
+		if physicalFrame < 0 {
+			// 映射失败，轨道隐藏
+			return false
 		}
+		currentPhysicalFrame = physicalFrame
 	}
 
-	return -1
-}
-
-// buildMergedTracksForOverlay builds accumulated frame arrays for an overlay animation.
-// This is similar to buildMergedTracks but for a specific animation name.
-func (s *RenderSystem) buildMergedTracksForOverlay(comp *components.ReanimComponent, animName string) map[string][]reanim.Frame {
-	// This is a simplified version that reuses the ReanimSystem's buildMergedTracks logic
-	// Since we're in RenderSystem, we need to access ReanimSystem's private method
-	// For now, we'll duplicate the logic here (not ideal, but works)
-
-	if comp.Reanim == nil {
-		return map[string][]reanim.Frame{}
+	// 模式 A: PlayAllFrames - 检查部件自己的 f 值
+	if isPlayAllFramesMode {
+		// 如果部件没有设置 f 值，或者 f=0，则可见
+		return mergedFrame.FrameNum == nil || *mergedFrame.FrameNum == 0
 	}
 
-	// Determine the standard frame count
-	standardFrameCount := 0
-	for _, track := range comp.Reanim.Tracks {
-		if len(track.Frames) > standardFrameCount {
-			standardFrameCount = len(track.Frames)
-		}
+	// 模式 B: PlayAnimation - 检查动画定义轨道的 f 值
+	// 遍历 Reanim.Tracks（完整的轨道列表），查找动画定义轨道
+	if reanimComp.Reanim == nil {
+		return false
 	}
 
-	if standardFrameCount == 0 {
-		return map[string][]reanim.Frame{}
-	}
-
-	mergedTracks := make(map[string][]reanim.Frame)
-
-	// Process ALL tracks
-	for _, track := range comp.Reanim.Tracks {
-		// Initialize accumulated state
-		accX := 0.0
-		accY := 0.0
-		accSX := 1.0
-		accSY := 1.0
-		accKX := 0.0
-		accKY := 0.0
-		accF := 0
-		accImg := ""
-
-		// Build merged frames array for this track
-		mergedFrames := make([]reanim.Frame, standardFrameCount)
-
-		for i := 0; i < standardFrameCount; i++ {
-			if i < len(track.Frames) {
-				frame := track.Frames[i]
-
-				if frame.X != nil {
-					accX = *frame.X
-				}
-				if frame.Y != nil {
-					accY = *frame.Y
-				}
-				if frame.ScaleX != nil {
-					accSX = *frame.ScaleX
-				}
-				if frame.ScaleY != nil {
-					accSY = *frame.ScaleY
-				}
-				if frame.SkewX != nil {
-					accKX = *frame.SkewX
-				}
-				if frame.SkewY != nil {
-					accKY = *frame.SkewY
-				}
-				if frame.FrameNum != nil {
-					accF = *frame.FrameNum
-				}
-				if frame.ImagePath != "" {
-					accImg = frame.ImagePath
-				}
-			}
-
-			x := accX
-			y := accY
-			sx := accSX
-			sy := accSY
-			kx := accKX
-			ky := accKY
-			f := accF
-
-			mergedFrames[i] = reanim.Frame{
-				X:         &x,
-				Y:         &y,
-				ScaleX:    &sx,
-				ScaleY:    &sy,
-				SkewX:     &kx,
-				SkewY:     &ky,
-				FrameNum:  &f,
-				ImagePath: accImg,
-			}
+	// Iterate through all tracks in Reanim.Tracks (including animation definition tracks)
+	for _, track := range reanimComp.Reanim.Tracks {
+		// Get merged frames for this track
+		frames, ok := reanimComp.MergedTracks[track.Name]
+		if !ok || currentPhysicalFrame >= len(frames) {
+			continue
 		}
 
-		mergedTracks[track.Name] = mergedFrames
+		frame := frames[currentPhysicalFrame]
+
+		// Animation definition track: has f value but no image
+		if frame.FrameNum != nil && frame.ImagePath == "" {
+			// If any animation definition track has f=0, this is a visible time window
+			if *frame.FrameNum == 0 {
+				return true
+			}
+		}
 	}
 
-	return mergedTracks
+	// No animation definition track allows rendering at this frame
+	return false
 }
 
 // DrawParticles 渲染所有粒子效果
@@ -1513,4 +1392,38 @@ func (s *RenderSystem) drawCenteredTextTTF(screen *ebiten.Image, textStr string,
 	op.GeoM.Translate(x, y)
 	op.ColorScale.ScaleWithColor(textColor)
 	text.Draw(screen, textStr, fontFace, op)
+}
+
+// findLastVisibleFrame finds the last visible frame for a given track (Story 12.1).
+// Returns the physical frame index where the track is last visible (f != -1).
+// Returns -1 if the track has no visible frames or is not found.
+//
+// This is used for PlayOnce tracks to determine where to lock the track.
+func (s *RenderSystem) findLastVisibleFrame(reanim *components.ReanimComponent, trackName string) int {
+	// Get merged frames for this track
+	mergedFrames, ok := reanim.MergedTracks[trackName]
+	if !ok || len(mergedFrames) == 0 {
+		return -1
+	}
+
+	// Search backwards from the end to find the last visible frame
+	lastVisibleFrame := -1
+	for i := len(mergedFrames) - 1; i >= 0; i-- {
+		frame := mergedFrames[i]
+
+		// Check if frame is visible
+		// - If f is nil, frame inherits visibility (consider as visible)
+		// - If f = 0, frame is explicitly visible
+		// - If f = -1, frame is hidden
+		if frame.FrameNum != nil && *frame.FrameNum == -1 {
+			// Hidden frame, continue searching backwards
+			continue
+		}
+
+		// Found a visible frame
+		lastVisibleFrame = i
+		break
+	}
+
+	return lastVisibleFrame
 }

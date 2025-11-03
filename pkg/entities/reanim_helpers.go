@@ -21,7 +21,7 @@ func createSimpleReanimComponent(image *ebiten.Image, imageName string) *compone
 			VisibleFrameCount: 0,
 			IsLooping:         true,
 			IsFinished:        false,
-			AnimVisibles:      []int{},
+			AnimVisiblesMap:   map[string][]int{"idle": {}},
 			MergedTracks:      map[string][]reanim.Frame{},
 			AnimTracks:        []reanim.Track{},
 			CenterOffsetX:     0,
@@ -75,7 +75,9 @@ func createSimpleReanimComponent(image *ebiten.Image, imageName string) *compone
 		VisibleFrameCount: 1,
 		IsLooping:         true,
 		IsFinished:        false,
-		AnimVisibles:      []int{0},
+		AnimVisiblesMap: map[string][]int{
+			"idle": {0},
+		},
 		MergedTracks: map[string][]reanim.Frame{
 			imageName: {frame},
 		},

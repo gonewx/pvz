@@ -222,10 +222,10 @@ func TestRenderReanimEntity_InvalidPhysicalFrame(t *testing.T) {
 
 	// ReanimComponent with CurrentFrame beyond valid range
 	reanimComp := &components.ReanimComponent{
-		CurrentAnim:  "anim_idle",
-		CurrentFrame: 999, // Invalid frame number
-		AnimTracks:   []reanim.Track{{Name: "track1"}},
-		AnimVisibles: []int{0, 0, -1}, // Only 3 frames
+		CurrentAnim:      "anim_idle",
+		CurrentFrame:     999, // Invalid frame number
+		AnimTracks:       []reanim.Track{{Name: "track1"}},
+		AnimVisiblesMap:  map[string][]int{"anim_idle": {0, 0, -1}}, // Only 3 frames
 	}
 
 	em.AddComponent(entity, reanimComp)
@@ -251,13 +251,13 @@ func TestRenderReanimEntity_VisibleTracksWhitelist(t *testing.T) {
 	y := 20.0
 	frameNum := 0
 	reanimComp := &components.ReanimComponent{
-		CurrentAnim:  "anim_idle",
-		CurrentFrame: 0,
+		CurrentAnim:     "anim_idle",
+		CurrentFrame:    0,
 		AnimTracks: []reanim.Track{
 			{Name: "track_visible"},
 			{Name: "track_hidden"},
 		},
-		AnimVisibles: []int{0}, // One visible frame
+		AnimVisiblesMap: map[string][]int{"anim_idle": {0}}, // One visible frame
 		MergedTracks: map[string][]reanim.Frame{
 			"track_visible": {
 				{X: &x, Y: &y, FrameNum: &frameNum, ImagePath: "test_img"},
@@ -302,7 +302,7 @@ func TestRenderReanimEntity_HiddenTracksBlacklist(t *testing.T) {
 			{Name: "track_normal"},
 			{Name: "track_hidden"},
 		},
-		AnimVisibles: []int{0},
+		AnimVisiblesMap: map[string][]int{"anim_idle": {0}},
 		MergedTracks: map[string][]reanim.Frame{
 			"track_normal": {
 				{X: &x, Y: &y, FrameNum: &frameNum, ImagePath: "test_img"},
@@ -341,7 +341,7 @@ func TestRenderReanimEntity_MissingMergedFrames(t *testing.T) {
 		AnimTracks: []reanim.Track{
 			{Name: "track1"},
 		},
-		AnimVisibles: []int{0},
+		AnimVisiblesMap: map[string][]int{"anim_idle": {0}},
 		MergedTracks: map[string][]reanim.Frame{},
 		// MergedTracks does not contain "track1"
 	}
@@ -370,7 +370,7 @@ func TestRenderReanimEntity_FrameOutOfBounds(t *testing.T) {
 		AnimTracks: []reanim.Track{
 			{Name: "track1"},
 		},
-		AnimVisibles: []int{0},
+		AnimVisiblesMap: map[string][]int{"anim_idle": {0}},
 		MergedTracks: map[string][]reanim.Frame{
 			"track1": {
 				{X: &x, Y: &y, FrameNum: &frameNum, ImagePath: "test_img"},
@@ -385,7 +385,7 @@ func TestRenderReanimEntity_FrameOutOfBounds(t *testing.T) {
 
 	// Manually set CurrentFrame beyond available frames
 	reanimComp.CurrentFrame = 10
-	reanimComp.AnimVisibles = []int{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} // 11 frames
+	reanimComp.AnimVisiblesMap["anim_idle"] = []int{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} // 11 frames
 
 	// Should not panic, skip rendering when physical index >= len(mergedFrames)
 	system.Draw(screen, 0.0)
@@ -409,7 +409,7 @@ func TestRenderReanimEntity_HiddenFrame(t *testing.T) {
 		AnimTracks: []reanim.Track{
 			{Name: "track1"},
 		},
-		AnimVisibles: []int{0},
+		AnimVisiblesMap: map[string][]int{"anim_idle": {0}},
 		MergedTracks: map[string][]reanim.Frame{
 			"track1": {
 				{X: &x, Y: &y, FrameNum: &frameNumHidden, ImagePath: "test_img"},
@@ -444,7 +444,7 @@ func TestRenderReanimEntity_EmptyImagePath(t *testing.T) {
 		AnimTracks: []reanim.Track{
 			{Name: "track1"},
 		},
-		AnimVisibles: []int{0},
+		AnimVisiblesMap: map[string][]int{"anim_idle": {0}},
 		MergedTracks: map[string][]reanim.Frame{
 			"track1": {
 				{X: &x, Y: &y, FrameNum: &frameNum, ImagePath: ""}, // Empty image path
@@ -476,7 +476,7 @@ func TestRenderReanimEntity_MissingPartImage(t *testing.T) {
 		AnimTracks: []reanim.Track{
 			{Name: "track1"},
 		},
-		AnimVisibles: []int{0},
+		AnimVisiblesMap: map[string][]int{"anim_idle": {0}},
 		MergedTracks: map[string][]reanim.Frame{
 			"track1": {
 				{X: &x, Y: &y, FrameNum: &frameNum, ImagePath: "missing_img"},
@@ -511,7 +511,7 @@ func TestRenderReanimEntity_NilPartImage(t *testing.T) {
 		AnimTracks: []reanim.Track{
 			{Name: "track1"},
 		},
-		AnimVisibles: []int{0},
+		AnimVisiblesMap: map[string][]int{"anim_idle": {0}},
 		MergedTracks: map[string][]reanim.Frame{
 			"track1": {
 				{X: &x, Y: &y, FrameNum: &frameNum, ImagePath: "nil_img"},
@@ -614,7 +614,7 @@ func TestRenderReanimEntity_TransformCalculation(t *testing.T) {
 				AnimTracks: []reanim.Track{
 					{Name: "track1"},
 				},
-				AnimVisibles: []int{0},
+				AnimVisiblesMap: map[string][]int{"anim_idle": {0}},
 				MergedTracks: map[string][]reanim.Frame{
 					"track1": {
 						{
@@ -664,7 +664,7 @@ func TestRenderReanimEntity_CameraOffset(t *testing.T) {
 		AnimTracks: []reanim.Track{
 			{Name: "track1"},
 		},
-		AnimVisibles: []int{0},
+		AnimVisiblesMap: map[string][]int{"anim_idle": {0}},
 		MergedTracks: map[string][]reanim.Frame{
 			"track1": {
 				{X: &x, Y: &y, FrameNum: &frameNum, ImagePath: "test_img"},
@@ -711,7 +711,7 @@ func TestRenderReanimEntity_MultipleEntities(t *testing.T) {
 			AnimTracks: []reanim.Track{
 				{Name: "body"},
 			},
-			AnimVisibles: []int{0},
+			AnimVisiblesMap: map[string][]int{"anim_idle": {0}},
 			MergedTracks: map[string][]reanim.Frame{
 				"body": {
 					{X: &x, Y: &y, FrameNum: &frameNum, ImagePath: "body_img"},
@@ -736,46 +736,53 @@ func TestFindPhysicalFrameIndex(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		animVisibles     []int
+		animVisiblesMap  map[string][]int
+		currentAnim      string
 		logicalFrameNum  int
 		expectedPhysical int
 	}{
 		{
 			name:             "First frame",
-			animVisibles:     []int{0, 0, -1, 0},
+			animVisiblesMap:  map[string][]int{"anim_idle": {0, 0, -1, 0}},
+			currentAnim:      "anim_idle",
 			logicalFrameNum:  0,
 			expectedPhysical: 0,
 		},
 		{
 			name:             "Second frame",
-			animVisibles:     []int{0, 0, -1, 0},
+			animVisiblesMap:  map[string][]int{"anim_idle": {0, 0, -1, 0}},
+			currentAnim:      "anim_idle",
 			logicalFrameNum:  1,
 			expectedPhysical: 1,
 		},
 		{
 			name:             "Third frame (skip hidden)",
-			animVisibles:     []int{0, 0, -1, 0},
+			animVisiblesMap:  map[string][]int{"anim_idle": {0, 0, -1, 0}},
+			currentAnim:      "anim_idle",
 			logicalFrameNum:  2,
 			expectedPhysical: 3,
 		},
 		{
 			name:             "Out of bounds",
-			animVisibles:     []int{0, 0, -1},
+			animVisiblesMap:  map[string][]int{"anim_idle": {0, 0, -1}},
+			currentAnim:      "anim_idle",
 			logicalFrameNum:  5,
 			expectedPhysical: -1,
 		},
 		{
 			name:             "Empty visibles",
-			animVisibles:     []int{},
+			animVisiblesMap:  map[string][]int{},
+			currentAnim:      "anim_idle",
 			logicalFrameNum:  0,
-			expectedPhysical: -1,
+			expectedPhysical: 0, // PlayAllFrames mode - direct passthrough
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reanim := &components.ReanimComponent{
-				AnimVisibles: tt.animVisibles,
+				CurrentAnim:     tt.currentAnim,
+				AnimVisiblesMap: tt.animVisiblesMap,
 			}
 
 			result := system.findPhysicalFrameIndex(reanim, tt.logicalFrameNum)

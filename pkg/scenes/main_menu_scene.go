@@ -79,13 +79,16 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	} else {
 		scene.selectorScreenEntity = selectorEntity
 
-		// Story 12.1 Task 9.1: Play opening animation (tombstones rising up)
-		// Note: We DON'T override VisibleFrameCount here, let anim_open play its natural frames
-		if err := scene.reanimSystem.PlayAnimationNoLoop(selectorEntity, "anim_open"); err != nil {
-			log.Printf("Warning: Failed to play SelectorScreen anim_open: %v", err)
+		// Story 6.6: 使用通用播放模式（自动检测为 ModeComplexScene）
+		// SelectorScreen 是一个复杂的场景动画，包含 500+ 轨道：
+		// - 背景/按钮：静止显示
+		// - 草丛：循环摆动
+		// - 云朵/墓碑：独立动画循环
+		// 系统会自动检测为复杂场景模式，使用 ComplexScenePlaybackStrategy
+		if err := scene.reanimSystem.PlayAnimation(selectorEntity, "anim_idle"); err != nil {
+			log.Printf("Warning: Failed to play SelectorScreen animation: %v", err)
 		} else {
-			log.Printf("[MainMenuScene] SelectorScreen playing anim_open (tombstone rising animation)")
-			log.Printf("[MainMenuScene] anim_open will play its natural frames, then switch to anim_idle")
+			log.Printf("[MainMenuScene] 使用通用播放模式播放主菜单动画（自动检测：ComplexScene）")
 		}
 	}
 
@@ -146,54 +149,6 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 	// Story 12.1: Update Reanim system (animate clouds, flowers, etc.)
 	if m.reanimSystem != nil {
 		m.reanimSystem.Update(deltaTime)
-	}
-
-	// Story 12.1 Task 9.1: Check if opening animation has finished
-	// When anim_open completes, automatically switch to anim_idle loop
-	if m.selectorScreenEntity != 0 {
-		if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity); ok {
-			// DEBUG: 打印当前动画状态（只打印一次）
-			if !m.debugPrinted && reanimComp.CurrentAnim == "anim_open" {
-				log.Printf("[MainMenuScene::Update] DEBUG: anim_open status: Frame=%d/%d, IsFinished=%v",
-					reanimComp.CurrentFrame, reanimComp.VisibleFrameCount, reanimComp.IsFinished)
-				m.debugPrinted = true
-			}
-
-			if reanimComp.CurrentAnim == "anim_open" && reanimComp.IsFinished {
-				log.Printf("[MainMenuScene] anim_open finished, switching to anim_idle")
-
-				// Switch to anim_idle (looping animation)
-				if err := m.reanimSystem.PlayAnimation(m.selectorScreenEntity, "anim_idle"); err != nil {
-					log.Printf("[MainMenuScene] Warning: Failed to switch to anim_idle: %v", err)
-				} else {
-					// Story 12.1: SelectorScreen 特殊处理
-					// SelectorScreen 的 anim_idle 不应该使用动画定义轨道的时间窗口（只有 37 帧可见）
-					// 而应该让所有 706 帧都可见，每个轨道（云朵、叶子）根据自己的数据控制可见性
-					reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
-					if ok && reanimComp.Reanim != nil {
-						// 计算总帧数
-						standardFrameCount := 0
-						for _, track := range reanimComp.Reanim.Tracks {
-							if len(track.Frames) > standardFrameCount {
-								standardFrameCount = len(track.Frames)
-							}
-						}
-
-						// 将所有帧标记为可见
-						reanimComp.AnimVisibles = make([]int, standardFrameCount)
-						for i := 0; i < standardFrameCount; i++ {
-							reanimComp.AnimVisibles[i] = 0 // All frames visible
-						}
-						reanimComp.VisibleFrameCount = standardFrameCount
-
-						log.Printf("[MainMenuScene] SelectorScreen: Override AnimVisibles to show all %d frames", standardFrameCount)
-					}
-
-					m.updateButtonVisibility()
-					log.Printf("[MainMenuScene] Re-applied VisibleTracks after switching to anim_idle")
-				}
-			}
-		}
 	}
 
 	// Get mouse position
@@ -446,100 +401,12 @@ func (m *MainMenuScene) updateButtonVisibility() {
 		return
 	}
 
-	// Build VisibleTracks whitelist
-	visibleTracks := make(map[string]bool)
+	// 实验：完全移除 VisibleTracks 白名单，让所有轨道依赖动画定义轨道的 f 值自然控制
+	// 这样可以验证 anim_grass, anim_open 等动画定义轨道是否能正确控制纯视觉轨道
+	reanimComp.VisibleTracks = nil
 
-	// 1. Always show background and decorations
-	visibleTracks["SelectorScreen_BG"] = true
-	visibleTracks["SelectorScreen_BG_Center"] = true
-	visibleTracks["SelectorScreen_BG_Left"] = true
-	visibleTracks["SelectorScreen_BG_Right"] = true
-	visibleTracks["anim_grass"] = true             // Grass to fill the black area
-	visibleTracks["almanac_key_shadow"] = true     // Shadow element for background coverage
-
-	// 2. Always show clouds (Note: actual track names are "Cloud1", not "SelectorScreen_Cloud1")
-	visibleTracks["Cloud1"] = true
-	visibleTracks["Cloud2"] = true
-	visibleTracks["Cloud4"] = true
-	visibleTracks["Cloud5"] = true
-	visibleTracks["Cloud6"] = true
-	visibleTracks["Cloud7"] = true
-
-	// Story 12.1 Task 9.2: Enable cloud animation tracks (clouds drifting left)
-	// These animated tracks provide slow horizontal movement (~30s to cross screen)
-	visibleTracks["anim_cloud1"] = true
-	visibleTracks["anim_cloud2"] = true
-	visibleTracks["anim_cloud4"] = true
-	visibleTracks["anim_cloud5"] = true
-	visibleTracks["anim_cloud6"] = true
-	visibleTracks["anim_cloud7"] = true
-
-	// 3. Always show leaves (Note: actual track names vary)
-	visibleTracks["leaf1"] = true
-	visibleTracks["leaf2"] = true
-	visibleTracks["leaf3"] = true
-	visibleTracks["leaf4"] = true
-	visibleTracks["leaf5"] = true
-	visibleTracks["leaf22"] = true
-	visibleTracks["leaf_SelectorScreen_Leaves"] = true
-
-	// 4. Always show flowers
-	visibleTracks["flower1"] = true
-	visibleTracks["flower2"] = true
-	visibleTracks["flower3"] = true
-
-	// Story 12.1 Task 9.3: Enable flower animation tracks (flowers swaying)
-	// These animated tracks provide subtle swaying motion (~2-3 second cycle)
-	visibleTracks["anim_flower1"] = true
-	visibleTracks["anim_flower2"] = true
-	visibleTracks["anim_flower3"] = true
-
-	// 5. Always show wood signs
-	visibleTracks["anim_sign"] = true
-	visibleTracks["woodsign1"] = true
-	visibleTracks["woodsign2"] = true
-	visibleTracks["woodsign3"] = true
-
-	// 6. Show buttons based on unlock status
-	// FIX: Show normal button if unlocked, shadow button if locked
-
-	// Adventure mode (always unlocked)
-	if config.IsMenuModeUnlocked(config.MenuButtonAdventure, m.currentLevel) {
-		visibleTracks["SelectorScreen_Adventure_button"] = true
-		visibleTracks["SelectorScreen_StartAdventure_button"] = true // "Start Adventure" text/icon
-	} else {
-		visibleTracks["SelectorScreen_Adventure_shadow"] = true
-		visibleTracks["SelectorScreen_StartAdventure_shadow"] = true
-	}
-
-	// Challenges mode (unlocked at 3-2)
-	// Note: SelectorScreen_Survival_button track corresponds to Challenges mode
-	if config.IsMenuModeUnlocked(config.MenuButtonChallenges, m.currentLevel) {
-		visibleTracks["SelectorScreen_Survival_button"] = true
-	} else {
-		visibleTracks["SelectorScreen_Survival_shadow"] = true
-	}
-
-	// Vasebreaker mode (unlocked at 5-10)
-	// Note: SelectorScreen_Challenges_button track corresponds to Vasebreaker mode
-	if config.IsMenuModeUnlocked(config.MenuButtonVasebreaker, m.currentLevel) {
-		visibleTracks["SelectorScreen_Challenges_button"] = true
-	} else {
-		visibleTracks["SelectorScreen_Challenges_shadow"] = true
-	}
-
-	// Survival mode (unlocked at 5-10)
-	// Note: SelectorScreen_ZenGarden_button track corresponds to Survival mode
-	if config.IsMenuModeUnlocked(config.MenuButtonSurvival, m.currentLevel) {
-		visibleTracks["SelectorScreen_ZenGarden_button"] = true
-	} else {
-		visibleTracks["SelectorScreen_ZenGarden_shadow"] = true
-	}
-
-	// Apply VisibleTracks to ReanimComponent
-	reanimComp.VisibleTracks = visibleTracks
-
-	log.Printf("[MainMenuScene] Updated button visibility (level=%s): Adventure=%v, Challenges=%v, Vasebreaker=%v, Survival=%v",
+	log.Printf("[MainMenuScene] 实验模式：移除 VisibleTracks 白名单，所有轨道依赖 f 值控制")
+	log.Printf("[MainMenuScene] Button visibility (level=%s): Adventure=%v, Challenges=%v, Vasebreaker=%v, Survival=%v",
 		m.currentLevel,
 		config.IsMenuModeUnlocked(config.MenuButtonAdventure, m.currentLevel),
 		config.IsMenuModeUnlocked(config.MenuButtonChallenges, m.currentLevel),

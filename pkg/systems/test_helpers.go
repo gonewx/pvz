@@ -39,7 +39,7 @@ func createTestReanimComponent(image *ebiten.Image, imageName string) *component
 			VisibleFrameCount: 0,
 			IsLooping:         true,
 			IsFinished:        false,
-			AnimVisibles:      []int{},
+			AnimVisiblesMap:   map[string][]int{},
 			MergedTracks:      map[string][]reanim.Frame{},
 			AnimTracks:        []reanim.Track{},
 			CenterOffsetX:     0,
@@ -91,7 +91,7 @@ func createTestReanimComponent(image *ebiten.Image, imageName string) *component
 		VisibleFrameCount: 1,
 		IsLooping:         true,
 		IsFinished:        false,
-		AnimVisibles:      []int{0},
+		AnimVisiblesMap:   map[string][]int{"anim_idle": {0}},
 		MergedTracks: map[string][]reanim.Frame{
 			imageName: {frame},
 		},

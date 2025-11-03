@@ -82,6 +82,9 @@ assets/images/SelectorScreen_Options2.png
 assets/images/SelectorScreen_Quit1.png
 assets/images/SelectorScreen_Quit2.png
 
+墓碑升起动画 只播放一次，然后停止, 主动画的逻辑不确定是不是anim_idle , 应该是背景\树\房子等 要一直显示, 
+云朵飘动应该周期性出现，而不是持续飘动, 草丛应该周期性晃动，而不是持续, 花朵应该要触发才显示. 
+
 ### 5. 解锁功能区
 随着游戏进程，主菜单会增加新的入口：
 *   **图鉴 (Almanac)**：通关2-4后解锁。一本放在草地左下角的书，封面有僵尸图案。

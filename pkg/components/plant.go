@@ -41,9 +41,9 @@ type PlantComponent struct {
 	// 保留此字段以备未来扩展（如需要峰值检测算法的特殊植物）
 	LastMouthX float64
 
-	// Story 6.4: 眨眼动画计时器
 	// BlinkTimer 眨眼计时器（秒）
 	// 当计时器 <= 0 时，触发眨眼动画并重置为随机值（3-5秒）
+	// 注意：眨眼动画通过 PlayAnimation() 切换实现，不使用动画叠加
 	BlinkTimer float64
 }
 
