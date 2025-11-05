@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/decker502/pvz/internal/reanim"
-	"github.com/decker502/pvz/pkg/components"
 )
 
 // ==================================================================
@@ -26,7 +25,7 @@ func TestDetectPlaybackMode_Simple(t *testing.T) {
 		},
 	}
 
-	mode := detectPlaybackMode(reanimData)
+	mode := detectPlaybackMode("TestSimple", reanimData)
 
 	if mode != ModeSimple {
 		t.Errorf("Expected ModeSimple, got %v", mode)
@@ -65,7 +64,7 @@ func TestDetectPlaybackMode_Skeleton(t *testing.T) {
 		},
 	}
 
-	mode := detectPlaybackMode(reanimData)
+	mode := detectPlaybackMode("TestSimple", reanimData)
 
 	if mode != ModeSkeleton {
 		t.Errorf("Expected ModeSkeleton, got %v", mode)
@@ -94,7 +93,7 @@ func TestDetectPlaybackMode_Sequence(t *testing.T) {
 		reanimData.Tracks = append(reanimData.Tracks, track)
 	}
 
-	mode := detectPlaybackMode(reanimData)
+	mode := detectPlaybackMode("TestSimple", reanimData)
 
 	if mode != ModeSequence {
 		t.Errorf("Expected ModeSequence, got %v", mode)
@@ -119,7 +118,7 @@ func TestDetectPlaybackMode_ComplexScene(t *testing.T) {
 		reanimData.Tracks = append(reanimData.Tracks, track)
 	}
 
-	mode := detectPlaybackMode(reanimData)
+	mode := detectPlaybackMode("TestSimple", reanimData)
 
 	if mode != ModeComplexScene {
 		t.Errorf("Expected ModeComplexScene, got %v", mode)
@@ -177,7 +176,7 @@ func TestDetectPlaybackMode_Blended(t *testing.T) {
 		},
 	}
 
-	mode := detectPlaybackMode(reanimData)
+	mode := detectPlaybackMode("TestSimple", reanimData)
 
 	if mode != ModeBlended {
 		t.Errorf("Expected ModeBlended, got %v", mode)
@@ -214,224 +213,10 @@ func TestDetectPlaybackMode_BlendedByAnimDefCount(t *testing.T) {
 		},
 	}
 
-	mode := detectPlaybackMode(reanimData)
+	mode := detectPlaybackMode("TestSimple", reanimData)
 
 	if mode != ModeBlended {
 		t.Errorf("Expected ModeBlended, got %v", mode)
-	}
-}
-
-// ==================================================================
-// Playback Strategy Tests (播放策略测试)
-// ==================================================================
-
-// TestSimplePlaybackStrategy_GetVisibleTracks 测试简单播放策略
-func TestSimplePlaybackStrategy_GetVisibleTracks(t *testing.T) {
-	strategy := &SimplePlaybackStrategy{}
-
-	comp := &components.ReanimComponent{
-		MergedTracks: map[string][]reanim.Frame{
-			"track1": {
-				{ImagePath: "image1.png"},
-			},
-			"track2": {
-				{ImagePath: "image2.png"},
-			},
-			"empty_track": {
-				{ImagePath: ""}, // 无图片
-			},
-		},
-	}
-
-	visible := strategy.GetVisibleTracks(comp, 0)
-
-	// 应该显示有图片的轨道
-	if !visible["track1"] {
-		t.Error("track1 should be visible")
-	}
-	if !visible["track2"] {
-		t.Error("track2 should be visible")
-	}
-	if visible["empty_track"] {
-		t.Error("empty_track should not be visible")
-	}
-}
-
-// TestSkeletonPlaybackStrategy_GetVisibleTracks 测试骨骼播放策略
-func TestSkeletonPlaybackStrategy_GetVisibleTracks(t *testing.T) {
-	strategy := &SkeletonPlaybackStrategy{}
-
-	comp := &components.ReanimComponent{
-		MergedTracks: map[string][]reanim.Frame{
-			"head": {
-				{ImagePath: "head.png"},
-			},
-			"body": {
-				{ImagePath: "body.png"},
-			},
-		},
-	}
-
-	visible := strategy.GetVisibleTracks(comp, 0)
-
-	// 所有部件都应该可见
-	if !visible["head"] {
-		t.Error("head should be visible")
-	}
-	if !visible["body"] {
-		t.Error("body should be visible")
-	}
-}
-
-// TestSequencePlaybackStrategy_GetVisibleTracks 测试序列播放策略
-func TestSequencePlaybackStrategy_GetVisibleTracks(t *testing.T) {
-	strategy := &SequencePlaybackStrategy{}
-
-	frameNumMinus1 := -1
-	frameNum0 := 0
-
-	comp := &components.ReanimComponent{
-		MergedTracks: map[string][]reanim.Frame{
-			"text_ready": {
-				{ImagePath: "ready.png", FrameNum: &frameNum0},
-				{ImagePath: "ready.png", FrameNum: &frameNumMinus1},
-			},
-			"text_set": {
-				{ImagePath: "set.png", FrameNum: &frameNumMinus1},
-				{ImagePath: "set.png", FrameNum: &frameNum0},
-			},
-		},
-	}
-
-	// 帧 0：text_ready 显示（f=0），text_set 隐藏（f=-1）
-	visible0 := strategy.GetVisibleTracks(comp, 0)
-	if !visible0["text_ready"] {
-		t.Error("text_ready should be visible at frame 0")
-	}
-	if visible0["text_set"] {
-		t.Error("text_set should not be visible at frame 0")
-	}
-
-	// 帧 1：text_ready 隐藏（f=-1），text_set 显示（f=0）
-	visible1 := strategy.GetVisibleTracks(comp, 1)
-	if visible1["text_ready"] {
-		t.Error("text_ready should not be visible at frame 1")
-	}
-	if !visible1["text_set"] {
-		t.Error("text_set should be visible at frame 1")
-	}
-}
-
-// TestComplexScenePlaybackStrategy_GetVisibleTracks 测试复杂场景播放策略
-func TestComplexScenePlaybackStrategy_GetVisibleTracks(t *testing.T) {
-	strategy := &ComplexScenePlaybackStrategy{}
-
-	// 测试使用 VisibleTracks 白名单
-	comp := &components.ReanimComponent{
-		VisibleTracks: map[string]bool{
-			"track1": true,
-			"track2": true,
-		},
-		MergedTracks: map[string][]reanim.Frame{
-			"track1": {
-				{ImagePath: "image1.png"},
-			},
-			"track2": {
-				{ImagePath: "image2.png"},
-			},
-			"track3": {
-				{ImagePath: "image3.png"},
-			},
-		},
-	}
-
-	visible := strategy.GetVisibleTracks(comp, 0)
-
-	// 只有白名单中的轨道可见
-	if !visible["track1"] {
-		t.Error("track1 should be visible (in whitelist)")
-	}
-	if !visible["track2"] {
-		t.Error("track2 should be visible (in whitelist)")
-	}
-	if visible["track3"] {
-		t.Error("track3 should not be visible (not in whitelist)")
-	}
-}
-
-// TestBlendedPlaybackStrategy_GetVisibleTracks 测试混合播放策略
-func TestBlendedPlaybackStrategy_GetVisibleTracks(t *testing.T) {
-	strategy := &BlendedPlaybackStrategy{}
-
-	frameNumMinus1 := -1
-	frameNum0 := 0
-
-	comp := &components.ReanimComponent{
-		CurrentAnim: "anim_idle",
-		AnimVisiblesMap: map[string][]int{
-			"anim_idle": {0, 0, 0}, // 所有帧都在时间窗口内
-		},
-		MergedTracks: map[string][]reanim.Frame{
-			"anim_idle": {
-				{FrameNum: &frameNum0}, // 动画定义轨道，不渲染
-			},
-			"head": {
-				{ImagePath: "head.png", FrameNum: &frameNumMinus1}, // f=-1，检查时间窗口
-			},
-			"body": {
-				{ImagePath: "body.png", FrameNum: &frameNum0}, // f=0，显示
-			},
-		},
-	}
-
-	visible := strategy.GetVisibleTracks(comp, 0)
-
-	// 动画定义轨道不应该显示
-	if visible["anim_idle"] {
-		t.Error("anim_idle (animation definition) should not be visible")
-	}
-
-	// head（f=-1）应该显示（时间窗口内）
-	if !visible["head"] {
-		t.Error("head should be visible (f=-1, within time window)")
-	}
-
-	// body（f=0）应该显示
-	if !visible["body"] {
-		t.Error("body should be visible (f=0)")
-	}
-}
-
-// TestBlendedPlaybackStrategy_OutsideTimeWindow 测试混合策略的时间窗口外逻辑
-func TestBlendedPlaybackStrategy_OutsideTimeWindow(t *testing.T) {
-	strategy := &BlendedPlaybackStrategy{}
-
-	frameNumMinus1 := -1
-
-	comp := &components.ReanimComponent{
-		CurrentAnim: "anim_shooting",
-		AnimVisiblesMap: map[string][]int{
-			"anim_shooting": {-1, 0, 0}, // 帧 0 在时间窗口外，帧 1-2 在时间窗口内
-		},
-		MergedTracks: map[string][]reanim.Frame{
-			"head": {
-				{ImagePath: "head.png", FrameNum: &frameNumMinus1},
-				{ImagePath: "head.png", FrameNum: &frameNumMinus1},
-				{ImagePath: "head.png", FrameNum: &frameNumMinus1},
-			},
-		},
-	}
-
-	// 帧 0：时间窗口外，所有部件隐藏
-	visible0 := strategy.GetVisibleTracks(comp, 0)
-	if len(visible0) > 0 {
-		t.Errorf("Expected no visible tracks at frame 0 (outside time window), got %d", len(visible0))
-	}
-
-	// 帧 1：时间窗口内，部件显示（因为 f=-1 且时间窗口为 0）
-	visible1 := strategy.GetVisibleTracks(comp, 1)
-	if !visible1["head"] {
-		t.Error("head should be visible at frame 1 (inside time window)")
 	}
 }
 

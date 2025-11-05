@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/scenes"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -78,6 +79,14 @@ func main() {
 			fmt.Fprintln(os.Stderr, "Reanim 资源加载失败（使用 --verbose 查看详细日志）")
 		}
 		os.Exit(1)
+	}
+
+	// Load Reanim playback mode configuration
+	// This provides explicit mode configuration for key animations (SelectorScreen, PeaShooter, etc.)
+	// Falls back to heuristic algorithm if config not found
+	if err := config.LoadReanimPlaybackConfig(); err != nil {
+		// Non-fatal error: will use heuristic algorithm as fallback
+		log.Printf("⚠️  Reanim playback config not loaded (will use heuristic algorithm): %v", err)
 	}
 
 	// Create scene manager

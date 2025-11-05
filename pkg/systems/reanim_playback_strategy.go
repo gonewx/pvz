@@ -5,6 +5,7 @@ import (
 
 	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
 )
 
 // ==================================================================
@@ -89,6 +90,31 @@ func (m PlaybackMode) String() string {
 	}
 }
 
+// parseModeFromString 将配置文件的字符串模式转换为 PlaybackMode 枚举
+//
+// 参数：
+//   - modeStr: 模式字符串（"Simple", "Skeleton", "Sequence", "ComplexScene", "Blended"）
+//
+// 返回：
+//   - PlaybackMode: 对应的枚举值，如果无法识别则返回 ModeSimple
+func parseModeFromString(modeStr string) PlaybackMode {
+	switch modeStr {
+	case "Simple":
+		return ModeSimple
+	case "Skeleton":
+		return ModeSkeleton
+	case "Sequence":
+		return ModeSequence
+	case "ComplexScene":
+		return ModeComplexScene
+	case "Blended":
+		return ModeBlended
+	default:
+		log.Printf("[parseModeFromString] Warning: Unknown mode string '%s', defaulting to Simple", modeStr)
+		return ModeSimple
+	}
+}
+
 // PlaybackStrategy 定义动画播放策略接口
 //
 // 每种播放模式实现各自的策略类，通过策略模式实现多态播放。
@@ -99,14 +125,6 @@ type PlaybackStrategy interface {
 	//   - comp: ReanimComponent 组件
 	//   - deltaTime: 时间增量（秒）
 	Update(comp *components.ReanimComponent, deltaTime float64)
-
-	// GetVisibleTracks 返回当前帧应该渲染的轨道列表
-	// 参数：
-	//   - comp: ReanimComponent 组件
-	//   - frame: 当前逻辑帧
-	// 返回：
-	//   - map[trackName]bool: 轨道名 -> 是否可见
-	GetVisibleTracks(comp *components.ReanimComponent, frame int) map[string]bool
 }
 
 // ==================================================================
@@ -115,21 +133,37 @@ type PlaybackStrategy interface {
 
 // detectPlaybackMode 自动检测 Reanim 文件的播放模式
 //
-// 算法基于以下特征：
-// 1. 轨道数量
-// 2. f 值存在性
-// 3. 图片资源分布
-// 4. 动画定义轨道数量
+// 采用**配置优先 + 启发式后备**策略：
+// 1. 优先查询 data/reanim_playback_config.yaml 配置文件
+// 2. 如果配置存在，使用配置指定的模式（100% 精确）
+// 3. 如果配置不存在，使用启发式算法自动检测（后备方案）
 //
 // 参数：
+//   - reanimName: Reanim 文件名（不含 .reanim 后缀，如 "SelectorScreen"）
 //   - reanimData: 解析后的 Reanim XML 数据
 //
 // 返回：
 //   - PlaybackMode: 检测到的播放模式
-func detectPlaybackMode(reanimData *reanim.ReanimXML) PlaybackMode {
+func detectPlaybackMode(reanimName string, reanimData *reanim.ReanimXML) PlaybackMode {
 	if reanimData == nil || len(reanimData.Tracks) == 0 {
 		return ModeSimple
 	}
+
+	// ==================================================================
+	// 步骤 1: 查询配置文件（配置优先策略）
+	// ==================================================================
+	if configMode, found := config.GetAnimationMode(reanimName); found {
+		// 将配置的字符串模式转换为 PlaybackMode 枚举
+		mode := parseModeFromString(configMode)
+		log.Printf("[detectPlaybackMode] ✅ Using configured mode for '%s': %s (source: config)",
+			reanimName, mode.String())
+		return mode
+	}
+
+	// ==================================================================
+	// 步骤 2: 启发式算法（后备方案）
+	// ==================================================================
+	log.Printf("[detectPlaybackMode] ⚠️  No config found for '%s', using heuristic algorithm", reanimName)
 
 	trackCount := len(reanimData.Tracks)
 	animDefCount := 0   // 动画定义轨道数量（只有 f 值）
@@ -162,17 +196,21 @@ func detectPlaybackMode(reanimData *reanim.ReanimXML) PlaybackMode {
 	}
 
 	// 决策树
-	// 规则 1：如果有多个动画定义轨道（3+），且部件轨道也多，则是混合模式
+	// 规则 1：优先检查复杂场景动画（修复 SelectorScreen 误判为 Blended 的问题）
+	// 特征：轨道数量 >= 40 或 动画定义轨道 >= 10
+	// 示例：SelectorScreen.reanim（48 轨道，14 动画定义）
+	if trackCount >= 40 || animDefCount >= 10 {
+		log.Printf("[detectPlaybackMode] Detected ComplexScene mode: trackCount=%d, animDefCount=%d",
+			trackCount, animDefCount)
+		return ModeComplexScene
+	}
+
+	// 规则 2：如果有多个动画定义轨道（3+），且部件轨道也多，则是混合模式
+	// 注意：此规则优先级低于 ComplexScene，避免误判
 	if animDefCount >= 3 && partTrackCount >= 3 {
 		log.Printf("[detectPlaybackMode] Detected Blended mode: animDefCount=%d, partTrackCount=%d",
 			animDefCount, partTrackCount)
 		return ModeBlended
-	}
-
-	// 规则 2：如果轨道数量超过 50，则是复杂场景动画
-	if trackCount >= 50 {
-		log.Printf("[detectPlaybackMode] Detected ComplexScene mode: trackCount=%d", trackCount)
-		return ModeComplexScene
 	}
 
 	// 规则 3：如果有 f 值且轨道数 10-30，则是序列动画
@@ -220,20 +258,6 @@ func (s *SimplePlaybackStrategy) Update(comp *components.ReanimComponent, deltaT
 	// 简单模式无需特殊处理
 }
 
-// GetVisibleTracks 返回所有轨道（简单模式下所有轨道都可见）
-func (s *SimplePlaybackStrategy) GetVisibleTracks(comp *components.ReanimComponent, frame int) map[string]bool {
-	visible := make(map[string]bool)
-
-	// 简单模式：所有有图片的轨道都可见
-	for trackName, frames := range comp.MergedTracks {
-		if len(frames) > 0 && frames[0].ImagePath != "" {
-			visible[trackName] = true
-		}
-	}
-
-	return visible
-}
-
 // ==================================================================
 // 策略实现 2: 骨骼动画 (SkeletonPlaybackStrategy)
 // ==================================================================
@@ -254,20 +278,6 @@ func (s *SkeletonPlaybackStrategy) Update(comp *components.ReanimComponent, delt
 	// 骨骼动画所有部件同步，无需特殊处理
 }
 
-// GetVisibleTracks 返回所有轨道（骨骼动画所有部件都可见）
-func (s *SkeletonPlaybackStrategy) GetVisibleTracks(comp *components.ReanimComponent, frame int) map[string]bool {
-	visible := make(map[string]bool)
-
-	// 骨骼动画：所有有图片的轨道都可见
-	for trackName, frames := range comp.MergedTracks {
-		if len(frames) > 0 && frames[0].ImagePath != "" {
-			visible[trackName] = true
-		}
-	}
-
-	return visible
-}
-
 // ==================================================================
 // 策略实现 3: 序列动画 (SequencePlaybackStrategy)
 // ==================================================================
@@ -286,38 +296,6 @@ func (s *SequencePlaybackStrategy) Update(comp *components.ReanimComponent, delt
 	// 使用默认的帧推进逻辑
 }
 
-// GetVisibleTracks 返回当前帧应该显示的轨道
-func (s *SequencePlaybackStrategy) GetVisibleTracks(comp *components.ReanimComponent, frame int) map[string]bool {
-	visible := make(map[string]bool)
-
-	// 序列动画：根据 f 值时间窗口判断可见性
-	for trackName, frames := range comp.MergedTracks {
-		if frame >= len(frames) {
-			continue
-		}
-
-		currentFrame := frames[frame]
-
-		// 检查是否有图片
-		if currentFrame.ImagePath == "" {
-			continue
-		}
-
-		// 检查 f 值（FrameNum）
-		// f=0 表示显示，f=-1 表示隐藏
-		if currentFrame.FrameNum != nil {
-			if *currentFrame.FrameNum == 0 {
-				visible[trackName] = true
-			}
-		} else {
-			// 如果没有 FrameNum，默认显示
-			visible[trackName] = true
-		}
-	}
-
-	return visible
-}
-
 // ==================================================================
 // 策略实现 4: 复杂场景动画 (ComplexScenePlaybackStrategy)
 // ==================================================================
@@ -326,36 +304,84 @@ func (s *SequencePlaybackStrategy) GetVisibleTracks(comp *components.ReanimCompo
 //
 // 特征：
 // - 50-500+ 轨道
-// - 独立时间线
-// - 使用 VisibleTracks 白名单控制
+// - 独立时间线（每个动画独立循环）
+// - 支持 IndependentAnims（如 SelectorScreen 的云朵、草丛、花朵各自独立播放）
 //
-// 示例：SelectorScreen.reanim（500+ 轨道，34033 行）
+// 示例：SelectorScreen.reanim（48 轨道，14 个独立动画定义）
+//
+// 工作原理：
+// 1. IndependentAnims 存储每个独立动画（如 "anim_cloud1"）的状态
+// 2. Update 方法更新所有独立动画的帧索引
+// 3. GetVisibleTracks 基于每个独立动画的当前帧，查询对应视觉轨道的可见性
 type ComplexScenePlaybackStrategy struct{}
 
 // Update 更新复杂场景动画状态
+//
+// 对于每个独立动画：
+// 1. 更新 FrameAccumulator
+// 2. 推进 CurrentFrame
+// 3. 处理循环/延迟
 func (s *ComplexScenePlaybackStrategy) Update(comp *components.ReanimComponent, deltaTime float64) {
-	// 复杂场景动画：每个轨道独立更新
-	// 使用 TrackConfigs 控制每个轨道的播放行为
-	// 默认逻辑由 ReanimSystem.Update 实现
-}
-
-// GetVisibleTracks 返回 VisibleTracks 白名单中的轨道
-func (s *ComplexScenePlaybackStrategy) GetVisibleTracks(comp *components.ReanimComponent, frame int) map[string]bool {
-	// 复杂场景动画使用 VisibleTracks 白名单
-	// 如果白名单存在，只渲染白名单中的轨道
-	if comp.VisibleTracks != nil && len(comp.VisibleTracks) > 0 {
-		return comp.VisibleTracks
+	if comp.IndependentAnims == nil || len(comp.IndependentAnims) == 0 {
+		// 如果没有独立动画，使用默认的全局帧推进（向后兼容）
+		return
 	}
 
-	// 如果没有白名单，渲染所有有图片的轨道
-	visible := make(map[string]bool)
-	for trackName, frames := range comp.MergedTracks {
-		if len(frames) > 0 && frames[0].ImagePath != "" {
-			visible[trackName] = true
+	// 计算帧时长
+	frameTime := 1.0 / float64(comp.Reanim.FPS)
+
+	// 更新每个独立动画
+	for _, state := range comp.IndependentAnims {
+		// 跳过未激活的动画
+		if !state.IsActive {
+			// 更新延迟计时器
+			if state.DelayDuration > 0 {
+				state.DelayTimer += deltaTime
+				if state.DelayTimer >= state.DelayDuration {
+					// 延迟结束，激活动画
+					state.IsActive = true
+					state.DelayTimer = 0
+					state.CurrentFrame = state.StartFrame       // 跳回起始帧（不是 0）
+					state.FrameAccumulator = 0
+				}
+			}
+			continue
+		}
+
+		// 更新帧累加器
+		state.FrameAccumulator += deltaTime
+
+		// 检查是否应该推进到下一帧
+		for state.FrameAccumulator >= frameTime {
+			state.FrameAccumulator -= frameTime
+			state.CurrentFrame++
+
+			// 计算结束帧（StartFrame + FrameCount）
+			endFrame := state.StartFrame + state.FrameCount
+
+			// 检查是否到达动画末尾
+			if state.CurrentFrame >= endFrame {
+				if state.IsLooping {
+					// 循环播放：重置到起始帧，继续播放
+					state.CurrentFrame = state.StartFrame
+
+					// 注意：即使没有延迟，也保持 IsActive = true，让动画持续循环
+					// 只有当有延迟时，才在每次循环后暂停
+					if state.DelayDuration > 0 {
+						state.IsActive = false
+						state.DelayTimer = 0
+					}
+					// 如果没有延迟，继续循环（IsActive 保持 true）
+				} else {
+					// 非循环动画：停在最后一帧
+					state.CurrentFrame = endFrame - 1
+					state.IsActive = false
+					log.Printf("[ComplexScene] Animation '%s' stopped at frame %d", state.AnimName, state.CurrentFrame)
+					break
+				}
+			}
 		}
 	}
-
-	return visible
 }
 
 // ==================================================================
@@ -382,79 +408,5 @@ type BlendedPlaybackStrategy struct{}
 // Update 更新混合模式动画状态
 func (s *BlendedPlaybackStrategy) Update(comp *components.ReanimComponent, deltaTime float64) {
 	// 混合模式使用默认的帧推进逻辑
-	// 特殊处理在 GetVisibleTracks 和渲染时进行
-}
-
-// GetVisibleTracks 返回当前状态下应该显示的部件轨道
-func (s *BlendedPlaybackStrategy) GetVisibleTracks(comp *components.ReanimComponent, frame int) map[string]bool {
-	visible := make(map[string]bool)
-
-	// 混合模式：
-	// 1. 检查当前动画的时间窗口（AnimVisiblesMap）
-	// 2. 渲染部件轨道（非动画定义轨道、非逻辑轨道）
-
-	// 如果有 AnimVisiblesMap，使用时间窗口控制
-	outsideTimeWindow := false
-	if comp.AnimVisiblesMap != nil && comp.CurrentAnim != "" {
-		animVisibles := comp.AnimVisiblesMap[comp.CurrentAnim]
-		if animVisibles != nil && frame < len(animVisibles) {
-			// 检查当前帧是否在时间窗口外
-			if animVisibles[frame] == -1 {
-				outsideTimeWindow = true
-			}
-		}
-	}
-
-	// 如果在时间窗口外，隐藏所有部件
-	if outsideTimeWindow {
-		return visible
-	}
-
-	// 渲染所有部件轨道
-	for trackName, frames := range comp.MergedTracks {
-		// 跳过动画定义轨道
-		if AnimationDefinitionTracks[trackName] {
-			continue
-		}
-
-		// 跳过逻辑轨道
-		if LogicalTracks[trackName] {
-			continue
-		}
-
-		// 检查是否有图片
-		if frame >= len(frames) {
-			continue
-		}
-
-		currentFrame := frames[frame]
-		if currentFrame.ImagePath == "" {
-			continue
-		}
-
-		// 检查混合轨道的 f 值
-		// 如果 f=-1，检查时间窗口；如果 f=0，显示
-		if currentFrame.FrameNum != nil {
-			if *currentFrame.FrameNum == -1 {
-				// f=-1：使用动画定义轨道的时间窗口
-				// 如果时间窗口内（animVisibles[frame] == 0），显示
-				if comp.AnimVisiblesMap != nil && comp.CurrentAnim != "" {
-					animVisibles := comp.AnimVisiblesMap[comp.CurrentAnim]
-					if animVisibles != nil && frame < len(animVisibles) {
-						if animVisibles[frame] == 0 {
-							visible[trackName] = true
-						}
-					}
-				}
-			} else if *currentFrame.FrameNum == 0 {
-				// f=0：显示
-				visible[trackName] = true
-			}
-		} else {
-			// 没有 f 值：默认显示
-			visible[trackName] = true
-		}
-	}
-
-	return visible
+	// 特殊处理在渲染时进行
 }

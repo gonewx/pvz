@@ -1,0 +1,250 @@
+# Reanim Playback Mode Configuration
+#
+# 此配置文件定义了每个 Reanim 动画的播放模式和元数据。
+# 配置优先级高于启发式算法，确保 100% 精确的模式识别。
+#
+# 版本: 1.0
+# 更新: 2025-11-03
+# 相关: Story 6.6 - Reanim 播放模式通用化
+
+version: "1.0"
+
+# 动画配置
+animations:
+  # ==================================================================
+  # 复杂场景动画 (ModeComplexScene)
+  # ==================================================================
+  # 特征：50+ 轨道，独立时间线，大型场景动画
+
+  SelectorScreen:
+    mode: ComplexScene
+    description: "主菜单场景，48 个轨道，14 个独立动画定义"
+    notes: |
+      包含独立播放的云朵、草丛、墓碑动画。
+      每个动画定义轨道（anim_*）控制对应的视觉轨道。
+
+      动画行为：
+      - 背景/树/房子：静态显示（第0帧，不推进）
+      - 云朵（7个）：周期性飘动，每次播放完后延迟 10-20 秒
+      - 草丛：周期性晃动，每次播放完后延迟 5 秒
+      - 花朵（3个）：默认不激活，需要手动触发（鼠标点击等）
+      - 木板/墓碑：一次性动画，播放后锁定在最后一帧
+
+      新增细粒度控制字段：
+      - is_active: 是否推进帧（true=推进，false=静态）
+      - render_when_stopped: 停止推进后是否继续渲染（true=渲染，false=隐藏）
+      - lock_at_frame: 锁定在指定帧（可选，null=自动使用最后一帧）
+    independent_animations:
+      # 云朵动画（7 个，缓慢从右向左飘动）
+      - anim_cloud1
+      - anim_cloud2
+      - anim_cloud4
+      - anim_cloud5
+      - anim_cloud6
+      - anim_cloud7
+      # 草丛动画（叶子轻微晃动）
+      - anim_grass
+      # # # 花朵动画
+      # # - anim_flower1
+      # # - anim_flower2
+      # # - anim_flower3
+      # 木板动画
+      - anim_sign
+      # 墓碑动画（从地下升起）
+      - anim_open
+      # - anim_start
+      - anim_idle
+
+    independent_anim_configs:
+      # 云朵动画配置（周期性出现）
+      anim_cloud1:
+        is_looping: true
+        is_active: true
+      anim_cloud2:
+        is_looping: true
+        is_active: true
+      anim_cloud4:
+        is_looping: true
+        is_active: true
+      anim_cloud5:
+        is_looping: true
+        is_active: true
+      anim_cloud6:
+        is_looping: true
+        is_active: true
+      anim_cloud7:
+        is_looping: true
+        is_active: true
+
+      # 草丛动画配置（周期性晃动）
+      anim_grass:
+        is_looping: true
+        is_active: true
+        controlled_tracks:
+          # anim_grass 控制所有 leaf 轨道（业务规则）
+          - leaf_SelectorScreen_Leaves
+          - leaf1
+          - leaf2
+          - leaf3
+          - leaf4
+          - leaf5
+
+    #   # 花朵动画配置（默认不激活，需要触发）
+    #   anim_flower1:
+    #     delay_duration: 0.0
+    #     is_looping: false       # 播放一次
+    #     is_active: false        # 默认不激活
+    #   anim_flower2:
+    #     delay_duration: 0.0
+    #     is_looping: false
+    #     is_active: false
+    #   anim_flower3:
+    #     delay_duration: 0.0
+    #     is_looping: false
+    #     is_active: false
+
+      # 木板动画
+      anim_idle:
+        delay_duration: 0.0
+        is_looping: true
+        is_active: true        # 默认不激活
+
+      # 木板动画（一次性播放）
+      anim_sign:
+        delay_duration: 0.0
+        is_looping: false
+        is_active: true        # 默认不激活
+        controlled_tracks:
+          - woodsign1
+          - woodsign2
+          - woodsign3
+
+      # 墓碑动画（一次性播放，默认激活，播放后锁定在最后一帧）
+      anim_open:
+        delay_duration: 0.0
+        is_looping: false          # 播放一次
+        is_active: true            # 初始激活
+        render_when_stopped: true  # 完成后继续渲染最后一帧（墓碑保持显示）
+        controlled_tracks:
+          - SelectorScreen_BG_Right
+          - SelectorScreen_Adventure_shadow
+          - SelectorScreen_Adventure_button
+          - SelectorScreen_Survival_shadow
+          - SelectorScreen_Survival_button
+          - SelectorScreen_Challenges_shadow
+          - SelectorScreen_Challenges_button
+          - SelectorScreen_ZenGarden_shadow
+          - SelectorScreen_ZenGarden_button
+          - SelectorScreen_StartAdventure_shadow
+          - SelectorScreen_StartAdventure_button
+
+  CrazyDave:
+    mode: ComplexScene
+    description: "疯狂戴夫动画，56 个轨道，大量独立部件"
+
+  # ==================================================================
+  # 混合模式 (ModeBlended)
+  # ==================================================================
+  # 特征：包含状态定义轨道 + 部件轨道，状态机控制渲染
+
+  PeaShooter:
+    mode: Blended
+    description: "豌豆射手，24 个轨道，使用双动画叠加"
+    notes: |
+      攻击时：身体使用 anim_idle，头部使用 anim_shooting
+      父骨骼：anim_stem 控制头部偏移
+    parent_bone: anim_stem
+
+  PeaShooterSingle:
+    mode: Blended
+    description: "单发豌豆射手（教学关卡），18 个轨道"
+    parent_bone: anim_stem
+
+  PotatoMine:
+    mode: Blended
+    description: "土豆雷，22 个轨道，5 个状态 + 11 个部件"
+    notes: |
+      状态：种植 -> 准备 -> 待命 -> 爆炸 -> 消失
+
+  Squash:
+    mode: Blended
+    description: "南瓜头，10 个轨道，6 个状态 + 多个部件"
+
+  SnowPea:
+    mode: Blended
+    description: "寒冰射手，20 个轨道"
+    parent_bone: anim_stem
+
+  SplitPea:
+    mode: Blended
+    description: "双向射手，22 个轨道"
+
+  ThreePeater:
+    mode: Blended
+    description: "三线射手，36 个轨道"
+
+  GatlingPea:
+    mode: Blended
+    description: "加特林豌豆，22 个轨道"
+    parent_bone: anim_stem
+
+  Chomper:
+    mode: Blended
+    description: "大嘴花，30 个轨道"
+
+  ScaredyShroom:
+    mode: Blended
+    description: "胆小菇，21 个轨道"
+
+  # ==================================================================
+  # 骨骼动画 (ModeSkeleton)
+  # ==================================================================
+  # 特征：4-30 个轨道，所有部件同步播放
+
+  Sun:
+    mode: Skeleton
+    description: "太阳，3 个轨道，简单旋转动画"
+
+  SunFlower:
+    mode: Skeleton
+    description: "向日葵，29 个轨道，30 个部件同步摆动"
+
+  Marigold:
+    mode: Skeleton
+    description: "金盏花，16 个轨道"
+
+  # ==================================================================
+  # 序列动画 (ModeSequence)
+  # ==================================================================
+  # 特征：使用 f 值控制时间窗口，轨道依次显示
+
+  StartReadySetPlant:
+    mode: Sequence
+    description: "开始动画，3 个轨道依次显示 'Ready', 'Set', 'Plant!'"
+
+  FinalWave:
+    mode: Sequence
+    description: "最终波次动画"
+
+  # ==================================================================
+  # 简单动画 (ModeSimple)
+  # ==================================================================
+  # 特征：1-2 个轨道，简单循环播放
+
+  Lilypad:
+    mode: Simple
+    description: "睡莲，2 个轨道，静态显示"
+
+  Pumpkin:
+    mode: Simple
+    description: "南瓜壳，3 个轨道"
+
+  Tallnut:
+    mode: Simple
+    description: "高坚果，3 个轨道"
+
+# ==================================================================
+# 默认行为
+# ==================================================================
+# 未在此配置的 Reanim 文件将使用启发式算法自动检测模式。
+# 启发式算法规则见 pkg/systems/reanim_playback_strategy.go:detectPlaybackMode()

@@ -5,6 +5,7 @@ import (
 	"log"
 	"math"
 	"sort"
+	"strings"
 
 	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/components"
@@ -322,8 +323,20 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		return
 	}
 
-	// 如果没有当前动画或动画轨道，跳过
-	if reanim.CurrentAnim == "" || len(reanim.AnimTracks) == 0 {
+	// Story 6.6/6.7: 支持独立动画系统（ComplexScene 模式）
+	// 检查是否使用独立动画
+	hasIndependentAnims := reanim.IndependentAnims != nil && len(reanim.IndependentAnims) > 0
+
+	// 传统模式：需要 CurrentAnim 和 AnimTracks
+	if !hasIndependentAnims {
+		// 如果没有当前动画或动画轨道，跳过
+		if reanim.CurrentAnim == "" || len(reanim.AnimTracks) == 0 {
+			return
+		}
+	}
+
+	// 检查是否有 MergedTracks（必需）
+	if len(reanim.MergedTracks) == 0 {
 		return
 	}
 
@@ -464,7 +477,170 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 	}
 
 	// 按 AnimTracks 顺序渲染部件（保证 Z-order 正确）
-	for _, track := range reanim.AnimTracks {
+	// Story 6.6/6.7: 独立动画模式使用不同的渲染逻辑
+	if hasIndependentAnims {
+		// 独立动画模式：按 Reanim.Tracks 原始顺序遍历（保证 Z-order）
+		// 注意：不能直接遍历 MergedTracks map，因为 map 遍历顺序是随机的
+		for _, track := range reanim.Reanim.Tracks {
+			trackName := track.Name
+			mergedFrames, ok := reanim.MergedTracks[trackName]
+			if !ok || len(mergedFrames) == 0 {
+				continue
+			}
+
+			// 确定此轨道的帧索引
+			trackPhysicalIndex := 0
+
+			// 查找控制此轨道的独立动画
+			var controllingState *components.IndependentAnimState
+
+			// 优先使用配置的映射规则
+			if reanim.TrackToAnimMapping != nil {
+				if animName, exists := reanim.TrackToAnimMapping[trackName]; exists {
+					controllingState = reanim.IndependentAnims[animName]
+				}
+			}
+
+			// 如果没有配置映射，使用默认命名匹配规则
+			if controllingState == nil {
+				for _, state := range reanim.IndependentAnims {
+					// 默认规则：轨道名包含动画基名
+					// 例如："Cloud1" 包含 "cloud1"（移除 "anim_" 前缀）
+					animBaseName := strings.TrimPrefix(state.AnimName, "anim_")
+					animBaseName = strings.ToLower(animBaseName)
+					lowerTrackName := strings.ToLower(trackName)
+
+					if strings.Contains(lowerTrackName, animBaseName) {
+						controllingState = state
+						break
+					}
+				}
+			}
+
+			// 如果找到控制动画，使用其当前帧
+			// 注意：即使动画已停止（IsActive = false），也使用 CurrentFrame
+			// 这样非循环动画播放完后会保持在最后一帧
+			if controllingState != nil {
+				trackPhysicalIndex = controllingState.CurrentFrame
+
+				// 检查 render_when_stopped：如果动画已停止且配置为不渲染，则跳过
+				if !controllingState.IsActive && !controllingState.RenderWhenStopped {
+					continue // 动画已停止，且配置为不渲染，跳过此轨道
+				}
+			}
+			// 否则使用第0帧（静态显示，如背景）
+
+			// 确保帧索引在范围内
+			if trackPhysicalIndex >= len(mergedFrames) {
+				trackPhysicalIndex = len(mergedFrames) - 1
+			}
+
+			// 获取帧数据
+			mergedFrame := mergedFrames[trackPhysicalIndex]
+
+			// 检查是否有图片
+			if mergedFrame.ImagePath == "" {
+				continue
+			}
+
+			// 检查可见性（f 值控制）
+			// Story 6.5: f=-1 表示使用动画定义轨道的时间窗口
+			if mergedFrame.FrameNum != nil && *mergedFrame.FrameNum == -1 {
+				// 查询 AnimVisiblesMap 判断可见性
+				if controllingState != nil && reanim.AnimVisiblesMap != nil {
+					if visibles, ok := reanim.AnimVisiblesMap[controllingState.AnimName]; ok {
+						if controllingState.CurrentFrame < len(visibles) {
+							if visibles[controllingState.CurrentFrame] == -1 {
+								// 时间窗口标记为隐藏
+								continue
+							}
+						}
+					}
+				} else if controllingState == nil {
+					// 没有控制动画的轨道，且 f=-1，默认隐藏
+					continue
+				}
+			}
+
+			// 使用 IMAGE 引用查找图片
+			img, exists := reanim.PartImages[mergedFrame.ImagePath]
+			if !exists || img == nil {
+				continue
+			}
+
+			// 获取图片尺寸
+			bounds := img.Bounds()
+			w := bounds.Dx()
+			h := bounds.Dy()
+			fw := float64(w)
+			fh := float64(h)
+
+			// 使用 Transform2D 等价矩阵
+			scaleX := 1.0
+			scaleY := 1.0
+			if mergedFrame.ScaleX != nil {
+				scaleX = *mergedFrame.ScaleX
+			}
+			if mergedFrame.ScaleY != nil {
+				scaleY = *mergedFrame.ScaleY
+			}
+
+			kx := 0.0
+			ky := 0.0
+			if mergedFrame.SkewX != nil {
+				kx = *mergedFrame.SkewX
+			}
+			if mergedFrame.SkewY != nil {
+				ky = *mergedFrame.SkewY
+			}
+
+			// 构建变换矩阵
+			a := math.Cos(kx*math.Pi/180.0) * scaleX
+			b := math.Sin(kx*math.Pi/180.0) * scaleX
+			c := -math.Sin(ky*math.Pi/180.0) * scaleY
+			d := math.Cos(ky*math.Pi/180.0) * scaleY
+
+			// 平移分量
+			tx := 0.0
+			ty := 0.0
+			if mergedFrame.X != nil {
+				tx = *mergedFrame.X
+			}
+			if mergedFrame.Y != nil {
+				ty = *mergedFrame.Y
+			}
+
+			tx += screenX
+			ty += screenY
+
+			// 应用变换矩阵到图片的四个角
+			x0 := tx
+			y0 := ty
+			x1 := a*fw + tx
+			y1 := b*fw + ty
+			x2 := c*fh + tx
+			y2 := d*fh + ty
+			x3 := a*fw + c*fh + tx
+			y3 := b*fw + d*fh + ty
+
+			// 构建顶点数组
+			colorR := float32(1.0 + flashIntensity)
+			colorG := float32(1.0 + flashIntensity)
+			colorB := float32(1.0 + flashIntensity)
+			colorA := float32(1.0)
+
+			vs := []ebiten.Vertex{
+				{DstX: float32(x0), DstY: float32(y0), SrcX: 0, SrcY: 0, ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
+				{DstX: float32(x1), DstY: float32(y1), SrcX: float32(w), SrcY: 0, ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
+				{DstX: float32(x2), DstY: float32(y2), SrcX: 0, SrcY: float32(h), ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
+				{DstX: float32(x3), DstY: float32(y3), SrcX: float32(w), SrcY: float32(h), ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
+			}
+			is := []uint16{0, 1, 2, 1, 3, 2}
+			screen.DrawTriangles(vs, is, img, nil)
+		}
+	} else {
+		// 传统模式：遍历 AnimTracks
+		for _, track := range reanim.AnimTracks {
 		// ==================================================================
 		// Story 6.5: Determine which physical frame to use for this track
 		// ==================================================================
@@ -640,6 +816,7 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		}
 		is := []uint16{0, 1, 2, 1, 3, 2}
 		screen.DrawTriangles(vs, is, img, nil)
+		}
 	}
 }
 

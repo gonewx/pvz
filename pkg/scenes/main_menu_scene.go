@@ -79,17 +79,10 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	} else {
 		scene.selectorScreenEntity = selectorEntity
 
-		// Story 6.6: 使用通用播放模式（自动检测为 ModeComplexScene）
-		// SelectorScreen 是一个复杂的场景动画，包含 500+ 轨道：
-		// - 背景/按钮：静止显示
-		// - 草丛：循环摆动
-		// - 云朵/墓碑：独立动画循环
-		// 系统会自动检测为复杂场景模式，使用 ComplexScenePlaybackStrategy
-		if err := scene.reanimSystem.PlayAnimation(selectorEntity, "anim_idle"); err != nil {
-			log.Printf("Warning: Failed to play SelectorScreen animation: %v", err)
-		} else {
-			log.Printf("[MainMenuScene] 使用通用播放模式播放主菜单动画（自动检测：ComplexScene）")
-		}
+		// Story 6.6/6.7: SelectorScreen 使用独立动画系统
+		// 不再调用 PlayAnimation，独立动画在实体初始化时已经设置
+		// ComplexScenePlaybackStrategy 会自动更新所有独立动画
+		log.Printf("[MainMenuScene] ✅ SelectorScreen 使用独立动画系统（ComplexScene 模式）")
 	}
 
 	// Story 12.1: Initialize button hitboxes
@@ -110,17 +103,17 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	}
 
 	// Story 12.1: Update button visibility based on unlock status
-	scene.updateButtonVisibility()
+	// scene.updateButtonVisibility()
 
 	// Load background image (fallback if SelectorScreen fails)
-	img, err := rm.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_BG")
-	if err != nil {
-		log.Printf("Warning: Failed to load main menu background: %v", err)
-		log.Printf("The game will use a fallback solid color background")
-		// Fallback: keep backgroundImage as nil, will use solid color in Draw()
-	} else {
-		scene.backgroundImage = img
-	}
+	// img, err := rm.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_BG")
+	// if err != nil {
+	// 	log.Printf("Warning: Failed to load main menu background: %v", err)
+	// 	log.Printf("The game will use a fallback solid color background")
+	// 	// Fallback: keep backgroundImage as nil, will use solid color in Draw()
+	// } else {
+	// 	scene.backgroundImage = img
+	// }
 
 	// Load background music (using titlescreen music from loaderbar group)
 	// Note: Need to ensure loaderbar group is loaded before this
@@ -133,7 +126,7 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	}
 
 	// Initialize buttons
-	scene.initButtons()
+	// scene.initButtons()
 
 	return scene
 }

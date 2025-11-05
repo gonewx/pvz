@@ -5,6 +5,50 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
+// IndependentAnimState 独立动画状态（用于 ComplexScene 模式）
+// 每个独立动画有自己的时间线，可以独立循环
+type IndependentAnimState struct {
+	// AnimName 动画名称（如 "anim_cloud1", "anim_grass"）
+	AnimName string
+
+	// CurrentFrame 当前帧索引
+	CurrentFrame int
+
+	// FrameAccumulator 帧累加器（用于精确 FPS 控制）
+	FrameAccumulator float64
+
+	// StartFrame 起始帧索引（循环动画从此帧开始）
+	// 用于支持"跳过前面的隐藏帧"场景
+	// 例如：anim_grass 的可见帧是 78-102，StartFrame=78
+	StartFrame int
+
+	// FrameCount 总帧数（从 StartFrame 开始计算）
+	// 例如：anim_grass 的 StartFrame=78, FrameCount=25 (78到102)
+	FrameCount int
+
+	// IsLooping 是否循环播放
+	IsLooping bool
+
+	// IsActive 是否激活（控制帧推进）
+	// true: 动画帧会持续更新
+	// false: 动画帧停止推进（锁定在当前帧）
+	IsActive bool
+
+	// RenderWhenStopped 停止推进后是否继续渲染
+	// true: 即使 IsActive=false，仍然渲染当前帧（适用于静态显示、锁定最后一帧）
+	// false: 当 IsActive=false 时，完全隐藏（适用于一次性特效）
+	// 默认值：true（保持向后兼容）
+	RenderWhenStopped bool
+
+	// DelayTimer 延迟计时器（用于控制周期性动画的间隔）
+	// 云朵、草丛等可能需要间隔一段时间才重新播放
+	DelayTimer float64
+
+	// DelayDuration 延迟时长（秒）
+	// 0 表示无延迟，立即循环
+	DelayDuration float64
+}
+
 // TrackPlaybackConfig defines playback behavior for an individual track (Story 12.1).
 // This allows fine-grained control over track behavior at the business logic level.
 type TrackPlaybackConfig struct {
@@ -42,6 +86,11 @@ type ReanimComponent struct {
 	// ==========================================================================
 	// Animation Definition (动画定义)
 	// ==========================================================================
+
+	// ReanimName is the name of the Reanim file (without .reanim extension).
+	// Used for configuration lookup and debugging.
+	// Example: "SelectorScreen", "PeaShooter", "Sun"
+	ReanimName string
 
 	// PlaybackMode is the auto-detected playback mode (Story 6.6).
 	// Automatically set by ReanimSystem when PlayAnimation is called.
@@ -179,4 +228,36 @@ type ReanimComponent struct {
 	// - Some tracks loop continuously (e.g., clouds, grass)
 	// - Some tracks can be paused/resumed
 	TrackConfigs map[string]*TrackPlaybackConfig
+
+	// --- Independent Animations (独立动画系统) ---
+
+	// IndependentAnims 存储独立动画的状态（用于 ComplexScene 模式）
+	// Key: 动画名称（如 "anim_cloud1", "anim_grass"）
+	// Value: 动画状态
+	//
+	// 用于 SelectorScreen 等复杂场景，每个独立动画有自己的时间线：
+	// - anim_cloud1-7: 云朵各自独立飘动
+	// - anim_grass: 草丛周期性晃动
+	// - anim_flower1-3: 花朵触发后播放
+	//
+	// 与 CurrentFrame 的区别：
+	// - CurrentFrame: 全局统一帧索引（用于简单/骨骼动画）
+	// - IndependentAnims: 每个动画独立的帧索引（用于复杂场景）
+	IndependentAnims map[string]*IndependentAnimState
+
+	// TrackToAnimMapping 轨道到动画的映射表（ComplexScene 模式使用）
+	//
+	// 定义哪个动画控制哪些轨道。
+	// Key: 轨道名称（如 "leaf1", "Cloud1"）
+	// Value: 控制该轨道的动画名称（如 "anim_grass", "anim_cloud1"）
+	//
+	// 用途：
+	// - 从配置文件读取业务逻辑（如 leaf* → anim_grass）
+	// - 避免在渲染系统硬编码特殊规则
+	// - 支持灵活的轨道控制策略
+	//
+	// 示例：
+	//   map["leaf1"] = "anim_grass"
+	//   map["Cloud1"] = "anim_cloud1"
+	TrackToAnimMapping map[string]string
 }
