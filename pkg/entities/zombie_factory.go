@@ -58,6 +58,7 @@ func NewZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs ReanimSystemIn
 	// 添加 ReanimComponent
 	// 普通僵尸：使用白名单方式，只显示基础身体部件和右手（anim_innerarm）
 	em.AddComponent(entityID, &components.ReanimComponent{
+		ReanimName: "Zombie",
 		Reanim:     reanimXML,
 		PartImages: partImages,
 		VisibleTracks: map[string]bool{
@@ -179,6 +180,7 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs Reanim
 	// 添加 ReanimComponent
 	// 路障僵尸：基础部件 + 路障
 	em.AddComponent(entityID, &components.ReanimComponent{
+		ReanimName: "Zombie",
 		Reanim:     reanimXML,
 		PartImages: partImages,
 		VisibleTracks: map[string]bool{
@@ -310,6 +312,7 @@ func NewBucketheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs Rean
 	// 添加 ReanimComponent
 	// 铁桶僵尸：基础部件 + 铁桶
 	em.AddComponent(entityID, &components.ReanimComponent{
+		ReanimName: "Zombie",
 		Reanim:     reanimXML,
 		PartImages: partImages,
 		VisibleTracks: map[string]bool{

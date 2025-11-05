@@ -5,17 +5,17 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// IndependentAnimState 独立动画状态（用于 ComplexScene 模式）
-// 每个独立动画有自己的时间线，可以独立循环
-type IndependentAnimState struct {
-	// AnimName 动画名称（如 "anim_cloud1", "anim_grass"）
-	AnimName string
+// AnimState 动画状态
+// 每个动画有自己的时间线，可以独立循环
+type AnimState struct {
+	// Name 动画名称（如 "anim_cloud1", "anim_grass"）
+	Name string
 
-	// CurrentFrame 当前帧索引
-	CurrentFrame int
+	// Frame 当前帧索引（独立帧，仅异步模式使用）
+	Frame int
 
-	// FrameAccumulator 帧累加器（用于精确 FPS 控制）
-	FrameAccumulator float64
+	// Accumulator 帧累加器（用于精确 FPS 控制）
+	Accumulator float64
 
 	// StartFrame 起始帧索引（循环动画从此帧开始）
 	// 用于支持"跳过前面的隐藏帧"场景
@@ -92,13 +92,6 @@ type ReanimComponent struct {
 	// Example: "SelectorScreen", "PeaShooter", "Sun"
 	ReanimName string
 
-	// PlaybackMode is the auto-detected playback mode (Story 6.6).
-	// Automatically set by ReanimSystem when PlayAnimation is called.
-	// Five modes: Simple, Skeleton, Sequence, ComplexScene, Blended.
-	// Note: This is an int enum value, not an interface (preserves component purity).
-	// The actual strategy interface is managed in ReanimSystem.
-	PlaybackMode int
-
 	// Reanim is the parsed Reanim animation data (from internal/reanim package).
 	// Contains FPS and track definitions for the animation.
 	Reanim *reanim.ReanimXML
@@ -114,6 +107,11 @@ type ReanimComponent struct {
 
 	// CurrentAnim is the name of the currently playing animation (e.g., "anim_idle").
 	CurrentAnim string
+
+	// GlobalFrame 全局帧索引（同步模式使用）
+	// 当 TrackMapping 为 nil 时，所有动画共享此帧索引
+	// 这是默认模式，适用于 95% 的场景（豌豆射手、向日葵等）
+	GlobalFrame int
 
 	// CurrentFrame is the current logical frame number (0-based index).
 	// This is the frame number in the animation sequence, not the game loop frame.
@@ -231,33 +229,32 @@ type ReanimComponent struct {
 
 	// --- Independent Animations (独立动画系统) ---
 
-	// IndependentAnims 存储独立动画的状态（用于 ComplexScene 模式）
-	// Key: 动画名称（如 "anim_cloud1", "anim_grass"）
+	// Anims 存储动画状态（统一命名，Story 6.8）
+	// Key: 动画名称（如 "anim_cloud1", "anim_grass", "anim_idle"）
 	// Value: 动画状态
 	//
-	// 用于 SelectorScreen 等复杂场景，每个独立动画有自己的时间线：
-	// - anim_cloud1-7: 云朵各自独立飘动
-	// - anim_grass: 草丛周期性晃动
-	// - anim_flower1-3: 花朵触发后播放
+	// 两种使用模式：
+	// 1. 同步模式（TrackMapping = nil）：
+	//    - 所有动画共享 GlobalFrame
+	//    - 适用于 95% 的场景（豌豆射手、向日葵等）
 	//
-	// 与 CurrentFrame 的区别：
-	// - CurrentFrame: 全局统一帧索引（用于简单/骨骼动画）
-	// - IndependentAnims: 每个动画独立的帧索引（用于复杂场景）
-	IndependentAnims map[string]*IndependentAnimState
+	// 2. 异步模式（TrackMapping != nil）：
+	//    - 每个动画使用独立的 Frame
+	//    - 适用于复杂场景（SelectorScreen 云朵各自独立飘动）
+	Anims map[string]*AnimState
 
-	// TrackToAnimMapping 轨道到动画的映射表（ComplexScene 模式使用）
+	// TrackMapping 轨道到动画的映射表（异步模式使用）
 	//
 	// 定义哪个动画控制哪些轨道。
 	// Key: 轨道名称（如 "leaf1", "Cloud1"）
 	// Value: 控制该轨道的动画名称（如 "anim_grass", "anim_cloud1"）
 	//
 	// 用途：
-	// - 从配置文件读取业务逻辑（如 leaf* → anim_grass）
-	// - 避免在渲染系统硬编码特殊规则
-	// - 支持灵活的轨道控制策略
+	// - nil: 同步模式，使用 GlobalFrame（默认）
+	// - 非 nil: 异步模式，每个轨道使用对应动画的独立帧
 	//
 	// 示例：
 	//   map["leaf1"] = "anim_grass"
 	//   map["Cloud1"] = "anim_cloud1"
-	TrackToAnimMapping map[string]string
+	TrackMapping map[string]string
 }

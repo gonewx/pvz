@@ -17,7 +17,6 @@ animations:
   # 特征：50+ 轨道，独立时间线，大型场景动画
 
   SelectorScreen:
-    mode: ComplexScene
     description: "主菜单场景，48 个轨道，14 个独立动画定义"
     notes: |
       包含独立播放的云朵、草丛、墓碑动画。
@@ -139,7 +138,6 @@ animations:
           - SelectorScreen_StartAdventure_button
 
   CrazyDave:
-    mode: ComplexScene
     description: "疯狂戴夫动画，56 个轨道，大量独立部件"
 
   # ==================================================================
@@ -148,7 +146,6 @@ animations:
   # 特征：包含状态定义轨道 + 部件轨道，状态机控制渲染
 
   PeaShooter:
-    mode: Blended
     description: "豌豆射手，24 个轨道，使用双动画叠加"
     notes: |
       攻击时：身体使用 anim_idle，头部使用 anim_shooting
@@ -156,44 +153,35 @@ animations:
     parent_bone: anim_stem
 
   PeaShooterSingle:
-    mode: Blended
     description: "单发豌豆射手（教学关卡），18 个轨道"
     parent_bone: anim_stem
 
   PotatoMine:
-    mode: Blended
     description: "土豆雷，22 个轨道，5 个状态 + 11 个部件"
     notes: |
       状态：种植 -> 准备 -> 待命 -> 爆炸 -> 消失
 
   Squash:
-    mode: Blended
     description: "南瓜头，10 个轨道，6 个状态 + 多个部件"
 
   SnowPea:
-    mode: Blended
     description: "寒冰射手，20 个轨道"
     parent_bone: anim_stem
 
   SplitPea:
-    mode: Blended
     description: "双向射手，22 个轨道"
 
   ThreePeater:
-    mode: Blended
     description: "三线射手，36 个轨道"
 
   GatlingPea:
-    mode: Blended
     description: "加特林豌豆，22 个轨道"
     parent_bone: anim_stem
 
   Chomper:
-    mode: Blended
     description: "大嘴花，30 个轨道"
 
   ScaredyShroom:
-    mode: Blended
     description: "胆小菇，21 个轨道"
 
   # ==================================================================
@@ -202,15 +190,16 @@ animations:
   # 特征：4-30 个轨道，所有部件同步播放
 
   Sun:
-    mode: Skeleton
     description: "太阳，3 个轨道，简单旋转动画"
 
   SunFlower:
-    mode: Skeleton
     description: "向日葵，29 个轨道，30 个部件同步摆动"
+    parent_bone: anim_stem
+
+  Zombie:
+    description: "普通僵尸，42 个轨道，骨骼动画"
 
   Marigold:
-    mode: Skeleton
     description: "金盏花，16 个轨道"
 
   # ==================================================================
@@ -219,11 +208,9 @@ animations:
   # 特征：使用 f 值控制时间窗口，轨道依次显示
 
   StartReadySetPlant:
-    mode: Sequence
     description: "开始动画，3 个轨道依次显示 'Ready', 'Set', 'Plant!'"
 
   FinalWave:
-    mode: Sequence
     description: "最终波次动画"
 
   # ==================================================================
@@ -232,15 +219,12 @@ animations:
   # 特征：1-2 个轨道，简单循环播放
 
   Lilypad:
-    mode: Simple
     description: "睡莲，2 个轨道，静态显示"
 
   Pumpkin:
-    mode: Simple
     description: "南瓜壳，3 个轨道"
 
   Tallnut:
-    mode: Simple
     description: "高坚果，3 个轨道"
 
 # ==================================================================

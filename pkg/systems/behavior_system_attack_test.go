@@ -556,6 +556,15 @@ func createMockReanimData() *reanim.ReanimXML {
 					{FrameNum: intPtr(-1)},
 				},
 			},
+			// Story 6.9: Add anim_head_idle for multi-animation overlay support
+			{
+				Name: "anim_head_idle",
+				Frames: []reanim.Frame{
+					{FrameNum: intPtr(0)},
+					{FrameNum: intPtr(0)},
+					{FrameNum: intPtr(-1)},
+				},
+			},
 		},
 	}
 }

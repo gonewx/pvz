@@ -325,7 +325,7 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 
 	// Story 6.6/6.7: 支持独立动画系统（ComplexScene 模式）
 	// 检查是否使用独立动画
-	hasIndependentAnims := reanim.IndependentAnims != nil && len(reanim.IndependentAnims) > 0
+	hasIndependentAnims := reanim.Anims != nil && len(reanim.Anims) > 0
 
 	// 传统模式：需要 CurrentAnim 和 AnimTracks
 	if !hasIndependentAnims {
@@ -341,7 +341,9 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 	}
 
 	// 将逻辑帧映射到物理帧索引
-	physicalIndex := s.findPhysicalFrameIndex(reanim, reanim.CurrentFrame)
+	// Story 6.8: 同步模式使用 GlobalFrame
+	logicalFrame := reanim.GlobalFrame
+	physicalIndex := s.findPhysicalFrameIndex(reanim, logicalFrame)
 	if physicalIndex < 0 {
 		return
 	}
@@ -492,21 +494,21 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 			trackPhysicalIndex := 0
 
 			// 查找控制此轨道的独立动画
-			var controllingState *components.IndependentAnimState
+			var controllingState *components.AnimState
 
 			// 优先使用配置的映射规则
-			if reanim.TrackToAnimMapping != nil {
-				if animName, exists := reanim.TrackToAnimMapping[trackName]; exists {
-					controllingState = reanim.IndependentAnims[animName]
+			if reanim.TrackMapping != nil {
+				if animName, exists := reanim.TrackMapping[trackName]; exists {
+					controllingState = reanim.Anims[animName]
 				}
 			}
 
 			// 如果没有配置映射，使用默认命名匹配规则
 			if controllingState == nil {
-				for _, state := range reanim.IndependentAnims {
+				for _, state := range reanim.Anims {
 					// 默认规则：轨道名包含动画基名
 					// 例如："Cloud1" 包含 "cloud1"（移除 "anim_" 前缀）
-					animBaseName := strings.TrimPrefix(state.AnimName, "anim_")
+					animBaseName := strings.TrimPrefix(state.Name, "anim_")
 					animBaseName = strings.ToLower(animBaseName)
 					lowerTrackName := strings.ToLower(trackName)
 
@@ -518,10 +520,10 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 			}
 
 			// 如果找到控制动画，使用其当前帧
-			// 注意：即使动画已停止（IsActive = false），也使用 CurrentFrame
+			// 注意：即使动画已停止（IsActive = false），也使用 Frame
 			// 这样非循环动画播放完后会保持在最后一帧
 			if controllingState != nil {
-				trackPhysicalIndex = controllingState.CurrentFrame
+				trackPhysicalIndex = controllingState.Frame
 
 				// 检查 render_when_stopped：如果动画已停止且配置为不渲染，则跳过
 				if !controllingState.IsActive && !controllingState.RenderWhenStopped {
@@ -548,9 +550,9 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 			if mergedFrame.FrameNum != nil && *mergedFrame.FrameNum == -1 {
 				// 查询 AnimVisiblesMap 判断可见性
 				if controllingState != nil && reanim.AnimVisiblesMap != nil {
-					if visibles, ok := reanim.AnimVisiblesMap[controllingState.AnimName]; ok {
-						if controllingState.CurrentFrame < len(visibles) {
-							if visibles[controllingState.CurrentFrame] == -1 {
+					if visibles, ok := reanim.AnimVisiblesMap[controllingState.Name]; ok {
+						if controllingState.Frame < len(visibles) {
+							if visibles[controllingState.Frame] == -1 {
 								// 时间窗口标记为隐藏
 								continue
 							}
@@ -949,11 +951,11 @@ func (s *RenderSystem) shouldRenderTrack(
 	// 检测播放模式
 	animVisibles := reanimComp.AnimVisiblesMap[reanimComp.CurrentAnim]
 	isPlayAllFramesMode := len(animVisibles) == 0
-	currentPhysicalFrame := reanimComp.CurrentFrame // 默认：物理帧
+	currentPhysicalFrame := reanimComp.GlobalFrame // Story 6.8: 使用 GlobalFrame
 
 	if !isPlayAllFramesMode {
 		// PlayAnimation 模式：映射逻辑帧到物理帧
-		logicalFrame := reanimComp.CurrentFrame
+		logicalFrame := reanimComp.GlobalFrame // Story 6.8: 使用 GlobalFrame
 		physicalFrame := s.findPhysicalFrameIndex(reanimComp, logicalFrame)
 		if physicalFrame < 0 {
 			// 映射失败，轨道隐藏
@@ -968,32 +970,77 @@ func (s *RenderSystem) shouldRenderTrack(
 		return mergedFrame.FrameNum == nil || *mergedFrame.FrameNum == 0
 	}
 
+	// ==================================================================
+	// Story 6.9: Multi-Animation Overlay Support (多动画叠加支持)
+	// ==================================================================
+	//
 	// 模式 B: PlayAnimation - 检查动画定义轨道的 f 值
-	// 遍历 Reanim.Tracks（完整的轨道列表），查找动画定义轨道
+	//
+	// 与 Story 6.8 不同，现在支持多个动画同时激活：
+	// - 只要在**任意一个**激活动画的时间窗口内，就渲染
+	// - 这样可以实现豌豆射手攻击时头部和身体同时显示
+	//
 	if reanimComp.Reanim == nil {
 		return false
 	}
 
-	// Iterate through all tracks in Reanim.Tracks (including animation definition tracks)
-	for _, track := range reanimComp.Reanim.Tracks {
-		// Get merged frames for this track
-		frames, ok := reanimComp.MergedTracks[track.Name]
-		if !ok || currentPhysicalFrame >= len(frames) {
-			continue
+	// 确定使用哪个帧索引和激活的动画
+	var frame int
+	var activeAnims []string
+
+	if reanimComp.TrackMapping != nil {
+		// 异步模式：查找控制该轨道的动画
+		if animName, exists := reanimComp.TrackMapping[trackName]; exists {
+			if state := reanimComp.Anims[animName]; state != nil && state.IsActive {
+				frame = state.Frame
+				activeAnims = []string{animName}
+			}
 		}
-
-		frame := frames[currentPhysicalFrame]
-
-		// Animation definition track: has f value but no image
-		if frame.FrameNum != nil && frame.ImagePath == "" {
-			// If any animation definition track has f=0, this is a visible time window
-			if *frame.FrameNum == 0 {
-				return true
+	} else {
+		// 同步模式：使用 GlobalFrame，检查所有激活的动画
+		frame = currentPhysicalFrame
+		for name, state := range reanimComp.Anims {
+			if state.IsActive {
+				activeAnims = append(activeAnims, name)
 			}
 		}
 	}
 
-	// No animation definition track allows rendering at this frame
+	// 如果没有激活的动画，不渲染（边界情况处理）
+	if len(activeAnims) == 0 {
+		return false
+	}
+
+	// 检查是否在任意激活动画的时间窗口内
+	for _, animName := range activeAnims {
+		animVisibles := reanimComp.AnimVisiblesMap[animName]
+		if len(animVisibles) == 0 {
+			// 如果这个动画没有 AnimVisibles，使用传统逻辑
+			// 检查动画定义轨道的 f 值
+			for _, track := range reanimComp.Reanim.Tracks {
+				frames, ok := reanimComp.MergedTracks[track.Name]
+				if !ok || frame >= len(frames) {
+					continue
+				}
+
+				trackFrame := frames[frame]
+				if trackFrame.FrameNum != nil {
+					if track.Name == animName || strings.HasPrefix(track.Name, "anim_") {
+						if *trackFrame.FrameNum == 0 {
+							return true
+						}
+					}
+				}
+			}
+		} else {
+			// 使用 AnimVisibles 检查可见性
+			if frame < len(animVisibles) && animVisibles[frame] == 0 {
+				return true // 在该动画的时间窗口内，渲染
+			}
+		}
+	}
+
+	// 不在任何激活动画的时间窗口内，不渲染
 	return false
 }
 

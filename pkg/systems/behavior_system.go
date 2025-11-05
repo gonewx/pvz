@@ -507,14 +507,19 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 
 		// 如果有僵尸在同一行，发射子弹
 		if hasZombieInLine {
-			// Story 10.3: 使用简单动画切换实现攻击动画
-			// anim_shooting 包含所有需要的部件（通过 VisibleTracks 机制）
-			// 使用 PlayAnimationNoLoop 确保动画单次播放，完成后自动切换回 idle
-			err := s.reanimSystem.PlayAnimationNoLoop(entityID, "anim_shooting")
+			// Story 6.9: 使用多动画叠加实现攻击动画
+			// 同时播放身体攻击动画（anim_shooting）和头部动画（anim_head_idle）
+			// 这样可以确保头部在攻击时不会消失
+			err := s.reanimSystem.PlayAnimations(entityID, []string{"anim_shooting", "anim_head_idle"})
 			if err != nil {
 				log.Printf("[BehaviorSystem] 切换到攻击动画失败: %v", err)
 			} else {
-				log.Printf("[BehaviorSystem] 豌豆射手 %d 切换到攻击动画（单次播放）", entityID)
+				// 设置为非循环模式（单次播放）
+				if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
+					reanim.IsLooping = false
+				}
+
+				log.Printf("[BehaviorSystem] 豌豆射手 %d 切换到攻击动画（anim_shooting + anim_head_idle，单次播放）", entityID)
 				// 设置攻击动画状态，用于动画完成后切换回 idle
 				plant.AttackAnimState = components.AttackAnimAttacking
 			}

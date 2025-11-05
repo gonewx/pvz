@@ -49,16 +49,12 @@ var LogicalTracks = map[string]bool{
 // - Advancing animation frames based on FPS
 // - Implementing frame inheritance (cumulative transformations)
 // - Managing animation loops
-// - Supporting 5 playback modes (Story 6.6)
+// - Supporting two playback modes: synchronous (GlobalFrame) and asynchronous (per-animation Frame)
 //
 // All animation logic is centralized in this system, following the ECS
 // architecture principle of data-behavior separation.
 type ReanimSystem struct {
 	entityManager *ecs.EntityManager
-
-	// Story 6.6: Playback strategy instances (策略实例)
-	// 每种播放模式对应一个策略实例，通过策略模式实现多态播放
-	strategies map[PlaybackMode]PlaybackStrategy
 }
 
 // NewReanimSystem creates a new Reanim animation system.
@@ -69,31 +65,19 @@ type ReanimSystem struct {
 // Returns:
 //   - A pointer to the newly created ReanimSystem
 func NewReanimSystem(em *ecs.EntityManager) *ReanimSystem {
-	// Story 6.6: Initialize playback strategies
-	strategies := map[PlaybackMode]PlaybackStrategy{
-		ModeSimple:       &SimplePlaybackStrategy{},
-		ModeSkeleton:     &SkeletonPlaybackStrategy{},
-		ModeSequence:     &SequencePlaybackStrategy{},
-		ModeComplexScene: &ComplexScenePlaybackStrategy{},
-		ModeBlended:      &BlendedPlaybackStrategy{},
-	}
-
 	return &ReanimSystem{
 		entityManager: em,
-		strategies:    strategies,
 	}
 }
 
 // Update updates all Reanim components by advancing animation frames.
 //
-// This method:
-// - Queries all entities with ReanimComponent
-// - Advances the frame counter based on FPS
-// - Updates the current frame when enough time has passed
-// - Loops the animation when it reaches the end
+// Story 6.8: Unified animation system with two modes:
+// - Synchronous mode (TrackMapping = nil): All animations share GlobalFrame
+// - Asynchronous mode (TrackMapping != nil): Each animation has independent Frame
 //
 // Parameters:
-//   - deltaTime: time elapsed since last update (in seconds, currently unused as we use frame-based timing)
+//   - deltaTime: time elapsed since last update (in seconds)
 func (s *ReanimSystem) Update(deltaTime float64) {
 	// Query all entities with ReanimComponent
 	entities := ecs.GetEntitiesWith1[*components.ReanimComponent](s.entityManager)
@@ -110,59 +94,106 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 			continue
 		}
 
-		// Skip if animation is paused (e.g., lawnmower before trigger)
+		// Skip if animation is paused
 		if reanimComp.IsPaused {
 			continue
 		}
 
-		// Story 6.6/6.7: ComplexScene 模式使用独立动画系统
-		// 检查是否使用独立动画（IndependentAnims != nil）
-		if reanimComp.IndependentAnims != nil && len(reanimComp.IndependentAnims) > 0 {
-			// 使用 ComplexScene 策略更新独立动画
-			strategy := s.strategies[ModeComplexScene]
-			if strategy != nil {
-				strategy.Update(reanimComp, deltaTime)
-			}
-			continue // 跳过传统的帧推进逻辑
+		// 判断使用哪种模式
+		if reanimComp.TrackMapping != nil {
+			// 异步模式：更新每个动画的独立帧
+			s.updateAsyncMode(reanimComp, deltaTime)
+		} else {
+			// 同步模式：更新 GlobalFrame
+			s.updateSyncMode(reanimComp, deltaTime)
 		}
+	}
+}
 
-		// 传统单动画模式：需要 CurrentAnim
-		if reanimComp.CurrentAnim == "" {
+// updateSyncMode 更新同步模式动画（使用 GlobalFrame）
+//
+// 同步模式特点：
+// - 所有动画共享一个全局帧索引 (GlobalFrame)
+// - 适用于 95% 的场景（豌豆射手、向日葵等）
+// - 性能更优，内存占用更小
+//
+// Parameters:
+//   - comp: ReanimComponent to update
+//   - deltaTime: time elapsed since last update (in seconds)
+func (s *ReanimSystem) updateSyncMode(comp *components.ReanimComponent, deltaTime float64) {
+	// 计算帧时长
+	frameTime := 1.0 / float64(comp.Reanim.FPS)
+
+	// 更新帧累加器
+	comp.FrameAccumulator += deltaTime
+
+	// 推进帧
+	for comp.FrameAccumulator >= frameTime {
+		comp.FrameAccumulator -= frameTime
+		comp.GlobalFrame++
+
+		// 检查是否需要循环
+		if comp.GlobalFrame >= comp.VisibleFrameCount {
+			if comp.IsLooping {
+				comp.GlobalFrame = 0
+			} else {
+				comp.GlobalFrame = comp.VisibleFrameCount - 1
+				comp.IsFinished = true
+				break
+			}
+		}
+	}
+}
+
+// updateAsyncMode 更新异步模式动画（每个动画使用独立帧）
+//
+// 异步模式特点：
+// - 每个动画有自己的 Frame 索引
+// - 适用于复杂场景（SelectorScreen 云朵各自独立飘动）
+// - 支持延迟机制（DelayTimer/DelayDuration）
+//
+// Parameters:
+//   - comp: ReanimComponent to update
+//   - deltaTime: time elapsed since last update (in seconds)
+func (s *ReanimSystem) updateAsyncMode(comp *components.ReanimComponent, deltaTime float64) {
+	// 更新每个动画的独立帧
+	frameTime := 1.0 / float64(comp.Reanim.FPS)
+
+	for _, state := range comp.Anims {
+		if !state.IsActive {
+			// 处理延迟
+			if state.DelayDuration > 0 {
+				state.DelayTimer += deltaTime
+				if state.DelayTimer >= state.DelayDuration {
+					state.IsActive = true
+					state.DelayTimer = 0
+					state.Frame = state.StartFrame
+				}
+			}
 			continue
 		}
 
-		// Get FPS from Reanim data, default to 12 if not set
-		fps := float64(reanimComp.Reanim.FPS)
-		if fps == 0 {
-			fps = 12.0 // Default FPS for PVZ animations
-		}
+		// 更新帧累加器
+		state.Accumulator += deltaTime
 
-		// Calculate time per frame (seconds)
-		timePerFrame := 1.0 / fps
+		// 推进帧
+		for state.Accumulator >= frameTime {
+			state.Accumulator -= frameTime
+			state.Frame++
 
-		// Accumulate deltaTime
-		reanimComp.FrameAccumulator += deltaTime
-
-		// Advance frames based on accumulated time
-		// 限制每次Update只推进1帧，避免跳帧导致视觉抖动
-		if reanimComp.FrameAccumulator >= timePerFrame {
-			reanimComp.FrameAccumulator -= timePerFrame
-			reanimComp.CurrentFrame++
-
-			// Loop animation when reaching the end (only if IsLooping is true)
-			if reanimComp.CurrentFrame >= reanimComp.VisibleFrameCount {
-				if reanimComp.IsLooping {
-					reanimComp.CurrentFrame = 0
-				} else {
-					// Non-looping animation: stay at the last frame and mark as finished
-					reanimComp.CurrentFrame = reanimComp.VisibleFrameCount - 1
-					reanimComp.FrameAccumulator = 0 // Reset accumulator
-					// 只在第一次标记完成时打印日志，避免每帧重复输出
-					if !reanimComp.IsFinished {
-						reanimComp.IsFinished = true
-						log.Printf("[ReanimSystem] 非循环动画完成: Entity=%d, Anim=%s, Frame=%d/%d",
-							id, reanimComp.CurrentAnim, reanimComp.CurrentFrame, reanimComp.VisibleFrameCount)
+			// 检查循环
+			endFrame := state.StartFrame + state.FrameCount
+			if state.Frame >= endFrame {
+				if state.IsLooping {
+					state.Frame = state.StartFrame
+					if state.DelayDuration > 0 {
+						state.IsActive = false
+						state.DelayTimer = 0
 					}
+				} else {
+					state.Frame = endFrame - 1
+					state.IsActive = false
+					break
 				}
 			}
 		}
@@ -357,15 +388,20 @@ func (s *ReanimSystem) getAnimationTracks(comp *components.ReanimComponent) []re
 	return result
 }
 
-// PlayAnimation starts playing the specified animation for the given entity.
+// PlayAnimation starts playing the specified animation for the given entity (single animation mode).
+//
+// Story 6.9: Refactored to use the new multi-animation API.
+// This method clears all existing animations and plays only the specified animation.
+//
+// For playing multiple animations simultaneously, use PlayAnimations() instead.
+// For adding animations incrementally, use AddAnimation() instead.
 //
 // This method:
-// - Resets the animation state (frame = 0, counter = 0)
-// - Builds the visibility array from the animation definition track
-// - Builds the merged tracks with frame inheritance
-// - Stores the animation tracks in rendering order
-// - Updates the component with the new animation state
-// - Story 6.5: Enables dual-animation blending for anim_shooting
+// - Clears all existing animations (Anims map)
+// - Adds the new animation via addAnimation()
+// - Resets global animation state (GlobalFrame, accumulator)
+// - Builds merged tracks and animation tracks
+// - Calculates center offset and best preview frame
 //
 // Parameters:
 //   - entityID: the ID of the entity to play the animation on
@@ -385,111 +421,33 @@ func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) err
 		return fmt.Errorf("entity %d has a ReanimComponent but no Reanim data", entityID)
 	}
 
-	// Check if the animation exists
-	animTrack := s.getAnimDefinitionTrack(reanimComp, animName)
-	if animTrack == nil {
-		return fmt.Errorf("animation '%s' not found in Reanim data for entity %d", animName, entityID)
-	}
-
-	// Reset animation state
-	reanimComp.CurrentFrame = 0
+	// Reset global animation state
+	reanimComp.GlobalFrame = 0
 	reanimComp.FrameAccumulator = 0.0
 	reanimComp.CurrentAnim = animName
-	reanimComp.IsLooping = true   // Default: animations loop
-	reanimComp.IsFinished = false // Reset finished flag
+	reanimComp.CurrentFrame = 0 // Legacy field for backward compatibility
+	reanimComp.IsLooping = true
+	reanimComp.IsFinished = false
 
-	// ==================================================================
-	// Story 6.6: Playback Mode Detection (播放模式检测)
-	// ==================================================================
-	//
-	// 自动检测 Reanim 文件的播放模式，替代之前的硬编码逻辑。
-	// 检测采用**配置优先 + 启发式后备**策略。
-	// 检测后设置对应的策略，无需调用者指定模式。
-	//
-	reanimComp.PlaybackMode = int(detectPlaybackMode(reanimComp.ReanimName, reanimComp.Reanim))
+	// Backward compatibility: Reset blending mode (will be set by addAnimation if needed)
+	reanimComp.IsBlending = false
+	reanimComp.PrimaryAnimation = ""
+	reanimComp.SecondaryAnimation = ""
 
-	log.Printf("[ReanimSystem] Entity %d: Detected playback mode: %s for animation '%s'",
-		entityID, PlaybackMode(reanimComp.PlaybackMode).String(), animName)
-
-	// 混合模式的特殊处理（向后兼容）
-	// 如果检测到混合模式，且当前动画是射击动画，启用双动画叠加
-	if PlaybackMode(reanimComp.PlaybackMode) == ModeBlended && animName == "anim_shooting" {
-		reanimComp.IsBlending = true
-		reanimComp.PrimaryAnimation = "anim_idle"
-		reanimComp.SecondaryAnimation = "anim_shooting"
-
-		log.Printf("[ReanimSystem] Entity %d: Enabling dual-animation blending (idle + shooting)", entityID)
-	} else {
-		// 单动画模式
-		reanimComp.IsBlending = false
-		reanimComp.PrimaryAnimation = animName
-		reanimComp.SecondaryAnimation = ""
-	}
-
-	// Initialize AnimVisiblesMap if needed
-	if reanimComp.AnimVisiblesMap == nil {
-		reanimComp.AnimVisiblesMap = make(map[string][]int)
-	}
-
-	// Build merged tracks with frame inheritance FIRST (before calculating VisibleFrameCount)
-	// 必须先构建 MergedTracks，因为 ComplexScene 模式需要从中计算最大帧数
+	// Build merged tracks with frame inheritance (required for rendering)
 	reanimComp.MergedTracks = reanim.BuildMergedTracks(reanimComp.Reanim)
 
-	// ==================================================================
-	// Story 6.6: Mode-specific initialization (模式特定初始化)
-	// ==================================================================
-	//
-	// ComplexScene 模式（如 SelectorScreen）使用 "PlayAllFrames" 渲染逻辑：
-	// - 不构建 AnimVisiblesMap（保持为空）
-	// - 每个轨道检查自己的 f 值决定可见性
-	// - 轨道独立播放，拥有独立的时间线
-	//
-	if PlaybackMode(reanimComp.PlaybackMode) == ModeComplexScene {
-		// ComplexScene 模式：清空 AnimVisiblesMap，使用 PlayAllFrames 渲染逻辑
-		reanimComp.AnimVisiblesMap[animName] = []int{} // 空数组表示 PlayAllFrames 模式
-
-		// 计算实际的最大帧数（所有轨道中的最大帧数）
-		// 这对于动画推进至关重要：VisibleFrameCount = 0 会导致动画冻结在帧 0
-		maxFrames := 0
-		for _, frames := range reanimComp.MergedTracks {
-			if len(frames) > maxFrames {
-				maxFrames = len(frames)
-			}
-		}
-		reanimComp.VisibleFrameCount = maxFrames
-
-		log.Printf("[ReanimSystem] Entity %d: ComplexScene mode - using PlayAllFrames rendering (maxFrames=%d)",
-			entityID, maxFrames)
-	} else {
-		// 其他模式：构建 AnimVisiblesMap
-		// Build visibility array for the current animation
-		reanimComp.AnimVisiblesMap[animName] = s.buildVisiblesArray(reanimComp, animName)
-
-		// Calculate visible frame count (number of frames with visibility 0)
-		visibleCount := 0
-		for _, v := range reanimComp.AnimVisiblesMap[animName] {
-			if v == 0 {
-				visibleCount++
-			}
-		}
-		reanimComp.VisibleFrameCount = visibleCount
-	}
-
-	// Story 6.5: If dual-animation mode, also build visibility for the primary animation
-	if reanimComp.IsBlending && reanimComp.PrimaryAnimation != animName {
-		primaryVisibles := s.buildVisiblesArray(reanimComp, reanimComp.PrimaryAnimation)
-		reanimComp.AnimVisiblesMap[reanimComp.PrimaryAnimation] = primaryVisibles
-
-		log.Printf("[ReanimSystem] Built visibility for primary animation '%s': %d visible frames",
-			reanimComp.PrimaryAnimation, len(primaryVisibles))
+	// Clear all animations and add the new one
+	reanimComp.Anims = make(map[string]*components.AnimState)
+	if err := s.addAnimation(reanimComp, animName, true); err != nil {
+		return err
 	}
 
 	// Store animation tracks in rendering order
 	reanimComp.AnimTracks = s.getAnimationTracks(reanimComp)
 
-	// Calculate center offset based on the bounding box of visible parts in the first frame
-	// 如果 FixedCenterOffset 为 true，则跳过重新计算（保持创建时的值）
-	// 这样可以避免不同动画包围盒大小不同导致的位置跳动
+	// Calculate center offset based on the bounding box of visible parts
+	// Skip if FixedCenterOffset is true (prevents position jumping when switching animations)
 	if !reanimComp.FixedCenterOffset {
 		s.calculateCenterOffset(reanimComp)
 	} else {
@@ -551,6 +509,258 @@ func (s *ReanimSystem) PlayAnimationNoLoop(entityID ecs.EntityID, animName strin
 		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
 	}
 	reanimComp.IsLooping = false
+
+	return nil
+}
+
+// ==================================================================
+// Story 6.9: Multi-Animation Overlay API (多动画叠加 API)
+// ==================================================================
+
+// addAnimation is an internal helper method that adds a single animation to the Anims map.
+//
+// This method:
+// 1. Validates that the animation exists in the Reanim data
+// 2. Initializes the Anims map if needed
+// 3. Builds AnimVisiblesMap if not already present
+// 4. Creates an AnimState and adds it to the Anims map
+// 5. Updates VisibleFrameCount for GlobalFrame loop control
+//
+// Parameters:
+//   - comp: the ReanimComponent to modify
+//   - animName: the name of the animation to add (e.g., "anim_idle", "anim_shooting")
+//   - isActive: whether the animation should start active (controls frame advancement)
+//
+// Returns:
+//   - An error if the animation doesn't exist in the Reanim data
+func (s *ReanimSystem) addAnimation(
+	comp *components.ReanimComponent,
+	animName string,
+	isActive bool,
+) error {
+	// Validate animation exists
+	animTrack := s.getAnimDefinitionTrack(comp, animName)
+	if animTrack == nil {
+		return fmt.Errorf("animation '%s' not found in Reanim data", animName)
+	}
+
+	// Initialize Anims map if needed
+	if comp.Anims == nil {
+		comp.Anims = make(map[string]*components.AnimState)
+	}
+
+	// Initialize AnimVisiblesMap if needed
+	if comp.AnimVisiblesMap == nil {
+		comp.AnimVisiblesMap = make(map[string][]int)
+	}
+
+	// Build AnimVisiblesMap for this animation if not already present
+	if comp.AnimVisiblesMap[animName] == nil {
+		comp.AnimVisiblesMap[animName] = s.buildVisiblesArray(comp, animName)
+	}
+
+	// Calculate frame count for this animation
+	frameCount := len(comp.AnimVisiblesMap[animName])
+
+	// Create AnimState
+	comp.Anims[animName] = &components.AnimState{
+		Name:               animName,
+		IsActive:           isActive,
+		IsLooping:          true, // Default: animations loop
+		Frame:              0,    // Used in async mode, ignored in sync mode
+		Accumulator:        0.0,
+		StartFrame:         0,
+		FrameCount:         frameCount,
+		RenderWhenStopped:  true, // Default: continue rendering when stopped
+		DelayTimer:         0.0,
+		DelayDuration:      0.0,
+	}
+
+	// Update VisibleFrameCount (used for GlobalFrame loop control in sync mode)
+	// Use the maximum frame count among all animations
+	if frameCount > comp.VisibleFrameCount {
+		comp.VisibleFrameCount = frameCount
+	}
+
+	return nil
+}
+
+// PlayAnimations plays multiple animations simultaneously (multi-animation mode).
+//
+// Story 6.9: Enables playing multiple animations that share the same GlobalFrame.
+// This is the core API for multi-animation overlay scenarios like PeaShooter attacking
+// (body animation + head animation).
+//
+// This method clears all existing animations before adding the new ones.
+//
+// Parameters:
+//   - entityID: the ID of the entity
+//   - animNames: slice of animation names to play (e.g., []string{"anim_shooting", "anim_head_idle"})
+//
+// Returns:
+//   - An error if the entity doesn't have a ReanimComponent or any animation doesn't exist
+//
+// Example:
+//   // Play both body and head animations for PeaShooter attack
+//   rs.PlayAnimations(entityID, []string{"anim_shooting", "anim_head_idle"})
+func (s *ReanimSystem) PlayAnimations(entityID ecs.EntityID, animNames []string) error {
+	// Get the ReanimComponent
+	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !exists {
+		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
+	}
+
+	// Check if Reanim data is present
+	if reanimComp.Reanim == nil {
+		return fmt.Errorf("entity %d has a ReanimComponent but no Reanim data", entityID)
+	}
+
+	// Validate at least one animation is specified
+	if len(animNames) == 0 {
+		return fmt.Errorf("at least one animation name must be specified")
+	}
+
+	// Reset global animation state
+	// Use the first animation name as the "primary" animation for backward compatibility
+	primaryAnimName := animNames[0]
+	reanimComp.GlobalFrame = 0
+	reanimComp.FrameAccumulator = 0.0
+	reanimComp.CurrentAnim = primaryAnimName
+	reanimComp.CurrentFrame = 0 // Legacy field for backward compatibility
+	reanimComp.IsLooping = true
+	reanimComp.IsFinished = false
+
+	// Backward compatibility: Reset blending mode
+	reanimComp.IsBlending = false
+	reanimComp.PrimaryAnimation = ""
+	reanimComp.SecondaryAnimation = ""
+
+	// Build merged tracks with frame inheritance (required for rendering)
+	reanimComp.MergedTracks = reanim.BuildMergedTracks(reanimComp.Reanim)
+
+	// Clear all animations and add the new ones
+	reanimComp.Anims = make(map[string]*components.AnimState)
+	for _, animName := range animNames {
+		if err := s.addAnimation(reanimComp, animName, true); err != nil {
+			return fmt.Errorf("failed to add animation '%s': %w", animName, err)
+		}
+	}
+
+	// Store animation tracks in rendering order
+	reanimComp.AnimTracks = s.getAnimationTracks(reanimComp)
+
+	// Calculate center offset based on the bounding box of visible parts
+	if !reanimComp.FixedCenterOffset {
+		s.calculateCenterOffset(reanimComp)
+	}
+
+	// Calculate best preview frame
+	// Use the primary animation for preview calculation
+	bestFrame := 0
+	maxVisibleParts := 0
+
+	for frameIdx := 0; frameIdx < reanimComp.VisibleFrameCount; frameIdx++ {
+		// Skip invisible frames
+		animVisibles := reanimComp.AnimVisiblesMap[primaryAnimName]
+		if frameIdx < len(animVisibles) && animVisibles[frameIdx] == -1 {
+			continue
+		}
+
+		// Count visible parts in this frame
+		visiblePartsCount := 0
+		for _, mergedFrames := range reanimComp.MergedTracks {
+			if frameIdx < len(mergedFrames) && mergedFrames[frameIdx].ImagePath != "" {
+				visiblePartsCount++
+			}
+		}
+
+		// Update best frame if this frame has more visible parts
+		if visiblePartsCount > maxVisibleParts {
+			maxVisibleParts = visiblePartsCount
+			bestFrame = frameIdx
+		}
+	}
+
+	reanimComp.BestPreviewFrame = bestFrame
+
+	log.Printf("[ReanimSystem] PlayAnimations: entity %d playing %d animations: %v",
+		entityID, len(animNames), animNames)
+
+	return nil
+}
+
+// AddAnimation adds an animation to the currently playing animations (incremental mode).
+//
+// Story 6.9: Enables adding animations without clearing existing ones.
+// This is useful for dynamically layering effects (e.g., adding a burning effect on top of walk animation).
+//
+// Unlike PlayAnimation/PlayAnimations which clear all animations first, this method
+// preserves existing animations and adds a new one.
+//
+// Parameters:
+//   - entityID: the ID of the entity
+//   - animName: the name of the animation to add (e.g., "anim_burning")
+//
+// Returns:
+//   - An error if the entity doesn't have a ReanimComponent or the animation doesn't exist
+//
+// Example:
+//   // Start with walk animation
+//   rs.PlayAnimation(entityID, "anim_walk")
+//   // Add burning effect on top
+//   rs.AddAnimation(entityID, "anim_burning")
+func (s *ReanimSystem) AddAnimation(entityID ecs.EntityID, animName string) error {
+	// Get the ReanimComponent
+	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !exists {
+		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
+	}
+
+	// Check if Reanim data is present
+	if reanimComp.Reanim == nil {
+		return fmt.Errorf("entity %d has a ReanimComponent but no Reanim data", entityID)
+	}
+
+	// Add the animation (preserves existing animations)
+	if err := s.addAnimation(reanimComp, animName, true); err != nil {
+		return fmt.Errorf("failed to add animation '%s': %w", animName, err)
+	}
+
+	log.Printf("[ReanimSystem] AddAnimation: entity %d added animation '%s' (total: %d)",
+		entityID, animName, len(reanimComp.Anims))
+
+	return nil
+}
+
+// RemoveAnimation removes a specific animation from the currently playing animations.
+//
+// Story 6.9: Enables removing individual animations without affecting others.
+// This is useful for removing temporary effects (e.g., removing burning effect when it expires).
+//
+// Parameters:
+//   - entityID: the ID of the entity
+//   - animName: the name of the animation to remove (e.g., "anim_burning")
+//
+// Returns:
+//   - An error if the entity doesn't have a ReanimComponent
+//
+// Note: It is safe to call this method even if the animation doesn't exist (no-op).
+//
+// Example:
+//   // Remove burning effect
+//   rs.RemoveAnimation(entityID, "anim_burning")
+func (s *ReanimSystem) RemoveAnimation(entityID ecs.EntityID, animName string) error {
+	// Get the ReanimComponent
+	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !exists {
+		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
+	}
+
+	// Remove from Anims map (safe even if animName doesn't exist)
+	delete(reanimComp.Anims, animName)
+
+	log.Printf("[ReanimSystem] RemoveAnimation: entity %d removed animation '%s' (remaining: %d)",
+		entityID, animName, len(reanimComp.Anims))
 
 	return nil
 }

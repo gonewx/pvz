@@ -460,6 +460,58 @@ reanimComp.VisibleTracks = map[string]bool{
 }
 ```
 
+#### 播放多个动画（叠加）
+
+```go
+// 豌豆射手攻击：身体动画 + 头部动画同时播放
+reanimSystem.PlayAnimations(peashooterID, []string{"anim_shooting", "anim_head_idle"})
+```
+
+#### 增量控制动画
+
+```go
+// 基础动画
+reanimSystem.PlayAnimation(entityID, "anim_walk")
+
+// 叠加特效动画（保留已有动画）
+reanimSystem.AddAnimation(entityID, "anim_burning")
+
+// 移除特效动画
+reanimSystem.RemoveAnimation(entityID, "anim_burning")
+```
+
+### 常见问题（FAQ）
+
+**Q: 如何让植物攻击时头部和身体同时显示？**
+
+A: 使用多动画叠加 API：
+```go
+reanimSystem.PlayAnimations(entityID, []string{"anim_shooting", "anim_head_idle"})
+```
+
+**Q: 如何控制僵尸装备显示？**
+
+A: 使用 VisibleTracks 白名单：
+```go
+reanimComp.VisibleTracks = map[string]bool{
+    "Zombie_body": true,
+    "anim_cone":   true,  // 显示路障
+}
+```
+
+**Q: PlayAnimation 和 PlayAnimations 有什么区别？**
+
+A:
+- `PlayAnimation(id, "anim")` - 播放单个动画（清空旧动画）
+- `PlayAnimations(id, []string{"anim1", "anim2"})` - 播放多个动画（清空旧动画，同时播放多个）
+- `AddAnimation(id, "anim")` - 增量添加（保留已有动画）
+
+**Q: 什么时候使用多动画叠加？**
+
+A: 当一个实体需要同时控制多个部件的动画时，例如：
+- 豌豆射手攻击：身体攻击 + 头部摆动
+- 僵尸行走时着火：行走动画 + 燃烧特效
+
 ### 参考文档
 
 - **Reanim 格式指南**: `docs/reanim/reanim-format-guide.md`

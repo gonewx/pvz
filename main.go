@@ -130,14 +130,19 @@ func main() {
 		log.Printf("[main] Starting level: %s", levelToLoad)
 	}
 
-	// Story 12.1: 启动主菜单场景
-	mainMenuScene := scenes.NewMainMenuScene(resourceManager, sceneManager)
-	sceneManager.SwitchTo(mainMenuScene)
-
-	// TEMPORARY: 直接启动游戏场景（用于快速测试关卡）
-	// 如果需要跳过主菜单直接进入游戏，取消下面两行注释：
-	// gameScene := scenes.NewGameScene(resourceManager, sceneManager, levelToLoad)
-	// sceneManager.SwitchTo(gameScene)
+	// 根据 --level 参数决定启动场景
+	if *levelFlag != "" {
+		// 如果指定了 --level 参数，直接启动游戏场景（跳过主菜单）
+		if *verboseFlag {
+			log.Printf("[main] --level flag detected, skipping main menu")
+		}
+		gameScene := scenes.NewGameScene(resourceManager, sceneManager, levelToLoad)
+		sceneManager.SwitchTo(gameScene)
+	} else {
+		// 否则启动主菜单场景
+		mainMenuScene := scenes.NewMainMenuScene(resourceManager, sceneManager)
+		sceneManager.SwitchTo(mainMenuScene)
+	}
 
 	// Create a new game instance with the scene manager
 	gameInstance := &Game{
