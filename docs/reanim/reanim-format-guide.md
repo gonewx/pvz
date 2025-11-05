@@ -2,6 +2,14 @@
 
 > 基于对 PeaShooterSingle.reanim 的深度分析得出的正确理解
 
+**⚠️ 重要更新（2025-11-05）**：
+- 本文档中提到的"双动画叠加机制"和 `buildMergedTracks` 局部实现已被废弃
+- 现在统一使用 `internal/reanim/parser.go` 中的 `BuildMergedTracks` 函数
+- 所有轨道的所有帧都设置 FrameNum 值（默认为0），包括纯视觉轨道
+- 详见：`docs/qa/sprint-change-proposal-buildMergedTracks-deduplication.md`
+
+---
+
 ## 目录
 
 - [1. 概述](#1-概述)

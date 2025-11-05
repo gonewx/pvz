@@ -143,7 +143,7 @@ func TestFindFirstCompleteVisibleFrame(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Build merged tracks
-			tc.reanimComp.MergedTracks = rs.buildMergedTracks(tc.reanimComp)
+			tc.reanimComp.MergedTracks = reanim.BuildMergedTracks(tc.reanimComp.Reanim)
 
 			// Call findFirstCompleteVisibleFrame
 			result := rs.findFirstCompleteVisibleFrame(tc.reanimComp)
@@ -190,7 +190,7 @@ func TestFindPreviewFrameHeuristic(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			reanimComp := createTestReanimWithIncompleteFrames(tc.totalFrames)
-			reanimComp.MergedTracks = rs.buildMergedTracks(reanimComp)
+			reanimComp.MergedTracks = reanim.BuildMergedTracks(reanimComp.Reanim)
 
 			result := rs.findPreviewFrameHeuristic(reanimComp)
 

@@ -33,7 +33,7 @@ func TestPlaybackModeIntegration_PeaShooter(t *testing.T) {
 	}
 
 	// 检测模式
-	mode := detectPlaybackMode(reanimData)
+	mode := detectPlaybackMode("PeaShooterSingle", reanimData)
 
 	// 豌豆射手应该被检测为混合模式
 	if mode != ModeBlended {
@@ -59,7 +59,7 @@ func TestPlaybackModeIntegration_SunFlower(t *testing.T) {
 	}
 
 	// 检测模式
-	mode := detectPlaybackMode(reanimData)
+	mode := detectPlaybackMode("SunFlower", reanimData)
 
 	// 向日葵应该被检测为骨骼动画模式
 	if mode != ModeSkeleton {
@@ -85,7 +85,7 @@ func TestPlaybackModeIntegration_SelectorScreen(t *testing.T) {
 	}
 
 	// 检测模式
-	mode := detectPlaybackMode(reanimData)
+	mode := detectPlaybackMode("SelectorScreen", reanimData)
 
 	// SelectorScreen 应该被检测为复杂场景模式
 	if mode != ModeComplexScene {

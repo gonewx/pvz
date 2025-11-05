@@ -87,7 +87,7 @@ func NewGame() (*Game, error) {
 			standardFrameCount = len(track.Frames)
 		}
 	}
-	mergedTracks := buildMergedTracks(reanimXML, standardFrameCount)
+	mergedTracks := reanim.BuildMergedTracks(reanimXML)
 
 	// 找出视觉轨道
 	visualTracks := []string{}
@@ -447,77 +447,6 @@ func (g *Game) drawPart(canvas *ebiten.Image, frame reanim.Frame, img *ebiten.Im
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 	return windowWidth, windowHeight
-}
-
-func buildMergedTracks(reanimXML *reanim.ReanimXML, standardFrameCount int) map[string][]reanim.Frame {
-	mergedTracks := make(map[string][]reanim.Frame)
-
-	for _, track := range reanimXML.Tracks {
-		accX := 0.0
-		accY := 0.0
-		accSX := 1.0
-		accSY := 1.0
-		accKX := 0.0
-		accKY := 0.0
-		accF := 0
-		accImg := ""
-
-		mergedFrames := make([]reanim.Frame, standardFrameCount)
-
-		for i := 0; i < standardFrameCount; i++ {
-			if i < len(track.Frames) {
-				frame := track.Frames[i]
-
-				if frame.X != nil {
-					accX = *frame.X
-				}
-				if frame.Y != nil {
-					accY = *frame.Y
-				}
-				if frame.ScaleX != nil {
-					accSX = *frame.ScaleX
-				}
-				if frame.ScaleY != nil {
-					accSY = *frame.ScaleY
-				}
-				if frame.SkewX != nil {
-					accKX = *frame.SkewX
-				}
-				if frame.SkewY != nil {
-					accKY = *frame.SkewY
-				}
-				if frame.FrameNum != nil {
-					accF = *frame.FrameNum
-				}
-				if frame.ImagePath != "" {
-					accImg = frame.ImagePath
-				}
-			}
-
-			x := accX
-			y := accY
-			sx := accSX
-			sy := accSY
-			kx := accKX
-			ky := accKY
-			f := accF
-
-			mergedFrames[i] = reanim.Frame{
-				X:         &x,
-				Y:         &y,
-				ScaleX:    &sx,
-				ScaleY:    &sy,
-				SkewX:     &kx,
-				SkewY:     &ky,
-				FrameNum:  &f,
-				ImagePath: accImg,
-			}
-		}
-
-		mergedTracks[track.Name] = mergedFrames
-	}
-
-	return mergedTracks
 }
 
 func main() {

@@ -105,13 +105,29 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 			continue
 		}
 
-		// Skip if no Reanim data or animation is not set
-		if reanimComp.Reanim == nil || reanimComp.CurrentAnim == "" {
+		// Skip if no Reanim data
+		if reanimComp.Reanim == nil {
 			continue
 		}
 
 		// Skip if animation is paused (e.g., lawnmower before trigger)
 		if reanimComp.IsPaused {
+			continue
+		}
+
+		// Story 6.6/6.7: ComplexScene 模式使用独立动画系统
+		// 检查是否使用独立动画（IndependentAnims != nil）
+		if reanimComp.IndependentAnims != nil && len(reanimComp.IndependentAnims) > 0 {
+			// 使用 ComplexScene 策略更新独立动画
+			strategy := s.strategies[ModeComplexScene]
+			if strategy != nil {
+				strategy.Update(reanimComp, deltaTime)
+			}
+			continue // 跳过传统的帧推进逻辑
+		}
+
+		// 传统单动画模式：需要 CurrentAnim
+		if reanimComp.CurrentAnim == "" {
 			continue
 		}
 
@@ -252,17 +268,6 @@ func (s *ReanimSystem) isLogicalTrack(trackName string) bool {
 	return LogicalTracks[trackName]
 }
 
-// hasFrameNumValues checks if a track has any FrameNum values.
-// Used to distinguish hybrid tracks (with f values) from pure visual tracks (without f values).
-func (s *ReanimSystem) hasFrameNumValues(track *reanim.Track) bool {
-	for _, frame := range track.Frames {
-		if frame.FrameNum != nil {
-			return true
-		}
-	}
-	return false
-}
-
 // buildVisiblesArray builds the visibility array for the given animation.
 //
 // The visibility array determines which frames should be visible during animation playback.
@@ -314,163 +319,6 @@ func (s *ReanimSystem) buildVisiblesArray(comp *components.ReanimComponent, anim
 	}
 
 	return visibles
-}
-
-// buildMergedTracks builds accumulated frame arrays for each track by applying frame inheritance.
-//
-// Story 6.5: Frame Inheritance Mechanism (帧继承机制)
-//
-// **Problem**: Reanim files use sparse keyframes to save space. Many frames are empty (nil values),
-// relying on the previous frame's values. Without frame inheritance, entities would disappear or jump around.
-//
-// **Solution**: Accumulate frame values across all physical frames:
-// - If a field is present (non-nil) at frame N, update the accumulated value
-// - If a field is absent (nil) at frame N, inherit the accumulated value from frame N-1
-// - Result: Every frame has complete data (no nil values)
-//
-// **Accumulated Fields**:
-// - Position: X, Y
-// - Scale: ScaleX, ScaleY
-// - Skew: SkewX, SkewY
-// - Frame Number: FrameNum (f value, controls visibility)
-// - Image: ImagePath (which sprite to draw)
-//
-// **Example**:
-//
-//	Original frames:
-//	Frame 0: X=10, Y=20, ImagePath="image.png"
-//	Frame 1: (empty - all nil)
-//	Frame 2: X=15 (Y is nil, ImagePath is "")
-//
-//	Merged frames (after inheritance):
-//	Frame 0: X=10, Y=20, ImagePath="image.png"
-//	Frame 1: X=10, Y=20, ImagePath="image.png" (inherited all from frame 0)
-//	Frame 2: X=15, Y=20, ImagePath="image.png" (X updated, Y and ImagePath inherited)
-//
-// **Why This Matters**:
-// Without frame inheritance, the entity would:
-// - Disappear at frame 1 (no image)
-// - Jump to wrong position at frame 2 (Y=0 instead of Y=20)
-//
-// Parameters:
-//   - comp: the ReanimComponent containing the Reanim data
-//
-// Returns:
-//   - A map of track name to merged frame array (all frames have complete data)
-//
-// Related:
-//   - Story 6.5 Phase 1: docs/stories/6.5.story.md
-//   - Fix Guide: docs/reanim/reanim-fix-guide.md Section 4.1
-func (s *ReanimSystem) buildMergedTracks(comp *components.ReanimComponent) map[string][]reanim.Frame {
-	if comp.Reanim == nil {
-		return map[string][]reanim.Frame{}
-	}
-
-	// Determine the standard frame count (max frames across all tracks)
-	standardFrameCount := 0
-	for _, track := range comp.Reanim.Tracks {
-		if len(track.Frames) > standardFrameCount {
-			standardFrameCount = len(track.Frames)
-		}
-	}
-
-	if standardFrameCount == 0 {
-		return map[string][]reanim.Frame{}
-	}
-
-	mergedTracks := make(map[string][]reanim.Frame)
-
-	// Process ALL tracks, including animation definition tracks
-	// Some plants (like SunFlower) have their head images in anim_* tracks
-	for _, track := range comp.Reanim.Tracks {
-		// Story 12.1 修复：检测轨道是否真正有 f 值
-		// 纯视觉轨道（如 leaf1）没有 f 值，不应该在 mergedFrame 中设置 FrameNum
-		hasFrameNum := false
-		for _, frame := range track.Frames {
-			if frame.FrameNum != nil {
-				hasFrameNum = true
-				break
-			}
-		}
-
-		// Initialize accumulated state
-		accX := 0.0
-		accY := 0.0
-		accSX := 1.0
-		accSY := 1.0
-		accKX := 0.0
-		accKY := 0.0
-		accF := 0
-		accImg := ""
-
-		// Build merged frames array for this track
-		mergedFrames := make([]reanim.Frame, standardFrameCount)
-
-		for i := 0; i < standardFrameCount; i++ {
-			// If the original track has a frame at this index, update accumulated state
-			if i < len(track.Frames) {
-				frame := track.Frames[i]
-
-				// Update accumulated values only if field is not nil
-				if frame.X != nil {
-					accX = *frame.X
-				}
-				if frame.Y != nil {
-					accY = *frame.Y
-				}
-				if frame.ScaleX != nil {
-					accSX = *frame.ScaleX
-				}
-				if frame.ScaleY != nil {
-					accSY = *frame.ScaleY
-				}
-				if frame.SkewX != nil {
-					accKX = *frame.SkewX
-				}
-				if frame.SkewY != nil {
-					accKY = *frame.SkewY
-				}
-				if frame.FrameNum != nil {
-					accF = *frame.FrameNum
-				}
-				if frame.ImagePath != "" {
-					accImg = frame.ImagePath
-				}
-			}
-
-			// Create a new frame with independent pointers (avoid pointer sharing)
-			// Each frame gets its own copy of the accumulated values
-			x := accX
-			y := accY
-			sx := accSX
-			sy := accSY
-			kx := accKX
-			ky := accKY
-
-			// Story 12.1 修复：只有轨道真正有 f 值时，才设置 FrameNum
-			// 否则保持 nil，让 shouldRenderTrack 能正确识别纯视觉轨道
-			var frameNumPtr *int
-			if hasFrameNum {
-				f := accF
-				frameNumPtr = &f
-			}
-
-			mergedFrames[i] = reanim.Frame{
-				X:         &x,
-				Y:         &y,
-				ScaleX:    &sx,
-				ScaleY:    &sy,
-				SkewX:     &kx,
-				SkewY:     &ky,
-				FrameNum:  frameNumPtr,
-				ImagePath: accImg,
-			}
-		}
-
-		mergedTracks[track.Name] = mergedFrames
-	}
-
-	return mergedTracks
 }
 
 // getAnimationTracks returns all part tracks that should be rendered for the animation.
@@ -555,9 +403,10 @@ func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) err
 	// ==================================================================
 	//
 	// 自动检测 Reanim 文件的播放模式，替代之前的硬编码逻辑。
+	// 检测采用**配置优先 + 启发式后备**策略。
 	// 检测后设置对应的策略，无需调用者指定模式。
 	//
-	reanimComp.PlaybackMode = int(detectPlaybackMode(reanimComp.Reanim))
+	reanimComp.PlaybackMode = int(detectPlaybackMode(reanimComp.ReanimName, reanimComp.Reanim))
 
 	log.Printf("[ReanimSystem] Entity %d: Detected playback mode: %s for animation '%s'",
 		entityID, PlaybackMode(reanimComp.PlaybackMode).String(), animName)
@@ -582,17 +431,49 @@ func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) err
 		reanimComp.AnimVisiblesMap = make(map[string][]int)
 	}
 
-	// Build visibility array for the current animation
-	reanimComp.AnimVisiblesMap[animName] = s.buildVisiblesArray(reanimComp, animName)
+	// Build merged tracks with frame inheritance FIRST (before calculating VisibleFrameCount)
+	// 必须先构建 MergedTracks，因为 ComplexScene 模式需要从中计算最大帧数
+	reanimComp.MergedTracks = reanim.BuildMergedTracks(reanimComp.Reanim)
 
-	// Calculate visible frame count (number of frames with visibility 0)
-	visibleCount := 0
-	for _, v := range reanimComp.AnimVisiblesMap[animName] {
-		if v == 0 {
-			visibleCount++
+	// ==================================================================
+	// Story 6.6: Mode-specific initialization (模式特定初始化)
+	// ==================================================================
+	//
+	// ComplexScene 模式（如 SelectorScreen）使用 "PlayAllFrames" 渲染逻辑：
+	// - 不构建 AnimVisiblesMap（保持为空）
+	// - 每个轨道检查自己的 f 值决定可见性
+	// - 轨道独立播放，拥有独立的时间线
+	//
+	if PlaybackMode(reanimComp.PlaybackMode) == ModeComplexScene {
+		// ComplexScene 模式：清空 AnimVisiblesMap，使用 PlayAllFrames 渲染逻辑
+		reanimComp.AnimVisiblesMap[animName] = []int{} // 空数组表示 PlayAllFrames 模式
+
+		// 计算实际的最大帧数（所有轨道中的最大帧数）
+		// 这对于动画推进至关重要：VisibleFrameCount = 0 会导致动画冻结在帧 0
+		maxFrames := 0
+		for _, frames := range reanimComp.MergedTracks {
+			if len(frames) > maxFrames {
+				maxFrames = len(frames)
+			}
 		}
+		reanimComp.VisibleFrameCount = maxFrames
+
+		log.Printf("[ReanimSystem] Entity %d: ComplexScene mode - using PlayAllFrames rendering (maxFrames=%d)",
+			entityID, maxFrames)
+	} else {
+		// 其他模式：构建 AnimVisiblesMap
+		// Build visibility array for the current animation
+		reanimComp.AnimVisiblesMap[animName] = s.buildVisiblesArray(reanimComp, animName)
+
+		// Calculate visible frame count (number of frames with visibility 0)
+		visibleCount := 0
+		for _, v := range reanimComp.AnimVisiblesMap[animName] {
+			if v == 0 {
+				visibleCount++
+			}
+		}
+		reanimComp.VisibleFrameCount = visibleCount
 	}
-	reanimComp.VisibleFrameCount = visibleCount
 
 	// Story 6.5: If dual-animation mode, also build visibility for the primary animation
 	if reanimComp.IsBlending && reanimComp.PrimaryAnimation != animName {
@@ -602,9 +483,6 @@ func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) err
 		log.Printf("[ReanimSystem] Built visibility for primary animation '%s': %d visible frames",
 			reanimComp.PrimaryAnimation, len(primaryVisibles))
 	}
-
-	// Build merged tracks with frame inheritance
-	reanimComp.MergedTracks = s.buildMergedTracks(reanimComp)
 
 	// Store animation tracks in rendering order
 	reanimComp.AnimTracks = s.getAnimationTracks(reanimComp)
@@ -763,7 +641,7 @@ func (s *ReanimSystem) initializeDirectRenderInternal(entityID ecs.EntityID, cal
 	reanimComp.VisibleFrameCount = standardFrameCount
 
 	// Build merged tracks with frame inheritance
-	reanimComp.MergedTracks = s.buildMergedTracks(reanimComp)
+	reanimComp.MergedTracks = reanim.BuildMergedTracks(reanimComp.Reanim)
 
 	// Store all tracks in rendering order
 	reanimComp.AnimTracks = s.getAnimationTracks(reanimComp)
@@ -1444,7 +1322,7 @@ func (s *ReanimSystem) getPartTracks(reanimComp *components.ReanimComponent) []r
 func (s *ReanimSystem) buildMergedTracksForPreview(reanimComp *components.ReanimComponent) map[string][]reanim.Frame {
 	// Reuse the existing buildMergedTracks logic, which already processes ALL tracks
 	// including part tracks, regardless of animation definition tracks
-	return s.buildMergedTracks(reanimComp)
+	return reanim.BuildMergedTracks(reanimComp.Reanim)
 }
 
 // findFirstCompleteVisibleFrame finds the first frame where all parts are visible.
