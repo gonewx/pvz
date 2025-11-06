@@ -847,6 +847,23 @@ func (s *ReanimSystem) initializeDirectRenderInternal(entityID ecs.EntityID, cal
 	}
 	reanimComp.AnimVisiblesMap["direct_render"] = animVisibles
 
+	// Story 6.8 修复：创建 Anims map（必需，否则 shouldRenderTrack 会因 len(activeAnims)==0 失败）
+	if reanimComp.Anims == nil {
+		reanimComp.Anims = make(map[string]*components.AnimState)
+	}
+	reanimComp.Anims["direct_render"] = &components.AnimState{
+		Name:              "direct_render",
+		IsActive:          true, // 必须为 true
+		IsLooping:         true,
+		Frame:             0,
+		Accumulator:       0.0,
+		StartFrame:        0,
+		FrameCount:        standardFrameCount,
+		RenderWhenStopped: true,
+		DelayTimer:        0.0,
+		DelayDuration:     0.0,
+	}
+
 	// Set visible frame count
 	reanimComp.VisibleFrameCount = standardFrameCount
 
