@@ -508,9 +508,9 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 		// 如果有僵尸在同一行，发射子弹
 		if hasZombieInLine {
 			// Story 6.9: 使用多动画叠加实现攻击动画
-			// 同时播放身体攻击动画（anim_shooting）和头部动画（anim_head_idle）
-			// 这样可以确保头部在攻击时不会消失
-			err := s.reanimSystem.PlayAnimations(entityID, []string{"anim_shooting", "anim_head_idle"})
+			// 同时播放身体攻击动画（anim_shooting）和身体动画（anim_idle）
+			// 这样可以确保身体和头部在攻击时都显示
+			err := s.reanimSystem.PlayAnimations(entityID, []string{"anim_shooting", "anim_idle"})
 			if err != nil {
 				log.Printf("[BehaviorSystem] 切换到攻击动画失败: %v", err)
 			} else {
@@ -519,7 +519,7 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 					reanim.IsLooping = false
 				}
 
-				log.Printf("[BehaviorSystem] 豌豆射手 %d 切换到攻击动画（anim_shooting + anim_head_idle，单次播放）", entityID)
+				log.Printf("[BehaviorSystem] 豌豆射手 %d 切换到攻击动画（anim_shooting + anim_idle，单次播放）", entityID)
 				// 设置攻击动画状态，用于动画完成后切换回 idle
 				plant.AttackAnimState = components.AttackAnimAttacking
 			}

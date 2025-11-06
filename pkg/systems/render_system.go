@@ -324,8 +324,10 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 	}
 
 	// Story 6.6/6.7: 支持独立动画系统（ComplexScene 模式）
-	// 检查是否使用独立动画
-	hasIndependentAnims := reanim.Anims != nil && len(reanim.Anims) > 0
+	// 检查是否使用独立动画（通过 TrackMapping 判断）
+	// TrackMapping 是 ComplexScene 模式的标志，用于将轨道映射到独立动画
+	// 植物等实体使用 PlayAnimation 的同步模式，没有 TrackMapping
+	hasIndependentAnims := reanim.TrackMapping != nil && len(reanim.TrackMapping) > 0
 
 	// 传统模式：需要 CurrentAnim 和 AnimTracks
 	if !hasIndependentAnims {
