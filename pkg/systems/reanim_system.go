@@ -143,6 +143,9 @@ func (s *ReanimSystem) updateSyncMode(comp *components.ReanimComponent, deltaTim
 			}
 		}
 	}
+
+	// 同步 CurrentFrame（向后兼容字段，用于关键帧检测等逻辑）
+	comp.CurrentFrame = comp.GlobalFrame
 }
 
 // updateAsyncMode 更新异步模式动画（每个动画使用独立帧）
@@ -196,6 +199,14 @@ func (s *ReanimSystem) updateAsyncMode(comp *components.ReanimComponent, deltaTi
 					break
 				}
 			}
+		}
+	}
+
+	// 同步 CurrentFrame（向后兼容字段，用于关键帧检测等逻辑）
+	// 使用主动画（CurrentAnim）的帧，如果存在的话
+	if comp.CurrentAnim != "" {
+		if animState, exists := comp.Anims[comp.CurrentAnim]; exists {
+			comp.CurrentFrame = animState.Frame
 		}
 	}
 }
