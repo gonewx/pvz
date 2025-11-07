@@ -68,6 +68,9 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	scene.entityManager = ecs.NewEntityManager()
 	scene.reanimSystem = systems.NewReanimSystem(scene.entityManager)
 	scene.renderSystem = systems.NewRenderSystem(scene.entityManager)
+
+	// Story 13.4: Enable render cache optimization
+	scene.renderSystem.SetReanimSystem(scene.reanimSystem)
 	log.Printf("[MainMenuScene] Initialized ECS systems")
 
 	// Story 12.1: Create SelectorScreen Reanim entity

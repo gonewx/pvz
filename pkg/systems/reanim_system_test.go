@@ -1324,3 +1324,283 @@ func floatEquals(a, b, epsilon float64) bool {
 	}
 	return diff < epsilon
 }
+
+// ==================================================================
+// Story 13.4: Render Cache Optimization Tests
+// ==================================================================
+
+// TestGetCurrentLogicalFrame_SingleAnimation 测试单动画场景
+func TestGetCurrentLogicalFrame_SingleAnimation(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rs := NewReanimSystem(em)
+
+	comp := &components.ReanimComponent{
+		CurrentAnimations: []string{"anim_idle"},
+		AnimStates: map[string]*components.AnimState{
+			"anim_idle": {
+				Name:         "anim_idle",
+				LogicalFrame: 5,
+				IsActive:     true,
+			},
+		},
+	}
+
+	frame := rs.getCurrentLogicalFrame(comp)
+
+	if frame != 5 {
+		t.Errorf("Expected logical frame 5, got %d", frame)
+	}
+}
+
+// TestGetCurrentLogicalFrame_MultiAnimation 测试多动画场景（返回主动画帧）
+func TestGetCurrentLogicalFrame_MultiAnimation(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rs := NewReanimSystem(em)
+
+	comp := &components.ReanimComponent{
+		CurrentAnimations: []string{"anim_shooting", "anim_head_idle"},
+		AnimStates: map[string]*components.AnimState{
+			"anim_shooting": {
+				Name:         "anim_shooting",
+				LogicalFrame: 10,
+				IsActive:     true,
+			},
+			"anim_head_idle": {
+				Name:         "anim_head_idle",
+				LogicalFrame: 3,
+				IsActive:     true,
+			},
+		},
+	}
+
+	frame := rs.getCurrentLogicalFrame(comp)
+
+	// 应该返回第一个动画（主动画）的帧
+	if frame != 10 {
+		t.Errorf("Expected logical frame 10 (from primary animation), got %d", frame)
+	}
+}
+
+// TestGetCurrentLogicalFrame_NoAnimation 测试无动画场景（返回 0）
+func TestGetCurrentLogicalFrame_NoAnimation(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rs := NewReanimSystem(em)
+
+	comp := &components.ReanimComponent{
+		CurrentAnimations: []string{},
+		AnimStates:        map[string]*components.AnimState{},
+	}
+
+	frame := rs.getCurrentLogicalFrame(comp)
+
+	if frame != 0 {
+		t.Errorf("Expected logical frame 0 for no animation, got %d", frame)
+	}
+}
+
+// TestGetParentOffsetIfNeeded_NoParent 测试无父轨道场景
+func TestGetParentOffsetIfNeeded_NoParent(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rs := NewReanimSystem(em)
+
+	comp := &components.ReanimComponent{
+		ParentTracks:  map[string]string{},
+		TrackBindings: map[string]string{},
+	}
+
+	offsetX, offsetY := rs.getParentOffsetIfNeeded("some_track", comp)
+
+	if offsetX != 0 || offsetY != 0 {
+		t.Errorf("Expected (0, 0) for track without parent, got (%.2f, %.2f)", offsetX, offsetY)
+	}
+}
+
+// TestGetParentOffsetIfNeeded_SameAnimation 测试子父使用相同动画（不应用偏移）
+func TestGetParentOffsetIfNeeded_SameAnimation(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rs := NewReanimSystem(em)
+
+	comp := &components.ReanimComponent{
+		ParentTracks: map[string]string{
+			"child_track": "parent_track",
+		},
+		TrackBindings: map[string]string{
+			"child_track":  "anim_shooting",
+			"parent_track": "anim_shooting", // 相同动画
+		},
+	}
+
+	offsetX, offsetY := rs.getParentOffsetIfNeeded("child_track", comp)
+
+	// 子父使用相同动画，不应用偏移
+	if offsetX != 0 || offsetY != 0 {
+		t.Errorf("Expected (0, 0) for same animation, got (%.2f, %.2f)", offsetX, offsetY)
+	}
+}
+
+// TestGetParentOffsetIfNeeded_DifferentAnimation 测试子父使用不同动画（应用偏移）
+func TestGetParentOffsetIfNeeded_DifferentAnimation(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rs := NewReanimSystem(em)
+
+	comp := &components.ReanimComponent{
+		ParentTracks: map[string]string{
+			"child_track": "parent_track",
+		},
+		TrackBindings: map[string]string{
+			"child_track":  "anim_head_idle",
+			"parent_track": "anim_shooting", // 不同动画
+		},
+		AnimStates: map[string]*components.AnimState{
+			"anim_shooting": {
+				Name:         "anim_shooting",
+				LogicalFrame: 1, // 当前在第2个可见帧
+				IsActive:     true,
+			},
+		},
+		MergedTracks: map[string][]reanim.Frame{
+			"parent_track": {
+				{X: floatPtr(0.0), Y: floatPtr(0.0)},    // 初始位置（第一个可见帧）
+				{X: floatPtr(15.0), Y: floatPtr(25.0)},  // 当前位置（第二个可见帧）
+			},
+		},
+		AnimVisiblesMap: map[string][]int{
+			"anim_shooting": {0, 0}, // 两帧都可见
+		},
+	}
+
+	offsetX, offsetY := rs.getParentOffsetIfNeeded("child_track", comp)
+
+	// 偏移 = 当前位置 - 初始位置 = (15, 25) - (0, 0) = (15, 25)
+	if offsetX != 15.0 || offsetY != 25.0 {
+		t.Errorf("Expected (15.0, 25.0) offset, got (%.2f, %.2f)", offsetX, offsetY)
+	}
+}
+
+// TestPrepareRenderCache_BasicScenario 测试基本缓存构建（单个动画）
+func TestPrepareRenderCache_BasicScenario(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rs := NewReanimSystem(em)
+
+	// 创建测试图片
+	img1 := ebiten.NewImage(10, 10)
+	img2 := ebiten.NewImage(20, 20)
+
+	comp := &components.ReanimComponent{
+		CurrentAnimations: []string{"anim_idle"},
+		TrackBindings: map[string]string{
+			"track1": "anim_idle",
+			"track2": "anim_idle",
+		},
+		AnimStates: map[string]*components.AnimState{
+			"anim_idle": {
+				Name:         "anim_idle",
+				LogicalFrame: 0,
+				IsActive:     true,
+			},
+		},
+		MergedTracks: map[string][]reanim.Frame{
+			"track1": {
+				{ImagePath: "IMAGE_PART1", X: floatPtr(10.0), Y: floatPtr(20.0)},
+			},
+			"track2": {
+				{ImagePath: "IMAGE_PART2", X: floatPtr(30.0), Y: floatPtr(40.0)},
+			},
+		},
+		PartImages: map[string]*ebiten.Image{
+			"IMAGE_PART1": img1,
+			"IMAGE_PART2": img2,
+		},
+		AnimVisiblesMap: map[string][]int{
+			"anim_idle": {0}, // 所有帧可见
+		},
+		AnimTracks: []reanim.Track{
+			{Name: "track1"},
+			{Name: "track2"},
+		},
+		CachedRenderData: make([]components.RenderPartData, 0, 10),
+	}
+
+	// 构建缓存
+	rs.prepareRenderCache(comp)
+
+	// 验证缓存长度
+	if len(comp.CachedRenderData) != 2 {
+		t.Errorf("Expected cache length 2, got %d", len(comp.CachedRenderData))
+	}
+
+	// 验证第一个缓存项
+	if comp.CachedRenderData[0].Img != img1 {
+		t.Error("Expected first cache item to have img1")
+	}
+	if *comp.CachedRenderData[0].Frame.X != 10.0 {
+		t.Errorf("Expected X=10.0, got %.2f", *comp.CachedRenderData[0].Frame.X)
+	}
+
+	// 验证第二个缓存项
+	if comp.CachedRenderData[1].Img != img2 {
+		t.Error("Expected second cache item to have img2")
+	}
+	if *comp.CachedRenderData[1].Frame.Y != 40.0 {
+		t.Errorf("Expected Y=40.0, got %.2f", *comp.CachedRenderData[1].Frame.Y)
+	}
+}
+
+// TestPrepareRenderCache_CacheReuse 测试缓存切片重用
+func TestPrepareRenderCache_CacheReuse(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rs := NewReanimSystem(em)
+
+	img := ebiten.NewImage(10, 10)
+
+	comp := &components.ReanimComponent{
+		CurrentAnimations: []string{"anim_idle"},
+		TrackBindings: map[string]string{
+			"track1": "anim_idle",
+		},
+		AnimStates: map[string]*components.AnimState{
+			"anim_idle": {
+				Name:         "anim_idle",
+				LogicalFrame: 0,
+				IsActive:     true,
+			},
+		},
+		MergedTracks: map[string][]reanim.Frame{
+			"track1": {
+				{ImagePath: "IMAGE_PART1", X: floatPtr(10.0), Y: floatPtr(20.0)},
+			},
+		},
+		PartImages: map[string]*ebiten.Image{
+			"IMAGE_PART1": img,
+		},
+		AnimVisiblesMap: map[string][]int{
+			"anim_idle": {0},
+		},
+		AnimTracks: []reanim.Track{
+			{Name: "track1"},
+		},
+		CachedRenderData: make([]components.RenderPartData, 0, 10),
+	}
+
+	// 第一次构建
+	rs.prepareRenderCache(comp)
+	if len(comp.CachedRenderData) != 1 {
+		t.Errorf("Expected cache length 1 after first build, got %d", len(comp.CachedRenderData))
+	}
+
+	// 验证容量不变
+	if cap(comp.CachedRenderData) != 10 {
+		t.Errorf("Expected capacity 10, got %d", cap(comp.CachedRenderData))
+	}
+
+	// 第二次构建（应该重用切片）
+	rs.prepareRenderCache(comp)
+	if len(comp.CachedRenderData) != 1 {
+		t.Errorf("Expected cache length 1 after second build, got %d", len(comp.CachedRenderData))
+	}
+
+	// 容量应该保持不变（切片重用成功）
+	if cap(comp.CachedRenderData) != 10 {
+		t.Errorf("Expected capacity 10 after reuse, got %d", cap(comp.CachedRenderData))
+	}
+}

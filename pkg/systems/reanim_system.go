@@ -2328,3 +2328,165 @@ func (s *ReanimSystem) mapLogicalToPhysical(logicalFrame int, animVisibles []int
 	}
 	return -1 // 逻辑帧越界
 }
+
+// ==================================================================
+// Story 13.4: Render Cache Optimization (渲染缓存优化)
+// ==================================================================
+
+// getCurrentLogicalFrame 获取组件当前的逻辑帧索引（用于缓存失效检测）
+//
+// 返回主动画（CurrentAnimations[0]）的当前逻辑帧
+// 如果没有动画播放，返回 0
+//
+// 参数：
+//   - comp: ReanimComponent 引用
+//
+// 返回：
+//   - 当前逻辑帧索引
+func (s *ReanimSystem) getCurrentLogicalFrame(comp *components.ReanimComponent) int {
+	// 如果没有播放任何动画，返回 0
+	if len(comp.CurrentAnimations) == 0 {
+		return 0
+	}
+
+	// 使用第一个动画作为主动画
+	primaryAnim := comp.CurrentAnimations[0]
+
+	// 获取该动画的状态
+	animState, exists := comp.AnimStates[primaryAnim]
+	if !exists {
+		return 0
+	}
+
+	return animState.LogicalFrame
+}
+
+// getParentOffsetIfNeeded 如果需要，计算父子偏移
+//
+// 检查轨道是否有父轨道，并且子父使用不同的动画
+// 如果满足条件，返回父轨道的偏移量；否则返回 (0, 0)
+//
+// 参数：
+//   - trackName: 轨道名称
+//   - comp: ReanimComponent 引用
+//
+// 返回：
+//   - offsetX: 父轨道的 X 偏移
+//   - offsetY: 父轨道的 Y 偏移
+func (s *ReanimSystem) getParentOffsetIfNeeded(trackName string, comp *components.ReanimComponent) (float64, float64) {
+	// 检查是否有父轨道
+	if comp.ParentTracks == nil {
+		return 0, 0
+	}
+
+	parentName, hasParent := comp.ParentTracks[trackName]
+	if !hasParent {
+		return 0, 0 // 无父轨道
+	}
+
+	// 检查轨道绑定
+	if comp.TrackBindings == nil {
+		return 0, 0
+	}
+
+	childAnim, childExists := comp.TrackBindings[trackName]
+	parentAnim, parentExists := comp.TrackBindings[parentName]
+
+	if !childExists || !parentExists {
+		return 0, 0
+	}
+
+	// 如果子父使用相同的动画，不应用偏移
+	if childAnim == parentAnim {
+		return 0, 0
+	}
+
+	// 调用 Story 13.3 的函数计算父轨道偏移
+	return s.getParentOffset(parentName, comp)
+}
+
+// prepareRenderCache 为指定组件构建渲染数据缓存（Story 13.4）
+//
+// 遍历所有可见轨道，计算并缓存渲染数据：
+// - 图片引用（从 PartImages 获取）
+// - 帧数据（变换信息）
+// - 父子偏移（Story 13.3）
+//
+// 重用 CachedRenderData 切片，避免频繁分配内存
+//
+// 参数：
+//   - comp: ReanimComponent 引用
+func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
+	// 步骤 1: 清空现有缓存（重用切片，避免分配）
+	comp.CachedRenderData = comp.CachedRenderData[:0]
+
+	// 步骤 2: 获取可见轨道列表
+	visualTracks := s.getVisualTracks(comp)
+
+	// 步骤 3: 遍历每个轨道，构建缓存
+	for _, trackName := range visualTracks {
+		var animName string
+		var logicalFrame int
+
+		// 3.1: 找到控制该轨道的动画
+		// 支持两种模式：TrackBindings 模式和传统模式
+		if comp.TrackBindings != nil && len(comp.TrackBindings) > 0 {
+			// TrackBindings 模式（Story 13.1）
+			var exists bool
+			animName, exists = comp.TrackBindings[trackName]
+			if !exists {
+				continue // 跳过未绑定的轨道
+			}
+		} else {
+			// 传统模式：所有轨道使用相同的主动画
+			animName = comp.CurrentAnim
+			if animName == "" {
+				continue
+			}
+		}
+
+		// 3.2: 获取动画的当前逻辑帧
+		animState, stateExists := comp.AnimStates[animName]
+		if !stateExists {
+			continue
+		}
+		logicalFrame = animState.LogicalFrame
+
+		// 3.3: 映射到物理帧
+		animVisibles, visiblesExist := comp.AnimVisiblesMap[animName]
+		if !visiblesExist {
+			continue
+		}
+		physicalFrame := s.mapLogicalToPhysical(logicalFrame, animVisibles)
+		if physicalFrame == -1 {
+			continue // 逻辑帧越界
+		}
+
+		// 3.4: 获取帧数据
+		mergedFrames, tracksExist := comp.MergedTracks[trackName]
+		if !tracksExist || physicalFrame >= len(mergedFrames) {
+			continue // 越界保护
+		}
+		frame := mergedFrames[physicalFrame]
+
+		// 3.5: 获取图片引用
+		if frame.ImagePath == "" {
+			continue // 跳过无图片路径的帧
+		}
+		img, imgExists := comp.PartImages[frame.ImagePath]
+		if !imgExists || img == nil {
+			continue // 跳过无图片的帧
+		}
+
+		// 3.6: 计算父子偏移（Story 13.3）
+		offsetX, offsetY := s.getParentOffsetIfNeeded(trackName, comp)
+
+		// 3.7: 加入缓存
+		comp.CachedRenderData = append(comp.CachedRenderData, components.RenderPartData{
+			Img:     img,
+			Frame:   frame,
+			OffsetX: offsetX,
+			OffsetY: offsetY,
+		})
+	}
+}

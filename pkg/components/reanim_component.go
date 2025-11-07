@@ -50,6 +50,23 @@ type AnimState struct {
 	DelayDuration float64
 }
 
+// RenderPartData 存储单个部件的渲染数据缓存（Story 13.4）
+// 用于优化 Reanim 渲染性能，避免每帧重复计算
+type RenderPartData struct {
+	// Img 图片引用（从 PartImages 获取）
+	Img *ebiten.Image
+
+	// Frame 帧数据（包含变换信息：位置、缩放、旋转等）
+	Frame reanim.Frame
+
+	// OffsetX 父子偏移 X（Story 13.3）
+	// 用于实现头部跟随身体摆动等效果
+	OffsetX float64
+
+	// OffsetY 父子偏移 Y（Story 13.3）
+	OffsetY float64
+}
+
 // TrackPlaybackConfig defines playback behavior for an individual track (Story 12.1).
 // This allows fine-grained control over track behavior at the business logic level.
 type TrackPlaybackConfig struct {
@@ -172,6 +189,17 @@ type ReanimComponent struct {
 	// in the first frame of the animation, to align the visual center with the entity position.
 	CenterOffsetX float64
 	CenterOffsetY float64
+
+	// CachedRenderData 渲染数据缓存（Story 13.4）
+	// 存储预计算的渲染数据，避免每帧重复计算
+	// 包括图片引用、帧数据、父子偏移等
+	// 缓存在帧变化时自动更新（通过 LastRenderFrame 检测）
+	CachedRenderData []RenderPartData
+
+	// LastRenderFrame 上次渲染的逻辑帧（Story 13.4）
+	// 用于检测缓存是否失效：当前逻辑帧 != LastRenderFrame 时需要重新构建缓存
+	// 初始化为 -1，表示尚未渲染过
+	LastRenderFrame int
 
 	// FixedCenterOffset 是否使用固定的中心偏移量（避免动画切换时的位置跳动）
 	// 如果为 true，则 CenterOffsetX/Y 在实体创建时计算一次后固定不变

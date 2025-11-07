@@ -276,6 +276,10 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	scene.reanimSystem = systems.NewReanimSystem(scene.entityManager)
 	log.Printf("[GameScene] Initialized Reanim system")
 
+	// Story 13.4: Enable render cache optimization
+	scene.renderSystem.SetReanimSystem(scene.reanimSystem)
+	log.Printf("[GameScene] Enabled render cache optimization")
+
 	// Initialize input system with sun counter target position and lawn grid system (Story 2.4 + Story 3.3)
 	// Story 6.3: Pass reanimSystem to InputSystem for plant animation initialization
 	scene.inputSystem = systems.NewInputSystem(
