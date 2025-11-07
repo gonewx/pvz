@@ -1850,6 +1850,45 @@ func (rs *ReanimSystem) ResumeTrack(entity ecs.EntityID, trackName string) error
 func (s *ReanimSystem) getVisualTracks(comp *components.ReanimComponent) []string {
 	var visualTracks []string
 
+	// Story 13.4 QA Fix: 优先使用 AnimTracks 保证顺序（渲染 Z-order）
+	// 修复 map 迭代顺序随机导致的缓存顺序错误和渲染顺序不一致
+	if len(comp.AnimTracks) > 0 {
+		for _, track := range comp.AnimTracks {
+			trackName := track.Name
+
+			// 跳过逻辑轨道
+			if LogicalTracks[trackName] {
+				continue
+			}
+
+			// 跳过动画定义轨道
+			if AnimationDefinitionTracks[trackName] {
+				continue
+			}
+
+			// 检查 MergedTracks 中是否有该轨道
+			mergedFrames, exists := comp.MergedTracks[trackName]
+			if !exists {
+				continue
+			}
+
+			// 检查是否至少有一帧包含图片
+			hasImage := false
+			for _, frame := range mergedFrames {
+				if frame.ImagePath != "" {
+					hasImage = true
+					break
+				}
+			}
+
+			if hasImage {
+				visualTracks = append(visualTracks, trackName)
+			}
+		}
+		return visualTracks
+	}
+
+	// 降级：如果没有 AnimTracks，遍历 MergedTracks（顺序不确定）
 	for trackName, mergedFrames := range comp.MergedTracks {
 		// 跳过逻辑轨道
 		if LogicalTracks[trackName] {
