@@ -5,9 +5,15 @@ package main
 
 import (
 	"fmt"
+	"image"
+	"image/color"
 	_ "image/jpeg" // 支持 JPEG 格式图片
+	_ "image/png"  // 支持 PNG 格式图片
 	"log"
 	"math"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/decker502/pvz/internal/reanim"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -42,6 +48,7 @@ type AnimationCell struct {
 	trackAnimationBinding map[string]string     // 轨道到动画的绑定
 	parentTracks          map[string]string     // 父子关系
 	hiddenTracks          map[string]bool       // 隐藏的轨道
+	manualHiddenTracks    map[string]bool       // 手动隐藏的轨道（用于单个模式）
 
 	// 渲染缓存（优化性能）
 	lastRenderFrame int
@@ -88,10 +95,10 @@ func NewAnimationCell(config *AnimationUnitConfig, globalFPS int) (*AnimationCel
 		animFPS = 12 // 最后的默认值
 	}
 
-	// 加载图片资源
+	// 加载图片资源（支持 JPG+PNG 蒙版）
 	partImages := make(map[string]*ebiten.Image)
 	for ref, path := range config.Images {
-		img, _, err := ebitenutil.NewImageFromFile(path)
+		img, err := loadImageWithMask(path)
 		if err != nil {
 			log.Printf("  警告: 无法加载图片 %s: %v", path, err)
 			continue
@@ -116,9 +123,10 @@ func NewAnimationCell(config *AnimationUnitConfig, globalFPS int) (*AnimationCel
 		frameAccumulator:      0,
 		animationFPS:          float64(animFPS),
 
-		visualTracks:  visualTracks,
-		logicalTracks: logicalTracks,
-		animVisiblesMap: make(map[string][]int),
+		visualTracks:       visualTracks,
+		logicalTracks:      logicalTracks,
+		animVisiblesMap:    make(map[string][]int),
+		manualHiddenTracks: make(map[string]bool),
 
 		scale:      config.Scale,
 		detailMode: false,
@@ -355,7 +363,12 @@ func (c *AnimationCell) updateRenderCache() {
 	c.cachedRenderData = c.cachedRenderData[:0]
 
 	for _, trackName := range c.visualTracks {
+		// 检查配置中的隐藏轨道
 		if c.hiddenTracks != nil && c.hiddenTracks[trackName] {
+			continue
+		}
+		// 检查手动隐藏的轨道
+		if c.manualHiddenTracks != nil && c.manualHiddenTracks[trackName] {
 			continue
 		}
 
@@ -612,6 +625,37 @@ func (c *AnimationCell) IsDetailMode() bool {
 	return c.detailMode
 }
 
+// GetVisualTracks 获取所有视觉轨道列表
+func (c *AnimationCell) GetVisualTracks() []string {
+	return c.visualTracks
+}
+
+// IsTrackVisible 检查轨道是否可见
+func (c *AnimationCell) IsTrackVisible(trackName string) bool {
+	// 检查配置中的隐藏轨道
+	if c.hiddenTracks != nil && c.hiddenTracks[trackName] {
+		return false
+	}
+	// 检查手动隐藏的轨道
+	if c.manualHiddenTracks != nil && c.manualHiddenTracks[trackName] {
+		return false
+	}
+	return true
+}
+
+// ToggleTrackVisibility 切换轨道可见性
+func (c *AnimationCell) ToggleTrackVisibility(trackName string) {
+	if c.manualHiddenTracks == nil {
+		c.manualHiddenTracks = make(map[string]bool)
+	}
+	c.manualHiddenTracks[trackName] = !c.manualHiddenTracks[trackName]
+}
+
+// ResetTrackVisibility 重置所有手动隐藏的轨道
+func (c *AnimationCell) ResetTrackVisibility() {
+	c.manualHiddenTracks = make(map[string]bool)
+}
+
 // === 工具函数 ===
 
 // analyzeTrackTypes 分析轨道类型（视觉轨道和逻辑轨道）
@@ -773,4 +817,116 @@ func getFloat(p *float64) float64 {
 		return 0.0
 	}
 	return *p
+}
+
+// loadImageWithMask 加载图片并应用蒙版（如果存在）
+// 对于 JPG 文件，检查是否有同名的以 _ 结尾的 PNG 文件作为 Alpha 蒙版
+func loadImageWithMask(imagePath string) (*ebiten.Image, error) {
+	// 检查文件扩展名
+	ext := strings.ToLower(filepath.Ext(imagePath))
+
+	// 如果不是 JPG，直接加载
+	if ext != ".jpg" && ext != ".jpeg" {
+		img, _, err := ebitenutil.NewImageFromFile(imagePath)
+		return img, err
+	}
+
+	// 检查是否有对应的蒙版文件
+	// 例如：image.jpg -> image_.png
+	dir := filepath.Dir(imagePath)
+	baseName := strings.TrimSuffix(filepath.Base(imagePath), filepath.Ext(imagePath))
+	maskPath := filepath.Join(dir, baseName+"_.png")
+
+	// 如果蒙版文件不存在，直接加载原图
+	if _, err := os.Stat(maskPath); os.IsNotExist(err) {
+		img, _, err := ebitenutil.NewImageFromFile(imagePath)
+		return img, err
+	}
+
+	// 加载 JPG 图片（使用标准库）
+	baseFile, err := os.Open(imagePath)
+	if err != nil {
+		return nil, fmt.Errorf("加载 JPG 失败: %w", err)
+	}
+	defer baseFile.Close()
+
+	baseImg, _, err := image.Decode(baseFile)
+	if err != nil {
+		return nil, fmt.Errorf("解码 JPG 失败: %w", err)
+	}
+
+	// 加载蒙版文件（使用标准库）
+	maskFile, err := os.Open(maskPath)
+	if err != nil {
+		log.Printf("  警告: 无法打开蒙版文件 %s: %v (将使用原图)", maskPath, err)
+		return ebiten.NewImageFromImage(baseImg), nil
+	}
+	defer maskFile.Close()
+
+	maskImg, _, err := image.Decode(maskFile)
+	if err != nil {
+		log.Printf("  警告: 无法解码蒙版文件 %s: %v (将使用原图)", maskPath, err)
+		return ebiten.NewImageFromImage(baseImg), nil
+	}
+
+	// 应用蒙版（在标准 image.Image 上操作）
+	resultImg, err := applyAlphaMask(baseImg, maskImg)
+	if err != nil {
+		log.Printf("  警告: 应用蒙版失败 %s: %v (将使用原图)", maskPath, err)
+		return ebiten.NewImageFromImage(baseImg), nil
+	}
+
+	if *verbose {
+		log.Printf("  ✓ 应用蒙版: %s <- %s", imagePath, maskPath)
+	}
+
+	// 转换为 Ebiten 图像
+	return ebiten.NewImageFromImage(resultImg), nil
+}
+
+// applyAlphaMask 将 PNG 蒙版应用到 JPG 图片上
+// PNG 蒙版是 8-bit 调色板模式，蒙版的非白色部分会让背景图片透明
+func applyAlphaMask(baseImage image.Image, maskImage image.Image) (*image.RGBA, error) {
+	baseBounds := baseImage.Bounds()
+	maskBounds := maskImage.Bounds()
+
+	// 检查尺寸是否匹配
+	if baseBounds.Dx() != maskBounds.Dx() || baseBounds.Dy() != maskBounds.Dy() {
+		return nil, fmt.Errorf("图片尺寸不匹配: base=%dx%d, mask=%dx%d",
+			baseBounds.Dx(), baseBounds.Dy(), maskBounds.Dx(), maskBounds.Dy())
+	}
+
+	// 创建新的 RGBA 图像
+	width := baseBounds.Dx()
+	height := baseBounds.Dy()
+	rgba := image.NewRGBA(image.Rect(0, 0, width, height))
+
+	// 逐像素处理
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// 获取基础图片的颜色
+			baseColor := baseImage.At(baseBounds.Min.X+x, baseBounds.Min.Y+y)
+			br, bg, bb, _ := baseColor.RGBA()
+
+			// 获取蒙版的颜色（使用红色通道作为 alpha 值）
+			maskColor := maskImage.At(maskBounds.Min.X+x, maskBounds.Min.Y+y)
+			mr, _, _, _ := maskColor.RGBA()
+
+			// 蒙版值：白色(255) = 不透明，黑色(0) = 透明
+			// 转换为 0-255 范围的 alpha 值
+			alpha := uint8(mr >> 8)
+
+			// 预乘 alpha 处理（改善边缘质量）
+			// 预乘 alpha: RGB 值乘以 alpha 值
+			alphaF := float64(alpha) / 255.0
+			finalR := uint8(float64(br>>8) * alphaF)
+			finalG := uint8(float64(bg>>8) * alphaF)
+			finalB := uint8(float64(bb>>8) * alphaF)
+
+			// 设置像素（预乘 alpha 格式）
+			rgba.SetRGBA(x, y, color.RGBA{R: finalR, G: finalG, B: finalB, A: alpha})
+		}
+	}
+
+	return rgba, nil
 }

@@ -36,6 +36,14 @@ const (
 	HelpBottomLeft
 )
 
+// DisplayMode 显示模式
+type DisplayMode int
+
+const (
+	DisplayModeGrid   DisplayMode = iota // 网格模式（默认）
+	DisplayModeSingle                    // 单个单元模式
+)
+
 // Game 主游戏结构
 type Game struct {
 	config *ShowcaseConfig
@@ -44,6 +52,7 @@ type Game struct {
 	// UI 状态
 	showHelp     bool
 	helpPosition HelpPosition // 帮助面板位置
+	displayMode  DisplayMode  // 显示模式
 
 	// 分页
 	allAnimConfigs []AnimationUnitConfig // 所有动画配置
@@ -92,6 +101,7 @@ func NewGame(configPath string) (*Game, error) {
 		cellsPerPage:   cellsPerPage,
 		showHelp:       true,
 		helpPosition:   HelpTopRight, // 默认右上角
+		displayMode:    DisplayModeGrid, // 默认网格模式
 		textFont:       font,
 	}
 
@@ -154,6 +164,25 @@ func (g *Game) loadPage(pageNum int) error {
 
 // Update 更新游戏状态
 func (g *Game) Update() error {
+	// 处理显示模式切换（Enter 键）
+	if inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
+		selectedIndex := g.layout.GetSelectedIndex()
+		if selectedIndex >= 0 {
+			// 切换模式
+			if g.displayMode == DisplayModeGrid {
+				g.displayMode = DisplayModeSingle
+				if *verbose {
+					log.Printf("切换到单个显示模式")
+				}
+			} else {
+				g.displayMode = DisplayModeGrid
+				if *verbose {
+					log.Printf("切换到网格显示模式")
+				}
+			}
+		}
+	}
+
 	// 处理帮助切换
 	if inpututil.IsKeyJustPressed(ebiten.KeyH) {
 		g.showHelp = !g.showHelp
@@ -168,20 +197,22 @@ func (g *Game) Update() error {
 		}
 	}
 
-	// 处理翻页（只用 PageDown/PageUp）
-	if inpututil.IsKeyJustPressed(ebiten.KeyPageDown) {
-		// 下一页
-		if g.currentPage < g.totalPages-1 {
-			if err := g.loadPage(g.currentPage + 1); err != nil {
-				log.Printf("警告: 加载下一页失败: %v", err)
+	// 处理翻页（只用 PageDown/PageUp，且仅在网格模式下）
+	if g.displayMode == DisplayModeGrid {
+		if inpututil.IsKeyJustPressed(ebiten.KeyPageDown) {
+			// 下一页
+			if g.currentPage < g.totalPages-1 {
+				if err := g.loadPage(g.currentPage + 1); err != nil {
+					log.Printf("警告: 加载下一页失败: %v", err)
+				}
 			}
 		}
-	}
-	if inpututil.IsKeyJustPressed(ebiten.KeyPageUp) {
-		// 上一页
-		if g.currentPage > 0 {
-			if err := g.loadPage(g.currentPage - 1); err != nil {
-				log.Printf("警告: 加载上一页失败: %v", err)
+		if inpututil.IsKeyJustPressed(ebiten.KeyPageUp) {
+			// 上一页
+			if g.currentPage > 0 {
+				if err := g.loadPage(g.currentPage - 1); err != nil {
+					log.Printf("警告: 加载上一页失败: %v", err)
+				}
 			}
 		}
 	}
@@ -214,17 +245,30 @@ func (g *Game) Update() error {
 		}
 	}
 
-	// 数字键快速跳转
-	for key := ebiten.Key0; key <= ebiten.Key9; key++ {
-		if inpututil.IsKeyJustPressed(key) {
-			pageNum := int(key - ebiten.Key0)
-			if key == ebiten.Key0 {
-				pageNum = 10 // 0 键代表第 10 页
+	// 在单个模式下，处理轨道切换（F1-F12）
+	if g.displayMode == DisplayModeSingle {
+		selectedIndex := g.layout.GetSelectedIndex()
+		if selectedIndex >= 0 {
+			cell := g.layout.GetCell(selectedIndex)
+			if cell != nil {
+				g.handleTrackToggle(cell)
 			}
-			pageNum-- // 转换为从 0 开始的索引
-			if pageNum >= 0 && pageNum < g.totalPages {
-				if err := g.loadPage(pageNum); err != nil {
-					log.Printf("警告: 跳转到第 %d 页失败: %v", pageNum+1, err)
+		}
+	}
+
+	// 数字键快速跳转（仅在网格模式下）
+	if g.displayMode == DisplayModeGrid {
+		for key := ebiten.Key0; key <= ebiten.Key9; key++ {
+			if inpututil.IsKeyJustPressed(key) {
+				pageNum := int(key - ebiten.Key0)
+				if key == ebiten.Key0 {
+					pageNum = 10 // 0 键代表第 10 页
+				}
+				pageNum-- // 转换为从 0 开始的索引
+				if pageNum >= 0 && pageNum < g.totalPages {
+					if err := g.loadPage(pageNum); err != nil {
+						log.Printf("警告: 跳转到第 %d 页失败: %v", pageNum+1, err)
+					}
 				}
 			}
 		}
@@ -276,11 +320,15 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// 清空屏幕
 	screen.Fill(color.RGBA{50, 50, 50, 255})
 
-	// 渲染网格布局
-	g.layout.Render(screen)
-
-	// 渲染顶部信息栏
-	g.drawInfoBar(screen)
+	// 根据显示模式渲染
+	if g.displayMode == DisplayModeGrid {
+		// 网格模式
+		g.layout.Render(screen)
+		g.drawInfoBar(screen)
+	} else {
+		// 单个模式
+		g.drawSingleCell(screen)
+	}
 
 	// 渲染帮助信息
 	if g.showHelp {
@@ -322,18 +370,164 @@ func (g *Game) drawInfoBar(screen *ebiten.Image) {
 	}
 }
 
+// drawSingleCell 绘制单个单元（全屏模式）
+func (g *Game) drawSingleCell(screen *ebiten.Image) {
+	selectedIndex := g.layout.GetSelectedIndex()
+	if selectedIndex < 0 {
+		// 没有选中的单元，显示提示
+		ebitenutil.DebugPrintAt(screen, "请先在网格模式下选择一个单元", g.config.Global.Window.Width/2-100, g.config.Global.Window.Height/2)
+		return
+	}
+
+	cell := g.layout.GetCell(selectedIndex)
+	if cell == nil {
+		return
+	}
+
+	// 在屏幕中央渲染
+	centerX := float64(g.config.Global.Window.Width) / 2
+	centerY := float64(g.config.Global.Window.Height) / 2
+
+	cell.Render(screen, centerX, centerY)
+
+	// 绘制信息栏
+	info := fmt.Sprintf("FPS: %.1f | 单元: %s | 动画: %s | 按 Enter 返回网格",
+		ebiten.ActualTPS(), cell.GetName(), cell.GetCurrentAnimationName())
+
+	// 绘制半透明背景
+	bgWidth := 800
+	bgHeight := 25
+	bgImage := ebiten.NewImage(bgWidth, bgHeight)
+	bgImage.Fill(color.RGBA{0, 0, 0, 160})
+	screen.DrawImage(bgImage, &ebiten.DrawImageOptions{})
+
+	// 绘制文本
+	if g.textFont != nil {
+		g.textDrawOpts.GeoM.Reset()
+		g.textDrawOpts.GeoM.Translate(10, 10)
+		g.textDrawOpts.ColorScale.Reset()
+		g.textDrawOpts.ColorScale.ScaleWithColor(color.White)
+		text.Draw(screen, info, g.textFont, &g.textDrawOpts)
+	} else {
+		ebitenutil.DebugPrintAt(screen, info, 10, 10)
+	}
+
+	// 绘制轨道列表
+	g.drawTrackList(screen, cell)
+}
+
+// drawTrackList 绘制轨道列表及状态
+func (g *Game) drawTrackList(screen *ebiten.Image, cell *AnimationCell) {
+	tracks := cell.GetVisualTracks()
+	if len(tracks) == 0 {
+		return
+	}
+
+	// 计算面板位置和大小
+	panelX := 10
+	panelY := 50
+	panelWidth := 300
+	lineHeight := 18
+	headerHeight := 20
+	panelHeight := headerHeight + len(tracks)*lineHeight + 10
+
+	// 绘制半透明背景
+	bgImage := ebiten.NewImage(panelWidth, panelHeight)
+	bgImage.Fill(color.RGBA{0, 0, 0, 180})
+	opts := &ebiten.DrawImageOptions{}
+	opts.GeoM.Translate(float64(panelX), float64(panelY))
+	screen.DrawImage(bgImage, opts)
+
+	// 绘制标题
+	title := "轨道列表 (F1-F12 切换, R 重置):"
+	if g.textFont != nil {
+		g.textDrawOpts.GeoM.Reset()
+		g.textDrawOpts.GeoM.Translate(float64(panelX+10), float64(panelY+10))
+		g.textDrawOpts.ColorScale.Reset()
+		g.textDrawOpts.ColorScale.ScaleWithColor(color.White)
+		text.Draw(screen, title, g.textFont, &g.textDrawOpts)
+	} else {
+		ebitenutil.DebugPrintAt(screen, title, panelX+10, panelY+10)
+	}
+
+	// 绘制轨道列表
+	for i, trackName := range tracks {
+		if i >= 12 { // 最多显示 12 个（F1-F12）
+			break
+		}
+
+		y := panelY + headerHeight + i*lineHeight
+
+		// 确定状态文本和颜色
+		visible := cell.IsTrackVisible(trackName)
+		status := "✓"
+		statusColor := color.RGBA{0, 255, 0, 255} // 绿色
+		if !visible {
+			status = "✗"
+			statusColor = color.RGBA{255, 0, 0, 255} // 红色
+		}
+
+		// 绘制 F 键标签
+		fKeyLabel := fmt.Sprintf("F%-2d", i+1)
+		line := fmt.Sprintf("%s %s %s", fKeyLabel, status, trackName)
+
+		if g.textFont != nil {
+			g.textDrawOpts.GeoM.Reset()
+			g.textDrawOpts.GeoM.Translate(float64(panelX+10), float64(y))
+			g.textDrawOpts.ColorScale.Reset()
+
+			// F 键标签用白色
+			text.Draw(screen, fKeyLabel, g.textFont, &g.textDrawOpts)
+
+			// 状态符号用对应颜色
+			g.textDrawOpts.GeoM.Reset()
+			g.textDrawOpts.GeoM.Translate(float64(panelX+50), float64(y))
+			g.textDrawOpts.ColorScale.Reset()
+			g.textDrawOpts.ColorScale.ScaleWithColor(statusColor)
+			text.Draw(screen, status, g.textFont, &g.textDrawOpts)
+
+			// 轨道名称用白色
+			g.textDrawOpts.GeoM.Reset()
+			g.textDrawOpts.GeoM.Translate(float64(panelX+70), float64(y))
+			g.textDrawOpts.ColorScale.Reset()
+			g.textDrawOpts.ColorScale.ScaleWithColor(color.White)
+			text.Draw(screen, trackName, g.textFont, &g.textDrawOpts)
+		} else {
+			ebitenutil.DebugPrintAt(screen, line, panelX+10, y)
+		}
+	}
+}
+
 // drawHelp 绘制帮助信息
 func (g *Game) drawHelp(screen *ebiten.Image) {
-	helpLines := []string{
-		"操作说明:",
-		"  PageDown    - 下一页",
-		"  PageUp      - 上一页",
-		"  1-9 数字键  - 快速跳转页面",
-		"  →/← 方向键  - 切换选中单元的动画",
-		"  左键点击    - 选中并切换动画",
-		"  H          - 显示/隐藏帮助",
-		"  Tab        - 切换帮助位置",
-		"  ESC        - 退出",
+	var helpLines []string
+
+	if g.displayMode == DisplayModeGrid {
+		// 网格模式的帮助
+		helpLines = []string{
+			"操作说明 (网格模式):",
+			"  PageDown    - 下一页",
+			"  PageUp      - 上一页",
+			"  1-9 数字键  - 快速跳转页面",
+			"  →/← 方向键  - 切换选中单元的动画",
+			"  左键点击    - 选中并切换动画",
+			"  Enter       - 切换到单个模式",
+			"  H          - 显示/隐藏帮助",
+			"  Tab        - 切换帮助位置",
+			"  ESC        - 退出",
+		}
+	} else {
+		// 单个模式的帮助
+		helpLines = []string{
+			"操作说明 (单个模式):",
+			"  →/← 方向键  - 切换动画",
+			"  F1-F12     - 切换轨道显示/隐藏",
+			"  R          - 重置所有轨道可见性",
+			"  Enter       - 返回网格模式",
+			"  H          - 显示/隐藏帮助",
+			"  Tab        - 切换帮助位置",
+			"  ESC        - 退出",
+		}
 	}
 
 	// 计算帮助面板大小
@@ -387,6 +581,40 @@ func (g *Game) drawHelp(screen *ebiten.Image) {
 // Layout 设置窗口布局
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 	return g.config.Global.Window.Width, g.config.Global.Window.Height
+}
+
+// handleTrackToggle 处理轨道切换快捷键（F1-F12）
+func (g *Game) handleTrackToggle(cell *AnimationCell) {
+	// F 键映射到 ebiten.KeyF1 到 ebiten.KeyF12
+	fKeys := []ebiten.Key{
+		ebiten.KeyF1, ebiten.KeyF2, ebiten.KeyF3, ebiten.KeyF4,
+		ebiten.KeyF5, ebiten.KeyF6, ebiten.KeyF7, ebiten.KeyF8,
+		ebiten.KeyF9, ebiten.KeyF10, ebiten.KeyF11, ebiten.KeyF12,
+	}
+
+	tracks := cell.GetVisualTracks()
+
+	for i, key := range fKeys {
+		if inpututil.IsKeyJustPressed(key) {
+			if i < len(tracks) {
+				trackName := tracks[i]
+				cell.ToggleTrackVisibility(trackName)
+				if *verbose {
+					visible := cell.IsTrackVisible(trackName)
+					log.Printf("轨道 %s: %v", trackName, visible)
+				}
+			}
+			break
+		}
+	}
+
+	// R 键重置所有轨道
+	if inpututil.IsKeyJustPressed(ebiten.KeyR) {
+		cell.ResetTrackVisibility()
+		if *verbose {
+			log.Printf("重置所有轨道可见性")
+		}
+	}
 }
 
 func main() {
