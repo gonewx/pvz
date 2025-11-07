@@ -76,10 +76,10 @@ func NewSelectorScreenPartialEntity(
 		Reanim:            reanimXML,
 		PartImages:        partImages,
 		CurrentAnim:       "",
+		CurrentAnimations: []string{},
 		IsLooping:         true,
 		IsPaused:          false,
 		VisibleTracks:     visibleTracks,
-		CurrentFrame:      0,
 		FrameAccumulator:  0,
 		FixedCenterOffset: true,
 		CenterOffsetX:     0,
@@ -127,8 +127,8 @@ func initializeIndependentAnimations(reanimComp *components.ReanimComponent, rm 
 		return nil
 	}
 
-	// 2. 初始化 Anims map
-	reanimComp.Anims = make(map[string]*components.AnimState)
+	// 2. 初始化 AnimStates map (Story 13.2: Anims -> AnimStates)
+	reanimComp.AnimStates = make(map[string]*components.AnimState)
 
 	// 3. 构建 AnimVisiblesMap（需要获取时间窗口信息）
 	// 使用 reanim 包的函数构建时间窗口
@@ -140,8 +140,8 @@ func initializeIndependentAnimations(reanimComp *components.ReanimComponent, rm 
 	reanimComp.MergedTracks = reanim.BuildMergedTracks(reanimComp.Reanim)
 	log.Printf("[SelectorScreen] Built MergedTracks: %d tracks", len(reanimComp.MergedTracks))
 
-	// 5. 为每个独立动画创建状态 + 构建轨道映射
-	reanimComp.TrackMapping = make(map[string]string)
+	// 5. 为每个独立动画创建状态 + 构建轨道绑定 (Story 13.2: TrackMapping -> TrackBindings)
+	reanimComp.TrackBindings = make(map[string]string)
 
 	for _, animName := range animConfig.IndependentAnimations {
 		// 计算动画的起始帧和帧数
@@ -184,13 +184,13 @@ func initializeIndependentAnimations(reanimComp *components.ReanimComponent, rm 
 		// 创建默认状态
 		state := &components.AnimState{
 			Name:              animName,
-			Frame:             startFrame, // 从可见帧开始
+			LogicalFrame:      startFrame, // Story 13.2: Frame -> LogicalFrame
 			Accumulator:       0,
 			StartFrame:        startFrame,
 			FrameCount:        frameCount,
-			IsLooping:         true,  // 默认循环
-			IsActive:          true,  // 默认激活
-			RenderWhenStopped: true,  // 默认停止后仍渲染（向后兼容）
+			IsLooping:         true, // 默认循环
+			IsActive:          true, // 默认激活
+			RenderWhenStopped: true, // 默认停止后仍渲染（向后兼容）
 			DelayTimer:        0,
 			DelayDuration:     0, // 默认无延迟
 		}
@@ -218,28 +218,28 @@ func initializeIndependentAnimations(reanimComp *components.ReanimComponent, rm 
 
 				// 应用 LockAtFrame 设置（新增）
 				if customConfig.LockAtFrame != nil {
-					state.Frame = *customConfig.LockAtFrame
-					state.IsActive = false // 锁定在指定帧，停止推进
+					state.LogicalFrame = *customConfig.LockAtFrame // Story 13.2: Frame -> LogicalFrame
+					state.IsActive = false                         // 锁定在指定帧，停止推进
 					log.Printf("[SelectorScreen] 🔒 Animation '%s' locked at frame %d",
 						animName, *customConfig.LockAtFrame)
 				}
 
-				// 构建轨道映射（配置的特殊规则）
+				// 构建轨道绑定（配置的特殊规则）(Story 13.2: TrackMapping -> TrackBindings)
 				if len(customConfig.ControlledTracks) > 0 {
 					for _, trackName := range customConfig.ControlledTracks {
-						reanimComp.TrackMapping[trackName] = animName
-						log.Printf("[SelectorScreen] 🔗 Track mapping: '%s' → '%s' (from config)",
+						reanimComp.TrackBindings[trackName] = animName
+						log.Printf("[SelectorScreen] 🔗 Track binding: '%s' → '%s' (from config)",
 							trackName, animName)
 					}
 				}
 			}
 		}
 
-		reanimComp.Anims[animName] = state
+		reanimComp.AnimStates[animName] = state
 		log.Printf("[SelectorScreen] ✅ Initialized independent animation '%s' (frames=%d, loop=%v, active=%v, render_stopped=%v, delay=%.1fs)",
 			animName, frameCount, state.IsLooping, state.IsActive, state.RenderWhenStopped, state.DelayDuration)
 	}
 
-	log.Printf("[SelectorScreen] ✅ Initialized %d independent animations", len(reanimComp.Anims))
+	log.Printf("[SelectorScreen] ✅ Initialized %d independent animations", len(reanimComp.AnimStates))
 	return nil
 }

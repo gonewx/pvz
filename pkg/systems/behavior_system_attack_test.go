@@ -260,10 +260,13 @@ func TestPeashooterAttackAnimationCycle(t *testing.T) {
 	}
 
 	// Story 10.5: Simulate animation advancing to keyframe 10 to trigger bullet creation
+	// Story 13.2: 使用 AnimStates[CurrentAnim].LogicalFrame 替代 CurrentFrame
 	// The bullet is created at config.PeashooterShootingFireFrame (Frame 10), not immediately
 	reanim, _ := ecs.GetComponent[*components.ReanimComponent](em, peashooterID)
 	for i := 0; i <= 10; i++ {
-		reanim.CurrentFrame = i
+		if state, ok := reanim.AnimStates[reanim.CurrentAnim]; ok {
+			state.LogicalFrame = i
+		}
 		bs.updatePlantAttackAnimation(peashooterID, 0.016)
 	}
 
@@ -317,9 +320,12 @@ func TestPeashooterAttackAnimationCycle(t *testing.T) {
 	bs.handlePeashooterBehavior(peashooterID, 0.016, []ecs.EntityID{zombieID})
 
 	// Story 10.5: Simulate animation advancing to keyframe 10 for second shot
+	// Story 13.2: 使用 AnimStates[CurrentAnim].LogicalFrame 替代 CurrentFrame
 	reanim, _ = ecs.GetComponent[*components.ReanimComponent](em, peashooterID)
 	for i := 0; i <= 10; i++ {
-		reanim.CurrentFrame = i
+		if state, ok := reanim.AnimStates[reanim.CurrentAnim]; ok {
+			state.LogicalFrame = i
+		}
 		bs.updatePlantAttackAnimation(peashooterID, 0.016)
 	}
 

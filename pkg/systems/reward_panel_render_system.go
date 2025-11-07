@@ -492,8 +492,8 @@ func (rprs *RewardPanelRenderSystem) drawPlantInfo(screen *ebiten.Image, panel *
 		// 1.2 再绘制主文字（金黄色）
 		nameOp := &text.DrawOptions{}
 		nameOp.GeoM.Translate(nameX, nameY)
-		nameOp.PrimaryAlign = text.AlignCenter                         // 水平居中
-		nameOp.SecondaryAlign = text.AlignStart                        // 垂直从上开始
+		nameOp.PrimaryAlign = text.AlignCenter                             // 水平居中
+		nameOp.SecondaryAlign = text.AlignStart                            // 垂直从上开始
 		nameOp.ColorScale.ScaleWithColor(config.RewardPanelPlantNameColor) // 金黄色
 		nameOp.ColorScale.ScaleAlpha(float32(panel.FadeAlpha))
 		text.Draw(screen, panel.PlantName, rprs.plantInfoFont, nameOp)
@@ -543,8 +543,8 @@ func (rprs *RewardPanelRenderSystem) drawPlantInfo(screen *ebiten.Image, panel *
 			// 2.2 再绘制主文字（深蓝黑色）
 			descOp := &text.DrawOptions{}
 			descOp.GeoM.Translate(boxCenterX, currentY)
-			descOp.PrimaryAlign = text.AlignCenter                              // 水平居中
-			descOp.SecondaryAlign = text.AlignStart                             // 垂直从上开始
+			descOp.PrimaryAlign = text.AlignCenter                               // 水平居中
+			descOp.SecondaryAlign = text.AlignStart                              // 垂直从上开始
 			descOp.ColorScale.ScaleWithColor(config.RewardPanelDescriptionColor) // 深蓝黑色
 			descOp.ColorScale.ScaleAlpha(float32(panel.FadeAlpha))
 			text.Draw(screen, line, rprs.plantInfoFont, descOp)

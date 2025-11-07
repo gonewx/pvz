@@ -72,9 +72,8 @@ func NewReanimSystem(em *ecs.EntityManager) *ReanimSystem {
 
 // Update updates all Reanim components by advancing animation frames.
 //
-// Story 6.8: Unified animation system with two modes:
-// - Synchronous mode (TrackMapping = nil): All animations share GlobalFrame
-// - Asynchronous mode (TrackMapping != nil): Each animation has independent Frame
+// Story 13.2: 统一的帧推进逻辑，不再区分同步/异步模式
+// 所有动画使用独立的 AnimState.LogicalFrame
 //
 // Parameters:
 //   - deltaTime: time elapsed since last update (in seconds)
@@ -99,78 +98,31 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 			continue
 		}
 
-		// 判断使用哪种模式
-		if reanimComp.TrackMapping != nil {
-			// 异步模式：更新每个动画的独立帧
-			s.updateAsyncMode(reanimComp, deltaTime)
-		} else {
-			// 同步模式：更新 GlobalFrame
-			s.updateSyncMode(reanimComp, deltaTime)
-		}
+		// ✅ 统一的帧推进逻辑（Story 13.2）
+		s.updateAnimationStates(reanimComp, deltaTime)
 	}
 }
 
-// updateSyncMode 更新同步模式动画（使用 GlobalFrame）
+// updateAnimationStates 更新所有动画状态的独立帧索引（Story 13.2）
 //
-// 同步模式特点：
-// - 所有动画共享一个全局帧索引 (GlobalFrame)
-// - 适用于 95% 的场景（豌豆射手、向日葵等）
-// - 性能更优，内存占用更小
+// 每个动画维护自己的 LogicalFrame、Accumulator 和循环状态
 //
 // Parameters:
 //   - comp: ReanimComponent to update
 //   - deltaTime: time elapsed since last update (in seconds)
-func (s *ReanimSystem) updateSyncMode(comp *components.ReanimComponent, deltaTime float64) {
-	// 计算帧时长
+func (s *ReanimSystem) updateAnimationStates(comp *components.ReanimComponent, deltaTime float64) {
 	frameTime := 1.0 / float64(comp.Reanim.FPS)
 
-	// 更新帧累加器
-	comp.FrameAccumulator += deltaTime
-
-	// 推进帧
-	for comp.FrameAccumulator >= frameTime {
-		comp.FrameAccumulator -= frameTime
-		comp.GlobalFrame++
-
-		// 检查是否需要循环
-		if comp.GlobalFrame >= comp.VisibleFrameCount {
-			if comp.IsLooping {
-				comp.GlobalFrame = 0
-			} else {
-				comp.GlobalFrame = comp.VisibleFrameCount - 1
-				comp.IsFinished = true
-				break
-			}
-		}
-	}
-
-	// 同步 CurrentFrame（向后兼容字段，用于关键帧检测等逻辑）
-	comp.CurrentFrame = comp.GlobalFrame
-}
-
-// updateAsyncMode 更新异步模式动画（每个动画使用独立帧）
-//
-// 异步模式特点：
-// - 每个动画有自己的 Frame 索引
-// - 适用于复杂场景（SelectorScreen 云朵各自独立飘动）
-// - 支持延迟机制（DelayTimer/DelayDuration）
-//
-// Parameters:
-//   - comp: ReanimComponent to update
-//   - deltaTime: time elapsed since last update (in seconds)
-func (s *ReanimSystem) updateAsyncMode(comp *components.ReanimComponent, deltaTime float64) {
-	// 更新每个动画的独立帧
-	frameTime := 1.0 / float64(comp.Reanim.FPS)
-
-	for _, state := range comp.Anims {
+	for _, state := range comp.AnimStates {
+		// 跳过非激活动画
 		if !state.IsActive {
-			// 处理延迟
+			// 处理延迟逻辑（如果需要）
 			if state.DelayDuration > 0 {
 				state.DelayTimer += deltaTime
 				if state.DelayTimer >= state.DelayDuration {
 					state.IsActive = true
 					state.DelayTimer = 0
-					state.Frame = state.StartFrame
+					state.LogicalFrame = state.StartFrame
 				}
 			}
 			continue
@@ -182,31 +134,24 @@ func (s *ReanimSystem) updateAsyncMode(comp *components.ReanimComponent, deltaTi
 		// 推进帧
 		for state.Accumulator >= frameTime {
 			state.Accumulator -= frameTime
-			state.Frame++
+			state.LogicalFrame++
 
 			// 检查循环
 			endFrame := state.StartFrame + state.FrameCount
-			if state.Frame >= endFrame {
+			if state.LogicalFrame >= endFrame {
 				if state.IsLooping {
-					state.Frame = state.StartFrame
+					state.LogicalFrame = state.StartFrame
+					// 如果有延迟，停止并重置延迟计时器
 					if state.DelayDuration > 0 {
 						state.IsActive = false
 						state.DelayTimer = 0
 					}
 				} else {
-					state.Frame = endFrame - 1
+					state.LogicalFrame = endFrame - 1
 					state.IsActive = false
 					break
 				}
 			}
-		}
-	}
-
-	// 同步 CurrentFrame（向后兼容字段，用于关键帧检测等逻辑）
-	// 使用主动画（CurrentAnim）的帧，如果存在的话
-	if comp.CurrentAnim != "" {
-		if animState, exists := comp.Anims[comp.CurrentAnim]; exists {
-			comp.CurrentFrame = animState.Frame
 		}
 	}
 }
@@ -401,16 +346,14 @@ func (s *ReanimSystem) getAnimationTracks(comp *components.ReanimComponent) []re
 
 // PlayAnimation starts playing the specified animation for the given entity (single animation mode).
 //
-// Story 6.9: Refactored to use the new multi-animation API.
-// This method clears all existing animations and plays only the specified animation.
+// Story 13.2: 重构为只管理 AnimStates，移除 GlobalFrame 设置
 //
 // For playing multiple animations simultaneously, use PlayAnimations() instead.
 // For adding animations incrementally, use AddAnimation() instead.
 //
 // This method:
-// - Clears all existing animations (Anims map)
+// - Clears all existing animations (AnimStates map)
 // - Adds the new animation via addAnimation()
-// - Resets global animation state (GlobalFrame, accumulator)
 // - Builds merged tracks and animation tracks
 // - Calculates center offset and best preview frame
 //
@@ -432,27 +375,25 @@ func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) err
 		return fmt.Errorf("entity %d has a ReanimComponent but no Reanim data", entityID)
 	}
 
-	// Reset global animation state
-	reanimComp.GlobalFrame = 0
+	// ✅ Story 13.2: 移除 GlobalFrame 和 CurrentFrame 设置
+	// 设置基本动画状态
 	reanimComp.FrameAccumulator = 0.0
 	reanimComp.CurrentAnim = animName
-	reanimComp.CurrentFrame = 0 // Legacy field for backward compatibility
+	reanimComp.CurrentAnimations = []string{animName}
 	reanimComp.IsLooping = true
 	reanimComp.IsFinished = false
-
-	// Backward compatibility: Reset blending mode (will be set by addAnimation if needed)
-	reanimComp.IsBlending = false
-	reanimComp.PrimaryAnimation = ""
-	reanimComp.SecondaryAnimation = ""
 
 	// Build merged tracks with frame inheritance (required for rendering)
 	reanimComp.MergedTracks = reanim.BuildMergedTracks(reanimComp.Reanim)
 
 	// Clear all animations and add the new one
-	reanimComp.Anims = make(map[string]*components.AnimState)
+	reanimComp.AnimStates = make(map[string]*components.AnimState)
 	if err := s.addAnimation(reanimComp, animName, true); err != nil {
 		return err
 	}
+
+	// 单动画时清空 TrackBindings（使用默认行为）
+	reanimComp.TrackBindings = nil
 
 	// Store animation tracks in rendering order
 	reanimComp.AnimTracks = s.getAnimationTracks(reanimComp)
@@ -556,8 +497,8 @@ func (s *ReanimSystem) addAnimation(
 	}
 
 	// Initialize Anims map if needed
-	if comp.Anims == nil {
-		comp.Anims = make(map[string]*components.AnimState)
+	if comp.AnimStates == nil {
+		comp.AnimStates = make(map[string]*components.AnimState)
 	}
 
 	// Initialize AnimVisiblesMap if needed
@@ -574,17 +515,17 @@ func (s *ReanimSystem) addAnimation(
 	frameCount := len(comp.AnimVisiblesMap[animName])
 
 	// Create AnimState
-	comp.Anims[animName] = &components.AnimState{
-		Name:               animName,
-		IsActive:           isActive,
-		IsLooping:          true, // Default: animations loop
-		Frame:              0,    // Used in async mode, ignored in sync mode
-		Accumulator:        0.0,
-		StartFrame:         0,
-		FrameCount:         frameCount,
-		RenderWhenStopped:  true, // Default: continue rendering when stopped
-		DelayTimer:         0.0,
-		DelayDuration:      0.0,
+	comp.AnimStates[animName] = &components.AnimState{
+		Name:              animName,
+		IsActive:          isActive,
+		IsLooping:         true, // Default: animations loop
+		LogicalFrame:      0,    // Story 13.2: 重命名自 Frame
+		Accumulator:       0.0,
+		StartFrame:        0,
+		FrameCount:        frameCount,
+		RenderWhenStopped: true, // Default: continue rendering when stopped
+		DelayTimer:        0.0,
+		DelayDuration:     0.0,
 	}
 
 	// Update VisibleFrameCount (used for GlobalFrame loop control in sync mode)
@@ -598,9 +539,8 @@ func (s *ReanimSystem) addAnimation(
 
 // PlayAnimations plays multiple animations simultaneously (multi-animation mode).
 //
-// Story 6.9: Enables playing multiple animations that share the same GlobalFrame.
-// This is the core API for multi-animation overlay scenarios like PeaShooter attacking
-// (body animation + head animation).
+// Story 13.2: 重构为只管理 AnimStates，移除 GlobalFrame 设置
+// Story 13.1: 多动画时自动分析轨道绑定
 //
 // This method clears all existing animations before adding the new ones.
 //
@@ -612,8 +552,9 @@ func (s *ReanimSystem) addAnimation(
 //   - An error if the entity doesn't have a ReanimComponent or any animation doesn't exist
 //
 // Example:
-//   // Play both body and head animations for PeaShooter attack
-//   rs.PlayAnimations(entityID, []string{"anim_shooting", "anim_head_idle"})
+//
+//	// Play both body and head animations for PeaShooter attack
+//	rs.PlayAnimations(entityID, []string{"anim_shooting", "anim_head_idle"})
 func (s *ReanimSystem) PlayAnimations(entityID ecs.EntityID, animNames []string) error {
 	// Get the ReanimComponent
 	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
@@ -631,30 +572,49 @@ func (s *ReanimSystem) PlayAnimations(entityID ecs.EntityID, animNames []string)
 		return fmt.Errorf("at least one animation name must be specified")
 	}
 
-	// Reset global animation state
-	// Use the first animation name as the "primary" animation for backward compatibility
+	// ✅ Story 13.2: 移除 GlobalFrame 和 CurrentFrame 设置
+	// 设置基本动画状态
 	primaryAnimName := animNames[0]
-	reanimComp.GlobalFrame = 0
 	reanimComp.FrameAccumulator = 0.0
 	reanimComp.CurrentAnim = primaryAnimName
-	reanimComp.CurrentFrame = 0 // Legacy field for backward compatibility
+	reanimComp.CurrentAnimations = animNames
 	reanimComp.IsLooping = true
 	reanimComp.IsFinished = false
 
-	// Backward compatibility: Reset blending mode
-	reanimComp.IsBlending = false
-	reanimComp.PrimaryAnimation = ""
-	reanimComp.SecondaryAnimation = ""
+	// 多动画支持说明（Story 13.1）
+	if len(animNames) > 1 {
+		log.Printf("[ReanimSystem] PlayAnimations 收到 %d 个动画，将使用 TrackBindings 机制进行轨道绑定",
+			len(animNames))
+	}
 
 	// Build merged tracks with frame inheritance (required for rendering)
 	reanimComp.MergedTracks = reanim.BuildMergedTracks(reanimComp.Reanim)
 
 	// Clear all animations and add the new ones
-	reanimComp.Anims = make(map[string]*components.AnimState)
+	reanimComp.AnimStates = make(map[string]*components.AnimState)
 	for _, animName := range animNames {
 		if err := s.addAnimation(reanimComp, animName, true); err != nil {
 			return fmt.Errorf("failed to add animation '%s': %w", animName, err)
 		}
+	}
+
+	// ==================================================================
+	// Story 13.1: Auto Track Binding (自动轨道绑定)
+	// ==================================================================
+	//
+	// 多动画时自动分析轨道绑定
+	if len(animNames) > 1 {
+		bindings := s.AnalyzeTrackBinding(reanimComp, animNames)
+		reanimComp.TrackBindings = bindings
+
+		// 输出绑定结果（用于调试）
+		log.Printf("[ReanimSystem] 自动轨道绑定 (entity %d):", entityID)
+		for track, anim := range bindings {
+			log.Printf("  - %s -> %s", track, anim)
+		}
+	} else {
+		// 单个动画时，清空绑定（使用默认行为）
+		reanimComp.TrackBindings = nil
 	}
 
 	// Store animation tracks in rendering order
@@ -716,10 +676,11 @@ func (s *ReanimSystem) PlayAnimations(entityID ecs.EntityID, animNames []string)
 //   - An error if the entity doesn't have a ReanimComponent or the animation doesn't exist
 //
 // Example:
-//   // Start with walk animation
-//   rs.PlayAnimation(entityID, "anim_walk")
-//   // Add burning effect on top
-//   rs.AddAnimation(entityID, "anim_burning")
+//
+//	// Start with walk animation
+//	rs.PlayAnimation(entityID, "anim_walk")
+//	// Add burning effect on top
+//	rs.AddAnimation(entityID, "anim_burning")
 func (s *ReanimSystem) AddAnimation(entityID ecs.EntityID, animName string) error {
 	// Get the ReanimComponent
 	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
@@ -738,7 +699,7 @@ func (s *ReanimSystem) AddAnimation(entityID ecs.EntityID, animName string) erro
 	}
 
 	log.Printf("[ReanimSystem] AddAnimation: entity %d added animation '%s' (total: %d)",
-		entityID, animName, len(reanimComp.Anims))
+		entityID, animName, len(reanimComp.AnimStates))
 
 	return nil
 }
@@ -758,8 +719,9 @@ func (s *ReanimSystem) AddAnimation(entityID ecs.EntityID, animName string) erro
 // Note: It is safe to call this method even if the animation doesn't exist (no-op).
 //
 // Example:
-//   // Remove burning effect
-//   rs.RemoveAnimation(entityID, "anim_burning")
+//
+//	// Remove burning effect
+//	rs.RemoveAnimation(entityID, "anim_burning")
 func (s *ReanimSystem) RemoveAnimation(entityID ecs.EntityID, animName string) error {
 	// Get the ReanimComponent
 	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
@@ -767,11 +729,11 @@ func (s *ReanimSystem) RemoveAnimation(entityID ecs.EntityID, animName string) e
 		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
 	}
 
-	// Remove from Anims map (safe even if animName doesn't exist)
-	delete(reanimComp.Anims, animName)
+	// Remove from AnimStates map (safe even if animName doesn't exist)
+	delete(reanimComp.AnimStates, animName)
 
 	log.Printf("[ReanimSystem] RemoveAnimation: entity %d removed animation '%s' (remaining: %d)",
-		entityID, animName, len(reanimComp.Anims))
+		entityID, animName, len(reanimComp.AnimStates))
 
 	return nil
 }
@@ -829,7 +791,6 @@ func (s *ReanimSystem) initializeDirectRenderInternal(entityID ecs.EntityID, cal
 
 	// Set animation state (required for rendering)
 	reanimComp.CurrentAnim = "direct_render" // Non-empty string to pass RenderSystem check
-	reanimComp.CurrentFrame = 0
 	reanimComp.FrameAccumulator = 0.0
 	reanimComp.IsFinished = false
 
@@ -858,15 +819,15 @@ func (s *ReanimSystem) initializeDirectRenderInternal(entityID ecs.EntityID, cal
 	}
 	reanimComp.AnimVisiblesMap["direct_render"] = animVisibles
 
-	// Story 6.8 修复：创建 Anims map（必需，否则 shouldRenderTrack 会因 len(activeAnims)==0 失败）
-	if reanimComp.Anims == nil {
-		reanimComp.Anims = make(map[string]*components.AnimState)
+	// Story 6.8 修复：创建 AnimStates map（必需，否则 shouldRenderTrack 会因 len(activeAnims)==0 失败）
+	if reanimComp.AnimStates == nil {
+		reanimComp.AnimStates = make(map[string]*components.AnimState)
 	}
-	reanimComp.Anims["direct_render"] = &components.AnimState{
+	reanimComp.AnimStates["direct_render"] = &components.AnimState{
 		Name:              "direct_render",
 		IsActive:          true, // 必须为 true
 		IsLooping:         true,
-		Frame:             0,
+		LogicalFrame:      0,
 		Accumulator:       0.0,
 		StartFrame:        0,
 		FrameCount:        standardFrameCount,
@@ -1122,130 +1083,6 @@ func (s *ReanimSystem) IsTrackVisible(entityID ecs.EntityID, trackName string) (
 	return reanimComp.VisibleTracks[trackName], nil
 }
 
-// HidePartGroup hides a group of animation tracks defined in PartGroups.
-// This provides a high-level semantic interface (e.g., "arm", "head") without
-// requiring the caller to know specific track names.
-//
-// Parameters:
-//   - entityID: the ID of the entity
-//   - groupName: the name of the part group (e.g., "arm", "head", "armor")
-//
-// Returns:
-//   - error: if the entity doesn't have a ReanimComponent, PartGroups is not configured,
-//     or the group name doesn't exist
-func (s *ReanimSystem) HidePartGroup(entityID ecs.EntityID, groupName string) error {
-	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-	if !exists {
-		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
-	}
-
-	// Check if PartGroups is configured
-	if reanimComp.PartGroups == nil {
-		return fmt.Errorf("entity %d does not have PartGroups configured", entityID)
-	}
-
-	// Get the track list for this group
-	tracks, ok := reanimComp.PartGroups[groupName]
-	if !ok {
-		return fmt.Errorf("part group '%s' not found in entity %d", groupName, entityID)
-	}
-
-	// Hide all tracks in the group
-	for _, track := range tracks {
-		if err := s.HideTrack(entityID, track); err != nil {
-			// Log warning but continue (some tracks might not exist for all variants)
-			log.Printf("[ReanimSystem] Warning: failed to hide track %s in group %s: %v", track, groupName, err)
-		}
-	}
-
-	return nil
-}
-
-// ShowPartGroup shows a group of animation tracks defined in PartGroups.
-// This is the reverse operation of HidePartGroup.
-//
-// Parameters:
-//   - entityID: the ID of the entity
-//   - groupName: the name of the part group (e.g., "arm", "head", "armor")
-//
-// Returns:
-//   - error: if the entity doesn't have a ReanimComponent, PartGroups is not configured,
-//     or the group name doesn't exist
-func (s *ReanimSystem) ShowPartGroup(entityID ecs.EntityID, groupName string) error {
-	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-	if !exists {
-		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
-	}
-
-	// Check if PartGroups is configured
-	if reanimComp.PartGroups == nil {
-		return fmt.Errorf("entity %d does not have PartGroups configured", entityID)
-	}
-
-	// Get the track list for this group
-	tracks, ok := reanimComp.PartGroups[groupName]
-	if !ok {
-		return fmt.Errorf("part group '%s' not found in entity %d", groupName, entityID)
-	}
-
-	// Show all tracks in the group
-	for _, track := range tracks {
-		if err := s.ShowTrack(entityID, track); err != nil {
-			log.Printf("[ReanimSystem] Warning: failed to show track %s in group %s: %v", track, groupName, err)
-		}
-	}
-
-	return nil
-}
-
-// GetPartGroupImage 获取部件组中第一个可见部件的图片
-// 用于创建掉落效果时获取部件的图片资源
-//
-// Parameters:
-//   - entityID: the ID of the entity
-//   - groupName: the name of the part group (e.g., "arm", "head")
-//
-// Returns:
-//   - *ebiten.Image: the image of the first visible part in the group, or nil if not found
-//   - error: if the entity doesn't have a ReanimComponent or the group doesn't exist
-func (s *ReanimSystem) GetPartGroupImage(entityID ecs.EntityID, groupName string) (*ebiten.Image, error) {
-	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-	if !exists {
-		return nil, fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
-	}
-
-	// Check if PartGroups is configured
-	if reanimComp.PartGroups == nil {
-		return nil, fmt.Errorf("entity %d does not have PartGroups configured", entityID)
-	}
-
-	// Get the track list for this group
-	tracks, ok := reanimComp.PartGroups[groupName]
-	if !ok {
-		return nil, fmt.Errorf("part group '%s' not found in entity %d", groupName, entityID)
-	}
-
-	// Try to find any image from this part group
-	// We iterate through all tracks in the group and try to find an image
-	if reanimComp.PartImages != nil {
-		for _, trackName := range tracks {
-			// Look through MergedTracks to find the ImagePath for this track
-			if mergedFrames, ok := reanimComp.MergedTracks[trackName]; ok && len(mergedFrames) > 0 {
-				// Try the first frame that has an image
-				for _, frame := range mergedFrames {
-					if frame.ImagePath != "" {
-						if img, exists := reanimComp.PartImages[frame.ImagePath]; exists && img != nil {
-							return img, nil
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return nil, fmt.Errorf("no image found for part group '%s' in entity %d", groupName, entityID)
-}
-
 // RenderToTexture 将指定实体的 Reanim 渲染到目标纹理（离屏渲染）
 // 用于生成植物卡片的预览图标
 //
@@ -1282,6 +1119,8 @@ func (s *ReanimSystem) RenderToTexture(entityID ecs.EntityID, target *ebiten.Ima
 // GetTrackPosition 获取指定轨道在当前帧的世界坐标位置
 // 用于定位游戏逻辑需要的特殊点位（如子弹发射点）
 //
+// Story 13.2: 使用主动画的 LogicalFrame 替代 CurrentFrame
+//
 // Parameters:
 //   - entityID: the ID of the entity
 //   - trackName: the name of the track (e.g., "anim_stem")
@@ -1298,8 +1137,16 @@ func (s *ReanimSystem) GetTrackPosition(entityID ecs.EntityID, trackName string)
 		return 0, 0, fmt.Errorf("entity %d missing required components", entityID)
 	}
 
+	// Story 13.2: 获取主动画的 LogicalFrame
+	mainAnimState, ok := reanim.AnimStates[reanim.CurrentAnim]
+	if !ok {
+		return 0, 0, fmt.Errorf("entity %d has no active animation '%s'", entityID, reanim.CurrentAnim)
+	}
+
+	currentLogicalFrame := mainAnimState.LogicalFrame
+
 	// 将逻辑帧映射到物理帧索引
-	physicalIndex := s.findPhysicalFrameIndex(reanim, reanim.CurrentFrame)
+	physicalIndex := s.findPhysicalFrameIndex(reanim, currentLogicalFrame)
 	if physicalIndex < 0 {
 		return 0, 0, fmt.Errorf("invalid frame index")
 	}
@@ -1321,7 +1168,7 @@ func (s *ReanimSystem) GetTrackPosition(entityID ecs.EntityID, trackName string)
 	}
 
 	if !isInWhitelist && frame.FrameNum != nil && *frame.FrameNum == -1 {
-		return 0, 0, fmt.Errorf("track '%s' is hidden at current frame %d", trackName, reanim.CurrentFrame)
+		return 0, 0, fmt.Errorf("track '%s' is hidden at current logical frame %d", trackName, currentLogicalFrame)
 	}
 
 	// 获取轨道的局部位置（相对于动画原点）
@@ -1335,7 +1182,7 @@ func (s *ReanimSystem) GetTrackPosition(entityID ecs.EntityID, trackName string)
 
 	// 如果X或Y为nil，说明轨道没有位置数据（可能是定位器轨道在未初始化状态）
 	if frame.X == nil || frame.Y == nil {
-		return 0, 0, fmt.Errorf("track '%s' has no position data at current frame %d", trackName, reanim.CurrentFrame)
+		return 0, 0, fmt.Errorf("track '%s' has no position data at current logical frame %d", trackName, currentLogicalFrame)
 	}
 
 	// DEBUG: 输出世界坐标计算过程
@@ -1486,9 +1333,8 @@ func (s *ReanimSystem) PrepareStaticPreview(entityID ecs.EntityID, reanimName st
 	reanimComp.IsLooping = false
 	reanimComp.IsFinished = true
 	reanimComp.CurrentAnim = "static_preview" // Marker for static preview mode
-	reanimComp.CurrentFrame = 0               // Logical frame 0 maps to physical frame bestFrame
 
-	log.Printf("[ReanimSystem] PrepareStaticPreview: bestFrame=%d (physical), logicalFrame=0, totalFrames=%d",
+	log.Printf("[ReanimSystem] PrepareStaticPreview: bestFrame=%d (physical), totalFrames=%d",
 		bestFrame, maxFrames)
 
 	return nil
@@ -1855,6 +1701,7 @@ func (s *ReanimSystem) calculateCenterOffsetForFrame(comp *components.ReanimComp
 // GetTrackTransform 获取指定轨道的当前变换矩阵（局部坐标）
 //
 // Story 10.5: 用于动画帧事件监听，获取部件实时位置
+// Story 13.2: 使用主动画的 LogicalFrame
 //
 // 参数：
 //   - entityID: 实体 ID
@@ -1885,8 +1732,13 @@ func (rs *ReanimSystem) GetTrackTransform(entityID ecs.EntityID, trackName strin
 		return 0, 0, fmt.Errorf("track '%s' not found in animation '%s'", trackName, reanim.CurrentAnim)
 	}
 
-	// 获取当前逻辑帧号
-	currentFrame := reanim.CurrentFrame
+	// Story 13.2: 获取主动画的 LogicalFrame
+	mainAnimState, hasMainAnim := reanim.AnimStates[reanim.CurrentAnim]
+	if !hasMainAnim {
+		return 0, 0, fmt.Errorf("entity %d has no active animation '%s'", entityID, reanim.CurrentAnim)
+	}
+
+	currentFrame := mainAnimState.LogicalFrame
 	if currentFrame < 0 || currentFrame >= len(mergedFrames) {
 		// 帧号越界，使用最后一帧
 		currentFrame = len(mergedFrames) - 1
@@ -1978,5 +1830,254 @@ func (rs *ReanimSystem) ResumeTrack(entity ecs.EntityID, trackName string) error
 	}
 
 	reanimComp.TrackConfigs[trackName].IsPaused = false
+	return nil
+}
+
+// ==================================================================
+// Story 13.1: Track Binding Helper Functions (轨道绑定辅助函数)
+// ==================================================================
+
+// getVisualTracks 获取所有有图片的轨道列表（视觉轨道）
+//
+// 视觉轨道定义：至少有一帧包含 ImagePath 的轨道
+// 排除：逻辑轨道（如 anim_stem, _ground）、纯动画定义轨道（如 anim_idle）
+//
+// 参数：
+//   - comp: ReanimComponent
+//
+// 返回：
+//   - 视觉轨道名称列表
+func (s *ReanimSystem) getVisualTracks(comp *components.ReanimComponent) []string {
+	var visualTracks []string
+
+	for trackName, mergedFrames := range comp.MergedTracks {
+		// 跳过逻辑轨道
+		if LogicalTracks[trackName] {
+			continue
+		}
+
+		// 跳过动画定义轨道
+		if AnimationDefinitionTracks[trackName] {
+			continue
+		}
+
+		// 检查是否至少有一帧包含图片
+		hasImage := false
+		for _, frame := range mergedFrames {
+			if frame.ImagePath != "" {
+				hasImage = true
+				break
+			}
+		}
+
+		if hasImage {
+			visualTracks = append(visualTracks, trackName)
+		}
+	}
+
+	return visualTracks
+}
+
+// findVisibleWindow 查找动画的可见窗口（首个可见帧和末尾可见帧）
+//
+// 参数：
+//   - animVisibles: 动画可见性数组（0 = 可见，-1 = 隐藏）
+//
+// 返回：
+//   - firstVisible: 第一个可见帧的索引
+//   - lastVisible: 最后一个可见帧的索引
+//   - 如果动画完全不可见，返回 (-1, -1)
+func (s *ReanimSystem) findVisibleWindow(animVisibles []int) (int, int) {
+	firstVisible := -1
+	lastVisible := -1
+
+	for i, visibility := range animVisibles {
+		if visibility == 0 {
+			if firstVisible == -1 {
+				firstVisible = i
+			}
+			lastVisible = i
+		}
+	}
+
+	return firstVisible, lastVisible
+}
+
+// calculatePositionVariance 计算位置方差（用于衡量轨道运动幅度）
+//
+// 算法原理：
+// 1. 计算指定帧范围内所有帧的平均位置（avgX, avgY）
+// 2. 计算每帧位置与平均位置的欧氏距离平方和
+// 3. 返回方差的平方根（标准差）
+//
+// 方差越大，说明轨道在该动画中运动越明显
+//
+// 参数：
+//   - frames: 轨道的帧数组（MergedTracks）
+//   - start: 起始帧索引
+//   - end: 结束帧索引（包含）
+//
+// 返回：
+//   - 位置方差（标准差）
+func (s *ReanimSystem) calculatePositionVariance(frames []reanim.Frame, start, end int) float64 {
+	if start < 0 || end >= len(frames) || start > end {
+		return 0
+	}
+
+	// 计算平均位置
+	avgX, avgY := 0.0, 0.0
+	count := 0
+	for i := start; i <= end && i < len(frames); i++ {
+		if frames[i].X != nil && frames[i].Y != nil {
+			avgX += *frames[i].X
+			avgY += *frames[i].Y
+			count++
+		}
+	}
+
+	if count == 0 {
+		return 0
+	}
+
+	avgX /= float64(count)
+	avgY /= float64(count)
+
+	// 计算方差
+	variance := 0.0
+	for i := start; i <= end && i < len(frames); i++ {
+		if frames[i].X != nil && frames[i].Y != nil {
+			dx := *frames[i].X - avgX
+			dy := *frames[i].Y - avgY
+			variance += dx*dx + dy*dy
+		}
+	}
+
+	return variance / float64(count) // 返回方差（不开方，保持敏感度）
+}
+
+// ==================================================================
+// Story 13.1: Track Binding Analysis API (轨道绑定分析 API)
+// ==================================================================
+
+// AnalyzeTrackBinding 自动分析轨道到动画的绑定关系
+//
+// 算法原理：
+// 1. 对于每个视觉轨道，遍历所有动画
+// 2. 计算轨道在该动画时间窗口内的位置方差（运动幅度）
+// 3. 将轨道绑定到方差最大的动画（运动最明显 = 最可能属于该动画）
+//
+// 参数：
+//   - comp: ReanimComponent
+//   - animNames: 要分析的动画列表（如 ["anim_shooting", "anim_head_idle"]）
+//
+// 返回：
+//   - map[string]string: 轨道绑定（轨道名 -> 动画名）
+//
+// 示例：
+//
+//	bindings := rs.AnalyzeTrackBinding(comp, []string{"anim_shooting", "anim_head_idle"})
+//	// 可能返回：{"anim_face": "anim_head_idle", "stalk_bottom": "anim_shooting"}
+func (s *ReanimSystem) AnalyzeTrackBinding(
+	comp *components.ReanimComponent,
+	animNames []string,
+) map[string]string {
+	bindings := make(map[string]string)
+
+	// 获取所有视觉轨道（有图片的轨道）
+	visualTracks := s.getVisualTracks(comp)
+
+	for _, trackName := range visualTracks {
+		mergedFrames, ok := comp.MergedTracks[trackName]
+		if !ok || len(mergedFrames) == 0 {
+			continue
+		}
+
+		bestAnim := ""
+		bestScore := 0.0
+
+		for _, animName := range animNames {
+			animVisibles, hasAnim := comp.AnimVisiblesMap[animName]
+			if !hasAnim || len(animVisibles) == 0 {
+				continue
+			}
+
+			// 查找该动画的可见窗口
+			firstVisible, lastVisible := s.findVisibleWindow(animVisibles)
+
+			if firstVisible < 0 || lastVisible >= len(mergedFrames) {
+				continue
+			}
+
+			// 检查轨道在该动画时间窗口内是否有图片
+			hasImage := false
+			for i := firstVisible; i <= lastVisible && i < len(mergedFrames); i++ {
+				if mergedFrames[i].ImagePath != "" {
+					hasImage = true
+					break
+				}
+			}
+
+			if !hasImage {
+				continue
+			}
+
+			// 计算位置方差
+			variance := s.calculatePositionVariance(mergedFrames, firstVisible, lastVisible)
+			score := 1.0 + variance
+
+			if score > bestScore {
+				bestScore = score
+				bestAnim = animName
+			}
+		}
+
+		if bestAnim != "" {
+			bindings[trackName] = bestAnim
+		}
+	}
+
+	return bindings
+}
+
+// SetTrackBindings 手动设置轨道绑定关系
+//
+// 参数：
+//   - entityID: 实体 ID
+//   - bindings: 轨道绑定（轨道名 -> 动画名）
+//
+// 返回：
+//   - error: 如果轨道或动画不存在
+//
+// 示例：
+//
+//	rs.SetTrackBindings(entityID, map[string]string{
+//	    "anim_face": "anim_head_idle",
+//	    "stalk_bottom": "anim_shooting",
+//	})
+func (s *ReanimSystem) SetTrackBindings(
+	entityID ecs.EntityID,
+	bindings map[string]string,
+) error {
+	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !exists {
+		return fmt.Errorf("entity %d does not have ReanimComponent", entityID)
+	}
+
+	// 验证绑定的有效性
+	for trackName, animName := range bindings {
+		// 检查轨道是否存在
+		if _, ok := reanimComp.MergedTracks[trackName]; !ok {
+			return fmt.Errorf("track '%s' does not exist", trackName)
+		}
+
+		// 检查动画是否存在
+		if _, ok := reanimComp.AnimVisiblesMap[animName]; !ok {
+			return fmt.Errorf("animation '%s' does not exist", animName)
+		}
+	}
+
+	// 应用绑定
+	reanimComp.TrackBindings = bindings
+
 	return nil
 }

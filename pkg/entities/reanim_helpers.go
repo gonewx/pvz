@@ -16,7 +16,7 @@ func createSimpleReanimComponent(image *ebiten.Image, imageName string) *compone
 			Reanim:            &reanim.ReanimXML{FPS: 12},
 			PartImages:        map[string]*ebiten.Image{},
 			CurrentAnim:       "idle",
-			CurrentFrame:      0,
+			CurrentAnimations: []string{"idle"},
 			FrameAccumulator:  0.0,
 			VisibleFrameCount: 0,
 			IsLooping:         true,
@@ -70,8 +70,7 @@ func createSimpleReanimComponent(image *ebiten.Image, imageName string) *compone
 		Reanim:            reanimXML,
 		PartImages:        partImages,
 		CurrentAnim:       "idle",
-		CurrentFrame:      0,
-		GlobalFrame:       0, // Story 6.8: 同步模式使用 GlobalFrame
+		CurrentAnimations: []string{"idle"},
 		FrameAccumulator:  0.0,
 		VisibleFrameCount: 1,
 		IsLooping:         true,
@@ -85,13 +84,13 @@ func createSimpleReanimComponent(image *ebiten.Image, imageName string) *compone
 		AnimTracks:    []reanim.Track{track},
 		CenterOffsetX: centerX,
 		CenterOffsetY: centerY,
-		// Story 6.8 修复：初始化 Anims（必需，否则 shouldRenderTrack 会因 len(activeAnims)==0 失败）
-		Anims: map[string]*components.AnimState{
+		// Story 13.2: 初始化 AnimStates（简单实体的单帧动画）
+		AnimStates: map[string]*components.AnimState{
 			"idle": {
 				Name:              "idle",
 				IsActive:          true, // 必须为 true
 				IsLooping:         true,
-				Frame:             0,
+				LogicalFrame:      0, // Story 13.2: Frame -> LogicalFrame
 				Accumulator:       0.0,
 				StartFrame:        0,
 				FrameCount:        1,

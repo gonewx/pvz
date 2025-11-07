@@ -480,6 +480,44 @@ reanimSystem.AddAnimation(entityID, "anim_burning")
 reanimSystem.RemoveAnimation(entityID, "anim_burning")
 ```
 
+#### 轨道绑定机制（Story 13.1）
+
+**自动绑定（推荐）**：
+```go
+// 播放多个动画时自动分析轨道绑定
+// 系统会自动将每个轨道绑定到运动最明显的动画
+reanimSystem.PlayAnimations(entityID, []string{"anim_shooting", "anim_head_idle"})
+
+// 内部自动设置 TrackBindings:
+//   TrackBindings["anim_face"] = "anim_head_idle"      // 头部用动画A
+//   TrackBindings["stalk_bottom"] = "anim_shooting"    // 身体用动画B
+```
+
+**手动绑定（高级用法）**：
+```go
+// 手动配置轨道绑定（用于特殊场景或微调）
+reanimSystem.SetTrackBindings(entityID, map[string]string{
+    "anim_face":    "anim_head_idle",   // 头部用动画A
+    "stalk_bottom": "anim_shooting",    // 身体用动画B
+})
+```
+
+**查看绑定结果**：
+```bash
+# 运行游戏时会自动输出绑定信息
+go run .
+
+# 日志输出：
+# [ReanimSystem] 自动轨道绑定 (entity 123):
+#   - anim_face -> anim_head_idle
+#   - stalk_bottom -> anim_shooting
+```
+
+**绑定原理**：
+- 系统计算每个轨道在不同动画时间窗口内的位置方差
+- 将轨道绑定到方差最大（运动最明显）的动画
+- 实现"头部用动画A，身体用动画B"的复杂组合
+
 ### 常见问题（FAQ）
 
 **Q: 如何让植物攻击时头部和身体同时显示？**

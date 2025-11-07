@@ -185,16 +185,6 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 				// 注意：不包含 anim_blink, idle_shoot_blink（眨眼轨道）
 				// 这些轨道不在白名单中，会遵守 f=-1，避免错误显示
 			},
-			// Story 6.5: PartGroups 用于双动画叠加
-			// 定义哪些轨道属于头部，在攻击时使用 anim_shooting 的帧索引
-			PartGroups: map[string][]string{
-				"head": {
-					"anim_head_idle", // 头部动画轨道
-					"anim_face",      // 脸部
-					"idle_mouth",     // 嘴巴
-					"anim_sprout",    // 头后的小嫩叶
-				},
-			},
 		})
 
 		// 使用 ReanimSystem 初始化动画（播放完整待机动画，包括头部）

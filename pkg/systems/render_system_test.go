@@ -220,12 +220,18 @@ func TestRenderReanimEntity_InvalidPhysicalFrame(t *testing.T) {
 	entity := em.CreateEntity()
 	em.AddComponent(entity, &components.PositionComponent{X: 100, Y: 200})
 
-	// ReanimComponent with CurrentFrame beyond valid range
+	// Story 13.2: ReanimComponent 使用 AnimStates 替代 CurrentFrame
 	reanimComp := &components.ReanimComponent{
-		CurrentAnim:      "anim_idle",
-		CurrentFrame:     999, // Invalid frame number
-		AnimTracks:       []reanim.Track{{Name: "track1"}},
-		AnimVisiblesMap:  map[string][]int{"anim_idle": {0, 0, -1}}, // Only 3 frames
+		CurrentAnim:     "anim_idle",
+		AnimTracks:      []reanim.Track{{Name: "track1"}},
+		AnimVisiblesMap: map[string][]int{"anim_idle": {0, 0, -1}}, // Only 3 frames
+		AnimStates: map[string]*components.AnimState{
+			"anim_idle": {
+				Name:         "anim_idle",
+				LogicalFrame: 999, // Invalid frame number
+				IsActive:     true,
+			},
+		},
 	}
 
 	em.AddComponent(entity, reanimComp)
@@ -251,8 +257,7 @@ func TestRenderReanimEntity_VisibleTracksWhitelist(t *testing.T) {
 	y := 20.0
 	frameNum := 0
 	reanimComp := &components.ReanimComponent{
-		CurrentAnim:     "anim_idle",
-		CurrentFrame:    0,
+		CurrentAnim: "anim_idle",
 		AnimTracks: []reanim.Track{
 			{Name: "track_visible"},
 			{Name: "track_hidden"},
@@ -296,8 +301,7 @@ func TestRenderReanimEntity_HiddenTracksBlacklist(t *testing.T) {
 	y := 20.0
 	frameNum := 0
 	reanimComp := &components.ReanimComponent{
-		CurrentAnim:  "anim_idle",
-		CurrentFrame: 0,
+		CurrentAnim: "anim_idle",
 		AnimTracks: []reanim.Track{
 			{Name: "track_normal"},
 			{Name: "track_hidden"},
@@ -336,13 +340,12 @@ func TestRenderReanimEntity_MissingMergedFrames(t *testing.T) {
 	em.AddComponent(entity, &components.PositionComponent{X: 100, Y: 200})
 
 	reanimComp := &components.ReanimComponent{
-		CurrentAnim:  "anim_idle",
-		CurrentFrame: 0,
+		CurrentAnim: "anim_idle",
 		AnimTracks: []reanim.Track{
 			{Name: "track1"},
 		},
 		AnimVisiblesMap: map[string][]int{"anim_idle": {0}},
-		MergedTracks: map[string][]reanim.Frame{},
+		MergedTracks:    map[string][]reanim.Frame{},
 		// MergedTracks does not contain "track1"
 	}
 
@@ -365,8 +368,7 @@ func TestRenderReanimEntity_FrameOutOfBounds(t *testing.T) {
 	y := 20.0
 	frameNum := 0
 	reanimComp := &components.ReanimComponent{
-		CurrentAnim:  "anim_idle",
-		CurrentFrame: 0,
+		CurrentAnim: "anim_idle",
 		AnimTracks: []reanim.Track{
 			{Name: "track1"},
 		},
@@ -383,8 +385,18 @@ func TestRenderReanimEntity_FrameOutOfBounds(t *testing.T) {
 
 	em.AddComponent(entity, reanimComp)
 
-	// Manually set CurrentFrame beyond available frames
-	reanimComp.CurrentFrame = 10
+	// Story 13.2: 手动设置 AnimState.LogicalFrame 超出可用帧数
+	if state, ok := reanimComp.AnimStates["anim_idle"]; ok {
+		state.LogicalFrame = 10
+	} else {
+		reanimComp.AnimStates = map[string]*components.AnimState{
+			"anim_idle": {
+				Name:         "anim_idle",
+				LogicalFrame: 10,
+				IsActive:     true,
+			},
+		}
+	}
 	reanimComp.AnimVisiblesMap["anim_idle"] = []int{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} // 11 frames
 
 	// Should not panic, skip rendering when physical index >= len(mergedFrames)
@@ -404,8 +416,7 @@ func TestRenderReanimEntity_HiddenFrame(t *testing.T) {
 	y := 20.0
 	frameNumHidden := -1
 	reanimComp := &components.ReanimComponent{
-		CurrentAnim:  "anim_idle",
-		CurrentFrame: 0,
+		CurrentAnim: "anim_idle",
 		AnimTracks: []reanim.Track{
 			{Name: "track1"},
 		},
@@ -439,8 +450,7 @@ func TestRenderReanimEntity_EmptyImagePath(t *testing.T) {
 	y := 20.0
 	frameNum := 0
 	reanimComp := &components.ReanimComponent{
-		CurrentAnim:  "anim_idle",
-		CurrentFrame: 0,
+		CurrentAnim: "anim_idle",
 		AnimTracks: []reanim.Track{
 			{Name: "track1"},
 		},
@@ -471,8 +481,7 @@ func TestRenderReanimEntity_MissingPartImage(t *testing.T) {
 	y := 20.0
 	frameNum := 0
 	reanimComp := &components.ReanimComponent{
-		CurrentAnim:  "anim_idle",
-		CurrentFrame: 0,
+		CurrentAnim: "anim_idle",
 		AnimTracks: []reanim.Track{
 			{Name: "track1"},
 		},
@@ -506,8 +515,7 @@ func TestRenderReanimEntity_NilPartImage(t *testing.T) {
 	y := 20.0
 	frameNum := 0
 	reanimComp := &components.ReanimComponent{
-		CurrentAnim:  "anim_idle",
-		CurrentFrame: 0,
+		CurrentAnim: "anim_idle",
 		AnimTracks: []reanim.Track{
 			{Name: "track1"},
 		},
@@ -609,8 +617,7 @@ func TestRenderReanimEntity_TransformCalculation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			frameNum := 0
 			reanimComp := &components.ReanimComponent{
-				CurrentAnim:  "anim_idle",
-				CurrentFrame: 0,
+				CurrentAnim: "anim_idle",
 				AnimTracks: []reanim.Track{
 					{Name: "track1"},
 				},
@@ -658,7 +665,6 @@ func TestRenderReanimEntity_CameraOffset(t *testing.T) {
 	frameNum := 0
 	reanimComp := &components.ReanimComponent{
 		CurrentAnim:   "anim_idle",
-		CurrentFrame:  0,
 		CenterOffsetX: 25.0, // Center offset
 		CenterOffsetY: 25.0,
 		AnimTracks: []reanim.Track{
@@ -706,8 +712,7 @@ func TestRenderReanimEntity_MultipleEntities(t *testing.T) {
 		y := 0.0
 		frameNum := 0
 		reanimComp := &components.ReanimComponent{
-			CurrentAnim:  "anim_idle",
-			CurrentFrame: 0,
+			CurrentAnim: "anim_idle",
 			AnimTracks: []reanim.Track{
 				{Name: "body"},
 			},

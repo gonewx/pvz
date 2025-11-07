@@ -17,11 +17,12 @@ type mockReanimSystem struct {
 
 func (m *mockReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) error {
 	// Mock implementation - 设置 CurrentAnim 字段以满足测试
+	// Story 13.2: 移除 CurrentFrame 设置（已废弃）
 	if m.em != nil {
 		if reanimComp, ok := m.em.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{})); ok {
 			reanim := reanimComp.(*components.ReanimComponent)
 			reanim.CurrentAnim = animName
-			reanim.CurrentFrame = 0
+			reanim.CurrentAnimations = []string{animName}
 			reanim.FrameAccumulator = 0.0
 			reanim.IsLooping = true
 			reanim.IsFinished = false
@@ -32,11 +33,12 @@ func (m *mockReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string)
 
 func (m *mockReanimSystem) PlayAnimationNoLoop(entityID ecs.EntityID, animName string) error {
 	// Mock implementation - 设置 CurrentAnim 字段并标记为不循环
+	// Story 13.2: 移除 CurrentFrame 设置（已废弃）
 	if m.em != nil {
 		if reanimComp, ok := m.em.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{})); ok {
 			reanim := reanimComp.(*components.ReanimComponent)
 			reanim.CurrentAnim = animName
-			reanim.CurrentFrame = 0
+			reanim.CurrentAnimations = []string{animName}
 			reanim.FrameAccumulator = 0.0
 			reanim.IsLooping = false
 			reanim.IsFinished = false
@@ -54,11 +56,12 @@ func (m *mockReanimSystem) RenderToTexture(entityID ecs.EntityID, target *ebiten
 func (m *mockReanimSystem) PrepareStaticPreview(entityID ecs.EntityID, reanimName string) error {
 	// Mock implementation - 用于静态预览准备（Story 11.1）
 	// 在测试中，设置基本的静态预览状态
+	// Story 13.2: 移除 CurrentFrame 设置（已废弃）
 	if m.em != nil {
 		if reanimComp, ok := m.em.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{})); ok {
 			reanim := reanimComp.(*components.ReanimComponent)
 			reanim.CurrentAnim = "static_preview"
-			reanim.CurrentFrame = 0
+			reanim.CurrentAnimations = []string{"static_preview"}
 			reanim.IsLooping = false
 			reanim.IsFinished = true
 		}

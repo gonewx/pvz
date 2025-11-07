@@ -85,9 +85,9 @@ func NewLawnmowerEntity(
 
 	// 暂停动画，直到除草车被触发（原版行为：静止时完全不动）
 	// 触发后 LawnmowerSystem 会设置 IsPaused = false 恢复播放
+	// Story 13.2: 移除 CurrentFrame 设置（PlayAnimation 会自动初始化动画从第 0 帧开始）
 	if reanim, ok := ecs.GetComponent[*components.ReanimComponent](em, entityID); ok {
 		reanim.IsPaused = true
-		reanim.CurrentFrame = 0 // 停在第一帧
 	}
 
 	// 添加除草车组件

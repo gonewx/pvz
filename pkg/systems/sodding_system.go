@@ -227,13 +227,14 @@ func (s *SoddingSystem) createSodRollEntity(posX, posY float64, lane int) ecs.En
 	})
 
 	// 添加 ReanimComponent
+	// Story 13.2: 移除 CurrentFrame 字段（已废弃），使用 AnimStates 管理帧
 	ecs.AddComponent(s.entityManager, entityID, &components.ReanimComponent{
-		Reanim:       reanimXML,
-		PartImages:   partImages,
-		CurrentAnim:  "", // 初始为空，等待初始化
-		CurrentFrame: 0,
-		IsLooping:    false, // 不循环播放
-		IsFinished:   false,
+		Reanim:      reanimXML,
+		PartImages:  partImages,
+		CurrentAnim: "", // 初始为空，等待初始化
+		// CurrentFrame 已移除（Story 13.2）
+		IsLooping:  false, // 不循环播放
+		IsFinished: false,
 	})
 
 	// 添加生命周期组件（动画持续约2.2秒）
@@ -419,8 +420,11 @@ func (s *SoddingSystem) calculateCurrentCenterX() float64 {
 	var minX, maxX *float64
 
 	for _, track := range reanimComp.Reanim.Tracks {
-		// 计算当前帧索引
-		frameIndex := int(reanimComp.CurrentFrame)
+		// Story 13.2: 使用主动画的 LogicalFrame 替代 CurrentFrame
+		frameIndex := 0
+		if state, ok := reanimComp.AnimStates[reanimComp.CurrentAnim]; ok {
+			frameIndex = state.LogicalFrame
+		}
 		if frameIndex >= len(track.Frames) {
 			frameIndex = len(track.Frames) - 1
 		}

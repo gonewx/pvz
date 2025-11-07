@@ -82,19 +82,6 @@ func NewZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs ReanimSystemIn
 			"anim_innerarm2": true, // 内侧手臂下部
 			"anim_innerarm3": true, // 内侧手
 		},
-		// Story 6.3: 部件组配置（数据驱动，业务系统通过语义接口操作）
-		// 这样 BehaviorSystem 只需要调用 HidePartGroup("arm") 而不需要知道具体轨道名
-		PartGroups: map[string][]string{
-			"arm": { // 左手（外侧手臂）- 受伤时会掉落
-				"Zombie_outerarm_hand",
-				"Zombie_outerarm_upper",
-				"Zombie_outerarm_lower",
-			},
-			"head": { // 头部 - 死亡时会掉落
-				"anim_head1",
-				"anim_head2",
-			},
-		},
 	})
 
 	// Story 8.3: 使用 ReanimSystem 初始化动画（播放 idle 动画，等待激活）
@@ -205,21 +192,6 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs Reanim
 			"anim_innerarm3": true,
 			// 路障
 			"anim_cone": true,
-		},
-		// Story 6.3: 部件组配置（数据驱动）
-		PartGroups: map[string][]string{
-			"arm": { // 左手（外侧手臂）
-				"Zombie_outerarm_hand",
-				"Zombie_outerarm_upper",
-				"Zombie_outerarm_lower",
-			},
-			"head": { // 头部
-				"anim_head1",
-				"anim_head2",
-			},
-			"armor": { // 护甲（路障）
-				"anim_cone",
-			},
 		},
 	})
 
@@ -337,21 +309,6 @@ func NewBucketheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs Rean
 			"anim_innerarm3": true,
 			// 铁桶
 			"anim_bucket": true,
-		},
-		// Story 6.3: 部件组配置（数据驱动）
-		PartGroups: map[string][]string{
-			"arm": { // 左手（外侧手臂）
-				"Zombie_outerarm_hand",
-				"Zombie_outerarm_upper",
-				"Zombie_outerarm_lower",
-			},
-			"head": { // 头部
-				"anim_head1",
-				"anim_head2",
-			},
-			"armor": { // 护甲（铁桶）
-				"anim_bucket",
-			},
 		},
 	})
 

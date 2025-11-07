@@ -69,8 +69,14 @@ func (s *PlantPreviewRenderSystem) drawReanimPreview(screen *ebiten.Image, reani
 		return
 	}
 
+	// Story 13.2: 使用主动画的 LogicalFrame 替代 CurrentFrame
+	logicalFrame := 0
+	if state, ok := reanim.AnimStates[reanim.CurrentAnim]; ok {
+		logicalFrame = state.LogicalFrame
+	}
+
 	// 将逻辑帧映射到物理帧索引
-	physicalIndex := s.findPhysicalFrameIndex(reanim, reanim.CurrentFrame)
+	physicalIndex := s.findPhysicalFrameIndex(reanim, logicalFrame)
 	if physicalIndex < 0 {
 		return
 	}
@@ -80,7 +86,7 @@ func (s *PlantPreviewRenderSystem) drawReanimPreview(screen *ebiten.Image, reani
 	screenY := pos.Y - reanim.CenterOffsetY
 
 	// 调试：输出预览位置信息（每60帧输出一次，避免刷屏）
-	// if reanim.CurrentFrame%60 == 0 {
+	// if logicalFrame%60 == 0 {
 	// 	log.Printf("[PlantPreviewRender] 预览 %d: 世界坐标(%.1f, %.1f), 屏幕坐标(%.1f, %.1f), CenterOffset(%.1f, %.1f)",
 	// 		entityID, pos.X, pos.Y, screenX, screenY, reanim.CenterOffsetX, reanim.CenterOffsetY)
 	// }

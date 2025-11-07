@@ -319,7 +319,12 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 
 		// 读取当前动画状态（调试用）
 		if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
-			log.Printf("[WaveSpawnSystem] Zombie %d 切换前动画: %s, 帧: %d", entityID, reanimComp.CurrentAnim, reanimComp.CurrentFrame)
+			// Story 13.2: 使用主动画的 LogicalFrame 替代 CurrentFrame
+			currentFrame := 0
+			if state, ok := reanimComp.AnimStates[reanimComp.CurrentAnim]; ok {
+				currentFrame = state.LogicalFrame
+			}
+			log.Printf("[WaveSpawnSystem] Zombie %d 切换前动画: %s, 帧: %d", entityID, reanimComp.CurrentAnim, currentFrame)
 		}
 
 		if err := s.reanimSystem.PlayAnimation(entityID, "anim_idle"); err != nil {
@@ -327,7 +332,12 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 		} else {
 			// 验证切换后的状态
 			if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
-				log.Printf("[WaveSpawnSystem] Zombie %d 切换后动画: %s, 帧: %d (preview mode)", entityID, reanimComp.CurrentAnim, reanimComp.CurrentFrame)
+				// Story 13.2: 使用主动画的 LogicalFrame 替代 CurrentFrame
+				currentFrame := 0
+				if state, ok := reanimComp.AnimStates[reanimComp.CurrentAnim]; ok {
+					currentFrame = state.LogicalFrame
+				}
+				log.Printf("[WaveSpawnSystem] Zombie %d 切换后动画: %s, 帧: %d (preview mode)", entityID, reanimComp.CurrentAnim, currentFrame)
 			}
 		}
 	}

@@ -775,7 +775,7 @@ func (ras *RewardAnimationSystem) createRewardPanel(rewardType string, plantID s
 		// 工具奖励信息 - 从 LawnStrings 加载
 		if toolID == "shovel" {
 			// 从 LawnStrings 加载铲子文本
-			rewardName = "铁铲" // 默认值
+			rewardName = "铁铲"                 // 默认值
 			rewardDesc = "让你挖出一株植物，腾出空间给其他植物" // 默认值
 
 			if ras.gameState.LawnStrings != nil {

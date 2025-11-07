@@ -406,13 +406,15 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 		}
 	}
 
-	// 2. 使用 ReanimSystem 通用接口隐藏 "head" 部件组（头掉落效果）
-	// 部件组映射在实体创建时配置（zombie_factory.go），BehaviorSystem 不需要知道具体轨道名
-	if err := s.reanimSystem.HidePartGroup(entityID, "head"); err != nil {
-		log.Printf("[BehaviorSystem] 警告：僵尸 %d 隐藏头部失败: %v", entityID, err)
-	} else {
-		log.Printf("[BehaviorSystem] 僵尸 %d 头部掉落", entityID)
+	// 2. 隐藏头部轨道（头掉落效果）
+	// 隐藏所有头部相关轨道
+	headTracks := []string{"anim_head1", "anim_head2"}
+	for _, trackName := range headTracks {
+		if err := s.reanimSystem.HideTrack(entityID, trackName); err != nil {
+			log.Printf("[BehaviorSystem] 警告：僵尸 %d 隐藏轨道 %s 失败: %v", entityID, trackName, err)
+		}
 	}
+	log.Printf("[BehaviorSystem] 僵尸 %d 头部掉落", entityID)
 
 	// 3. 移除 VelocityComponent（停止移动）
 	ecs.RemoveComponent[*components.VelocityComponent](s.entityManager, entityID)
@@ -599,16 +601,22 @@ func (s *BehaviorSystem) handleZombieDyingBehavior(entityID ecs.EntityID) {
 	// 检查死亡动画是否完成
 	// 使用 IsFinished 标志来判断非循环动画是否已完成
 	if reanim.IsFinished {
+		// Story 13.2: 使用主动画的 LogicalFrame 替代 CurrentFrame
+		currentFrame := 0
+		if state, ok := reanim.AnimStates[reanim.CurrentAnim]; ok {
+			currentFrame = state.LogicalFrame
+		}
 		log.Printf("[BehaviorSystem] 僵尸 %d 死亡动画完成 (frame %d/%d)，删除实体",
-			entityID, reanim.CurrentFrame, reanim.VisibleFrameCount)
+			entityID, currentFrame, reanim.VisibleFrameCount)
 		// Story 5.5: 僵尸死亡，增加计数
 		s.gameState.IncrementZombiesKilled()
 		s.entityManager.DestroyEntity(entityID)
 	} else {
 		// 调试日志：定期输出动画状态（每10帧输出一次）
-		// if reanim.CurrentFrame%10 == 0 {
+		// Story 13.2: 使用主动画的 LogicalFrame 替代 CurrentFrame
+		// if state, ok := reanim.AnimStates[reanim.CurrentAnim]; ok && state.LogicalFrame%10 == 0 {
 		// 	log.Printf("[BehaviorSystem] 僵尸 %d 死亡动画进行中: Frame=%d/%d, IsLooping=%v, IsFinished=%v",
-		// 		entityID, reanim.CurrentFrame, reanim.VisibleFrameCount, reanim.IsLooping, reanim.IsFinished)
+		// 		entityID, state.LogicalFrame, reanim.VisibleFrameCount, reanim.IsLooping, reanim.IsFinished)
 		// }
 	}
 }
@@ -627,11 +635,13 @@ func (s *BehaviorSystem) updateZombieDamageState(entityID ecs.EntityID, health *
 		// 标记手臂已掉落，防止重复触发
 		health.ArmLost = true
 
-		// 使用 ReanimSystem 通用接口隐藏 "arm" 部件组
-		// 部件组映射在实体创建时配置（zombie_factory.go），BehaviorSystem 不需要知道具体轨道名
-		if err := s.reanimSystem.HidePartGroup(entityID, "arm"); err != nil {
-			// 如果实体没有配置 PartGroups（非僵尸实体），静默忽略
-			return
+		// 隐藏手臂轨道（手臂掉落效果）
+		armTracks := []string{"Zombie_outerarm_hand", "Zombie_outerarm_upper", "Zombie_outerarm_lower"}
+		for _, trackName := range armTracks {
+			if err := s.reanimSystem.HideTrack(entityID, trackName); err != nil {
+				log.Printf("[BehaviorSystem] 警告：僵尸 %d 隐藏轨道 %s 失败: %v", entityID, trackName, err)
+				return
+			}
 		}
 
 		log.Printf("[BehaviorSystem] 僵尸 %d 手臂掉落 (HP=%d/%d)",
@@ -1529,10 +1539,15 @@ func (s *BehaviorSystem) updatePlantAttackAnimation(entityID ecs.EntityID, delta
 
 	// Story 10.5: 关键帧事件监听 - 子弹发射时机同步
 	if plant.PendingProjectile {
+		// Story 13.2: 使用主动画的 LogicalFrame 替代 CurrentFrame
+		currentFrame := 0
+		if state, ok := reanim.AnimStates[reanim.CurrentAnim]; ok {
+			currentFrame = state.LogicalFrame
+		}
 		// 精确匹配发射帧（零延迟）
-		if reanim.CurrentFrame == config.PeashooterShootingFireFrame {
+		if currentFrame == config.PeashooterShootingFireFrame {
 			log.Printf("[BehaviorSystem] 豌豆射手 %d 到达关键帧(%d)，发射子弹！",
-				entityID, reanim.CurrentFrame)
+				entityID, currentFrame)
 
 			// Story 10.5: 使用固定偏移值计算子弹发射位置
 			// 注意：经过测试，Reanim 轨道坐标（如 idle_mouth, anim_stem）不直接提供嘴部位置

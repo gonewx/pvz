@@ -222,7 +222,7 @@ func TestCherryBombExplosionReleasesGrid(t *testing.T) {
 		MaxHealth:     270,
 	})
 	ecs.AddComponent(em, zombieID, &components.PositionComponent{
-		X: config.GridWorldStartX + 5*config.CellWidth,   // 樱桃炸弹右侧一格
+		X: config.GridWorldStartX + 5*config.CellWidth, // 樱桃炸弹右侧一格
 		Y: config.GridWorldStartY + 2*config.CellHeight + config.CellHeight/2,
 	})
 

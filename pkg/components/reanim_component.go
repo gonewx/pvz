@@ -11,8 +11,9 @@ type AnimState struct {
 	// Name 动画名称（如 "anim_cloud1", "anim_grass"）
 	Name string
 
-	// Frame 当前帧索引（独立帧，仅异步模式使用）
-	Frame int
+	// LogicalFrame 当前逻辑帧索引（每个动画独立）
+	// Story 13.2: 重命名自 Frame，统一使用逻辑帧概念
+	LogicalFrame int
 
 	// Accumulator 帧累加器（用于精确 FPS 控制）
 	Accumulator float64
@@ -108,14 +109,10 @@ type ReanimComponent struct {
 	// CurrentAnim is the name of the currently playing animation (e.g., "anim_idle").
 	CurrentAnim string
 
-	// GlobalFrame 全局帧索引（同步模式使用）
-	// 当 TrackMapping 为 nil 时，所有动画共享此帧索引
-	// 这是默认模式，适用于 95% 的场景（豌豆射手、向日葵等）
-	GlobalFrame int
-
-	// CurrentFrame is the current logical frame number (0-based index).
-	// This is the frame number in the animation sequence, not the game loop frame.
-	CurrentFrame int
+	// CurrentAnimations 当前播放的动画列表（Story 13.2）
+	// 支持多动画组合播放（如 ["anim_shooting", "anim_head_idle"]）
+	// 单动画时也存储为数组���如 ["anim_idle"]）
+	CurrentAnimations []string
 
 	// FrameAccumulator is the frame accumulator for precise FPS control (float64).
 	// Accumulates deltaTime until it reaches the time for one animation frame (1.0/fps).
@@ -158,20 +155,10 @@ type ReanimComponent struct {
 	MergedTracks map[string][]reanim.Frame
 
 	// --- Dual Animation Blending (Story 6.5) ---
-
-	// IsBlending indicates whether dual-animation blending is active.
-	// When true, the entity renders using two animations simultaneously:
-	// - PrimaryAnimation for body parts (e.g., "anim_idle")
-	// - SecondaryAnimation for head parts (e.g., "anim_shooting")
-	IsBlending bool
-
-	// PrimaryAnimation is the base animation for body parts (e.g., "anim_idle").
-	// Used when IsBlending is true.
-	PrimaryAnimation string
-
-	// SecondaryAnimation is the overlay animation for head parts (e.g., "anim_shooting").
-	// Used when IsBlending is true.
-	SecondaryAnimation string
+	// REMOVED: 简化的单动画渲染系统不再需要双动画混合
+	// 原因: Reanim 格式中的坐标已经烘焙,单个动画的同一物理帧内所有部件坐标已协调
+	// 验证: cmd/verify_single_animation/main.go 证明了 anim_shooting 包含完整的身体+头部数据
+	// 移除的字段: IsBlending, PrimaryAnimation, SecondaryAnimation
 
 	// --- Rendering and Caching ---
 
@@ -207,16 +194,10 @@ type ReanimComponent struct {
 	// Use ReanimSystem.HideTrack() and ShowTrack() to manage track visibility.
 	VisibleTracks map[string]bool
 
-	// PartGroups defines logical groupings of animation tracks (pure data configuration).
-	// This allows high-level operations like "hide arm" without knowing specific track names.
-	// Example:
-	//   PartGroups: map[string][]string{
-	//       "arm":   {"Zombie_outerarm_hand", "Zombie_outerarm_upper", "Zombie_outerarm_lower"},
-	//       "head":  {"anim_head1", "anim_head2"},
-	//       "armor": {"anim_cone"},
-	//   }
-	// Use ReanimSystem.HidePartGroup() and ShowPartGroup() to manage part group visibility.
-	PartGroups map[string][]string
+	// PartGroups - REMOVED: 简化的单动画渲染系统不再需要部件分组
+	// 原因: 双动画模式已移除,不再需要区分"头部"和"身体"部件
+	// 僵尸等实体可以继续使用 VisibleTracks 白名单进行部件控制
+	// 移除的方法: HidePartGroup, ShowPartGroup, GetPartGroupImage
 
 	// TrackConfigs stores per-track playback configuration (Story 12.1).
 	// Key: track name (e.g., "SelectorScreen_Adventure_button", "Cloud1")
@@ -229,32 +210,26 @@ type ReanimComponent struct {
 
 	// --- Independent Animations (独立动画系统) ---
 
-	// Anims 存储动画状态（统一命名，Story 6.8）
-	// Key: 动画名称（如 "anim_cloud1", "anim_grass", "anim_idle"）
-	// Value: 动画状态
+	// AnimStates 存储每个动画的独���状态（Story 13.2 统一命名）
+	// Key: 动画名称（如 "anim_idle", "anim_shooting", "anim_head_idle"）
+	// Value: 动画状态（包含独立的 LogicalFrame、Accumulator 等）
 	//
-	// 两种使用模式：
-	// 1. 同步模式（TrackMapping = nil）：
-	//    - 所有动画共享 GlobalFrame
-	//    - 适用于 95% 的场景（豌豆射手、向日葵等）
-	//
-	// 2. 异步模式（TrackMapping != nil）：
-	//    - 每个动画使用独立的 Frame
-	//    - 适用于复杂场景（SelectorScreen 云朵各自独立飘动）
-	Anims map[string]*AnimState
+	// Story 13.2 重构说明：
+	// - 移除了同步/异步双模式，所有动画统一使用独立帧
+	// - 每个动画维护自己的 LogicalFrame（从 0 开始）
+	// - 轨道绑定通过 TrackBindings 实现（Story 13.1）
+	AnimStates map[string]*AnimState
 
-	// TrackMapping 轨道到动画的映射表（异步模式使用）
-	//
-	// 定义哪个动画控制哪些轨道。
-	// Key: 轨道名称（如 "leaf1", "Cloud1"）
-	// Value: 控制该轨道的动画名称（如 "anim_grass", "anim_cloud1"）
+	// TrackBindings 定义每个轨道由哪个动画控制（Story 13.1）
+	// Key: 轨道名（如 "anim_face", "stalk_bottom"）
+	// Value: 控制该轨道的动画名（如 "anim_head_idle", "anim_shooting"）
 	//
 	// 用途：
-	// - nil: 同步模式，使用 GlobalFrame（默认）
-	// - 非 nil: 异步模式，每个轨道使用对应动画的独立帧
+	// - 支持"头部用动画A，身体用动画B"的复杂组合
+	// - nil 时使用默认行为（所有轨道使用第一个动画）
 	//
 	// 示例：
-	//   map["leaf1"] = "anim_grass"
-	//   map["Cloud1"] = "anim_cloud1"
-	TrackMapping map[string]string
+	//   TrackBindings["anim_face"] = "anim_head_idle"
+	//   TrackBindings["stalk_bottom"] = "anim_shooting"
+	TrackBindings map[string]string
 }

@@ -29,12 +29,13 @@ func getTestAudioContext() *audio.Context {
 // 这是一个测试辅助函数，被多个测试文件共享使用
 func createTestReanimComponent(image *ebiten.Image, imageName string) *components.ReanimComponent {
 	if image == nil {
+		// Story 13.2: 移除 CurrentFrame 字段（已废弃）
 		// Return a minimal ReanimComponent with no images
 		return &components.ReanimComponent{
-			Reanim:            &reanim.ReanimXML{FPS: 12},
-			PartImages:        map[string]*ebiten.Image{},
-			CurrentAnim:       "idle",
-			CurrentFrame:      0,
+			Reanim:      &reanim.ReanimXML{FPS: 12},
+			PartImages:  map[string]*ebiten.Image{},
+			CurrentAnim: "idle",
+			// CurrentFrame 已移除（Story 13.2）
 			FrameAccumulator:  0.0,
 			VisibleFrameCount: 0,
 			IsLooping:         true,
@@ -44,6 +45,7 @@ func createTestReanimComponent(image *ebiten.Image, imageName string) *component
 			AnimTracks:        []reanim.Track{},
 			CenterOffsetX:     0,
 			CenterOffsetY:     0,
+			AnimStates:        map[string]*components.AnimState{},
 		}
 	}
 
@@ -82,11 +84,12 @@ func createTestReanimComponent(image *ebiten.Image, imageName string) *component
 		imageName: image,
 	}
 
+	// Story 13.2: 移除 CurrentFrame 字段（已废弃）
 	return &components.ReanimComponent{
-		Reanim:            reanimXML,
-		PartImages:        partImages,
-		CurrentAnim:       "idle",
-		CurrentFrame:      0,
+		Reanim:      reanimXML,
+		PartImages:  partImages,
+		CurrentAnim: "idle",
+		// CurrentFrame 已移除（Story 13.2）
 		FrameAccumulator:  0.0,
 		VisibleFrameCount: 1,
 		IsLooping:         true,

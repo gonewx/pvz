@@ -345,10 +345,9 @@ func TestGetTrackTransform(t *testing.T) {
 		// 创建测试实体
 		entityID := em.CreateEntity()
 
-		// 创建测试用的 Reanim 组件
+		// Story 13.2: 创建测试用的 Reanim 组件，使用 AnimStates 而非 CurrentFrame
 		reanimComp := &components.ReanimComponent{
-			CurrentAnim:  "test_anim",
-			CurrentFrame: 2, // 使用第3帧（0-based）
+			CurrentAnim: "test_anim",
 			MergedTracks: map[string][]reanim.Frame{
 				"idle_mouth": {
 					// Frame 0
@@ -359,6 +358,13 @@ func TestGetTrackTransform(t *testing.T) {
 					{X: floatPtr(20.0), Y: floatPtr(30.0)},
 					// Frame 3
 					{X: floatPtr(25.0), Y: floatPtr(35.0)},
+				},
+			},
+			AnimStates: map[string]*components.AnimState{
+				"test_anim": {
+					Name:         "test_anim",
+					LogicalFrame: 2, // 使用第3帧（0-based）
+					IsActive:     true,
 				},
 			},
 		}
@@ -382,12 +388,19 @@ func TestGetTrackTransform(t *testing.T) {
 	// 测试用例 2: 轨道不存在
 	t.Run("Track not found", func(t *testing.T) {
 		entityID := em.CreateEntity()
+		// Story 13.2: 使用 AnimStates
 		reanimComp := &components.ReanimComponent{
-			CurrentAnim:  "test_anim",
-			CurrentFrame: 0,
+			CurrentAnim: "test_anim",
 			MergedTracks: map[string][]reanim.Frame{
 				"other_track": {
 					{X: floatPtr(10.0), Y: floatPtr(20.0)},
+				},
+			},
+			AnimStates: map[string]*components.AnimState{
+				"test_anim": {
+					Name:         "test_anim",
+					LogicalFrame: 0,
+					IsActive:     true,
 				},
 			},
 		}
@@ -422,13 +435,20 @@ func TestGetTrackTransform(t *testing.T) {
 	// 测试用例 4: 帧号越界（使用最后一帧）
 	t.Run("Frame index out of bounds", func(t *testing.T) {
 		entityID := em.CreateEntity()
+		// Story 13.2: 使用 AnimStates
 		reanimComp := &components.ReanimComponent{
-			CurrentAnim:  "test_anim",
-			CurrentFrame: 100, // 超出范围
+			CurrentAnim: "test_anim",
 			MergedTracks: map[string][]reanim.Frame{
 				"idle_mouth": {
 					{X: floatPtr(10.0), Y: floatPtr(20.0)},
 					{X: floatPtr(15.0), Y: floatPtr(25.0)},
+				},
+			},
+			AnimStates: map[string]*components.AnimState{
+				"test_anim": {
+					Name:         "test_anim",
+					LogicalFrame: 100, // 超出范围
+					IsActive:     true,
 				},
 			},
 		}
@@ -451,12 +471,19 @@ func TestGetTrackTransform(t *testing.T) {
 	// 测试用例 5: 坐标为 nil（默认 0, 0）
 	t.Run("Nil coordinates", func(t *testing.T) {
 		entityID := em.CreateEntity()
+		// Story 13.2: 使用 AnimStates
 		reanimComp := &components.ReanimComponent{
-			CurrentAnim:  "test_anim",
-			CurrentFrame: 0,
+			CurrentAnim: "test_anim",
 			MergedTracks: map[string][]reanim.Frame{
 				"idle_mouth": {
 					{X: nil, Y: nil}, // 坐标为 nil
+				},
+			},
+			AnimStates: map[string]*components.AnimState{
+				"test_anim": {
+					Name:         "test_anim",
+					LogicalFrame: 0,
+					IsActive:     true,
 				},
 			},
 		}
@@ -478,11 +505,18 @@ func TestGetTrackTransform(t *testing.T) {
 	// 测试用例 6: 轨道无帧数据
 	t.Run("Track with no frames", func(t *testing.T) {
 		entityID := em.CreateEntity()
+		// Story 13.2: 使用 AnimStates
 		reanimComp := &components.ReanimComponent{
-			CurrentAnim:  "test_anim",
-			CurrentFrame: 0,
+			CurrentAnim: "test_anim",
 			MergedTracks: map[string][]reanim.Frame{
 				"idle_mouth": {}, // 空轨道
+			},
+			AnimStates: map[string]*components.AnimState{
+				"test_anim": {
+					Name:         "test_anim",
+					LogicalFrame: 0,
+					IsActive:     true,
+				},
 			},
 		}
 		ecs.AddComponent(em, entityID, reanimComp)
@@ -566,18 +600,18 @@ func TestPlayAnimations_MultipleAnimations(t *testing.T) {
 	}
 
 	// Verify: Both animations are in Anims map and active
-	if len(reanimComp.Anims) != 2 {
-		t.Errorf("Expected 2 animations in Anims, got %d", len(reanimComp.Anims))
+	if len(reanimComp.AnimStates) != 2 {
+		t.Errorf("Expected 2 animations in Anims, got %d", len(reanimComp.AnimStates))
 	}
 
-	idleAnim, hasIdle := reanimComp.Anims["anim_idle"]
+	idleAnim, hasIdle := reanimComp.AnimStates["anim_idle"]
 	if !hasIdle {
 		t.Error("Expected anim_idle in Anims map")
 	} else if !idleAnim.IsActive {
 		t.Error("Expected anim_idle to be active")
 	}
 
-	shootingAnim, hasShooting := reanimComp.Anims["anim_shooting"]
+	shootingAnim, hasShooting := reanimComp.AnimStates["anim_shooting"]
 	if !hasShooting {
 		t.Error("Expected anim_shooting in Anims map")
 	} else if !shootingAnim.IsActive {
@@ -639,8 +673,8 @@ func TestAddAnimation_PreservesExisting(t *testing.T) {
 	}
 
 	// Verify: Only walk animation is active
-	if len(reanimComp.Anims) != 1 {
-		t.Errorf("Expected 1 animation after PlayAnimation, got %d", len(reanimComp.Anims))
+	if len(reanimComp.AnimStates) != 1 {
+		t.Errorf("Expected 1 animation after PlayAnimation, got %d", len(reanimComp.AnimStates))
 	}
 
 	// Step 2: Add burning effect
@@ -650,14 +684,14 @@ func TestAddAnimation_PreservesExisting(t *testing.T) {
 	}
 
 	// Verify: Both walk and burning animations are active
-	if len(reanimComp.Anims) != 2 {
-		t.Errorf("Expected 2 animations after AddAnimation, got %d", len(reanimComp.Anims))
+	if len(reanimComp.AnimStates) != 2 {
+		t.Errorf("Expected 2 animations after AddAnimation, got %d", len(reanimComp.AnimStates))
 	}
 
-	if _, hasWalk := reanimComp.Anims["anim_walk"]; !hasWalk {
+	if _, hasWalk := reanimComp.AnimStates["anim_walk"]; !hasWalk {
 		t.Error("Expected anim_walk to still be present after AddAnimation")
 	}
-	if _, hasBurning := reanimComp.Anims["anim_burning"]; !hasBurning {
+	if _, hasBurning := reanimComp.AnimStates["anim_burning"]; !hasBurning {
 		t.Error("Expected anim_burning to be added")
 	}
 
@@ -668,17 +702,17 @@ func TestAddAnimation_PreservesExisting(t *testing.T) {
 	}
 
 	// Verify: All three animations are active
-	if len(reanimComp.Anims) != 3 {
-		t.Errorf("Expected 3 animations after second AddAnimation, got %d", len(reanimComp.Anims))
+	if len(reanimComp.AnimStates) != 3 {
+		t.Errorf("Expected 3 animations after second AddAnimation, got %d", len(reanimComp.AnimStates))
 	}
 
-	if _, hasWalk := reanimComp.Anims["anim_walk"]; !hasWalk {
+	if _, hasWalk := reanimComp.AnimStates["anim_walk"]; !hasWalk {
 		t.Error("Expected anim_walk to still be present")
 	}
-	if _, hasBurning := reanimComp.Anims["anim_burning"]; !hasBurning {
+	if _, hasBurning := reanimComp.AnimStates["anim_burning"]; !hasBurning {
 		t.Error("Expected anim_burning to still be present")
 	}
-	if _, hasFrozen := reanimComp.Anims["anim_frozen"]; !hasFrozen {
+	if _, hasFrozen := reanimComp.AnimStates["anim_frozen"]; !hasFrozen {
 		t.Error("Expected anim_frozen to be added")
 	}
 }
@@ -723,8 +757,8 @@ func TestRemoveAnimation(t *testing.T) {
 	}
 
 	// Verify: Both animations are active
-	if len(reanimComp.Anims) != 2 {
-		t.Errorf("Expected 2 animations initially, got %d", len(reanimComp.Anims))
+	if len(reanimComp.AnimStates) != 2 {
+		t.Errorf("Expected 2 animations initially, got %d", len(reanimComp.AnimStates))
 	}
 
 	// Step 2: Remove burning animation
@@ -734,14 +768,14 @@ func TestRemoveAnimation(t *testing.T) {
 	}
 
 	// Verify: Only walk animation remains
-	if len(reanimComp.Anims) != 1 {
-		t.Errorf("Expected 1 animation after RemoveAnimation, got %d", len(reanimComp.Anims))
+	if len(reanimComp.AnimStates) != 1 {
+		t.Errorf("Expected 1 animation after RemoveAnimation, got %d", len(reanimComp.AnimStates))
 	}
 
-	if _, hasWalk := reanimComp.Anims["anim_walk"]; !hasWalk {
+	if _, hasWalk := reanimComp.AnimStates["anim_walk"]; !hasWalk {
 		t.Error("Expected anim_walk to still be present")
 	}
-	if _, hasBurning := reanimComp.Anims["anim_burning"]; hasBurning {
+	if _, hasBurning := reanimComp.AnimStates["anim_burning"]; hasBurning {
 		t.Error("Expected anim_burning to be removed")
 	}
 
@@ -752,8 +786,8 @@ func TestRemoveAnimation(t *testing.T) {
 	}
 
 	// Verify: Walk animation still present
-	if len(reanimComp.Anims) != 1 {
-		t.Errorf("Expected 1 animation after removing non-existent, got %d", len(reanimComp.Anims))
+	if len(reanimComp.AnimStates) != 1 {
+		t.Errorf("Expected 1 animation after removing non-existent, got %d", len(reanimComp.AnimStates))
 	}
 }
 
