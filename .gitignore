@@ -27,3 +27,4 @@ pvz.log
 *.log
 *.bak
 data/saves/
+/animation_showcase

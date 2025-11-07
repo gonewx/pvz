@@ -1,0 +1,76 @@
+# 动画展示系统配置文件
+# 用于配置 Reanim 动画的展示参数
+
+# 全局配置
+global:
+  # 窗口配置
+  window:
+    width: 1600
+    height: 900
+    title: "PVZ3 Animation Showcase"
+
+  # 网格布局配置
+  grid:
+    columns: 6           # 每行显示的单元数
+    cell_width: 250      # 单元宽度
+    cell_height: 250     # 单元高度
+    padding: 10          # 单元间距
+    scroll_speed: 30     # 滚动速度
+    rows_per_page: 8     # 每页显示的行数
+
+  # 动画播放配置
+  playback:
+    fps: 12              # 默认帧率
+    scale: 1.0           # 默认缩放
+
+# 动画单元配置列表
+animations:
+  # 豌豆射手
+  - id: "peashooter"
+    name: "豌豆射手"
+    reanim_file: "assets/effect/reanim/PeaShooterSingle.reanim"
+    default_animation: "anim_idle"
+    scale: 1.0
+
+    # 图片资源映射
+    images:
+      IMAGE_REANIM_PEASHOOTER_BACKLEAF: "assets/reanim/PeaShooter_backleaf.png"
+      IMAGE_REANIM_PEASHOOTER_BACKLEAF_LEFTTIP: "assets/reanim/PeaShooter_backleaf_lefttip.png"
+      IMAGE_REANIM_PEASHOOTER_BACKLEAF_RIGHTTIP: "assets/reanim/PeaShooter_backleaf_righttip.png"
+      IMAGE_REANIM_PEASHOOTER_FRONTLEAF: "assets/reanim/PeaShooter_frontleaf.png"
+      IMAGE_REANIM_PEASHOOTER_FRONTLEAF_LEFTTIP: "assets/reanim/PeaShooter_frontleaf_lefttip.png"
+      IMAGE_REANIM_PEASHOOTER_FRONTLEAF_RIGHTTIP: "assets/reanim/PeaShooter_frontleaf_righttip.png"
+      IMAGE_REANIM_PEASHOOTER_STALK_BOTTOM: "assets/reanim/PeaShooter_stalk_bottom.png"
+      IMAGE_REANIM_PEASHOOTER_STALK_TOP: "assets/reanim/PeaShooter_stalk_top.png"
+      IMAGE_REANIM_PEASHOOTER_HEAD: "assets/reanim/PeaShooter_Head.png"
+      IMAGE_REANIM_PEASHOOTER_MOUTH: "assets/reanim/PeaShooter_mouth.png"
+      IMAGE_REANIM_PEASHOOTER_BLINK1: "assets/reanim/PeaShooter_blink1.png"
+      IMAGE_REANIM_PEASHOOTER_BLINK2: "assets/reanim/PeaShooter_blink2.png"
+      IMAGE_REANIM_ANIM_SPROUT: "assets/reanim/PeaShooter_sprout.png"
+      IMAGE_REANIM_PEASHOOTER_HEADLEAF_NEAREST: "assets/reanim/PeaShooter_headleaf_nearest.png"
+      IMAGE_REANIM_PEASHOOTER_HEADLEAF_FARTHEST: "assets/reanim/PeaShooter_headleaf_farthest.png"
+      IMAGE_REANIM_PEASHOOTER_HEADLEAF_2RDFARTHEST: "assets/reanim/PeaShooter_headleaf_2rdfarthest.png"
+      IMAGE_REANIM_PEASHOOTER_HEADLEAF_3RDFARTHEST: "assets/reanim/PeaShooter_headleaf_3rdfarthest.png"
+
+    # 可用的动画列表
+    available_animations:
+      - name: "anim_idle"
+        display_name: "待机"
+      - name: "anim_full_idle"
+        display_name: "完整待机"
+      - name: "anim_shooting"
+        display_name: "攻击"
+
+    # 多动画组合配置
+    animation_combos:
+      - name: "attack_with_sway"
+        display_name: "攻击+摇晃"
+        animations: ["anim_shooting", "anim_idle"]
+        binding_strategy: "auto"
+        parent_tracks:
+          anim_face: "anim_stem"
+          idle_mouth: "anim_stem"
+          anim_sprout: "anim_stem"
+        hidden_tracks:
+          - "anim_blink"
+          - "idle_shoot_blink"
