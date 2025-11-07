@@ -20,6 +20,8 @@ type ReanimSystemInterface interface {
 	RenderToTexture(entityID ecs.EntityID, target *ebiten.Image) error
 	// PrepareStaticPreview prepares a Reanim entity for static preview (Story 11.1)
 	PrepareStaticPreview(entityID ecs.EntityID, reanimName string) error
+	// ApplyReanimConfig 将 Reanim 配置应用到指定实体 (Story 13.5)
+	ApplyReanimConfig(entityID ecs.EntityID, cfg *config.ReanimConfig) error
 }
 
 // NewPlantEntity 创建植物实体
@@ -144,62 +146,95 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 			IsReady:     false,
 		})
 
-		// Story 6.3: 使用 ReanimComponent 替代 AnimationComponent
-		// 从 ResourceManager 获取豌豆射手的 Reanim 数据和部件图片
-		reanimXML := rm.GetReanimXML("PeaShooterSingle")
-		partImages := rm.GetReanimPartImages("PeaShooterSingle")
+		// Story 13.5: 使用配置文件创建豌豆射手动画
+		// 加载豌豆射手的 Reanim 配置
+		reanimConfig, err := config.LoadReanimConfig("data/reanim_configs/peashooter.yaml")
+		if err != nil {
+			// 如果配置文件加载失败，回退到旧的硬编码方式（向后兼容）
+			log.Printf("[PlantFactory] 加载豌豆射手配置文件失败，使用硬编码配置: %v", err)
 
-		if reanimXML == nil || partImages == nil {
-			return 0, fmt.Errorf("failed to load PeaShooterSingle Reanim resources")
-		}
+			// 从 ResourceManager 获取豌豆射手的 Reanim 数据和部件图片
+			reanimXML := rm.GetReanimXML("PeaShooterSingle")
+			partImages := rm.GetReanimPartImages("PeaShooterSingle")
 
-		// 添加 ReanimComponent
-		// 豌豆射手：使用 VisibleTracks 白名单，控制部件可见性
-		// 原因：某些轨道（如 anim_blink）在超出范围后仍有继承的图片引用和 f=-1
-		// 白名单轨道会忽略 f=-1，强制渲染（用于茎干在攻击时显示）
-		em.AddComponent(entityID, &components.ReanimComponent{
-			ReanimName: "PeaShooterSingle",
-			Reanim:     reanimXML,
-			PartImages: partImages,
-			// FixedCenterOffset 在第一次 PlayAnimation 后手动设置为 true
-			VisibleTracks: map[string]bool{
-				// 茎干部件（攻击时必须显示，即使 f=-1）
-				"stalk_bottom": true,
-				"stalk_top":    true,
-
-				// 叶子部件
-				"backleaf":            true,
-				"backleaf_left_tip":   true,
-				"backleaf_right_tip":  true,
-				"frontleaf":           true,
-				"frontleaf_right_tip": true,
-				"frontleaf_tip_left":  true,
-				"anim_sprout":         true, // Story 10.3: 头后的小嫩叶
-
-				// 头部部件
-				"anim_head_idle": true, // 头部动画轨道（包含头部图片）
-				"anim_face":      true, // 脸部
-				"idle_mouth":     true, // 嘴巴（Story 10.3: 用于子弹发射位置检测）
-
-				"anim_stem": true,
-				// 注意：不包含 anim_blink, idle_shoot_blink（眨眼轨道）
-				// 这些轨道不在白名单中，会遵守 f=-1，避免错误显示
-			},
-		})
-
-		// 使用 ReanimSystem 初始化动画（播放完整待机动画，包括头部）
-		// 注意：豌豆射手的 anim_idle 只显示茎和叶子，anim_full_idle 才显示完整植物
-		if err := rs.PlayAnimation(entityID, "anim_full_idle"); err != nil {
-			return 0, fmt.Errorf("failed to play PeaShooter idle animation: %w", err)
-		}
-
-		// Story 13.3: 配置豌豆射手的父子轨道关系
-		// 头部（anim_face）跟随茎干（anim_stem）摆动
-		if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](em, entityID); ok {
-			reanimComp.ParentTracks = map[string]string{
-				"anim_face": "anim_stem", // 头部跟随茎干
+			if reanimXML == nil || partImages == nil {
+				return 0, fmt.Errorf("failed to load PeaShooterSingle Reanim resources")
 			}
-			log.Printf("[PlantFactory] 豌豆射手 %d: 配置父子关系 anim_face -> anim_stem", entityID)
+
+			// 添加 ReanimComponent（硬编码配置）
+			em.AddComponent(entityID, &components.ReanimComponent{
+				ReanimName: "PeaShooterSingle",
+				Reanim:     reanimXML,
+				PartImages: partImages,
+				VisibleTracks: map[string]bool{
+					"stalk_bottom":        true,
+					"stalk_top":           true,
+					"backleaf":            true,
+					"backleaf_left_tip":   true,
+					"backleaf_right_tip":  true,
+					"frontleaf":           true,
+					"frontleaf_right_tip": true,
+					"frontleaf_tip_left":  true,
+					"anim_sprout":         true,
+					"anim_head_idle":      true,
+					"anim_face":           true,
+					"idle_mouth":          true,
+					"anim_stem":           true,
+				},
+			})
+
+			// 播放完整待机动画
+			if err := rs.PlayAnimation(entityID, "anim_full_idle"); err != nil {
+				return 0, fmt.Errorf("failed to play PeaShooter idle animation: %w", err)
+			}
+
+			// 配置父子关系
+			if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](em, entityID); ok {
+				reanimComp.ParentTracks = map[string]string{
+					"anim_face": "anim_stem",
+				}
+			}
+		} else {
+			// 使用配置文件（推荐方式）
+			log.Printf("[PlantFactory] 豌豆射手 %d: 使用配置文件创建动画", entityID)
+
+			// 从 ResourceManager 获取豌豆射手的 Reanim 数据和部件图片
+			reanimXML := rm.GetReanimXML("PeaShooterSingle")
+			partImages := rm.GetReanimPartImages("PeaShooterSingle")
+
+			if reanimXML == nil || partImages == nil {
+				return 0, fmt.Errorf("failed to load PeaShooterSingle Reanim resources")
+			}
+
+			// 添加基础的 ReanimComponent
+			em.AddComponent(entityID, &components.ReanimComponent{
+				ReanimName: "PeaShooterSingle",
+				Reanim:     reanimXML,
+				PartImages: partImages,
+				// VisibleTracks 白名单（向后兼容，配置文件可能会覆盖）
+				VisibleTracks: map[string]bool{
+					"stalk_bottom":        true,
+					"stalk_top":           true,
+					"backleaf":            true,
+					"backleaf_left_tip":   true,
+					"backleaf_right_tip":  true,
+					"frontleaf":           true,
+					"frontleaf_right_tip": true,
+					"frontleaf_tip_left":  true,
+					"anim_sprout":         true,
+					"anim_head_idle":      true,
+					"anim_face":           true,
+					"idle_mouth":          true,
+					"anim_stem":           true,
+				},
+			})
+
+			// 应用配置文件（播放动画、设置轨道绑定、父子关系等）
+			if err := rs.ApplyReanimConfig(entityID, reanimConfig); err != nil {
+				return 0, fmt.Errorf("failed to apply peashooter config: %w", err)
+			}
+
+			log.Printf("[PlantFactory] 豌豆射手 %d: 成功应用配置文件", entityID)
 		}
 
 		// 第一次 PlayAnimation 后，固定中心偏移量（避免动画切换时的位置跳动）

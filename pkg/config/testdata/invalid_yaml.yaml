@@ -1,0 +1,5 @@
+# 无效的 YAML 文件（格式错误）
+reanim_file: test.reanim
+animations:
+  - name: anim_idle
+  invalid yaml syntax here [[[

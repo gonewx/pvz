@@ -1,0 +1,24 @@
+# 向日葵 Reanim 配置
+# Sunflower Reanim Configuration
+#
+# 此文件定义向日葵的动画配置
+# 向日葵只有简单的待机动画
+
+# Reanim 文件路径（相对于项目根目录）
+reanim_file: assets/effect/reanim/SunFlower.reanim
+
+# 动画列表（用于文档和验证）
+animations:
+  - name: anim_idle
+    display_name: 待机
+
+# 动画组合配置
+animation_combos:
+  # 待机动画
+  - name: idle
+    display_name: 待机
+    animations:
+      - anim_idle
+
+    # 使用自动绑定
+    binding_strategy: auto

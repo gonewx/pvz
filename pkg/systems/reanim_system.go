@@ -2529,3 +2529,131 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 		})
 	}
 }
+
+// ==================================================================
+// Story 13.5: Configuration-Based Animation Setup (配置驱动的动画设置)
+// ==================================================================
+
+// ApplyReanimConfig 将 Reanim 配置应用到指定实体
+//
+// 此方法根据 YAML 配置文件设置实体的动画组合、轨道绑定、父子关系等。
+// 配置文件格式详见：docs/reanim/reanim-config-guide.md
+//
+// 参数：
+//   - entityID: 实体 ID
+//   - config: Reanim 配置对象（从 YAML 文件加载）
+//
+// 返回：
+//   - error: 应用失败时的错误
+//
+// 使用示例：
+//
+//	config, err := config.LoadReanimConfig("data/reanim_configs/peashooter.yaml")
+//	if err != nil {
+//	    return err
+//	}
+//	if err := reanimSystem.ApplyReanimConfig(entityID, config); err != nil {
+//	    return err
+//	}
+func (s *ReanimSystem) ApplyReanimConfig(entityID ecs.EntityID, cfg *config.ReanimConfig) error {
+	// 验证实体是否有 ReanimComponent
+	comp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !exists {
+		return fmt.Errorf("实体 %d 没有 ReanimComponent", entityID)
+	}
+
+	// 验证配置
+	if cfg == nil {
+		return fmt.Errorf("配置对象为空")
+	}
+
+	// 应用每个动画组合配置
+	for i, combo := range cfg.AnimationCombos {
+		// 验证组合配置
+		if len(combo.Animations) == 0 {
+			return fmt.Errorf("动画组合 #%d '%s' 的动画列表为空", i, combo.Name)
+		}
+
+		// 1. 播放动画
+		if err := s.PlayAnimations(entityID, combo.Animations); err != nil {
+			return fmt.Errorf("播放动画组合 '%s' 失败: %w", combo.Name, err)
+		}
+
+		// 2. 设置轨道绑定
+		if err := s.applyTrackBindings(entityID, comp, &combo); err != nil {
+			return fmt.Errorf("设置轨道绑定失败（组合 '%s'）: %w", combo.Name, err)
+		}
+
+		// 3. 设置父子关系
+		if len(combo.ParentTracks) > 0 {
+			if err := s.SetParentTracks(entityID, combo.ParentTracks); err != nil {
+				return fmt.Errorf("设置父子关系失败（组合 '%s'）: %w", combo.Name, err)
+			}
+		}
+
+		// 4. 设置隐藏轨道
+		if len(combo.HiddenTracks) > 0 {
+			if err := s.applyHiddenTracks(entityID, comp, combo.HiddenTracks); err != nil {
+				return fmt.Errorf("设置隐藏轨道失败（组合 '%s'）: %w", combo.Name, err)
+			}
+		}
+
+		// 注意：目前只应用第一个组合配置
+		// 未来可以扩展为支持多个组合的切换
+		break
+	}
+
+	return nil
+}
+
+// applyTrackBindings 根据配置应用轨道绑定
+func (s *ReanimSystem) applyTrackBindings(
+	entityID ecs.EntityID,
+	comp *components.ReanimComponent,
+	combo *config.AnimationComboConfig,
+) error {
+	// 如果没有指定策略，默认使用 auto
+	strategy := combo.BindingStrategy
+	if strategy == "" {
+		strategy = "auto"
+	}
+
+	switch strategy {
+	case "auto":
+		// 自动绑定已在 PlayAnimations() 中处理
+		// 不需要额外操作
+		return nil
+
+	case "manual":
+		// 手动绑定：使用配置中的绑定关系
+		if len(combo.ManualBindings) == 0 {
+			return fmt.Errorf("manual 绑定策略但未提供 manual_bindings")
+		}
+		if err := s.SetTrackBindings(entityID, combo.ManualBindings); err != nil {
+			return fmt.Errorf("设置手动绑定失败: %w", err)
+		}
+		return nil
+
+	default:
+		return fmt.Errorf("无效的绑定策略 '%s'，只能是 'auto' 或 'manual'", strategy)
+	}
+}
+
+// applyHiddenTracks 应用隐藏轨道配置
+func (s *ReanimSystem) applyHiddenTracks(
+	entityID ecs.EntityID,
+	comp *components.ReanimComponent,
+	hiddenTracks []string,
+) error {
+	// 初始化 VisibleTracks（如果需要）
+	if comp.VisibleTracks == nil {
+		comp.VisibleTracks = make(map[string]bool)
+	}
+
+	// 将指定的轨道标记为隐藏
+	for _, trackName := range hiddenTracks {
+		comp.VisibleTracks[trackName] = false
+	}
+
+	return nil
+}

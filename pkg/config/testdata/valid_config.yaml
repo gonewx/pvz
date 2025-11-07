@@ -1,0 +1,18 @@
+# 有效的测试配置文件
+reanim_file: assets/effect/reanim/Test.reanim
+
+animations:
+  - name: anim_idle
+    display_name: 待机
+  - name: anim_attack
+    display_name: 攻击
+
+animation_combos:
+  - name: test_combo
+    display_name: 测试组合
+    animations:
+      - anim_idle
+      - anim_attack
+    binding_strategy: auto
+    parent_tracks:
+      child_track: parent_track
