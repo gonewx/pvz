@@ -119,12 +119,8 @@ func (g *GridLayout) Render(screen *ebiten.Image) {
 			false,
 		)
 
-		// 绘制动画
-		centerX := x + float64(g.cellWidth)/2
-		centerY := y + float64(g.cellHeight)/2
-
-		// 直接渲染到屏幕，不需要创建子图像
-		cell.Render(screen, centerX, centerY)
+		// 以单元格左上角为原点渲染动画
+		cell.Render(screen, x, y)
 
 		// 绘制文本背景（深色半透明）
 		textBgY := y + float64(g.cellHeight) - 35

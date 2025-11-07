@@ -19,6 +19,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
+	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
 var (
@@ -384,18 +385,46 @@ func (g *Game) drawSingleCell(screen *ebiten.Image) {
 		return
 	}
 
-	// 在屏幕中央渲染
-	centerX := float64(g.config.Global.Window.Width) / 2
-	centerY := float64(g.config.Global.Window.Height) / 2
+	// 定义虚拟显示区域 (800x600)
+	const virtualWidth = 800.0
+	const virtualHeight = 600.0
 
-	cell.Render(screen, centerX, centerY)
+	// 计算虚拟显示区域在屏幕上的位置（居中）
+	screenCenterX := float64(g.config.Global.Window.Width) / 2
+	screenCenterY := float64(g.config.Global.Window.Height) / 2
+
+	virtualX := screenCenterX - virtualWidth/2
+	virtualY := screenCenterY - virtualHeight/2
+
+	// 绘制虚拟显示区域背景
+	virtualBg := ebiten.NewImage(int(virtualWidth), int(virtualHeight))
+	virtualBg.Fill(color.RGBA{30, 30, 30, 255}) // 深灰色背景
+
+	opts := &ebiten.DrawImageOptions{}
+	opts.GeoM.Translate(virtualX, virtualY)
+	screen.DrawImage(virtualBg, opts)
+
+	// 绘制虚拟显示区域边框
+	vector.StrokeRect(
+		screen,
+		float32(virtualX),
+		float32(virtualY),
+		float32(virtualWidth),
+		float32(virtualHeight),
+		3, // 边框宽度
+		color.RGBA{100, 100, 100, 255}, // 灰色边框
+		false,
+	)
+
+	// 以虚拟显示区域的左上角为原点渲染动画
+	cell.Render(screen, virtualX, virtualY)
 
 	// 绘制信息栏
-	info := fmt.Sprintf("FPS: %.1f | 单元: %s | 动画: %s | 按 Enter 返回网格",
+	info := fmt.Sprintf("FPS: %.1f | 单元: %s | 动画: %s | 显示区域: 800x600 | 按 Enter 返回网格",
 		ebiten.ActualTPS(), cell.GetName(), cell.GetCurrentAnimationName())
 
 	// 绘制半透明背景
-	bgWidth := 800
+	bgWidth := 900
 	bgHeight := 25
 	bgImage := ebiten.NewImage(bgWidth, bgHeight)
 	bgImage.Fill(color.RGBA{0, 0, 0, 160})

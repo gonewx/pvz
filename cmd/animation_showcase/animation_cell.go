@@ -340,9 +340,10 @@ func (c *AnimationCell) Update() {
 }
 
 // Render 渲染动画到指定画布
-func (c *AnimationCell) Render(canvas *ebiten.Image, x, y float64) {
-	c.centerX = x
-	c.centerY = y
+// originX, originY: 渲染原点（左上角）坐标
+func (c *AnimationCell) Render(canvas *ebiten.Image, originX, originY float64) {
+	c.centerX = originX
+	c.centerY = originY
 
 	// 使用缓存：如果帧没有变化，使用缓存的渲染数据
 	if c.currentFrame != c.lastRenderFrame {
