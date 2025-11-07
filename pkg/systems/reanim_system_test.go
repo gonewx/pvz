@@ -999,3 +999,328 @@ func BenchmarkTripleAnimationUpdate(b *testing.B) {
 		rs.Update(deltaTime)
 	}
 }
+
+// ==================================================================
+// Story 13.3: Parent-Child Offset System Unit Tests
+// ==================================================================
+//
+// These tests verify the parent-child offset calculation system
+// as required by Task 5 of Story 13.3.
+
+// TestSetParentTracks_Success tests the SetParentTracks API
+func TestSetParentTracks_Success(t *testing.T) {
+	// Setup
+	em := ecs.NewEntityManager()
+	rs := NewReanimSystem(em)
+	entityID := em.CreateEntity()
+
+	reanimComp := &components.ReanimComponent{
+		Reanim:       &reanim.ReanimXML{FPS: 12},
+		ParentTracks: nil, // Initially nil
+	}
+	ecs.AddComponent(em, entityID, reanimComp)
+
+	// Test: Set parent tracks
+	parentTracks := map[string]string{
+		"anim_face": "anim_stem",
+		"left_arm":  "body",
+		"right_arm": "body",
+	}
+	err := rs.SetParentTracks(entityID, parentTracks)
+
+	// Verify
+	if err != nil {
+		t.Fatalf("SetParentTracks failed: %v", err)
+	}
+
+	comp, _ := ecs.GetComponent[*components.ReanimComponent](em, entityID)
+	if len(comp.ParentTracks) != 3 {
+		t.Errorf("Expected 3 parent tracks, got %d", len(comp.ParentTracks))
+	}
+
+	if comp.ParentTracks["anim_face"] != "anim_stem" {
+		t.Errorf("Expected anim_face -> anim_stem, got %s", comp.ParentTracks["anim_face"])
+	}
+	if comp.ParentTracks["left_arm"] != "body" {
+		t.Errorf("Expected left_arm -> body, got %s", comp.ParentTracks["left_arm"])
+	}
+}
+
+// TestSetParentTracks_EntityWithoutReanimComponent tests error handling
+func TestSetParentTracks_EntityWithoutReanimComponent(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rs := NewReanimSystem(em)
+	entityID := em.CreateEntity() // No ReanimComponent
+
+	err := rs.SetParentTracks(entityID, map[string]string{"a": "b"})
+
+	if err == nil {
+		t.Fatal("Expected error for entity without ReanimComponent")
+	}
+}
+
+// TestSetParentTrack_Success tests the SetParentTrack API
+func TestSetParentTrack_Success(t *testing.T) {
+	// Setup
+	em := ecs.NewEntityManager()
+	rs := NewReanimSystem(em)
+	entityID := em.CreateEntity()
+
+	reanimComp := &components.ReanimComponent{
+		Reanim:       &reanim.ReanimXML{FPS: 12},
+		ParentTracks: nil, // Initially nil
+	}
+	ecs.AddComponent(em, entityID, reanimComp)
+
+	// Test: Set individual parent track
+	err := rs.SetParentTrack(entityID, "anim_face", "anim_stem")
+
+	// Verify
+	if err != nil {
+		t.Fatalf("SetParentTrack failed: %v", err)
+	}
+
+	comp, _ := ecs.GetComponent[*components.ReanimComponent](em, entityID)
+	if comp.ParentTracks == nil {
+		t.Fatal("ParentTracks should be initialized")
+	}
+	if comp.ParentTracks["anim_face"] != "anim_stem" {
+		t.Errorf("Expected anim_face -> anim_stem, got %s", comp.ParentTracks["anim_face"])
+	}
+}
+
+// TestSetParentTrack_MultipleInvocations tests adding multiple parent tracks
+func TestSetParentTrack_MultipleInvocations(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rs := NewReanimSystem(em)
+	entityID := em.CreateEntity()
+
+	reanimComp := &components.ReanimComponent{
+		Reanim: &reanim.ReanimXML{FPS: 12},
+	}
+	ecs.AddComponent(em, entityID, reanimComp)
+
+	// Add multiple parent tracks
+	rs.SetParentTrack(entityID, "anim_face", "anim_stem")
+	rs.SetParentTrack(entityID, "left_arm", "body")
+	rs.SetParentTrack(entityID, "right_arm", "body")
+
+	// Verify all are present
+	comp, _ := ecs.GetComponent[*components.ReanimComponent](em, entityID)
+	if len(comp.ParentTracks) != 3 {
+		t.Errorf("Expected 3 parent tracks, got %d", len(comp.ParentTracks))
+	}
+}
+
+// TestGetParentOffset_BasicOffset tests basic offset calculation
+func TestGetParentOffset_BasicOffset(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rs := NewReanimSystem(em)
+
+	// Create ReanimComponent with parent track data
+	// Parent track "anim_stem" moves from (37.6, 48.7) to (40.0, 50.0)
+	comp := &components.ReanimComponent{
+		CurrentAnim: "anim_shooting",
+		TrackBindings: map[string]string{
+			"anim_stem": "anim_shooting",
+		},
+		AnimStates: map[string]*components.AnimState{
+			"anim_shooting": {
+				Name:         "anim_shooting",
+				LogicalFrame: 2, // Currently at frame 2 (3rd visible frame)
+				IsActive:     true,
+			},
+		},
+		MergedTracks: map[string][]reanim.Frame{
+			"anim_stem": {
+				// Frame 0 (first visible, initial position)
+				{X: floatPtr(37.6), Y: floatPtr(48.7)},
+				// Frame 1
+				{X: floatPtr(38.8), Y: floatPtr(49.35)},
+				// Frame 2 (current position)
+				{X: floatPtr(40.0), Y: floatPtr(50.0)},
+			},
+		},
+		AnimVisiblesMap: map[string][]int{
+			"anim_shooting": {0, 0, 0}, // All frames visible
+		},
+	}
+
+	// Calculate offset
+	offsetX, offsetY := rs.getParentOffset("anim_stem", comp)
+
+	// Expected offset: (40.0 - 37.6, 50.0 - 48.7) = (2.4, 1.3)
+	expectedOffsetX := 2.4
+	expectedOffsetY := 1.3
+
+	if !floatEquals(offsetX, expectedOffsetX, 0.01) {
+		t.Errorf("Expected offsetX=%.2f, got %.2f", expectedOffsetX, offsetX)
+	}
+	if !floatEquals(offsetY, expectedOffsetY, 0.01) {
+		t.Errorf("Expected offsetY=%.2f, got %.2f", expectedOffsetY, offsetY)
+	}
+}
+
+// TestGetParentOffset_NoParentTrack tests offset when parent track doesn't exist
+func TestGetParentOffset_NoParentTrack(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rs := NewReanimSystem(em)
+
+	comp := &components.ReanimComponent{
+		CurrentAnim:   "anim_idle",
+		TrackBindings: map[string]string{},
+		MergedTracks:  map[string][]reanim.Frame{},
+	}
+
+	// Calculate offset for non-existent parent track
+	offsetX, offsetY := rs.getParentOffset("nonexistent_track", comp)
+
+	// Expected: (0, 0) - no offset for missing track
+	if offsetX != 0 || offsetY != 0 {
+		t.Errorf("Expected zero offset for missing track, got (%.2f, %.2f)", offsetX, offsetY)
+	}
+}
+
+// TestGetParentOffset_NoVisibleFrames tests offset when parent has no visible frames
+func TestGetParentOffset_NoVisibleFrames(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rs := NewReanimSystem(em)
+
+	comp := &components.ReanimComponent{
+		CurrentAnim: "anim_test",
+		TrackBindings: map[string]string{
+			"parent_track": "anim_test",
+		},
+		AnimStates: map[string]*components.AnimState{
+			"anim_test": {
+				Name:         "anim_test",
+				LogicalFrame: 0,
+				IsActive:     true,
+			},
+		},
+		MergedTracks: map[string][]reanim.Frame{
+			"parent_track": {
+				{X: floatPtr(10.0), Y: floatPtr(20.0)},
+			},
+		},
+		AnimVisiblesMap: map[string][]int{
+			"anim_test": {-1}, // All frames hidden
+		},
+	}
+
+	// Calculate offset
+	offsetX, offsetY := rs.getParentOffset("parent_track", comp)
+
+	// Expected: (0, 0) - no offset when no visible frames
+	if offsetX != 0 || offsetY != 0 {
+		t.Errorf("Expected zero offset for track with no visible frames, got (%.2f, %.2f)", offsetX, offsetY)
+	}
+}
+
+// TestGetParentOffset_NilPositionData tests offset when frame has nil X/Y
+func TestGetParentOffset_NilPositionData(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rs := NewReanimSystem(em)
+
+	comp := &components.ReanimComponent{
+		CurrentAnim: "anim_test",
+		TrackBindings: map[string]string{
+			"parent_track": "anim_test",
+		},
+		AnimStates: map[string]*components.AnimState{
+			"anim_test": {
+				Name:         "anim_test",
+				LogicalFrame: 0,
+				IsActive:     true,
+			},
+		},
+		MergedTracks: map[string][]reanim.Frame{
+			"parent_track": {
+				{X: nil, Y: nil}, // Nil position data
+			},
+		},
+		AnimVisiblesMap: map[string][]int{
+			"anim_test": {0}, // Frame visible
+		},
+	}
+
+	// Calculate offset
+	offsetX, offsetY := rs.getParentOffset("parent_track", comp)
+
+	// Expected: (0, 0) - no offset when position data is nil
+	if offsetX != 0 || offsetY != 0 {
+		t.Errorf("Expected zero offset for nil position data, got (%.2f, %.2f)", offsetX, offsetY)
+	}
+}
+
+// TestGetParentOffset_ZeroOffset tests offset when parent hasn't moved
+func TestGetParentOffset_ZeroOffset(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rs := NewReanimSystem(em)
+
+	// Parent track stays at same position (50.0, 60.0)
+	comp := &components.ReanimComponent{
+		CurrentAnim: "anim_static",
+		TrackBindings: map[string]string{
+			"parent_track": "anim_static",
+		},
+		AnimStates: map[string]*components.AnimState{
+			"anim_static": {
+				Name:         "anim_static",
+				LogicalFrame: 1,
+				IsActive:     true,
+			},
+		},
+		MergedTracks: map[string][]reanim.Frame{
+			"parent_track": {
+				{X: floatPtr(50.0), Y: floatPtr(60.0)}, // Initial
+				{X: floatPtr(50.0), Y: floatPtr(60.0)}, // Current (same)
+			},
+		},
+		AnimVisiblesMap: map[string][]int{
+			"anim_static": {0, 0},
+		},
+	}
+
+	offsetX, offsetY := rs.getParentOffset("parent_track", comp)
+
+	// Expected: (0, 0) - no movement
+	if offsetX != 0 || offsetY != 0 {
+		t.Errorf("Expected zero offset for static parent, got (%.2f, %.2f)", offsetX, offsetY)
+	}
+}
+
+// TestGetParentOffset_MissingAnimation tests offset when animation doesn't exist
+func TestGetParentOffset_MissingAnimation(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rs := NewReanimSystem(em)
+
+	comp := &components.ReanimComponent{
+		CurrentAnim:     "anim_missing",
+		TrackBindings:   map[string]string{},
+		AnimStates:      map[string]*components.AnimState{}, // No animation state
+		MergedTracks:    map[string][]reanim.Frame{},
+		AnimVisiblesMap: map[string][]int{},
+	}
+
+	// Calculate offset
+	offsetX, offsetY := rs.getParentOffset("parent_track", comp)
+
+	// Expected: (0, 0) - no offset when animation missing
+	if offsetX != 0 || offsetY != 0 {
+		t.Errorf("Expected zero offset for missing animation, got (%.2f, %.2f)", offsetX, offsetY)
+	}
+}
+
+// ==================================================================
+// Helper Functions for Story 13.3 Tests
+// ==================================================================
+
+// floatEquals checks if two floats are approximately equal within epsilon
+func floatEquals(a, b, epsilon float64) bool {
+	diff := a - b
+	if diff < 0 {
+		diff = -diff
+	}
+	return diff < epsilon
+}

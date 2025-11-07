@@ -193,6 +193,15 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 			return 0, fmt.Errorf("failed to play PeaShooter idle animation: %w", err)
 		}
 
+		// Story 13.3: 配置豌豆射手的父子轨道关系
+		// 头部（anim_face）跟随茎干（anim_stem）摆动
+		if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](em, entityID); ok {
+			reanimComp.ParentTracks = map[string]string{
+				"anim_face": "anim_stem", // 头部跟随茎干
+			}
+			log.Printf("[PlantFactory] 豌豆射手 %d: 配置父子关系 anim_face -> anim_stem", entityID)
+		}
+
 		// 第一次 PlayAnimation 后，固定中心偏移量（避免动画切换时的位置跳动）
 		if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](em, entityID); ok {
 			reanimComp.FixedCenterOffset = true

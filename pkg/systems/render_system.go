@@ -1,6 +1,7 @@
 package systems
 
 import (
+	"fmt"
 	"image/color"
 	"log"
 	"math"
@@ -435,9 +436,6 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 	// 新机制使用 TrackBindings 支持每个轨道绑定到不同的动画
 	// 渲染逻辑见下方 TrackBindings 处理代码
 
-	// 保留这些变量供后续使用（将在 TrackBindings 渲染逻辑中使用）
-	stemOffsetX, stemOffsetY := 0.0, 0.0
-
 	// 按 AnimTracks 顺序渲染部件（保证 Z-order 正确）
 	// Story 6.6/6.7: 独立动画模式使用不同的渲染逻辑
 	if hasIndependentAnims {
@@ -613,7 +611,6 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 
 			var trackPhysicalIndex int
 			var trackAnimationName string // 该轨道使用的动画名称（用于可见性检查）
-			applyStemOffset := false
 
 			// TODO (Story 13.1): 在此处添加 TrackBindings 逻辑
 			// 目前使用默认行为：所有轨道使用相同的 physicalIndex
@@ -742,13 +739,37 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 			}
 
 			// ==================================================================
-			// Story 6.5: Apply anim_stem offset to head parts
+			// Story 13.3: Apply Parent-Child Offset (父子偏移应用)
 			// ==================================================================
-			if applyStemOffset {
-				tx += stemOffsetX
-				ty += stemOffsetY
+			//
+			// 如果轨道有父轨道，且子父使用不同动画，则应用父轨道的偏移
+			// 这实现了头部跟随身体摆动等自然动画效果
+			if reanim.ParentTracks != nil {
+				if parentTrackName, hasParent := reanim.ParentTracks[track.Name]; hasParent {
+					// 检查子父是否使用不同动画
+					childAnim := trackAnimationName
+					parentAnim := childAnim // 默认使用相同动画
+
+					// 如果有 TrackBindings，查找父轨道的动画
+					if reanim.TrackBindings != nil {
+						if parentAnimName, ok := reanim.TrackBindings[parentTrackName]; ok {
+							parentAnim = parentAnimName
+						}
+					}
+
+					// 只有当子父使用不同动画时才应用偏移
+					if childAnim != parentAnim {
+						// 获取 ReanimSystem 实例（通过 entityManager 查找）
+						// 注意：这里需要访问 ReanimSystem 的方法
+						// 为了避免循环依赖，我们直接内联偏移计算逻辑
+						offsetX, offsetY := s.calculateParentOffset(parentTrackName, reanim)
+						tx += offsetX
+						ty += offsetY
+					}
+				}
 			}
 
+			// 应用实体屏幕位置
 			tx += screenX
 			ty += screenY
 
@@ -1679,4 +1700,177 @@ func (s *RenderSystem) countVisibleFrames(animVisibles []int) int {
 		}
 	}
 	return count
+}
+
+// ==================================================================
+// Story 13.3: Parent-Child Offset Calculation for RenderSystem
+// ==================================================================
+
+// calculateParentOffset 计算父轨道的当前偏移量（用于渲染时应用）
+//
+// 这个方法在 RenderSystem 中重新实现偏移计算逻辑
+// 原因：RenderSystem 不能直接访问 ReanimSystem 的私有方法
+//
+// 算法原理：
+// 1. 找到父轨道控制的动画（通过 TrackBindings）
+// 2. 获取父轨道在该动画时间窗口内的第一个可见帧位置（初始位置）
+// 3. 获取父轨道的当前位置
+// 4. 计算偏移：offset = current - initial
+//
+// 参数：
+//   - parentTrackName: 父轨道名称（如 "anim_stem"）
+//   - comp: ReanimComponent 引用
+//
+// 返回：
+//   - offsetX: X 轴偏移量
+//   - offsetY: Y 轴偏移量
+func (s *RenderSystem) calculateParentOffset(parentTrackName string, comp *components.ReanimComponent) (float64, float64) {
+	// 步骤 1: 找到父轨道控制的动画
+	parentAnim := comp.CurrentAnim
+	if comp.TrackBindings != nil {
+		if animName, exists := comp.TrackBindings[parentTrackName]; exists {
+			parentAnim = animName
+		}
+	}
+
+	// 步骤 2: 获取父轨道的初始位置（第一个可见帧）
+	initX, initY, err := s.getFirstVisiblePositionForRender(parentTrackName, parentAnim, comp)
+	if err != nil {
+		return 0, 0
+	}
+
+	// 步骤 3: 获取父轨道的当前位置
+	currentX, currentY, err := s.getCurrentPositionForRender(parentTrackName, parentAnim, comp)
+	if err != nil {
+		return 0, 0
+	}
+
+	// 步骤 4: 计算偏移量
+	offsetX := currentX - initX
+	offsetY := currentY - initY
+
+	return offsetX, offsetY
+}
+
+// getFirstVisiblePositionForRender 获取轨道在动画时间窗口内的第一个可见帧位置
+//
+// 参数：
+//   - trackName: 轨道名称（如 "anim_stem"）
+//   - animName: 动画名称（如 "anim_shooting"）
+//   - comp: ReanimComponent 引用
+//
+// 返回：
+//   - x, y: 第一个可见帧的位置
+//   - error: 如果找不到可见帧或轨道不存在
+func (s *RenderSystem) getFirstVisiblePositionForRender(
+	trackName, animName string,
+	comp *components.ReanimComponent,
+) (float64, float64, error) {
+	// 获取轨道的累积帧数据
+	mergedFrames, ok := comp.MergedTracks[trackName]
+	if !ok || len(mergedFrames) == 0 {
+		return 0, 0, fmt.Errorf("track '%s' not found or has no frames", trackName)
+	}
+
+	// 获取动画的可见性数组
+	animVisibles, ok := comp.AnimVisiblesMap[animName]
+	if !ok || len(animVisibles) == 0 {
+		return 0, 0, fmt.Errorf("animation '%s' has no visibility data", animName)
+	}
+
+	// 查找第一个可见帧（visibility = 0）
+	for physicalIdx, visibility := range animVisibles {
+		if visibility == 0 && physicalIdx < len(mergedFrames) {
+			frame := mergedFrames[physicalIdx]
+
+			// 检查帧是否有位置数据
+			if frame.X == nil || frame.Y == nil {
+				continue // 跳过没有位置数据的帧
+			}
+
+			return *frame.X, *frame.Y, nil
+		}
+	}
+
+	return 0, 0, fmt.Errorf("track '%s' has no visible frames in animation '%s'", trackName, animName)
+}
+
+// getCurrentPositionForRender 获取轨道的当前位置
+//
+// 参数：
+//   - trackName: 轨道名称（如 "anim_stem"）
+//   - animName: 动画名称（如 "anim_shooting"）
+//   - comp: ReanimComponent 引用
+//
+// 返回：
+//   - x, y: 当前帧的位置
+//   - error: 如果轨道不存在或当前帧越界
+func (s *RenderSystem) getCurrentPositionForRender(
+	trackName, animName string,
+	comp *components.ReanimComponent,
+) (float64, float64, error) {
+	// 获取动画状态
+	animState, ok := comp.AnimStates[animName]
+	if !ok {
+		return 0, 0, fmt.Errorf("animation '%s' is not active", animName)
+	}
+
+	logicalFrame := animState.LogicalFrame
+
+	// 获取动画的可见性数组
+	animVisibles, ok := comp.AnimVisiblesMap[animName]
+	if !ok || len(animVisibles) == 0 {
+		return 0, 0, fmt.Errorf("animation '%s' has no visibility data", animName)
+	}
+
+	// 将逻辑帧映射到物理帧
+	physicalFrame := s.mapLogicalToPhysicalForRender(logicalFrame, animVisibles)
+	if physicalFrame < 0 {
+		return 0, 0, fmt.Errorf("invalid logical frame %d for animation '%s'", logicalFrame, animName)
+	}
+
+	// 获取轨道的累积帧数据
+	mergedFrames, ok := comp.MergedTracks[trackName]
+	if !ok || len(mergedFrames) == 0 {
+		return 0, 0, fmt.Errorf("track '%s' not found or has no frames", trackName)
+	}
+
+	// 检查物理帧是否越界
+	if physicalFrame >= len(mergedFrames) {
+		return 0, 0, fmt.Errorf("physical frame %d out of range for track '%s' (len=%d)",
+			physicalFrame, trackName, len(mergedFrames))
+	}
+
+	frame := mergedFrames[physicalFrame]
+
+	// 检查帧是否有位置数据
+	if frame.X == nil || frame.Y == nil {
+		return 0, 0, fmt.Errorf("track '%s' has no position data at frame %d", trackName, physicalFrame)
+	}
+
+	return *frame.X, *frame.Y, nil
+}
+
+// mapLogicalToPhysicalForRender 将逻辑帧号映射到物理帧索引
+//
+// 逻辑帧是可见帧的序号（0, 1, 2, ...）
+// 物理帧是数组中的实际索引，包括隐藏帧
+//
+// 参数：
+//   - logicalFrame: 逻辑帧号（从 0 开始）
+//   - animVisibles: 动画可见性数组（0 = 可见，-1 = 隐藏）
+//
+// 返回：
+//   - 物理帧索引，如果越界返回 -1
+func (s *RenderSystem) mapLogicalToPhysicalForRender(logicalFrame int, animVisibles []int) int {
+	logicalIndex := 0
+	for physicalIdx, visibility := range animVisibles {
+		if visibility == 0 {
+			if logicalIndex == logicalFrame {
+				return physicalIdx
+			}
+			logicalIndex++
+		}
+	}
+	return -1 // 逻辑帧越界
 }

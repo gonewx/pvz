@@ -232,4 +232,18 @@ type ReanimComponent struct {
 	//   TrackBindings["anim_face"] = "anim_head_idle"
 	//   TrackBindings["stalk_bottom"] = "anim_shooting"
 	TrackBindings map[string]string
+
+	// ParentTracks 定义轨道的父子层级关系（Story 13.3）
+	// Key: 子轨道名（如 "anim_face"）
+	// Value: 父轨道名（如 "anim_stem"）
+	//
+	// 用途：
+	// - 子轨道渲染时会叠加父轨道的偏移量
+	// - 实现头部跟随身体摆动等自然动画效果
+	// - nil 时不应用父子偏移（保持向后兼容）
+	//
+	// 示例：
+	//   ParentTracks["anim_face"] = "anim_stem"
+	//   表示 anim_face 的父轨道是 anim_stem，渲染时需要叠加 anim_stem 的偏移
+	ParentTracks map[string]string
 }
