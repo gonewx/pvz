@@ -36,9 +36,10 @@ type AnimationCell struct {
 	currentAnimationIndex int // 当前播放的动画索引（用于切换）
 
 	// 当前播放状态
-	currentFrame int
+	currentFrame     int
 	frameAccumulator float64 // 帧累加器，用于控制动画速度
-	animationFPS float64 // 动画播放帧率
+	animationFPS     float64 // 动画播放帧率（从 reanim 文件读取）
+	targetTPS        float64 // 目标游戏 TPS（从配置文件读取）
 
 	// 动画播放数据
 	visualTracks          []string
@@ -79,7 +80,10 @@ type SwitchableAnimation struct {
 }
 
 // NewAnimationCell 创建动画展示单元
-func NewAnimationCell(config *AnimationUnitConfig, globalFPS int) (*AnimationCell, error) {
+// config: 动画单元配置
+// globalFPS: 全局默认帧率（仅当 reanim 文件未指定时使用）
+// targetTPS: 目标游戏 TPS（从配置文件读取）
+func NewAnimationCell(config *AnimationUnitConfig, globalFPS int, targetTPS int) (*AnimationCell, error) {
 	// 加载 Reanim 文件
 	reanimXML, err := reanim.ParseReanimFile(config.ReanimFile)
 	if err != nil {
@@ -122,6 +126,7 @@ func NewAnimationCell(config *AnimationUnitConfig, globalFPS int) (*AnimationCel
 		currentAnimationIndex: 0,
 		frameAccumulator:      0,
 		animationFPS:          float64(animFPS),
+		targetTPS:             float64(targetTPS),
 
 		visualTracks:       visualTracks,
 		logicalTracks:      logicalTracks,
@@ -326,12 +331,14 @@ func (c *AnimationCell) analyzeTrackBinding() map[string]string {
 // Update 更新动画帧
 func (c *AnimationCell) Update() {
 	// 使用帧累加器控制动画速度
-	// TPS = 60, animationFPS 从 Reanim 文件读取（通常是 12）
-	// 例如：TPS=60, animationFPS=12, 每 5 个游戏帧更新一次动画帧 (60/12 = 5)
+	// animationFPS: 从 Reanim 文件读取的动画帧率
+	// targetTPS: 从配置文件读取的目标游戏 TPS
+	//
+	// 计算公式：frameAccumulator += animationFPS / targetTPS
+	// 例如：animationFPS=12, targetTPS=60 时，每次累加 0.2
+	// 累加 5 次（5/60秒）后推进一帧，即每秒推进 12 帧
 
-	const gameTPS = 60.0 // 游戏运行的 TPS（在 main.go 中设置）
-
-	c.frameAccumulator += c.animationFPS / gameTPS
+	c.frameAccumulator += c.animationFPS / c.targetTPS
 
 	if c.frameAccumulator >= 1.0 {
 		c.currentFrame++

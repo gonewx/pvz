@@ -36,8 +36,9 @@ type GridConfig struct {
 
 // PlaybackConfig 播放配置
 type PlaybackConfig struct {
-	FPS   int     `yaml:"fps"`
-	Scale float64 `yaml:"scale"`
+	TPS   int     `yaml:"tps"`   // 游戏目标 TPS（Ticks Per Second）
+	FPS   int     `yaml:"fps"`   // 默认动画帧率（当 reanim 文件未指定时使用）
+	Scale float64 `yaml:"scale"` // 默认缩放比例
 }
 
 // AnimationUnitConfig 动画单元配置
@@ -88,8 +89,11 @@ func LoadConfig(configPath string) (*ShowcaseConfig, error) {
 	}
 
 	// 设置默认值
+	if config.Global.Playback.TPS == 0 {
+		config.Global.Playback.TPS = 60 // 默认 60 TPS
+	}
 	if config.Global.Playback.FPS == 0 {
-		config.Global.Playback.FPS = 12
+		config.Global.Playback.FPS = 12 // 默认 12 FPS（仅当 reanim 文件未指定时使用）
 	}
 	if config.Global.Playback.Scale == 0 {
 		config.Global.Playback.Scale = 1.0

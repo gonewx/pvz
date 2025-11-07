@@ -132,7 +132,11 @@ func (g *Game) loadPage(pageNum int) error {
 	// 创建当前页的动画单元
 	cells := make([]*AnimationCell, 0, endIdx-startIdx)
 	for i := startIdx; i < endIdx; i++ {
-		cell, err := NewAnimationCell(&g.allAnimConfigs[i], g.config.Global.Playback.FPS)
+		cell, err := NewAnimationCell(
+			&g.allAnimConfigs[i],
+			g.config.Global.Playback.FPS,
+			g.config.Global.Playback.TPS,
+		)
 		if err != nil {
 			log.Printf("  警告: 无法加载动画单元 [%s]: %v", g.allAnimConfigs[i].Name, err)
 			continue
@@ -663,13 +667,15 @@ func main() {
 	// 设置窗口
 	ebiten.SetWindowSize(game.config.Global.Window.Width, game.config.Global.Window.Height)
 	ebiten.SetWindowTitle(game.config.Global.Window.Title)
-	// 注意：TPS 应该保持 60 以确保流畅的输入响应和渲染
-	// 配置文件中的 fps 参数用于控制动画播放速度，而非游戏更新频率
-	ebiten.SetTPS(60)
+	// 从配置文件读取 TPS
+	ebiten.SetTPS(game.config.Global.Playback.TPS)
 
-	log.Printf("✓ 窗口配置: %dx%d @ 60 TPS (动画速度: %d FPS)",
+	log.Printf("✓ 窗口配置: %dx%d @ %d TPS",
 		game.config.Global.Window.Width,
 		game.config.Global.Window.Height,
+		game.config.Global.Playback.TPS,
+	)
+	log.Printf("✓ 动画配置: 默认 %d FPS (从 reanim 文件读取时覆盖)",
 		game.config.Global.Playback.FPS,
 	)
 	log.Println("=== 启动完成，开始运行 ===")
