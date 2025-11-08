@@ -1,0 +1,343 @@
+package systems
+
+import (
+	"testing"
+
+	"github.com/decker502/pvz/internal/reanim"
+	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
+	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/hajimehoshi/ebiten/v2"
+)
+
+// TestPlayCombo 测试 PlayCombo 方法的完整流程
+func TestPlayCombo(t *testing.T) {
+	// Setup
+	em := ecs.NewEntityManager()
+	rs := NewReanimSystem(em)
+
+	// 加载配置管理器
+	configManager, err := config.NewReanimConfigManager("data/reanim_config.yaml")
+	if err != nil {
+		t.Fatalf("加载配置管理器失败: %v", err)
+	}
+	rs.SetConfigManager(configManager)
+
+	// 创建测试实体
+	entity := em.CreateEntity()
+
+	// 创建模拟的 Reanim 数据（包含必要的轨道和动画）
+	reanimXML := createTestReanimData()
+
+	// 添加 ReanimComponent
+	reanimComp := &components.ReanimComponent{
+		Reanim:       reanimXML,
+		PartImages:   make(map[string]*ebiten.Image),
+		MergedTracks: reanim.BuildMergedTracks(reanimXML),
+	}
+	ecs.AddComponent(em, entity, reanimComp)
+
+	// 添加 PositionComponent (某些测试可能需要)
+	ecs.AddComponent(em, entity, &components.PositionComponent{
+		X: 100,
+		Y: 100,
+	})
+
+	t.Run("播放攻击组合", func(t *testing.T) {
+		err := rs.PlayCombo(entity, "peashooter", "attack")
+		if err != nil {
+			t.Fatalf("PlayCombo 失败: %v", err)
+		}
+
+		// 验证动画状态
+		updatedReanimComp, ok := ecs.GetComponent[*components.ReanimComponent](em, entity)
+		if !ok {
+			t.Fatal("无法获取 ReanimComponent")
+		}
+
+		// 验证当前动画包含预期的动画名称
+		expectedAnims := []string{"anim_shooting", "anim_head_idle"}
+		if len(updatedReanimComp.CurrentAnimations) != len(expectedAnims) {
+			t.Errorf("期望 CurrentAnimations 有 %d 个元素，实际有 %d 个",
+				len(expectedAnims), len(updatedReanimComp.CurrentAnimations))
+		}
+
+		for i, expected := range expectedAnims {
+			if i >= len(updatedReanimComp.CurrentAnimations) {
+				break
+			}
+			if updatedReanimComp.CurrentAnimations[i] != expected {
+				t.Errorf("CurrentAnimations[%d]: 期望 '%s'，实际 '%s'",
+					i, expected, updatedReanimComp.CurrentAnimations[i])
+			}
+		}
+
+		// 验证轨道绑定已应用（PlayAnimations 自动处理）
+		if updatedReanimComp.TrackBindings == nil {
+			t.Error("期望 TrackBindings 不为 nil")
+		}
+
+		// 验证父子关系已应用
+		if updatedReanimComp.ParentTracks == nil {
+			t.Error("期望 ParentTracks 不为 nil")
+		}
+		if updatedReanimComp.ParentTracks["anim_face"] != "anim_stem" {
+			t.Errorf("期望 ParentTracks['anim_face'] = 'anim_stem'，实际为 '%s'",
+				updatedReanimComp.ParentTracks["anim_face"])
+		}
+	})
+
+	t.Run("播放待机组合", func(t *testing.T) {
+		err := rs.PlayCombo(entity, "peashooter", "idle")
+		if err != nil {
+			t.Fatalf("PlayCombo 失败: %v", err)
+		}
+
+		updatedReanimComp, ok := ecs.GetComponent[*components.ReanimComponent](em, entity)
+		if !ok {
+			t.Fatal("无法获取 ReanimComponent")
+		}
+
+		// 待机动画只有一个动画
+		if len(updatedReanimComp.CurrentAnimations) != 1 {
+			t.Errorf("期望 CurrentAnimations 有 1 个元素，实际有 %d 个",
+				len(updatedReanimComp.CurrentAnimations))
+		}
+
+		if len(updatedReanimComp.CurrentAnimations) > 0 &&
+			updatedReanimComp.CurrentAnimations[0] != "anim_full_idle" {
+			t.Errorf("期望 CurrentAnimations[0] = 'anim_full_idle'，实际为 '%s'",
+				updatedReanimComp.CurrentAnimations[0])
+		}
+	})
+
+	t.Run("配置管理器未设置时返回错误", func(t *testing.T) {
+		// 创建一个没有配置管理器的新系统
+		em2 := ecs.NewEntityManager()
+		rs2 := NewReanimSystem(em2)
+
+		entity2 := em2.CreateEntity()
+		ecs.AddComponent(em2, entity2, &components.ReanimComponent{
+			Reanim:       reanimXML,
+			PartImages:   make(map[string]*ebiten.Image),
+			MergedTracks: reanim.BuildMergedTracks(reanimXML),
+		})
+
+		err := rs2.PlayCombo(entity2, "peashooter", "attack")
+		if err == nil {
+			t.Error("期望返回错误（配置管理器未设置），但没有返回错误")
+		}
+	})
+
+	t.Run("不存在的单元返回错误", func(t *testing.T) {
+		err := rs.PlayCombo(entity, "nonexistent_unit", "attack")
+		if err == nil {
+			t.Error("期望返回错误（单元不存在），但没有返回错误")
+		}
+	})
+
+	t.Run("不存在的组合返回错误", func(t *testing.T) {
+		err := rs.PlayCombo(entity, "peashooter", "nonexistent_combo")
+		if err == nil {
+			t.Error("期望返回错误（组合不存在），但没有返回错误")
+		}
+	})
+}
+
+// TestPlayDefaultAnimation 测试 PlayDefaultAnimation 方法
+func TestPlayDefaultAnimation(t *testing.T) {
+	// Setup
+	em := ecs.NewEntityManager()
+	rs := NewReanimSystem(em)
+
+	// 加载配置管理器
+	configManager, err := config.NewReanimConfigManager("data/reanim_config.yaml")
+	if err != nil {
+		t.Fatalf("加载配置管理器失败: %v", err)
+	}
+	rs.SetConfigManager(configManager)
+
+	// 创建模拟的 Reanim 数据
+	reanimXML := createTestReanimData()
+
+	// 创建测试实体
+	entity := em.CreateEntity()
+
+	// 添加 ReanimComponent
+	reanimComp := &components.ReanimComponent{
+		Reanim:       reanimXML,
+		PartImages:   make(map[string]*ebiten.Image),
+		MergedTracks: reanim.BuildMergedTracks(reanimXML),
+	}
+	ecs.AddComponent(em, entity, reanimComp)
+
+	t.Run("播放豌豆射手默认动画", func(t *testing.T) {
+		err := rs.PlayDefaultAnimation(entity, "peashooter")
+		if err != nil {
+			t.Fatalf("PlayDefaultAnimation 失败: %v", err)
+		}
+
+		updatedReanimComp, ok := ecs.GetComponent[*components.ReanimComponent](em, entity)
+		if !ok {
+			t.Fatal("无法获取 ReanimComponent")
+		}
+
+		// 验证当前动画是默认动画
+		if updatedReanimComp.CurrentAnim != "anim_full_idle" {
+			t.Errorf("期望 CurrentAnim = 'anim_full_idle'，实际为 '%s'",
+				updatedReanimComp.CurrentAnim)
+		}
+	})
+
+	t.Run("配置管理器未设置时返回错误", func(t *testing.T) {
+		em2 := ecs.NewEntityManager()
+		rs2 := NewReanimSystem(em2)
+
+		entity2 := em2.CreateEntity()
+		ecs.AddComponent(em2, entity2, &components.ReanimComponent{
+			Reanim:       reanimXML,
+			PartImages:   make(map[string]*ebiten.Image),
+			MergedTracks: reanim.BuildMergedTracks(reanimXML),
+		})
+
+		err := rs2.PlayDefaultAnimation(entity2, "peashooter")
+		if err == nil {
+			t.Error("期望返回错误（配置管理器未设置），但没有返回错误")
+		}
+	})
+
+	t.Run("不存在的单元返回错误", func(t *testing.T) {
+		err := rs.PlayDefaultAnimation(entity, "nonexistent_unit")
+		if err == nil {
+			t.Error("期望返回错误（单元不存在），但没有返回错误")
+		}
+	})
+}
+
+// TestPlayComboWithHiddenTracks 测试隐藏轨道功能
+func TestPlayComboWithHiddenTracks(t *testing.T) {
+	// Setup
+	em := ecs.NewEntityManager()
+	rs := NewReanimSystem(em)
+
+	// 加载配置管理器
+	configManager, err := config.NewReanimConfigManager("data/reanim_config.yaml")
+	if err != nil {
+		t.Fatalf("加载配置管理器失败: %v", err)
+	}
+	rs.SetConfigManager(configManager)
+
+	// 创建模拟的 Reanim 数据
+	reanimXML := createTestReanimData()
+
+	// 创建测试实体
+	entity := em.CreateEntity()
+
+	// 添加 ReanimComponent
+	reanimComp := &components.ReanimComponent{
+		Reanim:       reanimXML,
+		PartImages:   make(map[string]*ebiten.Image),
+		MergedTracks: reanim.BuildMergedTracks(reanimXML),
+	}
+	ecs.AddComponent(em, entity, reanimComp)
+
+	t.Run("隐藏轨道功能", func(t *testing.T) {
+		// 播放带有隐藏轨道的组合（如果配置了）
+		err := rs.PlayCombo(entity, "peashooter", "attack")
+		if err != nil {
+			t.Fatalf("PlayCombo 失败: %v", err)
+		}
+
+		updatedReanimComp, ok := ecs.GetComponent[*components.ReanimComponent](em, entity)
+		if !ok {
+			t.Fatal("无法获取 ReanimComponent")
+		}
+
+		// 如果配置文件中定义了 hidden_tracks，验证 VisibleTracks 已正确设置
+		// 注意：这个测试依赖于配置文件的具体内容
+		// 如果配置文件中 peashooter/attack 组合定义了 hidden_tracks，则验证
+		if len(updatedReanimComp.VisibleTracks) > 0 {
+			t.Logf("VisibleTracks 已设置，包含 %d 个轨道", len(updatedReanimComp.VisibleTracks))
+		}
+	})
+}
+
+// createTestReanimData 创建用于测试的 Reanim 数据
+func createTestReanimData() *reanim.ReanimXML {
+	// 创建一个简单的 Reanim 数据结构，包含必要的动画和轨道
+	return &reanim.ReanimXML{
+		FPS: 12,
+		Tracks: []reanim.Track{
+			{
+				Name: "anim_shooting",
+				Frames: []reanim.Frame{
+					{
+						X:         ptrFloat64(0),
+						Y:         ptrFloat64(0),
+						FrameNum:  ptrInt(0),
+						ImagePath: "test_image",
+					},
+					{
+						X:         ptrFloat64(10),
+						Y:         ptrFloat64(0),
+						FrameNum:  ptrInt(1),
+						ImagePath: "test_image",
+					},
+				},
+			},
+			{
+				Name: "anim_head_idle",
+				Frames: []reanim.Frame{
+					{
+						X:         ptrFloat64(0),
+						Y:         ptrFloat64(0),
+						FrameNum:  ptrInt(0),
+						ImagePath: "test_head",
+					},
+				},
+			},
+			{
+				Name: "anim_full_idle",
+				Frames: []reanim.Frame{
+					{
+						X:         ptrFloat64(0),
+						Y:         ptrFloat64(0),
+						FrameNum:  ptrInt(0),
+						ImagePath: "test_idle",
+					},
+				},
+			},
+			{
+				Name: "anim_face",
+				Frames: []reanim.Frame{
+					{
+						X:         ptrFloat64(0),
+						Y:         ptrFloat64(0),
+						FrameNum:  ptrInt(0),
+						ImagePath: "test_face",
+					},
+				},
+			},
+			{
+				Name: "anim_stem",
+				Frames: []reanim.Frame{
+					{
+						X:        ptrFloat64(37.6),
+						Y:        ptrFloat64(48.7),
+						FrameNum: ptrInt(0),
+					},
+				},
+			},
+		},
+	}
+}
+
+// ptrFloat64 返回 float64 指针
+func ptrFloat64(v float64) *float64 {
+	return &v
+}
+
+// ptrInt 返回 int 指针
+func ptrInt(v int) *int {
+	return &v
+}

@@ -276,6 +276,11 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	scene.reanimSystem = systems.NewReanimSystem(scene.entityManager)
 	log.Printf("[GameScene] Initialized Reanim system")
 
+	// Story 13.6: 设置配置管理器
+	if configManager := rm.GetReanimConfigManager(); configManager != nil {
+		scene.reanimSystem.SetConfigManager(configManager)
+	}
+
 	// Story 13.4: Enable render cache optimization
 	scene.renderSystem.SetReanimSystem(scene.reanimSystem)
 	log.Printf("[GameScene] Enabled render cache optimization")

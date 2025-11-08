@@ -455,6 +455,7 @@ func (s *InputSystem) createPlantPreview(plantType components.PlantType, x, y fl
 		animName = "anim_idle"
 	}
 
+	// Story 13.6: 预览动画播放 (P2 - 降级方案，保持原有实现)
 	if err := s.reanimSystem.PlayAnimation(entityID, animName); err != nil {
 		log.Printf("[InputSystem] Failed to play preview animation: %v", err)
 		// 不删除实体，让它以静态方式显示

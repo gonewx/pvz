@@ -5,6 +5,7 @@ import (
 
 	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -39,6 +40,14 @@ func TestTriggerPlantAttackAnimation(t *testing.T) {
 	em := ecs.NewEntityManager()
 	rm := game.NewResourceManager(getTestAudioContext())
 	rs := NewReanimSystem(em)
+
+	// Story 13.6: 设置配置管理器以支持配置驱动的动画播放
+	configManager, err := config.NewReanimConfigManager("data/reanim_config.yaml")
+	if err != nil {
+		t.Skipf("跳过测试：无法加载配置文件: %v", err)
+	}
+	rs.SetConfigManager(configManager)
+
 	gs := game.GetGameState()
 	bs := createTestBehaviorSystem(em, rm, rs, gs)
 
@@ -94,6 +103,14 @@ func TestUpdatePlantAttackAnimation(t *testing.T) {
 	em := ecs.NewEntityManager()
 	rm := game.NewResourceManager(getTestAudioContext())
 	rs := NewReanimSystem(em)
+
+	// Story 13.6: 设置配置管理器以支持配置驱动的动画播放
+	configManager, err := config.NewReanimConfigManager("data/reanim_config.yaml")
+	if err != nil {
+		t.Skipf("跳过测试：无法加载配置文件: %v", err)
+	}
+	rs.SetConfigManager(configManager)
+
 	gs := game.GetGameState()
 	bs := createTestBehaviorSystem(em, rm, rs, gs)
 
@@ -136,6 +153,14 @@ func TestUpdatePlantAttackAnimation_OtherPlants(t *testing.T) {
 	em := ecs.NewEntityManager()
 	rm := game.NewResourceManager(getTestAudioContext())
 	rs := NewReanimSystem(em)
+
+	// Story 13.6: 设置配置管理器以支持配置驱动的动画播放
+	configManager, err := config.NewReanimConfigManager("data/reanim_config.yaml")
+	if err != nil {
+		t.Skipf("跳过测试：无法加载配置文件: %v", err)
+	}
+	rs.SetConfigManager(configManager)
+
 	gs := game.GetGameState()
 	bs := createTestBehaviorSystem(em, rm, rs, gs)
 

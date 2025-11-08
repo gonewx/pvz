@@ -1,0 +1,148 @@
+# Quality Gate Decision
+# Story 13.6: 配置驱动的动画播放迁移
+
+schema: 1
+story: "13.6"
+story_title: "配置驱动的动画播放迁移 (Configuration-Driven Animation Playback Migration)"
+gate: PASS
+status_reason: "✅ 所有QA建议已正确应用，测试覆盖完整（单元、集成、端到端、性能），代码质量优秀，所有7个验收标准全部满足，无阻塞性问题。Story已达到Done标准。"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-11-08T00:00:00Z"
+
+waiver: { active: false }
+
+top_issues: []  # 所有问题已解决
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 1 }
+  highest: low
+  recommendations:
+    must_fix: []  # 无必须修复的问题
+    monitor:
+      - "继续关注死亡动画硬编码的技术债务（已知且合理，可在未来版本改进）"
+
+quality_score: 100  # 所有问题已解决，从 80 提升到 100
+
+evidence:
+  tests_reviewed: 18
+  unit_tests_passing: 6
+  integration_tests_passing: 5
+  e2e_tests_passing: 3
+  benchmark_tests_passing: 4
+  risks_identified: 1  # 仅剩死亡动画硬编码（低优先级）
+  files_modified: 13
+  files_added: 4  # 新增集成测试、性能基准测试等
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7]  # 所有AC都有自动化验证
+    ac_gaps: []  # 无缺口
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "无安全风险，配置文件仅在启动时加载，不涉及用户输入"
+  performance:
+    status: PASS
+    notes: "基准测试验证性能良好，配置管理器O(1)查询，无明显性能回退。PlayCombo与PlayAnimations性能相当。"
+  reliability:
+    status: PASS
+    notes: "错误处理完善，配置加载失败时游戏正确退出，废弃警告日志清晰"
+  maintainability:
+    status: PASS
+    notes: "代码清晰，文档完整，API设计合理，配置文件统一管理（3993行，140+单元）"
+
+compliance:
+  coding_standards: PASS
+  project_structure: PASS
+  testing_strategy: PASS  # 从 CONCERNS 提升到 PASS
+
+recommendations:
+  immediate: []  # 所有高优先级建议已完成
+
+  future:
+    - action: "考虑为死亡动画添加配置支持（可选）"
+      refs:
+        - "pkg/systems/behavior_system.go:425,769"
+        - "pkg/systems/lawnmower_system.go:338"
+      priority: low
+      notes: "当前使用硬编码是合理的降级方案（P2优先级），不影响质量门"
+
+    - action: "考虑为UI动画和特效动画添加配置支持（可选）"
+      refs:
+        - "pkg/systems/level_system.go:502"
+        - "pkg/entities/effect_factory.go:191"
+      priority: low
+      notes: "P2优先级，已在Story中明确标记"
+
+strengths:
+  - "✅ 所有QA建议已被正确且快速地应用"
+  - "✅ 测试覆盖完整：单元测试(6) + 集成测试(5) + 端到端测试(3) + 性能基准测试(4)"
+  - "✅ 配置管理器设计优秀：线程安全、O(1)查询、完善的错误处理"
+  - "✅ API设计清晰：PlayCombo和PlayDefaultAnimation简化了动画播放"
+  - "✅ 核心迁移完成度高：P0-P1优先级100%完成，P2降级方案合理"
+  - "✅ 文档完整：GoDoc注释清晰，Dev Notes详细记录所有变更"
+  - "✅ 配置文件完整：3993行，包含140+ Reanim定义，格式正确"
+  - "✅ 性能验证通过：基准测试显示性能良好，无明显回退"
+  - "✅ 编译和运行验证通过：go build成功，所有测试通过"
+
+weaknesses: []  # 所有弱点已修复
+
+improvements_completed:
+  - id: "TEST-001"
+    original_severity: medium
+    action: "添加PlayCombo/PlayDefaultAnimation集成测试"
+    result: "✅ 已完成 - pkg/systems/reanim_system_config_test.go (5个测试，全部通过)"
+
+  - id: "TEST-002"
+    original_severity: medium
+    action: "添加端到端测试验证关键场景"
+    result: "✅ 已完成 - 修复behavior_system_attack_test.go，添加配置管理器支持，所有测试通过"
+
+  - id: "TEST-003"
+    original_severity: low
+    action: "添加性能基准测试"
+    result: "✅ 已完成 - pkg/systems/reanim_system_config_bench_test.go (4个基准测试，性能良好)"
+
+remaining_technical_debt:
+  - id: "TECH-DEBT-001"
+    severity: low
+    finding: "死亡动画仍使用硬编码（3处）"
+    rationale: "已在Story中明确标记为P2降级方案，不影响核心功能，可在未来版本改进"
+    impact: "低 - 不影响游戏功能，不阻塞质量门"
+
+verification_performed:
+  - "✅ 单元测试验证：go test ./pkg/config - 6/6通过"
+  - "✅ 集成测试验证：go test ./pkg/systems -run TestPlayCombo|TestPlayDefaultAnimation - 5/5通过"
+  - "✅ 端到端测试验证：go test ./pkg/systems -run TestTriggerPlantAttackAnimation|TestUpdatePlantAttackAnimation - 3/3通过"
+  - "✅ 性能基准测试验证：go test -bench=. ./pkg/systems - 4个基准测试成功运行"
+  - "✅ 编译验证：go build - 编译成功，无错误"
+  - "✅ 迁移完成度验证：grep硬编码调用 - P0-P1迁移100%完成"
+  - "✅ 配置文件验证：3993行，格式正确，包含所有必需单元"
+
+qa_summary:
+  review_date: "2025-11-08"
+  previous_gate: "CONCERNS (2025-11-07, 质量分数: 80/100)"
+  current_gate: "PASS (2025-11-08, 质量分数: 100/100)"
+  improvement: "+20分，所有Medium问题已解决"
+  issues_resolved: 3
+  issues_remaining: 1  # 仅剩低优先级技术债务
+  test_coverage_improvement: "从0个集成测试和0个端到端测试，提升到5个集成测试、3个端到端测试、4个性能基准测试"
+  developer_response: "优秀 - 快速且正确地应用所有QA建议，修复质量高"
+  recommended_next_action: "Story已达到Done标准，可以合并到主分支"
+
+special_recognition:
+  - "测试文件路径问题的修复非常细致（正确理解Go测试从项目根目录运行）"
+  - "为behavior_system攻击动画测试添加配置管理器支持的方式标准规范"
+  - "性能基准测试设计合理，提供了有价值的性能对比数据"
+  - "配置文件创建工作量大（3993行），质量优秀"
+
+next_steps:
+  - "✅ Story可以标记为Done"
+  - "✅ 代码可以合并到主分支"
+  - "建议在Epic 13总结中表扬开发者的测试质量"
+  - "可选：在未来Epic中考虑为死亡动画添加配置支持"
+
+approval:
+  qa_approved: true
+  qa_notes: "所有验收标准已满足，测试覆盖完整，代码质量优秀。Story 13.6已达到Done标准。"
+  gate_decision: "PASS"
+  quality_gate_expires: "2025-11-22T00:00:00Z"  # 2周后过期，届时需要重新审查

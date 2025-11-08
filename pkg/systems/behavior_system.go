@@ -509,10 +509,9 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 
 		// 如果有僵尸在同一行，发射子弹
 		if hasZombieInLine {
-			// Story 6.9: 使用多动画叠加实现攻击动画
-			// 同时播放身体攻击动画（anim_shooting）和身体动画（anim_idle）
-			// 这样可以确保身体和头部在攻击时都显示
-			err := s.reanimSystem.PlayAnimations(entityID, []string{"anim_shooting", "anim_idle"})
+			// Story 13.6: 使用配置驱动的动画播放
+			// 播放配置文件中定义的攻击动画组合（anim_shooting + anim_head_idle）
+			err := s.reanimSystem.PlayCombo(entityID, "peashooter", "attack")
 			if err != nil {
 				log.Printf("[BehaviorSystem] 切换到攻击动画失败: %v", err)
 			} else {
@@ -521,7 +520,7 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 					reanim.IsLooping = false
 				}
 
-				log.Printf("[BehaviorSystem] 豌豆射手 %d 切换到攻击动画（anim_shooting + anim_idle，单次播放）", entityID)
+				log.Printf("[BehaviorSystem] 豌豆射手 %d 切换到攻击动画（配置驱动）", entityID)
 				// 设置攻击动画状态，用于动画完成后切换回 idle
 				plant.AttackAnimState = components.AttackAnimAttacking
 			}
@@ -754,28 +753,38 @@ func (s *BehaviorSystem) changeZombieAnimation(zombieID ecs.EntityID, newState c
 	// 更新状态
 	behavior.ZombieAnimState = newState
 
-	// 根据状态切换动画
-	var animName string
+	// 根据状态确定组合名称
+	// Story 13.6: 使用配置驱动的动画播放
+	var comboName string
 	switch newState {
 	case components.ZombieAnimIdle:
-		animName = "anim_idle"
+		comboName = "idle"
 	case components.ZombieAnimWalking:
-		animName = "anim_walk"
+		comboName = "walk"
 	case components.ZombieAnimEating:
-		animName = "anim_eat"
+		comboName = "eat"
 	case components.ZombieAnimDying:
-		animName = "anim_death"
+		// 死亡动画可能没有配置，降级到 PlayAnimation
+		if s.reanimSystem != nil {
+			err := s.reanimSystem.PlayAnimation(zombieID, "anim_death")
+			if err != nil {
+				log.Printf("[BehaviorSystem] 僵尸 %d 切换死亡动画失败: %v", zombieID, err)
+			} else {
+				log.Printf("[BehaviorSystem] 僵尸 %d 切换死亡动画", zombieID)
+			}
+		}
+		return
 	default:
 		return
 	}
 
-	// 使用 ReanimSystem 播放新动画
+	// 使用 ReanimSystem 播放新动画组合
 	if s.reanimSystem != nil {
-		err := s.reanimSystem.PlayAnimation(zombieID, animName)
+		err := s.reanimSystem.PlayCombo(zombieID, "zombie", comboName)
 		if err != nil {
 			log.Printf("[BehaviorSystem] 僵尸 %d 切换动画失败: %v", zombieID, err)
 		} else {
-			log.Printf("[BehaviorSystem] 僵尸 %d 切换动画: %s", zombieID, animName)
+			log.Printf("[BehaviorSystem] 僵尸 %d 切换动画: %s（配置驱动）", zombieID, comboName)
 		}
 	}
 }
@@ -1589,20 +1598,29 @@ func (s *BehaviorSystem) updatePlantAttackAnimation(entityID ecs.EntityID, delta
 
 	// Story 10.3: 检查攻击动画是否播放完毕，切换回 idle
 	if reanim.IsFinished {
-		// 切换回空闲动画
-		// 根据植物类型选择正确的空闲动画
-		idleAnimName := "anim_idle"
-		if plant.PlantType == components.PlantPeashooter {
-			// 豌豆射手使用 anim_full_idle（包含头部）
-			idleAnimName = "anim_full_idle"
+		// Story 13.6: 使用配置驱动的动画播放
+		// 根据植物类型确定 unitID
+		var unitID string
+		switch plant.PlantType {
+		case components.PlantPeashooter:
+			unitID = "peashooter"
+		case components.PlantSunflower:
+			unitID = "sunflower"
+		case components.PlantWallnut:
+			unitID = "wallnut"
+		case components.PlantCherryBomb:
+			unitID = "cherrybomb"
+		default:
+			log.Printf("[BehaviorSystem] 未知的植物类型: %v", plant.PlantType)
+			return
 		}
 
-		err := s.reanimSystem.PlayAnimation(entityID, idleAnimName)
+		err := s.reanimSystem.PlayDefaultAnimation(entityID, unitID)
 		if err != nil {
 			log.Printf("[BehaviorSystem] 切换回空闲动画失败: %v", err)
 		} else {
 			plant.AttackAnimState = components.AttackAnimIdle
-			log.Printf("[BehaviorSystem] 植物 %d 攻击动画完成，切换回空闲动画 '%s'", entityID, idleAnimName)
+			log.Printf("[BehaviorSystem] 植物 %d 攻击动画完成，切换回空闲动画（配置驱动）", entityID)
 		}
 	}
 }

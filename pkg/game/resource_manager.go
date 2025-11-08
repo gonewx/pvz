@@ -17,6 +17,7 @@ import (
 	auaudio "github.com/decker502/pvz/internal/audio"
 	"github.com/decker502/pvz/internal/particle"
 	"github.com/decker502/pvz/internal/reanim"
+	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
@@ -62,6 +63,9 @@ type ResourceManager struct {
 	reanimXMLCache      map[string]*reanim.ReanimXML        // Cache for parsed Reanim XML data: unit name -> ReanimXML
 	reanimImageCache    map[string]map[string]*ebiten.Image // Cache for Reanim part images: unit name -> (image ref -> Image)
 	particleConfigCache map[string]*particle.ParticleConfig // Cache for parsed particle configurations: config name -> ParticleConfig
+
+	// Story 13.6: Reanim 配置管理器
+	reanimConfigManager *config.ReanimConfigManager // Reanim 配置管理器（用于配置驱动的动画播放）
 
 	// YAML resource configuration
 	config      *ResourceConfig   // Parsed YAML configuration
@@ -1329,4 +1333,43 @@ func (rm *ResourceManager) LoadBitmapFont(imagePath, metaPath string) (*utils.Bi
 //	}
 func (rm *ResourceManager) GetBitmapFont(imagePath string) *utils.BitmapFont {
 	return rm.bitmapFontCache[imagePath]
+}
+
+// ========================================
+// Story 13.6: Reanim 配置管理器方法
+// ========================================
+
+// SetReanimConfigManager 设置 Reanim 配置管理器
+//
+// 此方法由游戏初始化逻辑调用，设置全局配置管理器。
+// 配置管理器将被传递给 ReanimSystem，用于配置驱动的动画播放。
+//
+// Parameters:
+//   - manager: 配置管理器实例
+//
+// Example usage:
+//
+//	reanimConfigManager, err := config.NewReanimConfigManager("data/reanim_config.yaml")
+//	if err != nil {
+//	    log.Fatalf("Failed to load config: %v", err)
+//	}
+//	resourceManager.SetReanimConfigManager(reanimConfigManager)
+func (rm *ResourceManager) SetReanimConfigManager(manager *config.ReanimConfigManager) {
+	rm.reanimConfigManager = manager
+	log.Printf("[ResourceManager] Reanim 配置管理器已设置")
+}
+
+// GetReanimConfigManager 获取 Reanim 配置管理器
+//
+// Returns:
+//   - *config.ReanimConfigManager: 配置管理器实例，如果未设置则返回 nil
+//
+// Example usage:
+//
+//	configManager := resourceManager.GetReanimConfigManager()
+//	if configManager != nil {
+//	    // 使用配置管理器
+//	}
+func (rm *ResourceManager) GetReanimConfigManager() *config.ReanimConfigManager {
+	return rm.reanimConfigManager
 }

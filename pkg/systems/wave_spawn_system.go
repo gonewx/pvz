@@ -209,14 +209,14 @@ func (s *WaveSpawnSystem) ActivateWave(waveIndex int) int {
 				}
 			}
 
-			// Story 8.3: 切换到 walk 动画（僵尸开始移动）
+			// Story 13.6: 使用配置驱动的动画播放
 			if behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID); ok {
 				if behavior.ZombieAnimState == components.ZombieAnimIdle {
 					behavior.ZombieAnimState = components.ZombieAnimWalking
-					if err := s.reanimSystem.PlayAnimation(entityID, "anim_walk"); err != nil {
+					if err := s.reanimSystem.PlayCombo(entityID, "zombie", "walk"); err != nil {
 						log.Printf("[WaveSpawnSystem] Warning: Failed to play walk animation for zombie %d: %v", entityID, err)
 					} else {
-						log.Printf("[WaveSpawnSystem] Zombie %d switched to walk animation (activated)", entityID)
+						log.Printf("[WaveSpawnSystem] Zombie %d switched to walk animation (activated, 配置驱动)", entityID)
 					}
 				}
 			}
@@ -327,7 +327,8 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 			log.Printf("[WaveSpawnSystem] Zombie %d 切换前动画: %s, 帧: %d", entityID, reanimComp.CurrentAnim, currentFrame)
 		}
 
-		if err := s.reanimSystem.PlayAnimation(entityID, "anim_idle"); err != nil {
+		// Story 13.6: 使用配置驱动的动画播放
+		if err := s.reanimSystem.PlayDefaultAnimation(entityID, "zombie"); err != nil {
 			log.Printf("[WaveSpawnSystem] Warning: Failed to play idle animation for zombie %d: %v", entityID, err)
 		} else {
 			// 验证切换后的状态
@@ -337,7 +338,7 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 				if state, ok := reanimComp.AnimStates[reanimComp.CurrentAnim]; ok {
 					currentFrame = state.LogicalFrame
 				}
-				log.Printf("[WaveSpawnSystem] Zombie %d 切换后动画: %s, 帧: %d (preview mode)", entityID, reanimComp.CurrentAnim, currentFrame)
+				log.Printf("[WaveSpawnSystem] Zombie %d 切换后动画: %s, 帧: %d (preview mode, 配置驱动)", entityID, reanimComp.CurrentAnim, currentFrame)
 			}
 		}
 	}

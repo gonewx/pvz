@@ -89,6 +89,23 @@ func main() {
 		log.Printf("⚠️  Reanim playback config not loaded (will use heuristic algorithm): %v", err)
 	}
 
+	// Load Reanim 配置管理器 (Story 13.6)
+	reanimConfigManager, err := config.NewReanimConfigManager("data/reanim_config.yaml")
+	if err != nil {
+		if *verboseFlag {
+			log.Printf("Failed to load Reanim config: %v", err)
+		} else {
+			fmt.Fprintln(os.Stderr, "Reanim 配置加载失败（使用 --verbose 查看详细日志）")
+		}
+		os.Exit(1)
+	}
+	log.Printf("[Config] 加载 Reanim 配置: data/reanim_config.yaml")
+	log.Printf("[Config] 成功加载 %d 个动画单元配置", len(reanimConfigManager.ListUnits()))
+	log.Printf("[Config] 配置管理器初始化完成")
+
+	// 将配置管理器传递给 ResourceManager
+	resourceManager.SetReanimConfigManager(reanimConfigManager)
+
 	// Create scene manager
 	sceneManager := game.NewSceneManager()
 

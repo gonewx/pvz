@@ -497,6 +497,7 @@ func (s *LevelSystem) triggerFinalWaveWarning() {
 		return
 	}
 
+	// Story 13.6: FinalWave 动画播放 (P2 - 降级方案，保持原有实现)
 	// 播放动画（FinalWave.reanim 中的动画名称为 "FinalWave"）
 	if err := s.reanimSystem.PlayAnimation(warningEntity, "FinalWave"); err != nil {
 		log.Printf("[LevelSystem] WARNING: Failed to play FinalWave animation: %v", err)

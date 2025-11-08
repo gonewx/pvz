@@ -76,8 +76,9 @@ func NewLawnmowerEntity(
 		IsLooping:  true, // 除草车动画循环播放
 	})
 
-	// 使用 ReanimSystem 初始化动画（播放 normal 动画，等待触发）
+	// Story 13.6: LawnMower 动画播放
 	// 注意：LawnMower.reanim 使用 anim_normal 动画
+	// 由于 lawnmower 可能没有在配置文件中定义，使用降级方案
 	// anim_tricked 是另一种状态（可能是被僵尸推着走），不在正常游戏流程中使用
 	if err := rs.PlayAnimation(entityID, "anim_normal"); err != nil {
 		return 0, fmt.Errorf("failed to play LawnMower normal animation: %w", err)

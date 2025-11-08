@@ -84,10 +84,10 @@ func NewZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs ReanimSystemIn
 		},
 	})
 
-	// Story 8.3: 使用 ReanimSystem 初始化动画（播放 idle 动画，等待激活）
+	// Story 13.6: 使用配置驱动的动画播放
 	// 激活后会由 WaveSpawnSystem.ActivateWave() 切换为 walk 动画
-	if err := rs.PlayAnimation(entityID, "anim_idle"); err != nil {
-		return 0, fmt.Errorf("failed to play Zombie idle animation: %w", err)
+	if err := rs.PlayDefaultAnimation(entityID, "zombie"); err != nil {
+		return 0, fmt.Errorf("failed to play Zombie default animation: %w", err)
 	}
 
 	// 添加速度组件（初始速度为0，待命状态）
@@ -195,10 +195,10 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs Reanim
 		},
 	})
 
-	// Story 8.3: 使用 ReanimSystem 初始化动画（播放 idle 动画，等待激活）
+	// Story 13.6: 使用配置驱动的动画播放
 	// 激活后会由 WaveSpawnSystem.ActivateWave() 切换为 walk 动画
-	if err := rs.PlayAnimation(entityID, "anim_idle"); err != nil {
-		return 0, fmt.Errorf("failed to play ZombieConeHead idle animation: %w", err)
+	if err := rs.PlayDefaultAnimation(entityID, "zombie"); err != nil {
+		return 0, fmt.Errorf("failed to play ZombieConeHead default animation: %w", err)
 	}
 
 	// 添加速度组件（初始速度为0，待命状态）
@@ -312,10 +312,10 @@ func NewBucketheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs Rean
 		},
 	})
 
-	// Story 8.3: 使用 ReanimSystem 初始化动画（播放 idle 动画，等待激活）
+	// Story 13.6: 使用配置驱动的动画播放
 	// 激活后会由 WaveSpawnSystem.ActivateWave() 切换为 walk 动画
-	if err := rs.PlayAnimation(entityID, "anim_idle"); err != nil {
-		return 0, fmt.Errorf("failed to play ZombieBucketHead idle animation: %w", err)
+	if err := rs.PlayDefaultAnimation(entityID, "zombie"); err != nil {
+		return 0, fmt.Errorf("failed to play ZombieBucketHead default animation: %w", err)
 	}
 
 	// 添加速度组件（初始速度为0，待命状态）

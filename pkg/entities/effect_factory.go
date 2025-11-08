@@ -186,6 +186,7 @@ func CreateFinalWaveEntity(em *ecs.EntityManager, rm ResourceLoader, reanimSyste
 	}
 	ecs.AddComponent(em, entityID, reanimComp)
 
+	// Story 13.6: 特效动画播放 (P2 - 降级方案，保持原有实现)
 	// 初始化 Reanim 动画
 	reanimSystem.PlayAnimation(entityID, "anim")
 

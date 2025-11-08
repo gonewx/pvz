@@ -55,6 +55,9 @@ var LogicalTracks = map[string]bool{
 // architecture principle of data-behavior separation.
 type ReanimSystem struct {
 	entityManager *ecs.EntityManager
+
+	// Story 13.6: 配置管理器（用于配置驱动的动画播放）
+	configManager *config.ReanimConfigManager
 }
 
 // NewReanimSystem creates a new Reanim animation system.
@@ -364,6 +367,9 @@ func (s *ReanimSystem) getAnimationTracks(comp *components.ReanimComponent) []re
 // Returns:
 //   - An error if the entity doesn't have a ReanimComponent or the animation doesn't exist
 func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) error {
+	// Story 13.6: DEPRECATED - 使用 PlayCombo() 或 PlayDefaultAnimation() 替代
+	log.Printf("⚠️  [DEPRECATED] PlayAnimation() 已废弃，请使用 PlayCombo() 或 PlayDefaultAnimation()")
+
 	// Get the ReanimComponent
 	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 	if !exists {
@@ -556,6 +562,9 @@ func (s *ReanimSystem) addAnimation(
 //	// Play both body and head animations for PeaShooter attack
 //	rs.PlayAnimations(entityID, []string{"anim_shooting", "anim_head_idle"})
 func (s *ReanimSystem) PlayAnimations(entityID ecs.EntityID, animNames []string) error {
+	// Story 13.6: DEPRECATED - 使用 PlayCombo() 替代
+	log.Printf("⚠️  [DEPRECATED] PlayAnimations() 已废弃，请使用 PlayCombo()")
+
 	// Get the ReanimComponent
 	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 	if !exists {
@@ -2654,6 +2663,146 @@ func (s *ReanimSystem) applyHiddenTracks(
 	for _, trackName := range hiddenTracks {
 		comp.VisibleTracks[trackName] = false
 	}
+
+	return nil
+}
+
+// ========================================
+// Story 13.6: 配置驱动的动画播放 API
+// ========================================
+
+// SetConfigManager 设置配置管理器
+//
+// 此方法由游戏初始化逻辑调用，设置全局配置管理器。
+// 调用此方法后，PlayCombo 和 PlayDefaultAnimation 才能正常工作。
+//
+// 参数：
+//   - manager: 配置管理器实例
+func (s *ReanimSystem) SetConfigManager(manager *config.ReanimConfigManager) {
+	s.configManager = manager
+	log.Printf("[ReanimSystem] 配置管理器已设置")
+}
+
+// PlayCombo 播放配置文件中定义的动画组合
+//
+// 此方法是配置驱动动画播放的核心 API，替代了旧的 PlayAnimation/PlayAnimations。
+// 它自动处理动画组合、轨道绑定、父子关系等复杂逻辑。
+//
+// 参数：
+//   - entityID: 实体 ID
+//   - unitID: 动画单元 ID（如 "peashooter", "zombie"）
+//   - comboName: 组合名称（如 "attack", "idle", "walk"）
+//
+// 返回：
+//   - error: 配置不存在或应用失败时返回错误
+//
+// 示例：
+//
+//	// 播放豌豆射手攻击动画（anim_shooting + anim_head_idle）
+//	rs.PlayCombo(peashooterID, "peashooter", "attack")
+//
+//	// 播放僵尸行走动画
+//	rs.PlayCombo(zombieID, "zombie", "walk")
+//
+// 内部逻辑：
+//  1. 从配置管理器获取组合配置
+//  2. 调用 PlayAnimations(combo.Animations)
+//  3. 应用轨道绑定（如果 binding_strategy = auto，已在 PlayAnimations 中处理）
+//  4. 应用父子关系（SetParentTracks）
+//  5. 应用隐藏轨道（通过 VisibleTracks）
+func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string) error {
+	// 0. 验证配置管理器已设置
+	if s.configManager == nil {
+		return fmt.Errorf("配置管理器未设置，请先调用 SetConfigManager()")
+	}
+
+	// 1. 获取组合配置
+	combo, err := s.configManager.GetCombo(unitID, comboName)
+	if err != nil {
+		return fmt.Errorf("获取动画组合失败: %w", err)
+	}
+
+	// 2. 播放动画（自动处理轨道绑定）
+	if err := s.PlayAnimations(entityID, combo.Animations); err != nil {
+		return fmt.Errorf("播放动画失败: %w", err)
+	}
+
+	// 3. 应用父子关系（如果配置了）
+	if len(combo.ParentTracks) > 0 {
+		if err := s.SetParentTracks(entityID, combo.ParentTracks); err != nil {
+			return fmt.Errorf("应用父子关系失败: %w", err)
+		}
+	}
+
+	// 4. 应用隐藏轨道（如果配置了）
+	if len(combo.HiddenTracks) > 0 {
+		reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+		if exists {
+			// 初始化 VisibleTracks（如果尚未初始化）
+			if reanimComp.VisibleTracks == nil {
+				reanimComp.VisibleTracks = make(map[string]bool)
+				// 默认所有轨道可见
+				for trackName := range reanimComp.MergedTracks {
+					reanimComp.VisibleTracks[trackName] = true
+				}
+			}
+
+			// 隐藏指定的轨道
+			for _, trackName := range combo.HiddenTracks {
+				reanimComp.VisibleTracks[trackName] = false
+			}
+		}
+	}
+
+	log.Printf("[ReanimSystem] PlayCombo: entity %d playing %s/%s (%v)",
+		entityID, unitID, comboName, combo.Animations)
+
+	return nil
+}
+
+// PlayDefaultAnimation 播放配置文件中定义的默认动画
+//
+// 此方法是 PlayCombo 的便捷版本，自动播放默认动画。
+// 通常用于实体初始化时播放待机动画。
+//
+// 参数：
+//   - entityID: 实体 ID
+//   - unitID: 动画单元 ID（如 "peashooter", "zombie"）
+//
+// 返回：
+//   - error: 配置不存在或应用失败时返回错误
+//
+// 示例：
+//
+//	// 播放豌豆射手默认动画（通常是 anim_idle）
+//	rs.PlayDefaultAnimation(peashooterID, "peashooter")
+//
+//	// 播放僵尸默认动画
+//	rs.PlayDefaultAnimation(zombieID, "zombie")
+//
+// 等效于：
+//
+//	animName, _ := configManager.GetDefaultAnimation(unitID)
+//	rs.PlayAnimation(entityID, animName)
+func (s *ReanimSystem) PlayDefaultAnimation(entityID ecs.EntityID, unitID string) error {
+	// 0. 验证配置管理器已设置
+	if s.configManager == nil {
+		return fmt.Errorf("配置管理器未设置，请先调用 SetConfigManager()")
+	}
+
+	// 1. 获取默认动画名称
+	animName, err := s.configManager.GetDefaultAnimation(unitID)
+	if err != nil {
+		return fmt.Errorf("获取默认动画失败: %w", err)
+	}
+
+	// 2. 播放动画
+	if err := s.PlayAnimation(entityID, animName); err != nil {
+		return fmt.Errorf("播放默认动画失败: %w", err)
+	}
+
+	log.Printf("[ReanimSystem] PlayDefaultAnimation: entity %d playing %s (default: %s)",
+		entityID, unitID, animName)
 
 	return nil
 }

@@ -22,6 +22,9 @@ type ReanimSystemInterface interface {
 	PrepareStaticPreview(entityID ecs.EntityID, reanimName string) error
 	// ApplyReanimConfig 将 Reanim 配置应用到指定实体 (Story 13.5)
 	ApplyReanimConfig(entityID ecs.EntityID, cfg *config.ReanimConfig) error
+	// Story 13.6: 配置驱动的动画播放
+	PlayCombo(entityID ecs.EntityID, unitID, comboName string) error
+	PlayDefaultAnimation(entityID ecs.EntityID, unitID string) error
 }
 
 // NewPlantEntity 创建植物实体
@@ -108,9 +111,9 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 			VisibleTracks: config.PlantPreviewVisibleTracks["SunFlower"],
 		})
 
-		// 使用 ReanimSystem 初始化动画（播放待机动画）
-		if err := rs.PlayAnimation(entityID, "anim_idle"); err != nil {
-			return 0, fmt.Errorf("failed to play SunFlower idle animation: %w", err)
+		// Story 13.6: 使用配置驱动的动画播放
+		if err := rs.PlayDefaultAnimation(entityID, "sunflower"); err != nil {
+			return 0, fmt.Errorf("failed to play SunFlower default animation: %w", err)
 		}
 		log.Printf("[PlantFactory] 向日葵 %d: 成功添加 ReanimComponent 并初始化动画", entityID)
 	}
@@ -183,9 +186,9 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 				},
 			})
 
-			// 播放完整待机动画
-			if err := rs.PlayAnimation(entityID, "anim_full_idle"); err != nil {
-				return 0, fmt.Errorf("failed to play PeaShooter idle animation: %w", err)
+			// Story 13.6: 使用配置驱动的动画播放
+			if err := rs.PlayDefaultAnimation(entityID, "peashooter"); err != nil {
+				return 0, fmt.Errorf("failed to play PeaShooter default animation: %w", err)
 			}
 
 			// 配置父子关系
@@ -312,9 +315,9 @@ func NewWallnutEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameSta
 		PartImages: partImages,
 	})
 
-	// 使用 ReanimSystem 初始化动画（播放完好状态的待机动画）
-	if err := rs.PlayAnimation(entityID, "anim_idle"); err != nil {
-		return 0, fmt.Errorf("failed to play WallNut idle animation: %w", err)
+	// Story 13.6: 使用配置驱动的动画播放
+	if err := rs.PlayDefaultAnimation(entityID, "wallnut"); err != nil {
+		return 0, fmt.Errorf("failed to play WallNut default animation: %w", err)
 	}
 
 	// 添加碰撞组件（用于僵尸碰撞检测）
@@ -371,9 +374,9 @@ func NewCherryBombEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.Game
 		PartImages: partImages,
 	})
 
-	// 使用 ReanimSystem 初始化动画（播放引信待机动画）
-	if err := rs.PlayAnimation(entityID, "anim_idle"); err != nil {
-		return 0, fmt.Errorf("failed to play CherryBomb idle animation: %w", err)
+	// Story 13.6: 使用配置驱动的动画播放
+	if err := rs.PlayDefaultAnimation(entityID, "cherrybomb"); err != nil {
+		return 0, fmt.Errorf("failed to play CherryBomb default animation: %w", err)
 	}
 	log.Printf("[PlantFactory] 樱桃炸弹 %d: 成功添加 ReanimComponent 并初始化引信动画", entityID)
 
