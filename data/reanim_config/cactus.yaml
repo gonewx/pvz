@@ -1,0 +1,38 @@
+id: cactus
+name: Cactus
+reanim_file: data/reanim/Cactus.reanim
+default_animation: anim_blink
+scale: 1
+images:
+    IMAGE_REANIM_CACTUS_ARM1_1: assets/reanim/Cactus_arm1_1.png
+    IMAGE_REANIM_CACTUS_ARM1_2: assets/reanim/Cactus_arm1_2.png
+    IMAGE_REANIM_CACTUS_ARM2_1: assets/reanim/Cactus_arm2_1.png
+    IMAGE_REANIM_CACTUS_ARM2_2: assets/reanim/Cactus_arm2_2.png
+    IMAGE_REANIM_CACTUS_BLINK1: assets/reanim/Cactus_blink1.png
+    IMAGE_REANIM_CACTUS_BLINK2: assets/reanim/Cactus_blink2.png
+    IMAGE_REANIM_CACTUS_BODY_OVERLAY: assets/reanim/Cactus_body_overlay.png
+    IMAGE_REANIM_CACTUS_BODY_OVERLAY2: assets/reanim/Cactus_body_overlay2.png
+    IMAGE_REANIM_CACTUS_BODY1: assets/reanim/Cactus_body1.png
+    IMAGE_REANIM_CACTUS_BODY2: assets/reanim/Cactus_body2.png
+    IMAGE_REANIM_CACTUS_BODY3: assets/reanim/Cactus_body3.png
+    IMAGE_REANIM_CACTUS_FLOWER: assets/reanim/Cactus_flower.png
+    IMAGE_REANIM_CACTUS_FLOWER_TOP: assets/reanim/Cactus_flower_top.png
+    IMAGE_REANIM_CACTUS_LIPS: assets/reanim/Cactus_lips.png
+    IMAGE_REANIM_CACTUS_MOUTH: assets/reanim/Cactus_mouth.png
+available_animations:
+    - name: anim_blink
+      display_name: blink
+    - name: anim_idle
+      display_name: idle
+    - name: anim_shooting
+      display_name: shooting
+    - name: anim_rise
+      display_name: rise
+    - name: anim_idlehigh
+      display_name: idlehigh
+    - name: anim_shootinghigh
+      display_name: shootinghigh
+    - name: anim_lower
+      display_name: lower
+    - name: anim_face
+      display_name: face

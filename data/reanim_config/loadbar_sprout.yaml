@@ -1,0 +1,13 @@
+id: loadbar_sprout
+name: LoadBar_sprout
+reanim_file: data/reanim/LoadBar_sprout.reanim
+default_animation: anim_sprout
+scale: 1
+images:
+    IMAGE_REANIM_POTATOMINE_ROCK1: assets/reanim/PotatoMine_rock1.png
+    IMAGE_REANIM_POTATOMINE_ROCK3: assets/reanim/PotatoMine_rock3.png
+    IMAGE_REANIM_SPROUT_BODY: assets/reanim/sprout_body.png
+    IMAGE_REANIM_SPROUT_PETAL: assets/reanim/sprout_petal.png
+available_animations:
+    - name: anim_sprout
+      display_name: sprout

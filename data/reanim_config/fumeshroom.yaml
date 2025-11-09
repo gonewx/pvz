@@ -1,0 +1,23 @@
+id: fumeshroom
+name: Fumeshroom
+reanim_file: data/reanim/Fumeshroom.reanim
+default_animation: anim_sleep
+scale: 1
+images:
+    IMAGE_REANIM_FUMESHROOM_BLINK1: assets/reanim/FumeShroom_blink1.png
+    IMAGE_REANIM_FUMESHROOM_BLINK2: assets/reanim/FumeShroom_blink2.png
+    IMAGE_REANIM_FUMESHROOM_BODY: assets/reanim/FumeShroom_body.png
+    IMAGE_REANIM_FUMESHROOM_HEAD: assets/reanim/FumeShroom_head.png
+    IMAGE_REANIM_FUMESHROOM_SPOUT: assets/reanim/FumeShroom_spout.png
+    IMAGE_REANIM_FUMESHROOM_TIP: assets/reanim/FumeShroom_tip.png
+available_animations:
+    - name: anim_sleep
+      display_name: sleep
+    - name: anim_shooting
+      display_name: shooting
+    - name: anim_idle
+      display_name: idle
+    - name: anim_face
+      display_name: face
+    - name: anim_blink
+      display_name: blink

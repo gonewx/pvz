@@ -1,0 +1,30 @@
+id: twinsunflower
+name: TwinSunFlower
+reanim_file: data/reanim/TwinSunFlower.reanim
+default_animation: anim_blink
+scale: 1
+images:
+    IMAGE_REANIM_PEASHOOTER_BACKLEAF: assets/reanim/PeaShooter_backleaf.png
+    IMAGE_REANIM_PEASHOOTER_BACKLEAF_LEFTTIP: assets/reanim/PeaShooter_backleaf_lefttip.png
+    IMAGE_REANIM_PEASHOOTER_BACKLEAF_RIGHTTIP: assets/reanim/PeaShooter_backleaf_righttip.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF: assets/reanim/PeaShooter_frontleaf.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF_LEFTTIP: assets/reanim/PeaShooter_frontleaf_lefttip.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF_RIGHTTIP: assets/reanim/PeaShooter_frontleaf_righttip.png
+    IMAGE_REANIM_SUNFLOWER_BLINK1: assets/reanim/SunFlower_blink1.png
+    IMAGE_REANIM_SUNFLOWER_BLINK2: assets/reanim/SunFlower_blink2.png
+    IMAGE_REANIM_SUNFLOWER_DOUBLE_PETALS: assets/reanim/SunFlower_double_petals.png
+    IMAGE_REANIM_SUNFLOWER_HEAD: assets/reanim/SunFlower_head.png
+    IMAGE_REANIM_TWINSUNFLOWER_LEAF: assets/reanim/TwinSunflower_leaf.png
+    IMAGE_REANIM_TWINSUNFLOWER_STEM1: assets/reanim/TwinSunflower_stem1.png
+    IMAGE_REANIM_TWINSUNFLOWER_STEM2: assets/reanim/TwinSunflower_stem2.png
+available_animations:
+    - name: anim_blink
+      display_name: blink
+    - name: anim_blink2
+      display_name: blink2
+    - name: anim_idle
+      display_name: idle
+    - name: anim_face2
+      display_name: face2
+    - name: anim_face
+      display_name: face

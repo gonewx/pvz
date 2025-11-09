@@ -1,0 +1,8 @@
+id: finalwave
+name: FinalWave
+reanim_file: data/reanim/FinalWave.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_FINALWAVE: assets/reanim/FinalWave.png
+available_animations: []

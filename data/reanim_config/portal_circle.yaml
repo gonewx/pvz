@@ -1,0 +1,18 @@
+id: portal_circle
+name: Portal_Circle
+reanim_file: data/reanim/Portal_Circle.reanim
+default_animation: anim_appear
+scale: 1
+images:
+    IMAGE_REANIM_PORTAL_CIRCLE_CENTER: assets/reanim/Portal_Circle_center.png
+    IMAGE_REANIM_PORTAL_CIRCLE_GLOW: assets/reanim/Portal_Circle_glow.png
+    IMAGE_REANIM_PORTAL_CIRCLE_OUTER: assets/reanim/Portal_Circle_outer.png
+available_animations:
+    - name: anim_appear
+      display_name: appear
+    - name: anim_pulse
+      display_name: pulse
+    - name: anim_pulse_reverse
+      display_name: pulse_reverse
+    - name: anim_dissapear
+      display_name: dissapear

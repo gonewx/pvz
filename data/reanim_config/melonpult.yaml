@@ -1,0 +1,26 @@
+id: melonpult
+name: Melonpult
+reanim_file: data/reanim/Melonpult.reanim
+default_animation: anim_blink
+scale: 1
+images:
+    IMAGE_REANIM_CABBAGEPULT_BASKET: assets/reanim/Cabbagepult_basket.png
+    IMAGE_REANIM_CABBAGEPULT_BASKET_OVERLAY: assets/reanim/Cabbagepult_basket_overlay.png
+    IMAGE_REANIM_MELONPULT_BLINK1: assets/reanim/Melonpult_blink1.png
+    IMAGE_REANIM_MELONPULT_BLINK2: assets/reanim/Melonpult_blink2.png
+    IMAGE_REANIM_MELONPULT_BODY: assets/reanim/Melonpult_body.png
+    IMAGE_REANIM_MELONPULT_EYEBROW: assets/reanim/Melonpult_eyebrow.png
+    IMAGE_REANIM_MELONPULT_MELON: assets/reanim/Melonpult_melon.png
+    IMAGE_REANIM_MELONPULT_STALK: assets/reanim/Melonpult_stalk.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF: assets/reanim/PeaShooter_frontleaf.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF_LEFTTIP: assets/reanim/PeaShooter_frontleaf_lefttip.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF_RIGHTTIP: assets/reanim/PeaShooter_frontleaf_righttip.png
+available_animations:
+    - name: anim_blink
+      display_name: blink
+    - name: anim_idle
+      display_name: idle
+    - name: anim_shooting
+      display_name: shooting
+    - name: anim_face
+      display_name: face

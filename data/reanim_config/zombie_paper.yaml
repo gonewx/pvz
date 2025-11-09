@@ -1,0 +1,60 @@
+id: zombie_paper
+name: Zombie_paper
+reanim_file: data/reanim/Zombie_paper.reanim
+default_animation: anim_death
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_HAIR: assets/reanim/Zombie_hair.png
+    IMAGE_REANIM_ZOMBIE_HEAD: assets/reanim/Zombie_head.png
+    IMAGE_REANIM_ZOMBIE_JAW: assets/reanim/Zombie_jaw.png
+    IMAGE_REANIM_ZOMBIE_PAPER_BODY: assets/reanim/Zombie_paper_body.png
+    IMAGE_REANIM_ZOMBIE_PAPER_GLASSES: assets/reanim/Zombie_paper_glasses.png
+    IMAGE_REANIM_ZOMBIE_PAPER_HAIRPIECE: assets/reanim/Zombie_paper_hairpiece.png
+    IMAGE_REANIM_ZOMBIE_PAPER_HANDS: assets/reanim/Zombie_paper_hands.png
+    IMAGE_REANIM_ZOMBIE_PAPER_HANDS2: assets/reanim/Zombie_paper_hands2.png
+    IMAGE_REANIM_ZOMBIE_PAPER_HANDS3: assets/reanim/Zombie_paper_hands3.png
+    IMAGE_REANIM_ZOMBIE_PAPER_HEAD_LOOK: assets/reanim/Zombie_paper_head_look.png
+    IMAGE_REANIM_ZOMBIE_PAPER_LEFTARM_LOWER: assets/reanim/Zombie_paper_leftarm_lower.png
+    IMAGE_REANIM_ZOMBIE_PAPER_LEFTARM_UPPER: assets/reanim/Zombie_paper_leftarm_upper.png
+    IMAGE_REANIM_ZOMBIE_PAPER_LEFTARM_UPPER2: assets/reanim/Zombie_paper_leftarm_upper2.png
+    IMAGE_REANIM_ZOMBIE_PAPER_LEFTFOOT: assets/reanim/Zombie_paper_leftfoot.png
+    IMAGE_REANIM_ZOMBIE_PAPER_LEFTLEG_LOWER: assets/reanim/Zombie_paper_leftleg_lower.png
+    IMAGE_REANIM_ZOMBIE_PAPER_LEFTLEG_UPPER: assets/reanim/Zombie_paper_leftleg_upper.png
+    IMAGE_REANIM_ZOMBIE_PAPER_LOWERBODY1: assets/reanim/Zombie_paper_lowerbody1.png
+    IMAGE_REANIM_ZOMBIE_PAPER_LOWERBODY2: assets/reanim/Zombie_paper_lowerbody2.png
+    IMAGE_REANIM_ZOMBIE_PAPER_PAPER1: assets/reanim/Zombie_paper_paper1.png
+    IMAGE_REANIM_ZOMBIE_PAPER_RIGHTARM_LOWER: assets/reanim/Zombie_paper_rightarm_lower.png
+    IMAGE_REANIM_ZOMBIE_PAPER_RIGHTARM_UPPER: assets/reanim/Zombie_paper_rightarm_upper.png
+    IMAGE_REANIM_ZOMBIE_PAPER_RIGHTFOOT: assets/reanim/Zombie_paper_rightfoot.png
+    IMAGE_REANIM_ZOMBIE_PAPER_RIGHTLEG_LOWER: assets/reanim/Zombie_paper_rightleg_lower.png
+    IMAGE_REANIM_ZOMBIE_PAPER_RIGHTLEG_UPPER: assets/reanim/Zombie_paper_rightleg_upper.png
+    IMAGE_REANIM_ZOMBIE_PUPILS: assets/reanim/Zombie_pupils.png
+available_animations:
+    - name: anim_death
+      display_name: death
+    - name: anim_eat
+      display_name: eat
+    - name: anim_eat_nopaper
+      display_name: eat_nopaper
+    - name: anim_walk
+      display_name: walk
+    - name: anim_walk_nopaper
+      display_name: walk_nopaper
+    - name: anim_idle
+      display_name: idle
+    - name: anim_gasp
+      display_name: gasp
+    - name: anim_hair
+      display_name: hair
+    - name: anim_head1
+      display_name: head1
+    - name: anim_head_look
+      display_name: head_look
+    - name: anim_head_pupils
+      display_name: head_pupils
+    - name: anim_hairpiece
+      display_name: hairpiece
+    - name: anim_head_jaw
+      display_name: head_jaw
+    - name: anim_head_glasses
+      display_name: head_glasses

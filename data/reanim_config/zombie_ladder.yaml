@@ -1,0 +1,50 @@
+id: zombie_ladder
+name: Zombie_ladder
+reanim_file: data/reanim/Zombie_ladder.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_INNERARM_HAND: assets/reanim/Zombie_innerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_LADDER_1: assets/reanim/Zombie_ladder_1.png
+    IMAGE_REANIM_ZOMBIE_LADDER_2: assets/reanim/Zombie_ladder_2.png
+    IMAGE_REANIM_ZOMBIE_LADDER_3: assets/reanim/Zombie_ladder_3.png
+    IMAGE_REANIM_ZOMBIE_LADDER_4: assets/reanim/Zombie_ladder_4.png
+    IMAGE_REANIM_ZOMBIE_LADDER_5: assets/reanim/Zombie_ladder_5.png
+    IMAGE_REANIM_ZOMBIE_LADDER_BODY: assets/reanim/Zombie_ladder_body.png
+    IMAGE_REANIM_ZOMBIE_LADDER_BODY2: assets/reanim/Zombie_ladder_body2.png
+    IMAGE_REANIM_ZOMBIE_LADDER_HAMMER: assets/reanim/Zombie_ladder_hammer.png
+    IMAGE_REANIM_ZOMBIE_LADDER_HEAD: assets/reanim/Zombie_ladder_head.png
+    IMAGE_REANIM_ZOMBIE_LADDER_INNERARM_HAND: assets/reanim/Zombie_ladder_innerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_LADDER_INNERARM_LOWER: assets/reanim/Zombie_ladder_innerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_LADDER_INNERARM_UPPER: assets/reanim/Zombie_ladder_innerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_LADDER_INNERLEG_FOOT: assets/reanim/Zombie_ladder_innerleg_foot.png
+    IMAGE_REANIM_ZOMBIE_LADDER_INNERLEG_LOWER: assets/reanim/Zombie_ladder_innerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_LADDER_INNERLEG_UPPER: assets/reanim/Zombie_ladder_innerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_LADDER_JAW: assets/reanim/Zombie_ladder_jaw.png
+    IMAGE_REANIM_ZOMBIE_LADDER_OUTERARM_HAND2: assets/reanim/Zombie_ladder_outerarm_hand2.png
+    IMAGE_REANIM_ZOMBIE_LADDER_OUTERARM_LOWER: assets/reanim/Zombie_ladder_outerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_LADDER_OUTERARM_UPPER: assets/reanim/Zombie_ladder_outerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_LADDER_OUTERARM_UPPER2: assets/reanim/Zombie_ladder_outerarm_upper2.png
+    IMAGE_REANIM_ZOMBIE_LADDER_OUTERLEG_LOWER: assets/reanim/Zombie_ladder_outerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_LADDER_OUTERLEG_UPPER: assets/reanim/Zombie_ladder_outerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_OUTERARM_HAND: assets/reanim/Zombie_outerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_OUTERLEG_FOOT: assets/reanim/Zombie_outerleg_foot.png
+available_animations:
+    - name: anim_idle
+      display_name: idle
+    - name: anim_ladderwalk
+      display_name: ladderwalk
+    - name: anim_laddereat
+      display_name: laddereat
+    - name: anim_death
+      display_name: death
+    - name: anim_walk
+      display_name: walk
+    - name: anim_eat
+      display_name: eat
+    - name: anim_placeladder
+      display_name: placeladder
+    - name: anim_head2
+      display_name: head2
+    - name: anim_head1
+      display_name: head1

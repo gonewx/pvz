@@ -1,0 +1,7 @@
+id: credits_zombiearmy2
+name: Credits_ZombieArmy2
+reanim_file: data/reanim/Credits_ZombieArmy2.reanim
+default_animation: anim_idle
+scale: 1
+images: {}
+available_animations: []

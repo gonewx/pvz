@@ -1,0 +1,9 @@
+id: sodroll
+name: SodRoll
+reanim_file: data/reanim/SodRoll.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_SODROLL: assets/reanim/SodRoll.png
+    IMAGE_REANIM_SODROLLCAP: assets/reanim/SodRollCap.png
+available_animations: []

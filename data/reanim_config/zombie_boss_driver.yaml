@@ -1,0 +1,36 @@
+id: zombie_boss_driver
+name: Zombie_Boss_driver
+reanim_file: data/reanim/Zombie_Boss_driver.reanim
+default_animation: anim_swell
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_BOSS_FLAG: assets/reanim/Zombie_boss_flag.png
+    IMAGE_REANIM_ZOMBIE_BOSS_FLAGPOLE: assets/reanim/Zombie_boss_flagpole.png
+    IMAGE_REANIM_ZOMBIE_BOSSDRIVER_BODY: assets/reanim/Zombie_bossdriver_body.png
+    IMAGE_REANIM_ZOMBIE_BOSSDRIVER_BRAIN: assets/reanim/Zombie_bossdriver_brain.png
+    IMAGE_REANIM_ZOMBIE_BOSSDRIVER_FACE: assets/reanim/Zombie_bossdriver_face.png
+    IMAGE_REANIM_ZOMBIE_BOSSDRIVER_FACE2: assets/reanim/Zombie_bossdriver_face2.png
+    IMAGE_REANIM_ZOMBIE_BOSSDRIVER_INNERHAND: assets/reanim/Zombie_bossdriver_innerhand.png
+    IMAGE_REANIM_ZOMBIE_BOSSDRIVER_JAW: assets/reanim/Zombie_bossdriver_jaw.png
+    IMAGE_REANIM_ZOMBIE_BOSSDRIVER_JAW2: assets/reanim/Zombie_bossdriver_jaw2.png
+    IMAGE_REANIM_ZOMBIE_BOSSDRIVER_LOWERARM: assets/reanim/Zombie_bossdriver_lowerarm.png
+    IMAGE_REANIM_ZOMBIE_BOSSDRIVER_LOWERARM2: assets/reanim/Zombie_bossdriver_lowerarm2.png
+    IMAGE_REANIM_ZOMBIE_BOSSDRIVER_OUTERHAND: assets/reanim/Zombie_bossdriver_outerhand.png
+    IMAGE_REANIM_ZOMBIE_BOSSDRIVER_UPPERARM: assets/reanim/Zombie_bossdriver_upperarm.png
+available_animations:
+    - name: anim_swell
+      display_name: swell
+    - name: anim_idle
+      display_name: idle
+    - name: anim_drive
+      display_name: drive
+    - name: anim_damage
+      display_name: damage
+    - name: anim_laugh
+      display_name: laugh
+    - name: anim_death
+      display_name: death
+    - name: anim_flag
+      display_name: flag
+    - name: anim_flag_loop
+      display_name: flag_loop

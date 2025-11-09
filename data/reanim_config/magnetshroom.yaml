@@ -1,0 +1,48 @@
+id: magnetshroom
+name: Magnetshroom
+reanim_file: data/reanim/Magnetshroom.reanim
+default_animation: anim_blink
+scale: 1
+images:
+    IMAGE_REANIM_MAGNETSHROOM_DOT: assets/reanim/Magnetshroom_dot.png
+    IMAGE_REANIM_MAGNETSHROOM_EYE1: assets/reanim/Magnetshroom_eye1.png
+    IMAGE_REANIM_MAGNETSHROOM_EYE3: assets/reanim/Magnetshroom_eye3.png
+    IMAGE_REANIM_MAGNETSHROOM_EYEBLINK3: assets/reanim/Magnetshroom_eyeblink3.png
+    IMAGE_REANIM_MAGNETSHROOM_EYEBLINK4: assets/reanim/Magnetshroom_eyeblink4.png
+    IMAGE_REANIM_MAGNETSHROOM_EYEBROW: assets/reanim/Magnetshroom_eyebrow.png
+    IMAGE_REANIM_MAGNETSHROOM_HEAD1: assets/reanim/Magnetshroom_head1.png
+    IMAGE_REANIM_MAGNETSHROOM_HEAD2: assets/reanim/Magnetshroom_head2.png
+    IMAGE_REANIM_MAGNETSHROOM_HEAD3: assets/reanim/Magnetshroom_head3.png
+    IMAGE_REANIM_MAGNETSHROOM_HEAD4: assets/reanim/Magnetshroom_head4.png
+    IMAGE_REANIM_MAGNETSHROOM_IDLE_ELECTRIC1: assets/reanim/Magnetshroom_idle_electric1.png
+    IMAGE_REANIM_MAGNETSHROOM_IDLE_ELECTRIC2: assets/reanim/Magnetshroom_idle_electric2.png
+    IMAGE_REANIM_MAGNETSHROOM_IDLE_ELECTRIC3: assets/reanim/Magnetshroom_idle_electric3.png
+    IMAGE_REANIM_MAGNETSHROOM_SHOCK1: assets/reanim/Magnetshroom_shock1.png
+    IMAGE_REANIM_MAGNETSHROOM_SHOCK2: assets/reanim/Magnetshroom_shock2.png
+    IMAGE_REANIM_MAGNETSHROOM_SHOCK3: assets/reanim/Magnetshroom_shock3.png
+    IMAGE_REANIM_MAGNETSHROOM_STEM: assets/reanim/Magnetshroom_stem.png
+    IMAGE_REANIM_MAGNETSHROOM_STEMCAP: assets/reanim/Magnetshroom_stemcap.png
+    IMAGE_REANIM_MAGNETSHROOM_STEMCAP_OVERLAY: assets/reanim/Magnetshroom_stemcap_overlay.png
+available_animations:
+    - name: anim_blink
+      display_name: blink
+    - name: anim_idle
+      display_name: idle
+    - name: anim_nonactive_idle
+      display_name: nonactive_idle
+    - name: anim_shooting
+      display_name: shooting
+    - name: anim_sleep
+      display_name: sleep
+    - name: anim_nonactive_idle2
+      display_name: nonactive_idle2
+    - name: anim_face
+      display_name: face
+    - name: anim_eyes
+      display_name: eyes
+    - name: anim_eyes2
+      display_name: eyes2
+    - name: anim_eyes2
+      display_name: eyes2
+    - name: anim_eyes22
+      display_name: eyes22

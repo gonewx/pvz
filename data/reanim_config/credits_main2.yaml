@@ -1,0 +1,15 @@
+id: credits_main2
+name: Credits_Main2
+reanim_file: data/reanim/Credits_Main2.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_BACKGROUND2: assets/images/background2.jpg
+    IMAGE_REANIM_BACKGROUND4: assets/images/background4.jpg
+    IMAGE_REANIM_CREDITS_BOX: assets/reanim/Credits_box.png
+    IMAGE_REANIM_CREDITS_MIC: assets/reanim/Credits_mic.png
+    IMAGE_REANIM_PLANTSHADOW: assets/images/plantshadow.png
+    IMAGE_REANIM_SPOTLIGHT: assets/images/spotlight.png
+    IMAGE_REANIM_SPOTLIGHT2: assets/images/spotlight2.png
+    IMAGE_REANIM_STORE_SPEECHBUBBLE2: assets/images/Store_SpeechBubble2.png
+available_animations: []

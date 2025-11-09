@@ -187,6 +187,136 @@ entities := ecs.GetEntitiesWith3[
 - `CollisionComponent`: 碰撞检测的边界框
 - `ParticleComponent`: 粒子效果数据(位置、速度、颜色、生命周期等) - Story 7.2
 - `EmitterComponent`: 粒子发射器配置(生成规则、限制、力场等) - Story 7.2
+- `ReanimComponent`: Reanim 动画组件，支持复杂的多轨道动画系统 - Epic 13
+
+## Reanim 动画配置系统（Epic 13）
+
+本项目使用**配置驱动**的 Reanim 动画系统，所有动画配置统一在 YAML 文件中管理，无需修改代码即可调整动画组合。
+
+### 配置文件位置
+
+**配置目录**：`data/reanim_config/` (Story 13.9 - 多文件架构)
+
+这是一个分片配置目录，每个动画单元对应一个独立的 YAML 文件，便于定位、编辑和维护。
+
+**全局配置文件**：`data/reanim_config.yaml`（仅包含全局设置）
+
+**示例结构**：
+```
+data/
+├── reanim_config.yaml          # 全局配置
+└── reanim_config/              # 动画单元配置目录
+    ├── peashooter.yaml         # 豌豆射手配置
+    ├── sunflower.yaml          # 向日葵配置
+    ├── zombie.yaml             # 僵尸配置
+    ├── zombie_conehead.yaml    # 路障僵尸配置
+    └── ... (共 142 个文件)
+```
+
+### 配置文件格式
+
+**全局配置文件** (`data/reanim_config.yaml`):
+```yaml
+global:
+  playback:
+    tps: 60      # 游戏目标 TPS
+    fps: 12      # 默认动画 FPS
+```
+
+**单个动画单元配置** (`data/reanim_config/peashooter.yaml`):
+```yaml
+id: "peashooter"                    # 动画单元 ID
+name: "PeaShooter"                  # 显示名称
+reanim_file: "data/reanim/PeaShooterSingle.reanim"
+default_animation: "anim_idle"     # 默认动画
+
+images:                             # 图片映射
+  IMAGE_REANIM_PEASHOOTER_HEAD: "assets/reanim/PeaShooter_Head.png"
+  # ... 其他图片
+
+available_animations:               # 可用动画列表
+  - name: "anim_idle"
+    display_name: "待机"
+  - name: "anim_shooting"
+    display_name: "攻击"
+
+animation_combos:                   # 动画组合配置
+  - name: "attack"                  # 组合名称
+    display_name: "攻击+摇晃"
+    animations: ["anim_shooting", "anim_head_idle"]  # 多动画组合
+    binding_strategy: "auto"        # 自动轨道绑定
+    parent_tracks:                  # 父子关系定义
+      anim_face: "anim_stem"       # 头部跟随茎干
+```
+
+### 配置驱动的动画播放 API
+
+**推荐方式**：使用配置驱动的 API（Epic 13 - Story 13.6）
+
+```go
+// ✅ 推荐：使用 PlayCombo 播放配置的动画组合
+rs.PlayCombo(entityID, "peashooter", "attack")
+// 自动处理：
+// - 播放 anim_shooting + anim_head_idle
+// - 自动轨道绑定
+// - 应用父子关系（头部跟随身体）
+
+// ✅ 推荐：使用 PlayDefaultAnimation 播放默认动画
+rs.PlayDefaultAnimation(entityID, "peashooter")
+// 自动播放 default_animation 配置的动画
+
+// ❌ 不推荐：硬编码动画名称（已废弃）
+rs.PlayAnimations(entityID, []string{"anim_shooting", "anim_head_idle"})
+```
+
+### 配置管理器
+
+游戏启动时会自动加载配置：
+
+```go
+// 配置目录在 main.go 中预加载 (Story 13.9)
+configManager, err := config.NewReanimConfigManager("data/reanim_config")
+if err != nil {
+    log.Fatalf("加载 Reanim 配置失败: %v", err)
+}
+
+// 配置管理器传递给 ReanimSystem
+reanimSystem.SetConfigManager(configManager)
+```
+
+### 添加新实体的动画配置
+
+1. 在 `data/reanim_config/` 目录中创建新的配置文件：
+   ```yaml
+   # data/reanim_config/new_plant.yaml
+   id: "new_plant"                  # 新实体 ID
+   name: "NewPlant"
+   reanim_file: "data/reanim/NewPlant.reanim"
+   default_animation: "anim_idle"
+   # ... 配置其他字段
+   ```
+
+2. 在代码中使用配置驱动的 API：
+   ```go
+   // 实体初始化时播放默认动画
+   rs.PlayDefaultAnimation(entityID, "new_plant")
+
+   // 需要时播放特定组合
+   rs.PlayCombo(entityID, "new_plant", "attack")
+   ```
+
+### 关键设计原则
+
+- ✅ **配置优于硬编码**：动画组合在配置文件中定义
+- ✅ **集中管理**：所有配置在单个文件中，便于维护
+- ✅ **自动绑定**：系统自动处理轨道绑定和父子关系
+- ✅ **热修改**：修改配置文件无需重新编译代码
+
+### 详细文档参考
+
+- **配置指南**：[docs/reanim/reanim-config-guide.md](docs/reanim/reanim-config-guide.md)
+- **Epic 13 PRD**：[docs/prd/epic-13-reanim-modernization.md](docs/prd/epic-13-reanim-modernization.md)
+
 
 ## 坐标系统使用指南
 

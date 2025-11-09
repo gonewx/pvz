@@ -1,0 +1,26 @@
+id: zengarden_wateringcan
+name: ZenGarden_wateringcan
+reanim_file: data/reanim/ZenGarden_wateringcan.reanim
+default_animation: anim_water
+scale: 1
+images:
+    IMAGE_REANIM_ZENGARDEN-WATERINGCAN4: assets/reanim/ZenGarden-wateringcan4.png
+    IMAGE_REANIM_ZENGARDEN_WATERINGCAN_WATER1: assets/reanim/ZenGarden_wateringcan_water1.png
+    IMAGE_REANIM_ZENGARDEN_WATERINGCAN_WATER2: assets/reanim/ZenGarden_wateringcan_water2.png
+    IMAGE_REANIM_ZENGARDEN_WATERINGCAN_WATER3: assets/reanim/ZenGarden_wateringcan_water3.png
+    IMAGE_REANIM_ZENGARDEN_WATERINGCAN_WATER4: assets/reanim/ZenGarden_wateringcan_water4.png
+    IMAGE_REANIM_ZENGARDEN_WATERINGCAN_WATER5: assets/reanim/ZenGarden_wateringcan_water5.png
+    IMAGE_REANIM_ZENGARDEN_WATERINGCAN_WATER6: assets/reanim/ZenGarden_wateringcan_water6.png
+    IMAGE_REANIM_ZENGARDEN_WATERINGCAN_WATER7: assets/reanim/ZenGarden_wateringcan_water7.png
+    IMAGE_REANIM_ZENGARDEN_WATERINGCAN_WATER8: assets/reanim/ZenGarden_wateringcan_water8.png
+    IMAGE_REANIM_ZENGARDEN_WATERINGCAN1: assets/reanim/ZenGarden_wateringcan1.png
+    IMAGE_REANIM_ZENGARDEN_WATERINGCAN1_GOLD: assets/reanim/ZenGarden_wateringcan1_gold.png
+    IMAGE_REANIM_ZENGARDEN_WATERINGCAN2: assets/reanim/ZenGarden_wateringcan2.png
+    IMAGE_REANIM_ZENGARDEN_WATERINGCAN2_GOLD: assets/reanim/ZenGarden_wateringcan2_gold.png
+    IMAGE_REANIM_ZENGARDEN_WATERINGCAN3: assets/reanim/ZenGarden_wateringcan3.png
+    IMAGE_REANIM_ZENGARDEN_WATERINGCAN3_GOLD: assets/reanim/ZenGarden_wateringcan3_gold.png
+available_animations:
+    - name: anim_water
+      display_name: water
+    - name: anim_water_area
+      display_name: water_area

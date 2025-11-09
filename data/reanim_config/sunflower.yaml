@@ -1,0 +1,47 @@
+id: sunflower
+name: SunFlower
+reanim_file: data/reanim/SunFlower.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_PEASHOOTER_BACKLEAF: assets/reanim/PeaShooter_backleaf.png
+    IMAGE_REANIM_PEASHOOTER_BACKLEAF_LEFTTIP: assets/reanim/PeaShooter_backleaf_lefttip.png
+    IMAGE_REANIM_PEASHOOTER_BACKLEAF_RIGHTTIP: assets/reanim/PeaShooter_backleaf_righttip.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF: assets/reanim/PeaShooter_frontleaf.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF_LEFTTIP: assets/reanim/PeaShooter_frontleaf_lefttip.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF_RIGHTTIP: assets/reanim/PeaShooter_frontleaf_righttip.png
+    IMAGE_REANIM_PEASHOOTER_STALK_BOTTOM: assets/reanim/PeaShooter_stalk_bottom.png
+    IMAGE_REANIM_PEASHOOTER_STALK_TOP: assets/reanim/PeaShooter_stalk_top.png
+    IMAGE_REANIM_SUNFLOWER_BLINK1: assets/reanim/SunFlower_blink1.png
+    IMAGE_REANIM_SUNFLOWER_BLINK2: assets/reanim/SunFlower_blink2.png
+    IMAGE_REANIM_SUNFLOWER_BOTTOMPETALS: assets/reanim/SunFlower_bottompetals.png
+    IMAGE_REANIM_SUNFLOWER_HEAD: assets/reanim/SunFlower_head.png
+    IMAGE_REANIM_SUNFLOWER_LEFTPETAL1: assets/reanim/SunFlower_leftpetal1.png
+    IMAGE_REANIM_SUNFLOWER_LEFTPETAL2: assets/reanim/SunFlower_leftpetal2.png
+    IMAGE_REANIM_SUNFLOWER_LEFTPETAL3: assets/reanim/SunFlower_leftpetal3.png
+    IMAGE_REANIM_SUNFLOWER_LEFTPETAL4: assets/reanim/SunFlower_leftpetal4.png
+    IMAGE_REANIM_SUNFLOWER_LEFTPETAL5: assets/reanim/SunFlower_leftpetal5.png
+    IMAGE_REANIM_SUNFLOWER_LEFTPETAL6: assets/reanim/SunFlower_leftpetal6.png
+    IMAGE_REANIM_SUNFLOWER_LEFTPETAL7: assets/reanim/SunFlower_leftpetal7.png
+    IMAGE_REANIM_SUNFLOWER_LEFTPETAL8: assets/reanim/SunFlower_leftpetal8.png
+    IMAGE_REANIM_SUNFLOWER_RIGHTPETAL1: assets/reanim/SunFlower_rightpetal1.png
+    IMAGE_REANIM_SUNFLOWER_RIGHTPETAL2: assets/reanim/SunFlower_rightpetal2.png
+    IMAGE_REANIM_SUNFLOWER_RIGHTPETAL3: assets/reanim/SunFlower_rightpetal3.png
+    IMAGE_REANIM_SUNFLOWER_RIGHTPETAL4: assets/reanim/SunFlower_rightpetal4.png
+    IMAGE_REANIM_SUNFLOWER_RIGHTPETAL5: assets/reanim/SunFlower_rightpetal5.png
+    IMAGE_REANIM_SUNFLOWER_RIGHTPETAL6: assets/reanim/SunFlower_rightpetal6.png
+    IMAGE_REANIM_SUNFLOWER_RIGHTPETAL7: assets/reanim/SunFlower_rightpetal7.png
+    IMAGE_REANIM_SUNFLOWER_RIGHTPETAL8: assets/reanim/SunFlower_rightpetal8.png
+    IMAGE_REANIM_SUNFLOWER_RIGHTPETAL9: assets/reanim/SunFlower_rightpetal9.png
+    IMAGE_REANIM_SUNFLOWER_TOPPETALS: assets/reanim/SunFlower_toppetals.png
+available_animations:
+    - name: anim_idle
+      display_name: idle
+    - name: anim_blink
+      display_name: blink
+animation_combos:
+    - name: idle
+      display_name: 待机
+      animations:
+        - anim_idle
+      binding_strategy: auto

@@ -1,0 +1,64 @@
+id: zombie_credits_dance
+name: Zombie_credits_dance
+reanim_file: data/reanim/Zombie_credits_dance.reanim
+default_animation: anim_dance1
+scale: 1
+images:
+    IMAGE_REANIM_PLANTSHADOW: assets/images/plantshadow.png
+    IMAGE_REANIM_ZOMBIE_BODY: assets/reanim/Zombie_body.png
+    IMAGE_REANIM_ZOMBIE_DUCKYTUBE_INWATER: assets/reanim/Zombie_duckytube_inwater.png
+    IMAGE_REANIM_ZOMBIE_HAIR: assets/reanim/Zombie_hair.png
+    IMAGE_REANIM_ZOMBIE_HEAD: assets/reanim/Zombie_head.png
+    IMAGE_REANIM_ZOMBIE_INNERARM_HAND: assets/reanim/Zombie_innerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_INNERARM_LOWER: assets/reanim/Zombie_innerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_INNERARM_UPPER: assets/reanim/Zombie_innerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_INNERLEG_FOOT: assets/reanim/Zombie_innerleg_foot.png
+    IMAGE_REANIM_ZOMBIE_INNERLEG_LOWER: assets/reanim/Zombie_innerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_INNERLEG_UPPER: assets/reanim/Zombie_innerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_JAW: assets/reanim/Zombie_jaw.png
+    IMAGE_REANIM_ZOMBIE_NECK: assets/reanim/Zombie_neck.png
+    IMAGE_REANIM_ZOMBIE_OUTERARM_HAND: assets/reanim/Zombie_outerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_OUTERARM_LOWER: assets/reanim/Zombie_outerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_OUTERARM_UPPER: assets/reanim/Zombie_outerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_OUTERLEG_FOOT: assets/reanim/Zombie_outerleg_foot.png
+    IMAGE_REANIM_ZOMBIE_OUTERLEG_LOWER: assets/reanim/Zombie_outerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_OUTERLEG_UPPER: assets/reanim/Zombie_outerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_TIE: assets/reanim/Zombie_tie.png
+    IMAGE_REANIM_ZOMBIE_TONGUE: assets/reanim/Zombie_tongue.png
+available_animations:
+    - name: anim_dance1
+      display_name: dance1
+    - name: anim_dance2
+      display_name: dance2
+    - name: anim_dance3
+      display_name: dance3
+    - name: anim_dance4
+      display_name: dance4
+    - name: anim_dance5
+      display_name: dance5
+    - name: anim_dance6
+      display_name: dance6
+    - name: anim_dance7
+      display_name: dance7
+    - name: anim_dance8
+      display_name: dance8
+    - name: anim_dance9
+      display_name: dance9
+    - name: anim_dance10
+      display_name: dance10
+    - name: anim_dance11
+      display_name: dance11
+    - name: anim_innerarm_hand
+      display_name: innerarm_hand
+    - name: anim_innerarm_lower
+      display_name: innerarm_lower
+    - name: anim_innerarm_upper
+      display_name: innerarm_upper
+    - name: anim_head
+      display_name: head
+    - name: anim_jaw
+      display_name: jaw
+    - name: anim_tongue
+      display_name: tongue
+    - name: anim_hair
+      display_name: hair

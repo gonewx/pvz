@@ -1,0 +1,14 @@
+id: lilypad
+name: Lilypad
+reanim_file: data/reanim/Lilypad.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_LILYPAD_BLINK1: assets/reanim/LilyPad_blink1.png
+    IMAGE_REANIM_LILYPAD_BLINK2: assets/reanim/LilyPad_blink2.png
+    IMAGE_REANIM_LILYPAD_BODY: assets/reanim/LilyPad_body.png
+available_animations:
+    - name: anim_idle
+      display_name: idle
+    - name: anim_blink
+      display_name: blink

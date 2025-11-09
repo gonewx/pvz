@@ -1,0 +1,12 @@
+id: splash
+name: splash
+reanim_file: data/reanim/splash.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_SPLASH_1: assets/reanim/splash_1.png
+    IMAGE_REANIM_SPLASH_2: assets/reanim/splash_2.png
+    IMAGE_REANIM_SPLASH_3: assets/reanim/splash_3.png
+    IMAGE_REANIM_SPLASH_4: assets/reanim/splash_4.png
+    IMAGE_REANIM_SPLASH_RING: assets/reanim/splash_ring.png
+available_animations: []

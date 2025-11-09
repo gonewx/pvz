@@ -1,0 +1,60 @@
+id: zombie_snorkle
+name: Zombie_snorkle
+reanim_file: data/reanim/Zombie_snorkle.reanim
+default_animation: anim_aquarium_death
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_OUTERARM_HAND: assets/reanim/Zombie_outerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_SNORKLE_BODY1: assets/reanim/Zombie_snorkle_body1.png
+    IMAGE_REANIM_ZOMBIE_SNORKLE_BODY2: assets/reanim/Zombie_snorkle_body2.png
+    IMAGE_REANIM_ZOMBIE_SNORKLE_HEAD: assets/reanim/Zombie_snorkle_head.png
+    IMAGE_REANIM_ZOMBIE_SNORKLE_HEAD_JAW: assets/reanim/Zombie_snorkle_head_jaw.png
+    IMAGE_REANIM_ZOMBIE_SNORKLE_HEAD3: assets/reanim/Zombie_snorkle_head3.png
+    IMAGE_REANIM_ZOMBIE_SNORKLE_HEAD4: assets/reanim/Zombie_snorkle_head4.png
+    IMAGE_REANIM_ZOMBIE_SNORKLE_HEADLIPS: assets/reanim/Zombie_snorkle_headlips.png
+    IMAGE_REANIM_ZOMBIE_SNORKLE_HEADWATER: assets/reanim/Zombie_snorkle_headwater.png
+    IMAGE_REANIM_ZOMBIE_SNORKLE_INNERARM_HAND: assets/reanim/Zombie_snorkle_innerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_SNORKLE_INNERARM_LOWER: assets/reanim/Zombie_snorkle_innerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_SNORKLE_INNERARM_UPPER: assets/reanim/Zombie_snorkle_innerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_SNORKLE_INNERLEG_FOOT: assets/reanim/Zombie_snorkle_innerleg_foot.png
+    IMAGE_REANIM_ZOMBIE_SNORKLE_INNERLEG_LOWER: assets/reanim/Zombie_snorkle_innerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_SNORKLE_INNERLEG_UPPER: assets/reanim/Zombie_snorkle_innerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_SNORKLE_OUTERARM_LOWER: assets/reanim/Zombie_snorkle_outerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_SNORKLE_OUTERARM_UPPER: assets/reanim/Zombie_snorkle_outerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_SNORKLE_OUTERARM_UPPER2: assets/reanim/Zombie_snorkle_outerarm_upper2.png
+    IMAGE_REANIM_ZOMBIE_SNORKLE_OUTERLEG_FOOT: assets/reanim/Zombie_snorkle_outerleg_foot.png
+    IMAGE_REANIM_ZOMBIE_SNORKLE_OUTERLEG_LOWER: assets/reanim/Zombie_snorkle_outerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_SNORKLE_OUTERLEG_UPPER: assets/reanim/Zombie_snorkle_outerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_SNORKLE_SNORKLE: assets/reanim/Zombie_snorkle_snorkle.png
+    IMAGE_REANIM_ZOMBIE_SNORKLE_WHITEWATER1: assets/reanim/Zombie_snorkle_whitewater1.png
+    IMAGE_REANIM_ZOMBIE_SNORKLE_WHITEWATER2: assets/reanim/Zombie_snorkle_whitewater2.png
+    IMAGE_REANIM_ZOMBIE_SNORKLE_WHITEWATER3: assets/reanim/Zombie_snorkle_whitewater3.png
+available_animations:
+    - name: anim_aquarium_death
+      display_name: aquarium_death
+    - name: anim_aquarium_bite
+      display_name: aquarium_bite
+    - name: anim_aquarium_swim
+      display_name: aquarium_swim
+    - name: anim_death
+      display_name: death
+    - name: anim_eat
+      display_name: eat
+    - name: anim_uptoeat
+      display_name: uptoeat
+    - name: anim_swim
+      display_name: swim
+    - name: anim_jumpinpool
+      display_name: jumpinpool
+    - name: anim_walk
+      display_name: walk
+    - name: anim_idle
+      display_name: idle
+    - name: anim_head1
+      display_name: head1
+    - name: anim_head_lips
+      display_name: head_lips
+    - name: anim_head_jaw
+      display_name: head_jaw
+    - name: anim_head_snorkle
+      display_name: head_snorkle

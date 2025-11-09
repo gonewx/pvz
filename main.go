@@ -71,7 +71,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Load all Reanim resources (auto-scan assets/effect/reanim directory)
+	// Load all Reanim resources (auto-scan data/reanim directory - Epic 13 migration)
 	if err := resourceManager.LoadReanimResources(); err != nil {
 		if *verboseFlag {
 			log.Printf("Failed to load Reanim resources: %v", err)
@@ -81,16 +81,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Load Reanim playback mode configuration
-	// This provides explicit mode configuration for key animations (SelectorScreen, PeaShooter, etc.)
-	// Falls back to heuristic algorithm if config not found
-	if err := config.LoadReanimPlaybackConfig(); err != nil {
-		// Non-fatal error: will use heuristic algorithm as fallback
-		log.Printf("⚠️  Reanim playback config not loaded (will use heuristic algorithm): %v", err)
-	}
+	// Story 13.7: reanim_playback_config.yaml 已被 Epic 13 的配置系统替代
+	// Story 13.9: 配置文件拆分为多文件架构
+	// 所有动画配置现在在 data/reanim_config/ 目录中管理
 
-	// Load Reanim 配置管理器 (Story 13.6)
-	reanimConfigManager, err := config.NewReanimConfigManager("data/reanim_config.yaml")
+	// Load Reanim 配置管理器 (Story 13.6, Story 13.9)
+	reanimConfigManager, err := config.NewReanimConfigManager("data/reanim_config")
 	if err != nil {
 		if *verboseFlag {
 			log.Printf("Failed to load Reanim config: %v", err)
@@ -99,7 +95,7 @@ func main() {
 		}
 		os.Exit(1)
 	}
-	log.Printf("[Config] 加载 Reanim 配置: data/reanim_config.yaml")
+	log.Printf("[Config] 加载 Reanim 配置目录: data/reanim_config/")
 	log.Printf("[Config] 成功加载 %d 个动画单元配置", len(reanimConfigManager.ListUnits()))
 	log.Printf("[Config] 配置管理器初始化完成")
 

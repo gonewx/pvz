@@ -1,0 +1,17 @@
+id: zengarden_fertilizer
+name: ZenGarden_fertilizer
+reanim_file: data/reanim/ZenGarden_fertilizer.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_ZENGARDEN_FERTILIZE_BAG1: assets/reanim/ZenGarden_fertilize_bag1.png
+    IMAGE_REANIM_ZENGARDEN_FERTILIZER_BAG2: assets/reanim/ZenGarden_fertilizer_bag2.png
+    IMAGE_REANIM_ZENGARDEN_FERTILIZER_BAG3: assets/reanim/ZenGarden_fertilizer_bag3.png
+    IMAGE_REANIM_ZENGARDEN_FERTILIZER_BAG4: assets/reanim/ZenGarden_fertilizer_bag4.png
+    IMAGE_REANIM_ZENGARDEN_FERTILIZER_SEED1: assets/reanim/ZenGarden_fertilizer_seed1.png
+    IMAGE_REANIM_ZENGARDEN_FERTILIZER_SEED2: assets/reanim/ZenGarden_fertilizer_seed2.png
+    IMAGE_REANIM_ZENGARDEN_FERTILIZER_SEED3: assets/reanim/ZenGarden_fertilizer_seed3.png
+    IMAGE_REANIM_ZENGARDEN_FERTILIZER_SEED4: assets/reanim/ZenGarden_fertilizer_seed4.png
+    IMAGE_REANIM_ZENGARDEN_FERTILIZER_SEED5: assets/reanim/ZenGarden_fertilizer_seed5.png
+    IMAGE_REANIM_ZENGARDEN_FERTILIZER_SEED6: assets/reanim/ZenGarden_fertilizer_seed6.png
+available_animations: []

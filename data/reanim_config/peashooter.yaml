@@ -1,0 +1,54 @@
+id: peashooter
+name: PeaShooter
+reanim_file: data/reanim/PeaShooter.reanim
+default_animation: anim_full_idle
+scale: 1
+images:
+    IMAGE_REANIM_PEASHOOTER_BACKLEAF: assets/reanim/PeaShooter_backleaf.png
+    IMAGE_REANIM_PEASHOOTER_BACKLEAF_LEFTTIP: assets/reanim/PeaShooter_backleaf_lefttip.png
+    IMAGE_REANIM_PEASHOOTER_BACKLEAF_RIGHTTIP: assets/reanim/PeaShooter_backleaf_righttip.png
+    IMAGE_REANIM_PEASHOOTER_BLINK1: assets/reanim/PeaShooter_blink1.png
+    IMAGE_REANIM_PEASHOOTER_BLINK2: assets/reanim/PeaShooter_blink2.png
+    IMAGE_REANIM_PEASHOOTER_EYEBROW: assets/reanim/PeaShooter_eyebrow.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF: assets/reanim/PeaShooter_frontleaf.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF_LEFTTIP: assets/reanim/PeaShooter_frontleaf_lefttip.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF_RIGHTTIP: assets/reanim/PeaShooter_frontleaf_righttip.png
+    IMAGE_REANIM_PEASHOOTER_HEAD: assets/reanim/PeaShooter_Head.png
+    IMAGE_REANIM_PEASHOOTER_HEADLEAF_2RDFARTHEST: assets/reanim/PeaShooter_headleaf_2rdfarthest.png
+    IMAGE_REANIM_PEASHOOTER_HEADLEAF_3RDFARTHEST: assets/reanim/PeaShooter_headleaf_3rdfarthest.png
+    IMAGE_REANIM_PEASHOOTER_HEADLEAF_FARTHEST: assets/reanim/PeaShooter_headleaf_farthest.png
+    IMAGE_REANIM_PEASHOOTER_HEADLEAF_NEAREST: assets/reanim/PeaShooter_headleaf_nearest.png
+    IMAGE_REANIM_PEASHOOTER_HEADLEAF_TIP_BOTTOM: assets/reanim/PeaShooter_headleaf_tip_bottom.png
+    IMAGE_REANIM_PEASHOOTER_HEADLEAF_TIP_TOP: assets/reanim/PeaShooter_headleaf_tip_top.png
+    IMAGE_REANIM_PEASHOOTER_MOUTH: assets/reanim/PeaShooter_mouth.png
+    IMAGE_REANIM_PEASHOOTER_STALK_BOTTOM: assets/reanim/PeaShooter_stalk_bottom.png
+    IMAGE_REANIM_PEASHOOTER_STALK_TOP: assets/reanim/PeaShooter_stalk_top.png
+available_animations:
+    - name: anim_full_idle
+      display_name: full_idle
+    - name: anim_shooting
+      display_name: shooting
+    - name: anim_head_idle
+      display_name: head_idle
+    - name: anim_idle
+      display_name: idle
+    - name: anim_stem
+      display_name: stem
+    - name: anim_face
+      display_name: face
+    - name: anim_blink
+      display_name: blink
+animation_combos:
+    - name: idle
+      display_name: 待机
+      animations:
+        - anim_full_idle
+      binding_strategy: auto
+    - name: attack
+      display_name: 攻击
+      animations:
+        - anim_shooting
+        - anim_head_idle
+      binding_strategy: auto
+      parent_tracks:
+        anim_face: anim_stem

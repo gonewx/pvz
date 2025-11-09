@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"gopkg.in/yaml.v3"
@@ -29,13 +30,13 @@ type PlaybackConfig struct {
 // AnimationUnitConfig 动画单元配置
 // 与 animation_showcase 的结构完全一致
 type AnimationUnitConfig struct {
-	ID                  string                   `yaml:"id"`
-	Name                string                   `yaml:"name"`
-	ReanimFile          string                   `yaml:"reanim_file"`
-	DefaultAnimation    string                   `yaml:"default_animation"`
-	Images              map[string]string        `yaml:"images"`
-	AvailableAnimations []AnimationInfo          `yaml:"available_animations"`
-	AnimationCombos     []AnimationComboConfig   `yaml:"animation_combos"`
+	ID                  string                 `yaml:"id"`
+	Name                string                 `yaml:"name"`
+	ReanimFile          string                 `yaml:"reanim_file"`
+	DefaultAnimation    string                 `yaml:"default_animation"`
+	Images              map[string]string      `yaml:"images"`
+	AvailableAnimations []AnimationInfo        `yaml:"available_animations"`
+	AnimationCombos     []AnimationComboConfig `yaml:"animation_combos"`
 }
 
 // AnimationInfo 动画信息
@@ -49,20 +50,38 @@ type AnimationInfo struct {
 // ReanimConfigManager Reanim 配置管理器
 // 负责加载和管理全量 Reanim 配置
 type ReanimConfigManager struct {
-	config  *GameReanimConfig              // 全量配置
+	config  *GameReanimConfig               // 全量配置
 	unitMap map[string]*AnimationUnitConfig // 按 id 索引的配置映射
-	mu      sync.RWMutex                   // 读写锁（并发安全）
+	mu      sync.RWMutex                    // 读写锁（并发安全）
 }
 
 // NewReanimConfigManager 创建配置管理器
 //
 // 参数：
-//   - configPath: 配置文件路径（如 "data/reanim_config.yaml"）
+//   - configPath: 配置文件路径或目录路径
+//   - 如果是文件路径（如 "data/reanim_config.yaml"），则使用单文件模式（向后兼容）
+//   - 如果是目录路径（如 "data/reanim_config"），则从目录加载所有 YAML 文件
 //
 // 返回：
 //   - *ReanimConfigManager: 配置管理器实例
 //   - error: 加载或解析错误
 func NewReanimConfigManager(configPath string) (*ReanimConfigManager, error) {
+	// 1. 判断路径类型
+	fileInfo, err := os.Stat(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("无法访问路径 %s: %w", configPath, err)
+	}
+
+	// 2. 根据路径类型选择加载方式
+	if fileInfo.IsDir() {
+		return loadFromDirectory(configPath)
+	} else {
+		return loadFromFile(configPath)
+	}
+}
+
+// loadFromFile 从单个文件加载配置（向后兼容）
+func loadFromFile(configPath string) (*ReanimConfigManager, error) {
 	// 1. 读取配置文件
 	data, err := os.ReadFile(configPath)
 	if err != nil {
@@ -92,6 +111,109 @@ func NewReanimConfigManager(configPath string) (*ReanimConfigManager, error) {
 	}
 
 	return manager, nil
+}
+
+// loadFromDirectory 从目录加载所有配置文件
+func loadFromDirectory(dirPath string) (*ReanimConfigManager, error) {
+	// 1. 加载全局配置
+	globalConfig, err := loadGlobalConfig(dirPath)
+	if err != nil {
+		return nil, fmt.Errorf("加载全局配置失败: %w", err)
+	}
+
+	// 2. 扫描目录中的所有 YAML 文件
+	files, err := filepath.Glob(filepath.Join(dirPath, "*.yaml"))
+	if err != nil {
+		return nil, fmt.Errorf("扫描目录 %s 失败: %w", dirPath, err)
+	}
+
+	// 3. 加载所有动画单元配置
+	var animations []AnimationUnitConfig
+	unitMap := make(map[string]*AnimationUnitConfig)
+
+	for _, file := range files {
+		unit, err := loadAnimationUnit(file)
+		if err != nil {
+			return nil, fmt.Errorf("加载文件 %s 失败: %w", file, err)
+		}
+
+		// 跳过全局配置文件（没有 id 字段）
+		if unit.ID == "" {
+			continue
+		}
+
+		animations = append(animations, unit)
+		// 注意：这里先添加到数组，后面再设置指针
+	}
+
+	// 4. 构建索引（指向数组中的元素）
+	for i := range animations {
+		unit := &animations[i]
+		if _, exists := unitMap[unit.ID]; exists {
+			return nil, fmt.Errorf("重复的动画单元 ID: %s", unit.ID)
+		}
+		unitMap[unit.ID] = unit
+	}
+
+	// 5. 创建管理器
+	config := &GameReanimConfig{
+		Global:     globalConfig,
+		Animations: animations,
+	}
+
+	manager := &ReanimConfigManager{
+		config:  config,
+		unitMap: unitMap,
+	}
+
+	return manager, nil
+}
+
+// loadAnimationUnit 加载单个动画单元配置文件
+func loadAnimationUnit(filePath string) (AnimationUnitConfig, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return AnimationUnitConfig{}, fmt.Errorf("无法读取文件: %w", err)
+	}
+
+	var unit AnimationUnitConfig
+	if err := yaml.Unmarshal(data, &unit); err != nil {
+		return AnimationUnitConfig{}, fmt.Errorf("无法解析 YAML: %w", err)
+	}
+
+	return unit, nil
+}
+
+// loadGlobalConfig 加载全局配置
+// 优先查找 data/reanim_config.yaml (上级目录)
+// 如果不存在，使用默认配置
+func loadGlobalConfig(dirPath string) (GlobalConfig, error) {
+	// 1. 尝试从上级目录加载全局配置文件
+	globalPath := filepath.Join(filepath.Dir(dirPath), "reanim_config.yaml")
+	if _, err := os.Stat(globalPath); err == nil {
+		// 文件存在，读取全局配置
+		data, err := os.ReadFile(globalPath)
+		if err != nil {
+			return GlobalConfig{}, fmt.Errorf("无法读取全局配置文件 %s: %w", globalPath, err)
+		}
+
+		var config struct {
+			Global GlobalConfig `yaml:"global"`
+		}
+		if err := yaml.Unmarshal(data, &config); err != nil {
+			return GlobalConfig{}, fmt.Errorf("无法解析全局配置文件 %s: %w", globalPath, err)
+		}
+
+		return config.Global, nil
+	}
+
+	// 2. 如果全局配置文件不存在，使用默认配置
+	return GlobalConfig{
+		Playback: PlaybackConfig{
+			TPS: 60,
+			FPS: 12,
+		},
+	}, nil
 }
 
 // GetUnit 获取动画单元配置

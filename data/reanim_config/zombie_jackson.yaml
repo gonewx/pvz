@@ -1,0 +1,46 @@
+id: zombie_jackson
+name: Zombie_Jackson
+reanim_file: data/reanim/Zombie_Jackson.reanim
+default_animation: anim_moonwalk
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_JACKSON_BODY1: assets/reanim/Zombie_Jackson_body1.png
+    IMAGE_REANIM_ZOMBIE_JACKSON_BODY2: assets/reanim/Zombie_Jackson_body2.png
+    IMAGE_REANIM_ZOMBIE_JACKSON_COLAR: assets/reanim/Zombie_Jackson_colar.png
+    IMAGE_REANIM_ZOMBIE_JACKSON_HAIR: assets/reanim/Zombie_Jackson_hair.png
+    IMAGE_REANIM_ZOMBIE_JACKSON_HEAD: assets/reanim/Zombie_jackson_head.png
+    IMAGE_REANIM_ZOMBIE_JACKSON_INNERARM_HAND: assets/reanim/Zombie_Jackson_innerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_JACKSON_INNERARM_HAND2: assets/reanim/Zombie_Jackson_innerarm_hand2.png
+    IMAGE_REANIM_ZOMBIE_JACKSON_INNERARM_LOWER: assets/reanim/Zombie_Jackson_innerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_JACKSON_INNERARM_UPPER: assets/reanim/Zombie_Jackson_innerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_JACKSON_INNERLEG_FOOT: assets/reanim/Zombie_Jackson_innerleg_foot.png
+    IMAGE_REANIM_ZOMBIE_JACKSON_INNERLEG_LOWER: assets/reanim/Zombie_Jackson_innerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_JACKSON_INNERLEG_TOE: assets/reanim/Zombie_Jackson_innerleg_toe.png
+    IMAGE_REANIM_ZOMBIE_JACKSON_INNERLEG_UPPER: assets/reanim/Zombie_Jackson_innerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_JACKSON_OUTERARM_HAND: assets/reanim/Zombie_Jackson_outerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_JACKSON_OUTERARM_LOWER: assets/reanim/Zombie_Jackson_outerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_JACKSON_OUTERARM_UPPER: assets/reanim/Zombie_Jackson_outerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_JACKSON_OUTERLEG_FOOT: assets/reanim/Zombie_Jackson_outerleg_foot.png
+    IMAGE_REANIM_ZOMBIE_JACKSON_OUTERLEG_LOWER: assets/reanim/Zombie_Jackson_outerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_JACKSON_OUTERLEG_TOE: assets/reanim/Zombie_Jackson_outerleg_toe.png
+    IMAGE_REANIM_ZOMBIE_JACKSON_OUTERLEG_UPPER: assets/reanim/Zombie_Jackson_outerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_JAW: assets/reanim/Zombie_jaw.png
+available_animations:
+    - name: anim_moonwalk
+      display_name: moonwalk
+    - name: anim_point
+      display_name: point
+    - name: anim_walk
+      display_name: walk
+    - name: anim_armraise
+      display_name: armraise
+    - name: anim_eat
+      display_name: eat
+    - name: anim_death
+      display_name: death
+    - name: anim_head1
+      display_name: head1
+    - name: anim_head2
+      display_name: head2
+    - name: anim_hair
+      display_name: hair

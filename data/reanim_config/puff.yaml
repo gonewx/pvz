@@ -1,0 +1,14 @@
+id: puff
+name: Puff
+reanim_file: data/reanim/Puff.reanim
+default_animation: anim_puff
+scale: 1
+images:
+    IMAGE_REANIM_PUFF_1: assets/reanim/puff_1.png
+    IMAGE_REANIM_PUFF_3: assets/reanim/puff_3.png
+    IMAGE_REANIM_PUFF_4: assets/reanim/puff_4.png
+    IMAGE_REANIM_PUFF_5: assets/reanim/puff_5.png
+    IMAGE_REANIM_PUFF_7: assets/reanim/puff_7.png
+available_animations:
+    - name: anim_puff
+      display_name: puff

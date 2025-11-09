@@ -1,0 +1,37 @@
+id: chomper
+name: Chomper
+reanim_file: data/reanim/Chomper.reanim
+default_animation: anim_swallow
+scale: 1
+images:
+    IMAGE_REANIM_CHOMPER_BOTTOMLIP: assets/reanim/Chomper_bottomlip.png
+    IMAGE_REANIM_CHOMPER_GROUNDLEAF1: assets/reanim/Chomper_groundleaf1.png
+    IMAGE_REANIM_CHOMPER_GROUNDLEAF1TIP: assets/reanim/Chomper_groundleaf1tip.png
+    IMAGE_REANIM_CHOMPER_GROUNDLEAF2: assets/reanim/Chomper_groundleaf2.png
+    IMAGE_REANIM_CHOMPER_GROUNDLEAF2TIP: assets/reanim/Chomper_groundleaf2tip.png
+    IMAGE_REANIM_CHOMPER_GROUNDLEAF3: assets/reanim/Chomper_groundleaf3.png
+    IMAGE_REANIM_CHOMPER_GROUNDLEAF4: assets/reanim/Chomper_groundleaf4.png
+    IMAGE_REANIM_CHOMPER_HEADLEAF1: assets/reanim/Chomper_Headleaf1.png
+    IMAGE_REANIM_CHOMPER_HEADLEAF2: assets/reanim/Chomper_Headleaf2.png
+    IMAGE_REANIM_CHOMPER_HEADLEAF3: assets/reanim/Chomper_Headleaf3.png
+    IMAGE_REANIM_CHOMPER_HEADLEAF4: assets/reanim/Chomper_Headleaf4.png
+    IMAGE_REANIM_CHOMPER_INSIDEMOUTH: assets/reanim/Chomper_insidemouth.png
+    IMAGE_REANIM_CHOMPER_SPIKE: assets/reanim/Chomper_spike.png
+    IMAGE_REANIM_CHOMPER_STEM1: assets/reanim/Chomper_stem1.png
+    IMAGE_REANIM_CHOMPER_STEM2: assets/reanim/Chomper_stem2.png
+    IMAGE_REANIM_CHOMPER_STEM3: assets/reanim/Chomper_stem3.png
+    IMAGE_REANIM_CHOMPER_STOMACH: assets/reanim/Chomper_stomach.png
+    IMAGE_REANIM_CHOMPER_TONGUE: assets/reanim/Chomper_tongue.png
+    IMAGE_REANIM_CHOMPER_TOPJAW: assets/reanim/Chomper_topjaw.png
+    IMAGE_REANIM_CHOMPER_UNDERJAW: assets/reanim/Chomper_underjaw.png
+    IMAGE_REANIM_ZOMBIE_OUTERARM_HAND: assets/reanim/Zombie_outerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_OUTERARM_LOWER: assets/reanim/Zombie_outerarm_lower.png
+available_animations:
+    - name: anim_swallow
+      display_name: swallow
+    - name: anim_chew
+      display_name: chew
+    - name: anim_bite
+      display_name: bite
+    - name: anim_idle
+      display_name: idle

@@ -1,0 +1,26 @@
+id: coffeebean
+name: Coffeebean
+reanim_file: data/reanim/Coffeebean.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_COFFEEBEAN_HEAD1: assets/reanim/Coffeebean_head1.png
+    IMAGE_REANIM_COFFEEBEAN_HEAD2: assets/reanim/Coffeebean_head2.png
+    IMAGE_REANIM_COFFEEBEAN_HEAD3: assets/reanim/Coffeebean_head3.png
+    IMAGE_REANIM_COFFEEBEAN_HEAD4: assets/reanim/Coffeebean_head4.png
+    IMAGE_REANIM_COFFEEBEAN_HEAD5: assets/reanim/Coffeebean_head5.png
+    IMAGE_REANIM_COFFEEBEAN_HEAD6: assets/reanim/Coffeebean_head6.png
+    IMAGE_REANIM_COFFEEBEAN_HEAD7: assets/reanim/Coffeebean_head7.png
+    IMAGE_REANIM_COFFEEBEAN_HEAD8: assets/reanim/Coffeebean_head8.png
+    IMAGE_REANIM_COFFEEBEAN_HEAD9: assets/reanim/Coffeebean_head9.png
+    IMAGE_REANIM_COFFEEBEAN_HEAD10: assets/reanim/Coffeebean_head10.png
+    IMAGE_REANIM_COFFEEBEAN_HEAD11: assets/reanim/Coffeebean_head11.png
+    IMAGE_REANIM_COFFEEBEAN_HEAD12: assets/reanim/Coffeebean_head12.png
+    IMAGE_REANIM_COFFEEBEAN_LEAF: assets/reanim/Coffeebean_leaf.png
+available_animations:
+    - name: anim_idle
+      display_name: idle
+    - name: anim_twitch
+      display_name: twitch
+    - name: anim_crumble
+      display_name: crumble

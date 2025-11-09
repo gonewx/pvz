@@ -1,0 +1,22 @@
+id: iceshroom
+name: Iceshroom
+reanim_file: data/reanim/Iceshroom.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_ICESHROOM_BASE: assets/reanim/IceShroom_base.png
+    IMAGE_REANIM_ICESHROOM_BLINK1: assets/reanim/IceShroom_blink1.png
+    IMAGE_REANIM_ICESHROOM_BLINK2: assets/reanim/IceShroom_blink2.png
+    IMAGE_REANIM_ICESHROOM_BODY: assets/reanim/IceShroom_body.png
+    IMAGE_REANIM_ICESHROOM_HEAD: assets/reanim/IceShroom_head.png
+available_animations:
+    - name: anim_idle
+      display_name: idle
+    - name: anim_sleep
+      display_name: sleep
+    - name: anim_face
+      display_name: face
+    - name: anim_sleep
+      display_name: sleep
+    - name: anim_blink
+      display_name: blink

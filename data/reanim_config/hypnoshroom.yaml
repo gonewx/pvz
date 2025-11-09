@@ -1,0 +1,16 @@
+id: hypnoshroom
+name: Hypnoshroom
+reanim_file: data/reanim/Hypnoshroom.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_HYPNOSHROOM_BODY: assets/reanim/HypnoShroom_body.png
+    IMAGE_REANIM_HYPNOSHROOM_EYE1: assets/reanim/HypnoShroom_eye1.png
+    IMAGE_REANIM_HYPNOSHROOM_EYE2: assets/reanim/HypnoShroom_eye2.png
+    IMAGE_REANIM_HYPNOSHROOM_HEAD: assets/reanim/HypnoShroom_head.png
+    IMAGE_REANIM_HYPNOSHROOM_SLEEPEYE: assets/reanim/HypnoShroom_sleepeye.png
+available_animations:
+    - name: anim_idle
+      display_name: idle
+    - name: anim_sleep
+      display_name: sleep

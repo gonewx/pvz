@@ -1,0 +1,7 @@
+id: lawnmoweredzombie
+name: LawnMoweredZombie
+reanim_file: data/reanim/LawnMoweredZombie.reanim
+default_animation: anim_idle
+scale: 1
+images: {}
+available_animations: []

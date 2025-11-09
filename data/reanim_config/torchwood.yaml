@@ -1,0 +1,21 @@
+id: torchwood
+name: Torchwood
+reanim_file: data/reanim/Torchwood.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_TORCHWOOD_BODY: assets/reanim/Torchwood_body.png
+    IMAGE_REANIM_TORCHWOOD_EYES1: assets/reanim/Torchwood_eyes1.png
+    IMAGE_REANIM_TORCHWOOD_EYES2: assets/reanim/Torchwood_eyes2.png
+    IMAGE_REANIM_TORCHWOOD_FIRE1A: assets/reanim/Torchwood_fire1a.png
+    IMAGE_REANIM_TORCHWOOD_FIRE1B: assets/reanim/Torchwood_fire1b.png
+    IMAGE_REANIM_TORCHWOOD_FIRE1C: assets/reanim/Torchwood_fire1c.png
+    IMAGE_REANIM_TORCHWOOD_MOUTH: assets/reanim/Torchwood_mouth.png
+    IMAGE_REANIM_TORCHWOOD_SPARK: assets/reanim/Torchwood_spark.png
+available_animations:
+    - name: anim_idle
+      display_name: idle
+    - name: anim_blink
+      display_name: blink
+    - name: anim_face
+      display_name: face

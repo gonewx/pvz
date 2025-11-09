@@ -1,0 +1,55 @@
+id: threepeater
+name: ThreePeater
+reanim_file: data/reanim/ThreePeater.reanim
+default_animation: anim_shooting2
+scale: 1
+images:
+    IMAGE_REANIM_PEASHOOTER_BACKLEAF: assets/reanim/PeaShooter_backleaf.png
+    IMAGE_REANIM_PEASHOOTER_BACKLEAF_LEFTTIP: assets/reanim/PeaShooter_backleaf_lefttip.png
+    IMAGE_REANIM_PEASHOOTER_BACKLEAF_RIGHTTIP: assets/reanim/PeaShooter_backleaf_righttip.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF: assets/reanim/PeaShooter_frontleaf.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF_LEFTTIP: assets/reanim/PeaShooter_frontleaf_lefttip.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF_RIGHTTIP: assets/reanim/PeaShooter_frontleaf_righttip.png
+    IMAGE_REANIM_THREEPEATER_BLINK1: assets/reanim/ThreePeater_blink1.png
+    IMAGE_REANIM_THREEPEATER_BLINK2: assets/reanim/ThreePeater_blink2.png
+    IMAGE_REANIM_THREEPEATER_HEAD: assets/reanim/ThreePeater_head.png
+    IMAGE_REANIM_THREEPEATER_HEADLEAF1: assets/reanim/ThreePeater_headleaf1.png
+    IMAGE_REANIM_THREEPEATER_HEADLEAF2: assets/reanim/ThreePeater_headleaf2.png
+    IMAGE_REANIM_THREEPEATER_HEADLEAF3: assets/reanim/ThreePeater_headleaf3.png
+    IMAGE_REANIM_THREEPEATER_MOUTH: assets/reanim/ThreePeater_mouth.png
+    IMAGE_REANIM_THREEPEATER_STEM1: assets/reanim/ThreePeater_stem1.png
+    IMAGE_REANIM_THREEPEATER_STEM2: assets/reanim/ThreePeater_stem2.png
+    IMAGE_REANIM_THREEPEATER_STEM3: assets/reanim/ThreePeater_stem3.png
+available_animations:
+    - name: anim_shooting2
+      display_name: shooting2
+    - name: anim_head_idle2
+      display_name: head_idle2
+    - name: anim_blink2
+      display_name: blink2
+    - name: anim_shooting3
+      display_name: shooting3
+    - name: anim_head_idle3
+      display_name: head_idle3
+    - name: anim_blink3
+      display_name: blink3
+    - name: anim_shooting1
+      display_name: shooting1
+    - name: anim_head_idle1
+      display_name: head_idle1
+    - name: anim_blink1
+      display_name: blink1
+    - name: anim_idle
+      display_name: idle
+    - name: anim_head1
+      display_name: head1
+    - name: anim_face1
+      display_name: face1
+    - name: anim_head3
+      display_name: head3
+    - name: anim_face3
+      display_name: face3
+    - name: anim_head2
+      display_name: head2
+    - name: anim_face2
+      display_name: face2

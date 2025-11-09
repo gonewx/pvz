@@ -1,0 +1,22 @@
+id: plantern
+name: Plantern
+reanim_file: data/reanim/Plantern.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_PLANTERN_BODY: assets/reanim/Plantern_body.png
+    IMAGE_REANIM_PLANTERN_EYES: assets/reanim/Plantern_eyes.png
+    IMAGE_REANIM_PLANTERN_EYES2: assets/reanim/Plantern_eyes2.png
+    IMAGE_REANIM_PLANTERN_LEAF1: assets/reanim/Plantern_leaf1.png
+    IMAGE_REANIM_PLANTERN_LEAF2: assets/reanim/Plantern_leaf2.png
+    IMAGE_REANIM_PLANTERN_LEAF3: assets/reanim/Plantern_leaf3.png
+    IMAGE_REANIM_PLANTERN_LEAF4: assets/reanim/Plantern_leaf4.png
+    IMAGE_REANIM_PLANTERN_LEAF5: assets/reanim/Plantern_leaf5.png
+    IMAGE_REANIM_PLANTERN_STEM: assets/reanim/Plantern_stem.png
+available_animations:
+    - name: anim_idle
+      display_name: idle
+    - name: anim_blink
+      display_name: blink
+    - name: anim_face
+      display_name: face

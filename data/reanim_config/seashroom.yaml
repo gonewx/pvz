@@ -1,0 +1,30 @@
+id: seashroom
+name: SeaShroom
+reanim_file: data/reanim/SeaShroom.reanim
+default_animation: anim_blink
+scale: 1
+images:
+    IMAGE_REANIM_SEASHROOM_BLINK1: assets/reanim/SeaShroom_blink1.png
+    IMAGE_REANIM_SEASHROOM_BLINK2: assets/reanim/SeaShroom_blink2.png
+    IMAGE_REANIM_SEASHROOM_BODY: assets/reanim/SeaShroom_body.png
+    IMAGE_REANIM_SEASHROOM_FOAM: assets/reanim/SeaShroom_foam.png
+    IMAGE_REANIM_SEASHROOM_HEAD: assets/reanim/SeaShroom_head.png
+    IMAGE_REANIM_SEASHROOM_LIPS: assets/reanim/SeaShroom_lips.png
+    IMAGE_REANIM_SEASHROOM_MOUTH: assets/reanim/SeaShroom_mouth.png
+    IMAGE_REANIM_SEASHROOM_TENTACLES: assets/reanim/SeaShroom_tentacles.png
+    IMAGE_REANIM_SEASHROOM_TENTACLES_ZENGARDEN: assets/reanim/SeaShroom_tentacles_zengarden.png
+available_animations:
+    - name: anim_blink
+      display_name: blink
+    - name: anim_sleep
+      display_name: sleep
+    - name: anim_idle
+      display_name: idle
+    - name: anim_idle_aquarium
+      display_name: idle_aquarium
+    - name: anim_shooting
+      display_name: shooting
+    - name: anim_face
+      display_name: face
+    - name: anim_waterline
+      display_name: waterline

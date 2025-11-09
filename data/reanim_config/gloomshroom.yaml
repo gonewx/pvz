@@ -1,0 +1,31 @@
+id: gloomshroom
+name: GloomShroom
+reanim_file: data/reanim/GloomShroom.reanim
+default_animation: anim_blink
+scale: 1
+images:
+    IMAGE_REANIM_GLOOMSHROOM_BASE: assets/reanim/GloomShroom_base.png
+    IMAGE_REANIM_GLOOMSHROOM_BLINK1: assets/reanim/GloomShroom_blink1.png
+    IMAGE_REANIM_GLOOMSHROOM_BLINK2: assets/reanim/GloomShroom_blink2.png
+    IMAGE_REANIM_GLOOMSHROOM_FACE1: assets/reanim/GloomShroom_face1.png
+    IMAGE_REANIM_GLOOMSHROOM_FACE2: assets/reanim/GloomShroom_face2.png
+    IMAGE_REANIM_GLOOMSHROOM_HEAD: assets/reanim/GloomShroom_head.png
+    IMAGE_REANIM_GLOOMSHROOM_SHOOTER1: assets/reanim/GloomShroom_shooter1.png
+    IMAGE_REANIM_GLOOMSHROOM_SHOOTER2: assets/reanim/GloomShroom_shooter2.png
+    IMAGE_REANIM_GLOOMSHROOM_SHOOTER3: assets/reanim/GloomShroom_shooter3.png
+    IMAGE_REANIM_GLOOMSHROOM_SHOOTER4: assets/reanim/GloomShroom_shooter4.png
+    IMAGE_REANIM_GLOOMSHROOM_SHOOTER5: assets/reanim/GloomShroom_shooter5.png
+    IMAGE_REANIM_GLOOMSHROOM_STEM1: assets/reanim/GloomShroom_stem1.png
+    IMAGE_REANIM_GLOOMSHROOM_STEM2: assets/reanim/GloomShroom_stem2.png
+    IMAGE_REANIM_GLOOMSHROOM_STEM3: assets/reanim/GloomShroom_stem3.png
+available_animations:
+    - name: anim_blink
+      display_name: blink
+    - name: anim_idle
+      display_name: idle
+    - name: anim_sleep
+      display_name: sleep
+    - name: anim_shooting
+      display_name: shooting
+    - name: anim_face
+      display_name: face

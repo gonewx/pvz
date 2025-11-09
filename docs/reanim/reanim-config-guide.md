@@ -31,15 +31,30 @@
 
 ### 配置文件位置
 
-所有 Reanim 配置文件存放在：
+Reanim 配置文件采用多文件架构管理（Story 13.9）：
+
+**配置目录**：`data/reanim_config/`
+**全局配置文件**：`data/reanim_config.yaml`（仅包含全局设置）
+
+每个动画单元对应一个独立的 YAML 文件，便于定位、编辑和维护。
+
+**配置结构**：
 ```
-data/reanim_configs/
-├── peashooter.yaml      # 豌豆射手配置
-├── sunflower.yaml       # 向日葵配置
-└── zombie.yaml          # 僵尸配置
+data/
+├── reanim_config.yaml          # 全局配置（仅包含 global 部分）
+└── reanim_config/              # 动画单元配置目录
+    ├── peashooter.yaml         # 豌豆射手配置
+    ├── sunflower.yaml          # 向日葵配置
+    ├── zombie.yaml             # 普通僵尸配置
+    ├── zombie_conehead.yaml    # 路障僵尸配置
+    └── ... (共 142 个文件)
 ```
 
-**命名规范**：`{实体名}.yaml`（使用小写字母和下划线）
+**历史演进**：
+- Epic 13 Story 13.5 初始设计使用分散配置（`data/reanim_configs/*.yaml`）
+- Story 13.6 迁移为集中单文件配置（`data/reanim_config.yaml`）
+- Story 13.9 回归多文件架构（`data/reanim_config/*.yaml`），解决单文件过大问题
+- 当前版本使用多文件架构（便于维护和协作）
 
 ---
 
@@ -47,26 +62,41 @@ data/reanim_configs/
 
 ### YAML Schema
 
+**全局配置文件格式** (`data/reanim_config.yaml`):
+
 ```yaml
-# Reanim 文件路径（必填）
-reanim_file: string
+# 全局配置（仅包含 global 部分）
+global:
+  playback:
+    tps: int      # 游戏目标 TPS
+    fps: int      # 默认动画 FPS
+```
 
-# 动画列表（可选，用于文档和验证）
-animations:
-  - name: string           # 动画名称
-    display_name: string   # 显示名称（可选）
+**单个动画单元配置文件格式** (`data/reanim_config/{id}.yaml`):
 
-# 动画组合配置（必填）
-animation_combos:
-  - name: string                   # 组合名称（必填）
-    display_name: string           # 显示名称（可选）
-    animations: [string]           # 动画列表（必填）
-    binding_strategy: string       # 绑定策略（可选："auto" 或 "manual"）
-    manual_bindings:               # 手动绑定（可选）
+```yaml
+id: string                      # 动画单元 ID（如 "peashooter"）
+name: string                    # 显示名称
+reanim_file: string             # Reanim 文件路径
+default_animation: string       # 默认动画名称
+
+images:                         # 图片映射
+  IMAGE_KEY: path/to/image.png
+
+available_animations:           # 可用动画列表
+  - name: string
+    display_name: string
+
+animation_combos:               # 动画组合配置
+  - name: string                # 组合名称
+    display_name: string        # 显示名称
+    animations: [string]        # 动画列表
+    binding_strategy: string    # "auto" 或 "manual"
+    manual_bindings:            # 手动绑定（可选）
       track_name: animation_name
-    parent_tracks:                 # 父子关系（可选）
+    parent_tracks:              # 父子关系（可选）
       child_track: parent_track
-    hidden_tracks: [string]        # 隐藏轨道（可选）
+    hidden_tracks: [string]     # 隐藏轨道（可选）
 ```
 
 ### Go 数据结构映射
@@ -209,106 +239,128 @@ type AnimationComboConfig struct {
 
 ## 配置示例
 
-### 示例 1：豌豆射手 - 攻击组合
+### 示例 1：豌豆射手 - 在集中配置文件中的定义
 
 ```yaml
-# data/reanim_configs/peashooter.yaml
+# data/reanim_config.yaml (集中配置文件片段)
 
-# Reanim 文件路径
-reanim_file: assets/effect/reanim/PeaShooterSingle.reanim
-
-# 动画列表（用于文档和验证）
 animations:
-  - name: anim_idle
-    display_name: 待机
-  - name: anim_shooting
-    display_name: 攻击
-  - name: anim_head_idle
-    display_name: 头部摇晃
+  - id: "peashooter"
+    name: "PeaShooter"
+    reanim_file: "data/reanim/PeaShooterSingle.reanim"
+    default_animation: "anim_idle"
 
-# 动画组合配置
-animation_combos:
-  # 待机动画
-  - name: idle
-    display_name: 待机
-    animations:
-      - anim_idle
-    binding_strategy: auto
+    images:
+      IMAGE_REANIM_PEASHOOTER_HEAD: "assets/reanim/PeaShooter_Head.png"
+      IMAGE_REANIM_PEASHOOTER_MOUTH: "assets/reanim/PeaShooter_mouth.png"
+      # ... 其他图片映射
 
-  # 攻击+头部摇晃组合
-  - name: attack_with_sway
-    display_name: 攻击+摇晃
-    animations:
-      - anim_shooting
-      - anim_head_idle
+    available_animations:
+      - name: anim_idle
+        display_name: 待机
+      - name: anim_shooting
+        display_name: 攻击
+      - name: anim_head_idle
+        display_name: 头部摇晃
 
-    # 使用自动绑定（推荐）
-    binding_strategy: auto
+    animation_combos:
+      # 待机动画
+      - name: idle
+        display_name: 待机
+        animations:
+          - anim_idle
+        binding_strategy: auto
 
-    # 定义父子关系
-    parent_tracks:
-      anim_face: anim_stem    # 头部跟随茎干运动
+      # 攻击+头部摇晃组合
+      - name: attack
+        display_name: 攻击+摇晃
+        animations:
+          - anim_shooting
+          - anim_head_idle
+
+        # 使用自动绑定（推荐）
+        binding_strategy: auto
+
+        # 定义父子关系
+        parent_tracks:
+          anim_face: anim_stem    # 头部跟随茎干运动
 ```
 
-### 示例 2：向日葵 - 简单配置
+### 示例 2：向日葵 - 在集中配置文件中的定义
 
 ```yaml
-# data/reanim_configs/sunflower.yaml
-
-reanim_file: assets/effect/reanim/Sunflower.reanim
+# data/reanim_config.yaml (集中配置文件片段)
 
 animations:
-  - name: anim_idle
-    display_name: 待机
+  - id: "sunflower"
+    name: "Sunflower"
+    reanim_file: "data/reanim/Sunflower.reanim"
+    default_animation: "anim_idle"
 
-animation_combos:
-  - name: idle
-    display_name: 待机
-    animations:
-      - anim_idle
-    binding_strategy: auto
+    images:
+      IMAGE_REANIM_SUNFLOWER_LEAF: "assets/reanim/Sunflower_leaf.png"
+      # ... 其他图片映射
+
+    available_animations:
+      - name: anim_idle
+        display_name: 待机
+
+    animation_combos:
+      - name: idle
+        display_name: 待机
+        animations:
+          - anim_idle
+        binding_strategy: auto
 ```
 
-### 示例 3：僵尸 - 手动绑定 + 隐藏轨道
+### 示例 3：僵尸 - 在集中配置文件中的定义（手动绑定 + 隐藏轨道）
 
 ```yaml
-# data/reanim_configs/zombie.yaml
-
-reanim_file: assets/effect/reanim/Zombie.reanim
+# data/reanim_config.yaml (集中配置文件片段)
 
 animations:
-  - name: anim_walk
-    display_name: 行走
-  - name: anim_attack
-    display_name: 攻击
-  - name: anim_head_blink
-    display_name: 眨眼
+  - id: "zombie"
+    name: "Zombie"
+    reanim_file: "data/reanim/Zombie.reanim"
+    default_animation: "anim_idle"
 
-animation_combos:
-  # 行走动画
-  - name: walk
-    display_name: 行走
-    animations:
-      - anim_walk
-    binding_strategy: auto
+    images:
+      IMAGE_REANIM_ZOMBIE_BODY: "assets/reanim/Zombie_body.png"
+      # ... 其他图片映射
 
-  # 攻击动画（手动绑定）
-  - name: attack_with_blink
-    display_name: 攻击+眨眼
-    animations:
-      - anim_attack
-      - anim_head_blink
+    available_animations:
+      - name: anim_walk
+        display_name: 行走
+      - name: anim_attack
+        display_name: 攻击
+      - name: anim_head_blink
+        display_name: 眨眼
 
-    # 使用手动绑定
-    binding_strategy: manual
-    manual_bindings:
-      Zombie_head: anim_head_blink     # 头部用眨眼动画
-      Zombie_body: anim_attack         # 身体用攻击动画
-      Zombie_outerarm: anim_attack     # 手臂用攻击动画
+    animation_combos:
+      # 行走动画
+      - name: walk
+        display_name: 行走
+        animations:
+          - anim_walk
+        binding_strategy: auto
 
-    # 隐藏路障（初始状态）
-    hidden_tracks:
-      - anim_cone    # 隐藏路障装备
+      # 攻击动画（手动绑定）
+      - name: attack_with_blink
+        display_name: 攻击+眨眼
+        animations:
+          - anim_attack
+          - anim_head_blink
+
+        # 使用手动绑定
+        binding_strategy: manual
+        manual_bindings:
+          Zombie_head: anim_head_blink     # 头部用眨眼动画
+          Zombie_body: anim_attack         # 身体用攻击动画
+          Zombie_outerarm: anim_attack     # 手臂用攻击动画
+
+        # 隐藏路障（初始状态）
+        hidden_tracks:
+          - anim_cone    # 隐藏路障装备
 ```
 
 ---
@@ -489,9 +541,10 @@ animations:
 
 ## 下一步
 
-- 查看更多示例配置：`data/reanim_configs/`
+- 查看实际配置：`data/reanim_config.yaml`（集中配置文件）
 - 了解 Reanim 系统 API：`CLAUDE.md` - Reanim 动画系统使用指南
 - 查看 Reanim 格式说明：`docs/reanim/reanim-format-guide.md`
+- 参考实现：`cmd/animation_showcase/` - 完整的动画预览工具
 
 ---
 

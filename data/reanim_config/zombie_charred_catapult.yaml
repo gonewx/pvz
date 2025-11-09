@@ -1,0 +1,22 @@
+id: zombie_charred_catapult
+name: Zombie_charred_catapult
+reanim_file: data/reanim/Zombie_charred_catapult.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_CHARRED_CATAPULT_BLINK1: assets/reanim/Zombie_charred_catapult_blink1.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_CATAPULT_BLINK2: assets/reanim/Zombie_charred_catapult_blink2.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_CATAPULT_HEAD: assets/reanim/Zombie_charred_catapult_head.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_CATAPULT1: assets/reanim/Zombie_charred_catapult1.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_CATAPULT2: assets/reanim/Zombie_charred_catapult2.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_CATAPULT3: assets/reanim/Zombie_charred_catapult3.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_CATAPULT4: assets/reanim/Zombie_charred_catapult4.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_CATAPULT5: assets/reanim/Zombie_charred_catapult5.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_CATAPULT6: assets/reanim/Zombie_charred_catapult6.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_CATAPULT7: assets/reanim/Zombie_charred_catapult7.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_CATAPULT8: assets/reanim/Zombie_charred_catapult8.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_CATAPULT9: assets/reanim/Zombie_charred_catapult9.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_PILE1: assets/reanim/Zombie_charred_pile1.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_PILE2: assets/reanim/Zombie_charred_pile2.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_TAIL: assets/reanim/Zombie_charred_tail.png
+available_animations: []

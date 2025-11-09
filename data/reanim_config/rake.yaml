@@ -1,0 +1,10 @@
+id: rake
+name: Rake
+reanim_file: data/reanim/Rake.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_RAKE_HANDLE: assets/reanim/rake_handle.png
+    IMAGE_REANIM_RAKE1: assets/reanim/rake1.png
+    IMAGE_REANIM_RAKE2: assets/reanim/rake2.png
+available_animations: []

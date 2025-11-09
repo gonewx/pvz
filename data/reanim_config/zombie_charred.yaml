@@ -1,0 +1,28 @@
+id: zombie_charred
+name: Zombie_charred
+reanim_file: data/reanim/Zombie_charred.reanim
+default_animation: anim_blink
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_CHARRED_EYES1: assets/reanim/Zombie_charred_eyes1.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_EYES2: assets/reanim/Zombie_charred_eyes2.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_HEAD: assets/reanim/Zombie_charred_head.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_PILE1: assets/reanim/Zombie_charred_pile1.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_PILE2: assets/reanim/Zombie_charred_pile2.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_TAIL: assets/reanim/Zombie_charred_tail.png
+    IMAGE_REANIM_ZOMBIE_CHARRED1: assets/reanim/Zombie_charred1.png
+    IMAGE_REANIM_ZOMBIE_CHARRED2: assets/reanim/Zombie_charred2.png
+    IMAGE_REANIM_ZOMBIE_CHARRED3: assets/reanim/Zombie_charred3.png
+    IMAGE_REANIM_ZOMBIE_CHARRED4: assets/reanim/Zombie_charred4.png
+    IMAGE_REANIM_ZOMBIE_CHARRED5: assets/reanim/Zombie_charred5.png
+    IMAGE_REANIM_ZOMBIE_CHARRED6: assets/reanim/Zombie_charred6.png
+    IMAGE_REANIM_ZOMBIE_CHARRED7: assets/reanim/Zombie_charred7.png
+    IMAGE_REANIM_ZOMBIE_CHARRED8: assets/reanim/Zombie_charred8.png
+    IMAGE_REANIM_ZOMBIE_CHARRED9: assets/reanim/Zombie_charred9.png
+    IMAGE_REANIM_ZOMBIE_CHARRED10: assets/reanim/Zombie_charred10.png
+    IMAGE_REANIM_ZOMBIE_HAIR: assets/reanim/Zombie_hair.png
+available_animations:
+    - name: anim_blink
+      display_name: blink
+    - name: anim_crumble
+      display_name: crumble

@@ -1,0 +1,52 @@
+id: zombie_gargantuar
+name: Zombie_gargantuar
+reanim_file: data/reanim/Zombie_gargantuar.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_GARGANTUAR_BODY1: assets/reanim/Zombie_gargantuar_body1.png
+    IMAGE_REANIM_ZOMBIE_GARGANTUAR_BODY2: assets/reanim/Zombie_gargantuar_body2.png
+    IMAGE_REANIM_ZOMBIE_GARGANTUAR_FOOT: assets/reanim/Zombie_gargantuar_foot.png
+    IMAGE_REANIM_ZOMBIE_GARGANTUAR_HEAD: assets/reanim/Zombie_gargantuar_head.png
+    IMAGE_REANIM_ZOMBIE_GARGANTUAR_INNERARM_HAND: assets/reanim/Zombie_gargantuar_innerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_GARGANTUAR_INNERARM_LOWER: assets/reanim/Zombie_gargantuar_innerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_GARGANTUAR_INNERARM_THUMB: assets/reanim/Zombie_gargantuar_innerarm_thumb.png
+    IMAGE_REANIM_ZOMBIE_GARGANTUAR_INNERARM_UPPER: assets/reanim/Zombie_gargantuar_innerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_GARGANTUAR_INNERLEG_LOWER: assets/reanim/Zombie_gargantuar_innerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_GARGANTUAR_INNERLEG_UPPER: assets/reanim/Zombie_gargantuar_innerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_GARGANTUAR_JAW: assets/reanim/Zombie_gargantuar_jaw.png
+    IMAGE_REANIM_ZOMBIE_GARGANTUAR_OUTERARM_HAND: assets/reanim/Zombie_gargantuar_outerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_GARGANTUAR_OUTERARM_LOWER: assets/reanim/Zombie_gargantuar_outerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_GARGANTUAR_OUTERARM_UPPER: assets/reanim/Zombie_gargantuar_outerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_GARGANTUAR_OUTERLEG_LOWER: assets/reanim/Zombie_gargantuar_outerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_GARGANTUAR_OUTERLEG_UPPER: assets/reanim/Zombie_gargantuar_outerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_GARGANTUAR_ROPE: assets/reanim/Zombie_gargantuar_rope.png
+    IMAGE_REANIM_ZOMBIE_GARGANTUAR_TELEPHONEPOLE: assets/reanim/Zombie_gargantuar_telephonepole.png
+    IMAGE_REANIM_ZOMBIE_GARGANTUAR_TRASHCAN1: assets/reanim/Zombie_gargantuar_trashcan1.png
+    IMAGE_REANIM_ZOMBIE_GARGANTUAR_TRASHCAN2: assets/reanim/Zombie_gargantuar_trashcan2.png
+    IMAGE_REANIM_ZOMBIE_GARGANTUAR_WHITEROPE: assets/reanim/Zombie_gargantuar_whiterope.png
+    IMAGE_REANIM_ZOMBIE_IMP_ARM1: assets/reanim/Zombie_imp_arm1.png
+    IMAGE_REANIM_ZOMBIE_IMP_ARM2: assets/reanim/Zombie_imp_arm2.png
+    IMAGE_REANIM_ZOMBIE_IMP_BODY1: assets/reanim/Zombie_imp_body1.png
+    IMAGE_REANIM_ZOMBIE_IMP_BODY2: assets/reanim/Zombie_imp_body2.png
+    IMAGE_REANIM_ZOMBIE_IMP_HEAD: assets/reanim/Zombie_imp_head.png
+    IMAGE_REANIM_ZOMBIE_IMP_INNERLEG_FOOT: assets/reanim/Zombie_imp_innerleg_foot.png
+    IMAGE_REANIM_ZOMBIE_IMP_INNERLEG_LOWER: assets/reanim/Zombie_imp_innerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_IMP_INNERLEG_UPPER: assets/reanim/Zombie_imp_innerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_IMP_JAW: assets/reanim/Zombie_imp_jaw.png
+    IMAGE_REANIM_ZOMBIE_IMP_OUTERLEG_FOOT: assets/reanim/Zombie_imp_outerleg_foot.png
+    IMAGE_REANIM_ZOMBIE_IMP_OUTERLEG_LOWER: assets/reanim/Zombie_imp_outerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_IMP_OUTERLEG_UPPER: assets/reanim/Zombie_imp_outerleg_upper.png
+available_animations:
+    - name: anim_idle
+      display_name: idle
+    - name: anim_walk
+      display_name: walk
+    - name: anim_smash
+      display_name: smash
+    - name: anim_throw
+      display_name: throw
+    - name: anim_death
+      display_name: death
+    - name: anim_head1
+      display_name: head1

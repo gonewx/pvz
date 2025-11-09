@@ -1,0 +1,18 @@
+id: roofcleaner
+name: RoofCleaner
+reanim_file: data/reanim/RoofCleaner.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_ROOFCLEANER_BODY1: assets/reanim/RoofCleaner_body1.png
+    IMAGE_REANIM_ROOFCLEANER_BODY2: assets/reanim/RoofCleaner_body2.png
+    IMAGE_REANIM_ROOFCLEANER_BODY3: assets/reanim/RoofCleaner_body3.png
+    IMAGE_REANIM_ROOFCLEANER_BODY4: assets/reanim/RoofCleaner_body4.png
+    IMAGE_REANIM_ROOFCLEANER_BRUSH1: assets/reanim/RoofCleaner_brush1.png
+    IMAGE_REANIM_ROOFCLEANER_BRUSH2: assets/reanim/RoofCleaner_brush2.png
+    IMAGE_REANIM_ROOFCLEANER_BRUSH3: assets/reanim/RoofCleaner_brush3.png
+    IMAGE_REANIM_ROOFCLEANER_BRUSH4: assets/reanim/RoofCleaner_brush4.png
+    IMAGE_REANIM_ROOFCLEANER_BRUSH5: assets/reanim/RoofCleaner_brush5.png
+    IMAGE_REANIM_ROOFCLEANER_HUBCAP: assets/reanim/RoofCleaner_hubcap.png
+    IMAGE_REANIM_ROOFCLEANER_WHEEL: assets/reanim/RoofCleaner_wheel.png
+available_animations: []

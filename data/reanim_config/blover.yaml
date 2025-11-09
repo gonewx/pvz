@@ -1,0 +1,20 @@
+id: blover
+name: Blover
+reanim_file: data/reanim/Blover.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_BLOVER_DIRT_BACK: assets/reanim/Blover_dirt_back.png
+    IMAGE_REANIM_BLOVER_DIRT_FRONT: assets/reanim/Blover_dirt_front.png
+    IMAGE_REANIM_BLOVER_HEAD: assets/reanim/Blover_head.png
+    IMAGE_REANIM_BLOVER_HEAD2: assets/reanim/Blover_head2.png
+    IMAGE_REANIM_BLOVER_PETAL: assets/reanim/Blover_petal.png
+    IMAGE_REANIM_BLOVER_STEM1: assets/reanim/Blover_stem1.png
+    IMAGE_REANIM_BLOVER_STEM2: assets/reanim/Blover_stem2.png
+available_animations:
+    - name: anim_idle
+      display_name: idle
+    - name: anim_loop
+      display_name: loop
+    - name: anim_blow
+      display_name: blow

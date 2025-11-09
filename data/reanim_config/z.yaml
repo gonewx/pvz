@@ -1,0 +1,8 @@
+id: z
+name: Z
+reanim_file: data/reanim/Z.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_Z: assets/reanim/Z.png
+available_animations: []

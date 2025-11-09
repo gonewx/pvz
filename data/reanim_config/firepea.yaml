@@ -1,0 +1,12 @@
+id: firepea
+name: FirePea
+reanim_file: data/reanim/FirePea.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_FIREPEA: assets/reanim/FirePea.png
+    IMAGE_REANIM_FIREPEA_FLAME1: assets/reanim/FirePea_flame1.png
+    IMAGE_REANIM_FIREPEA_FLAME2: assets/reanim/FirePea_flame2.png
+    IMAGE_REANIM_FIREPEA_FLAME3: assets/reanim/FirePea_flame3.png
+    IMAGE_REANIM_FIREPEA_SPARK: assets/reanim/FirePea_spark.png
+available_animations: []

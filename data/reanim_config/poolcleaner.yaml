@@ -1,0 +1,26 @@
+id: poolcleaner
+name: PoolCleaner
+reanim_file: data/reanim/PoolCleaner.reanim
+default_animation: anim_land
+scale: 1
+images:
+    IMAGE_REANIM_POOLCLEANER_BODY1: assets/reanim/PoolCleaner_body1.png
+    IMAGE_REANIM_POOLCLEANER_BODY2: assets/reanim/PoolCleaner_body2.png
+    IMAGE_REANIM_POOLCLEANER_BUBBLE: assets/reanim/PoolCleaner_bubble.png
+    IMAGE_REANIM_POOLCLEANER_FUNNEL: assets/reanim/PoolCleaner_funnel.png
+    IMAGE_REANIM_POOLCLEANER_FUNNEL_OVERLAY: assets/reanim/PoolCleaner_funnel_overlay.png
+    IMAGE_REANIM_POOLCLEANER_TUBE: assets/reanim/PoolCleaner_tube.png
+    IMAGE_REANIM_POOLCLEANER_TUBEEND: assets/reanim/PoolCleaner_tubeend.png
+    IMAGE_REANIM_POOLCLEANER_WHEEL: assets/reanim/PoolCleaner_wheel.png
+    IMAGE_REANIM_POOLCLEANER_WHITEWATER1: assets/reanim/PoolCleaner_whitewater1.png
+    IMAGE_REANIM_POOLCLEANER_WHITEWATER2: assets/reanim/PoolCleaner_whitewater2.png
+    IMAGE_REANIM_POOLCLEANER_WHITEWATER3: assets/reanim/PoolCleaner_whitewater3.png
+available_animations:
+    - name: anim_land
+      display_name: land
+    - name: anim_water
+      display_name: water
+    - name: anim_suck
+      display_name: suck
+    - name: anim_landsuck
+      display_name: landsuck

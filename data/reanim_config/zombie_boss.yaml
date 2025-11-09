@@ -1,0 +1,89 @@
+id: zombie_boss
+name: Zombie_boss
+reanim_file: data/reanim/Zombie_boss.reanim
+default_animation: anim_enter
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_BOSS_ANTENNA: assets/reanim/Zombie_boss_antenna.png
+    IMAGE_REANIM_ZOMBIE_BOSS_ANTENNA_LIT: assets/reanim/Zombie_boss_antenna_lit.png
+    IMAGE_REANIM_ZOMBIE_BOSS_ARM_UPPER2: assets/reanim/Zombie_boss_arm_upper2.png
+    IMAGE_REANIM_ZOMBIE_BOSS_EYEGLOW: assets/reanim/Zombie_boss_eyeglow.png
+    IMAGE_REANIM_ZOMBIE_BOSS_EYEGLOW_BLACK: assets/reanim/Zombie_boss_eyeglow_black.png
+    IMAGE_REANIM_ZOMBIE_BOSS_EYEGLOW_RED: assets/reanim/Zombie_boss_eyeglow_red.png
+    IMAGE_REANIM_ZOMBIE_BOSS_FOOT: assets/reanim/Zombie_boss_foot.png
+    IMAGE_REANIM_ZOMBIE_BOSS_HEAD: assets/reanim/Zombie_boss_head.png
+    IMAGE_REANIM_ZOMBIE_BOSS_HEAD2: assets/reanim/Zombie_boss_head2.png
+    IMAGE_REANIM_ZOMBIE_BOSS_INNERARM_FINGER: assets/reanim/Zombie_boss_innerarm_finger.png
+    IMAGE_REANIM_ZOMBIE_BOSS_INNERARM_FINGERROPE: assets/reanim/Zombie_boss_innerarm_fingerrope.png
+    IMAGE_REANIM_ZOMBIE_BOSS_INNERARM_HAND: assets/reanim/Zombie_boss_innerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_BOSS_INNERARM_LOWER: assets/reanim/Zombie_boss_innerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_BOSS_INNERARM_THUMB1: assets/reanim/Zombie_boss_innerarm_thumb1.png
+    IMAGE_REANIM_ZOMBIE_BOSS_INNERARM_THUMB2: assets/reanim/Zombie_boss_innerarm_thumb2.png
+    IMAGE_REANIM_ZOMBIE_BOSS_INNERARM_UPPER: assets/reanim/Zombie_boss_innerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_BOSS_INNERJAW: assets/reanim/Zombie_boss_innerjaw.png
+    IMAGE_REANIM_ZOMBIE_BOSS_INNERLEG_UPPER: assets/reanim/Zombie_boss_innerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_BOSS_JAW: assets/reanim/Zombie_boss_jaw.png
+    IMAGE_REANIM_ZOMBIE_BOSS_LEG_LOWER: assets/reanim/Zombie_boss_leg_lower.png
+    IMAGE_REANIM_ZOMBIE_BOSS_LEGBITS: assets/reanim/Zombie_boss_legbits.png
+    IMAGE_REANIM_ZOMBIE_BOSS_LOWERBODY: assets/reanim/Zombie_boss_lowerbody.png
+    IMAGE_REANIM_ZOMBIE_BOSS_MOUTHGLOW: assets/reanim/Zombie_boss_mouthglow.png
+    IMAGE_REANIM_ZOMBIE_BOSS_MOUTHGLOW_RED: assets/reanim/Zombie_boss_mouthglow_red.png
+    IMAGE_REANIM_ZOMBIE_BOSS_NECK: assets/reanim/Zombie_boss_neck.jpg
+    IMAGE_REANIM_ZOMBIE_BOSS_OUTERARM_FINGER1: assets/reanim/Zombie_boss_outerarm_finger1.png
+    IMAGE_REANIM_ZOMBIE_BOSS_OUTERARM_FINGER2: assets/reanim/Zombie_boss_outerarm_finger2.png
+    IMAGE_REANIM_ZOMBIE_BOSS_OUTERARM_HAND: assets/reanim/Zombie_boss_outerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_BOSS_OUTERARM_LOWER: assets/reanim/Zombie_boss_outerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_BOSS_OUTERARM_THUMB1: assets/reanim/Zombie_boss_outerarm_thumb1.png
+    IMAGE_REANIM_ZOMBIE_BOSS_OUTERARM_THUMB2: assets/reanim/Zombie_boss_outerarm_thumb2.png
+    IMAGE_REANIM_ZOMBIE_BOSS_OUTERARM_UPPER: assets/reanim/Zombie_boss_outerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_BOSS_OUTERLEG_UPPER: assets/reanim/Zombie_boss_outerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_BOSS_RV: assets/reanim/Zombie_boss_rv.png
+    IMAGE_REANIM_ZOMBIE_BOSS_RVWHEEL: assets/reanim/Zombie_boss_RVwheel.png
+    IMAGE_REANIM_ZOMBIE_BOSS_UPPERBODY: assets/reanim/Zombie_boss_upperbody.jpg
+available_animations:
+    - name: anim_enter
+      display_name: enter
+    - name: anim_idle
+      display_name: idle
+    - name: anim_spawn_5
+      display_name: spawn_5
+    - name: anim_spawn_4
+      display_name: spawn_4
+    - name: anim_spawn_3
+      display_name: spawn_3
+    - name: anim_spawn_2
+      display_name: spawn_2
+    - name: anim_spawn_1
+      display_name: spawn_1
+    - name: anim_bungee_1_enter
+      display_name: bungee_1_enter
+    - name: anim_bungee_1_leave
+      display_name: bungee_1_leave
+    - name: anim_stomp_1
+      display_name: stomp_1
+    - name: anim_stomp_2
+      display_name: stomp_2
+    - name: anim_stomp_3
+      display_name: stomp_3
+    - name: anim_stomp_4
+      display_name: stomp_4
+    - name: anim_head_enter
+      display_name: head_enter
+    - name: anim_head_idle
+      display_name: head_idle
+    - name: anim_head_attack_1
+      display_name: head_attack_1
+    - name: anim_head_attack_2
+      display_name: head_attack_2
+    - name: anim_head_attack_3
+      display_name: head_attack_3
+    - name: anim_head_attack_4
+      display_name: head_attack_4
+    - name: anim_head_attack_5
+      display_name: head_attack_5
+    - name: anim_head_leave
+      display_name: head_leave
+    - name: anim_death
+      display_name: death
+    - name: anim_RV_1
+      display_name: RV_1

@@ -1,0 +1,7 @@
+id: credits_infantry
+name: Credits_Infantry
+reanim_file: data/reanim/Credits_Infantry.reanim
+default_animation: anim_idle
+scale: 1
+images: {}
+available_animations: []

@@ -1,0 +1,8 @@
+id: credits_bigbrain
+name: Credits_BigBrain
+reanim_file: data/reanim/Credits_BigBrain.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_CREDITS_BIGBRAIN: assets/images/Credits_BigBrain.jpg
+available_animations: []

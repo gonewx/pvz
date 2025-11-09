@@ -1,0 +1,43 @@
+id: credits_crazydave
+name: Credits_CrazyDave
+reanim_file: data/reanim/Credits_CrazyDave.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_CRAZYDAVE_BEARD: assets/reanim/CrazyDave_beard.png
+    IMAGE_REANIM_CRAZYDAVE_BODY1: assets/reanim/CrazyDave_body1.jpg
+    IMAGE_REANIM_CRAZYDAVE_BODY2: assets/reanim/CrazyDave_body2.png
+    IMAGE_REANIM_CRAZYDAVE_EYE: assets/reanim/CrazyDave_eye.png
+    IMAGE_REANIM_CRAZYDAVE_EYEBROW: assets/reanim/CrazyDave_eyebrow.png
+    IMAGE_REANIM_CRAZYDAVE_FOOT1: assets/reanim/CrazyDave_foot1.png
+    IMAGE_REANIM_CRAZYDAVE_FOOT2: assets/reanim/CrazyDave_foot2.png
+    IMAGE_REANIM_CRAZYDAVE_HEAD: assets/reanim/CrazyDave_head.png
+    IMAGE_REANIM_CRAZYDAVE_INNERARM: assets/reanim/CrazyDave_innerarm.png
+    IMAGE_REANIM_CRAZYDAVE_INNERFINGER1: assets/reanim/CrazyDave_innerfinger1.png
+    IMAGE_REANIM_CRAZYDAVE_INNERFINGER2: assets/reanim/CrazyDave_innerfinger2.png
+    IMAGE_REANIM_CRAZYDAVE_INNERFINGER3: assets/reanim/CrazyDave_innerfinger3.png
+    IMAGE_REANIM_CRAZYDAVE_INNERFINGER4: assets/reanim/CrazyDave_innerfinger4.png
+    IMAGE_REANIM_CRAZYDAVE_INNERHAND: assets/reanim/CrazyDave_innerhand.png
+    IMAGE_REANIM_CRAZYDAVE_INNERPANTS: assets/reanim/CrazyDave_innerpants.png
+    IMAGE_REANIM_CRAZYDAVE_MOUTH2: assets/reanim/CrazyDave_mouth2.png
+    IMAGE_REANIM_CRAZYDAVE_OUTERARM: assets/reanim/CrazyDave_outerarm.png
+    IMAGE_REANIM_CRAZYDAVE_OUTERFINGER1: assets/reanim/CrazyDave_outerfinger1.png
+    IMAGE_REANIM_CRAZYDAVE_OUTERFINGER2: assets/reanim/CrazyDave_outerfinger2.png
+    IMAGE_REANIM_CRAZYDAVE_OUTERFINGER3: assets/reanim/CrazyDave_outerfinger3.png
+    IMAGE_REANIM_CRAZYDAVE_OUTERFINGER4: assets/reanim/CrazyDave_outerfinger4.png
+    IMAGE_REANIM_CRAZYDAVE_OUTERHAND: assets/reanim/CrazyDave_outerhand.png
+    IMAGE_REANIM_CRAZYDAVE_POT: assets/reanim/CrazyDave_pot.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_ARM1: assets/reanim/CrazyDave_Zombie_arm1.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_ARM2: assets/reanim/CrazyDave_zombie_arm2.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_BODY: assets/reanim/CrazyDave_zombie_body.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_FOOT1: assets/reanim/CrazyDave_zombie_foot1.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_FOOT2: assets/reanim/CrazyDave_zombie_foot2.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_GRABHAND: assets/reanim/CrazyDave_zombie_grabhand.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_HEAD1: assets/reanim/CrazyDave_zombie_head1.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_HEAD2: assets/reanim/CrazyDave_zombie_head2.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_LOWERLEG1: assets/reanim/CrazyDave_zombie_lowerleg1.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_LOWERLEG2: assets/reanim/CrazyDave_zombie_lowerleg2.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_UPPERLEG1: assets/reanim/CrazyDave_zombie_upperleg1.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_UPPERLEG2: assets/reanim/CrazyDave_zombie_upperleg2.png
+    IMAGE_REANIM_CREDITS_CRAZYDAVE_ROPE: assets/reanim/Credits_CrazyDave_rope.png
+available_animations: []

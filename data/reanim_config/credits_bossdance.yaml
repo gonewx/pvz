@@ -1,0 +1,15 @@
+id: credits_bossdance
+name: Credits_Bossdance
+reanim_file: data/reanim/Credits_Bossdance.reanim
+default_animation: anim_dance
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_BOSS_FOOT: assets/reanim/Zombie_boss_foot.png
+    IMAGE_REANIM_ZOMBIE_BOSS_INNERLEG_UPPER: assets/reanim/Zombie_boss_innerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_BOSS_LEG_LOWER: assets/reanim/Zombie_boss_leg_lower.png
+    IMAGE_REANIM_ZOMBIE_BOSS_LEGBITS: assets/reanim/Zombie_boss_legbits.png
+    IMAGE_REANIM_ZOMBIE_BOSS_LOWERBODY: assets/reanim/Zombie_boss_lowerbody.png
+    IMAGE_REANIM_ZOMBIE_BOSS_OUTERLEG_UPPER: assets/reanim/Zombie_boss_outerleg_upper.png
+available_animations:
+    - name: anim_dance
+      display_name: dance

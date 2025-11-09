@@ -1,0 +1,29 @@
+id: lawnmower
+name: LawnMower
+reanim_file: data/reanim/LawnMower.reanim
+default_animation: anim_normal
+scale: 1
+images:
+    IMAGE_REANIM_LAWNMOWER_BODY: assets/reanim/LawnMower_body.png
+    IMAGE_REANIM_LAWNMOWER_BODY_TRICKED: assets/reanim/LawnMower_body_tricked.png
+    IMAGE_REANIM_LAWNMOWER_DICE_TRICKED: assets/reanim/LawnMower_dice_tricked.png
+    IMAGE_REANIM_LAWNMOWER_ENGINE: assets/reanim/LawnMower_engine.png
+    IMAGE_REANIM_LAWNMOWER_ENGINE_TRICKED: assets/reanim/LawnMower_engine_tricked.png
+    IMAGE_REANIM_LAWNMOWER_EXHAUST: assets/reanim/LawnMower_exhaust.png
+    IMAGE_REANIM_LAWNMOWER_EXHAUST_TRICKED: assets/reanim/LawnMower_exhaust_tricked.png
+    IMAGE_REANIM_LAWNMOWER_PULL: assets/reanim/LawnMower_pull.png
+    IMAGE_REANIM_LAWNMOWER_WHEEL1: assets/reanim/LawnMower_wheel1.png
+    IMAGE_REANIM_LAWNMOWER_WHEEL2: assets/reanim/LawnMower_wheel2.png
+    IMAGE_REANIM_LAWNMOWER_WHEELPIECE: assets/reanim/LawnMower_wheelpiece.png
+    IMAGE_REANIM_LAWNMOWER_WHEELSHINE: assets/reanim/LawnMower_wheelshine.png
+available_animations:
+    - name: anim_normal
+      display_name: normal
+    - name: anim_tricked
+      display_name: tricked
+animation_combos:
+    - name: idle
+      display_name: 待机
+      animations:
+        - anim_normal
+      binding_strategy: auto

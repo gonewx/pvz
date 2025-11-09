@@ -1,0 +1,80 @@
+id: selectorscreen
+name: SelectorScreen
+reanim_file: data/reanim/SelectorScreen.reanim
+default_animation: anim_open
+scale: 1
+images:
+    IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_BUTTON: assets/reanim/SelectorScreen_Adventure_button.png
+    IMAGE_REANIM_SELECTORSCREEN_ALMANAC_KEY_SHADOW: assets/reanim/SelectorScreen_almanac_key_shadow.png
+    IMAGE_REANIM_SELECTORSCREEN_BG: assets/reanim/SelectorScreen_BG.jpg
+    IMAGE_REANIM_SELECTORSCREEN_BG_CENTER: assets/reanim/SelectorScreen_BG_Center.jpg
+    IMAGE_REANIM_SELECTORSCREEN_BG_LEFT: assets/reanim/SelectorScreen_BG_Left.jpg
+    IMAGE_REANIM_SELECTORSCREEN_BG_RIGHT: assets/reanim/SelectorScreen_BG_Right.jpg
+    IMAGE_REANIM_SELECTORSCREEN_CHALLENGES_BUTTON: assets/reanim/SelectorScreen_Challenges_button.png
+    IMAGE_REANIM_SELECTORSCREEN_CLOUD1: assets/reanim/SelectorScreen_Cloud1.png
+    IMAGE_REANIM_SELECTORSCREEN_CLOUD2: assets/reanim/SelectorScreen_Cloud2.png
+    IMAGE_REANIM_SELECTORSCREEN_CLOUD4: assets/reanim/SelectorScreen_Cloud4.png
+    IMAGE_REANIM_SELECTORSCREEN_CLOUD5: assets/reanim/SelectorScreen_Cloud5.png
+    IMAGE_REANIM_SELECTORSCREEN_CLOUD6: assets/reanim/SelectorScreen_Cloud6.png
+    IMAGE_REANIM_SELECTORSCREEN_CLOUD7: assets/reanim/SelectorScreen_Cloud7.png
+    IMAGE_REANIM_SELECTORSCREEN_FLOWER1: assets/reanim/SelectorScreen_Flower1.png
+    IMAGE_REANIM_SELECTORSCREEN_FLOWER2: assets/reanim/SelectorScreen_Flower2.png
+    IMAGE_REANIM_SELECTORSCREEN_FLOWER3: assets/reanim/SelectorScreen_Flower3.png
+    IMAGE_REANIM_SELECTORSCREEN_LEAF1: assets/reanim/SelectorScreen_Leaf1.png
+    IMAGE_REANIM_SELECTORSCREEN_LEAF2: assets/reanim/SelectorScreen_Leaf2.png
+    IMAGE_REANIM_SELECTORSCREEN_LEAF3: assets/reanim/SelectorScreen_Leaf3.png
+    IMAGE_REANIM_SELECTORSCREEN_LEAF4: assets/reanim/SelectorScreen_Leaf4.png
+    IMAGE_REANIM_SELECTORSCREEN_LEAF5: assets/reanim/SelectorScreen_Leaf5.png
+    IMAGE_REANIM_SELECTORSCREEN_LEAVES: assets/reanim/SelectorScreen_Leaves.png
+    IMAGE_REANIM_SELECTORSCREEN_SHADOW_ADVENTURE: assets/reanim/SelectorScreen_Shadow_Adventure.png
+    IMAGE_REANIM_SELECTORSCREEN_SHADOW_CHALLENGE: assets/reanim/SelectorScreen_Shadow_Challenge.png
+    IMAGE_REANIM_SELECTORSCREEN_SHADOW_STARTADVENTURE: assets/reanim/SelectorScreen_Shadow_StartAdventure.png
+    IMAGE_REANIM_SELECTORSCREEN_SHADOW_SURVIVAL: assets/reanim/SelectorScreen_Shadow_Survival.png
+    IMAGE_REANIM_SELECTORSCREEN_SHADOW_ZENGARDEN: assets/reanim/SelectorScreen_Shadow_ZenGarden.png
+    IMAGE_REANIM_SELECTORSCREEN_STARTADVENTURE_BUTTON1: assets/reanim/SelectorScreen_StartAdventure_Button1.png
+    IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_BUTTON: assets/reanim/SelectorScreen_Survival_button.png
+    IMAGE_REANIM_SELECTORSCREEN_VASEBREAKER_BUTTON: assets/reanim/SelectorScreen_Vasebreaker_button.png
+    IMAGE_REANIM_SELECTORSCREEN_WOODSIGN1: assets/reanim/SelectorScreen_WoodSign1.png
+    IMAGE_REANIM_SELECTORSCREEN_WOODSIGN2: assets/reanim/SelectorScreen_WoodSign2.png
+    IMAGE_REANIM_SELECTORSCREEN_WOODSIGN3: assets/reanim/SelectorScreen_WoodSign3.png
+available_animations:
+    - name: anim_open
+      display_name: open
+    - name: anim_sign
+      display_name: sign
+    - name: anim_idle
+      display_name: idle
+    - name: anim_grass
+      display_name: grass
+    - name: anim_flower2
+      display_name: flower2
+    - name: anim_flower1
+      display_name: flower1
+    - name: anim_flower3
+      display_name: flower3
+    - name: anim_start
+      display_name: start
+    - name: anim_cloud1
+      display_name: cloud1
+    - name: anim_cloud7
+      display_name: cloud7
+    - name: anim_cloud2
+      display_name: cloud2
+    - name: anim_cloud4
+      display_name: cloud4
+    - name: anim_cloud6
+      display_name: cloud6
+    - name: anim_cloud5
+      display_name: cloud5
+animation_combos:
+    - name: all
+      display_name: 正式
+      animations:
+        - anim_grass
+        - anim_cloud1
+        - anim_cloud7
+        - anim_cloud2
+        - anim_cloud4
+        - anim_cloud6
+        - anim_cloud5
+      binding_strategy: auto

@@ -1,0 +1,49 @@
+id: zombie_catapult
+name: Zombie_catapult
+reanim_file: data/reanim/Zombie_catapult.reanim
+default_animation: anim_walk
+scale: 1
+images:
+    IMAGE_REANIM_LAWNMOWER_WHEEL2: assets/reanim/LawnMower_wheel2.png
+    IMAGE_REANIM_LAWNMOWER_WHEELPIECE: assets/reanim/LawnMower_wheelpiece.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_BASKET: assets/reanim/Zombie_catapult_basket.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_BASKET_OVERLAY: assets/reanim/Zombie_catapult_basket_overlay.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_BASKETBALL: assets/reanim/Zombie_catapult_basketball.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_BODY: assets/reanim/Zombie_catapult_body.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_BODY_OVERLAY1: assets/reanim/Zombie_catapult_body_overlay1.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_BODY_OVERLAY2: assets/reanim/Zombie_catapult_body_overlay2.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_CRANK: assets/reanim/Zombie_catapult_crank.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_CRANKARM: assets/reanim/Zombie_catapult_crankarm.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_DRIVER_BODY: assets/reanim/Zombie_catapult_driver_body.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_DRIVER_HANKIE: assets/reanim/Zombie_catapult_driver_hankie.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_DRIVER_HEAD: assets/reanim/Zombie_catapult_driver_head.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_DRIVER_INNERARM_HAND: assets/reanim/Zombie_catapult_driver_innerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_DRIVER_INNERARM_LOWER: assets/reanim/Zombie_catapult_driver_innerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_DRIVER_INNERARM_UPPER: assets/reanim/Zombie_catapult_driver_innerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_DRIVER_INNERLEG_FOOT: assets/reanim/Zombie_catapult_driver_innerleg_foot.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_DRIVER_INNERLEG_LOWER: assets/reanim/Zombie_catapult_driver_innerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_DRIVER_INNERLEG_UPPER: assets/reanim/Zombie_catapult_driver_innerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_DRIVER_MOUTH: assets/reanim/Zombie_catapult_driver_mouth.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_DRIVER_OUTERARM_HAND: assets/reanim/Zombie_catapult_driver_outerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_DRIVER_OUTERARM_LOWER: assets/reanim/Zombie_catapult_driver_outerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_DRIVER_OUTERARM_UPPER: assets/reanim/Zombie_catapult_driver_outerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_DRIVER_OUTERLEG_FOOT: assets/reanim/Zombie_catapult_driver_outerleg_foot.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_DRIVER_OUTERLEG_LOWER: assets/reanim/Zombie_catapult_driver_outerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_DRIVER_OUTERLEG_UPPER: assets/reanim/Zombie_catapult_driver_outerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_ENGINE: assets/reanim/Zombie_catapult_engine.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_MANHOLE: assets/reanim/Zombie_catapult_manhole.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_MANHOLE_OVERLAY: assets/reanim/Zombie_catapult_manhole_overlay.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_POLE: assets/reanim/Zombie_catapult_pole.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_POLE_WITHBALL: assets/reanim/Zombie_catapult_pole_withball.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_SIDING: assets/reanim/Zombie_catapult_siding.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_SPRING: assets/reanim/Zombie_catapult_spring.png
+    IMAGE_REANIM_ZOMBIE_CATAPULT_TAPE: assets/reanim/Zombie_catapult_tape.png
+available_animations:
+    - name: anim_walk
+      display_name: walk
+    - name: anim_shoot
+      display_name: shoot
+    - name: anim_idle
+      display_name: idle
+    - name: anim_bounce
+      display_name: bounce

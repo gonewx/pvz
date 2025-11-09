@@ -1,0 +1,14 @@
+id: hammer
+name: Hammer
+reanim_file: data/reanim/Hammer.reanim
+default_animation: anim_open_pot
+scale: 1
+images:
+    IMAGE_REANIM_HAMMER_1: assets/reanim/hammer_1.png
+    IMAGE_REANIM_HAMMER_2: assets/reanim/Hammer_2.png
+    IMAGE_REANIM_HAMMER_3: assets/reanim/Hammer_3.png
+available_animations:
+    - name: anim_open_pot
+      display_name: open_pot
+    - name: anim_whack_zombie
+      display_name: whack_zombie

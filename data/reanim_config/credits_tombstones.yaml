@@ -1,0 +1,8 @@
+id: credits_tombstones
+name: Credits_Tombstones
+reanim_file: data/reanim/Credits_Tombstones.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_MELONPULT_MELON: assets/reanim/Melonpult_melon.png
+available_animations: []

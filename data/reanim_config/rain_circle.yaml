@@ -1,0 +1,8 @@
+id: rain_circle
+name: Rain_circle
+reanim_file: data/reanim/Rain_circle.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_RAIN_CIRCLE: assets/reanim/Rain_circle.png
+available_animations: []

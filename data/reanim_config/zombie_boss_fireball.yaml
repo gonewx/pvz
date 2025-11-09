@@ -1,0 +1,17 @@
+id: zombie_boss_fireball
+name: Zombie_boss_fireball
+reanim_file: data/reanim/Zombie_boss_fireball.reanim
+default_animation: anim_form
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_BOSS_FIREBALL: assets/reanim/Zombie_boss_fireball.png
+    IMAGE_REANIM_ZOMBIE_BOSS_FIREBALL_ADDITIVE: assets/reanim/Zombie_boss_fireball_additive.png
+    IMAGE_REANIM_ZOMBIE_BOSS_FIREBALL_CHUNKS: assets/reanim/Zombie_boss_fireball_chunks.png
+    IMAGE_REANIM_ZOMBIE_BOSS_FIREBALL_MULTIPLY: assets/reanim/Zombie_boss_fireball_multiply.png
+    IMAGE_REANIM_ZOMBIE_BOSS_FIREBALL_SUPERGLOW: assets/reanim/Zombie_boss_fireball_superglow.png
+    IMAGE_REANIM_ZOMBIE_BOSS_ICEFIRE_SHADOW: assets/reanim/Zombie_boss_icefire_shadow.png
+available_animations:
+    - name: anim_form
+      display_name: form
+    - name: anim_role
+      display_name: role

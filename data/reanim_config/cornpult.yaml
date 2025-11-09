@@ -1,0 +1,38 @@
+id: cornpult
+name: Cornpult
+reanim_file: data/reanim/Cornpult.reanim
+default_animation: anim_blink
+scale: 1
+images:
+    IMAGE_REANIM_CABBAGEPULT_BASKET: assets/reanim/Cabbagepult_basket.png
+    IMAGE_REANIM_CABBAGEPULT_BASKET_OVERLAY: assets/reanim/Cabbagepult_basket_overlay.png
+    IMAGE_REANIM_CORNPULT_BLINK1: assets/reanim/Cornpult_blink1.png
+    IMAGE_REANIM_CORNPULT_BLINK2: assets/reanim/Cornpult_blink2.png
+    IMAGE_REANIM_CORNPULT_BODY: assets/reanim/Cornpult_body.png
+    IMAGE_REANIM_CORNPULT_BUTTER: assets/reanim/Cornpult_butter.png
+    IMAGE_REANIM_CORNPULT_EYEBROW: assets/reanim/Cornpult_eyebrow.png
+    IMAGE_REANIM_CORNPULT_HUSK1: assets/reanim/Cornpult_husk1.png
+    IMAGE_REANIM_CORNPULT_HUSK2: assets/reanim/Cornpult_husk2.png
+    IMAGE_REANIM_CORNPULT_HUSK3: assets/reanim/Cornpult_husk3.png
+    IMAGE_REANIM_CORNPULT_HUSK4: assets/reanim/Cornpult_husk4.png
+    IMAGE_REANIM_CORNPULT_HUSK5: assets/reanim/Cornpult_husk5.png
+    IMAGE_REANIM_CORNPULT_HUSK6: assets/reanim/Cornpult_husk6.png
+    IMAGE_REANIM_CORNPULT_HUSKTIP1: assets/reanim/Cornpult_husktip1.png
+    IMAGE_REANIM_CORNPULT_HUSKTIP2: assets/reanim/Cornpult_husktip2.png
+    IMAGE_REANIM_CORNPULT_HUSKTIP3: assets/reanim/Cornpult_husktip3.png
+    IMAGE_REANIM_CORNPULT_KERNAL: assets/reanim/Cornpult_kernal.png
+    IMAGE_REANIM_CORNPULT_STALK1: assets/reanim/Cornpult_stalk1.png
+    IMAGE_REANIM_CORNPULT_STALK2: assets/reanim/Cornpult_stalk2.png
+    IMAGE_REANIM_CORNPULT_STALK3: assets/reanim/Cornpult_stalk3.png
+    IMAGE_REANIM_CORNPULT_STALK4: assets/reanim/Cornpult_stalk4.png
+available_animations:
+    - name: anim_blink
+      display_name: blink
+    - name: anim_idle
+      display_name: idle
+    - name: anim_shooting
+      display_name: shooting
+    - name: anim_full_idle
+      display_name: full_idle
+    - name: anim_face
+      display_name: face

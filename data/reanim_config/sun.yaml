@@ -1,0 +1,10 @@
+id: sun
+name: Sun
+reanim_file: data/reanim/Sun.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_SUN1: assets/reanim/Sun1.png
+    IMAGE_REANIM_SUN2: assets/reanim/Sun2.png
+    IMAGE_REANIM_SUN3: assets/reanim/Sun3.png
+available_animations: []

@@ -1,0 +1,14 @@
+id: loadbar_zombiehead
+name: LoadBar_Zombiehead
+reanim_file: data/reanim/LoadBar_Zombiehead.reanim
+default_animation: anim_zombie
+scale: 1
+images:
+    IMAGE_REANIM_POTATOMINE_ROCK1: assets/reanim/PotatoMine_rock1.png
+    IMAGE_REANIM_POTATOMINE_ROCK3: assets/reanim/PotatoMine_rock3.png
+    IMAGE_REANIM_ZOMBIE_HAIR: assets/reanim/Zombie_hair.png
+    IMAGE_REANIM_ZOMBIE_HEAD: assets/reanim/Zombie_head.png
+    IMAGE_REANIM_ZOMBIE_JAW: assets/reanim/Zombie_jaw.png
+available_animations:
+    - name: anim_zombie
+      display_name: zombie

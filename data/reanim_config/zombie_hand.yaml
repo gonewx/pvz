@@ -1,0 +1,23 @@
+id: zombie_hand
+name: Zombie_hand
+reanim_file: data/reanim/Zombie_hand.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_HAND_ARM: assets/reanim/Zombie_hand_arm.png
+    IMAGE_REANIM_ZOMBIE_HAND_FINGER1_1: assets/reanim/Zombie_hand_finger1_1.png
+    IMAGE_REANIM_ZOMBIE_HAND_FINGER1_2: assets/reanim/Zombie_hand_finger1_2.png
+    IMAGE_REANIM_ZOMBIE_HAND_FINGER2_1: assets/reanim/Zombie_hand_finger2_1.png
+    IMAGE_REANIM_ZOMBIE_HAND_FINGER2_2: assets/reanim/Zombie_hand_finger2_2.png
+    IMAGE_REANIM_ZOMBIE_HAND_FINGER3_1: assets/reanim/Zombie_hand_finger3_1.png
+    IMAGE_REANIM_ZOMBIE_HAND_FINGER3_2: assets/reanim/Zombie_hand_finger3_2.png
+    IMAGE_REANIM_ZOMBIE_HAND_FINGER4_1: assets/reanim/Zombie_hand_finger4_1.png
+    IMAGE_REANIM_ZOMBIE_HAND_FINGER4_2: assets/reanim/Zombie_hand_finger4_2.png
+    IMAGE_REANIM_ZOMBIE_HAND_HAND: assets/reanim/Zombie_hand_hand.png
+    IMAGE_REANIM_ZOMBIE_HAND_ROCK1: assets/reanim/Zombie_hand_rock1.png
+    IMAGE_REANIM_ZOMBIE_HAND_ROCK2: assets/reanim/Zombie_hand_rock2.png
+    IMAGE_REANIM_ZOMBIE_HAND_ROCK3: assets/reanim/Zombie_hand_rock3.png
+    IMAGE_REANIM_ZOMBIE_HAND_ROCK4: assets/reanim/Zombie_hand_rock4.png
+    IMAGE_REANIM_ZOMBIE_HAND_ROCK5: assets/reanim/Zombie_hand_rock5.png
+    IMAGE_REANIM_ZOMBIE_HAND_ROCK6: assets/reanim/Zombie_hand_rock6.png
+available_animations: []

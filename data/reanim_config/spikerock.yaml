@@ -1,0 +1,26 @@
+id: spikerock
+name: SpikeRock
+reanim_file: data/reanim/SpikeRock.reanim
+default_animation: anim_blink
+scale: 1
+images:
+    IMAGE_REANIM_SPIKEROCK_BIGSPIKE1: assets/reanim/Spikerock_bigspike1.png
+    IMAGE_REANIM_SPIKEROCK_BIGSPIKE2: assets/reanim/Spikerock_bigspike2.png
+    IMAGE_REANIM_SPIKEROCK_BIGSPIKE3: assets/reanim/Spikerock_bigspike3.png
+    IMAGE_REANIM_SPIKEROCK_BODY: assets/reanim/SpikeRock_body.png
+    IMAGE_REANIM_SPIKEROCK_EYEBROW: assets/reanim/SpikeRock_eyebrow.png
+    IMAGE_REANIM_SPIKEROCK_MOUTH: assets/reanim/SpikeRock_mouth.png
+    IMAGE_REANIM_SPIKEROCK_SPIKE: assets/reanim/SpikeRock_spike.png
+available_animations:
+    - name: anim_blink
+      display_name: blink
+    - name: anim_idle
+      display_name: idle
+    - name: anim_attack
+      display_name: attack
+    - name: anim_face
+      display_name: face
+    - name: anim_eye_leftbrow
+      display_name: eye_leftbrow
+    - name: anim_eye_rightbrow
+      display_name: eye_rightbrow

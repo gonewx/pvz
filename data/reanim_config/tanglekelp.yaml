@@ -1,0 +1,45 @@
+id: tanglekelp
+name: Tanglekelp
+reanim_file: data/reanim/Tanglekelp.reanim
+default_animation: anim_blink
+scale: 1
+images:
+    IMAGE_REANIM_TANGLEKELP_ARM 8: assets/reanim/Tanglekelp_arm 8.png
+    IMAGE_REANIM_TANGLEKELP_ARM1: assets/reanim/Tanglekelp_arm1.png
+    IMAGE_REANIM_TANGLEKELP_ARM2: assets/reanim/Tanglekelp_arm2.png
+    IMAGE_REANIM_TANGLEKELP_ARM3: assets/reanim/Tanglekelp_arm3.png
+    IMAGE_REANIM_TANGLEKELP_ARM4: assets/reanim/Tanglekelp_arm4.png
+    IMAGE_REANIM_TANGLEKELP_ARM5: assets/reanim/Tanglekelp_arm5.png
+    IMAGE_REANIM_TANGLEKELP_ARM6: assets/reanim/Tanglekelp_arm6.png
+    IMAGE_REANIM_TANGLEKELP_ARM7: assets/reanim/Tanglekelp_arm7.png
+    IMAGE_REANIM_TANGLEKELP_BLINK1: assets/reanim/Tanglekelp_blink1.png
+    IMAGE_REANIM_TANGLEKELP_BLINK2: assets/reanim/Tanglekelp_blink2.png
+    IMAGE_REANIM_TANGLEKELP_BODY: assets/reanim/Tanglekelp_body.png
+    IMAGE_REANIM_TANGLEKELP_BODY_ZENGARDEN: assets/reanim/Tanglekelp_body_zengarden.png
+    IMAGE_REANIM_TANGLEKELP_GRAB_BACK1: assets/reanim/Tanglekelp_grab_back1.png
+    IMAGE_REANIM_TANGLEKELP_GRAB_BACK2: assets/reanim/Tanglekelp_grab_back2.png
+    IMAGE_REANIM_TANGLEKELP_GRAB_BACK3: assets/reanim/Tanglekelp_grab_back3.png
+    IMAGE_REANIM_TANGLEKELP_GRAB_BACK4: assets/reanim/Tanglekelp_grab_back4.png
+    IMAGE_REANIM_TANGLEKELP_GRAB_FRONT1: assets/reanim/Tanglekelp_grab_front1.png
+    IMAGE_REANIM_TANGLEKELP_GRAB_FRONT2: assets/reanim/Tanglekelp_grab_front2.png
+    IMAGE_REANIM_TANGLEKELP_GRAB_FRONT3: assets/reanim/Tanglekelp_grab_front3.png
+    IMAGE_REANIM_TANGLEKELP_GRAB_FRONT4: assets/reanim/Tanglekelp_grab_front4.png
+    IMAGE_REANIM_TANGLEKELP_GRAB_FRONT5: assets/reanim/Tanglekelp_grab_front5.png
+    IMAGE_REANIM_TANGLEKELP_WHITEWATER1: assets/reanim/Tanglekelp_whitewater1.png
+    IMAGE_REANIM_TANGLEKELP_WHITEWATER2: assets/reanim/Tanglekelp_whitewater2.png
+    IMAGE_REANIM_TANGLEKELP_WHITEWATER3: assets/reanim/Tanglekelp_whitewater3.png
+available_animations:
+    - name: anim_blink
+      display_name: blink
+    - name: anim_idle
+      display_name: idle
+    - name: anim_grab
+      display_name: grab
+    - name: anim_idle_aquarium
+      display_name: idle_aquarium
+    - name: anim_face
+      display_name: face
+    - name: anim_waterline
+      display_name: waterline
+    - name: anim_blink
+      display_name: blink

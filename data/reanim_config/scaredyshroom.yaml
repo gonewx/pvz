@@ -1,0 +1,39 @@
+id: scaredyshroom
+name: ScaredyShroom
+reanim_file: data/reanim/ScaredyShroom.reanim
+default_animation: anim_sleep
+scale: 1
+images:
+    IMAGE_REANIM_SCAREDYSHROOM_EYE_BIG: assets/reanim/ScaredyShroom_eye_big.png
+    IMAGE_REANIM_SCAREDYSHROOM_EYE1: assets/reanim/ScaredyShroom_eye1.png
+    IMAGE_REANIM_SCAREDYSHROOM_EYE2: assets/reanim/ScaredyShroom_eye2.png
+    IMAGE_REANIM_SCAREDYSHROOM_EYEBROW1: assets/reanim/ScaredyShroom_eyebrow1.png
+    IMAGE_REANIM_SCAREDYSHROOM_EYEBROW2: assets/reanim/ScaredyShroom_eyebrow2.png
+    IMAGE_REANIM_SCAREDYSHROOM_HEAD: assets/reanim/ScaredyShroom_head.png
+    IMAGE_REANIM_SCAREDYSHROOM_HEAD_INNER: assets/reanim/ScaredyShroom_head_inner.png
+    IMAGE_REANIM_SCAREDYSHROOM_HEAD2: assets/reanim/ScaredyShroom_head2.png
+    IMAGE_REANIM_SCAREDYSHROOM_LIPS: assets/reanim/ScaredyShroom_lips.png
+    IMAGE_REANIM_SCAREDYSHROOM_MOUTH: assets/reanim/ScaredyShroom_mouth.png
+    IMAGE_REANIM_SCAREDYSHROOM_STEM: assets/reanim/ScaredyShroom_stem.png
+    IMAGE_REANIM_SCAREDYSHROOM_SWEAT: assets/reanim/ScaredyShroom_sweat.png
+available_animations:
+    - name: anim_sleep
+      display_name: sleep
+    - name: anim_grow
+      display_name: grow
+    - name: anim_scaredidle
+      display_name: scaredidle
+    - name: anim_scared
+      display_name: scared
+    - name: anim_shooting
+      display_name: shooting
+    - name: anim_idle
+      display_name: idle
+    - name: anim_blink
+      display_name: blink
+    - name: anim_face
+      display_name: face
+    - name: anim_eye2
+      display_name: eye2
+    - name: anim_eye1
+      display_name: eye1

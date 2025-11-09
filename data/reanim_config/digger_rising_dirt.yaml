@@ -1,0 +1,15 @@
+id: digger_rising_dirt
+name: Digger_rising_dirt
+reanim_file: data/reanim/Digger_rising_dirt.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_DIGGER_RISING_DIRT: assets/reanim/Digger_rising_dirt.png
+    IMAGE_REANIM_DIGGER_RISING_DIRT2: assets/reanim/Digger_rising_dirt2.png
+    IMAGE_REANIM_DIGGER_RISING_DIRT3: assets/reanim/Digger_rising_dirt3.png
+    IMAGE_REANIM_DIGGER_RISING_DIRT4: assets/reanim/Digger_rising_dirt4.png
+    IMAGE_REANIM_DIGGER_RISING_DIRT5: assets/reanim/Digger_rising_dirt5.png
+    IMAGE_REANIM_DIGGER_RISING_DIRT6: assets/reanim/Digger_rising_dirt6.png
+    IMAGE_REANIM_DIGGER_RISING_DIRT7: assets/reanim/Digger_rising_dirt7.png
+    IMAGE_REANIM_DIGGER_RISING_DIRT8: assets/reanim/Digger_rising_dirt8.png
+available_animations: []

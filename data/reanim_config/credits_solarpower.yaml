@@ -1,0 +1,8 @@
+id: credits_solarpower
+name: Credits_SolarPower
+reanim_file: data/reanim/Credits_SolarPower.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_CREDITS_WHITELINE: assets/reanim/Credits_WhiteLine.png
+available_animations: []

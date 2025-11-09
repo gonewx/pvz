@@ -1,0 +1,9 @@
+id: zombie_flagpole
+name: Zombie_FlagPole
+reanim_file: data/reanim/Zombie_FlagPole.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_FLAG1: assets/reanim/Zombie_flag1.png
+    IMAGE_REANIM_ZOMBIE_FLAGPOLE: assets/reanim/Zombie_flagpole.png
+available_animations: []

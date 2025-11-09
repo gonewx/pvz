@@ -1,0 +1,18 @@
+id: doomshroom
+name: DoomShroom
+reanim_file: data/reanim/DoomShroom.reanim
+default_animation: anim_sleep
+scale: 1
+images:
+    IMAGE_REANIM_DOOMSHROOM_BODY: assets/reanim/DoomShroom_body.png
+    IMAGE_REANIM_DOOMSHROOM_HEAD1: assets/reanim/DoomShroom_head1.png
+    IMAGE_REANIM_DOOMSHROOM_HEAD2: assets/reanim/DoomShroom_head2.png
+    IMAGE_REANIM_DOOMSHROOM_HEAD3: assets/reanim/DoomShroom_head3.png
+    IMAGE_REANIM_DOOMSHROOM_SLEEPINGHEAD: assets/reanim/DoomShroom_sleepinghead.png
+available_animations:
+    - name: anim_sleep
+      display_name: sleep
+    - name: anim_explode
+      display_name: explode
+    - name: anim_idle
+      display_name: idle

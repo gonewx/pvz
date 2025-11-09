@@ -1,0 +1,11 @@
+id: coin_silver
+name: Coin_silver
+reanim_file: data/reanim/Coin_silver.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_COIN_BLACK: assets/reanim/coin_black.png
+    IMAGE_REANIM_COIN_SHADING: assets/reanim/coin_shading.png
+    IMAGE_REANIM_COIN_SILVER_DOLLAR: assets/reanim/coin_silver_dollar.png
+    IMAGE_REANIM_COINGLOW: assets/reanim/CoinGlow.png
+available_animations: []

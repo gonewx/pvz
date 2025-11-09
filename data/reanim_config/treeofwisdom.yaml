@@ -1,0 +1,136 @@
+id: treeofwisdom
+name: TreeOfWisdom
+reanim_file: data/reanim/TreeOfWisdom.reanim
+default_animation: anim_start
+scale: 1
+images:
+    IMAGE_REANIM_LEAF1: assets/reanim/leaf1.png
+    IMAGE_REANIM_LEAF2: assets/reanim/leaf2.png
+    IMAGE_REANIM_LEAF3: assets/reanim/leaf3.png
+    IMAGE_REANIM_LEAF4: assets/reanim/leaf4.png
+    IMAGE_REANIM_LEAFBUNCH1: assets/reanim/leafbunch1.png
+    IMAGE_REANIM_LEAFBUNCH2: assets/reanim/leafbunch2.png
+    IMAGE_REANIM_LEAFBUNCH3: assets/reanim/leafbunch3.png
+    IMAGE_REANIM_TREE_BG: assets/reanim/tree_bg.jpg
+    IMAGE_REANIM_TREE_GRASS: assets/reanim/tree_grass.jpg
+    IMAGE_REANIM_TREE_OVERLAY4: assets/reanim/tree_overlay4.png
+    IMAGE_REANIM_TREE_OVERLAY5: assets/reanim/tree_overlay5.png
+    IMAGE_REANIM_TREE_OVERLAY6: assets/reanim/tree_overlay6.png
+    IMAGE_REANIM_TREE_OVERLAY7: assets/reanim/tree_overlay7.png
+    IMAGE_REANIM_TREE_OVERLAY8: assets/reanim/tree_overlay8.jpg
+    IMAGE_REANIM_TREE_OVERLAY9: assets/reanim/tree_overlay9.jpg
+    IMAGE_REANIM_TREE1: assets/reanim/tree1.png
+    IMAGE_REANIM_TREE01: assets/reanim/tree01.png
+    IMAGE_REANIM_TREE2: assets/reanim/tree2.png
+    IMAGE_REANIM_TREE3: assets/reanim/tree3.png
+    IMAGE_REANIM_TREE4: assets/reanim/tree4.png
+    IMAGE_REANIM_TREE5: assets/reanim/tree5.png
+    IMAGE_REANIM_TREE6: assets/reanim/tree6.jpg
+    IMAGE_REANIM_TREE7: assets/reanim/tree7.jpg
+    IMAGE_REANIM_TREE8: assets/reanim/tree8.jpg
+    IMAGE_REANIM_TREE9: assets/reanim/tree9.jpg
+available_animations:
+    - name: anim_start
+      display_name: start
+    - name: anim_grow1
+      display_name: grow1
+    - name: anim_grow2
+      display_name: grow2
+    - name: anim_grow3
+      display_name: grow3
+    - name: anim_grow4
+      display_name: grow4
+    - name: anim_grow5
+      display_name: grow5
+    - name: anim_grow6
+      display_name: grow6
+    - name: anim_grow7
+      display_name: grow7
+    - name: anim_grow8
+      display_name: grow8
+    - name: anim_grow9
+      display_name: grow9
+    - name: anim_grow10
+      display_name: grow10
+    - name: anim_grow11
+      display_name: grow11
+    - name: anim_grow12
+      display_name: grow12
+    - name: anim_grow13
+      display_name: grow13
+    - name: anim_grow14
+      display_name: grow14
+    - name: anim_grow15
+      display_name: grow15
+    - name: anim_grow16
+      display_name: grow16
+    - name: anim_grow17
+      display_name: grow17
+    - name: anim_grow18
+      display_name: grow18
+    - name: anim_grow19
+      display_name: grow19
+    - name: anim_grow20
+      display_name: grow20
+    - name: anim_grow21
+      display_name: grow21
+    - name: anim_grow22
+      display_name: grow22
+    - name: anim_grow23
+      display_name: grow23
+    - name: anim_grow24
+      display_name: grow24
+    - name: anim_grow25
+      display_name: grow25
+    - name: anim_grow26
+      display_name: grow26
+    - name: anim_grow27
+      display_name: grow27
+    - name: anim_grow28
+      display_name: grow28
+    - name: anim_grow29
+      display_name: grow29
+    - name: anim_grow30
+      display_name: grow30
+    - name: anim_grow31
+      display_name: grow31
+    - name: anim_grow32
+      display_name: grow32
+    - name: anim_grow33
+      display_name: grow33
+    - name: anim_grow34
+      display_name: grow34
+    - name: anim_grow35
+      display_name: grow35
+    - name: anim_grow36
+      display_name: grow36
+    - name: anim_grow37
+      display_name: grow37
+    - name: anim_grow38
+      display_name: grow38
+    - name: anim_grow39
+      display_name: grow39
+    - name: anim_grow40
+      display_name: grow40
+    - name: anim_grow41
+      display_name: grow41
+    - name: anim_grow42
+      display_name: grow42
+    - name: anim_grow43
+      display_name: grow43
+    - name: anim_grow44
+      display_name: grow44
+    - name: anim_grow45
+      display_name: grow45
+    - name: anim_grow46
+      display_name: grow46
+    - name: anim_grow47
+      display_name: grow47
+    - name: anim_grow48
+      display_name: grow48
+    - name: anim_grow49
+      display_name: grow49
+    - name: anim_grow50
+      display_name: grow50
+    - name: anim_grow51
+      display_name: grow51

@@ -1,0 +1,31 @@
+id: zombie_charred_digger
+name: Zombie_charred_digger
+reanim_file: data/reanim/Zombie_charred_digger.reanim
+default_animation: anim_crumble
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_CHARRED_DIGGERAXE: assets/reanim/Zombie_charred_diggeraxe.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_DIGGERBLINK1: assets/reanim/Zombie_charred_diggerblink1.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_DIGGERBLINK2: assets/reanim/Zombie_charred_diggerblink2.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_DIGGERBODY1: assets/reanim/Zombie_charred_diggerbody1.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_DIGGERBODY1_NOAXE: assets/reanim/Zombie_charred_diggerbody1_noaxe.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_DIGGERBODY2: assets/reanim/Zombie_charred_diggerbody2.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_DIGGERBODY2_NOAXE: assets/reanim/Zombie_charred_diggerbody2_noaxe.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_DIGGERBODY3: assets/reanim/Zombie_charred_diggerbody3.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_DIGGERBODY3_NOAXE: assets/reanim/Zombie_charred_diggerbody3_noaxe.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_DIGGERBODY4: assets/reanim/Zombie_charred_diggerbody4.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_DIGGERBODY4_NOAXE: assets/reanim/Zombie_charred_diggerbody4_noaxe.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_DIGGERBODY5: assets/reanim/Zombie_charred_diggerbody5.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_DIGGERBODY6: assets/reanim/Zombie_charred_diggerbody6.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_DIGGERBODY7: assets/reanim/Zombie_charred_diggerbody7.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_DIGGERBODY8: assets/reanim/Zombie_charred_diggerbody8.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_DIGGERBODY9: assets/reanim/Zombie_charred_diggerbody9.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_DIGGERHEAD: assets/reanim/Zombie_charred_diggerhead.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_PILE1: assets/reanim/Zombie_charred_pile1.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_PILE2: assets/reanim/Zombie_charred_pile2.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_TAIL: assets/reanim/Zombie_charred_tail.png
+available_animations:
+    - name: anim_crumble
+      display_name: crumble
+    - name: anim_crumble_noaxe
+      display_name: crumble_noaxe

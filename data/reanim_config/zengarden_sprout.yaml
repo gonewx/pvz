@@ -1,0 +1,21 @@
+id: zengarden_sprout
+name: ZenGarden_sprout
+reanim_file: data/reanim/ZenGarden_sprout.reanim
+default_animation: anim_sprout
+scale: 1
+images:
+    IMAGE_REANIM_POTATOMINE_ROCK1: assets/reanim/PotatoMine_rock1.png
+    IMAGE_REANIM_POTATOMINE_ROCK3: assets/reanim/PotatoMine_rock3.png
+    IMAGE_REANIM_SPROUT_BODY: assets/reanim/sprout_body.png
+    IMAGE_REANIM_SPROUT_BODY1: assets/reanim/sprout_body1.png
+    IMAGE_REANIM_SPROUT_BODY2: assets/reanim/sprout_body2.png
+    IMAGE_REANIM_SPROUT_PETAL: assets/reanim/sprout_petal.png
+available_animations:
+    - name: anim_sprout
+      display_name: sprout
+    - name: anim_flower
+      display_name: flower
+    - name: anim_idle
+      display_name: idle
+    - name: anim_idle_noflower
+      display_name: idle_noflower

@@ -1,0 +1,27 @@
+id: squash
+name: Squash
+reanim_file: data/reanim/Squash.reanim
+default_animation: anim_jumpdown
+scale: 1
+images:
+    IMAGE_REANIM_SQUASH_BODY: assets/reanim/Squash_body.png
+    IMAGE_REANIM_SQUASH_EYEBROWS: assets/reanim/Squash_eyebrows.png
+    IMAGE_REANIM_SQUASH_EYES: assets/reanim/Squash_eyes.png
+    IMAGE_REANIM_SQUASH_STEM: assets/reanim/Squash_stem.png
+available_animations:
+    - name: anim_jumpdown
+      display_name: jumpdown
+    - name: anim_jumpup
+      display_name: jumpup
+    - name: anim_lookright
+      display_name: lookright
+    - name: anim_lookleft
+      display_name: lookleft
+    - name: anim_idle
+      display_name: idle
+    - name: anim_blink
+      display_name: blink
+    - name: anim_face
+      display_name: face
+    - name: anim_eye
+      display_name: eye

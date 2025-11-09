@@ -1,0 +1,28 @@
+id: imitater
+name: Imitater
+reanim_file: data/reanim/Imitater.reanim
+default_animation: anim_blink
+scale: 1
+images:
+    IMAGE_REANIM_IMITATER_BLINK1: assets/reanim/Imitater_blink1.png
+    IMAGE_REANIM_IMITATER_BLINK2: assets/reanim/Imitater_blink2.png
+    IMAGE_REANIM_IMITATER_BODY: assets/reanim/Imitater_body.png
+    IMAGE_REANIM_IMITATER_HAT: assets/reanim/Imitater_hat.png
+    IMAGE_REANIM_IMITATER_ROOT1: assets/reanim/Imitater_root1.png
+    IMAGE_REANIM_IMITATER_ROOT2: assets/reanim/Imitater_root2.png
+    IMAGE_REANIM_IMITATER_ROOT3: assets/reanim/Imitater_root3.png
+    IMAGE_REANIM_IMITATER_SPIN1: assets/reanim/Imitater_spin1.png
+    IMAGE_REANIM_IMITATER_SPIN2: assets/reanim/Imitater_spin2.png
+    IMAGE_REANIM_IMITATER_SPIN3: assets/reanim/Imitater_spin3.png
+    IMAGE_REANIM_IMITATER_SPIN4: assets/reanim/Imitater_spin4.png
+    IMAGE_REANIM_IMITATER_SPIN5: assets/reanim/Imitater_spin5.png
+    IMAGE_REANIM_IMITATER_SPIN6: assets/reanim/Imitater_spin6.png
+available_animations:
+    - name: anim_blink
+      display_name: blink
+    - name: anim_idle
+      display_name: idle
+    - name: anim_explode
+      display_name: explode
+    - name: anim_face
+      display_name: face

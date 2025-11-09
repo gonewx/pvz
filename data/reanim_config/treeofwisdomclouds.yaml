@@ -1,0 +1,13 @@
+id: treeofwisdomclouds
+name: TreeOfWisdomClouds
+reanim_file: data/reanim/TreeOfWisdomClouds.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_SELECTORSCREEN_CLOUD1: assets/reanim/SelectorScreen_Cloud1.png
+    IMAGE_REANIM_SELECTORSCREEN_CLOUD2: assets/reanim/SelectorScreen_Cloud2.png
+    IMAGE_REANIM_SELECTORSCREEN_CLOUD4: assets/reanim/SelectorScreen_Cloud4.png
+    IMAGE_REANIM_SELECTORSCREEN_CLOUD5: assets/reanim/SelectorScreen_Cloud5.png
+    IMAGE_REANIM_SELECTORSCREEN_CLOUD6: assets/reanim/SelectorScreen_Cloud6.png
+    IMAGE_REANIM_SELECTORSCREEN_CLOUD7: assets/reanim/SelectorScreen_Cloud7.png
+available_animations: []

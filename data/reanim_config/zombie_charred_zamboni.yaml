@@ -1,0 +1,31 @@
+id: zombie_charred_zamboni
+name: Zombie_charred_zamboni
+reanim_file: data/reanim/Zombie_charred_zamboni.reanim
+default_animation: anim_blink
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_CHARRED_PILE1: assets/reanim/Zombie_charred_pile1.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_PILE2: assets/reanim/Zombie_charred_pile2.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_ZAMBONI1: assets/reanim/Zombie_charred_zamboni1.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_ZAMBONI2: assets/reanim/Zombie_charred_zamboni2.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_ZAMBONI3: assets/reanim/Zombie_charred_zamboni3.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_ZAMBONI4: assets/reanim/Zombie_charred_zamboni4.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_ZAMBONI5: assets/reanim/Zombie_charred_zamboni5.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_ZAMBONI6: assets/reanim/Zombie_charred_zamboni6.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_ZAMBONI7: assets/reanim/Zombie_charred_zamboni7.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_ZAMBONI8: assets/reanim/Zombie_charred_zamboni8.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_ZAMBONI9: assets/reanim/Zombie_charred_zamboni9.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_ZAMBONI10: assets/reanim/Zombie_charred_zamboni10.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_ZAMBONI11: assets/reanim/Zombie_charred_zamboni11.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_ZAMBONI12: assets/reanim/Zombie_charred_zamboni12.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_ZAMBONI13: assets/reanim/Zombie_charred_zamboni13.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_ZAMBONI14: assets/reanim/Zombie_charred_zamboni14.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_ZAMBONIBLINK1: assets/reanim/Zombie_charred_zamboniblink1.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_ZAMBONIBLINK2: assets/reanim/Zombie_charred_zamboniblink2.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_ZAMBONIHEAD: assets/reanim/Zombie_charred_zambonihead.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_ZAMBONITAIL: assets/reanim/Zombie_charred_zambonitail.png
+available_animations:
+    - name: anim_blink
+      display_name: blink
+    - name: anim_crumble
+      display_name: crumble

@@ -1,0 +1,33 @@
+id: gatlingpea
+name: GatlingPea
+reanim_file: data/reanim/GatlingPea.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_GATLINGPEA_BARREL: assets/reanim/GatlingPea_barrel.png
+    IMAGE_REANIM_GATLINGPEA_BLINK1: assets/reanim/GatlingPea_blink1.png
+    IMAGE_REANIM_GATLINGPEA_BLINK2: assets/reanim/GatlingPea_blink2.png
+    IMAGE_REANIM_GATLINGPEA_HEAD: assets/reanim/GatlingPea_head.png
+    IMAGE_REANIM_GATLINGPEA_HELMET: assets/reanim/GatlingPea_helmet.png
+    IMAGE_REANIM_GATLINGPEA_MOUTH: assets/reanim/GatlingPea_mouth.png
+    IMAGE_REANIM_GATLINGPEA_MOUTH_OVERLAY: assets/reanim/GatlingPea_mouth_overlay.png
+    IMAGE_REANIM_PEASHOOTER_BACKLEAF: assets/reanim/PeaShooter_backleaf.png
+    IMAGE_REANIM_PEASHOOTER_BACKLEAF_LEFTTIP: assets/reanim/PeaShooter_backleaf_lefttip.png
+    IMAGE_REANIM_PEASHOOTER_BACKLEAF_RIGHTTIP: assets/reanim/PeaShooter_backleaf_righttip.png
+    IMAGE_REANIM_PEASHOOTER_EYEBROW: assets/reanim/PeaShooter_eyebrow.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF: assets/reanim/PeaShooter_frontleaf.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF_LEFTTIP: assets/reanim/PeaShooter_frontleaf_lefttip.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF_RIGHTTIP: assets/reanim/PeaShooter_frontleaf_righttip.png
+    IMAGE_REANIM_PEASHOOTER_STALK_BOTTOM: assets/reanim/PeaShooter_stalk_bottom.png
+    IMAGE_REANIM_PEASHOOTER_STALK_TOP: assets/reanim/PeaShooter_stalk_top.png
+available_animations:
+    - name: anim_idle
+      display_name: idle
+    - name: anim_shooting
+      display_name: shooting
+    - name: anim_head_idle
+      display_name: head_idle
+    - name: anim_face
+      display_name: face
+    - name: anim_blink
+      display_name: blink

@@ -1,0 +1,28 @@
+id: cattail
+name: Cattail
+reanim_file: data/reanim/Cattail.reanim
+default_animation: anim_blink
+scale: 1
+images:
+    IMAGE_REANIM_CATTAIL_BLINK1: assets/reanim/Cattail_blink1.png
+    IMAGE_REANIM_CATTAIL_BLINK2: assets/reanim/Cattail_blink2.png
+    IMAGE_REANIM_CATTAIL_EYEBROW1: assets/reanim/Cattail_eyebrow1.png
+    IMAGE_REANIM_CATTAIL_EYEBROW2: assets/reanim/Cattail_eyebrow2.png
+    IMAGE_REANIM_CATTAIL_HAT: assets/reanim/Cattail_hat.png
+    IMAGE_REANIM_CATTAIL_HEAD: assets/reanim/Cattail_head.png
+    IMAGE_REANIM_CATTAIL_PAW1: assets/reanim/Cattail_paw1.png
+    IMAGE_REANIM_CATTAIL_PAW2: assets/reanim/Cattail_paw2.png
+    IMAGE_REANIM_CATTAIL_PAW3: assets/reanim/Cattail_paw3.png
+    IMAGE_REANIM_CATTAIL_SPIKE: assets/reanim/Cattail_spike.png
+    IMAGE_REANIM_CATTAIL_TAIL: assets/reanim/Cattail_tail.png
+    IMAGE_REANIM_CATTAIL_TAIL2: assets/reanim/Cattail_tail2.png
+    IMAGE_REANIM_CATTAIL_TAIL2_OVERLAY: assets/reanim/Cattail_tail2_overlay.png
+available_animations:
+    - name: anim_blink
+      display_name: blink
+    - name: anim_idle
+      display_name: idle
+    - name: anim_shooting
+      display_name: shooting
+    - name: anim_face
+      display_name: face

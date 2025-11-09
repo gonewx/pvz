@@ -1,0 +1,16 @@
+id: tallnut
+name: Tallnut
+reanim_file: data/reanim/Tallnut.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_TALLNUT_BLINK1: assets/reanim/Tallnut_blink1.png
+    IMAGE_REANIM_TALLNUT_BLINK2: assets/reanim/Tallnut_blink2.png
+    IMAGE_REANIM_TALLNUT_BODY: assets/reanim/Tallnut_body.png
+available_animations:
+    - name: anim_idle
+      display_name: idle
+    - name: anim_blink_twice
+      display_name: blink_twice
+    - name: anim_blink_thrice
+      display_name: blink_thrice

@@ -1,0 +1,23 @@
+id: puffshroom
+name: Puffshroom
+reanim_file: data/reanim/Puffshroom.reanim
+default_animation: anim_sleep
+scale: 1
+images:
+    IMAGE_REANIM_PUFFSHROOM_BLINK1: assets/reanim/PuffShroom_blink1.png
+    IMAGE_REANIM_PUFFSHROOM_BLINK2: assets/reanim/PuffShroom_blink2.png
+    IMAGE_REANIM_PUFFSHROOM_BODY: assets/reanim/PuffShroom_body.png
+    IMAGE_REANIM_PUFFSHROOM_HEAD: assets/reanim/PuffShroom_head.png
+    IMAGE_REANIM_PUFFSHROOM_STEM: assets/reanim/PuffShroom_stem.png
+    IMAGE_REANIM_PUFFSHROOM_TIP: assets/reanim/PuffShroom_tip.png
+available_animations:
+    - name: anim_sleep
+      display_name: sleep
+    - name: anim_shooting
+      display_name: shooting
+    - name: anim_idle
+      display_name: idle
+    - name: anim_face
+      display_name: face
+    - name: anim_blink
+      display_name: blink

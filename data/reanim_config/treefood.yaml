@@ -1,0 +1,17 @@
+id: treefood
+name: TreeFood
+reanim_file: data/reanim/TreeFood.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_TREEFOOD: assets/reanim/TreeFood.png
+    IMAGE_REANIM_TREEFOOD2: assets/reanim/TreeFood2.png
+    IMAGE_REANIM_TREEFOOD3: assets/reanim/TreeFood3.png
+    IMAGE_REANIM_TREEFOOD4: assets/reanim/TreeFood4.png
+    IMAGE_REANIM_ZENGARDEN_FERTILIZER_SEED1: assets/reanim/ZenGarden_fertilizer_seed1.png
+    IMAGE_REANIM_ZENGARDEN_FERTILIZER_SEED2: assets/reanim/ZenGarden_fertilizer_seed2.png
+    IMAGE_REANIM_ZENGARDEN_FERTILIZER_SEED3: assets/reanim/ZenGarden_fertilizer_seed3.png
+    IMAGE_REANIM_ZENGARDEN_FERTILIZER_SEED4: assets/reanim/ZenGarden_fertilizer_seed4.png
+    IMAGE_REANIM_ZENGARDEN_FERTILIZER_SEED5: assets/reanim/ZenGarden_fertilizer_seed5.png
+    IMAGE_REANIM_ZENGARDEN_FERTILIZER_SEED6: assets/reanim/ZenGarden_fertilizer_seed6.png
+available_animations: []

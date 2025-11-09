@@ -1,0 +1,57 @@
+id: zombie_dolphinrider
+name: Zombie_dolphinrider
+reanim_file: data/reanim/Zombie_dolphinrider.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_BODY1: assets/reanim/Zombie_dolphinrider_body1.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_BODY2: assets/reanim/Zombie_dolphinrider_body2.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_DOLPHINBODY1: assets/reanim/Zombie_dolphinrider_dolphinbody1.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_DOLPHINBODY2: assets/reanim/Zombie_dolphinrider_dolphinbody2.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_DOLPHINFIN1: assets/reanim/Zombie_dolphinrider_dolphinfin1.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_DOLPHINFIN2: assets/reanim/Zombie_dolphinrider_dolphinfin2.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_DOLPHININWATER: assets/reanim/Zombie_dolphinrider_dolphininwater.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_DOLPHINJAW: assets/reanim/Zombie_dolphinrider_dolphinjaw.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_HEAD: assets/reanim/Zombie_dolphinrider_head.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_INNERARM_HAND: assets/reanim/Zombie_dolphinrider_innerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_INNERARM_LOWER: assets/reanim/Zombie_dolphinrider_innerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_INNERARM_UPPER: assets/reanim/Zombie_dolphinrider_innerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_INNERLEG_FOOT: assets/reanim/Zombie_dolphinrider_innerleg_foot.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_INNERLEG_LOWER: assets/reanim/Zombie_dolphinrider_innerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_INNERLEG_UPPER: assets/reanim/Zombie_dolphinrider_innerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_JAW: assets/reanim/Zombie_dolphinrider_jaw.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_OUTERARM_HAND: assets/reanim/Zombie_dolphinrider_outerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_OUTERARM_LOWER: assets/reanim/Zombie_dolphinrider_outerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_OUTERARM_UPPER: assets/reanim/Zombie_dolphinrider_outerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_OUTERARM_UPPER2: assets/reanim/Zombie_dolphinrider_outerarm_upper2.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_OUTERLEG_FOOT1: assets/reanim/Zombie_dolphinrider_outerleg_foot1.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_OUTERLEG_FOOT2: assets/reanim/Zombie_dolphinrider_outerleg_foot2.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_OUTERLEG_LOWER: assets/reanim/Zombie_dolphinrider_outerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_OUTERLEG_UPPER: assets/reanim/Zombie_dolphinrider_outerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_WATERSHADOW: assets/reanim/Zombie_dolphinrider_watershadow.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_WHITEWATER1: assets/reanim/Zombie_dolphinrider_whitewater1.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_WHITEWATER2: assets/reanim/Zombie_dolphinrider_whitewater2.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_WHITEWATER3: assets/reanim/Zombie_dolphinrider_whitewater3.png
+available_animations:
+    - name: anim_idle
+      display_name: idle
+    - name: anim_walkdolphin
+      display_name: walkdolphin
+    - name: anim_walk
+      display_name: walk
+    - name: anim_jumpinpool
+      display_name: jumpinpool
+    - name: anim_ride
+      display_name: ride
+    - name: anim_dolphinjump
+      display_name: dolphinjump
+    - name: anim_eat
+      display_name: eat
+    - name: anim_swim
+      display_name: swim
+    - name: anim_death
+      display_name: death
+    - name: anim_head2
+      display_name: head2
+    - name: anim_head1
+      display_name: head1

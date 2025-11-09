@@ -1,0 +1,25 @@
+id: umbrellaleaf
+name: Umbrellaleaf
+reanim_file: data/reanim/Umbrellaleaf.reanim
+default_animation: anim_blink
+scale: 1
+images:
+    IMAGE_REANIM_UMBRELLALEAF_BLINK1: assets/reanim/Umbrellaleaf_blink1.png
+    IMAGE_REANIM_UMBRELLALEAF_BLINK2: assets/reanim/Umbrellaleaf_blink2.png
+    IMAGE_REANIM_UMBRELLALEAF_BODY: assets/reanim/Umbrellaleaf_body.png
+    IMAGE_REANIM_UMBRELLALEAF_LEAF1: assets/reanim/Umbrellaleaf_leaf1.png
+    IMAGE_REANIM_UMBRELLALEAF_LEAF2: assets/reanim/Umbrellaleaf_leaf2.png
+    IMAGE_REANIM_UMBRELLALEAF_LEAF3: assets/reanim/Umbrellaleaf_leaf3.png
+    IMAGE_REANIM_UMBRELLALEAF_LEAF4: assets/reanim/Umbrellaleaf_leaf4.png
+    IMAGE_REANIM_UMBRELLALEAF_LEAF5: assets/reanim/Umbrellaleaf_leaf5.png
+    IMAGE_REANIM_UMBRELLALEAF_LEAF6: assets/reanim/Umbrellaleaf_leaf6.png
+    IMAGE_REANIM_UMBRELLALEAF_LEAF7: assets/reanim/Umbrellaleaf_leaf7.png
+available_animations:
+    - name: anim_blink
+      display_name: blink
+    - name: anim_idle
+      display_name: idle
+    - name: anim_block
+      display_name: block
+    - name: anim_face
+      display_name: face

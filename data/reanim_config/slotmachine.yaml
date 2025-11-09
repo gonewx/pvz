@@ -1,0 +1,14 @@
+id: slotmachine
+name: SlotMachine
+reanim_file: data/reanim/SlotMachine.reanim
+default_animation: anim_return
+scale: 1
+images:
+    IMAGE_REANIM_SLOTMACHINE_BALL: assets/reanim/SlotMachine_ball.png
+    IMAGE_REANIM_SLOTMACHINE_BASE: assets/reanim/SlotMachine_base.png
+    IMAGE_REANIM_SLOTMACHINE_SHAFT: assets/reanim/SlotMachine_shaft.png
+available_animations:
+    - name: anim_return
+      display_name: return
+    - name: anim_pull
+      display_name: pull

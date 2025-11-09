@@ -1,0 +1,11 @@
+id: pumpkin
+name: Pumpkin
+reanim_file: data/reanim/Pumpkin.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_PUMPKIN_BACK: assets/reanim/Pumpkin_back.png
+    IMAGE_REANIM_PUMPKIN_FRONT: assets/reanim/Pumpkin_front.png
+available_animations:
+    - name: anim_idle
+      display_name: idle

@@ -1,0 +1,22 @@
+id: starfruit
+name: Starfruit
+reanim_file: data/reanim/Starfruit.reanim
+default_animation: anim_blink
+scale: 1
+images:
+    IMAGE_REANIM_STARFRUIT_BODY: assets/reanim/Starfruit_body.png
+    IMAGE_REANIM_STARFRUIT_EYES1: assets/reanim/Starfruit_eyes1.png
+    IMAGE_REANIM_STARFRUIT_EYES2: assets/reanim/Starfruit_eyes2.png
+    IMAGE_REANIM_STARFRUIT_LEAF: assets/reanim/Starfruit_leaf.png
+    IMAGE_REANIM_STARFRUIT_MOUTH: assets/reanim/Starfruit_mouth.png
+    IMAGE_REANIM_STARFRUIT_SMILE: assets/reanim/Starfruit_smile.png
+    IMAGE_REANIM_STARFRUIT_STEM: assets/reanim/Starfruit_stem.png
+available_animations:
+    - name: anim_blink
+      display_name: blink
+    - name: anim_idle
+      display_name: idle
+    - name: anim_shoot
+      display_name: shoot
+    - name: anim_face
+      display_name: face

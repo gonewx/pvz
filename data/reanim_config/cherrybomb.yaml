@@ -1,0 +1,39 @@
+id: cherrybomb
+name: CherryBomb
+reanim_file: data/reanim/CherryBomb.reanim
+default_animation: anim_explode
+scale: 1
+images:
+    IMAGE_REANIM_CHERRYBOMB_LEAF1: assets/reanim/CherryBomb_leaf1.png
+    IMAGE_REANIM_CHERRYBOMB_LEAF1TIP: assets/reanim/CherryBomb_leaf1tip.png
+    IMAGE_REANIM_CHERRYBOMB_LEAF2: assets/reanim/CherryBomb_leaf2.png
+    IMAGE_REANIM_CHERRYBOMB_LEAF2TIP: assets/reanim/CherryBomb_leaf2tip.png
+    IMAGE_REANIM_CHERRYBOMB_LEAF3: assets/reanim/CherryBomb_leaf3.png
+    IMAGE_REANIM_CHERRYBOMB_LEFT1: assets/reanim/CherryBomb_left1.png
+    IMAGE_REANIM_CHERRYBOMB_LEFT3: assets/reanim/CherryBomb_left3.png
+    IMAGE_REANIM_CHERRYBOMB_LEFTEYE11: assets/reanim/CherryBomb_lefteye11.png
+    IMAGE_REANIM_CHERRYBOMB_LEFTEYE21: assets/reanim/CherryBomb_lefteye21.png
+    IMAGE_REANIM_CHERRYBOMB_LEFTMOUTH1: assets/reanim/CherryBomb_leftmouth1.png
+    IMAGE_REANIM_CHERRYBOMB_LEFTSTEM: assets/reanim/CherryBomb_leftstem.png
+    IMAGE_REANIM_CHERRYBOMB_RIGHT1: assets/reanim/CherryBomb_right1.png
+    IMAGE_REANIM_CHERRYBOMB_RIGHT3: assets/reanim/CherryBomb_right3.png
+    IMAGE_REANIM_CHERRYBOMB_RIGHTEYE11: assets/reanim/CherryBomb_righteye11.png
+    IMAGE_REANIM_CHERRYBOMB_RIGHTEYE21: assets/reanim/CherryBomb_righteye21.png
+    IMAGE_REANIM_CHERRYBOMB_RIGHTMOUTH1: assets/reanim/CherryBomb_rightmouth1.png
+    IMAGE_REANIM_CHERRYBOMB_RIGHTSTEM: assets/reanim/CherryBomb_rightstem.png
+available_animations:
+    - name: anim_explode
+      display_name: explode
+    - name: anim_idle
+      display_name: idle
+animation_combos:
+    - name: idle
+      display_name: 待机
+      animations:
+        - anim_idle
+      binding_strategy: auto
+    - name: explode
+      display_name: 爆炸
+      animations:
+        - anim_explode
+      binding_strategy: auto

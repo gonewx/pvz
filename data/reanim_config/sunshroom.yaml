@@ -1,0 +1,28 @@
+id: sunshroom
+name: SunShroom
+reanim_file: data/reanim/SunShroom.reanim
+default_animation: anim_bigsleep
+scale: 1
+images:
+    IMAGE_REANIM_SUNSHROOM_BLINK1: assets/reanim/SunShroom_blink1.png
+    IMAGE_REANIM_SUNSHROOM_BLINK2: assets/reanim/SunShroom_blink2.png
+    IMAGE_REANIM_SUNSHROOM_BODY: assets/reanim/SunShroom_body.png
+    IMAGE_REANIM_SUNSHROOM_HEAD: assets/reanim/SunShroom_head.png
+    IMAGE_REANIM_SUNSHROOM_SLEEP: assets/reanim/SunShroom_sleep.png
+available_animations:
+    - name: anim_bigsleep
+      display_name: bigsleep
+    - name: anim_bigidle
+      display_name: bigidle
+    - name: anim_grow
+      display_name: grow
+    - name: anim_sleep
+      display_name: sleep
+    - name: anim_idle
+      display_name: idle
+    - name: anim_face
+      display_name: face
+    - name: anim_sleep
+      display_name: sleep
+    - name: anim_blink
+      display_name: blink

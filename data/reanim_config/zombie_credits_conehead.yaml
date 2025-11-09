@@ -1,0 +1,42 @@
+id: zombie_credits_conehead
+name: Zombie_Credits_Conehead
+reanim_file: data/reanim/Zombie_Credits_Conehead.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_BODY: assets/reanim/Zombie_body.png
+    IMAGE_REANIM_ZOMBIE_CONE1: assets/reanim/Zombie_cone1.png
+    IMAGE_REANIM_ZOMBIE_HEAD: assets/reanim/Zombie_head.png
+    IMAGE_REANIM_ZOMBIE_INNERARM_HAND: assets/reanim/Zombie_innerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_INNERARM_LOWER: assets/reanim/Zombie_innerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_INNERARM_UPPER: assets/reanim/Zombie_innerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_INNERLEG_FOOT: assets/reanim/Zombie_innerleg_foot.png
+    IMAGE_REANIM_ZOMBIE_INNERLEG_LOWER: assets/reanim/Zombie_innerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_INNERLEG_UPPER: assets/reanim/Zombie_innerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_JAW: assets/reanim/Zombie_jaw.png
+    IMAGE_REANIM_ZOMBIE_NECK: assets/reanim/Zombie_neck.png
+    IMAGE_REANIM_ZOMBIE_OUTERARM_HAND: assets/reanim/Zombie_outerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_OUTERARM_LOWER: assets/reanim/Zombie_outerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_OUTERARM_UPPER: assets/reanim/Zombie_outerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_OUTERLEG_FOOT: assets/reanim/Zombie_outerleg_foot.png
+    IMAGE_REANIM_ZOMBIE_OUTERLEG_LOWER: assets/reanim/Zombie_outerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_OUTERLEG_UPPER: assets/reanim/Zombie_outerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_TIE: assets/reanim/Zombie_tie.png
+    IMAGE_REANIM_ZOMBIE_TONGUE: assets/reanim/Zombie_tongue.png
+available_animations:
+    - name: anim_idle
+      display_name: idle
+    - name: anim_innerarm3
+      display_name: innerarm3
+    - name: anim_innerarm2
+      display_name: innerarm2
+    - name: anim_innerarm1
+      display_name: innerarm1
+    - name: anim_head1
+      display_name: head1
+    - name: anim_head2
+      display_name: head2
+    - name: anim_tongue
+      display_name: tongue
+    - name: anim_cone
+      display_name: cone

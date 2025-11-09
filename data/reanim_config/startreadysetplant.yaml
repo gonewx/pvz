@@ -1,0 +1,10 @@
+id: startreadysetplant
+name: StartReadySetPlant
+reanim_file: data/reanim/StartReadySetPlant.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_STARTPLANT: assets/reanim/StartPlant.png
+    IMAGE_REANIM_STARTREADY: assets/reanim/StartReady.png
+    IMAGE_REANIM_STARTSET: assets/reanim/StartSet.png
+available_animations: []

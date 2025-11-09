@@ -1,0 +1,27 @@
+id: wallnut
+name: Wallnut
+reanim_file: data/reanim/Wallnut.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_WALLNUT_BLINK1: assets/reanim/Wallnut_blink1.png
+    IMAGE_REANIM_WALLNUT_BLINK2: assets/reanim/Wallnut_blink2.png
+    IMAGE_REANIM_WALLNUT_BODY: assets/reanim/Wallnut_body.png
+    IMAGE_REANIM_WALLNUT_TWITCH: assets/reanim/Wallnut_twitch.png
+available_animations:
+    - name: anim_idle
+      display_name: idle
+    - name: anim_face
+      display_name: face
+    - name: anim_blink_twitch
+      display_name: blink_twitch
+    - name: anim_blink_twice
+      display_name: blink_twice
+    - name: anim_blink_thrice
+      display_name: blink_thrice
+animation_combos:
+    - name: idle
+      display_name: 待机
+      animations:
+        - anim_idle
+      binding_strategy: auto

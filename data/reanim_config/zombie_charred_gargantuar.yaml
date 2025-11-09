@@ -1,0 +1,28 @@
+id: zombie_charred_gargantuar
+name: Zombie_charred_gargantuar
+reanim_file: data/reanim/Zombie_charred_gargantuar.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_CHARRED_GARGANTUAR_ARM: assets/reanim/Zombie_charred_gargantuar_arm.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_GARGANTUAR_BLINK1: assets/reanim/Zombie_charred_gargantuar_blink1.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_GARGANTUAR_BLINK2: assets/reanim/Zombie_charred_gargantuar_blink2.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_GARGANTUAR_HEAD: assets/reanim/Zombie_charred_gargantuar_head.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_GARGANTUAR_IMPBLINK1: assets/reanim/Zombie_charred_gargantuar_impblink1.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_GARGANTUAR_IMPBLINK2: assets/reanim/Zombie_charred_gargantuar_impblink2.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_GARGANTUAR_IMPHEAD: assets/reanim/Zombie_charred_gargantuar_imphead.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_GARGANTUAR1: assets/reanim/Zombie_charred_gargantuar1.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_GARGANTUAR2: assets/reanim/Zombie_charred_gargantuar2.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_GARGANTUAR3: assets/reanim/Zombie_charred_gargantuar3.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_GARGANTUAR4: assets/reanim/Zombie_charred_gargantuar4.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_GARGANTUAR5: assets/reanim/Zombie_charred_gargantuar5.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_GARGANTUAR6: assets/reanim/Zombie_charred_gargantuar6.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_GARGANTUAR7: assets/reanim/Zombie_charred_gargantuar7.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_GARGANTUAR8: assets/reanim/Zombie_charred_gargantuar8.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_GARGANTUAR9: assets/reanim/Zombie_charred_gargantuar9.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_GARGANTUAR10: assets/reanim/Zombie_charred_gargantuar10.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_GARGANTUAR11: assets/reanim/Zombie_charred_gargantuar11.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_PILE1: assets/reanim/Zombie_charred_pile1.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_PILE2: assets/reanim/Zombie_charred_pile2.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_TAIL: assets/reanim/Zombie_charred_tail.png
+available_animations: []

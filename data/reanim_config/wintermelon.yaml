@@ -1,0 +1,26 @@
+id: wintermelon
+name: WinterMelon
+reanim_file: data/reanim/WinterMelon.reanim
+default_animation: anim_blink
+scale: 1
+images:
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF: assets/reanim/PeaShooter_frontleaf.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF_LEFTTIP: assets/reanim/PeaShooter_frontleaf_lefttip.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF_RIGHTTIP: assets/reanim/PeaShooter_frontleaf_righttip.png
+    IMAGE_REANIM_WINTERMELON_BASKET: assets/reanim/WinterMelon_basket.png
+    IMAGE_REANIM_WINTERMELON_BASKET_OVERLAY: assets/reanim/WinterMelon_basket_overlay.png
+    IMAGE_REANIM_WINTERMELON_BLINK1: assets/reanim/WinterMelon_blink1.png
+    IMAGE_REANIM_WINTERMELON_BLINK2: assets/reanim/WinterMelon_blink2.png
+    IMAGE_REANIM_WINTERMELON_EYEBROW: assets/reanim/WinterMelon_eyebrow.png
+    IMAGE_REANIM_WINTERMELON_MELON: assets/reanim/WinterMelon_melon.png
+    IMAGE_REANIM_WINTERMELON_PROJECTILE: assets/reanim/WinterMelon_projectile.png
+    IMAGE_REANIM_WINTERMELON_STALK: assets/reanim/WinterMelon_stalk.png
+available_animations:
+    - name: anim_blink
+      display_name: blink
+    - name: anim_idle
+      display_name: idle
+    - name: anim_shooting
+      display_name: shooting
+    - name: anim_face
+      display_name: face

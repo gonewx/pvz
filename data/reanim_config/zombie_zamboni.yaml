@@ -1,0 +1,32 @@
+id: zombie_zamboni
+name: Zombie_zamboni
+reanim_file: data/reanim/Zombie_zamboni.reanim
+default_animation: anim_drive
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_HEAD: assets/reanim/Zombie_head.png
+    IMAGE_REANIM_ZOMBIE_JAW: assets/reanim/Zombie_jaw.png
+    IMAGE_REANIM_ZOMBIE_ZAMBONI_1: assets/reanim/Zombie_zamboni_1.png
+    IMAGE_REANIM_ZOMBIE_ZAMBONI_2: assets/reanim/Zombie_zamboni_2.png
+    IMAGE_REANIM_ZOMBIE_ZAMBONI_3: assets/reanim/Zombie_zamboni_3.png
+    IMAGE_REANIM_ZOMBIE_ZAMBONI_4: assets/reanim/Zombie_zamboni_4.png
+    IMAGE_REANIM_ZOMBIE_ZAMBONI_BRUSH: assets/reanim/Zombie_zamboni_brush.png
+    IMAGE_REANIM_ZOMBIE_ZAMBONI_SEAT: assets/reanim/Zombie_zamboni_seat.png
+    IMAGE_REANIM_ZOMBIE_ZAMBONI_WHEEL: assets/reanim/Zombie_zamboni_wheel.png
+    IMAGE_REANIM_ZOMBIE_ZAMBONI_WIRES: assets/reanim/Zombie_zamboni_wires.png
+    IMAGE_REANIM_ZOMBIE_ZAMBONIDRIVER_BEANIE: assets/reanim/Zombie_zambonidriver_beanie.png
+    IMAGE_REANIM_ZOMBIE_ZAMBONIDRIVER_BODY: assets/reanim/Zombie_zambonidriver_body.png
+    IMAGE_REANIM_ZOMBIE_ZAMBONIDRIVER_INNERARM_HAND: assets/reanim/Zombie_zambonidriver_innerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_ZAMBONIDRIVER_LEGS: assets/reanim/Zombie_zambonidriver_legs.png
+    IMAGE_REANIM_ZOMBIE_ZAMBONIDRIVER_LOWERARM_OUTER: assets/reanim/Zombie_zambonidriver_lowerarm_outer.png
+    IMAGE_REANIM_ZOMBIE_ZAMBONIDRIVER_MULLET2: assets/reanim/Zombie_zambonidriver_mullet2.png
+    IMAGE_REANIM_ZOMBIE_ZAMBONIDRIVER_OUTERARM_HAND: assets/reanim/Zombie_zambonidriver_outerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_ZAMBONIDRIVER_SHOULDER: assets/reanim/Zombie_zambonidriver_shoulder.png
+    IMAGE_REANIM_ZOMBIE_ZAMBONIDRIVER_UPPERARM: assets/reanim/Zombie_zambonidriver_upperarm.png
+available_animations:
+    - name: anim_drive
+      display_name: drive
+    - name: anim_wheelie1
+      display_name: wheelie1
+    - name: anim_wheelie2
+      display_name: wheelie2

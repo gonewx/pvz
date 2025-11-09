@@ -1,0 +1,37 @@
+id: splitpea
+name: SplitPea
+reanim_file: data/reanim/SplitPea.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_PEASHOOTER_BACKLEAF: assets/reanim/PeaShooter_backleaf.png
+    IMAGE_REANIM_PEASHOOTER_BACKLEAF_LEFTTIP: assets/reanim/PeaShooter_backleaf_lefttip.png
+    IMAGE_REANIM_PEASHOOTER_BACKLEAF_RIGHTTIP: assets/reanim/PeaShooter_backleaf_righttip.png
+    IMAGE_REANIM_PEASHOOTER_BLINK1: assets/reanim/PeaShooter_blink1.png
+    IMAGE_REANIM_PEASHOOTER_BLINK2: assets/reanim/PeaShooter_blink2.png
+    IMAGE_REANIM_PEASHOOTER_EYEBROW: assets/reanim/PeaShooter_eyebrow.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF: assets/reanim/PeaShooter_frontleaf.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF_LEFTTIP: assets/reanim/PeaShooter_frontleaf_lefttip.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF_RIGHTTIP: assets/reanim/PeaShooter_frontleaf_righttip.png
+    IMAGE_REANIM_PEASHOOTER_HEAD: assets/reanim/PeaShooter_Head.png
+    IMAGE_REANIM_PEASHOOTER_MOUTH: assets/reanim/PeaShooter_mouth.png
+    IMAGE_REANIM_PEASHOOTER_STALK_BOTTOM: assets/reanim/PeaShooter_stalk_bottom.png
+    IMAGE_REANIM_PEASHOOTER_STALK_TOP: assets/reanim/PeaShooter_stalk_top.png
+    IMAGE_REANIM_SPLITPEA_HEAD: assets/reanim/Splitpea_head.png
+available_animations:
+    - name: anim_idle
+      display_name: idle
+    - name: anim_shooting
+      display_name: shooting
+    - name: anim_head_idle
+      display_name: head_idle
+    - name: anim_face
+      display_name: face
+    - name: anim_splitpea_idle
+      display_name: splitpea_idle
+    - name: anim_splitpea_shooting
+      display_name: splitpea_shooting
+    - name: anim_blink
+      display_name: blink
+    - name: anim_SplitPea_blink
+      display_name: SplitPea_blink

@@ -1,0 +1,7 @@
+id: credits_jackbox
+name: Credits_Jackbox
+reanim_file: data/reanim/Credits_Jackbox.reanim
+default_animation: anim_idle
+scale: 1
+images: {}
+available_animations: []

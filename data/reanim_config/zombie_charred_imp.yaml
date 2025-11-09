@@ -1,0 +1,19 @@
+id: zombie_charred_imp
+name: Zombie_charred_imp
+reanim_file: data/reanim/Zombie_charred_imp.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_CHARRED_IMPBLINK1: assets/reanim/Zombie_charred_impblink1.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_IMPBLINK2: assets/reanim/Zombie_charred_impblink2.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_IMPBODY1: assets/reanim/Zombie_charred_impbody1.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_IMPBODY2: assets/reanim/Zombie_charred_impbody2.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_IMPBODY3: assets/reanim/Zombie_charred_impbody3.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_IMPBODY4: assets/reanim/Zombie_charred_impbody4.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_IMPBODY5: assets/reanim/Zombie_charred_impbody5.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_IMPBODY6: assets/reanim/Zombie_charred_impbody6.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_IMPHEAD: assets/reanim/Zombie_charred_imphead.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_PILE1: assets/reanim/Zombie_charred_pile1.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_PILE2: assets/reanim/Zombie_charred_pile2.png
+    IMAGE_REANIM_ZOMBIE_CHARRED_TAIL: assets/reanim/Zombie_charred_tail.png
+available_animations: []

@@ -1,0 +1,12 @@
+id: zengarden_phonograph
+name: ZenGarden_phonograph
+reanim_file: data/reanim/ZenGarden_phonograph.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_ZENGARDEN_PHONOGRAPH_BASE: assets/reanim/ZenGarden_phonograph_base.png
+    IMAGE_REANIM_ZENGARDEN_PHONOGRAPH_NEEDLE: assets/reanim/ZenGarden_phonograph_needle.png
+    IMAGE_REANIM_ZENGARDEN_PHONOGRAPH_RECORD: assets/reanim/ZenGarden_phonograph_record.png
+    IMAGE_REANIM_ZENGARDEN_PHONOGRAPH_SHAFT1: assets/reanim/ZenGarden_phonograph_shaft1.png
+    IMAGE_REANIM_ZENGARDEN_PHONOGRAPH_SHAFT2: assets/reanim/ZenGarden_phonograph_shaft2.png
+available_animations: []

@@ -1,0 +1,50 @@
+id: peashootersingle
+name: PeaShooterSingle
+reanim_file: data/reanim/PeaShooterSingle.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_ANIM_SPROUT: assets/reanim/anim_sprout.png
+    IMAGE_REANIM_PEASHOOTER_BACKLEAF: assets/reanim/PeaShooter_backleaf.png
+    IMAGE_REANIM_PEASHOOTER_BACKLEAF_LEFTTIP: assets/reanim/PeaShooter_backleaf_lefttip.png
+    IMAGE_REANIM_PEASHOOTER_BACKLEAF_RIGHTTIP: assets/reanim/PeaShooter_backleaf_righttip.png
+    IMAGE_REANIM_PEASHOOTER_BLINK1: assets/reanim/PeaShooter_blink1.png
+    IMAGE_REANIM_PEASHOOTER_BLINK2: assets/reanim/PeaShooter_blink2.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF: assets/reanim/PeaShooter_frontleaf.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF_LEFTTIP: assets/reanim/PeaShooter_frontleaf_lefttip.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF_RIGHTTIP: assets/reanim/PeaShooter_frontleaf_righttip.png
+    IMAGE_REANIM_PEASHOOTER_HEAD: assets/reanim/PeaShooter_Head.png
+    IMAGE_REANIM_PEASHOOTER_MOUTH: assets/reanim/PeaShooter_mouth.png
+    IMAGE_REANIM_PEASHOOTER_STALK_BOTTOM: assets/reanim/PeaShooter_stalk_bottom.png
+    IMAGE_REANIM_PEASHOOTER_STALK_TOP: assets/reanim/PeaShooter_stalk_top.png
+available_animations:
+    - name: anim_idle
+      display_name: idle
+    - name: anim_head_idle
+      display_name: head_idle
+    - name: anim_shooting
+      display_name: shooting
+    - name: anim_full_idle
+      display_name: full_idle
+    - name: anim_stem
+      display_name: stem
+    - name: anim_sprout
+      display_name: sprout
+    - name: anim_face
+      display_name: face
+    - name: anim_blink
+      display_name: blink
+animation_combos:
+    - name: attack_with_sway
+      display_name: 攻击+摇晃
+      animations:
+        - anim_shooting
+        - anim_head_idle
+      binding_strategy: auto
+      parent_tracks:
+        anim_face: anim_stem
+        anim_sprout: anim_stem
+        idle_mouth: anim_stem
+      hidden_tracks:
+        - anim_blink
+        - idle_shoot_blink

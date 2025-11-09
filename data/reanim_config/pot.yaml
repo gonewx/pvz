@@ -1,0 +1,21 @@
+id: pot
+name: Pot
+reanim_file: data/reanim/Pot.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_POT_BOTTOM: assets/reanim/Pot_bottom.png
+    IMAGE_REANIM_POT_BOTTOM2: assets/reanim/Pot_bottom2.png
+    IMAGE_REANIM_POT_LEAF1: assets/reanim/Pot_leaf1.png
+    IMAGE_REANIM_POT_LEAF2: assets/reanim/Pot_leaf2.png
+    IMAGE_REANIM_POT_STEM: assets/reanim/Pot_stem.png
+    IMAGE_REANIM_POT_TOP: assets/reanim/Pot_top.png
+    IMAGE_REANIM_POT_WATER_BASE: assets/reanim/Pot_water_base.png
+    IMAGE_REANIM_POT_WATER_TOP: assets/reanim/Pot_water_top.png
+available_animations:
+    - name: anim_idle
+      display_name: idle
+    - name: anim_zengarden
+      display_name: zengarden
+    - name: anim_waterplants
+      display_name: waterplants

@@ -1,0 +1,35 @@
+id: zombie_yeti
+name: Zombie_yeti
+reanim_file: data/reanim/Zombie_yeti.reanim
+default_animation: anim_death
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_YETI_BODY: assets/reanim/Zombie_yeti_body.png
+    IMAGE_REANIM_ZOMBIE_YETI_HEAD: assets/reanim/Zombie_yeti_head.png
+    IMAGE_REANIM_ZOMBIE_YETI_INNERARM_HAND: assets/reanim/Zombie_yeti_innerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_YETI_INNERARM_LOWER: assets/reanim/Zombie_yeti_innerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_YETI_INNERARM_UPPER: assets/reanim/Zombie_yeti_innerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_YETI_INNERLEG_FOOT: assets/reanim/Zombie_yeti_innerleg_foot.png
+    IMAGE_REANIM_ZOMBIE_YETI_INNERLEG_LOWER: assets/reanim/Zombie_yeti_innerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_YETI_INNERLEG_UPPER: assets/reanim/Zombie_yeti_innerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_YETI_JAW: assets/reanim/Zombie_yeti_jaw.png
+    IMAGE_REANIM_ZOMBIE_YETI_OUTERARM_HAND: assets/reanim/Zombie_yeti_outerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_YETI_OUTERARM_LOWER: assets/reanim/Zombie_yeti_outerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_YETI_OUTERARM_UPPER: assets/reanim/Zombie_yeti_outerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_YETI_OUTERARM_UPPER2: assets/reanim/Zombie_yeti_outerarm_upper2.png
+    IMAGE_REANIM_ZOMBIE_YETI_OUTERLEG_FOOT: assets/reanim/Zombie_yeti_outerleg_foot.png
+    IMAGE_REANIM_ZOMBIE_YETI_OUTERLEG_LOWER: assets/reanim/Zombie_yeti_outerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_YETI_OUTERLEG_UPPER: assets/reanim/Zombie_yeti_outerleg_upper.png
+available_animations:
+    - name: anim_death
+      display_name: death
+    - name: anim_eat
+      display_name: eat
+    - name: anim_walk
+      display_name: walk
+    - name: anim_idle
+      display_name: idle
+    - name: anim_head1
+      display_name: head1
+    - name: anim_head2
+      display_name: head2

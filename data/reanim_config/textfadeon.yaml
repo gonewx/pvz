@@ -1,0 +1,11 @@
+id: textfadeon
+name: TextFadeOn
+reanim_file: data/reanim/TextFadeOn.reanim
+default_animation: anim_leave
+scale: 1
+images: {}
+available_animations:
+    - name: anim_leave
+      display_name: leave
+    - name: anim_enter
+      display_name: enter

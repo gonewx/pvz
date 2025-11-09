@@ -1,0 +1,11 @@
+id: rain_splash
+name: Rain_splash
+reanim_file: data/reanim/Rain_splash.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_RAIN_SPLASH1: assets/reanim/Rain_splash1.png
+    IMAGE_REANIM_RAIN_SPLASH2: assets/reanim/Rain_splash2.png
+    IMAGE_REANIM_RAIN_SPLASH3: assets/reanim/Rain_splash3.png
+    IMAGE_REANIM_RAIN_SPLASH4: assets/reanim/Rain_splash4.png
+available_animations: []

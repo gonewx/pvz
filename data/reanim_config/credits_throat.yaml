@@ -1,0 +1,14 @@
+id: credits_throat
+name: Credits_Throat
+reanim_file: data/reanim/Credits_Throat.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_CREDITS_BIGBRAIN: assets/images/Credits_BigBrain.jpg
+    IMAGE_REANIM_CREDITS_JAW: assets/reanim/Credits_jaw.png
+    IMAGE_REANIM_CREDITS_PLATE: assets/reanim/Credits_plate.png
+    IMAGE_REANIM_CREDITS_PLATESHADOW: assets/reanim/Credits_plateshadow.png
+    IMAGE_REANIM_CREDITS_SADHEART: assets/reanim/Credits_sadheart.png
+    IMAGE_REANIM_CREDITS_SADHEART_HAPPY: assets/reanim/Credits_sadheart_happy.png
+    IMAGE_REANIM_CREDITS_THROAT: assets/reanim/Credits_throat.jpg
+available_animations: []

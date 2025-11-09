@@ -1,0 +1,48 @@
+id: zombie_balloon
+name: Zombie_balloon
+reanim_file: data/reanim/Zombie_balloon.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_BALLOON_BODY1: assets/reanim/Zombie_balloon_body1.png
+    IMAGE_REANIM_ZOMBIE_BALLOON_BODY2: assets/reanim/Zombie_balloon_body2.png
+    IMAGE_REANIM_ZOMBIE_BALLOON_BOTTOM: assets/reanim/Zombie_balloon_bottom.png
+    IMAGE_REANIM_ZOMBIE_BALLOON_HAT: assets/reanim/Zombie_balloon_hat.png
+    IMAGE_REANIM_ZOMBIE_BALLOON_HEAD: assets/reanim/Zombie_balloon_head.png
+    IMAGE_REANIM_ZOMBIE_BALLOON_INNERARM_LOWER: assets/reanim/Zombie_balloon_innerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_BALLOON_INNERARM_UPPER: assets/reanim/Zombie_balloon_innerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_BALLOON_INNERLEG_FOOT: assets/reanim/Zombie_balloon_innerleg_foot.png
+    IMAGE_REANIM_ZOMBIE_BALLOON_INNERLEG_LOWER: assets/reanim/Zombie_balloon_innerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_BALLOON_INNERLEG_UPPER: assets/reanim/Zombie_balloon_innerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_BALLOON_JAW: assets/reanim/Zombie_balloon_jaw.png
+    IMAGE_REANIM_ZOMBIE_BALLOON_OUTERARM_LOWER: assets/reanim/Zombie_balloon_outerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_BALLOON_OUTERARM_UPPER: assets/reanim/Zombie_balloon_outerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_BALLOON_OUTERARM_UPPER2: assets/reanim/Zombie_balloon_outerarm_upper2.png
+    IMAGE_REANIM_ZOMBIE_BALLOON_OUTERLEG_FOOT: assets/reanim/Zombie_balloon_outerleg_FOOT.png
+    IMAGE_REANIM_ZOMBIE_BALLOON_OUTERLEG_LOWER: assets/reanim/Zombie_balloon_outerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_BALLOON_OUTERLEG_UPPER: assets/reanim/Zombie_balloon_outerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_BALLOON_POP1: assets/reanim/Zombie_balloon_pop1.png
+    IMAGE_REANIM_ZOMBIE_BALLOON_POP2: assets/reanim/Zombie_balloon_pop2.png
+    IMAGE_REANIM_ZOMBIE_BALLOON_PROPELLER: assets/reanim/Zombie_balloon_propeller.png
+    IMAGE_REANIM_ZOMBIE_BALLOON_PROPELLER2: assets/reanim/Zombie_balloon_propeller2.png
+    IMAGE_REANIM_ZOMBIE_BALLOON_STRING: assets/reanim/Zombie_balloon_string.png
+    IMAGE_REANIM_ZOMBIE_BALLOON_TOP: assets/reanim/Zombie_balloon_top.png
+    IMAGE_REANIM_ZOMBIE_INNERARM_HAND: assets/reanim/Zombie_innerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_OUTERARM_HAND: assets/reanim/Zombie_outerarm_hand.png
+available_animations:
+    - name: anim_idle
+      display_name: idle
+    - name: anim_swing
+      display_name: swing
+    - name: anim_pop
+      display_name: pop
+    - name: anim_eat
+      display_name: eat
+    - name: anim_walk
+      display_name: walk
+    - name: anim_death
+      display_name: death
+    - name: anim_head1
+      display_name: head1
+    - name: anim_head2
+      display_name: head2

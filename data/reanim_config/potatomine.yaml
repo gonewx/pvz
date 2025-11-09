@@ -1,0 +1,39 @@
+id: potatomine
+name: PotatoMine
+reanim_file: data/reanim/PotatoMine.reanim
+default_animation: anim_armed
+scale: 1
+images:
+    IMAGE_REANIM_POTATOMINE_BLINK1: assets/reanim/PotatoMine_blink1.png
+    IMAGE_REANIM_POTATOMINE_BLINK2: assets/reanim/PotatoMine_blink2.png
+    IMAGE_REANIM_POTATOMINE_BODY: assets/reanim/PotatoMine_body.png
+    IMAGE_REANIM_POTATOMINE_EYES: assets/reanim/PotatoMine_eyes.png
+    IMAGE_REANIM_POTATOMINE_LIGHT1: assets/reanim/PotatoMine_light1.png
+    IMAGE_REANIM_POTATOMINE_LIGHT2: assets/reanim/PotatoMine_light2.png
+    IMAGE_REANIM_POTATOMINE_MASHED: assets/reanim/PotatoMine_mashed.png
+    IMAGE_REANIM_POTATOMINE_ROCK1: assets/reanim/PotatoMine_rock1.png
+    IMAGE_REANIM_POTATOMINE_ROCK2: assets/reanim/PotatoMine_rock2.png
+    IMAGE_REANIM_POTATOMINE_ROCK3: assets/reanim/PotatoMine_rock3.png
+    IMAGE_REANIM_POTATOMINE_ROCK4: assets/reanim/PotatoMine_rock4.png
+    IMAGE_REANIM_POTATOMINE_ROCK5: assets/reanim/PotatoMine_rock5.png
+    IMAGE_REANIM_POTATOMINE_ROCK6: assets/reanim/PotatoMine_rock6.png
+    IMAGE_REANIM_POTATOMINE_STEM: assets/reanim/PotatoMine_stem.png
+available_animations:
+    - name: anim_armed
+      display_name: armed
+    - name: anim_rise
+      display_name: rise
+    - name: anim_idle
+      display_name: idle
+    - name: anim_blink
+      display_name: blink
+    - name: anim_mashed
+      display_name: mashed
+    - name: anim_face
+      display_name: face
+    - name: anim_eye
+      display_name: eye
+    - name: anim_light
+      display_name: light
+    - name: anim_glow
+      display_name: glow

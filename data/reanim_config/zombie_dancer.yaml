@@ -1,0 +1,44 @@
+id: zombie_dancer
+name: Zombie_dancer
+reanim_file: data/reanim/Zombie_dancer.reanim
+default_animation: anim_walk
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_DANCER__HEAD: assets/reanim/Zombie_dancer__head.png
+    IMAGE_REANIM_ZOMBIE_DANCER_BELT: assets/reanim/Zombie_dancer_belt.png
+    IMAGE_REANIM_ZOMBIE_DANCER_BODY1: assets/reanim/Zombie_dancer_body1.png
+    IMAGE_REANIM_ZOMBIE_DANCER_BODY2: assets/reanim/Zombie_dancer_body2.png
+    IMAGE_REANIM_ZOMBIE_DANCER_COLAR: assets/reanim/Zombie_dancer_colar.png
+    IMAGE_REANIM_ZOMBIE_DANCER_EARING: assets/reanim/Zombie_dancer_earing.png
+    IMAGE_REANIM_ZOMBIE_DANCER_HAIR: assets/reanim/Zombie_dancer_hair.png
+    IMAGE_REANIM_ZOMBIE_DANCER_INNERARM_HAND: assets/reanim/Zombie_dancer_innerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_DANCER_INNERARM_LOWER: assets/reanim/Zombie_dancer_innerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_DANCER_INNERARM_UPPER: assets/reanim/Zombie_dancer_innerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_DANCER_INNERLEG_FOOT: assets/reanim/Zombie_dancer_innerleg_foot.png
+    IMAGE_REANIM_ZOMBIE_DANCER_INNERLEG_LOWER: assets/reanim/Zombie_dancer_innerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_DANCER_INNERLEG_UPPER: assets/reanim/Zombie_dancer_innerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_DANCER_OUTERARM_HAND: assets/reanim/Zombie_dancer_outerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_DANCER_OUTERARM_LOWER: assets/reanim/Zombie_dancer_outerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_DANCER_OUTERARM_UPPER: assets/reanim/Zombie_dancer_outerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_DANCER_OUTERLEG_FOOT: assets/reanim/Zombie_dancer_outerleg_foot.png
+    IMAGE_REANIM_ZOMBIE_DANCER_OUTERLEG_LOWER: assets/reanim/Zombie_dancer_outerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_DANCER_OUTERLEG_TOE: assets/reanim/Zombie_dancer_outerleg_toe.png
+    IMAGE_REANIM_ZOMBIE_DANCER_OUTERLEG_UPPER: assets/reanim/Zombie_dancer_outerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_JAW: assets/reanim/Zombie_jaw.png
+available_animations:
+    - name: anim_walk
+      display_name: walk
+    - name: anim_armraise
+      display_name: armraise
+    - name: anim_eat
+      display_name: eat
+    - name: anim_death
+      display_name: death
+    - name: anim_head1
+      display_name: head1
+    - name: anim_head2
+      display_name: head2
+    - name: anim_earing
+      display_name: earing
+    - name: anim_hair
+      display_name: hair

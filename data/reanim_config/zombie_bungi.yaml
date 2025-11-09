@@ -1,0 +1,44 @@
+id: zombie_bungi
+name: Zombie_bungi
+reanim_file: data/reanim/Zombie_bungi.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_BUNGI_BODY: assets/reanim/Zombie_bungi_body.png
+    IMAGE_REANIM_ZOMBIE_BUNGI_BODY2: assets/reanim/Zombie_bungi_body2.png
+    IMAGE_REANIM_ZOMBIE_BUNGI_FOOT: assets/reanim/Zombie_bungi_foot.png
+    IMAGE_REANIM_ZOMBIE_BUNGI_HAIR: assets/reanim/Zombie_bungi_hair.png
+    IMAGE_REANIM_ZOMBIE_BUNGI_HAND: assets/reanim/Zombie_bungi_hand.png
+    IMAGE_REANIM_ZOMBIE_BUNGI_HAND2: assets/reanim/Zombie_bungi_hand2.png
+    IMAGE_REANIM_ZOMBIE_BUNGI_HEAD: assets/reanim/Zombie_bungi_head.png
+    IMAGE_REANIM_ZOMBIE_BUNGI_JAW: assets/reanim/Zombie_bungi_jaw.png
+    IMAGE_REANIM_ZOMBIE_BUNGI_LEFT_TATTER: assets/reanim/Zombie_bungi_left_tatter.png
+    IMAGE_REANIM_ZOMBIE_BUNGI_LEFTARM_LOWER: assets/reanim/Zombie_bungi_leftarm_lower.png
+    IMAGE_REANIM_ZOMBIE_BUNGI_LEFTARM_LOWER2: assets/reanim/Zombie_bungi_leftarm_lower2.png
+    IMAGE_REANIM_ZOMBIE_BUNGI_LEFTARM_UPPER: assets/reanim/Zombie_bungi_leftarm_upper.png
+    IMAGE_REANIM_ZOMBIE_BUNGI_LEFTARM_UPPER2: assets/reanim/Zombie_bungi_leftarm_upper2.png
+    IMAGE_REANIM_ZOMBIE_BUNGI_LEFTLEG_LOWER: assets/reanim/Zombie_bungi_leftleg_lower.png
+    IMAGE_REANIM_ZOMBIE_BUNGI_LEFTLEG_TATTER: assets/reanim/Zombie_bungi_leftleg_tatter.png
+    IMAGE_REANIM_ZOMBIE_BUNGI_LEFTLEG_UPPER: assets/reanim/Zombie_bungi_leftleg_upper.png
+    IMAGE_REANIM_ZOMBIE_BUNGI_LEFTSHIRT: assets/reanim/Zombie_bungi_leftshirt.png
+    IMAGE_REANIM_ZOMBIE_BUNGI_RIGHTARM_CUFF: assets/reanim/Zombie_bungi_rightarm_cuff.png
+    IMAGE_REANIM_ZOMBIE_BUNGI_RIGHTARM_LOWER: assets/reanim/Zombie_bungi_rightarm_lower.png
+    IMAGE_REANIM_ZOMBIE_BUNGI_RIGHTARM_LOWER2: assets/reanim/Zombie_bungi_rightarm_lower2.png
+    IMAGE_REANIM_ZOMBIE_BUNGI_RIGHTARM_UPPER: assets/reanim/Zombie_bungi_rightarm_upper.png
+    IMAGE_REANIM_ZOMBIE_BUNGI_RIGHTARM_UPPER2: assets/reanim/Zombie_bungi_rightarm_upper2.png
+    IMAGE_REANIM_ZOMBIE_BUNGI_RIGHTLEG_LOWER: assets/reanim/Zombie_bungi_rightleg_lower.png
+    IMAGE_REANIM_ZOMBIE_BUNGI_RIGHTLEG_UPPER: assets/reanim/Zombie_bungi_rightleg_upper.png
+    IMAGE_REANIM_ZOMBIE_BUNGI_RIGHTSHIRT: assets/reanim/Zombie_bungi_rightshirt.png
+available_animations:
+    - name: anim_idle
+      display_name: idle
+    - name: anim_drop
+      display_name: drop
+    - name: anim_grab
+      display_name: grab
+    - name: anim_hold
+      display_name: hold
+    - name: anim_raise
+      display_name: raise
+    - name: anim_head1
+      display_name: head1

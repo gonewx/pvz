@@ -1,0 +1,81 @@
+id: crazydave
+name: CrazyDave
+reanim_file: data/reanim/CrazyDave.reanim
+default_animation: anim_enter
+scale: 1
+images:
+    IMAGE_REANIM_CRAZYDAVE_BEARD: assets/reanim/CrazyDave_beard.png
+    IMAGE_REANIM_CRAZYDAVE_BLINK1: assets/reanim/CrazyDave_blink1.png
+    IMAGE_REANIM_CRAZYDAVE_BLINK2: assets/reanim/CrazyDave_blink2.png
+    IMAGE_REANIM_CRAZYDAVE_BODY1: assets/reanim/CrazyDave_body1.jpg
+    IMAGE_REANIM_CRAZYDAVE_BODY2: assets/reanim/CrazyDave_body2.png
+    IMAGE_REANIM_CRAZYDAVE_EYE: assets/reanim/CrazyDave_eye.png
+    IMAGE_REANIM_CRAZYDAVE_EYEBROW: assets/reanim/CrazyDave_eyebrow.png
+    IMAGE_REANIM_CRAZYDAVE_FOOT1: assets/reanim/CrazyDave_foot1.png
+    IMAGE_REANIM_CRAZYDAVE_FOOT2: assets/reanim/CrazyDave_foot2.png
+    IMAGE_REANIM_CRAZYDAVE_HANDINGHAND: assets/reanim/CrazyDave_handinghand.png
+    IMAGE_REANIM_CRAZYDAVE_HANDINGHAND2: assets/reanim/CrazyDave_handinghand2.png
+    IMAGE_REANIM_CRAZYDAVE_HANDINGHAND3: assets/reanim/CrazyDave_handinghand3.png
+    IMAGE_REANIM_CRAZYDAVE_HEAD: assets/reanim/CrazyDave_head.png
+    IMAGE_REANIM_CRAZYDAVE_INNERARM: assets/reanim/CrazyDave_innerarm.png
+    IMAGE_REANIM_CRAZYDAVE_INNERFINGER1: assets/reanim/CrazyDave_innerfinger1.png
+    IMAGE_REANIM_CRAZYDAVE_INNERFINGER2: assets/reanim/CrazyDave_innerfinger2.png
+    IMAGE_REANIM_CRAZYDAVE_INNERFINGER3: assets/reanim/CrazyDave_innerfinger3.png
+    IMAGE_REANIM_CRAZYDAVE_INNERFINGER4: assets/reanim/CrazyDave_innerfinger4.png
+    IMAGE_REANIM_CRAZYDAVE_INNERHAND: assets/reanim/CrazyDave_innerhand.png
+    IMAGE_REANIM_CRAZYDAVE_INNERPANTS: assets/reanim/CrazyDave_innerpants.png
+    IMAGE_REANIM_CRAZYDAVE_MOUTH1: assets/reanim/CrazyDave_mouth1.png
+    IMAGE_REANIM_CRAZYDAVE_MOUTH2: assets/reanim/CrazyDave_mouth2.png
+    IMAGE_REANIM_CRAZYDAVE_MOUTH3: assets/reanim/CrazyDave_mouth3.png
+    IMAGE_REANIM_CRAZYDAVE_MOUTH4: assets/reanim/CrazyDave_mouth4.png
+    IMAGE_REANIM_CRAZYDAVE_MOUTH5: assets/reanim/CrazyDave_mouth5.png
+    IMAGE_REANIM_CRAZYDAVE_MOUTH6: assets/reanim/CrazyDave_mouth6.png
+    IMAGE_REANIM_CRAZYDAVE_OUTERARM: assets/reanim/CrazyDave_outerarm.png
+    IMAGE_REANIM_CRAZYDAVE_OUTERFINGER1: assets/reanim/CrazyDave_outerfinger1.png
+    IMAGE_REANIM_CRAZYDAVE_OUTERFINGER2: assets/reanim/CrazyDave_outerfinger2.png
+    IMAGE_REANIM_CRAZYDAVE_OUTERFINGER3: assets/reanim/CrazyDave_outerfinger3.png
+    IMAGE_REANIM_CRAZYDAVE_OUTERFINGER4: assets/reanim/CrazyDave_outerfinger4.png
+    IMAGE_REANIM_CRAZYDAVE_OUTERHAND: assets/reanim/CrazyDave_outerhand.png
+    IMAGE_REANIM_CRAZYDAVE_POT: assets/reanim/CrazyDave_pot.png
+    IMAGE_REANIM_CRAZYDAVE_POT_INSIDE: assets/reanim/CrazyDave_pot_inside.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_ARM1: assets/reanim/CrazyDave_Zombie_arm1.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_ARM2: assets/reanim/CrazyDave_zombie_arm2.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_BODY: assets/reanim/CrazyDave_zombie_body.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_FOOT1: assets/reanim/CrazyDave_zombie_foot1.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_FOOT2: assets/reanim/CrazyDave_zombie_foot2.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_GRABHAND: assets/reanim/CrazyDave_zombie_grabhand.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_HAND1: assets/reanim/CrazyDave_zombie_hand1.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_HAND2: assets/reanim/CrazyDave_zombie_hand2.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_HEAD1: assets/reanim/CrazyDave_zombie_head1.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_HEAD2: assets/reanim/CrazyDave_zombie_head2.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_LOWERLEG1: assets/reanim/CrazyDave_zombie_lowerleg1.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_LOWERLEG2: assets/reanim/CrazyDave_zombie_lowerleg2.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_UPPERLEG1: assets/reanim/CrazyDave_zombie_upperleg1.png
+    IMAGE_REANIM_CRAZYDAVE_ZOMBIE_UPPERLEG2: assets/reanim/CrazyDave_zombie_upperleg2.png
+available_animations:
+    - name: anim_enter
+      display_name: enter
+    - name: anim_leave
+      display_name: leave
+    - name: anim_blahblah
+      display_name: blahblah
+    - name: anim_idle
+      display_name: idle
+    - name: anim_smalltalk
+      display_name: smalltalk
+    - name: anim_crazy
+      display_name: crazy
+    - name: anim_mediumtalk
+      display_name: mediumtalk
+    - name: anim_blink
+      display_name: blink
+    - name: anim_grab
+      display_name: grab
+    - name: anim_enter_handing
+      display_name: enter_handing
+    - name: anim_idle_handing
+      display_name: idle_handing
+    - name: anim_talk_handing
+      display_name: talk_handing
+    - name: anim_enterup
+      display_name: enterup

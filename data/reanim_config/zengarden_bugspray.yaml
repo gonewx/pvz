@@ -1,0 +1,13 @@
+id: zengarden_bugspray
+name: ZenGarden_bugspray
+reanim_file: data/reanim/ZenGarden_bugspray.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_ZENGARDEN_BUGSPRAY_BOTTLE: assets/reanim/ZenGarden_bugspray_bottle.png
+    IMAGE_REANIM_ZENGARDEN_BUGSPRAY_SPRAY1: assets/reanim/ZenGarden_bugspray_spray1.png
+    IMAGE_REANIM_ZENGARDEN_BUGSPRAY_SPRAY2: assets/reanim/ZenGarden_bugspray_spray2.png
+    IMAGE_REANIM_ZENGARDEN_BUGSPRAY_SPRAY3: assets/reanim/ZenGarden_bugspray_spray3.png
+    IMAGE_REANIM_ZENGARDEN_BUGSPRAY_SPRAY4: assets/reanim/ZenGarden_bugspray_spray4.png
+    IMAGE_REANIM_ZENGARDEN_BUGSPRAY_TRIGGER: assets/reanim/ZenGarden_bugspray_trigger.png
+available_animations: []

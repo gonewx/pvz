@@ -1,0 +1,32 @@
+id: goldmagnet
+name: GoldMagnet
+reanim_file: data/reanim/GoldMagnet.reanim
+default_animation: anim_blink
+scale: 1
+images:
+    IMAGE_REANIM_GOLDMAGNET_BIGSPARK1: assets/reanim/GoldMagnet_bigspark1.png
+    IMAGE_REANIM_GOLDMAGNET_BIGSPARK2: assets/reanim/GoldMagnet_bigspark2.png
+    IMAGE_REANIM_GOLDMAGNET_BIGSPARK3: assets/reanim/GoldMagnet_bigspark3.png
+    IMAGE_REANIM_GOLDMAGNET_BLINK1: assets/reanim/GoldMagnet_blink1.png
+    IMAGE_REANIM_GOLDMAGNET_BLINK2: assets/reanim/GoldMagnet_blink2.png
+    IMAGE_REANIM_GOLDMAGNET_EYEBROW: assets/reanim/GoldMagnet_eyebrow.png
+    IMAGE_REANIM_GOLDMAGNET_HEAD1: assets/reanim/GoldMagnet_head1.png
+    IMAGE_REANIM_GOLDMAGNET_HEAD2: assets/reanim/GoldMagnet_head2.png
+    IMAGE_REANIM_GOLDMAGNET_LEAF1: assets/reanim/GoldMagnet_leaf1.png
+    IMAGE_REANIM_GOLDMAGNET_LEAF2: assets/reanim/GoldMagnet_leaf2.png
+    IMAGE_REANIM_GOLDMAGNET_LEAF3: assets/reanim/GoldMagnet_leaf3.png
+    IMAGE_REANIM_GOLDMAGNET_LEAF4: assets/reanim/GoldMagnet_leaf4.png
+    IMAGE_REANIM_GOLDMAGNET_LEAF5: assets/reanim/GoldMagnet_leaf5.png
+    IMAGE_REANIM_GOLDMAGNET_SMALLSPARK1: assets/reanim/GoldMagnet_smallspark1.png
+    IMAGE_REANIM_GOLDMAGNET_SMALLSPARK2: assets/reanim/GoldMagnet_smallspark2.png
+    IMAGE_REANIM_GOLDMAGNET_SMALLSPARK3: assets/reanim/GoldMagnet_smallspark3.png
+    IMAGE_REANIM_GOLDMAGNET_STEM: assets/reanim/GoldMagnet_stem.png
+available_animations:
+    - name: anim_blink
+      display_name: blink
+    - name: anim_idle
+      display_name: idle
+    - name: anim_attract
+      display_name: attract
+    - name: anim_face
+      display_name: face

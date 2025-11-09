@@ -1,0 +1,13 @@
+id: diamond
+name: Diamond
+reanim_file: data/reanim/Diamond.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_DIAMOND: assets/reanim/Diamond.png
+    IMAGE_REANIM_DIAMOND_SHINE1: assets/reanim/Diamond_shine1.png
+    IMAGE_REANIM_DIAMOND_SHINE2: assets/reanim/Diamond_shine2.png
+    IMAGE_REANIM_DIAMOND_SHINE3: assets/reanim/Diamond_shine3.png
+    IMAGE_REANIM_DIAMOND_SHINE4: assets/reanim/Diamond_shine4.png
+    IMAGE_REANIM_DIAMOND_SHINE5: assets/reanim/Diamond_shine5.png
+available_animations: []

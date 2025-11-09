@@ -1,0 +1,30 @@
+id: cabbagepult
+name: Cabbagepult
+reanim_file: data/reanim/Cabbagepult.reanim
+default_animation: anim_blink
+scale: 1
+images:
+    IMAGE_REANIM_CABBAGEPULT_BASKET: assets/reanim/Cabbagepult_basket.png
+    IMAGE_REANIM_CABBAGEPULT_BASKET_OVERLAY: assets/reanim/Cabbagepult_basket_overlay.png
+    IMAGE_REANIM_CABBAGEPULT_BLINK1: assets/reanim/Cabbagepult_blink1.png
+    IMAGE_REANIM_CABBAGEPULT_BLINK2: assets/reanim/Cabbagepult_blink2.png
+    IMAGE_REANIM_CABBAGEPULT_CABBAGE: assets/reanim/Cabbagepult_cabbage.png
+    IMAGE_REANIM_CABBAGEPULT_EYEBROW: assets/reanim/Cabbagepult_eyebrow.png
+    IMAGE_REANIM_CABBAGEPULT_HEAD: assets/reanim/Cabbagepult_head.png
+    IMAGE_REANIM_CABBAGEPULT_LEAF: assets/reanim/Cabbagepult_leaf.png
+    IMAGE_REANIM_CABBAGEPULT_STALK1: assets/reanim/Cabbagepult_stalk1.png
+    IMAGE_REANIM_CABBAGEPULT_STALK2: assets/reanim/Cabbagepult_stalk2.png
+    IMAGE_REANIM_CABBAGEPULT_STALK3: assets/reanim/Cabbagepult_stalk3.png
+    IMAGE_REANIM_CABBAGEPULT_STALK4: assets/reanim/Cabbagepult_stalk4.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF: assets/reanim/PeaShooter_frontleaf.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF_LEFTTIP: assets/reanim/PeaShooter_frontleaf_lefttip.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF_RIGHTTIP: assets/reanim/PeaShooter_frontleaf_righttip.png
+available_animations:
+    - name: anim_blink
+      display_name: blink
+    - name: anim_idle
+      display_name: idle
+    - name: anim_shooting
+      display_name: shooting
+    - name: anim_face
+      display_name: face

@@ -1,0 +1,11 @@
+id: credits_anyhour
+name: Credits_Anyhour
+reanim_file: data/reanim/Credits_Anyhour.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_BACKGROUND1: assets/images/background1.jpg
+    IMAGE_REANIM_BACKGROUND2: assets/images/background2.jpg
+    IMAGE_REANIM_PLANTSHADOW: assets/images/plantshadow.png
+    IMAGE_REANIM_PLANTSHADOW2: assets/images/plantshadow2.png
+available_animations: []

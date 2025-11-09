@@ -1,0 +1,17 @@
+id: credits_main3
+name: Credits_Main3
+reanim_file: data/reanim/Credits_Main3.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_BACKGROUND1: assets/images/background1.jpg
+    IMAGE_REANIM_BACKGROUND5: assets/images/background5.jpg
+    IMAGE_REANIM_CORNPULT_BUTTER_SPLAT: assets/reanim/Cornpult_butter_splat.png
+    IMAGE_REANIM_CREDITS_BOX: assets/reanim/Credits_box.png
+    IMAGE_REANIM_CREDITS_CIRCLEFADE: assets/reanim/Credits_CircleFade.png
+    IMAGE_REANIM_CREDITS_MIC: assets/reanim/Credits_mic.png
+    IMAGE_REANIM_CREDITS_MTV: assets/reanim/Credits_MTV.png
+    IMAGE_REANIM_PLANTSHADOW: assets/images/plantshadow.png
+    IMAGE_REANIM_STORE_SPEECHBUBBLE2: assets/images/Store_SpeechBubble2.png
+    IMAGE_REANIM_ZOMBIE_DOLPHINRIDER_DOLPHININWATER: assets/reanim/Zombie_dolphinrider_dolphininwater.png
+available_animations: []

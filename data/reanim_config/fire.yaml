@@ -1,0 +1,23 @@
+id: fire
+name: fire
+reanim_file: data/reanim/fire.reanim
+default_animation: anim_flame
+scale: 1
+images:
+    IMAGE_REANIM_FIRE1: assets/reanim/fire1.png
+    IMAGE_REANIM_FIRE2: assets/reanim/fire2.png
+    IMAGE_REANIM_FIRE3: assets/reanim/fire3.png
+    IMAGE_REANIM_FIRE4: assets/reanim/fire4.png
+    IMAGE_REANIM_FIRE4B: assets/reanim/fire4b.png
+    IMAGE_REANIM_FIRE5: assets/reanim/fire5.png
+    IMAGE_REANIM_FIRE5B: assets/reanim/fire5b.png
+    IMAGE_REANIM_FIRE6: assets/reanim/fire6.png
+    IMAGE_REANIM_FIRE6B: assets/reanim/fire6b.png
+    IMAGE_REANIM_FIRE7: assets/reanim/fire7.png
+    IMAGE_REANIM_FIRE7B: assets/reanim/fire7b.png
+    IMAGE_REANIM_FIRE8: assets/reanim/fire8.png
+available_animations:
+    - name: anim_flame
+      display_name: flame
+    - name: anim_done
+      display_name: done

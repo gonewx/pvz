@@ -1,0 +1,7 @@
+id: credits_football
+name: Credits_Football
+reanim_file: data/reanim/Credits_Football.reanim
+default_animation: anim_idle
+scale: 1
+images: {}
+available_animations: []

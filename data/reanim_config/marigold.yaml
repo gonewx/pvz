@@ -1,0 +1,28 @@
+id: marigold
+name: Marigold
+reanim_file: data/reanim/Marigold.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_MARIGOLD_BLINK1: assets/reanim/Marigold_blink1.png
+    IMAGE_REANIM_MARIGOLD_BLINK2: assets/reanim/Marigold_blink2.png
+    IMAGE_REANIM_MARIGOLD_EYEBROW1: assets/reanim/Marigold_eyebrow1.png
+    IMAGE_REANIM_MARIGOLD_EYEBROW2: assets/reanim/Marigold_eyebrow2.png
+    IMAGE_REANIM_MARIGOLD_HEAD: assets/reanim/Marigold_head.png
+    IMAGE_REANIM_MARIGOLD_MOUTH: assets/reanim/Marigold_mouth.png
+    IMAGE_REANIM_MARIGOLD_PETALS: assets/reanim/Marigold_petals.png
+    IMAGE_REANIM_PEASHOOTER_BACKLEAF: assets/reanim/PeaShooter_backleaf.png
+    IMAGE_REANIM_PEASHOOTER_BACKLEAF_LEFTTIP: assets/reanim/PeaShooter_backleaf_lefttip.png
+    IMAGE_REANIM_PEASHOOTER_BACKLEAF_RIGHTTIP: assets/reanim/PeaShooter_backleaf_righttip.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF: assets/reanim/PeaShooter_frontleaf.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF_LEFTTIP: assets/reanim/PeaShooter_frontleaf_lefttip.png
+    IMAGE_REANIM_PEASHOOTER_FRONTLEAF_RIGHTTIP: assets/reanim/PeaShooter_frontleaf_righttip.png
+    IMAGE_REANIM_PEASHOOTER_STALK_BOTTOM: assets/reanim/PeaShooter_stalk_bottom.png
+    IMAGE_REANIM_PEASHOOTER_STALK_TOP: assets/reanim/PeaShooter_stalk_top.png
+available_animations:
+    - name: anim_idle
+      display_name: idle
+    - name: anim_blink
+      display_name: blink
+    - name: anim_face
+      display_name: face

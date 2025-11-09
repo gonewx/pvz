@@ -1,0 +1,8 @@
+id: zombie_surprise
+name: Zombie_surprise
+reanim_file: data/reanim/Zombie_surprise.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_QUESTIONMARK: assets/reanim/Zombie_questionmark.png
+available_animations: []

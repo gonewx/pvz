@@ -1,0 +1,11 @@
+id: coin_gold
+name: Coin_gold
+reanim_file: data/reanim/Coin_gold.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_COIN_BLACK_GOLD: assets/reanim/coin_black_gold.png
+    IMAGE_REANIM_COIN_GOLD_DOLLAR: assets/reanim/coin_gold_dollar.png
+    IMAGE_REANIM_COIN_SHADING: assets/reanim/coin_shading.png
+    IMAGE_REANIM_COINGLOW: assets/reanim/CoinGlow.png
+available_animations: []

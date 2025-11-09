@@ -1,0 +1,8 @@
+id: credits_discolights
+name: Credits_DiscoLights
+reanim_file: data/reanim/Credits_DiscoLights.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_SPOTLIGHT: assets/images/spotlight.png
+available_animations: []

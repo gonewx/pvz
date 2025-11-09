@@ -6,7 +6,7 @@ import (
 
 func TestReanimConfigManager_NewReanimConfigManager(t *testing.T) {
 	t.Run("加载配置成功", func(t *testing.T) {
-		manager, err := NewReanimConfigManager("../../data/reanim_config.yaml")
+		manager, err := NewReanimConfigManager("../../data/reanim_config")
 		if err != nil {
 			t.Fatalf("加载配置失败: %v", err)
 		}
@@ -24,7 +24,7 @@ func TestReanimConfigManager_NewReanimConfigManager(t *testing.T) {
 }
 
 func TestReanimConfigManager_GetUnit(t *testing.T) {
-	manager, err := NewReanimConfigManager("../../data/reanim_config.yaml")
+	manager, err := NewReanimConfigManager("../../data/reanim_config")
 	if err != nil {
 		t.Fatalf("加载配置失败: %v", err)
 	}
@@ -72,7 +72,7 @@ func TestReanimConfigManager_GetUnit(t *testing.T) {
 }
 
 func TestReanimConfigManager_GetCombo(t *testing.T) {
-	manager, err := NewReanimConfigManager("../../data/reanim_config.yaml")
+	manager, err := NewReanimConfigManager("../../data/reanim_config")
 	if err != nil {
 		t.Fatalf("加载配置失败: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestReanimConfigManager_GetCombo(t *testing.T) {
 }
 
 func TestReanimConfigManager_GetDefaultAnimation(t *testing.T) {
-	manager, err := NewReanimConfigManager("../../data/reanim_config.yaml")
+	manager, err := NewReanimConfigManager("../../data/reanim_config")
 	if err != nil {
 		t.Fatalf("加载配置失败: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestReanimConfigManager_GetDefaultAnimation(t *testing.T) {
 }
 
 func TestReanimConfigManager_ListUnits(t *testing.T) {
-	manager, err := NewReanimConfigManager("../../data/reanim_config.yaml")
+	manager, err := NewReanimConfigManager("../../data/reanim_config")
 	if err != nil {
 		t.Fatalf("加载配置失败: %v", err)
 	}
@@ -215,7 +215,7 @@ func TestReanimConfigManager_ListUnits(t *testing.T) {
 }
 
 func TestReanimConfigManager_GetGlobalConfig(t *testing.T) {
-	manager, err := NewReanimConfigManager("../../data/reanim_config.yaml")
+	manager, err := NewReanimConfigManager("../../data/reanim_config")
 	if err != nil {
 		t.Fatalf("加载配置失败: %v", err)
 	}

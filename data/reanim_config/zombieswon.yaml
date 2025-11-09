@@ -1,0 +1,10 @@
+id: zombieswon
+name: ZombiesWon
+reanim_file: data/reanim/ZombiesWon.reanim
+default_animation: anim_screen
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIESWON: assets/reanim/ZombiesWon.jpg
+available_animations:
+    - name: anim_screen
+      display_name: screen

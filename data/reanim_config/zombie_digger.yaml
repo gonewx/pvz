@@ -1,0 +1,59 @@
+id: zombie_digger
+name: Zombie_digger
+reanim_file: data/reanim/Zombie_digger.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_DIGGER_BODY: assets/reanim/Zombie_digger_body.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_DIG0: assets/reanim/Zombie_digger_dig0.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_DIG1: assets/reanim/Zombie_digger_dig1.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_DIG2: assets/reanim/Zombie_digger_dig2.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_DIG3: assets/reanim/Zombie_digger_dig3.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_DIG4: assets/reanim/Zombie_digger_dig4.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_DIG5: assets/reanim/Zombie_digger_dig5.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_DIRT: assets/reanim/Zombie_digger_dirt.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_HARDHAT: assets/reanim/Zombie_digger_hardhat.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_HEAD: assets/reanim/Zombie_digger_head.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_HEAD_EYE: assets/reanim/Zombie_digger_head_eye.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_HEAD2: assets/reanim/Zombie_digger_head2.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_INNERARM_HAND: assets/reanim/Zombie_digger_innerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_INNERARM_LOWER: assets/reanim/Zombie_digger_innerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_INNERARM_UPPER: assets/reanim/Zombie_digger_innerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_INNERLEG_FOOT: assets/reanim/Zombie_digger_innerleg_foot.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_INNERLEG_LOWER: assets/reanim/Zombie_digger_innerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_INNERLEG_UPPER: assets/reanim/Zombie_digger_innerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_JAW: assets/reanim/Zombie_digger_jaw.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_OUTERARM_HAND: assets/reanim/Zombie_digger_outerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_OUTERARM_LOWER: assets/reanim/Zombie_digger_outerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_OUTERARM_UPPER: assets/reanim/Zombie_digger_outerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_OUTERARM_UPPER2: assets/reanim/Zombie_digger_outerarm_upper2.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_OUTERLEG_FOOL: assets/reanim/Zombie_digger_outerleg_fool.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_OUTERLEG_LOWER: assets/reanim/Zombie_digger_outerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_OUTERLEG_UPPER: assets/reanim/Zombie_digger_outerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_PICKAXE: assets/reanim/Zombie_digger_pickaxe.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_RISE2: assets/reanim/Zombie_digger_rise2.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_RISE3: assets/reanim/Zombie_digger_rise3.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_RISE4: assets/reanim/Zombie_digger_rise4.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_RISE5: assets/reanim/Zombie_digger_rise5.png
+    IMAGE_REANIM_ZOMBIE_DIGGER_RISE6: assets/reanim/Zombie_digger_rise6.png
+available_animations:
+    - name: anim_idle
+      display_name: idle
+    - name: anim_walk
+      display_name: walk
+    - name: anim_eat
+      display_name: eat
+    - name: anim_death
+      display_name: death
+    - name: anim_dig
+      display_name: dig
+    - name: anim_drill
+      display_name: drill
+    - name: anim_landing
+      display_name: landing
+    - name: anim_dizzy
+      display_name: dizzy
+    - name: anim_head1
+      display_name: head1
+    - name: anim_head2
+      display_name: head2

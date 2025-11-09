@@ -1,0 +1,29 @@
+id: cobcannon
+name: CobCannon
+reanim_file: data/reanim/CobCannon.reanim
+default_animation: anim_unarmed_idle
+scale: 1
+images:
+    IMAGE_REANIM_COBCANNON_BLINK1: assets/reanim/CobCannon_blink1.png
+    IMAGE_REANIM_COBCANNON_BLINK2: assets/reanim/CobCannon_blink2.png
+    IMAGE_REANIM_COBCANNON_COB: assets/reanim/CobCannon_cob.png
+    IMAGE_REANIM_COBCANNON_FUSE: assets/reanim/CobCannon_fuse.png
+    IMAGE_REANIM_COBCANNON_HUSK1: assets/reanim/CobCannon_husk1.png
+    IMAGE_REANIM_COBCANNON_HUSK2: assets/reanim/CobCannon_husk2.png
+    IMAGE_REANIM_COBCANNON_HUSK3: assets/reanim/CobCannon_husk3.png
+    IMAGE_REANIM_COBCANNON_HUSK4: assets/reanim/CobCannon_husk4.png
+    IMAGE_REANIM_COBCANNON_LOG: assets/reanim/CobCannon_log.png
+    IMAGE_REANIM_COBCANNON_WHEEL: assets/reanim/CobCannon_wheel.png
+available_animations:
+    - name: anim_unarmed_idle
+      display_name: unarmed_idle
+    - name: anim_idle
+      display_name: idle
+    - name: anim_shooting
+      display_name: shooting
+    - name: anim_charge
+      display_name: charge
+    - name: anim_blink
+      display_name: blink
+    - name: anim_face
+      display_name: face

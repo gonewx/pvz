@@ -1,0 +1,22 @@
+id: caltrop
+name: Caltrop
+reanim_file: data/reanim/Caltrop.reanim
+default_animation: anim_attack
+scale: 1
+images:
+    IMAGE_REANIM_CALTROP_BLINK1: assets/reanim/Caltrop_blink1.png
+    IMAGE_REANIM_CALTROP_BLINK2: assets/reanim/Caltrop_blink2.png
+    IMAGE_REANIM_CALTROP_BODY: assets/reanim/Caltrop_body.png
+    IMAGE_REANIM_CALTROP_HORN1: assets/reanim/Caltrop_horn1.png
+    IMAGE_REANIM_CALTROP_HORN2: assets/reanim/Caltrop_horn2.png
+    IMAGE_REANIM_CALTROP_HORN3: assets/reanim/Caltrop_horn3.png
+    IMAGE_REANIM_CALTROP_HORN4: assets/reanim/Caltrop_horn4.png
+available_animations:
+    - name: anim_attack
+      display_name: attack
+    - name: anim_idle
+      display_name: idle
+    - name: anim_face
+      display_name: face
+    - name: anim_blink
+      display_name: blink

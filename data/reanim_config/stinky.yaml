@@ -1,0 +1,29 @@
+id: stinky
+name: Stinky
+reanim_file: data/reanim/Stinky.reanim
+default_animation: anim_crawl
+scale: 1
+images:
+    IMAGE_REANIM_STINKY_ANTENNA: assets/reanim/Stinky_antenna.png
+    IMAGE_REANIM_STINKY_BODY: assets/reanim/Stinky_body.png
+    IMAGE_REANIM_STINKY_SHELL: assets/reanim/Stinky_shell.png
+    IMAGE_REANIM_STINKY_TAIL: assets/reanim/Stinky_tail.png
+    IMAGE_REANIM_STINKY_TURN1: assets/reanim/Stinky_turn1.png
+    IMAGE_REANIM_STINKY_TURN2: assets/reanim/Stinky_turn2.png
+    IMAGE_REANIM_STINKY_TURN3: assets/reanim/Stinky_turn3.png
+    IMAGE_REANIM_STINKY_TURN4: assets/reanim/Stinky_turn4.png
+    IMAGE_REANIM_STINKY_TURN5: assets/reanim/Stinky_turn5.png
+    IMAGE_REANIM_STINKY_TURN6: assets/reanim/Stinky_turn6.png
+    IMAGE_REANIM_STINKY_TURN7: assets/reanim/Stinky_turn7.png
+    IMAGE_REANIM_STINKY_TURN8: assets/reanim/Stinky_turn8.png
+available_animations:
+    - name: anim_crawl
+      display_name: crawl
+    - name: anim_turn
+      display_name: turn
+    - name: anim_in
+      display_name: in
+    - name: anim_out
+      display_name: out
+    - name: anim_idle
+      display_name: idle

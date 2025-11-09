@@ -1,0 +1,23 @@
+id: garlic
+name: Garlic
+reanim_file: data/reanim/Garlic.reanim
+default_animation: anim_blink
+scale: 1
+images:
+    IMAGE_REANIM_GARLIC_BLINK1: assets/reanim/Garlic_blink1.png
+    IMAGE_REANIM_GARLIC_BLINK2: assets/reanim/Garlic_blink2.png
+    IMAGE_REANIM_GARLIC_BODY1: assets/reanim/Garlic_body1.png
+    IMAGE_REANIM_GARLIC_STEM1: assets/reanim/Garlic_stem1.png
+    IMAGE_REANIM_GARLIC_STEM2: assets/reanim/Garlic_stem2.png
+    IMAGE_REANIM_GARLIC_STEM3: assets/reanim/Garlic_stem3.png
+    IMAGE_REANIM_GARLIC_STINK1: assets/reanim/Garlic_stink1.png
+    IMAGE_REANIM_GARLIC_STINK2: assets/reanim/Garlic_stink2.png
+    IMAGE_REANIM_GARLIC_STINK3: assets/reanim/Garlic_stink3.png
+    IMAGE_REANIM_GARLIC_STINK4: assets/reanim/Garlic_stink4.png
+available_animations:
+    - name: anim_blink
+      display_name: blink
+    - name: anim_idle
+      display_name: idle
+    - name: anim_face
+      display_name: face

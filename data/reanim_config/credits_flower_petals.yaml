@@ -1,0 +1,15 @@
+id: credits_flower_petals
+name: Credits_Flower_petals
+reanim_file: data/reanim/Credits_Flower_petals.reanim
+default_animation: anim_idle
+scale: 1
+images:
+    IMAGE_REANIM_CREDITS_FLOWER_PETAL1: assets/reanim/Credits_Flower_petal1.png
+    IMAGE_REANIM_CREDITS_FLOWER_PETAL2: assets/reanim/Credits_Flower_petal2.png
+    IMAGE_REANIM_CREDITS_FLOWER_PETAL3: assets/reanim/Credits_Flower_petal3.png
+    IMAGE_REANIM_CREDITS_FLOWER_PETAL4: assets/reanim/Credits_Flower_petal4.png
+    IMAGE_REANIM_CREDITS_FLOWER_PETAL5: assets/reanim/Credits_Flower_petal5.png
+    IMAGE_REANIM_CREDITS_FLOWER_PETAL6: assets/reanim/Credits_Flower_petal6.png
+    IMAGE_REANIM_CREDITS_FLOWER_PETAL7: assets/reanim/Credits_Flower_petal7.png
+    IMAGE_REANIM_CREDITS_FLOWER_PETAL8: assets/reanim/Credits_Flower_petal8.png
+available_animations: []

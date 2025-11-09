@@ -1,0 +1,19 @@
+id: zombie_boss_iceball
+name: Zombie_boss_iceball
+reanim_file: data/reanim/Zombie_boss_iceball.reanim
+default_animation: anim_form
+scale: 1
+images:
+    IMAGE_REANIM_ZOMBIE_BOSS_ICEBALL: assets/reanim/Zombie_boss_iceball.png
+    IMAGE_REANIM_ZOMBIE_BOSS_ICEBALL_CRYSTAL1: assets/reanim/Zombie_boss_iceball_crystal1.png
+    IMAGE_REANIM_ZOMBIE_BOSS_ICEBALL_CRYSTAL2: assets/reanim/Zombie_boss_iceball_crystal2.png
+    IMAGE_REANIM_ZOMBIE_BOSS_ICEBALL_CRYSTAL3: assets/reanim/Zombie_boss_iceball_crystal3.png
+    IMAGE_REANIM_ZOMBIE_BOSS_ICEBALL_HIGHLIGHT: assets/reanim/Zombie_boss_iceball_highlight.png
+    IMAGE_REANIM_ZOMBIE_BOSS_ICEBALL_MULTIPLY: assets/reanim/Zombie_boss_iceball_multiply.png
+    IMAGE_REANIM_ZOMBIE_BOSS_ICEBALL_OVERLAY: assets/reanim/Zombie_boss_iceball_overlay.png
+    IMAGE_REANIM_ZOMBIE_BOSS_ICEFIRE_SHADOW: assets/reanim/Zombie_boss_icefire_shadow.png
+available_animations:
+    - name: anim_form
+      display_name: form
+    - name: anim_role
+      display_name: role

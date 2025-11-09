@@ -1,0 +1,21 @@
+id: jalapeno
+name: Jalapeno
+reanim_file: data/reanim/Jalapeno.reanim
+default_animation: anim_blink
+scale: 1
+images:
+    IMAGE_REANIM_JALAPENO_BODY: assets/reanim/Jalapeno_body.png
+    IMAGE_REANIM_JALAPENO_CHEEK: assets/reanim/Jalapeno_cheek.png
+    IMAGE_REANIM_JALAPENO_EYE1: assets/reanim/Jalapeno_eye1.png
+    IMAGE_REANIM_JALAPENO_EYE2: assets/reanim/Jalapeno_eye2.png
+    IMAGE_REANIM_JALAPENO_EYEBROW1: assets/reanim/Jalapeno_eyebrow1.png
+    IMAGE_REANIM_JALAPENO_EYEBROW2: assets/reanim/Jalapeno_eyebrow2.png
+    IMAGE_REANIM_JALAPENO_MOUTH: assets/reanim/Jalapeno_mouth.png
+    IMAGE_REANIM_JALAPENO_STEM: assets/reanim/Jalapeno_stem.png
+available_animations:
+    - name: anim_blink
+      display_name: blink
+    - name: anim_idle
+      display_name: idle
+    - name: anim_explode
+      display_name: explode

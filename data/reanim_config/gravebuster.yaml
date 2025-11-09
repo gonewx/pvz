@@ -1,0 +1,22 @@
+id: gravebuster
+name: Gravebuster
+reanim_file: data/reanim/Gravebuster.reanim
+default_animation: anim_land
+scale: 1
+images:
+    IMAGE_REANIM_GRAVEBUSTER_EYEBROWS: assets/reanim/Gravebuster_eyebrows.png
+    IMAGE_REANIM_GRAVEBUSTER_HEAD: assets/reanim/Gravebuster_head.png
+    IMAGE_REANIM_GRAVEBUSTER_LEAF1: assets/reanim/Gravebuster_leaf1.png
+    IMAGE_REANIM_GRAVEBUSTER_LEAF2: assets/reanim/Gravebuster_leaf2.png
+    IMAGE_REANIM_GRAVEBUSTER_TOOTH1: assets/reanim/Gravebuster_tooth1.png
+    IMAGE_REANIM_GRAVEBUSTER_TOOTH2: assets/reanim/Gravebuster_tooth2.png
+    IMAGE_REANIM_GRAVEBUSTER_TOOTH3: assets/reanim/Gravebuster_tooth3.png
+    IMAGE_REANIM_GRAVEBUSTER_TOOTH4: assets/reanim/Gravebuster_tooth4.png
+    IMAGE_REANIM_GRAVEBUSTER_TOOTH5: assets/reanim/Gravebuster_tooth5.png
+    IMAGE_REANIM_GRAVEBUSTER_TOOTH6: assets/reanim/Gravebuster_tooth6.png
+    IMAGE_REANIM_GRAVEBUSTER_VINES: assets/reanim/Gravebuster_vines.png
+available_animations:
+    - name: anim_land
+      display_name: land
+    - name: anim_idle
+      display_name: idle
