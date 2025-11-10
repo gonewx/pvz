@@ -85,6 +85,12 @@ type ReanimComponent struct {
 	// 单动画时也存储为数组（如 ["anim_idle"]）
 	CurrentAnimations []string
 
+	// AnimationLoopStates 存储每个动画的循环状态
+	// Key: 动画名称（如 "anim_open", "anim_cloud1"）
+	// Value: true 表示循环播放，false 表示播放一次后停止
+	// 如果某个动画不在此 map 中，默认使用全局 IsLooping 值
+	AnimationLoopStates map[string]bool
+
 	// ==========================================================================
 	// 动画数据 (Animation Data)
 	// ==========================================================================

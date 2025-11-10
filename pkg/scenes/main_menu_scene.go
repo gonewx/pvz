@@ -43,6 +43,9 @@ type MainMenuScene struct {
 	hoveredButton  string // Current hovered button track name (empty = no hover)
 	currentLevel   string // Current highest level from save (format: "X-Y")
 
+	// 开场动画完成标志
+	openingAnimFinished bool
+
 	// Debug flag (only print once)
 	debugPrinted bool
 }
@@ -88,10 +91,22 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	} else {
 		scene.selectorScreenEntity = selectorEntity
 
-		// Story 6.6/6.7: SelectorScreen 使用独立动画系统
-		// 不再调用 PlayAnimation，独立动画在实体初始化时已经设置
-		// ComplexScenePlaybackStrategy 会自动更新所有独立动画
-		log.Printf("[MainMenuScene] ✅ SelectorScreen 使用独立动画系统（ComplexScene 模式）")
+		// Story 13.8: 初始化 SelectorScreen 动画
+		// 先播放开场动画（非循环），完成后切换到云朵循环
+		if err := scene.reanimSystem.PlayCombo(selectorEntity, "selectorscreen", "opening"); err != nil {
+			log.Printf("[MainMenuScene] Warning: Failed to play opening animation: %v", err)
+		} else {
+			log.Printf("[MainMenuScene] ✅ SelectorScreen 开场动画初始化成功")
+		}
+
+		// 修复：SelectorScreen 是全屏 UI，应该使用左上角对齐（Reanim 原始坐标）
+		// 而不是中心对齐。禁用 CenterOffset 功能。
+		reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](scene.entityManager, selectorEntity)
+		if ok {
+			reanimComp.CenterOffsetX = 0
+			reanimComp.CenterOffsetY = 0
+			log.Printf("[MainMenuScene] SelectorScreen 使用左上角对齐（CenterOffset = 0）")
+		}
 	}
 
 	// Story 12.1: Initialize button hitboxes
@@ -153,6 +168,60 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 		m.reanimSystem.Update(deltaTime)
 	}
 
+	// 检测开场动画是否完成，完成后添加云朵循环动画
+	if !m.openingAnimFinished && m.selectorScreenEntity != 0 {
+		reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
+		if ok && reanimComp.IsFinished {
+			// 开场动画完成，添加云朵和草的循环动画
+			m.openingAnimFinished = true
+
+			// 初始化 AnimationLoopStates（如果尚未初始化）
+			if reanimComp.AnimationLoopStates == nil {
+				reanimComp.AnimationLoopStates = make(map[string]bool)
+			}
+
+			// 设置开场动画为非循环（保持在最后一帧）
+			for _, animName := range reanimComp.CurrentAnimations {
+				reanimComp.AnimationLoopStates[animName] = false
+			}
+
+			// 添加云朵和草的动画，并设置为循环
+			cloudAnims := []string{"anim_grass", "anim_cloud1", "anim_cloud2", "anim_cloud4",
+				"anim_cloud5", "anim_cloud6", "anim_cloud7"}
+			for _, animName := range cloudAnims {
+				m.reanimSystem.AddAnimation(m.selectorScreenEntity, animName)
+				reanimComp.AnimationLoopStates[animName] = true // 云朵动画循环播放
+			}
+
+			// 设置为循环模式（整体设为循环，但具体每个动画由 AnimationLoopStates 控制）
+			reanimComp.IsLooping = true
+			reanimComp.IsFinished = false
+
+			// 完成动画设置（重新生成轨道绑定）
+			if err := m.reanimSystem.FinalizeAnimations(m.selectorScreenEntity); err != nil {
+				log.Printf("[MainMenuScene] Warning: Failed to finalize animations: %v", err)
+			}
+
+			// ✅ 手动修复：将 leaf_SelectorScreen_Leaves 绑定到 anim_grass
+			// 原因：自动绑定算法将其绑定到了 anim_open，导致草不显示
+			if reanimComp.TrackAnimationBinding == nil {
+				reanimComp.TrackAnimationBinding = make(map[string]string)
+			}
+			reanimComp.TrackAnimationBinding["leaf_SelectorScreen_Leaves"] = "anim_grass"
+
+			// Debug: 打印轨道绑定信息（仅针对 grass 相关轨道）
+			if reanimComp.TrackAnimationBinding != nil {
+				for trackName, animName := range reanimComp.TrackAnimationBinding {
+					if trackName == "leaf_SelectorScreen_Leaves" || trackName == "anim_grass" {
+						log.Printf("[MainMenuScene] 🔍 轨道绑定: %s → %s", trackName, animName)
+					}
+				}
+			}
+
+			log.Printf("[MainMenuScene] ✅ 开场动画完成，已添加云朵循环动画")
+		}
+	}
+
 	// Get mouse position
 	mouseX, mouseY := ebiten.CursorPosition()
 
@@ -209,10 +278,10 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 // Otherwise, it uses a dark blue fallback background.
 func (m *MainMenuScene) Draw(screen *ebiten.Image) {
 	// Story 12.1: Draw SelectorScreen Reanim (contains background, buttons, decorations)
-	if m.renderSystem != nil && m.selectorScreenEntity != 0 {
-		// 使用 RenderSystem.Draw() 渲染所有实体（包括 SelectorScreen）
+	if m.selectorScreenEntity != 0 {
+		// 主菜单使用 Reanim 渲染，直接调用 DrawEntity
 		// 使用 cameraX = 0（主菜单没有摄像机偏移）
-		m.renderSystem.Draw(screen, 0)
+		m.renderSystem.DrawEntity(screen, m.selectorScreenEntity, 0)
 
 		// Note: Old m.buttons drawing removed - SelectorScreen Reanim handles all button rendering
 	} else {

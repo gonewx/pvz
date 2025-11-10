@@ -90,6 +90,7 @@ func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) err
 	comp.CurrentFrame = 0
 	comp.FrameAccumulator = 0
 	comp.IsFinished = false
+	comp.IsLooping = true // ✅ 显式设置为循环播放
 
 	// 重建动画数据
 	s.rebuildAnimationData(comp)
@@ -99,6 +100,76 @@ func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) err
 
 	// 标记缓存失效
 	comp.LastRenderFrame = -1
+
+	return nil
+}
+
+// AddAnimation 添加一个动画到当前播放列表（累加模式）
+// 用于同时播放多个独立动画（如背景 + 云朵 + 草）
+//
+// 参数：
+//   - entityID: 实体 ID
+//   - animName: 动画名称（如 "anim_cloud1"）
+//
+// 返回：
+//   - error: 如果实体不存在或没有 ReanimComponent，返回错误
+func (s *ReanimSystem) AddAnimation(entityID ecs.EntityID, animName string) error {
+	comp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !ok {
+		return fmt.Errorf("entity %d does not have ReanimComponent", entityID)
+	}
+
+	if comp.ReanimXML == nil {
+		return fmt.Errorf("entity %d has no ReanimXML data", entityID)
+	}
+
+	// ✅ 自动初始化基础字段（如果尚未初始化）
+	if comp.MergedTracks == nil {
+		comp.MergedTracks = reanim.BuildMergedTracks(comp.ReanimXML)
+		comp.VisualTracks, comp.LogicalTracks = s.analyzeTrackTypes(comp.ReanimXML)
+		comp.AnimationFPS = float64(comp.ReanimXML.FPS)
+		comp.IsLooping = true
+		comp.LastRenderFrame = -1
+	}
+
+	// ✅ 添加动画到列表（而不是替换）
+	comp.CurrentAnimations = append(comp.CurrentAnimations, animName)
+
+	// 重建动画数据（为新动画构建 AnimVisiblesMap）
+	s.rebuildAnimationData(comp)
+
+	// 标记缓存失效
+	comp.LastRenderFrame = -1
+
+	log.Printf("[ReanimSystem] AddAnimation: entity %d, added animation '%s', total animations: %d",
+		entityID, animName, len(comp.CurrentAnimations))
+
+	return nil
+}
+
+// FinalizeAnimations 完成动画设置（生成轨道绑定）
+// 在使用 PlayAnimation + AddAnimation 添加完所有动画后调用
+// 自动分析轨道绑定，确定哪个轨道由哪个动画控制
+//
+// 参数：
+//   - entityID: 实体 ID
+//
+// 返回：
+//   - error: 如果实体不存在或没有 ReanimComponent，返回错误
+func (s *ReanimSystem) FinalizeAnimations(entityID ecs.EntityID) error {
+	comp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !ok {
+		return fmt.Errorf("entity %d does not have ReanimComponent", entityID)
+	}
+
+	// 自动生成轨道绑定
+	comp.TrackAnimationBinding = s.analyzeTrackBinding(comp)
+
+	// 标记缓存失效
+	comp.LastRenderFrame = -1
+
+	log.Printf("[ReanimSystem] FinalizeAnimations: entity %d, generated %d track bindings",
+		entityID, len(comp.TrackAnimationBinding))
 
 	return nil
 }
@@ -131,6 +202,7 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 		comp.MergedTracks = reanim.BuildMergedTracks(comp.ReanimXML)
 		comp.VisualTracks, comp.LogicalTracks = s.analyzeTrackTypes(comp.ReanimXML)
 		comp.AnimationFPS = float64(comp.ReanimXML.FPS)
+		// IsLooping 默认为 true，会在后面根据配置覆盖
 		comp.IsLooping = true
 		comp.LastRenderFrame = -1
 		log.Printf("[ReanimSystem] PlayCombo: 初始化实体 %d, ReanimName='%s', VisualTracks=%d, LogicalTracks=%d, FPS=%.1f",
@@ -173,8 +245,18 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 	comp.CurrentFrame = 0
 	comp.FrameAccumulator = 0
 	comp.IsFinished = false
-	log.Printf("[ReanimSystem] PlayCombo: entity %d, unit %s, combo %s → animations: %v",
-		entityID, unitID, comboName, combo.Animations)
+
+	// 应用循环设置（如果配置中指定了）
+	if combo.Loop != nil {
+		comp.IsLooping = *combo.Loop
+		log.Printf("[ReanimSystem] PlayCombo: entity %d, unit %s, combo %s → loop: %v", entityID, unitID, comboName, *combo.Loop)
+	} else {
+		// 默认循环
+		comp.IsLooping = true
+	}
+
+	log.Printf("[ReanimSystem] PlayCombo: entity %d, unit %s, combo %s → animations: %v, loop: %v",
+		entityID, unitID, comboName, combo.Animations, comp.IsLooping)
 
 	// 2. 应用父子关系
 	if len(combo.ParentTracks) > 0 {
@@ -290,7 +372,7 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 					comp.IsFinished = true
 					// 将帧数钳制在最后一帧，防止越界
 					comp.CurrentFrame = maxVisibleFrames - 1
-					log.Printf("[ReanimSystem] 非循环动画完成: entity=%d, maxFrames=%d", id, maxVisibleFrames)
+					log.Printf("[ReanimSystem] 非循环动画完成: entity=%d, ReanimName=%s, maxFrames=%d", id, comp.ReanimName, maxVisibleFrames)
 				}
 			}
 		}
@@ -568,7 +650,24 @@ func (s *ReanimSystem) findControllingAnimation(comp *components.ReanimComponent
 			animVisibles := comp.AnimVisiblesMap[animName]
 			visibleCount := countVisibleFrames(animVisibles)
 			if visibleCount > 0 {
-				animLogicalFrame := comp.CurrentFrame % visibleCount
+				// ✅ 检查该动画的单独循环状态
+				isLooping := comp.IsLooping // 默认使用全局循环状态
+				if comp.AnimationLoopStates != nil {
+					if loopState, hasState := comp.AnimationLoopStates[animName]; hasState {
+						isLooping = loopState // 使用该动画的独立循环状态
+					}
+				}
+
+				var animLogicalFrame int
+				if isLooping {
+					animLogicalFrame = comp.CurrentFrame % visibleCount
+				} else {
+					animLogicalFrame = comp.CurrentFrame
+					// 如果超出范围，钳制到最后一帧
+					if animLogicalFrame >= visibleCount {
+						animLogicalFrame = visibleCount - 1
+					}
+				}
 				physicalFrame := mapLogicalToPhysical(animLogicalFrame, animVisibles)
 				return animName, physicalFrame
 			}
@@ -581,7 +680,24 @@ func (s *ReanimSystem) findControllingAnimation(comp *components.ReanimComponent
 		animVisibles := comp.AnimVisiblesMap[animName]
 		visibleCount := countVisibleFrames(animVisibles)
 		if visibleCount > 0 {
-			animLogicalFrame := comp.CurrentFrame % visibleCount
+			// ✅ 检查该动画的单独循环状态
+			isLooping := comp.IsLooping // 默认使用全局循环状态
+			if comp.AnimationLoopStates != nil {
+				if loopState, hasState := comp.AnimationLoopStates[animName]; hasState {
+					isLooping = loopState // 使用该动画的独立循环状态
+				}
+			}
+
+			var animLogicalFrame int
+			if isLooping {
+				animLogicalFrame = comp.CurrentFrame % visibleCount
+			} else {
+				animLogicalFrame = comp.CurrentFrame
+				// 如果超出范围，钳制到最后一帧
+				if animLogicalFrame >= visibleCount {
+					animLogicalFrame = visibleCount - 1
+				}
+			}
 			physicalFrame := mapLogicalToPhysical(animLogicalFrame, animVisibles)
 			return animName, physicalFrame
 		}
@@ -692,11 +808,12 @@ func buildVisiblesArray(reanimXML *reanim.ReanimXML, mergedTracks map[string][]r
 	return visibles
 }
 
-// countVisibleFrames 计算可见帧数
+// countVisibleFrames 计算可见帧数（非隐藏帧的数量）
+// animVisibles 中：-1 表示隐藏，>= 0 表示可见
 func countVisibleFrames(animVisibles []int) int {
 	count := 0
 	for _, visible := range animVisibles {
-		if visible == 0 {
+		if visible >= 0 {
 			count++
 		}
 	}
