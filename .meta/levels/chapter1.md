@@ -119,28 +119,22 @@
 *   **核心教学/目的**: 引入“防御型植物”的概念。坚果墙可以阻挡僵尸，为后排的攻击植物争取输出时间。本关结束后会**解锁铲子**。
 *   **关卡流程与细节**: 战场首次扩展到完整的5行，让玩家感受到防守压力的增加。玩家需要学习构建“前排防御，后排输出”的基本阵型。
 
-- 背景图渲染：使用配置中的背景图，要延续上一关的场景 ，初始化时第2,3,4行的草皮就是铺好的(使用IMAGE_SOD3ROW图片)，铺草皮动画是和level 1-1时一样的渲染方式，但是分别同时渲染第1行和第5行的草皮。注意资源中只有IMAGE_BACKGROUND1UNSODDED 和 IMAGE_BACKGROUND1, 并没有、IMAGE_BACKGROUND1_SODROW5和IMAGE_SOD5ROW。实现第1,第5行边铺边看到全部5行草皮显现的效果， 要注意单行草皮图片（IMAGE_SOD1ROW）有上下边缘效果，不能简单的拼接，否则会看到明显的分界线，需要通过初始化时使用图片IMAGE_SOD3ROW预先渲染草皮来实现，然后边铺边显示 IMAGE_BACKGROUND1 有完整草皮的背景图达到效果。
-
 - 背景图渲染（两阶段渲染）：使用配置中的背景图，延续上一关场景。采用两阶段渲染技术实现平滑过渡：
-  - **初始状态**：底层背景显示第3行草皮（IMAGE_SOD1ROW），延续1-1关卡的场景
-  - **动画播放**：第2行和第4行同时播放草皮卷动画，叠加层渐进显示 IMAGE_SOD3ROW（3行整体草皮），逐步覆盖底层的单行草皮
+  - **初始状态**：底层背景显示3行草皮（IMAGE_SOD3ROW），延续1-3关卡的场景
+  - **动画播放**：第1行和第5行同时播放草皮卷动画，叠加层渐进显示 IMAGE_BACKGROUND1（5行整体草皮），逐步覆盖底层的3行草皮
+  - **动画完成**：底层背景完全替换为 IMAGE_BACKGROUND1，停止叠加层渲染，显示完整5行草皮
   - **技术要点**：
-    - 底层背景：IMAGE_BACKGROUND1UNSODDED + 第3行草皮（IMAGE_SOD1ROW）
-    - 叠加层：IMAGE_BACKGROUND1UNSODDED + 第2,3,4行草皮（IMAGE_SOD3ROW）
-    - 叠加层根据草皮卷位置渐进显示（从 256px 扩展到 995px），实现从单行草皮到3行整体草皮的无缝过渡
+    - 底层背景：IMAGE_BACKGROUND1UNSODDED + 3行草皮（IMAGE_SOD3ROW，图片中心对齐第3行中心）
+    - 叠加层：IMAGE_BACKGROUND1（5行整体草皮，从世界坐标0开始）
+    - 叠加层根据草皮卷中心位置渐进显示（从草皮起点扩展到草皮卷中心），实现从3行草皮到整体草皮的无缝过渡
+    - 动画完成后清空 `soddedBackground` 和 `preSoddedImage`，避免继续叠加渲染
   - **配置文件**：
-    - `preSoddedLanes: [3]` - 预渲染第3行到底层背景
-    - `sodRowImage: "IMAGE_SOD1ROW"` - 底层使用单行草皮
-    - `sodRowImageAnim: "IMAGE_SOD3ROW"` - 叠加层使用3行草皮
-    - `soddingAnimLanes: [2, 4]` - 只在第2/4行播放草皮卷动画
-    
-- 需要有和前面关卡类似的奖励动画， 只是植物卡包换成铲子图片， 卡包背景的粒子效果换成 assets/effect/particles/AwardPickupArrow.xml。奖励动画时图片为 Shovel_hi_res.png, 缩放改为和植物卡包一样的逻辑.
+    - `preSoddedLanes: [2,3,4]` - 预渲染第2,3,4行到底层背景（使用 IMAGE_SOD3ROW 整体图片，中心对齐第3行）
+    - `sodRowImage: "IMAGE_SOD3ROW"` - 底层使用3行草皮整体图片
+    - `sodRowImageAnim: "IMAGE_BACKGROUND1"` - 叠加层使用完整背景图
+    - `soddingAnimLanes: [1, 5]` - 只在第1/5行播放草皮卷动画
 
-  实现方式：
-  - 加载 IMAGE_BACKGROUND1 作为叠加背景
-  - 根据草皮卷位置，裁剪 IMAGE_BACKGROUND1 的可见区域（从左向右展开）
-  - 预渲染第2-4行草皮还是需要的,因为要展示开始时的三行草皮的初始状态
-  - 预渲染草皮用固定的世界坐标 X：config.GridWorldStartX + config.SodOverlayOffsetX
+- 需要有和前面关卡类似的奖励动画， 只是植物卡包换成铲子图片， 卡包背景的粒子效果换成 assets/effect/particles/AwardPickupArrow.xml。奖励动画时图片为 Shovel_hi_res.png, 缩放改为和植物卡包一样的逻辑.
 
 ### **关卡 1-5**
 *   **场地布局**: 完整的5行草地。

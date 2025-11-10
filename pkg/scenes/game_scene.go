@@ -785,8 +785,27 @@ func (s *GameScene) loadSoddingResources() {
 		// 检测是否需要两阶段渲染（配置了 sodRowImageAnim）
 		hasTwoStageRendering := s.gameState.CurrentLevel.SodRowImageAnim != ""
 
-		if isLevel14Pattern {
-			// Level 1-4: 双背景叠加模式，加载 IMAGE_BACKGROUND1 作为叠加层
+		if isLevel14Pattern && hasTwoStageRendering && s.gameState.CurrentLevel.SodRowImageAnim == "IMAGE_BACKGROUND1" {
+			// Level 1-4: 双背景叠加模式，使用 sodRowImageAnim="IMAGE_BACKGROUND1" 作为叠加层
+			log.Printf("[GameScene] 检测到 Level 1-4 双背景叠加模式：sodRowImageAnim=%s", s.gameState.CurrentLevel.SodRowImageAnim)
+			log.Printf("[GameScene] 底层=未铺草皮+预渲染(IMAGE_SOD3ROW), 叠加层=IMAGE_BACKGROUND1")
+
+			// 加载已铺草皮完整背景（IMAGE_BACKGROUND1）作为叠加层
+			soddedBg, err := s.resourceManager.LoadImageByID("IMAGE_BACKGROUND1")
+			if err != nil {
+				log.Printf("Warning: Failed to load IMAGE_BACKGROUND1: %v", err)
+			} else {
+				s.soddedBackground = soddedBg
+				log.Printf("[GameScene] ✅ 加载已铺草皮背景作为叠加层: IMAGE_BACKGROUND1")
+			}
+
+			// 重构简化：叠加背景从 (0,0) 开始（与底层背景完全对齐）
+			s.sodOverlayX = 0
+			s.sodOverlayY = 0
+			log.Printf("[GameScene] 双背景叠加模式：叠加层从 (0,0) 开始")
+
+		} else if isLevel14Pattern {
+			// Level 1-4（旧版兼容）: 双背景叠加模式，加载 IMAGE_BACKGROUND1 作为叠加层
 			log.Printf("[GameScene] 检测到 Level 1-4 模式：双背景叠加（底层=未铺草皮+预渲染，叠加层=IMAGE_BACKGROUND1）")
 
 			// 加载已铺草皮完整背景（IMAGE_BACKGROUND1）
@@ -912,38 +931,85 @@ func (s *GameScene) loadSoddingResources() {
 
 		// 步骤1：预渲染底层背景的草皮（preSoddedLanes）
 		if len(preSoddedLanes) > 0 {
-			// 为底层背景添加预铺草皮（使用 sodRowImage）
-			sod1RowRGB, err := s.resourceManager.LoadImageWithAlphaMask(
-				"assets/images/sod1row.jpg",
-				"assets/images/sod1row_.png",
-			)
+			// 检查预铺行是否是连续的3行（第2,3,4行）
+			isConsecutive3Rows := len(preSoddedLanes) == 3 &&
+				preSoddedLanes[0] == 2 && preSoddedLanes[1] == 3 && preSoddedLanes[2] == 4
+
+			// 根据配置的 sodRowImage 选择使用的草皮图片
+			var sodRowRGB *ebiten.Image
+			var sodImageID string
+			var err error
+
+			if s.gameState.CurrentLevel.SodRowImage == "IMAGE_SOD3ROW" && isConsecutive3Rows {
+				// 使用 IMAGE_SOD3ROW（3行整体草皮）
+				sodRowRGB, err = s.resourceManager.LoadImageWithAlphaMask(
+					"assets/images/sod3row.jpg",
+					"assets/images/sod3row_.png",
+				)
+				sodImageID = "IMAGE_SOD3ROW"
+			} else {
+				// 默认使用 IMAGE_SOD1ROW（单行草皮）
+				sodRowRGB, err = s.resourceManager.LoadImageWithAlphaMask(
+					"assets/images/sod1row.jpg",
+					"assets/images/sod1row_.png",
+				)
+				sodImageID = "IMAGE_SOD1ROW"
+			}
+
 			if err != nil {
-				log.Printf("[GameScene] Error: 无法加载单行草皮图片: %v", err)
+				log.Printf("[GameScene] Error: 无法加载草皮图片 %s: %v", sodImageID, err)
 				return
 			}
 
-			log.Printf("[GameScene] 预渲染底层背景草皮: 预铺行=%v (使用 IMAGE_SOD1ROW)", preSoddedLanes)
+			log.Printf("[GameScene] 预渲染底层背景草皮: 预铺行=%v (使用 %s)", preSoddedLanes, sodImageID)
 
-			// 为每个预铺行绘制单行草皮到底层背景
-			for _, lane := range preSoddedLanes {
-				sodBounds := sod1RowRGB.Bounds()
+			// 根据草皮图片类型选择渲染方式
+			if sodImageID == "IMAGE_SOD3ROW" && isConsecutive3Rows {
+				// IMAGE_SOD3ROW：整体渲染3行草皮（无需循环）
+				// 图片覆盖第2,3,4行，图片中心应该对齐到第3行（中间行）的中心
+				sodBounds := sodRowRGB.Bounds()
 				sodHeight := float64(sodBounds.Dy())
 
-				// 计算目标行的中心Y坐标
-				rowCenterY := config.GridWorldStartY + float64(lane-1)*config.CellHeight + config.CellHeight/2.0
+				// 计算中间行（第3行）的中心Y坐标
+				middleLane := preSoddedLanes[1] // 第3行（索引1）
+				middleRowCenterY := config.GridWorldStartY + float64(middleLane-1)*config.CellHeight + config.CellHeight/2.0
 
-				// 草皮Y坐标 = 行中心 - 草皮高度的一半 + 偏移
-				dstY := rowCenterY - sodHeight/2.0 + config.SodOverlayOffsetY
+				// 草皮Y坐标 = 中间行中心 - 草皮高度的一半 + 偏移
+				// 这样图片的中心对齐到第3行的中心，覆盖第2,3,4行
+				dstY := middleRowCenterY - sodHeight/2.0 + config.SodOverlayOffsetY
 
 				// 草皮X坐标
 				dstX := config.GridWorldStartX + config.SodOverlayOffsetX
 
-				// 绘制到底层背景
+				// 整体绘制到底层背景
 				op := &ebiten.DrawImageOptions{}
 				op.GeoM.Translate(dstX, dstY)
-				s.background.DrawImage(sod1RowRGB, op)
+				s.background.DrawImage(sodRowRGB, op)
 
-				log.Printf("[GameScene] ✅ 底层背景预渲染第 %d 行草皮 (IMAGE_SOD1ROW): 位置(%.1f,%.1f)", lane, dstX, dstY)
+				log.Printf("[GameScene] ✅ 底层背景预渲染第 %v 行草皮 (IMAGE_SOD3ROW 整体): 中心对齐第%d行, 位置(%.1f,%.1f)",
+					preSoddedLanes, middleLane, dstX, dstY)
+			} else {
+				// IMAGE_SOD1ROW：逐行渲染单行草皮
+				for _, lane := range preSoddedLanes {
+					sodBounds := sodRowRGB.Bounds()
+					sodHeight := float64(sodBounds.Dy())
+
+					// 计算目标行的中心Y坐标
+					rowCenterY := config.GridWorldStartY + float64(lane-1)*config.CellHeight + config.CellHeight/2.0
+
+					// 草皮Y坐标 = 行中心 - 草皮高度的一半 + 偏移
+					dstY := rowCenterY - sodHeight/2.0 + config.SodOverlayOffsetY
+
+					// 草皮X坐标
+					dstX := config.GridWorldStartX + config.SodOverlayOffsetX
+
+					// 绘制到底层背景
+					op := &ebiten.DrawImageOptions{}
+					op.GeoM.Translate(dstX, dstY)
+					s.background.DrawImage(sodRowRGB, op)
+
+					log.Printf("[GameScene] ✅ 底层背景预渲染第 %d 行草皮 (IMAGE_SOD1ROW): 位置(%.1f,%.1f)", lane, dstX, dstY)
+				}
 			}
 		}
 
@@ -1129,6 +1195,7 @@ func (s *GameScene) Update(deltaTime float64) {
 					log.Printf("[GameScene] 替换底层背景: IMAGE_BACKGROUND1UNSODDED → IMAGE_BACKGROUND1")
 					s.background = s.soddedBackground
 					s.soddedBackground = nil // 清空叠加层，停止叠加渲染
+					s.preSoddedImage = nil   // 同时清空预渲染图片，避免继续渲染
 				}
 
 				if s.tutorialSystem != nil {
@@ -1194,6 +1261,7 @@ func (s *GameScene) Update(deltaTime float64) {
 						log.Printf("[GameScene] 替换底层背景: IMAGE_BACKGROUND1UNSODDED → IMAGE_BACKGROUND1")
 						s.background = s.soddedBackground
 						s.soddedBackground = nil // 清空叠加层，停止叠加渲染
+						s.preSoddedImage = nil   // 同时清空预渲染图片，避免继续渲染
 					}
 
 					if s.tutorialSystem != nil {
