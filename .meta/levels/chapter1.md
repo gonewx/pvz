@@ -90,7 +90,18 @@
 
 - 向日葵生产阳光动画：阳光是从向日葵中心生成， 弹出后落到附近的随机位置
 
-- 背景图渲染：使用配置中的背景图，要延续上一关的场景 ，初始化时第3行的草皮就是铺好的（使用IMAGE_SOD1ROW图片），铺草皮动画是和level 1-1时一样的渲染方式，但是分别同时渲染第2行和第4行的草皮。注意资源中只有IMAGE_BACKGROUND1UNSODDED （无草皮） 和 IMAGE_BACKGROUND1 （5行草皮） 背景图, 并没有、IMAGE_BACKGROUND1_SODROW5和IMAGE_SOD5ROW， 需要通过初始化时使用图片IMAGE_SOD3ROW预先渲染草皮来实现。要实现第2,第4行边铺边看到全部3行草皮显现的效果。单行草皮图片（IMAGE_SOD1ROW）有上下边缘效果，不能简单的拼接，否则会看到明显的分界线，要叠加2个背景图才能实现想要的效果
+- 背景图渲染（两阶段渲染）：使用配置中的背景图，延续上一关场景。采用两阶段渲染技术实现平滑过渡：
+  - **初始状态**：底层背景显示第3行草皮（IMAGE_SOD1ROW），延续1-1关卡的场景
+  - **动画播放**：第2行和第4行同时播放草皮卷动画，叠加层渐进显示 IMAGE_SOD3ROW（3行整体草皮），逐步覆盖底层的单行草皮
+  - **技术要点**：
+    - 底层背景：IMAGE_BACKGROUND1UNSODDED + 第3行草皮（IMAGE_SOD1ROW）
+    - 叠加层：IMAGE_BACKGROUND1UNSODDED + 第2,3,4行草皮（IMAGE_SOD3ROW）
+    - 叠加层根据草皮卷位置渐进显示（从 256px 扩展到 995px），实现从单行草皮到3行整体草皮的无缝过渡
+  - **配置文件**：
+    - `preSoddedLanes: [3]` - 预渲染第3行到底层背景
+    - `sodRowImage: "IMAGE_SOD1ROW"` - 底层使用单行草皮
+    - `sodRowImageAnim: "IMAGE_SOD3ROW"` - 叠加层使用3行草皮
+    - `soddingAnimLanes: [2, 4]` - 只在第2/4行播放草皮卷动画
 
 ### **关卡 1-3**
 *   **场地布局**: 中间3行草地, 延续1-2时背景， 使用图片 IMAGE_BACKGROUND1UNSODDED 背景 和 图片 IMAGE_SOD3ROW （三行草坪）预先渲染草皮。没有铺草皮的动画。
@@ -108,8 +119,21 @@
 *   **核心教学/目的**: 引入“防御型植物”的概念。坚果墙可以阻挡僵尸，为后排的攻击植物争取输出时间。本关结束后会**解锁铲子**。
 *   **关卡流程与细节**: 战场首次扩展到完整的5行，让玩家感受到防守压力的增加。玩家需要学习构建“前排防御，后排输出”的基本阵型。
 
-- 背景图渲染：使用配置中的背景图，要延续上一关的场景 ，初始化时第2,3,4行的草皮就是铺好的(使用IMAGE_SOD3ROW图片)，铺草皮动画是和level 1-1时一样的渲染方式，但是分别同时渲染第1行和第5行的草皮。注意资源中只有IMAGE_BACKGROUND1UNSODDED 和 IMAGE_BACKGROUND1, 并没有、IMAGE_BACKGROUND1_SODROW5和IMAGE_SOD5ROW， 需要通过初始化时使用图片IMAGE_SOD3ROW预先渲染草皮来实现。要实现第1,第5行边铺边看到全部5行草皮显现的效果。单行草皮图片（IMAGE_SOD1ROW）有上下边缘效果，不能简单的拼接，否则会看到明显的分界线，要叠加2个背景图才能实现想要的效果
+- 背景图渲染：使用配置中的背景图，要延续上一关的场景 ，初始化时第2,3,4行的草皮就是铺好的(使用IMAGE_SOD3ROW图片)，铺草皮动画是和level 1-1时一样的渲染方式，但是分别同时渲染第1行和第5行的草皮。注意资源中只有IMAGE_BACKGROUND1UNSODDED 和 IMAGE_BACKGROUND1, 并没有、IMAGE_BACKGROUND1_SODROW5和IMAGE_SOD5ROW。实现第1,第5行边铺边看到全部5行草皮显现的效果， 要注意单行草皮图片（IMAGE_SOD1ROW）有上下边缘效果，不能简单的拼接，否则会看到明显的分界线，需要通过初始化时使用图片IMAGE_SOD3ROW预先渲染草皮来实现，然后边铺边显示 IMAGE_BACKGROUND1 有完整草皮的背景图达到效果。
 
+- 背景图渲染（两阶段渲染）：使用配置中的背景图，延续上一关场景。采用两阶段渲染技术实现平滑过渡：
+  - **初始状态**：底层背景显示第3行草皮（IMAGE_SOD1ROW），延续1-1关卡的场景
+  - **动画播放**：第2行和第4行同时播放草皮卷动画，叠加层渐进显示 IMAGE_SOD3ROW（3行整体草皮），逐步覆盖底层的单行草皮
+  - **技术要点**：
+    - 底层背景：IMAGE_BACKGROUND1UNSODDED + 第3行草皮（IMAGE_SOD1ROW）
+    - 叠加层：IMAGE_BACKGROUND1UNSODDED + 第2,3,4行草皮（IMAGE_SOD3ROW）
+    - 叠加层根据草皮卷位置渐进显示（从 256px 扩展到 995px），实现从单行草皮到3行整体草皮的无缝过渡
+  - **配置文件**：
+    - `preSoddedLanes: [3]` - 预渲染第3行到底层背景
+    - `sodRowImage: "IMAGE_SOD1ROW"` - 底层使用单行草皮
+    - `sodRowImageAnim: "IMAGE_SOD3ROW"` - 叠加层使用3行草皮
+    - `soddingAnimLanes: [2, 4]` - 只在第2/4行播放草皮卷动画
+    
 - 需要有和前面关卡类似的奖励动画， 只是植物卡包换成铲子图片， 卡包背景的粒子效果换成 assets/effect/particles/AwardPickupArrow.xml。奖励动画时图片为 Shovel_hi_res.png, 缩放改为和植物卡包一样的逻辑.
 
   实现方式：

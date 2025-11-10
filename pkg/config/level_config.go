@@ -30,6 +30,7 @@ type LevelConfig struct {
 	// Story 8.2 QA改进：背景和草皮配置
 	BackgroundImage  string  `yaml:"backgroundImage"`  // 背景图片ID，如 \"IMAGE_BACKGROUND1_UNSODDED\"，默认 \"IMAGE_BACKGROUND1\"
 	SodRowImage      string  `yaml:"sodRowImage"`      // 草皮叠加图片ID，如 \"IMAGE_SOD1ROW\"，空表示无草皮
+	SodRowImageAnim  string  `yaml:"sodRowImageAnim"`  // 动画阶段草皮图片ID（如\"IMAGE_SOD3ROW\"），空表示使用SodRowImage
 	ShowSoddingAnim  bool    `yaml:"showSoddingAnim"`  // 是否播放铺草皮动画，默认 false
 	SoddingAnimDelay float64 `yaml:"soddingAnimDelay"` // 铺草皮动画延迟（秒），默认 0
 

@@ -764,6 +764,7 @@ func (s *GameScene) loadSoddingResources() {
 	// - 启用行为连续3行（如 [2,3,4]）→ 使用 IMAGE_SOD3ROW（整体效果，无边缘）
 	// - 启用行为5行，动画行为 [1,5]（Level 1-4）→ 双背景叠加（IMAGE_BACKGROUND1）
 	// - 其他情况 → 使用 IMAGE_SOD1ROW（逐行渲染）
+	// - 两阶段渲染（Level 1-2）→ 初始使用 IMAGE_SOD1ROW，动画时使用 IMAGE_SOD3ROW
 	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.ShowSoddingAnim {
 		enabledLanes := s.gameState.CurrentLevel.EnabledLanes
 		animLanes := s.gameState.CurrentLevel.SoddingAnimLanes
@@ -780,6 +781,9 @@ func (s *GameScene) loadSoddingResources() {
 		isLevel14Pattern := len(enabledLanes) == 5 &&
 			len(animLanes) == 2 &&
 			animLanes[0] == 1 && animLanes[1] == 5
+
+		// 检测是否需要两阶段渲染（配置了 sodRowImageAnim）
+		hasTwoStageRendering := s.gameState.CurrentLevel.SodRowImageAnim != ""
 
 		if isLevel14Pattern {
 			// Level 1-4: 双背景叠加模式，加载 IMAGE_BACKGROUND1 作为叠加层
@@ -798,6 +802,39 @@ func (s *GameScene) loadSoddingResources() {
 			s.sodOverlayX = 0
 			s.sodOverlayY = 0
 			log.Printf("[GameScene] 双背景叠加模式：叠加层从 (0,0) 开始")
+
+		} else if hasTwoStageRendering && isConsecutive3Rows {
+			// 两阶段渲染模式（Level 1-2）
+			// 阶段1（初始化）：使用 sodRowImage（IMAGE_SOD1ROW）预渲染指定行
+			// 阶段2（动画播放）：使用 sodRowImageAnim（IMAGE_SOD3ROW）叠加渲染
+			log.Printf("[GameScene] 检测到两阶段渲染模式：初始=%s, 动画=%s",
+				s.gameState.CurrentLevel.SodRowImage, s.gameState.CurrentLevel.SodRowImageAnim)
+
+			// 加载动画阶段使用的草皮图片（IMAGE_SOD3ROW）
+			sod3RowImage, err := s.resourceManager.LoadImageWithAlphaMask(
+				"assets/images/sod3row.jpg",
+				"assets/images/sod3row_.png",
+			)
+			if err != nil {
+				log.Printf("Warning: Failed to composite sod3row image: %v", err)
+			} else {
+				s.sodRowImage = sod3RowImage
+				log.Printf("[GameScene] ✅ 合成草皮叠加图片 (RGB + Alpha): IMAGE_SOD3ROW (动画阶段)")
+
+				// 性能优化：缓存草皮图片尺寸
+				sodBounds := sod3RowImage.Bounds()
+				s.sodWidth = sodBounds.Dx()
+				s.sodHeight = sodBounds.Dy()
+
+				// 计算草皮叠加层Y坐标（对齐到第一行的顶部）
+				firstLane := enabledLanes[0]
+				sodOverlayY := config.GridWorldStartY + float64(firstLane-1)*config.CellHeight
+
+				// X坐标从0开始
+				s.sodOverlayX = 0
+				s.sodOverlayY = sodOverlayY
+				log.Printf("[GameScene] 草皮叠加层: 位置(0, %.1f) 尺寸(%dx%d)", sodOverlayY, s.sodWidth, s.sodHeight)
+			}
 
 		} else if isConsecutive3Rows {
 			// 连续3行：使用 IMAGE_SOD3ROW（整体草皮，无边缘分界线）
@@ -864,28 +901,67 @@ func (s *GameScene) loadSoddingResources() {
 	// Story 8.6 QA修正 + 统一草皮渲染重构：
 	// 为所有启用的行预渲染草皮到背景副本，用于双背景叠加渲染
 	//
-	// 设计思路：
-	// - 底层背景：未铺草皮的背景 (IMAGE_BACKGROUND1UNSODDED)
-	// - 叠加层：预渲染所有启用行的草皮 (enabledLanes)
-	// - 预铺草皮行 (preSoddedLanes)：这些行的草皮会同时绘制在底层和叠加层
-	// - 运行时根据草皮卷位置，渐进显示预渲染背景
+	// 设计思路（两阶段渲染模式 - Level 1-2）：
+	// - 底层背景：未铺草皮背景 + preSoddedLanes 草皮（IMAGE_SOD1ROW）
+	// - 叠加层：未铺草皮背景 + 所有启用行草皮（sodRowImageAnim 如 IMAGE_SOD3ROW）
+	// - 动画播放时：叠加层渐进显示，覆盖底层的 IMAGE_SOD1ROW，展现完整的 IMAGE_SOD3ROW
 	if s.gameState.CurrentLevel != nil && s.background != nil && s.gameState.CurrentLevel.ShowSoddingAnim {
 		enabledLanes := s.gameState.CurrentLevel.EnabledLanes
 		preSoddedLanes := s.gameState.CurrentLevel.PreSoddedLanes
+		hasTwoStageRendering := s.gameState.CurrentLevel.SodRowImageAnim != ""
 
+		// 步骤1：预渲染底层背景的草皮（preSoddedLanes）
+		if len(preSoddedLanes) > 0 {
+			// 为底层背景添加预铺草皮（使用 sodRowImage）
+			sod1RowRGB, err := s.resourceManager.LoadImageWithAlphaMask(
+				"assets/images/sod1row.jpg",
+				"assets/images/sod1row_.png",
+			)
+			if err != nil {
+				log.Printf("[GameScene] Error: 无法加载单行草皮图片: %v", err)
+				return
+			}
+
+			log.Printf("[GameScene] 预渲染底层背景草皮: 预铺行=%v (使用 IMAGE_SOD1ROW)", preSoddedLanes)
+
+			// 为每个预铺行绘制单行草皮到底层背景
+			for _, lane := range preSoddedLanes {
+				sodBounds := sod1RowRGB.Bounds()
+				sodHeight := float64(sodBounds.Dy())
+
+				// 计算目标行的中心Y坐标
+				rowCenterY := config.GridWorldStartY + float64(lane-1)*config.CellHeight + config.CellHeight/2.0
+
+				// 草皮Y坐标 = 行中心 - 草皮高度的一半 + 偏移
+				dstY := rowCenterY - sodHeight/2.0 + config.SodOverlayOffsetY
+
+				// 草皮X坐标
+				dstX := config.GridWorldStartX + config.SodOverlayOffsetX
+
+				// 绘制到底层背景
+				op := &ebiten.DrawImageOptions{}
+				op.GeoM.Translate(dstX, dstY)
+				s.background.DrawImage(sod1RowRGB, op)
+
+				log.Printf("[GameScene] ✅ 底层背景预渲染第 %d 行草皮 (IMAGE_SOD1ROW): 位置(%.1f,%.1f)", lane, dstX, dstY)
+			}
+		}
+
+		// 步骤2：预渲染叠加层背景（用于动画时渐进显示）
 		// 创建新的背景图片副本（叠加层）
 		bgBounds := s.background.Bounds()
 		newBackground := ebiten.NewImage(bgBounds.Dx(), bgBounds.Dy())
 
-		// 1. 绘制原始背景
+		// 1. 绘制原始背景（现在已包含 preSoddedLanes 草皮）
 		op := &ebiten.DrawImageOptions{}
 		newBackground.DrawImage(s.background, op)
 
-		// 2. 预渲染草皮到叠加层
-		// 只预渲染 preSoddedLanes 指定的行（如果未指定则预渲染所有启用行）
-		lanesToPreRender := preSoddedLanes
-		if len(lanesToPreRender) == 0 {
-			lanesToPreRender = enabledLanes
+		// 2. 预渲染叠加层草皮
+		// 如果是两阶段渲染模式，使用 sodRowImageAnim（IMAGE_SOD3ROW）渲染所有启用行
+		// 否则使用 sodRowImage 渲染 preSoddedLanes
+		lanesToPreRender := enabledLanes
+		if !hasTwoStageRendering && len(preSoddedLanes) > 0 {
+			lanesToPreRender = preSoddedLanes
 		}
 
 		if len(lanesToPreRender) > 0 {
@@ -894,11 +970,12 @@ func (s *GameScene) loadSoddingResources() {
 				lanesToPreRender[1] == lanesToPreRender[0]+1 &&
 				lanesToPreRender[2] == lanesToPreRender[1]+1
 
-			log.Printf("[GameScene] 预渲染草皮到叠加层: 启用行=%v, 预铺行=%v, 实际预渲染=%v", enabledLanes, preSoddedLanes, lanesToPreRender)
+			log.Printf("[GameScene] 预渲染叠加层草皮: 启用行=%v, 预铺行=%v, 实际预渲染=%v, 两阶段模式=%v",
+				enabledLanes, preSoddedLanes, lanesToPreRender, hasTwoStageRendering)
 
-			// 根据行数自动选择渲染方式
-			if isConsecutive3Rows {
-				// 使用 IMAGE_SOD3ROW 一次性渲染3行
+			// 根据行数和两阶段模式选择渲染方式
+			if hasTwoStageRendering && isConsecutive3Rows {
+				// 两阶段模式：叠加层使用 IMAGE_SOD3ROW
 				sod3RowRGB, err := s.resourceManager.LoadImageWithAlphaMask(
 					"assets/images/sod3row.jpg",
 					"assets/images/sod3row_.png",
@@ -919,15 +996,40 @@ func (s *GameScene) loadSoddingResources() {
 				// 草皮Y坐标 = 中间行中心 - 草皮高度的一半 + 偏移
 				dstY := rowCenterY - sodHeight/2.0 + config.SodOverlayOffsetY
 
-				// 草皮X坐标（固定世界坐标，不受动画模式影响）
+				// 草皮X坐标
 				dstX := config.GridWorldStartX + config.SodOverlayOffsetX
 
-				// 一次性绘制3行草皮
+				// 一次性绘制3行草皮到叠加层
+				op := &ebiten.DrawImageOptions{}
+				op.GeoM.Translate(dstX, dstY)
+				newBackground.DrawImage(sod3RowRGB, op)
+
+				log.Printf("[GameScene] ✅ 叠加层预渲染第 %v 行草皮 (IMAGE_SOD3ROW): 位置(%.1f,%.1f)", lanesToPreRender, dstX, dstY)
+
+			} else if isConsecutive3Rows {
+				// 连续3行但非两阶段模式：使用 IMAGE_SOD3ROW
+				sod3RowRGB, err := s.resourceManager.LoadImageWithAlphaMask(
+					"assets/images/sod3row.jpg",
+					"assets/images/sod3row_.png",
+				)
+				if err != nil {
+					log.Printf("[GameScene] Error: 无法加载3行草皮图片: %v", err)
+					return
+				}
+
+				middleLane := lanesToPreRender[1]
+				rowCenterY := config.GridWorldStartY + float64(middleLane-1)*config.CellHeight + config.CellHeight/2.0
+				sodBounds := sod3RowRGB.Bounds()
+				sodHeight := float64(sodBounds.Dy())
+				dstY := rowCenterY - sodHeight/2.0 + config.SodOverlayOffsetY
+				dstX := config.GridWorldStartX + config.SodOverlayOffsetX
+
 				op := &ebiten.DrawImageOptions{}
 				op.GeoM.Translate(dstX, dstY)
 				newBackground.DrawImage(sod3RowRGB, op)
 
 				log.Printf("[GameScene] ✅ 使用 IMAGE_SOD3ROW 一次性预渲染第 %v 行草皮: 背景位置(%.1f,%.1f)", lanesToPreRender, dstX, dstY)
+
 			} else {
 				// 使用 IMAGE_SOD1ROW 循环渲染每行
 				sod1RowRGB, err := s.resourceManager.LoadImageWithAlphaMask(
@@ -941,20 +1043,12 @@ func (s *GameScene) loadSoddingResources() {
 
 				// 为每个需要预渲染的行绘制单行草皮
 				for _, lane := range lanesToPreRender {
-					// 计算此行的Y坐标
 					sodBounds := sod1RowRGB.Bounds()
 					sodHeight := float64(sodBounds.Dy())
-
-					// 计算目标行的中心Y坐标（绝对行号）
 					rowCenterY := config.GridWorldStartY + float64(lane-1)*config.CellHeight + config.CellHeight/2.0
-
-					// 草皮Y坐标 = 行中心 - 草皮高度的一半 + 偏移
 					dstY := rowCenterY - sodHeight/2.0 + config.SodOverlayOffsetY
-
-					// 草皮X坐标（固定世界坐标，不受动画模式影响）
 					dstX := config.GridWorldStartX + config.SodOverlayOffsetX
 
-					// 绘制到背景
 					op := &ebiten.DrawImageOptions{}
 					op.GeoM.Translate(dstX, dstY)
 					newBackground.DrawImage(sod1RowRGB, op)
@@ -965,13 +1059,9 @@ func (s *GameScene) loadSoddingResources() {
 		}
 
 		// 3. 保存预渲染背景副本（用于草皮叠加渲染）
-		// 底层背景：原始未铺草皮背景（已在上面设置）
-		// 叠加层：预渲染后的背景（包含 preSoddedLanes 草皮，如果有的话）
 		s.preSoddedImage = newBackground
 
-		log.Printf("[GameScene] ✅ 创建预渲染背景副本用于草皮叠加 (preSoddedLanes: %v)", preSoddedLanes)
-
-		// 注意：不替换 s.background，保持原始未铺草皮背景作为底层
+		log.Printf("[GameScene] ✅ 创建预渲染背景副本用于草皮叠加 (preSoddedLanes: %v, 两阶段模式: %v)", preSoddedLanes, hasTwoStageRendering)
 	}
 }
 
@@ -1394,8 +1484,10 @@ func (s *GameScene) drawBackground(screen *ebiten.Image) {
 		if s.soddingSystem != nil && s.gameState.CurrentLevel != nil {
 			// 选择叠加背景（优先使用完整背景，否则使用预渲染背景）
 			overlayBg := s.soddedBackground
+			usingPreSoddedImage := false
 			if overlayBg == nil {
 				overlayBg = s.preSoddedImage
+				usingPreSoddedImage = true
 			}
 
 			if overlayBg != nil {
@@ -1404,6 +1496,13 @@ func (s *GameScene) drawBackground(screen *ebiten.Image) {
 
 				// 计算可见宽度（从世界坐标 0 到草皮卷中心）
 				visibleWorldWidth := int(sodRollCenterX)
+
+				// 特殊处理：如果使用预渲染图片且动画未启动，显示整个预渲染背景
+				// 这样可以在动画开始前显示预铺的草皮（如 1-2 关的第3行）
+				if usingPreSoddedImage && !s.soddingSystem.HasStarted() {
+					bgBounds := overlayBg.Bounds()
+					visibleWorldWidth = bgBounds.Dx()
+				}
 
 				// 只有草皮卷到达可见位置后才渲染叠加层
 				if visibleWorldWidth > 0 {
