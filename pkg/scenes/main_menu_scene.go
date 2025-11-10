@@ -42,12 +42,6 @@ type MainMenuScene struct {
 	buttonHitboxes []config.MenuButtonHitbox
 	hoveredButton  string // Current hovered button track name (empty = no hover)
 	currentLevel   string // Current highest level from save (format: "X-Y")
-
-	// 开场动画完成标志
-	openingAnimFinished bool
-
-	// Debug flag (only print once)
-	debugPrinted bool
 }
 
 // NewMainMenuScene creates and returns a new MainMenuScene instance.
@@ -92,16 +86,61 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 		scene.selectorScreenEntity = selectorEntity
 
 		// Story 13.8: 初始化 SelectorScreen 动画
-		// 先播放开场动画（非循环），完成后切换到云朵循环
-		if err := scene.reanimSystem.PlayCombo(selectorEntity, "selectorscreen", "opening"); err != nil {
-			log.Printf("[MainMenuScene] Warning: Failed to play opening animation: %v", err)
-		} else {
-			log.Printf("[MainMenuScene] ✅ SelectorScreen 开场动画初始化成功")
+		// 策略：所有动画在初始化时一起播放，但循环状态不同
+		// - 开场动画（anim_open, anim_sign, anim_idle）：非循环，播放一次后停留在最后一帧
+		// - 云朵和草动画（anim_grass, anim_cloud*）：循环播放
+
+		// 1. 先播放开场动画
+		if err := scene.reanimSystem.PlayAnimation(selectorEntity, "anim_open"); err != nil {
+			log.Printf("[MainMenuScene] Warning: Failed to play anim_open: %v", err)
+		}
+
+		// 2. 添加其他开场动画
+		scene.reanimSystem.AddAnimation(selectorEntity, "anim_sign")
+		scene.reanimSystem.AddAnimation(selectorEntity, "anim_idle")
+
+		// 3. 添加云朵和草的循环动画
+		cloudAnims := []string{"anim_grass", "anim_cloud1", "anim_cloud2", "anim_cloud4",
+			"anim_cloud5", "anim_cloud6", "anim_cloud7"}
+		for _, animName := range cloudAnims {
+			scene.reanimSystem.AddAnimation(selectorEntity, animName)
+		}
+
+		// 4. 完成动画设置（生成轨道绑定）
+		if err := scene.reanimSystem.FinalizeAnimations(selectorEntity); err != nil {
+			log.Printf("[MainMenuScene] Warning: Failed to finalize animations: %v", err)
+		}
+
+		// 5. 获取 ReanimComponent 并设置循环状态
+		reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](scene.entityManager, selectorEntity)
+		if ok {
+			// 初始化 AnimationLoopStates
+			reanimComp.AnimationLoopStates = make(map[string]bool)
+
+			// 开场动画设置为非循环
+			reanimComp.AnimationLoopStates["anim_open"] = false
+			reanimComp.AnimationLoopStates["anim_sign"] = false
+			reanimComp.AnimationLoopStates["anim_idle"] = false
+
+			// 云朵和草动画设置为循环
+			for _, animName := range cloudAnims {
+				reanimComp.AnimationLoopStates[animName] = true
+			}
+
+			// 全局设置为循环模式（但具体每个动画由 AnimationLoopStates 控制）
+			reanimComp.IsLooping = true
+
+			// ✅ 手动修复：将 leaf_SelectorScreen_Leaves 绑定到 anim_grass
+			if reanimComp.TrackAnimationBinding == nil {
+				reanimComp.TrackAnimationBinding = make(map[string]string)
+			}
+			reanimComp.TrackAnimationBinding["leaf_SelectorScreen_Leaves"] = "anim_grass"
+
+			log.Printf("[MainMenuScene] ✅ SelectorScreen 动画初始化完成（开场动画非循环，云朵循环）")
 		}
 
 		// 修复：SelectorScreen 是全屏 UI，应该使用左上角对齐（Reanim 原始坐标）
 		// 而不是中心对齐。禁用 CenterOffset 功能。
-		reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](scene.entityManager, selectorEntity)
 		if ok {
 			reanimComp.CenterOffsetX = 0
 			reanimComp.CenterOffsetY = 0
@@ -166,60 +205,6 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 	// Story 12.1: Update Reanim system (animate clouds, flowers, etc.)
 	if m.reanimSystem != nil {
 		m.reanimSystem.Update(deltaTime)
-	}
-
-	// 检测开场动画是否完成，完成后添加云朵循环动画
-	if !m.openingAnimFinished && m.selectorScreenEntity != 0 {
-		reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
-		if ok && reanimComp.IsFinished {
-			// 开场动画完成，添加云朵和草的循环动画
-			m.openingAnimFinished = true
-
-			// 初始化 AnimationLoopStates（如果尚未初始化）
-			if reanimComp.AnimationLoopStates == nil {
-				reanimComp.AnimationLoopStates = make(map[string]bool)
-			}
-
-			// 设置开场动画为非循环（保持在最后一帧）
-			for _, animName := range reanimComp.CurrentAnimations {
-				reanimComp.AnimationLoopStates[animName] = false
-			}
-
-			// 添加云朵和草的动画，并设置为循环
-			cloudAnims := []string{"anim_grass", "anim_cloud1", "anim_cloud2", "anim_cloud4",
-				"anim_cloud5", "anim_cloud6", "anim_cloud7"}
-			for _, animName := range cloudAnims {
-				m.reanimSystem.AddAnimation(m.selectorScreenEntity, animName)
-				reanimComp.AnimationLoopStates[animName] = true // 云朵动画循环播放
-			}
-
-			// 设置为循环模式（整体设为循环，但具体每个动画由 AnimationLoopStates 控制）
-			reanimComp.IsLooping = true
-			reanimComp.IsFinished = false
-
-			// 完成动画设置（重新生成轨道绑定）
-			if err := m.reanimSystem.FinalizeAnimations(m.selectorScreenEntity); err != nil {
-				log.Printf("[MainMenuScene] Warning: Failed to finalize animations: %v", err)
-			}
-
-			// ✅ 手动修复：将 leaf_SelectorScreen_Leaves 绑定到 anim_grass
-			// 原因：自动绑定算法将其绑定到了 anim_open，导致草不显示
-			if reanimComp.TrackAnimationBinding == nil {
-				reanimComp.TrackAnimationBinding = make(map[string]string)
-			}
-			reanimComp.TrackAnimationBinding["leaf_SelectorScreen_Leaves"] = "anim_grass"
-
-			// Debug: 打印轨道绑定信息（仅针对 grass 相关轨道）
-			if reanimComp.TrackAnimationBinding != nil {
-				for trackName, animName := range reanimComp.TrackAnimationBinding {
-					if trackName == "leaf_SelectorScreen_Leaves" || trackName == "anim_grass" {
-						log.Printf("[MainMenuScene] 🔍 轨道绑定: %s → %s", trackName, animName)
-					}
-				}
-			}
-
-			log.Printf("[MainMenuScene] ✅ 开场动画完成，已添加云朵循环动画")
-		}
 	}
 
 	// Get mouse position
