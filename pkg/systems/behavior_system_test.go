@@ -87,7 +87,7 @@ func TestZombieDeathParticleEffect(t *testing.T) {
 	})
 	// 添加 ReanimComponent 用于动画播放（避免 ReanimSystem 报错）
 	em.AddComponent(zombieID, &components.ReanimComponent{
-		Reanim:     nil, // 测试环境简化，不加载真实动画数据
+		ReanimXML:  nil, // 测试环境简化，不加载真实动画数据
 		PartImages: make(map[string]*ebiten.Image),
 	})
 
@@ -281,7 +281,7 @@ func TestParticleEffectErrorHandling(t *testing.T) {
 		VX: -20.0,
 	})
 	em.AddComponent(zombieID, &components.ReanimComponent{
-		Reanim:     nil, //  "Zombie",
+		ReanimXML:  nil, //  "Zombie",
 		PartImages: make(map[string]*ebiten.Image),
 	})
 
@@ -327,7 +327,7 @@ func TestZombieDeathNoPosition(t *testing.T) {
 		VX: -20.0,
 	})
 	em.AddComponent(zombieID, &components.ReanimComponent{
-		Reanim:     nil, //  "Zombie",
+		ReanimXML:  nil, //  "Zombie",
 		PartImages: make(map[string]*ebiten.Image),
 	})
 

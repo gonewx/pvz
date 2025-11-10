@@ -209,14 +209,14 @@ func (s *WaveSpawnSystem) ActivateWave(waveIndex int) int {
 				}
 			}
 
-			// Story 13.6: 使用配置驱动的动画播放
+			// Story 13.8: 僵尸使用配置驱动的动画组合（自动隐藏装备轨道）
 			if behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID); ok {
 				if behavior.ZombieAnimState == components.ZombieAnimIdle {
 					behavior.ZombieAnimState = components.ZombieAnimWalking
 					if err := s.reanimSystem.PlayCombo(entityID, "zombie", "walk"); err != nil {
-						log.Printf("[WaveSpawnSystem] Warning: Failed to play walk animation for zombie %d: %v", entityID, err)
+						log.Printf("[WaveSpawnSystem] Warning: Failed to play walk combo for zombie %d: %v", entityID, err)
 					} else {
-						log.Printf("[WaveSpawnSystem] Zombie %d switched to walk animation (activated, 配置驱动)", entityID)
+						log.Printf("[WaveSpawnSystem] Zombie %d switched to walk animation (activated)", entityID)
 					}
 				}
 			}
@@ -319,26 +319,28 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 
 		// 读取当前动画状态（调试用）
 		if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
-			// Story 13.2: 使用主动画的 LogicalFrame 替代 CurrentFrame
-			currentFrame := 0
-			if state, ok := reanimComp.AnimStates[reanimComp.CurrentAnim]; ok {
-				currentFrame = state.LogicalFrame
+			// Story 13.8: 使用新的简化结构
+			currentFrame := reanimComp.CurrentFrame
+			currentAnim := ""
+			if len(reanimComp.CurrentAnimations) > 0 {
+				currentAnim = reanimComp.CurrentAnimations[0]
 			}
-			log.Printf("[WaveSpawnSystem] Zombie %d 切换前动画: %s, 帧: %d", entityID, reanimComp.CurrentAnim, currentFrame)
+			log.Printf("[WaveSpawnSystem] Zombie %d 切换前动画: %s, 帧: %d", entityID, currentAnim, currentFrame)
 		}
 
-		// Story 13.6: 使用配置驱动的动画播放
-		if err := s.reanimSystem.PlayDefaultAnimation(entityID, "zombie"); err != nil {
-			log.Printf("[WaveSpawnSystem] Warning: Failed to play idle animation for zombie %d: %v", entityID, err)
+		// Story 13.8: 僵尸使用配置驱动的动画组合（自动隐藏装备轨道）
+		if err := s.reanimSystem.PlayCombo(entityID, "zombie", "idle"); err != nil {
+			log.Printf("[WaveSpawnSystem] Warning: Failed to play idle combo for zombie %d: %v", entityID, err)
 		} else {
 			// 验证切换后的状态
 			if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
-				// Story 13.2: 使用主动画的 LogicalFrame 替代 CurrentFrame
-				currentFrame := 0
-				if state, ok := reanimComp.AnimStates[reanimComp.CurrentAnim]; ok {
-					currentFrame = state.LogicalFrame
+				// Story 13.8: 使用新的简化结构
+				currentFrame := reanimComp.CurrentFrame
+				currentAnim := ""
+				if len(reanimComp.CurrentAnimations) > 0 {
+					currentAnim = reanimComp.CurrentAnimations[0]
 				}
-				log.Printf("[WaveSpawnSystem] Zombie %d 切换后动画: %s, 帧: %d (preview mode, 配置驱动)", entityID, reanimComp.CurrentAnim, currentFrame)
+				log.Printf("[WaveSpawnSystem] Zombie %d 切换后动画: %s, 帧: %d (预生成阶段使用 idle)", entityID, currentAnim, currentFrame)
 			}
 		}
 	}

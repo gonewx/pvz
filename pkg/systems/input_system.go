@@ -210,7 +210,6 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 			pos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, id)
 			clickable, _ := ecs.GetComponent[*components.ClickableComponent](s.entityManager, id)
 			sun, _ := ecs.GetComponent[*components.SunComponent](s.entityManager, id)
-			reanim, _ := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id)
 
 			// 只处理可点击的阳光（允许下落中和已落地的阳光）
 			if !clickable.IsEnabled {
@@ -233,24 +232,16 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 			//
 			// 修复方案：点击中心应该对齐到实际的视觉中心（渲染后的中心）
 			// - 渲染原点 = pos - CenterOffset
-			// - Sun1 中心 ≈ 渲染原点 + 0 (Sun1 的中心接近部件坐标原点)
-			// - 因此点击中心 = pos - CenterOffset (而不是 pos)
-			//
-			// 但是这会让所有使用 Reanim 的实体都偏移，只有阳光需要特殊处理
-			// 因为阳光的部件分布不均匀（Sun3 拉偏了几何中心）
-			//
-			// 临时方案：如果有 Reanim，点击中心向左偏移 CenterOffset
+			// - Sun1 中心 ≈ 渲染原点 + Sun1 偏移 ≈ 渲染原点
+			// - 因此点击中心 = pos - CenterOffset
 			clickCenterX := pos.X
 			clickCenterY := pos.Y
 
-			// 修复阳光点击偏移：考虑 CenterOffset
-			if reanim != nil && sun != nil {
-				// 对于阳光，点击中心应该在渲染原点附近（Sun1 的位置）
-				// 而不是 pos（几何中心）
-				clickCenterX = pos.X - reanim.CenterOffsetX
-				clickCenterY = pos.Y - reanim.CenterOffsetY
-				log.Printf("[InputSystem] 阳光 %d: 调整点击中心 pos=(%.1f, %.1f) -> click=(%.1f, %.1f), offset=(%.1f, %.1f)",
-					id, pos.X, pos.Y, clickCenterX, clickCenterY, reanim.CenterOffsetX, reanim.CenterOffsetY)
+			// Bug Fix: 阳光的几何中心偏右，需要向左偏移 CenterOffset 对齐视觉中心
+			// 只对有 ReanimComponent 的阳光应用此修正
+			if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id); ok {
+				clickCenterX = pos.X - reanimComp.CenterOffsetX
+				clickCenterY = pos.Y - reanimComp.CenterOffsetY
 			}
 
 			halfWidth := clickable.Width / 2.0
@@ -396,33 +387,38 @@ func (s *InputSystem) handlePlantCardClick(mouseX, mouseY int, cameraX float64) 
 	return false // 未处理任何卡片点击
 }
 
-// createPlantPreview 创建植物预览实体（使用 Reanim）
+// createPlantPreview 创建植物预览实体（复用植物卡片的渲染逻辑）
+// 使用与植物卡片相同的 Reanim 离屏渲染技术,确保预览和卡片显示一致
 func (s *InputSystem) createPlantPreview(plantType components.PlantType, x, y float64) {
 	// 先删除现有预览
 	s.destroyPlantPreview()
 
-	// 获取植物对应的 Reanim 资源名称
-	var reanimName string
+	// 获取植物对应的资源名称和配置ID
+	var resourceName string
+	var configID string
 	switch plantType {
 	case components.PlantSunflower:
-		reanimName = "SunFlower"
+		resourceName = "SunFlower"
+		configID = "sunflower"
 	case components.PlantPeashooter:
-		reanimName = "PeaShooterSingle" // Story 10.3: 修正为普通豌豆射手资源
+		resourceName = "PeaShooterSingle"
+		configID = "peashooter"
 	case components.PlantWallnut:
-		reanimName = "Wallnut"
+		resourceName = "Wallnut"
+		configID = "wallnut"
 	case components.PlantCherryBomb:
-		reanimName = "CherryBomb"
+		resourceName = "CherryBomb"
+		configID = "cherrybomb"
 	default:
 		log.Printf("[InputSystem] Unknown plant type for preview: %v", plantType)
 		return
 	}
 
-	// 从 ResourceManager 获取 Reanim 数据和部件图片
-	reanimXML := s.resourceManager.GetReanimXML(reanimName)
-	partImages := s.resourceManager.GetReanimPartImages(reanimName)
-
-	if reanimXML == nil || partImages == nil {
-		log.Printf("[InputSystem] Failed to load Reanim resources for preview: %s", reanimName)
+	// 使用 RenderPlantIcon 复用卡片渲染逻辑
+	// 这确保预览图像与卡片上的图标完全一致
+	plantIcon, err := entities.RenderPlantIcon(s.entityManager, s.resourceManager, s.reanimSystem, resourceName, configID)
+	if err != nil {
+		log.Printf("[InputSystem] Failed to render plant icon for preview: %v", err)
 		return
 	}
 
@@ -435,10 +431,9 @@ func (s *InputSystem) createPlantPreview(plantType components.PlantType, x, y fl
 		Y: y,
 	})
 
-	// 添加 ReanimComponent
-	ecs.AddComponent(s.entityManager, entityID, &components.ReanimComponent{
-		Reanim:     reanimXML,
-		PartImages: partImages,
+	// 添加静态精灵组件（使用渲染好的图标）
+	ecs.AddComponent(s.entityManager, entityID, &components.SpriteComponent{
+		Image: plantIcon,
 	})
 
 	// 添加植物预览组件
@@ -447,22 +442,8 @@ func (s *InputSystem) createPlantPreview(plantType components.PlantType, x, y fl
 		Alpha:     0.5, // 半透明效果
 	})
 
-	// 初始化动画
-	var animName string
-	if plantType == components.PlantPeashooter {
-		animName = "anim_full_idle" // 豌豆射手使用完整待机动画
-	} else {
-		animName = "anim_idle"
-	}
-
-	// Story 13.6: 预览动画播放 (P2 - 降级方案，保持原有实现)
-	if err := s.reanimSystem.PlayAnimation(entityID, animName); err != nil {
-		log.Printf("[InputSystem] Failed to play preview animation: %v", err)
-		// 不删除实体，让它以静态方式显示
-	}
-
-	log.Printf("[InputSystem] Created plant preview (ID: %d, Type: %v, Reanim: %s) at (%.1f, %.1f)",
-		entityID, plantType, reanimName, x, y)
+	log.Printf("[InputSystem] Created plant preview (ID: %d, Type: %v, Resource: %s) at (%.1f, %.1f)",
+		entityID, plantType, resourceName, x, y)
 }
 
 // destroyPlantPreview 删除所有植物预览实体

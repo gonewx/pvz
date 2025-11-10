@@ -1,9 +1,20 @@
 id: sodroll
 name: SodRoll
 reanim_file: data/reanim/SodRoll.reanim
-default_animation: anim_idle
+default_animation: SodRoll
 scale: 1
 images:
     IMAGE_REANIM_SODROLL: assets/reanim/SodRoll.png
     IMAGE_REANIM_SODROLLCAP: assets/reanim/SodRollCap.png
-available_animations: []
+available_animations:
+    - name: SodRoll
+      display_name: "草皮滚动"
+    - name: SodRollCap
+      display_name: t
+animation_combos:
+    - name: roll
+      display_name: "草皮铺设动画"
+      animations:
+          - SodRoll
+          - SodRollCap
+      binding_strategy: auto

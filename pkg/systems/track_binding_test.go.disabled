@@ -369,7 +369,7 @@ func TestPlayAnimations_AutoBinding(t *testing.T) {
 	}
 
 	comp := &components.ReanimComponent{
-		Reanim: reanimData,
+		ReanimXML: reanimData,
 	}
 	ecs.AddComponent(em, entity, comp)
 	ecs.AddComponent(em, entity, &components.PositionComponent{X: 0, Y: 0})

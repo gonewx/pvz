@@ -328,6 +328,7 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	// PlantPreviewRenderSystem 需要引用 PlantPreviewSystem 来获取两个渲染位置
 	// Story 8.1: PlantPreviewSystem 需要 LawnGridSystem 来检查行是否启用
 	scene.plantPreviewSystem = systems.NewPlantPreviewSystem(scene.entityManager, scene.gameState, scene.lawnGridSystem)
+	// 修复: 使用静态图像预览,不需要 ReanimSystem
 	scene.plantPreviewRenderSystem = systems.NewPlantPreviewRenderSystem(scene.entityManager, scene.plantPreviewSystem)
 
 	// Story 3.4: Initialize behavior system (sunflower sun production, etc.)
@@ -759,7 +760,7 @@ func (s *GameScene) loadSoddingResources() {
 	}
 
 	// Story 8.2 QA改进：加载草皮叠加图片（用于动画播放时的叠加渲染）
-	// Sprint Change 2025-10-28: 智能选择叠加图类型
+	// 重构简化：所有叠加层X坐标从 0 开始，Y坐标对齐到草皮行位置
 	// - 启用行为连续3行（如 [2,3,4]）→ 使用 IMAGE_SOD3ROW（整体效果，无边缘）
 	// - 启用行为5行，动画行为 [1,5]（Level 1-4）→ 双背景叠加（IMAGE_BACKGROUND1）
 	// - 其他情况 → 使用 IMAGE_SOD1ROW（逐行渲染）
@@ -793,7 +794,7 @@ func (s *GameScene) loadSoddingResources() {
 				log.Printf("[GameScene] ✅ 加载已铺草皮背景: IMAGE_BACKGROUND1")
 			}
 
-			// 缓存位置参数（叠加背景从 (0,0) 开始，与底层背景对齐）
+			// 重构简化：叠加背景从 (0,0) 开始（与底层背景完全对齐）
 			s.sodOverlayX = 0
 			s.sodOverlayY = 0
 			log.Printf("[GameScene] 双背景叠加模式：叠加层从 (0,0) 开始")
@@ -810,14 +811,19 @@ func (s *GameScene) loadSoddingResources() {
 				s.sodRowImage = sod3RowImage
 				log.Printf("[GameScene] ✅ 合成草皮叠加图片 (RGB + Alpha): IMAGE_SOD3ROW (启用行: %v)", enabledLanes)
 
-				// 性能优化：缓存草皮图片尺寸和位置
+				// 性能优化：缓存草皮图片尺寸
 				sodBounds := sod3RowImage.Bounds()
 				s.sodWidth = sodBounds.Dx()
 				s.sodHeight = sodBounds.Dy()
 
-				// 计算并缓存草皮世界坐标（基于启用行计算，覆盖整个3行区域）
-				s.sodOverlayX, s.sodOverlayY = config.CalculateSodOverlayPosition(enabledLanes, float64(s.sodHeight))
-				log.Printf("[GameScene] 缓存草皮渲染参数: 位置(%.1f, %.1f) 尺寸(%dx%d)", s.sodOverlayX, s.sodOverlayY, s.sodWidth, s.sodHeight)
+				// 计算草皮叠加层Y坐标（对齐到第一行的顶部）
+				firstLane := enabledLanes[0]
+				sodOverlayY := config.GridWorldStartY + float64(firstLane-1)*config.CellHeight
+
+				// X坐标从0开始
+				s.sodOverlayX = 0
+				s.sodOverlayY = sodOverlayY
+				log.Printf("[GameScene] 草皮叠加层: 位置(0, %.1f) 尺寸(%dx%d)", sodOverlayY, s.sodWidth, s.sodHeight)
 			}
 		} else {
 			// 其他情况：使用 IMAGE_SOD1ROW（单行草皮）
@@ -831,14 +837,20 @@ func (s *GameScene) loadSoddingResources() {
 				s.sodRowImage = sod1RowImage
 				log.Printf("[GameScene] ✅ 合成草皮叠加图片 (RGB + Alpha): IMAGE_SOD1ROW (启用行: %v)", enabledLanes)
 
-				// 性能优化：缓存草皮图片尺寸和位置
+				// 性能优化：缓存草皮图片尺寸
 				sodBounds := sod1RowImage.Bounds()
 				s.sodWidth = sodBounds.Dx()
 				s.sodHeight = sodBounds.Dy()
 
-				// 计算并缓存草皮世界坐标（基于动画行计算）
-				s.sodOverlayX, s.sodOverlayY = config.CalculateSodOverlayPosition(animLanes, float64(s.sodHeight))
-				log.Printf("[GameScene] 缓存草皮渲染参数: 位置(%.1f, %.1f) 尺寸(%dx%d)", s.sodOverlayX, s.sodOverlayY, s.sodWidth, s.sodHeight)
+				// 计算草皮叠加层Y坐标（对齐到动画行的顶部）
+				// 单行模式下，使用第一个动画行的位置
+				firstAnimLane := animLanes[0]
+				sodOverlayY := config.GridWorldStartY + float64(firstAnimLane-1)*config.CellHeight
+
+				// X坐标从0开始
+				s.sodOverlayX = 0
+				s.sodOverlayY = sodOverlayY
+				log.Printf("[GameScene] 草皮叠加层: 位置(0, %.1f) 尺寸(%dx%d)", sodOverlayY, s.sodWidth, s.sodHeight)
 			}
 		}
 
@@ -849,22 +861,19 @@ func (s *GameScene) loadSoddingResources() {
 		log.Printf("[GameScene] 设置铺草皮动画延迟: %.1f 秒", s.soddingAnimDelay)
 	}
 
-	// Story 8.6 QA修正: 预渲染指定行的草皮（直接绘制到背景图片上）
-	// Sprint Change 2025-10-28: 根据 preSoddedLanes 行数自动选择图片
-	// 设计思路:
-	// - 连续3行（如[2,3,4]）→ 使用 IMAGE_SOD3ROW 一次性渲染
-	// - 其他情况 → 使用 IMAGE_SOD1ROW 逐行渲染
-	if s.gameState.CurrentLevel != nil && len(s.gameState.CurrentLevel.PreSoddedLanes) > 0 && s.background != nil {
+	// Story 8.6 QA修正 + 统一草皮渲染重构：
+	// 为所有启用的行预渲染草皮到背景副本，用于双背景叠加渲染
+	//
+	// 设计思路：
+	// - 底层背景：未铺草皮的背景 (IMAGE_BACKGROUND1UNSODDED)
+	// - 叠加层：预渲染所有启用行的草皮 (enabledLanes)
+	// - 预铺草皮行 (preSoddedLanes)：这些行的草皮会同时绘制在底层和叠加层
+	// - 运行时根据草皮卷位置，渐进显示预渲染背景
+	if s.gameState.CurrentLevel != nil && s.background != nil && s.gameState.CurrentLevel.ShowSoddingAnim {
+		enabledLanes := s.gameState.CurrentLevel.EnabledLanes
 		preSoddedLanes := s.gameState.CurrentLevel.PreSoddedLanes
 
-		// 检查是否是连续的3行
-		isConsecutive3Rows := len(preSoddedLanes) == 3 &&
-			preSoddedLanes[1] == preSoddedLanes[0]+1 &&
-			preSoddedLanes[2] == preSoddedLanes[1]+1
-
-		log.Printf("[GameScene] 预渲染草皮行: %v (自动选择图片)", preSoddedLanes)
-
-		// 创建新的背景图片副本
+		// 创建新的背景图片副本（叠加层）
 		bgBounds := s.background.Bounds()
 		newBackground := ebiten.NewImage(bgBounds.Dx(), bgBounds.Dy())
 
@@ -872,78 +881,97 @@ func (s *GameScene) loadSoddingResources() {
 		op := &ebiten.DrawImageOptions{}
 		newBackground.DrawImage(s.background, op)
 
-		// 2. 根据行数自动选择渲染方式
-		if isConsecutive3Rows {
-			// 使用 IMAGE_SOD3ROW 一次性渲染3行
-			sod3RowRGB, err := s.resourceManager.LoadImageWithAlphaMask(
-				"assets/images/sod3row.jpg",
-				"assets/images/sod3row_.png",
-			)
-			if err != nil {
-				log.Printf("[GameScene] Error: 无法加载3行草皮图片: %v", err)
-				return
-			}
+		// 2. 预渲染草皮到叠加层
+		// 只预渲染 preSoddedLanes 指定的行（如果未指定则预渲染所有启用行）
+		lanesToPreRender := preSoddedLanes
+		if len(lanesToPreRender) == 0 {
+			lanesToPreRender = enabledLanes
+		}
 
-			// 计算中间行的中心Y坐标
-			middleLane := preSoddedLanes[1] // 中间行
-			rowCenterY := config.GridWorldStartY + float64(middleLane-1)*config.CellHeight + config.CellHeight/2.0
+		if len(lanesToPreRender) > 0 {
+			// 检查是否是连续的3行
+			isConsecutive3Rows := len(lanesToPreRender) == 3 &&
+				lanesToPreRender[1] == lanesToPreRender[0]+1 &&
+				lanesToPreRender[2] == lanesToPreRender[1]+1
 
-			// 3行草皮图片的高度
-			sodBounds := sod3RowRGB.Bounds()
-			sodHeight := float64(sodBounds.Dy())
+			log.Printf("[GameScene] 预渲染草皮到叠加层: 启用行=%v, 预铺行=%v, 实际预渲染=%v", enabledLanes, preSoddedLanes, lanesToPreRender)
 
-			// 草皮Y坐标 = 中间行中心 - 草皮高度的一半 + 偏移
-			dstY := rowCenterY - sodHeight/2.0 + config.SodOverlayOffsetY
+			// 根据行数自动选择渲染方式
+			if isConsecutive3Rows {
+				// 使用 IMAGE_SOD3ROW 一次性渲染3行
+				sod3RowRGB, err := s.resourceManager.LoadImageWithAlphaMask(
+					"assets/images/sod3row.jpg",
+					"assets/images/sod3row_.png",
+				)
+				if err != nil {
+					log.Printf("[GameScene] Error: 无法加载3行草皮图片: %v", err)
+					return
+				}
 
-			// 草皮X坐标（固定世界坐标，不受动画模式影响）
-			dstX := config.GridWorldStartX + config.SodOverlayOffsetX
+				// 计算中间行的中心Y坐标
+				middleLane := lanesToPreRender[1] // 中间行
+				rowCenterY := config.GridWorldStartY + float64(middleLane-1)*config.CellHeight + config.CellHeight/2.0
 
-			// 一次性绘制3行草皮
-			op := &ebiten.DrawImageOptions{}
-			op.GeoM.Translate(dstX, dstY)
-			newBackground.DrawImage(sod3RowRGB, op)
-
-			log.Printf("[GameScene] ✅ 使用 IMAGE_SOD3ROW 一次性预渲染第 %v 行草皮: 背景位置(%.1f,%.1f)", preSoddedLanes, dstX, dstY)
-		} else {
-			// 使用 IMAGE_SOD1ROW 循环渲染每行
-			sod1RowRGB, err := s.resourceManager.LoadImageWithAlphaMask(
-				"assets/images/sod1row.jpg",
-				"assets/images/sod1row_.png",
-			)
-			if err != nil {
-				log.Printf("[GameScene] Error: 无法加载单行草皮图片: %v", err)
-				return
-			}
-
-			// 为每个预渲染行绘制单行草皮
-			for _, lane := range preSoddedLanes {
-				// 计算此行的Y坐标
-				sodBounds := sod1RowRGB.Bounds()
+				// 3行草皮图片的高度
+				sodBounds := sod3RowRGB.Bounds()
 				sodHeight := float64(sodBounds.Dy())
 
-				// 计算目标行的中心Y坐标（绝对行号）
-				rowCenterY := config.GridWorldStartY + float64(lane-1)*config.CellHeight + config.CellHeight/2.0
-
-				// 草皮Y坐标 = 行中心 - 草皮高度的一半 + 偏移
+				// 草皮Y坐标 = 中间行中心 - 草皮高度的一半 + 偏移
 				dstY := rowCenterY - sodHeight/2.0 + config.SodOverlayOffsetY
 
 				// 草皮X坐标（固定世界坐标，不受动画模式影响）
 				dstX := config.GridWorldStartX + config.SodOverlayOffsetX
 
-				// 绘制到背景
+				// 一次性绘制3行草皮
 				op := &ebiten.DrawImageOptions{}
 				op.GeoM.Translate(dstX, dstY)
-				newBackground.DrawImage(sod1RowRGB, op)
+				newBackground.DrawImage(sod3RowRGB, op)
 
-				log.Printf("[GameScene] ✅ 使用 IMAGE_SOD1ROW 预渲染第 %d 行草皮: 背景位置(%.1f,%.1f)", lane, dstX, dstY)
+				log.Printf("[GameScene] ✅ 使用 IMAGE_SOD3ROW 一次性预渲染第 %v 行草皮: 背景位置(%.1f,%.1f)", lanesToPreRender, dstX, dstY)
+			} else {
+				// 使用 IMAGE_SOD1ROW 循环渲染每行
+				sod1RowRGB, err := s.resourceManager.LoadImageWithAlphaMask(
+					"assets/images/sod1row.jpg",
+					"assets/images/sod1row_.png",
+				)
+				if err != nil {
+					log.Printf("[GameScene] Error: 无法加载单行草皮图片: %v", err)
+					return
+				}
+
+				// 为每个需要预渲染的行绘制单行草皮
+				for _, lane := range lanesToPreRender {
+					// 计算此行的Y坐标
+					sodBounds := sod1RowRGB.Bounds()
+					sodHeight := float64(sodBounds.Dy())
+
+					// 计算目标行的中心Y坐标（绝对行号）
+					rowCenterY := config.GridWorldStartY + float64(lane-1)*config.CellHeight + config.CellHeight/2.0
+
+					// 草皮Y坐标 = 行中心 - 草皮高度的一半 + 偏移
+					dstY := rowCenterY - sodHeight/2.0 + config.SodOverlayOffsetY
+
+					// 草皮X坐标（固定世界坐标，不受动画模式影响）
+					dstX := config.GridWorldStartX + config.SodOverlayOffsetX
+
+					// 绘制到背景
+					op := &ebiten.DrawImageOptions{}
+					op.GeoM.Translate(dstX, dstY)
+					newBackground.DrawImage(sod1RowRGB, op)
+
+					log.Printf("[GameScene] ✅ 使用 IMAGE_SOD1ROW 预渲染第 %d 行草皮: 背景位置(%.1f,%.1f)", lane, dstX, dstY)
+				}
 			}
 		}
 
-		// 3. 替换背景图片
-		s.background = newBackground
+		// 3. 保存预渲染背景副本（用于草皮叠加渲染）
+		// 底层背景：原始未铺草皮背景（已在上面设置）
+		// 叠加层：预渲染后的背景（包含 preSoddedLanes 草皮，如果有的话）
+		s.preSoddedImage = newBackground
 
-		// 4. 清除 preSoddedImage 标记（不再需要）
-		s.preSoddedImage = nil
+		log.Printf("[GameScene] ✅ 创建预渲染背景副本用于草皮叠加 (preSoddedLanes: %v)", preSoddedLanes)
+
+		// 注意：不替换 s.background，保持原始未铺草皮背景作为底层
 	}
 }
 
@@ -1055,7 +1083,7 @@ func (s *GameScene) Update(deltaTime float64) {
 		// 检查是否应该播放铺草皮动画
 		shouldPlayAnim := s.gameState.CurrentLevel.ShowSoddingAnim || s.gameState.CurrentLevel.SodRollAnimation
 
-		if shouldPlayAnim && s.soddingAnimDelay > 0 {
+		if shouldPlayAnim && s.soddingAnimDelay >= 0 {
 			s.soddingAnimTimer += deltaTime
 			if s.soddingAnimTimer >= s.soddingAnimDelay {
 				log.Printf("[GameScene] 启动铺草皮动画（延迟 %.1f 秒后）", s.soddingAnimDelay)
@@ -1298,8 +1326,8 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	// DEBUG: Draw particle test instructions (Story 7.4 debugging) - DISABLED
 	// s.drawParticleTestInstructions(screen)
 
-	// DEBUG: Draw grid boundaries (Story 3.3 debugging) - DISABLED
-	// s.drawGridDebug(screen)
+	// DEBUG: Draw grid boundaries and SodRoll debug lines (Story 3.3 debugging)
+	s.drawGridDebug(screen)
 
 	// Story 10.1: Draw pause menu (最顶层 - 在所有其他元素之上)
 	if s.pauseMenuModule != nil {
@@ -1352,207 +1380,88 @@ func (s *GameScene) drawBackground(screen *ebiten.Image) {
 		op := &ebiten.DrawImageOptions{}
 		screen.DrawImage(visibleBG, op)
 
-		// Story 8.2 QA改进：在背景上叠加草皮图片（随草皮卷位置同步显示）
-		// Story 8.6 QA修正：预渲染草皮已整合到此逻辑中
-		// Sprint Change 2025-10-28: 智能渲染草皮叠加图
-		// - Level 1-4 模式 → 双背景叠加（底层=未铺草皮+预渲染，叠加层=IMAGE_BACKGROUND1）
-		// - 连续3行（如 [2,3,4]）→ 使用 IMAGE_SOD3ROW 整体渲染（无边缘分界线）
-		// - 非连续行 → 使用 IMAGE_SOD1ROW 逐行渲染
+		// 统一草皮渲染：所有关卡使用双背景叠加模式
+		//
+		// 设计原理：
+		// - 底层：未铺草皮背景 (IMAGE_BACKGROUND1UNSODDED) + 预渲染的preSoddedLanes草皮
+		// - 叠加层：预渲染背景副本 (preSoddedImage) 或完整铺草皮背景 (soddedBackground)
+		// - 根据草皮卷位置 (sodRollCenterX)，渐进显示叠加层（从世界坐标0裁剪到草皮卷中心）
+		//
+		// 优势：
+		// - 统一逻辑：1-1/1-2/1-4 使用相同代码路径
+		// - 坐标清晰：所有计算使用世界坐标，最后转屏幕坐标
+		// - 易于维护：无需区分单行/连续行/全行模式
 		if s.soddingSystem != nil && s.gameState.CurrentLevel != nil {
-			// 检测是否为 Level 1-4 双背景叠加模式
-			isLevel14Pattern := s.soddedBackground != nil
+			// 选择叠加背景（优先使用完整背景，否则使用预渲染背景）
+			overlayBg := s.soddedBackground
+			if overlayBg == nil {
+				overlayBg = s.preSoddedImage
+			}
 
-			if isLevel14Pattern {
-				// Level 1-4 双背景叠加模式：渲染 IMAGE_BACKGROUND1（已铺草皮完整背景）
-				// 随草皮卷位置从左向右裁剪显示
-
+			if overlayBg != nil {
 				// 获取草皮卷当前位置（世界坐标X）
 				sodRollCenterX := s.soddingSystem.GetSodRollCenterX()
 
-				// 获取叠加背景尺寸
-				bgBounds := s.soddedBackground.Bounds()
-				bgWidth := bgBounds.Dx()
-				bgHeight := bgBounds.Dy()
-
 				// 计算可见宽度（从世界坐标 0 到草皮卷中心）
 				visibleWorldWidth := int(sodRollCenterX)
-				if visibleWorldWidth <= 0 {
-					return // 草皮卷还没到，不显示
-				}
 
-				// 限制可见宽度不超过背景宽度
-				if visibleWorldWidth > bgWidth {
-					visibleWorldWidth = bgWidth
-				}
+				// 只有草皮卷到达可见位置后才渲染叠加层
+				if visibleWorldWidth > 0 {
+					// 获取叠加背景尺寸
+					bgBounds := overlayBg.Bounds()
+					bgWidth := bgBounds.Dx()
+					bgHeight := bgBounds.Dy()
 
-				// 计算视口裁剪区域（考虑摄像机位置）
-				// viewportX 是摄像机在世界坐标中的位置
-				overlayViewportX := viewportX
-				overlayViewportY := viewportY
-
-				// 水平方向：裁剪从 viewportX 到 min(visibleWorldWidth, viewportX + WindowWidth)
-				overlayViewportEndX := visibleWorldWidth
-				if overlayViewportX < 0 {
-					overlayViewportX = 0
-				}
-				// 不能超过可见宽度
-				if overlayViewportEndX < overlayViewportX {
-					return // 可见区域还没有进入视口
-				}
-
-				// 垂直方向：显示整个高度
-				overlayViewportEndY := overlayViewportY + WindowHeight
-				if overlayViewportEndY > bgHeight {
-					overlayViewportEndY = bgHeight
-				}
-				if overlayViewportY < 0 {
-					overlayViewportY = 0
-				}
-
-				// 裁剪叠加背景的可见部分
-				overlayRect := image.Rect(
-					overlayViewportX,
-					overlayViewportY,
-					overlayViewportEndX,
-					overlayViewportEndY,
-				)
-
-				visibleOverlay := s.soddedBackground.SubImage(overlayRect).(*ebiten.Image)
-
-				// 计算屏幕绘制位置（将世界坐标转换为屏幕坐标）
-				screenX := float64(overlayViewportX) - float64(viewportX)
-				screenY := 0.0
-
-				// 绘制叠加背景到屏幕
-				overlayOp := &ebiten.DrawImageOptions{}
-				overlayOp.GeoM.Translate(screenX, screenY)
-				screen.DrawImage(visibleOverlay, overlayOp)
-
-				// DEBUG: 打印叠加背景信息（仅一次）
-				if !s.sodDebugPrinted {
-					log.Printf("[草皮叠加] Level 1-4 双背景叠加模式")
-					log.Printf("[草皮叠加] 底层: IMAGE_BACKGROUND1UNSODDED + 预渲染第2-4行")
-					log.Printf("[草皮叠加] 叠加层: IMAGE_BACKGROUND1, 可见世界宽度: %d px (从0到草皮卷中心%.1f)", visibleWorldWidth, sodRollCenterX)
-					log.Printf("[草皮叠加] 视口裁剪: [%d, %d, %d, %d], 屏幕位置: (%.1f, %.1f)",
-						overlayViewportX, overlayViewportY, overlayViewportEndX, overlayViewportEndY, screenX, screenY)
-					s.sodDebugPrinted = true
-				}
-
-			} else {
-				// 其他模式：使用草皮图片叠加
-				enabledLanes := s.gameState.CurrentLevel.EnabledLanes
-
-				// 检测启用行是否为连续3行
-				isConsecutive3Rows := len(enabledLanes) == 3 &&
-					enabledLanes[1] == enabledLanes[0]+1 &&
-					enabledLanes[2] == enabledLanes[1]+1
-
-				if isConsecutive3Rows && s.sodRowImage != nil {
-					// 连续3行：整体渲染 IMAGE_SOD3ROW
-					sodWidth := s.sodWidth
-					sodHeight := s.sodHeight
-					sodOverlayX := s.sodOverlayX
-					sodOverlayY := s.sodOverlayY
-
-					sodRollCenterX := s.soddingSystem.GetSodRollCenterX()
-					animStartX := s.soddingSystem.GetAnimStartX()
-
-					visibleWidth := int(sodRollCenterX - animStartX)
-					if visibleWidth > sodWidth {
-						visibleWidth = sodWidth
-					}
-					if visibleWidth <= 0 {
-						return
+					// 限制可见宽度不超过背景宽度
+					if visibleWorldWidth > bgWidth {
+						visibleWorldWidth = bgWidth
 					}
 
-					sodViewportX := viewportX - int(sodOverlayX)
-					if sodViewportX < 0 {
-						sodViewportX = 0
+					// 计算视口裁剪区域（世界坐标）
+					// viewportX 是摄像机在世界坐标中的位置
+					overlayViewportX := viewportX
+					overlayViewportY := viewportY
+
+					// 水平方向：裁剪从 viewportX 到 min(visibleWorldWidth, viewportX + WindowWidth)
+					overlayViewportEndX := visibleWorldWidth
+					if overlayViewportX < 0 {
+						overlayViewportX = 0
 					}
-
-					sodViewportEndX := sodViewportX + WindowWidth
-					if sodViewportEndX > visibleWidth {
-						sodViewportEndX = visibleWidth
-					}
-
-					sodViewportRect := image.Rect(sodViewportX, 0, sodViewportEndX, sodHeight)
-					visibleSod := s.sodRowImage.SubImage(sodViewportRect).(*ebiten.Image)
-
-					screenX := sodOverlayX - float64(viewportX)
-					screenY := sodOverlayY - float64(viewportY)
-
-					sodOp := &ebiten.DrawImageOptions{}
-					sodOp.GeoM.Translate(screenX, screenY)
-					screen.DrawImage(visibleSod, sodOp)
-
-					if !s.sodDebugPrinted {
-						log.Printf("[草皮叠加] 连续3行模式: 使用 IMAGE_SOD3ROW 整体渲染")
-						log.Printf("[草皮叠加] 启用行: %v, 草皮位置: (%.1f, %.1f), 尺寸: %dx%d",
-							enabledLanes, sodOverlayX, sodOverlayY, sodWidth, sodHeight)
-						s.sodDebugPrinted = true
-					}
-
-				} else if s.sodRowImage != nil {
-					// 非连续行：逐行渲染 IMAGE_SOD1ROW
-					animLanes := s.gameState.CurrentLevel.SoddingAnimLanes
-					if len(animLanes) == 0 {
-						animLanes = enabledLanes
-					}
-
-					preSoddedLanes := s.gameState.CurrentLevel.PreSoddedLanes
-					preSoddedMap := make(map[int]bool)
-					for _, lane := range preSoddedLanes {
-						preSoddedMap[lane] = true
-					}
-
-					sodWidth := s.sodWidth
-					sodHeight := s.sodHeight
-					sodOverlayX := s.sodOverlayX
-
-					sodRollCenterX := s.soddingSystem.GetSodRollCenterX()
-					animStartX := s.soddingSystem.GetAnimStartX()
-
-					visibleWidth := int(sodRollCenterX - animStartX)
-					if visibleWidth > sodWidth {
-						visibleWidth = sodWidth
-					}
-					if visibleWidth <= 0 {
-						return
-					}
-
-					sodViewportX := viewportX - int(sodOverlayX)
-					if sodViewportX < 0 {
-						sodViewportX = 0
-					}
-
-					sodViewportEndX := sodViewportX + WindowWidth
-					if sodViewportEndX > visibleWidth {
-						sodViewportEndX = visibleWidth
-					}
-
-					for _, lane := range animLanes {
-						if preSoddedMap[lane] {
-							continue
+					// 不能超过可见宽度
+					if overlayViewportEndX >= overlayViewportX {
+						// 垂直方向：显示整个高度
+						overlayViewportEndY := overlayViewportY + WindowHeight
+						if overlayViewportEndY > bgHeight {
+							overlayViewportEndY = bgHeight
+						}
+						if overlayViewportY < 0 {
+							overlayViewportY = 0
 						}
 
-						rowCenterY := config.GridWorldStartY + float64(lane-1)*config.CellHeight + config.CellHeight/2.0
-						sodOverlayY := rowCenterY - float64(sodHeight)/2.0 + config.SodOverlayOffsetY
+						// 裁剪叠加背景的可见部分（世界坐标裁剪）
+						overlayRect := image.Rect(
+							overlayViewportX,
+							overlayViewportY,
+							overlayViewportEndX,
+							overlayViewportEndY,
+						)
 
-						sodViewportRect := image.Rect(sodViewportX, 0, sodViewportEndX, sodHeight)
-						visibleSod := s.sodRowImage.SubImage(sodViewportRect).(*ebiten.Image)
+						visibleOverlay := overlayBg.SubImage(overlayRect).(*ebiten.Image)
 
-						screenX := sodOverlayX - float64(viewportX)
-						screenY := sodOverlayY - float64(viewportY)
+						// 世界坐标 → 屏幕坐标转换
+						screenX := float64(overlayViewportX) - float64(viewportX)
+						screenY := 0.0 // Y轴无摄像机移动
 
-						sodOp := &ebiten.DrawImageOptions{}
-						sodOp.GeoM.Translate(screenX, screenY)
-						screen.DrawImage(visibleSod, sodOp)
-					}
+						// 绘制叠加背景到屏幕
+						overlayOp := &ebiten.DrawImageOptions{}
+						overlayOp.GeoM.Translate(screenX, screenY)
+						screen.DrawImage(visibleOverlay, overlayOp)
 
-					if !s.sodDebugPrinted {
-						log.Printf("[草皮叠加] 逐行渲染模式: 使用 IMAGE_SOD1ROW")
-						log.Printf("[草皮叠加] 动画行: %v, 预渲染行: %v", animLanes, preSoddedLanes)
-						s.sodDebugPrinted = true
+						// DEBUG: 打印叠加背景信息（每10帧输出一次）
+						if frameIndex := int(s.soddingSystem.GetProgress() * 48); frameIndex%10 == 0 || frameIndex == 0 || frameIndex >= 47 {
+							log.Printf("[草皮叠加] 帧:%d, 可见世界宽度: %d px, sodRollCenterX: %.1f, 差值: %.1f px",
+								frameIndex, visibleWorldWidth, sodRollCenterX, sodRollCenterX-float64(visibleWorldWidth))
+						}
 					}
 				}
 			}
@@ -1689,9 +1598,15 @@ func (s *GameScene) drawParticleTestInstructions(screen *ebiten.Image) {
 // drawGridDebug 绘制草坪网格边界（调试用）
 // 在开发阶段帮助可视化可种植区域
 func (s *GameScene) drawGridDebug(screen *ebiten.Image) {
-	// Story 8.2 QA: 临时启用调试绘制，验证草坪布局
-	// 只在种植模式（选中植物卡片）时显示网格线
-	if !s.gameState.IsPlantingMode {
+	// Story 8.2 QA: 临时启用调试绘制，验证草坪布局和SodRoll动画
+	// 在种植模式或SodRoll动画期间显示
+	showDebug := s.gameState.IsPlantingMode
+	// if !showDebug && s.soddingSystem != nil {
+	// 	// 如果SodRoll动画启动过（包括正在播放和已完成），也显示调试信息
+	// 	showDebug = s.soddingSystem.HasStarted()
+	// }
+
+	if !showDebug {
 		return
 	}
 
@@ -1749,19 +1664,39 @@ func (s *GameScene) drawGridDebug(screen *ebiten.Image) {
 		// 右边
 		ebitenutil.DrawRect(screen, sodScreenX+sodWidth-thickness, sodScreenY, thickness, sodHeight, sodColor)
 
-		// 绘制草皮卷中心位置标记（绿色十字）
-		if s.soddingSystem != nil && s.soddingSystem.IsPlaying() {
-			sodRollCenterX := s.soddingSystem.GetSodRollCenterX()
-			sodRollScreenX := sodRollCenterX - s.cameraX
+		// 绘制草皮卷左、中、右边缘标记
+		// 只要动画启动过就绘制（包括已完成的状态）
+		if s.soddingSystem != nil && s.soddingSystem.HasStarted() {
+			leftEdge, centerX, rightEdge := s.soddingSystem.GetSodRollEdges()
 
-			// 绘制绿色十字标记（中心位置）
-			crossSize := 10.0
-			crossColor := color.RGBA{R: 0, G: 255, B: 0, A: 255}
-			// 竖线
-			ebitenutil.DrawRect(screen, sodRollScreenX-1, sodScreenY-crossSize, 2, sodHeight+crossSize*2, crossColor)
-			// 横线（在草皮中间）
-			midY := sodScreenY + sodHeight/2.0
-			ebitenutil.DrawRect(screen, sodRollScreenX-crossSize, midY-1, crossSize*2, 2, crossColor)
+			// 转换为屏幕坐标
+			leftScreenX := leftEdge - s.cameraX
+			centerScreenX := centerX - s.cameraX
+			rightScreenX := rightEdge - s.cameraX
+
+			// DEBUG: 每10帧打印一次
+			frameIndex := int(s.soddingSystem.GetProgress() * 48)
+			if frameIndex%10 == 0 || frameIndex == 0 {
+				log.Printf("[调试线] 帧:%d, 世界坐标: 左=%.1f 中=%.1f 右=%.1f, 屏幕坐标: 左=%.1f 中=%.1f 右=%.1f",
+					frameIndex, leftEdge, centerX, rightEdge, leftScreenX, centerScreenX, rightScreenX)
+			}
+
+			// 绘制三条竖线（加粗，更明显）
+			lineHeight := sodHeight + 40.0
+			lineStartY := sodScreenY - 20.0
+			lineWidth := 4.0 // 加粗线条
+
+			// 左边缘 - 红色
+			leftColor := color.RGBA{R: 255, G: 0, B: 0, A: 255}
+			ebitenutil.DrawRect(screen, leftScreenX-lineWidth/2, lineStartY, lineWidth, lineHeight, leftColor)
+
+			// 中心 - 绿色
+			centerColor := color.RGBA{R: 0, G: 255, B: 0, A: 255}
+			ebitenutil.DrawRect(screen, centerScreenX-lineWidth/2, lineStartY, lineWidth, lineHeight, centerColor)
+
+			// 右边缘 - 蓝色
+			rightColor := color.RGBA{R: 0, G: 0, B: 255, A: 255}
+			ebitenutil.DrawRect(screen, rightScreenX-lineWidth/2, lineStartY, lineWidth, lineHeight, rightColor)
 		}
 
 		// 详细调试信息
@@ -1769,13 +1704,13 @@ func (s *GameScene) drawGridDebug(screen *ebiten.Image) {
 			sodOverlayX, sodOverlayY, sodScreenX, sodScreenY, sodWidth, sodHeight, s.cameraX)
 		ebitenutil.DebugPrintAt(screen, debugInfo, 10, 30)
 
-		// 草皮卷中心位置调试信息
+		// 草皮卷边缘位置调试信息
 		if s.soddingSystem != nil && s.soddingSystem.IsPlaying() {
-			sodRollCenterX := s.soddingSystem.GetSodRollCenterX() // 返回中心X坐标
+			leftEdge, centerX, rightEdge := s.soddingSystem.GetSodRollEdges()
 			progress := s.soddingSystem.GetProgress()
-			capInfo := fmt.Sprintf("草皮卷中心: world(%.0f) screen(%.0f) progress(%.1f%%)",
-				sodRollCenterX, sodRollCenterX-s.cameraX, progress*100)
-			ebitenutil.DebugPrintAt(screen, capInfo, 10, 50)
+			edgeInfo := fmt.Sprintf("草皮卷: 左(%.0f) 中(%.0f) 右(%.0f) 进度(%.1f%%)",
+				leftEdge, centerX, rightEdge, progress*100)
+			ebitenutil.DebugPrintAt(screen, edgeInfo, 10, 50)
 		}
 	}
 

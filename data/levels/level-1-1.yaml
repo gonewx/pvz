@@ -16,6 +16,7 @@ backgroundImage: "IMAGE_BACKGROUND1UNSODDED"  # 使用未铺草皮的背景
 sodRowImage: "IMAGE_SOD1ROW"                  # 铺草皮后叠加1行草地图片
 showSoddingAnim: true                         # 播放铺草皮动画
 soddingAnimDelay: 1.0                         # 游戏开始1秒后播放动画
+preSoddedLanes: [3]                           # 预先渲染第3行草皮到叠加层
 
 # Story 11.4：铺草皮粒子特效配置
 sodRollAnimation: true                        # 启用铺草皮动画

@@ -541,13 +541,13 @@ func (rm *ResourceManager) GetFont(path string, size float64) *text.GoTextFace {
 // Returns:
 //   - An error if any resource fails to load.
 func (rm *ResourceManager) LoadReanimResources() error {
-	// 自动扫描并加载 assets/effect/reanim 目录下的所有 .reanim 文件
+	// 自动扫描并加载 data/reanim 目录下的所有 .reanim 文件（Epic 13 迁移）
 	// 优点：
 	// - 无需手动维护加载列表
 	// - 自动发现新添加的动画文件
 	// - 避免遗漏资源（如之前的 SelectorScreen.reanim）
 
-	reanimDir := "assets/effect/reanim"
+	reanimDir := "data/reanim"
 	pattern := filepath.Join(reanimDir, "*.reanim")
 	files, err := filepath.Glob(pattern)
 	if err != nil {
@@ -623,7 +623,7 @@ func (rm *ResourceManager) loadReanimAuto(name string, filePath string) error {
 //   - An error if loading fails.
 func (rm *ResourceManager) loadPlantReanim(name string) error {
 	// 1. 解析 .reanim 文件
-	reanimPath := fmt.Sprintf("assets/effect/reanim/%s.reanim", name)
+	reanimPath := fmt.Sprintf("data/reanim/%s.reanim", name)
 	reanimXML, err := reanim.ParseReanimFile(reanimPath)
 	if err != nil {
 		return fmt.Errorf("failed to parse reanim file: %w", err)
@@ -650,7 +650,7 @@ func (rm *ResourceManager) loadPlantReanim(name string) error {
 //   - An error if loading fails.
 func (rm *ResourceManager) loadZombieReanim(name string) error {
 	// 1. 解析 .reanim 文件
-	reanimPath := fmt.Sprintf("assets/effect/reanim/%s.reanim", name)
+	reanimPath := fmt.Sprintf("data/reanim/%s.reanim", name)
 	reanimXML, err := reanim.ParseReanimFile(reanimPath)
 	if err != nil {
 		return fmt.Errorf("failed to parse reanim file: %w", err)
@@ -680,7 +680,7 @@ func (rm *ResourceManager) loadZombieReanim(name string) error {
 // 从 assets/reanim/ 目录加载部件图片（而非 Plants 或 Zombies 子目录）
 func (rm *ResourceManager) loadEffectReanim(name string) error {
 	// 1. 解析 .reanim 文件
-	reanimPath := fmt.Sprintf("assets/effect/reanim/%s.reanim", name)
+	reanimPath := fmt.Sprintf("data/reanim/%s.reanim", name)
 	log.Printf("[ResourceManager] Loading effect reanim: %s from %s", name, reanimPath)
 	reanimXML, err := reanim.ParseReanimFile(reanimPath)
 	if err != nil {

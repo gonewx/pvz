@@ -31,7 +31,7 @@ func TestPlayCombo(t *testing.T) {
 
 	// 添加 ReanimComponent
 	reanimComp := &components.ReanimComponent{
-		Reanim:       reanimXML,
+		ReanimXML:    reanimXML,
 		PartImages:   make(map[string]*ebiten.Image),
 		MergedTracks: reanim.BuildMergedTracks(reanimXML),
 	}
@@ -118,7 +118,7 @@ func TestPlayCombo(t *testing.T) {
 
 		entity2 := em2.CreateEntity()
 		ecs.AddComponent(em2, entity2, &components.ReanimComponent{
-			Reanim:       reanimXML,
+			ReanimXML:    reanimXML,
 			PartImages:   make(map[string]*ebiten.Image),
 			MergedTracks: reanim.BuildMergedTracks(reanimXML),
 		})
@@ -165,7 +165,7 @@ func TestPlayDefaultAnimation(t *testing.T) {
 
 	// 添加 ReanimComponent
 	reanimComp := &components.ReanimComponent{
-		Reanim:       reanimXML,
+		ReanimXML:    reanimXML,
 		PartImages:   make(map[string]*ebiten.Image),
 		MergedTracks: reanim.BuildMergedTracks(reanimXML),
 	}
@@ -195,7 +195,7 @@ func TestPlayDefaultAnimation(t *testing.T) {
 
 		entity2 := em2.CreateEntity()
 		ecs.AddComponent(em2, entity2, &components.ReanimComponent{
-			Reanim:       reanimXML,
+			ReanimXML:    reanimXML,
 			PartImages:   make(map[string]*ebiten.Image),
 			MergedTracks: reanim.BuildMergedTracks(reanimXML),
 		})
@@ -235,7 +235,7 @@ func TestPlayComboWithHiddenTracks(t *testing.T) {
 
 	// 添加 ReanimComponent
 	reanimComp := &components.ReanimComponent{
-		Reanim:       reanimXML,
+		ReanimXML:    reanimXML,
 		PartImages:   make(map[string]*ebiten.Image),
 		MergedTracks: reanim.BuildMergedTracks(reanimXML),
 	}

@@ -653,10 +653,11 @@ func (s *TutorialSystem) spawnSkyFallingSun() {
 	sunID := entities.NewSunEntity(s.entityManager, s.resourceManager, startX, targetY)
 	log.Printf("[TutorialSystem] Created tutorial sun entity ID=%d at X=%.1f, targetY=%.1f", sunID, startX, targetY)
 
-	// 初始化阳光动画（Sun.reanim 是效果动画，不计算 CenterOffset）
+	// Bug Fix: Sun.reanim 只有轨道(Sun1, Sun2, Sun3),没有动画定义
+	// 使用 PlayCombo 播放配置的"idle"组合（包含所有3个轨道）
 	if s.reanimSystem != nil {
-		if err := s.reanimSystem.InitializeSceneAnimation(sunID); err != nil {
-			log.Printf("[TutorialSystem] WARNING: Failed to initialize sun animation: %v", err)
+		if err := s.reanimSystem.PlayCombo(sunID, "sun", "idle"); err != nil {
+			log.Printf("[TutorialSystem] WARNING: Failed to play sun animation combo: %v", err)
 		}
 	}
 }
@@ -775,9 +776,9 @@ func (s *TutorialSystem) showFinalWaveWarning() {
 
 	// 添加 Reanim 组件
 	ecs.AddComponent(s.entityManager, finalWaveEntity, &components.ReanimComponent{
-		Reanim:      reanimXML,
+		ReanimXML:      reanimXML,
 		PartImages:  partImages,
-		CurrentAnim: "FinalWave", // FinalWave.reanim 中的轨道名称
+		CurrentAnimations: []string{"FinalWave"}, // FinalWave.reanim 中的轨道名称
 		IsLooping:   false,       // 播放一次后自动停止（会被 PlayAnimation 覆盖）
 	})
 
@@ -792,8 +793,8 @@ func (s *TutorialSystem) showFinalWaveWarning() {
 		State: components.UINormal,
 	})
 
-	// 使用 PlayAnimationNoLoop 播放动画（只播放一次）
-	if err := s.reanimSystem.PlayAnimationNoLoop(finalWaveEntity, "FinalWave"); err != nil {
+	// 使用 PlayAnimation 播放动画（只播放一次）
+	if err := s.reanimSystem.PlayAnimation(finalWaveEntity, "FinalWave"); err != nil {
 		log.Printf("[TutorialSystem] WARNING: Failed to play FinalWave animation: %v", err)
 	} else {
 		log.Printf("[TutorialSystem] Final wave warning displayed at (%.1f, %.1f)", centerX, centerY)

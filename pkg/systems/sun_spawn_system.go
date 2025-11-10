@@ -126,9 +126,10 @@ func (s *SunSpawnSystem) Update(deltaTime float64) {
 		sunID := entities.NewSunEntity(s.entityManager, s.resourceManager, startX, targetY)
 		log.Printf("[SunSpawnSystem] Created sun entity ID: %d", sunID)
 
-		// Story 8.2 QA修复：初始化阳光动画（Sun.reanim 是效果动画，不计算 CenterOffset）
-		if err := s.reanimSystem.InitializeSceneAnimation(sunID); err != nil {
-			log.Printf("[SunSpawnSystem] WARNING: Failed to initialize sun animation: %v", err)
+		// Bug Fix: Sun.reanim 只有轨道(Sun1, Sun2, Sun3),没有动画定义
+		// 使用 PlayCombo 播放配置的"idle"组合（包含所有3个轨道）
+		if err := s.reanimSystem.PlayCombo(sunID, "sun", "idle"); err != nil {
+			log.Printf("[SunSpawnSystem] WARNING: Failed to play sun animation combo: %v", err)
 		}
 	}
 }

@@ -1,11 +1,14 @@
 package systems
 
 import (
+	"fmt"
 	"image/color"
 	"log"
 	"math"
 	"sort"
+	"strings"
 
+	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
@@ -42,7 +45,7 @@ import (
 //   - docs/stories/6.3.story.md
 type RenderSystem struct {
 	entityManager     *ecs.EntityManager
-	reanimSystem      *ReanimSystem         // Story 13.4: ReanimSystem 引用（用于渲染缓存优化）
+	reanimSystem      *ReanimSystem          // Story 13.4: ReanimSystem 引用（用于渲染缓存优化）
 	debugPrinted      map[ecs.EntityID]bool // 记录已打印调试信息的实体
 	particleVertices  []ebiten.Vertex       // 粒子顶点数组（复用，避免每帧分配）
 	particleIndices   []uint16              // 粒子索引数组（复用，避免每帧分配）
@@ -113,7 +116,6 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 	}
 
 	// 第二遍：渲染僵尸、子弹、特效（中间层）
-	// 特效包括：SodRoll（草皮卷）、爆炸效果等
 	// 需要按Y坐标排序以解决重叠闪烁问题（上方行先渲染，下方行后渲染会遮挡上方）
 	zombiesAndProjectiles := make([]ecs.EntityID, 0)
 	for _, id := range entities {
@@ -139,7 +141,6 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 			continue
 		}
 
-		// 渲染其他所有实体（僵尸、子弹、SodRoll 等特效）
 		zombiesAndProjectiles = append(zombiesAndProjectiles, id)
 	}
 
@@ -314,7 +315,12 @@ func (s *RenderSystem) findPhysicalFrameIndex(reanim *components.ReanimComponent
 }
 
 // renderReanimEntity 渲染使用 ReanimComponent 的实体
-// Story 13.8: 完全重写，使用 CachedRenderData 简化实现
+// 完全按照参考实现的逻辑：
+// 1. 将逻辑帧映射到物理帧
+// 2. 按 AnimTracks 顺序遍历轨道（保证 Z-order）
+// 3. 使用完整的变换矩阵（不使用 GeoM 链式调用）
+//
+// Story 13.4: 添加渲染缓存优化，减少重复计算，提升性能 20%+
 //
 // 参数:
 //   - screen: 绘制目标屏幕
@@ -323,9 +329,57 @@ func (s *RenderSystem) findPhysicalFrameIndex(reanim *components.ReanimComponent
 func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID, cameraX float64) {
 	// 获取组件
 	pos, hasPosComp := ecs.GetComponent[*components.PositionComponent](s.entityManager, id)
-	reanimComp, hasReanimComp := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id)
+	reanim, hasReanimComp := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id)
 
 	if !hasPosComp || !hasReanimComp {
+		return
+	}
+
+	// ==================================================================
+	// Story 13.4: Render Cache Optimization (渲染缓存优化)
+	// ==================================================================
+	//
+	// 检查缓存是否有效，如果失效则重新构建
+	// 只有当 reanimSystem 设置后才启用缓存优化
+	if s.reanimSystem != nil {
+		currentFrame := reanim.CurrentFrame
+
+		// 检查缓存是否失效（当前帧 != 上次渲染帧）
+		if currentFrame != reanim.LastRenderFrame {
+			// 缓存失效，重新构建
+			s.reanimSystem.PrepareRenderCache(reanim)
+			reanim.LastRenderFrame = currentFrame
+		}
+	}
+
+	// Story 6.6/6.7: 支持独立动画系统（ComplexScene 模式）
+	// 检查是否使用独立动画（通过 TrackBindings 判断）
+	// TrackBindings 是 ComplexScene 模式的标志，用于将轨道绑定到独立动画
+	// 植物等实体使用 PlayAnimation 的同步模式，没有 TrackBindings
+	// Story 13.2: TrackMapping -> TrackBindings
+	hasIndependentAnims := false /* TrackBindings 已废弃，禁用独立动画 */ && len(reanim.TrackBindings) > 0
+
+	// 传统模式：需要 CurrentAnim 和 AnimTracks
+	if !hasIndependentAnims {
+		// 如果没有当前动画或动画轨道，跳过
+		if len(reanim.CurrentAnimations) == 0 || reanim.CurrentAnimations[0] == "" || false /* AnimTracks 已废弃 */ {
+			return
+		}
+	}
+
+	// 检查是否有 MergedTracks（必需）
+	if len(reanim.MergedTracks) == 0 {
+		return
+	}
+
+	// 将逻辑帧映射到物理帧索引
+	// Story 13.2: 使用主动画的 LogicalFrame 替代 GlobalFrame
+	logicalFrame := 0
+	if state, ok := /* AnimStates 已废弃 */ reanim.AnimStates[reanim.CurrentAnimations[0]]; ok {
+		logicalFrame = state.LogicalFrame
+	}
+	physicalIndex := s.findPhysicalFrameIndex(reanim, logicalFrame)
+	if physicalIndex < 0 {
 		return
 	}
 
@@ -336,122 +390,442 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		effectiveCameraX = 0 // UI 元素使用屏幕坐标，不应用摄像机偏移
 	}
 
-	// 获取渲染数据（自动更新缓存）
-	if s.reanimSystem == nil {
-		return // 没有 ReanimSystem，无法渲染
-	}
+	// 将世界坐标转换为屏幕坐标，并应用 Reanim 的中心偏移
+	//
+	// 坐标系统说明：
+	// - PositionComponent(X,Y) 表示格子中心的世界坐标（游戏世界实体）或屏幕坐标（UI元素）
+	// - Reanim 的部件坐标以"原点"为基准，部件图片锚点在左上角
+	// - CenterOffset 将绘制原点从 Position 向左上平移，使视觉中心对齐到 Position
+	//
+	// 例如：豌豆射手的 CenterOffset = (39, 47.7)
+	//      渲染时原点 = Position - (39, 47.7)，使得植物视觉上居中显示
+	screenX := pos.X - effectiveCameraX - reanim.CenterOffsetX
+	screenY := pos.Y - reanim.CenterOffsetY
 
-	renderData := s.reanimSystem.GetRenderData(id)
-	if len(renderData) == 0 {
-		return // 没有渲染数据
-	}
-
-	// 检查是否有闪烁效果组件
+	// 方案A+：检查是否有闪烁效果组件
 	flashIntensity := 0.0
 	if flashComp, hasFlash := ecs.GetComponent[*components.FlashEffectComponent](s.entityManager, id); hasFlash && flashComp.IsActive {
 		flashIntensity = flashComp.Intensity
 	}
 
-	// 计算屏幕坐标（世界坐标 - 摄像机偏移 - 居中偏移）
-	// CenterOffsetX/Y 是预先计算好的 bounding box 中心坐标
-	// 减去 CenterOffset 使得 bounding box 中心对齐到 Position
-	baseScreenX := pos.X - effectiveCameraX - reanimComp.CenterOffsetX
-	baseScreenY := pos.Y - reanimComp.CenterOffsetY
+	// 调试：打印第一个植物的位置和部件范围
+	if !s.debugPrinted[id] {
+		if plant, hasPlant := ecs.GetComponent[*components.PlantComponent](s.entityManager, id); hasPlant {
+			log.Printf("=== 植物 %d (Type=%d) 位置调试 ===", id, plant.PlantType)
+			log.Printf("世界坐标: (%.1f, %.1f), 屏幕坐标: (%.1f, %.1f)", pos.X, pos.Y, screenX, screenY)
 
-	// 渲染每个部件
-	for _, partData := range renderData {
-		if partData.Img == nil {
-			continue
+			// 计算部件坐标范围
+			minX, maxX, minY, maxY := 999.0, -999.0, 999.0, -999.0
+			for _, track := range reanim.AnimTracks {
+				if mergedFrames, ok := reanim.MergedTracks[track.Name]; ok && physicalIndex < len(mergedFrames) {
+					frame := mergedFrames[physicalIndex]
+					if frame.FrameNum == nil || *frame.FrameNum != -1 {
+						if frame.ImagePath != "" {
+							x, y := getFloat(frame.X), getFloat(frame.Y)
+							if x < minX {
+								minX = x
+							}
+							if x > maxX {
+								maxX = x
+							}
+							if y < minY {
+								minY = y
+							}
+							if y > maxY {
+								maxY = y
+							}
+						}
+					}
+				}
+			}
+			log.Printf("部件坐标范围: X[%.1f, %.1f], Y[%.1f, %.1f]", minX, maxX, minY, maxY)
+			log.Printf("部件中心: (%.1f, %.1f)", (minX+maxX)/2, (minY+maxY)/2)
+			s.debugPrinted[id] = true
 		}
+	}
 
-		frame := partData.Frame
-
-		// 跳过隐藏帧（FrameNum == -1）
-		if frame.FrameNum != nil && *frame.FrameNum == -1 {
-			continue
+	// Story 8.2 QA: 验证 SodRoll 草皮卷动画位置是否正确对齐
+	// 只在第一次渲染时检查并打印关键信息
+	if !s.debugPrinted[id] && pos.X == 0 && pos.Y >= -200 && pos.Y < 220 {
+		_, isPlant := ecs.GetComponent[*components.PlantComponent](s.entityManager, id)
+		if !isPlant {
+			// 验证整体视觉中心是否对齐到目标行中心
+			visualCenterY := pos.Y + 313.8 // SodRollBaseY
+			log.Printf("[SodRoll] Entity %d: Position.Y=%.1f, VisualCenterY=%.1f", id, pos.Y, visualCenterY)
+			s.debugPrinted[id] = true
 		}
+	}
 
-		// 计算部件位置（相对于实体原点，加上父子偏移）
-		partX := getFloat(frame.X) + partData.OffsetX
-		partY := getFloat(frame.Y) + partData.OffsetY
+	// ==================================================================
+	// Story 13.1: Track-Based Animation Binding (替代旧的双动画混合)
+	// ==================================================================
+	//
+	// 旧的 IsBlending/PrimaryAnimation/SecondaryAnimation 机制已移除
+	// 新机制使用 TrackBindings 支持每个轨道绑定到不同的动画
+	// 渲染逻辑见下方 TrackBindings 处理代码
 
-		// 获取图片尺寸
-		bounds := partData.Img.Bounds()
-		w := float64(bounds.Dx())
-		h := float64(bounds.Dy())
+	// 按 AnimTracks 顺序渲染部件（保证 Z-order 正确）
+	// Story 6.6/6.7: 独立动画模式使用不同的渲染逻辑
+	if hasIndependentAnims {
+		// 独立动画模式：按 Reanim.Tracks 原始顺序遍历（保证 Z-order）
+		// 注意：不能直接遍历 MergedTracks map，因为 map 遍历顺序是随机的
+		for _, track := range reanim.Reanim.Tracks {
+			trackName := track.Name
+			mergedFrames, ok := reanim.MergedTracks[trackName]
+			if !ok || len(mergedFrames) == 0 {
+				continue
+			}
 
-		// 获取变换参数
-		scaleX := getFloat(frame.ScaleX)
-		scaleY := getFloat(frame.ScaleY)
-		if scaleX == 0 {
-			scaleX = 1.0
+			// 确定此轨道的帧索引
+			trackPhysicalIndex := 0
+
+			// 查找控制此轨道的独立动画
+			var controllingState *components.AnimState
+
+			// 优先使用配置的绑定规则 (Story 13.2: TrackMapping -> TrackBindings)
+			if false /* TrackBindings 已废弃，禁用独立动画 */ {
+				if animName, exists := reanim.TrackBindings[trackName]; exists {
+					controllingState = reanim.AnimStates[animName]
+				}
+			}
+
+			// 如果没有配置绑定，使用默认命名匹配规则
+			if controllingState == nil {
+				for _, state := range reanim.AnimStates {
+					// 默认规则：轨道名包含动画基名
+					// 例如："Cloud1" 包含 "cloud1"（移除 "anim_" 前缀）
+					animBaseName := strings.TrimPrefix(state.Name, "anim_")
+					animBaseName = strings.ToLower(animBaseName)
+					lowerTrackName := strings.ToLower(trackName)
+
+					if strings.Contains(lowerTrackName, animBaseName) {
+						controllingState = state
+						break
+					}
+				}
+			}
+
+			// 如果找到控制动画，使用其当前帧 (Story 13.2: Frame -> LogicalFrame)
+			// 注意：即使动画已停止（IsActive = false），也使用 LogicalFrame
+			// 这样非循环动画播放完后会保持在最后一帧
+			if controllingState != nil {
+				trackPhysicalIndex = controllingState.LogicalFrame
+
+				// 检查 render_when_stopped：如果动画已停止且配置为不渲染，则跳过
+				if !controllingState.IsActive && !controllingState.RenderWhenStopped {
+					continue // 动画已停止，且配置为不渲染，跳过此轨道
+				}
+			}
+			// 否则使用第0帧（静态显示，如背景）
+
+			// 确保帧索引在范围内
+			if trackPhysicalIndex >= len(mergedFrames) {
+				trackPhysicalIndex = len(mergedFrames) - 1
+			}
+
+			// 获取帧数据
+			mergedFrame := mergedFrames[trackPhysicalIndex]
+
+			// 检查是否有图片
+			if mergedFrame.ImagePath == "" {
+				continue
+			}
+
+			// 检查可见性（f 值控制）
+			// Story 6.5: f=-1 表示使用动画定义轨道的时间窗口
+			if mergedFrame.FrameNum != nil && *mergedFrame.FrameNum == -1 {
+				// 查询 AnimVisiblesMap 判断可见性
+				if controllingState != nil && reanim.AnimVisiblesMap != nil {
+					if visibles, ok := reanim.AnimVisiblesMap[controllingState.Name]; ok {
+						// Story 13.2: Frame -> LogicalFrame
+						if controllingState.LogicalFrame < len(visibles) {
+							if visibles[controllingState.LogicalFrame] == -1 {
+								// 时间窗口标记为隐藏
+								continue
+							}
+						}
+					}
+				} else if controllingState == nil {
+					// 没有控制动画的轨道，且 f=-1，默认隐藏
+					continue
+				}
+			}
+
+			// 使用 IMAGE 引用查找图片
+			img, exists := reanim.PartImages[mergedFrame.ImagePath]
+			if !exists || img == nil {
+				continue
+			}
+
+			// 获取图片尺寸
+			bounds := img.Bounds()
+			w := bounds.Dx()
+			h := bounds.Dy()
+			fw := float64(w)
+			fh := float64(h)
+
+			// 使用 Transform2D 等价矩阵
+			scaleX := 1.0
+			scaleY := 1.0
+			if mergedFrame.ScaleX != nil {
+				scaleX = *mergedFrame.ScaleX
+			}
+			if mergedFrame.ScaleY != nil {
+				scaleY = *mergedFrame.ScaleY
+			}
+
+			kx := 0.0
+			ky := 0.0
+			if mergedFrame.SkewX != nil {
+				kx = *mergedFrame.SkewX
+			}
+			if mergedFrame.SkewY != nil {
+				ky = *mergedFrame.SkewY
+			}
+
+			// 构建变换矩阵
+			a := math.Cos(kx*math.Pi/180.0) * scaleX
+			b := math.Sin(kx*math.Pi/180.0) * scaleX
+			c := -math.Sin(ky*math.Pi/180.0) * scaleY
+			d := math.Cos(ky*math.Pi/180.0) * scaleY
+
+			// 平移分量
+			tx := 0.0
+			ty := 0.0
+			if mergedFrame.X != nil {
+				tx = *mergedFrame.X
+			}
+			if mergedFrame.Y != nil {
+				ty = *mergedFrame.Y
+			}
+
+			tx += screenX
+			ty += screenY
+
+			// 应用变换矩阵到图片的四个角
+			x0 := tx
+			y0 := ty
+			x1 := a*fw + tx
+			y1 := b*fw + ty
+			x2 := c*fh + tx
+			y2 := d*fh + ty
+			x3 := a*fw + c*fh + tx
+			y3 := b*fw + d*fh + ty
+
+			// 构建顶点数组
+			colorR := float32(1.0 + flashIntensity)
+			colorG := float32(1.0 + flashIntensity)
+			colorB := float32(1.0 + flashIntensity)
+			colorA := float32(1.0)
+
+			vs := []ebiten.Vertex{
+				{DstX: float32(x0), DstY: float32(y0), SrcX: 0, SrcY: 0, ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
+				{DstX: float32(x1), DstY: float32(y1), SrcX: float32(w), SrcY: 0, ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
+				{DstX: float32(x2), DstY: float32(y2), SrcX: 0, SrcY: float32(h), ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
+				{DstX: float32(x3), DstY: float32(y3), SrcX: float32(w), SrcY: float32(h), ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
+			}
+			is := []uint16{0, 1, 2, 1, 3, 2}
+			screen.DrawTriangles(vs, is, img, nil)
 		}
-		if scaleY == 0 {
-			scaleY = 1.0
+	} else {
+		// 传统模式：遍历 AnimTracks
+		for _, track := range reanim.AnimTracks {
+			// ==================================================================
+			// Story 13.1: Track-Based Animation Binding
+			// ==================================================================
+			//
+			// 确定该轨道使用的物理帧和动画名称
+			// 旧的 PartGroups/IsBlending 机制已移除，使用 TrackBindings 替代
+
+			var trackPhysicalIndex int
+			var trackAnimationName string // 该轨道使用的动画名称（用于可见性检查）
+
+			// TODO (Story 13.1): 在此处添加 TrackBindings 逻辑
+			// 目前使用默认行为：所有轨道使用相同的 physicalIndex
+			trackPhysicalIndex = physicalIndex
+			trackAnimationName = reanim.CurrentAnim
+
+			// ==================================================================
+			// Story 12.1: Track-Level Playback Control
+			// ==================================================================
+			//
+			// Check if this track has playback configuration (e.g., PlayOnce, Paused).
+			// If configured to play once, lock the track at its last visible frame.
+			if reanim.TrackConfigs != nil {
+				if config, hasConfig := reanim.TrackConfigs[track.Name]; hasConfig && config.PlayOnce {
+					// 检查轨道是否已经锁定
+					if config.IsLocked {
+						// 已锁定，使用锁定的帧
+						trackPhysicalIndex = config.LockedFrame
+					} else {
+						// 未锁定，检查是否需要锁定
+						lastVisibleFrame := s.findLastVisibleFrame(reanim, track.Name)
+
+						// DEBUG: 只打印一次
+						if !s.debugPrinted[id] && track.Name == "SelectorScreen_Adventure_button" {
+							log.Printf("[RenderSystem] DEBUG: Track %s - lastVisibleFrame=%d, trackPhysicalIndex=%d",
+								track.Name, lastVisibleFrame, trackPhysicalIndex)
+						}
+
+						if lastVisibleFrame >= 0 && trackPhysicalIndex >= lastVisibleFrame {
+							// 到达最后可见帧，锁定轨道
+							config.IsLocked = true
+							config.LockedFrame = lastVisibleFrame
+							trackPhysicalIndex = lastVisibleFrame
+
+							log.Printf("[RenderSystem] Track '%s' locked at frame %d", track.Name, lastVisibleFrame)
+						}
+					}
+				}
+			}
+
+			// 获取该轨道的累积帧数组
+			mergedFrames, ok := reanim.MergedTracks[track.Name]
+			if !ok || len(mergedFrames) == 0 {
+				continue
+			}
+
+			// 确保物理索引在范围内
+			if trackPhysicalIndex >= len(mergedFrames) {
+				continue
+			}
+
+			// 获取累积后的帧数据
+			mergedFrame := mergedFrames[trackPhysicalIndex]
+
+			// DEBUG: 检测空 ImagePath 导致的消失问题
+			if reanim.VisibleTracks != nil && reanim.VisibleTracks[track.Name] {
+				if mergedFrame.ImagePath == "" {
+					if plant, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, id); ok && plant != nil {
+						log.Printf("[RenderSystem] ⚠️ Entity %d track '%s' at physical frame %d: ImagePath is EMPTY (will disappear)",
+							id, track.Name, trackPhysicalIndex)
+					}
+				}
+			}
+
+			// ==================================================================
+			// Story 6.5: New rendering judgment logic
+			// ==================================================================
+			//
+			// Use shouldRenderTrack() to implement correct rendering rules:
+			// - Skip animation definition tracks (no images)
+			// - Skip logical tracks (no images)
+			// - For hybrid tracks: check their own f value
+			// - For pure visual tracks: check time window
+			//
+			// This replaces the old incorrect f=-1 check that hid body parts.
+			if !s.shouldRenderTrack(track.Name, mergedFrame, reanim, trackAnimationName) {
+				continue
+			}
+
+			// 使用 IMAGE 引用查找图片
+			img, exists := reanim.PartImages[mergedFrame.ImagePath]
+			if !exists || img == nil {
+				continue
+			}
+
+			// 获取图片尺寸
+			bounds := img.Bounds()
+			w := bounds.Dx()
+			h := bounds.Dy()
+			fw := float64(w)
+			fh := float64(h)
+
+			// 使用 Transform2D 等价矩阵，通过 DrawTriangles 精确绘制
+			scaleX := 1.0
+			scaleY := 1.0
+			if mergedFrame.ScaleX != nil {
+				scaleX = *mergedFrame.ScaleX
+			}
+			if mergedFrame.ScaleY != nil {
+				scaleY = *mergedFrame.ScaleY
+			}
+
+			kx := 0.0
+			ky := 0.0
+			if mergedFrame.SkewX != nil {
+				kx = *mergedFrame.SkewX
+			}
+			if mergedFrame.SkewY != nil {
+				ky = *mergedFrame.SkewY
+			}
+
+			// 构建变换矩阵
+			a := math.Cos(kx*math.Pi/180.0) * scaleX
+			b := math.Sin(kx*math.Pi/180.0) * scaleX
+			c := -math.Sin(ky*math.Pi/180.0) * scaleY
+			d := math.Cos(ky*math.Pi/180.0) * scaleY
+
+			// 平移分量（部件位置 + 实体屏幕位置）
+			tx := 0.0
+			ty := 0.0
+			if mergedFrame.X != nil {
+				tx = *mergedFrame.X
+			}
+			if mergedFrame.Y != nil {
+				ty = *mergedFrame.Y
+			}
+
+			// ==================================================================
+			// Story 13.3: Apply Parent-Child Offset (父子偏移应用)
+			// ==================================================================
+			//
+			// 如果轨道有父轨道，且子父使用不同动画，则应用父轨道的偏移
+			// 这实现了头部跟随身体摆动等自然动画效果
+			if reanim.ParentTracks != nil {
+				if parentTrackName, hasParent := reanim.ParentTracks[track.Name]; hasParent {
+					// 检查子父是否使用不同动画
+					childAnim := trackAnimationName
+					parentAnim := childAnim // 默认使用相同动画
+
+					// 如果有 TrackBindings，查找父轨道的动画
+					if false /* TrackBindings 已废弃，禁用独立动画 */ {
+						if parentAnimName, ok := reanim.TrackBindings[parentTrackName]; ok {
+							parentAnim = parentAnimName
+						}
+					}
+
+					// 只有当子父使用不同动画时才应用偏移
+					if childAnim != parentAnim {
+						// 获取 ReanimSystem 实例（通过 entityManager 查找）
+						// 注意：这里需要访问 ReanimSystem 的方法
+						// 为了避免循环依赖，我们直接内联偏移计算逻辑
+						offsetX, offsetY := s.calculateParentOffset(parentTrackName, reanim)
+						tx += offsetX
+						ty += offsetY
+					}
+				}
+			}
+
+			// 应用实体屏幕位置
+			tx += screenX
+			ty += screenY
+
+			// 应用变换矩阵到图片的四个角
+			x0 := tx
+			y0 := ty
+			x1 := a*fw + tx
+			y1 := b*fw + ty
+			x2 := c*fh + tx
+			y2 := d*fh + ty
+			x3 := a*fw + c*fh + tx
+			y3 := b*fw + d*fh + ty
+
+			// 构建顶点数组
+			colorR := float32(1.0 + flashIntensity)
+			colorG := float32(1.0 + flashIntensity)
+			colorB := float32(1.0 + flashIntensity)
+			colorA := float32(1.0)
+
+			vs := []ebiten.Vertex{
+				{DstX: float32(x0), DstY: float32(y0), SrcX: 0, SrcY: 0, ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
+				{DstX: float32(x1), DstY: float32(y1), SrcX: float32(w), SrcY: 0, ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
+				{DstX: float32(x2), DstY: float32(y2), SrcX: 0, SrcY: float32(h), ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
+				{DstX: float32(x3), DstY: float32(y3), SrcX: float32(w), SrcY: float32(h), ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
+			}
+			is := []uint16{0, 1, 2, 1, 3, 2}
+			screen.DrawTriangles(vs, is, img, nil)
 		}
-
-		skewX := getFloat(frame.SkewX)
-		skewY := getFloat(frame.SkewY)
-
-		// 构建变换矩阵
-		// a, b 控制 X 方向的变换
-		// c, d 控制 Y 方向的变换
-		//
-		// ✅ Story 13.8 Bug Fix #11: 修复 Skew 变换计算
-		//   - 参考实现：animation_cell.go:530-546
-		//   - Reanim 文件中 SkewX/SkewY 存储的是度数，需要转换为弧度
-		//   - 使用正确的 cos/sin 矩阵，而不是 tan
-		var a, b, c, d float64
-		if skewX == 0 && skewY == 0 {
-			// 优化：无倾斜时使用简单的缩放（最常见情况）
-			a = scaleX
-			b = 0
-			c = 0
-			d = scaleY
-		} else {
-			// 有倾斜，使用完整的变换矩阵
-			// ✅ 修复 1: 将度数转换为弧度（Reanim 文件存储的是度数）
-			skewXRad := skewX * math.Pi / 180.0
-			skewYRad := skewY * math.Pi / 180.0
-
-			// ✅ 修复 2: 使用正确的 cos/sin 矩阵
-			// 标准 skew 矩阵：
-			// [a  c]   [cos(kx)*sx   -sin(ky)*sy]
-			// [b  d] = [sin(kx)*sx    cos(ky)*sy]
-			a = math.Cos(skewXRad) * scaleX
-			b = math.Sin(skewXRad) * scaleX
-			c = -math.Sin(skewYRad) * scaleY // 注意负号
-			d = math.Cos(skewYRad) * scaleY
-		}
-
-		// 计算最终位置（部件位置 + 父子偏移 + 实体屏幕位置）
-		tx := partX + baseScreenX
-		ty := partY + baseScreenY
-
-		// 应用变换矩阵到图片的四个角
-		x0 := tx
-		y0 := ty
-		x1 := a*w + tx
-		y1 := b*w + ty
-		x2 := c*h + tx
-		y2 := d*h + ty
-		x3 := a*w + c*h + tx
-		y3 := b*w + d*h + ty
-
-		// 构建顶点数组（应用闪烁效果）
-		colorR := float32(1.0 + flashIntensity)
-		colorG := float32(1.0 + flashIntensity)
-		colorB := float32(1.0 + flashIntensity)
-		colorA := float32(1.0)
-
-		vs := []ebiten.Vertex{
-			{DstX: float32(x0), DstY: float32(y0), SrcX: 0, SrcY: 0, ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
-			{DstX: float32(x1), DstY: float32(y1), SrcX: float32(w), SrcY: 0, ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
-			{DstX: float32(x2), DstY: float32(y2), SrcX: 0, SrcY: float32(h), ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
-			{DstX: float32(x3), DstY: float32(y3), SrcX: float32(w), SrcY: float32(h), ColorR: colorR, ColorG: colorG, ColorB: colorB, ColorA: colorA},
-		}
-		is := []uint16{0, 1, 2, 1, 3, 2}
-		screen.DrawTriangles(vs, is, partData.Img, nil)
 	}
 }
 
@@ -540,6 +914,194 @@ func (s *RenderSystem) mapLogicalFrameToPhysical(logicalFrameNum int, animVisibl
 	}
 
 	return -1
+}
+
+// shouldRenderTrack determines whether a track should be rendered at a given frame.
+//
+// Story 6.5: Implements the correct rendering rules based on track types:
+// - Animation definition tracks (anim_idle, anim_shooting): NOT rendered (no images)
+// - Logical tracks (anim_stem, _ground): NOT rendered (no images)
+// - Hybrid tracks (76%): Check their OWN f value (f=0: visible, f=-1: hidden)
+// - Pure visual tracks (<1%): Check animation definition track's time window
+//
+// This replaces the old incorrect logic that checked f=-1 for all tracks.
+//
+// Parameters:
+//   - trackName: the name of the track
+//   - mergedFrame: the merged frame data for this track
+//   - reanim: the ReanimComponent (for checking hybrid vs pure visual)
+//   - currentAnim: the current animation name (for time window check)
+//
+// Returns:
+//   - bool: true if the track should be rendered, false otherwise
+func (s *RenderSystem) shouldRenderTrack(
+	trackName string,
+	mergedFrame reanim.Frame,
+	reanimComp *components.ReanimComponent,
+	currentAnim string,
+) bool {
+	// 0. VisibleTracks whitelist check (for entities like zombies with explicit part control)
+	// If VisibleTracks is set, ONLY render tracks in the whitelist
+	// IMPORTANT: If track is in whitelist, it bypasses all other checks (including f=-1)
+	isInWhitelist := false
+	if reanimComp.VisibleTracks != nil && len(reanimComp.VisibleTracks) > 0 {
+		if !reanimComp.VisibleTracks[trackName] {
+			return false // Not in whitelist, skip immediately
+		}
+		isInWhitelist = true // Track is in whitelist
+	}
+
+	// 1. Skip logical tracks (no images, only transforms)
+	// These are attachment points like anim_stem, _ground
+	if LogicalTracks[trackName] {
+		return false
+	}
+
+	// 2. Must have an image to render
+	// This naturally filters out pure animation definition tracks (they have no images)
+	if mergedFrame.ImagePath == "" {
+		return false
+	}
+
+	// 3. If track is in VisibleTracks whitelist, render it regardless of f value
+	// This is critical for static preview where we want to show all whitelisted parts
+	if isInWhitelist {
+		return true // Whitelist overrides f value check
+	}
+
+	// 4. 渲染决策逻辑（Story 12.1 QA）：
+	//
+	// 两种播放模式有不同的渲染规则：
+	//
+	// **模式 A: PlayAllFrames（AnimVisibles 为空）**
+	// - 用于复杂场景动画（如 SelectorScreen）
+	// - 直接播放所有物理帧，不同部件有独立时间轴
+	// - 渲染规则：检查部件**自己的 f 值**
+	//   - f=0 或 f=nil：可见
+	//   - f=-1：隐藏
+	//
+	// **模式 B: PlayAnimation（有 AnimVisibles）**
+	// - 用于单一动画播放（如植物的 anim_idle, anim_shooting）
+	// - 逻辑帧映射到物理帧，统一的时间窗口
+	// - 渲染规则：检查**动画定义轨道的 f 值**，忽略部件自己的 f 值
+	//   - 任意动画定义轨道 f=0：所有部件可见
+	//   - 所有动画定义轨道 f=-1：所有部件隐藏
+
+	// 检测播放模式
+	animVisibles := reanimComp.AnimVisiblesMap[reanimComp.CurrentAnim]
+	isPlayAllFramesMode := len(animVisibles) == 0
+
+	// Story 13.2: 使用主动画的 LogicalFrame 替代 GlobalFrame
+	currentPhysicalFrame := 0
+	if state, ok := reanimComp.AnimStates[reanimComp.CurrentAnim]; ok {
+		currentPhysicalFrame = state.LogicalFrame
+	}
+
+	if !isPlayAllFramesMode {
+		// PlayAnimation 模式：映射逻辑帧到物理帧
+		// Story 13.2: 使用主动画的 LogicalFrame 替代 GlobalFrame
+		logicalFrame := 0
+		if state, ok := reanimComp.AnimStates[reanimComp.CurrentAnim]; ok {
+			logicalFrame = state.LogicalFrame
+		}
+		physicalFrame := s.findPhysicalFrameIndex(reanimComp, logicalFrame)
+		if physicalFrame < 0 {
+			// 映射失败，轨道隐藏
+			return false
+		}
+		currentPhysicalFrame = physicalFrame
+	}
+
+	// 模式 A: PlayAllFrames - 检查部件自己的 f 值
+	if isPlayAllFramesMode {
+		// 如果部件没有设置 f 值，或者 f=0，则可见
+		return mergedFrame.FrameNum == nil || *mergedFrame.FrameNum == 0
+	}
+
+	// ==================================================================
+	// Story 6.9: Multi-Animation Overlay Support (多动画叠加支持)
+	// ==================================================================
+	//
+	// 模式 B: PlayAnimation - 检查动画定义轨道的 f 值
+	//
+	// 与 Story 6.8 不同，现在支持多个动画同时激活：
+	// - 只要在**任意一个**激活动画的时间窗口内，就渲染
+	// - 这样可以实现豌豆射手攻击时头部和身体同时显示
+	//
+	if reanimComp.Reanim == nil {
+		return false
+	}
+
+	// 确定使用哪个帧索引和激活的动画
+	var physicalFrame int // 物理帧索引（用于访问 MergedTracks）
+	var logicalFrame int  // 逻辑帧索引（用于访问 AnimVisibles）
+	var activeAnims []string
+
+	// Story 13.2: TrackMapping -> TrackBindings, Anims -> AnimStates
+	if reanimComp.TrackBindings != nil {
+		// 异步模式：查找控制该轨道的动画
+		if animName, exists := reanimComp.TrackBindings[trackName]; exists {
+			if state := reanimComp.AnimStates[animName]; state != nil && state.IsActive {
+				physicalFrame = state.LogicalFrame
+				logicalFrame = state.LogicalFrame // 异步模式下，逻辑帧 = 物理帧
+				activeAnims = []string{animName}
+			}
+		}
+	} else {
+		// 同步模式：使用主动画的 LogicalFrame，检查所有激活的动画
+		physicalFrame = currentPhysicalFrame
+		// Story 13.2: 使用主动画的 LogicalFrame 替代 GlobalFrame
+		if state, ok := reanimComp.AnimStates[reanimComp.CurrentAnim]; ok {
+			logicalFrame = state.LogicalFrame
+		}
+		for name, state := range reanimComp.AnimStates {
+			if state.IsActive {
+				activeAnims = append(activeAnims, name)
+			}
+		}
+	}
+
+	// 如果没有激活的动画，不渲染（边界情况处理）
+	if len(activeAnims) == 0 {
+		return false
+	}
+
+	// 检查是否在任意激活动画的时间窗口内
+	for _, animName := range activeAnims {
+		animVisibles := reanimComp.AnimVisiblesMap[animName]
+		if len(animVisibles) == 0 {
+			// 如果这个动画没有 AnimVisibles，使用传统逻辑
+			// 检查动画定义轨道的 f 值
+			for _, track := range reanimComp.Reanim.Tracks {
+				frames, ok := reanimComp.MergedTracks[track.Name]
+				if !ok || physicalFrame >= len(frames) {
+					continue
+				}
+
+				trackFrame := frames[physicalFrame]
+				if trackFrame.FrameNum != nil {
+					if track.Name == animName || strings.HasPrefix(track.Name, "anim_") {
+						if *trackFrame.FrameNum == 0 {
+							return true
+						}
+					}
+				}
+			}
+		} else {
+			// 使用 AnimVisibles 检查可见性
+			// 关键修复：使用逻辑帧索引来访问 animVisibles 数组
+			if logicalFrame >= len(animVisibles) {
+				// 逻辑帧超出范围，输出警告
+				log.Printf("[shouldRenderTrack] ⚠️ Track=%s, AnimName=%s, LogicalFrame=%d >= AnimVisiblesLen=%d, HIDDEN",
+					trackName, animName, logicalFrame, len(animVisibles))
+			} else if animVisibles[logicalFrame] == 0 {
+				return true // 在该动画的时间窗口内，渲染
+			}
+		}
+	}
+
+	// 不在任何激活动画的时间窗口内，不渲染
+	return false
 }
 
 // DrawParticles 渲染所有粒子效果
@@ -1121,3 +1683,222 @@ func (s *RenderSystem) drawCenteredTextTTF(screen *ebiten.Image, textStr string,
 // Returns -1 if the track has no visible frames or is not found.
 //
 // This is used for PlayOnce tracks to determine where to lock the track.
+func (s *RenderSystem) findLastVisibleFrame(reanim *components.ReanimComponent, trackName string) int {
+	// Get merged frames for this track
+	mergedFrames, ok := reanim.MergedTracks[trackName]
+	if !ok || len(mergedFrames) == 0 {
+		return -1
+	}
+
+	// Search backwards from the end to find the last visible frame
+	lastVisibleFrame := -1
+	for i := len(mergedFrames) - 1; i >= 0; i-- {
+		frame := mergedFrames[i]
+
+		// Check if frame is visible
+		// - If f is nil, frame inherits visibility (consider as visible)
+		// - If f = 0, frame is explicitly visible
+		// - If f = -1, frame is hidden
+		if frame.FrameNum != nil && *frame.FrameNum == -1 {
+			// Hidden frame, continue searching backwards
+			continue
+		}
+
+		// Found a visible frame
+		lastVisibleFrame = i
+		break
+	}
+
+	return lastVisibleFrame
+}
+
+// countVisibleFrames 计算 AnimVisibles 数组中可见帧的数量
+// 用于双动画独立循环时计算模运算的除数
+//
+// 参数:
+//   - animVisibles: 可见性数组（0=可见，-1=隐藏）
+//
+// 返回:
+//   - 可见帧数量
+func (s *RenderSystem) countVisibleFrames(animVisibles []int) int {
+	count := 0
+	for _, visible := range animVisibles {
+		if visible == 0 {
+			count++
+		}
+	}
+	return count
+}
+
+// ==================================================================
+// Story 13.3: Parent-Child Offset Calculation for RenderSystem
+// ==================================================================
+
+// calculateParentOffset 计算父轨道的当前偏移量（用于渲染时应用）
+//
+// 这个方法在 RenderSystem 中重新实现偏移计算逻辑
+// 原因：RenderSystem 不能直接访问 ReanimSystem 的私有方法
+//
+// 算法原理：
+// 1. 找到父轨道控制的动画（通过 TrackBindings）
+// 2. 获取父轨道在该动画时间窗口内的第一个可见帧位置（初始位置）
+// 3. 获取父轨道的当前位置
+// 4. 计算偏移：offset = current - initial
+//
+// 参数：
+//   - parentTrackName: 父轨道名称（如 "anim_stem"）
+//   - comp: ReanimComponent 引用
+//
+// 返回：
+//   - offsetX: X 轴偏移量
+//   - offsetY: Y 轴偏移量
+func (s *RenderSystem) calculateParentOffset(parentTrackName string, comp *components.ReanimComponent) (float64, float64) {
+	// 步骤 1: 找到父轨道控制的动画
+	parentAnim := comp.CurrentAnim
+	if comp.TrackBindings != nil {
+		if animName, exists := comp.TrackBindings[parentTrackName]; exists {
+			parentAnim = animName
+		}
+	}
+
+	// 步骤 2: 获取父轨道的初始位置（第一个可见帧）
+	initX, initY, err := s.getFirstVisiblePositionForRender(parentTrackName, parentAnim, comp)
+	if err != nil {
+		return 0, 0
+	}
+
+	// 步骤 3: 获取父轨道的当前位置
+	currentX, currentY, err := s.getCurrentPositionForRender(parentTrackName, parentAnim, comp)
+	if err != nil {
+		return 0, 0
+	}
+
+	// 步骤 4: 计算偏移量
+	offsetX := currentX - initX
+	offsetY := currentY - initY
+
+	return offsetX, offsetY
+}
+
+// getFirstVisiblePositionForRender 获取轨道在动画时间窗口内的第一个可见帧位置
+//
+// 参数：
+//   - trackName: 轨道名称（如 "anim_stem"）
+//   - animName: 动画名称（如 "anim_shooting"）
+//   - comp: ReanimComponent 引用
+//
+// 返回：
+//   - x, y: 第一个可见帧的位置
+//   - error: 如果找不到可见帧或轨道不存在
+func (s *RenderSystem) getFirstVisiblePositionForRender(
+	trackName, animName string,
+	comp *components.ReanimComponent,
+) (float64, float64, error) {
+	// 获取轨道的累积帧数据
+	mergedFrames, ok := comp.MergedTracks[trackName]
+	if !ok || len(mergedFrames) == 0 {
+		return 0, 0, fmt.Errorf("track '%s' not found or has no frames", trackName)
+	}
+
+	// 获取动画的可见性数组
+	animVisibles, ok := comp.AnimVisiblesMap[animName]
+	if !ok || len(animVisibles) == 0 {
+		return 0, 0, fmt.Errorf("animation '%s' has no visibility data", animName)
+	}
+
+	// 查找第一个可见帧（visibility = 0）
+	for physicalIdx, visibility := range animVisibles {
+		if visibility == 0 && physicalIdx < len(mergedFrames) {
+			frame := mergedFrames[physicalIdx]
+
+			// 检查帧是否有位置数据
+			if frame.X == nil || frame.Y == nil {
+				continue // 跳过没有位置数据的帧
+			}
+
+			return *frame.X, *frame.Y, nil
+		}
+	}
+
+	return 0, 0, fmt.Errorf("track '%s' has no visible frames in animation '%s'", trackName, animName)
+}
+
+// getCurrentPositionForRender 获取轨道的当前位置
+//
+// 参数：
+//   - trackName: 轨道名称（如 "anim_stem"）
+//   - animName: 动画名称（如 "anim_shooting"）
+//   - comp: ReanimComponent 引用
+//
+// 返回：
+//   - x, y: 当前帧的位置
+//   - error: 如果轨道不存在或当前帧越界
+func (s *RenderSystem) getCurrentPositionForRender(
+	trackName, animName string,
+	comp *components.ReanimComponent,
+) (float64, float64, error) {
+	// 获取动画状态
+	animState, ok := comp.AnimStates[animName]
+	if !ok {
+		return 0, 0, fmt.Errorf("animation '%s' is not active", animName)
+	}
+
+	logicalFrame := animState.LogicalFrame
+
+	// 获取动画的可见性数组
+	animVisibles, ok := comp.AnimVisiblesMap[animName]
+	if !ok || len(animVisibles) == 0 {
+		return 0, 0, fmt.Errorf("animation '%s' has no visibility data", animName)
+	}
+
+	// 将逻辑帧映射到物理帧
+	physicalFrame := s.mapLogicalToPhysicalForRender(logicalFrame, animVisibles)
+	if physicalFrame < 0 {
+		return 0, 0, fmt.Errorf("invalid logical frame %d for animation '%s'", logicalFrame, animName)
+	}
+
+	// 获取轨道的累积帧数据
+	mergedFrames, ok := comp.MergedTracks[trackName]
+	if !ok || len(mergedFrames) == 0 {
+		return 0, 0, fmt.Errorf("track '%s' not found or has no frames", trackName)
+	}
+
+	// 检查物理帧是否越界
+	if physicalFrame >= len(mergedFrames) {
+		return 0, 0, fmt.Errorf("physical frame %d out of range for track '%s' (len=%d)",
+			physicalFrame, trackName, len(mergedFrames))
+	}
+
+	frame := mergedFrames[physicalFrame]
+
+	// 检查帧是否有位置数据
+	if frame.X == nil || frame.Y == nil {
+		return 0, 0, fmt.Errorf("track '%s' has no position data at frame %d", trackName, physicalFrame)
+	}
+
+	return *frame.X, *frame.Y, nil
+}
+
+// mapLogicalToPhysicalForRender 将逻辑帧号映射到物理帧索引
+//
+// 逻辑帧是可见帧的序号（0, 1, 2, ...）
+// 物理帧是数组中的实际索引，包括隐藏帧
+//
+// 参数：
+//   - logicalFrame: 逻辑帧号（从 0 开始）
+//   - animVisibles: 动画可见性数组（0 = 可见，-1 = 隐藏）
+//
+// 返回：
+//   - 物理帧索引，如果越界返回 -1
+func (s *RenderSystem) mapLogicalToPhysicalForRender(logicalFrame int, animVisibles []int) int {
+	logicalIndex := 0
+	for physicalIdx, visibility := range animVisibles {
+		if visibility == 0 {
+			if logicalIndex == logicalFrame {
+				return physicalIdx
+			}
+			logicalIndex++
+		}
+	}
+	return -1 // 逻辑帧越界
+}

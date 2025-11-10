@@ -334,12 +334,17 @@ func (s *LawnmowerSystem) triggerZombieDeath(zombieID ecs.EntityID) {
 	}
 
 	// 3. 播放死亡动画（单次播放，不循环）
+	// Story 13.8: 使用配置驱动的动画组合（自动隐藏装备轨道）
 	if s.reanimSystem != nil {
-		err := s.reanimSystem.PlayAnimationNoLoop(zombieID, "anim_death")
+		err := s.reanimSystem.PlayCombo(zombieID, "zombie", "death")
 		if err != nil {
 			log.Printf("[LawnmowerSystem] 僵尸 %d 播放死亡动画失败: %v", zombieID, err)
 		} else {
-			log.Printf("[LawnmowerSystem] 僵尸 %d 开始播放死亡动画 anim_death", zombieID)
+			// 设置为不循环
+			if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, zombieID); ok {
+				reanim.IsLooping = false
+			}
+			log.Printf("[LawnmowerSystem] 僵尸 %d 开始播放死亡动画", zombieID)
 		}
 	}
 

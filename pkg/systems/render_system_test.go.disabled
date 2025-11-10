@@ -120,19 +120,19 @@ func TestRenderReanimEntity_MissingComponents(t *testing.T) {
 		{
 			name:          "Missing PositionComponent",
 			hasPosition:   false,
-			hasReanim:     true,
+			hasReanimXML:  true,
 			expectNoPanic: true,
 		},
 		{
 			name:          "Missing ReanimComponent",
 			hasPosition:   true,
-			hasReanim:     false,
+			hasReanimXML:  false,
 			expectNoPanic: true,
 		},
 		{
 			name:          "Missing both components",
 			hasPosition:   false,
-			hasReanim:     false,
+			hasReanimXML:  false,
 			expectNoPanic: true,
 		},
 	}

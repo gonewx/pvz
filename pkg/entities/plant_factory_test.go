@@ -80,8 +80,8 @@ func TestNewPlantEntity(t *testing.T) {
 				t.Error("Plant entity should have ReanimComponent")
 			} else {
 				reanim := reanimComp.(*components.ReanimComponent)
-				if reanim.Reanim == nil {
-					t.Error("ReanimComponent.Reanim should not be nil")
+				if reanim.ReanimXML == nil {
+					t.Error("ReanimComponent.ReanimXML should not be nil")
 				}
 				if reanim.PartImages == nil {
 					t.Error("ReanimComponent.PartImages should not be nil")
@@ -310,8 +310,8 @@ func TestNewWallnutEntity(t *testing.T) {
 				t.Error("Wallnut entity should have ReanimComponent")
 			} else {
 				reanim := reanimComp.(*components.ReanimComponent)
-				if reanim.Reanim == nil {
-					t.Error("ReanimComponent.Reanim should not be nil")
+				if reanim.ReanimXML == nil {
+					t.Error("ReanimComponent.ReanimXML should not be nil")
 				}
 				if reanim.PartImages == nil {
 					t.Error("ReanimComponent.PartImages should not be nil")
@@ -486,15 +486,15 @@ func TestNewCherryBombEntity(t *testing.T) {
 				t.Error("Cherry bomb entity should have ReanimComponent")
 			} else {
 				reanim := reanimComp.(*components.ReanimComponent)
-				if reanim.Reanim == nil {
-					t.Error("ReanimComponent.Reanim should not be nil")
+				if reanim.ReanimXML == nil {
+					t.Error("ReanimComponent.ReanimXML should not be nil")
 				}
 				if reanim.PartImages == nil {
 					t.Error("ReanimComponent.PartImages should not be nil")
 				}
 				// 验证初始动画设置为 anim_idle（引信动画）
-				if reanim.CurrentAnim != "anim_idle" {
-					t.Errorf("CurrentAnim should be 'anim_idle', got '%s'", reanim.CurrentAnim)
+				if len(reanim.CurrentAnimations) == 0 || reanim.CurrentAnimations[0] != "anim_idle" {
+					t.Errorf("CurrentAnimations[0] should be 'anim_idle', got %v", reanim.CurrentAnimations)
 				}
 			}
 

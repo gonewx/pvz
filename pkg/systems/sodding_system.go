@@ -13,16 +13,18 @@ import (
 // SoddingSystem 管理铺草皮动画系统
 // Story 8.2 优化：基于草皮卷图片中心的简化定位逻辑
 // Story 11.4 扩展：支持土粒飞溅粒子特效
+// 重构简化：所有叠加层从 (0, 0) 开始，草皮卷中心自动对齐到可见边缘
 //
 // 功能：
 //   - 播放 SodRoll.reanim 草皮滚动动画（2.17秒，52帧 @ 24fps）
-//   - 根据动画进度线性插值计算草皮卷中心位置，同步显示草皮叠加层
+//   - 草皮卷的 Reanim 包围盒中心 = 草皮可见宽度
 //   - 可选：播放土粒飞溅粒子特效（SodRoll.xml 粒子配置）
 //
 // 定位原理：
-//   - X轴：草皮卷图片中心从草皮左边缘线性移动到草皮右边缘
-//   - Y轴：草皮卷图片中心与草皮叠加图Y中心对齐（都对齐到目标行中心）
-//   - 草皮可见宽度 = 草皮卷中心X - 草皮左边缘X
+//   - Position.X: 草皮卷实体位置（从 0 向右移动到草皮宽度）
+//   - Position.Y: 行中心Y坐标
+//   - Reanim 包围盒中心自动对齐到 Position
+//   - 草皮可见宽度 = Position.X（自动从 Reanim 渲染计算）
 type SoddingSystem struct {
 	entityManager   *ecs.EntityManager
 	resourceManager *game.ResourceManager
@@ -41,6 +43,10 @@ type SoddingSystem struct {
 
 	// 缓存最后一帧的中心位置（避免动画完成后跳跃）
 	lastFrameCenterX float64 // 动画结束时的实际中心X
+
+	// 缓存最后一帧的边缘位置（用于调试绘制）
+	lastFrameLeftEdge   float64
+	lastFrameRightEdge  float64
 
 	// 动画完成回调
 	onAnimationComplete func() // 动画完成时调用
@@ -66,9 +72,9 @@ func NewSoddingSystem(entityManager *ecs.EntityManager, rm *game.ResourceManager
 // 参数:
 //   - onComplete: 动画完成时的回调函数
 //   - enabledLanes: 启用的行列表(如 [2,3,4])
-//   - animLanes: 播放动画的行列表(如 [2,4],空表示使用 enabledLanes) - Story 8.6 QA修正
-//   - sodOverlayX: 草皮叠加图的世界X坐标(左边缘)
-//   - sodImageHeight: 草皮图片的实际高度
+//   - animLanes: 播放动画的行列表(如 [2,4],空表示使用 enabledLanes)
+//   - sodOverlayX: 草皮叠加图的世界X坐标（重构简化：现在固定为 0）
+//   - sodImageHeight: 草皮图片的实际高度（重构简化：现在不使用此参数）
 //   - enableParticles: 是否启用土粒飞溅粒子特效
 func (s *SoddingSystem) StartAnimation(onComplete func(), enabledLanes, animLanes []int, sodOverlayX, sodImageHeight float64, enableParticles bool) {
 	if s.isAnimationPlaying {
@@ -109,40 +115,14 @@ func (s *SoddingSystem) StartAnimation(onComplete func(), enabledLanes, animLane
 	}
 
 	s.animationDuration = float64(maxFrames) / float64(fps)
-	// log.Printf("[SoddingSystem] 从 reanim 读取: 帧数=%d, FPS=%d, 时长=%.2f秒",
-	// 	maxFrames, fps, s.animationDuration)
 
-	// Story 8.6 QA修正: 计算动画起点X坐标(所有行共用)
+	// 草皮卷从网格起点开始滚动
 	s.animStartX = config.GridWorldStartX + config.SodRollStartOffsetX
+	log.Printf("[SoddingSystem] animStartX = %.1f (GridWorldStartX=%.1f + SodRollStartOffsetX=%.1f)",
+		s.animStartX, config.GridWorldStartX, config.SodRollStartOffsetX)
 
 	// Story 8.6 QA修正: 为每个动画行创建独立的草皮卷实体
 	s.sodRollEntityIDs = make([]ecs.EntityID, 0, len(animLanes))
-
-	// 计算 reanim 动画的包围盒（用于Y坐标对齐）
-	// 从 reanim 数据计算包围盒中心
-	var minY, maxY *float64
-	for _, track := range reanimXML.Tracks {
-		for _, frame := range track.Frames {
-			if frame.Y != nil {
-				y := *frame.Y
-				if minY == nil || y < *minY {
-					minY = &y
-				}
-				if maxY == nil || y > *maxY {
-					maxY = &y
-				}
-			}
-		}
-	}
-
-	var animCenterY float64
-	if minY != nil && maxY != nil {
-		animCenterY = (*minY + *maxY) / 2.0
-		log.Printf("[SoddingSystem] Reanim包围盒: minY=%.1f, maxY=%.1f, centerY=%.1f", *minY, *maxY, animCenterY)
-	} else {
-		animCenterY = 0
-		log.Printf("[SoddingSystem] Warning: 无法从reanim计算包围盒,使用默认centerY=0")
-	}
 
 	for _, lane := range animLanes {
 		// 验证行号合法性（1-5）
@@ -164,18 +144,14 @@ func (s *SoddingSystem) StartAnimation(onComplete func(), enabledLanes, animLane
 			continue
 		}
 
-		// Story 8.6 QA修正: 计算此行的Y坐标（使用与CalculateSodRollPosition相同的逻辑）
-		// 1. 计算目标行的中心Y坐标（绝对行号）
+		// 重构简化: 计算此行的Y坐标（行中心）
+		// 草皮卷的 Reanim 包围盒中心会自动对齐到 Position
 		targetCenterY := config.GridWorldStartY + float64(lane-1)*config.CellHeight + config.CellHeight/2.0
 
-		// 2. 对齐 reanim 动画包围盒中心到目标行中心
-		laneY := targetCenterY - animCenterY + config.SodRollOffsetY
-
-		log.Printf("[SoddingSystem] 计算第 %d 行草皮卷位置: targetCenterY=%.1f, animCenterY=%.1f, offsetY=%.1f → laneY=%.1f",
-			lane, targetCenterY, animCenterY, config.SodRollOffsetY, laneY)
+		log.Printf("[SoddingSystem] 创建第 %d 行草皮卷: Position=(0, %.1f)", lane, targetCenterY)
 
 		// 创建草皮卷实体
-		entityID := s.createSodRollEntity(s.animStartX, laneY, lane)
+		entityID := s.createSodRollEntity(s.animStartX, targetCenterY, lane)
 		if entityID != 0 {
 			s.sodRollEntityIDs = append(s.sodRollEntityIDs, entityID)
 		}
@@ -227,14 +203,16 @@ func (s *SoddingSystem) createSodRollEntity(posX, posY float64, lane int) ecs.En
 	})
 
 	// 添加 ReanimComponent
-	// Story 13.2: 移除 CurrentFrame 字段（已废弃），使用 AnimStates 管理帧
+	// Story 13.8: 使用新的简化结构
+	// 重要：MergedTracks 设置为 nil，让 PlayCombo 自动初始化
 	ecs.AddComponent(s.entityManager, entityID, &components.ReanimComponent{
-		Reanim:      reanimXML,
-		PartImages:  partImages,
-		CurrentAnim: "", // 初始为空，等待初始化
-		// CurrentFrame 已移除（Story 13.2）
-		IsLooping:  false, // 不循环播放
-		IsFinished: false,
+		ReanimXML:         reanimXML,
+		PartImages:        partImages,
+		MergedTracks:      nil,        // nil 让 PlayCombo 自动初始化
+		CurrentAnimations: []string{}, // 初始为空，等待初始化
+		IsLooping:         false,      // 不循环播放
+		IsFinished:        false,
+		AnimationFPS:      float64(reanimXML.FPS),
 	})
 
 	// 添加生命周期组件（动画持续约2.2秒）
@@ -244,13 +222,14 @@ func (s *SoddingSystem) createSodRollEntity(posX, posY float64, lane int) ecs.En
 		IsExpired:       false,
 	})
 
-	// 初始化场景动画（使用 InitializeSceneAnimation 不计算 CenterOffset）
-	// SodRoll 是场景动画，坐标在 reanim 文件中已经定义好，不需要自动居中
-	if err := s.reanimSystem.InitializeSceneAnimation(entityID); err != nil {
-		log.Printf("[SoddingSystem] ERROR: Failed to initialize SodRoll scene animation for lane %d: %v", lane, err)
+	// 初始化 SodRoll 动画
+	// Story 13.8: 使用配置驱动的 PlayCombo API
+	// 配置文件: data/reanim_config/sodroll.yaml
+	if err := s.reanimSystem.PlayCombo(entityID, "sodroll", "roll"); err != nil {
+		log.Printf("[SoddingSystem] ERROR: Failed to play SodRoll animation for lane %d: %v", lane, err)
 		log.Printf("[SoddingSystem] Animation may not display correctly")
 	} else {
-		log.Printf("[SoddingSystem] SodRoll scene animation initialized successfully for lane %d", lane)
+		log.Printf("[SoddingSystem] SodRoll animation started successfully for lane %d", lane)
 	}
 
 	return entityID
@@ -287,11 +266,16 @@ func (s *SoddingSystem) Update(deltaTime float64) {
 func (s *SoddingSystem) completeAnimation() {
 	log.Printf("[SoddingSystem] Animation complete, cleaning up entities (animationTimer=%.3f)", s.animationTimer)
 
-	// 保存最后一帧的中心位置（避免完成后跳跃）
+	// 保存最后一帧的中心位置和边缘位置（避免完成后跳跃）
 	// 在标记实体过期之前读取位置
 	if len(s.sodRollEntityIDs) > 0 {
 		s.lastFrameCenterX = s.calculateCurrentCenterX()
-		log.Printf("[SoddingSystem] 缓存最后一帧中心位置: %.1f", s.lastFrameCenterX)
+		// 同时缓存边缘位置
+		leftEdge, centerEdge, rightEdge := s.calculateCurrentEdges()
+		s.lastFrameLeftEdge = leftEdge
+		s.lastFrameRightEdge = rightEdge
+		log.Printf("[SoddingSystem] 缓存最后一帧位置: 中心=%.1f, 左=%.1f, 中边=%.1f, 右=%.1f",
+			s.lastFrameCenterX, s.lastFrameLeftEdge, centerEdge, s.lastFrameRightEdge)
 
 		// Story 8.6 QA修正: 标记所有草皮卷实体为过期
 		for _, entityID := range s.sodRollEntityIDs {
@@ -362,13 +346,14 @@ func (s *SoddingSystem) GetProgress() float64 {
 	return progress
 }
 
-// GetSodRollCenterX 返回草皮卷图片中心当前X坐标（世界坐标）
-// 用于同步草皮叠加层的显示
+// GetSodRollCenterX 返回草皮可见区域的右边缘X坐标（世界坐标）
+// 用于同步草皮叠加层的显示（叠加层从起点显示到这个位置）
 //
 // 定位原理：
-//   - 读取 SodRoll 动画当前帧的实际位置
-//   - 计算整体包围盒的中心X坐标
-//   - 草皮可见宽度 = 中心X - 动画起点X
+//   - 追踪 SodRoll 轨道的X坐标和sx缩放值
+//   - 计算草皮卷的左边缘 = SodRoll.X - (图片宽度 * sx) / 2
+//   - 草皮可见右边缘 = 实体Position.X + 草皮卷左边缘
+//   - 草皮叠加层应该裁剪显示：从世界坐标0到此返回值
 func (s *SoddingSystem) GetSodRollCenterX() float64 {
 	// 动画未启动：返回起点（草皮不可见）
 	if !s.animationStarted {
@@ -384,13 +369,102 @@ func (s *SoddingSystem) GetSodRollCenterX() float64 {
 	return s.calculateCurrentCenterX()
 }
 
-// GetAnimStartX 返回动画起点X坐标（世界坐标）
-// 用于计算草皮可见宽度：visibleWidth = GetSodRollCenterX() - GetAnimStartX()
-func (s *SoddingSystem) GetAnimStartX() float64 {
-	return s.animStartX
+// GetSodRollEdges 返回草皮卷的左、中、右边缘X坐标（世界坐标）
+// 用于调试绘制
+// 返回值: leftEdge, centerX, rightEdge
+func (s *SoddingSystem) GetSodRollEdges() (float64, float64, float64) {
+	// 动画未启动：返回起点
+	if !s.animationStarted {
+		return s.animStartX, s.animStartX, s.animStartX
+	}
+
+	// 动画已完成：返回缓存的最后一帧位置
+	if !s.isAnimationPlaying {
+		return s.lastFrameLeftEdge, s.lastFrameCenterX, s.lastFrameRightEdge
+	}
+
+	// 动画进行中：计算实时位置
+	return s.calculateCurrentEdges()
 }
 
-// calculateCurrentCenterX 计算草皮卷当前帧的中心X坐标（世界坐标）
+// calculateCurrentEdges 计算草皮卷当前帧的左、中、右边缘（辅助函数）
+func (s *SoddingSystem) calculateCurrentEdges() (float64, float64, float64) {
+	// 检查是否有草皮卷实体
+	if len(s.sodRollEntityIDs) == 0 {
+		return s.animStartX, s.animStartX, s.animStartX
+	}
+
+	// 使用第一个草皮卷实体
+	entityID := s.sodRollEntityIDs[0]
+
+	// 获取 ReanimComponent
+	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !ok {
+		return s.animStartX, s.animStartX, s.animStartX
+	}
+
+	// 获取实体Position
+	posComp, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+	if !ok {
+		return s.animStartX, s.animStartX, s.animStartX
+	}
+
+	// 查找 SodRoll 轨道
+	var sodRollX *float64
+	var sodRollSX *float64
+	frameIndex := reanimComp.CurrentFrame
+
+	for _, track := range reanimComp.ReanimXML.Tracks {
+		if track.Name == "SodRoll" {
+			if frameIndex >= len(track.Frames) {
+				frameIndex = len(track.Frames) - 1
+			}
+			if frameIndex < 0 {
+				break
+			}
+
+			frame := track.Frames[frameIndex]
+			if frame.X != nil {
+				sodRollX = frame.X
+			}
+			if frame.ScaleX != nil {
+				sodRollSX = frame.ScaleX
+			}
+			break
+		}
+	}
+
+	if sodRollX == nil {
+		return s.animStartX, s.animStartX, s.animStartX
+	}
+
+	// 计算缩放后的半宽
+	sodRollImageWidth := 68.0
+	scaleX := 1.0
+	if sodRollSX != nil {
+		scaleX = *sodRollSX
+	}
+	scaledHalfWidth := (sodRollImageWidth * scaleX) / 2.0
+
+	// 计算左、中、右边缘（相对坐标）
+	// 注意：渲染系统直接把 SodRoll.X 当作图片左上角使用
+	// 所以这里不需要转换，直接用 SodRoll.X
+	leftEdge := *sodRollX                       // 图片左边缘 = SodRoll.X（渲染系统当作左上角）
+	centerX := *sodRollX + scaledHalfWidth      // 图片中心
+	rightEdge := *sodRollX + scaledHalfWidth*2  // 图片右边缘
+
+	// 转换为世界坐标
+	// 渲染公式：图片左上角世界坐标 = pos.X - CenterOffsetX + SodRoll.X
+	worldLeftEdge := posComp.X - reanimComp.CenterOffsetX + leftEdge
+	worldCenterX := posComp.X - reanimComp.CenterOffsetX + centerX
+	worldRightEdge := posComp.X - reanimComp.CenterOffsetX + rightEdge
+
+	return worldLeftEdge, worldCenterX, worldRightEdge
+}
+
+
+// calculateCurrentCenterX 计算草皮可见区域右边缘的X坐标（世界坐标）
+// 通过追踪 SodRoll 轨道的X坐标和sx缩放，计算草皮卷左边缘作为草皮右边缘
 // Story 8.6 QA修正: 使用第一个草皮卷实体(所有行X坐标相同)
 func (s *SoddingSystem) calculateCurrentCenterX() float64 {
 	// Story 8.6 QA修正: 检查是否有草皮卷实体
@@ -415,56 +489,56 @@ func (s *SoddingSystem) calculateCurrentCenterX() float64 {
 		return s.animStartX
 	}
 
-	// 计算整体包围盒的中心X坐标
-	// 策略：遍历所有轨道，找到当前帧所有部件的X范围，取中心
-	var minX, maxX *float64
+	// 查找 SodRoll 轨道（草皮卷主体）
+	var sodRollX *float64
+	var sodRollSX *float64
+	frameIndex := reanimComp.CurrentFrame
 
-	for _, track := range reanimComp.Reanim.Tracks {
-		// Story 13.2: 使用主动画的 LogicalFrame 替代 CurrentFrame
-		frameIndex := 0
-		if state, ok := reanimComp.AnimStates[reanimComp.CurrentAnim]; ok {
-			frameIndex = state.LogicalFrame
-		}
-		if frameIndex >= len(track.Frames) {
-			frameIndex = len(track.Frames) - 1
-		}
-		if frameIndex < 0 {
-			continue
-		}
+	for _, track := range reanimComp.ReanimXML.Tracks {
+		// 找到名为 "SodRoll" 的轨道
+		if track.Name == "SodRoll" {
+			if frameIndex >= len(track.Frames) {
+				frameIndex = len(track.Frames) - 1
+			}
+			if frameIndex < 0 {
+				break
+			}
 
-		frame := track.Frames[frameIndex]
-		if frame.X != nil {
-			x := *frame.X
-			if minX == nil || x < *minX {
-				minX = &x
+			frame := track.Frames[frameIndex]
+			if frame.X != nil {
+				sodRollX = frame.X
 			}
-			if maxX == nil || x > *maxX {
-				maxX = &x
+			if frame.ScaleX != nil {
+				sodRollSX = frame.ScaleX
 			}
+			break
 		}
 	}
 
-	// 如果没有找到任何X坐标，返回起点
-	if minX == nil || maxX == nil {
+	// 如果没有找到 SodRoll 轨道的X坐标，返回起点
+	if sodRollX == nil {
 		return s.animStartX
 	}
 
-	// 计算包围盒中心X（相对于实体Position）
-	// 草皮卷图片右边有透明边，所以追踪中心而不是右边缘
-	centerX := (*minX + *maxX) / 2.0
+	// 获取 SodRoll 图片宽度
+	sodRollImageWidth := 68.0 // SodRoll.png 的宽度
+
+	// 计算缩放后的半宽
+	scaleX := 1.0
+	if sodRollSX != nil {
+		scaleX = *sodRollSX
+	}
+	scaledHalfWidth := (sodRollImageWidth * scaleX) / 2.0
+
+	// 草皮的右边缘应该对齐到草皮卷的中心
+	// 渲染系统把 SodRoll.X 当作图片左上角，图片中心 = SodRoll.X + scaledHalfWidth
+	sodRollCenterX := *sodRollX + scaledHalfWidth
 
 	// 转换为世界坐标
-	worldCenterX := posComp.X + centerX
+	// 使用和 calculateCurrentEdges 一致的坐标系统
+	worldRightEdgeX := posComp.X - reanimComp.CenterOffsetX + sodRollCenterX
 
-	// 调试日志（每10帧输出一次）
-	// frameIndex := int(reanimComp.CurrentFrame)
-	// if frameIndex%10 == 0 || frameIndex == 0 || frameIndex == len(reanimComp.Reanim.Tracks[0].Frames)-1 {
-	// 	progress := s.GetProgress()
-	// 	log.Printf("[SoddingSystem] 帧:%d, 进度:%.1f%%, 包围盒:[%.1f,%.1f], 中心:%.1f",
-	// 		frameIndex, progress*100, *minX, *maxX, worldCenterX)
-	// }
-
-	return worldCenterX
+	return worldRightEdgeX
 }
 
 // Story 11.4: createSodRollParticleEmitterForEntity 为指定草皮卷实体创建粒子发射器
@@ -475,42 +549,13 @@ func (s *SoddingSystem) calculateCurrentCenterX() float64 {
 //
 // 返回: 粒子发射器实体ID，失败返回0
 func (s *SoddingSystem) createSodRollParticleEmitterForEntity(entityID ecs.EntityID, lane int) ecs.EntityID {
-	// 计算粒子发射器位置
-	// 注意：粒子发射器需要使用草皮卷的视觉中心Y坐标，而不是动画实体的锚点Y坐标
+	// 从草皮卷实体读取位置
 	particleX := s.animStartX
 	particleY := 0.0
 
-	// 从草皮卷实体读取当前视觉中心位置
 	if posComp, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID); ok {
 		particleX = posComp.X
 		particleY = posComp.Y
-
-		// 读取 reanim 的包围盒中心偏移
-		if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
-			if reanimComp.Reanim != nil {
-				// 计算 reanim 的 Y 包围盒中心
-				var minY, maxY *float64
-				for _, track := range reanimComp.Reanim.Tracks {
-					for _, frame := range track.Frames {
-						if frame.Y != nil {
-							y := *frame.Y
-							if minY == nil || y < *minY {
-								minY = &y
-							}
-							if maxY == nil || y > *maxY {
-								maxY = &y
-							}
-						}
-					}
-				}
-
-				if minY != nil && maxY != nil {
-					// 粒子发射器的Y坐标 = 实体锚点Y + 包围盒中心偏移
-					animCenterOffsetY := (*minY + *maxY) / 2.0
-					particleY = posComp.Y + animCenterOffsetY
-				}
-			}
-		}
 	}
 
 	// 应用配置的偏移量
@@ -525,7 +570,7 @@ func (s *SoddingSystem) createSodRollParticleEmitterForEntity(entityID ecs.Entit
 		s.resourceManager,
 		"SodRoll", // 粒子配置名称
 		particleX, // 起始位置X
-		particleY, // 起始位置Y（草皮卷视觉中心）
+		particleY, // 起始位置Y
 	)
 
 	if err != nil {

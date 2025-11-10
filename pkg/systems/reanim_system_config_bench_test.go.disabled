@@ -28,7 +28,7 @@ func BenchmarkPlayCombo(b *testing.B) {
 	reanimXML := createBenchReanimData()
 
 	ecs.AddComponent(em, entity, &components.ReanimComponent{
-		Reanim:       reanimXML,
+		ReanimXML:    reanimXML,
 		PartImages:   make(map[string]*ebiten.Image),
 		MergedTracks: reanim.BuildMergedTracks(reanimXML),
 	})
@@ -51,7 +51,7 @@ func BenchmarkPlayAnimations(b *testing.B) {
 	reanimXML := createBenchReanimData()
 
 	ecs.AddComponent(em, entity, &components.ReanimComponent{
-		Reanim:       reanimXML,
+		ReanimXML:    reanimXML,
 		PartImages:   make(map[string]*ebiten.Image),
 		MergedTracks: reanim.BuildMergedTracks(reanimXML),
 	})
@@ -79,7 +79,7 @@ func BenchmarkPlayComboVsPlayAnimations(b *testing.B) {
 		reanimXML := createBenchReanimData()
 
 		ecs.AddComponent(em, entity, &components.ReanimComponent{
-			Reanim:       reanimXML,
+			ReanimXML:    reanimXML,
 			PartImages:   make(map[string]*ebiten.Image),
 			MergedTracks: reanim.BuildMergedTracks(reanimXML),
 		})
@@ -99,7 +99,7 @@ func BenchmarkPlayComboVsPlayAnimations(b *testing.B) {
 		reanimXML := createBenchReanimData()
 
 		ecs.AddComponent(em, entity, &components.ReanimComponent{
-			Reanim:       reanimXML,
+			ReanimXML:    reanimXML,
 			PartImages:   make(map[string]*ebiten.Image),
 			MergedTracks: reanim.BuildMergedTracks(reanimXML),
 		})
@@ -130,7 +130,7 @@ func BenchmarkPlayDefaultAnimation(b *testing.B) {
 	reanimXML := createBenchReanimData()
 
 	ecs.AddComponent(em, entity, &components.ReanimComponent{
-		Reanim:       reanimXML,
+		ReanimXML:    reanimXML,
 		PartImages:   make(map[string]*ebiten.Image),
 		MergedTracks: reanim.BuildMergedTracks(reanimXML),
 	})

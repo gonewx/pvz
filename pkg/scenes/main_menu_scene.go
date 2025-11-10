@@ -382,7 +382,7 @@ func isPointInRect(px, py, x, y, width, height float64) bool {
 }
 
 // updateButtonVisibility updates the visibility of SelectorScreen buttons based on unlock status.
-// This method controls which buttons are visible in the Reanim animation by setting the VisibleTracks whitelist.
+// This method controls which buttons are visible in the Reanim animation by setting the HiddenTracks whitelist.
 //
 // Unlock rules:
 //   - Adventure mode: Always visible
@@ -403,11 +403,11 @@ func (m *MainMenuScene) updateButtonVisibility() {
 		return
 	}
 
-	// 实验：完全移除 VisibleTracks 白名单，让所有轨道依赖动画定义轨道的 f 值自然控制
+	// 实验：完全移除 HiddenTracks 白名单，让所有轨道依赖动画定义轨道的 f 值自然控制
 	// 这样可以验证 anim_grass, anim_open 等动画定义轨道是否能正确控制纯视觉轨道
-	reanimComp.VisibleTracks = nil
+	reanimComp.HiddenTracks = nil
 
-	log.Printf("[MainMenuScene] 实验模式：移除 VisibleTracks 白名单，所有轨道依赖 f 值控制")
+	log.Printf("[MainMenuScene] 实验模式：移除 HiddenTracks 白名单，所有轨道依赖 f 值控制")
 	log.Printf("[MainMenuScene] Button visibility (level=%s): Adventure=%v, Challenges=%v, Vasebreaker=%v, Survival=%v",
 		m.currentLevel,
 		config.IsMenuModeUnlocked(config.MenuButtonAdventure, m.currentLevel),

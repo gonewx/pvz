@@ -89,7 +89,7 @@ func TestPrepareStaticPreview_EmptyReanim(t *testing.T) {
 	entity := em.CreateEntity()
 
 	reanimComp := &components.ReanimComponent{
-		Reanim: &reanim.ReanimXML{
+		ReanimXML: &reanim.ReanimXML{
 			FPS:    12,
 			Tracks: []reanim.Track{}, // 空轨道
 		},
@@ -206,7 +206,7 @@ func TestFindPreviewFrameHeuristic(t *testing.T) {
 func createTestReanimWithCompleteFrames() *components.ReanimComponent {
 	// Create a Reanim with 3 part tracks, all frames have images and are visible
 	return &components.ReanimComponent{
-		Reanim: &reanim.ReanimXML{
+		ReanimXML: &reanim.ReanimXML{
 			FPS: 12,
 			Tracks: []reanim.Track{
 				{
@@ -277,7 +277,7 @@ func createTestReanimWithIncompleteFrames(totalFrames int) *components.ReanimCom
 	}
 
 	return &components.ReanimComponent{
-		Reanim: &reanim.ReanimXML{
+		ReanimXML: &reanim.ReanimXML{
 			FPS: 12,
 			Tracks: []reanim.Track{
 				{Name: "part1", Frames: frames1},
@@ -291,7 +291,7 @@ func createTestReanimWithIncompleteFrames(totalFrames int) *components.ReanimCom
 // createTestReanimWithFirstFrameIncomplete creates a ReanimComponent where first frame is incomplete
 func createTestReanimWithFirstFrameIncomplete() *components.ReanimComponent {
 	return &components.ReanimComponent{
-		Reanim: &reanim.ReanimXML{
+		ReanimXML: &reanim.ReanimXML{
 			FPS: 12,
 			Tracks: []reanim.Track{
 				{
@@ -587,7 +587,7 @@ func TestPlayAnimations_MultipleAnimations(t *testing.T) {
 	}
 
 	reanimComp := &components.ReanimComponent{
-		Reanim:     reanimData,
+		ReanimXML:  reanimData,
 		PartImages: make(map[string]*ebiten.Image),
 	}
 	ecs.AddComponent(em, entityID, reanimComp)
@@ -660,7 +660,7 @@ func TestAddAnimation_PreservesExisting(t *testing.T) {
 	}
 
 	reanimComp := &components.ReanimComponent{
-		Reanim:     reanimData,
+		ReanimXML:  reanimData,
 		PartImages: make(map[string]*ebiten.Image),
 	}
 	ecs.AddComponent(em, entityID, reanimComp)
@@ -744,7 +744,7 @@ func TestRemoveAnimation(t *testing.T) {
 	}
 
 	reanimComp := &components.ReanimComponent{
-		Reanim:     reanimData,
+		ReanimXML:  reanimData,
 		PartImages: make(map[string]*ebiten.Image),
 	}
 	ecs.AddComponent(em, entityID, reanimComp)
@@ -839,7 +839,7 @@ func BenchmarkSingleAnimationUpdate(b *testing.B) {
 	}
 
 	reanimComp := &components.ReanimComponent{
-		Reanim:     reanimData,
+		ReanimXML:  reanimData,
 		PartImages: make(map[string]*ebiten.Image),
 	}
 	ecs.AddComponent(em, entityID, reanimComp)
@@ -911,7 +911,7 @@ func BenchmarkDoubleAnimationUpdate(b *testing.B) {
 	}
 
 	reanimComp := &components.ReanimComponent{
-		Reanim:     reanimData,
+		ReanimXML:  reanimData,
 		PartImages: make(map[string]*ebiten.Image),
 	}
 	ecs.AddComponent(em, entityID, reanimComp)
@@ -979,7 +979,7 @@ func BenchmarkTripleAnimationUpdate(b *testing.B) {
 	}
 
 	reanimComp := &components.ReanimComponent{
-		Reanim:     reanimData,
+		ReanimXML:  reanimData,
 		PartImages: make(map[string]*ebiten.Image),
 	}
 	ecs.AddComponent(em, entityID, reanimComp)
@@ -1015,7 +1015,7 @@ func TestSetParentTracks_Success(t *testing.T) {
 	entityID := em.CreateEntity()
 
 	reanimComp := &components.ReanimComponent{
-		Reanim:       &reanim.ReanimXML{FPS: 12},
+		ReanimXML:    &reanim.ReanimXML{FPS: 12},
 		ParentTracks: nil, // Initially nil
 	}
 	ecs.AddComponent(em, entityID, reanimComp)
@@ -1067,7 +1067,7 @@ func TestSetParentTrack_Success(t *testing.T) {
 	entityID := em.CreateEntity()
 
 	reanimComp := &components.ReanimComponent{
-		Reanim:       &reanim.ReanimXML{FPS: 12},
+		ReanimXML:    &reanim.ReanimXML{FPS: 12},
 		ParentTracks: nil, // Initially nil
 	}
 	ecs.AddComponent(em, entityID, reanimComp)
@@ -1096,7 +1096,7 @@ func TestSetParentTrack_MultipleInvocations(t *testing.T) {
 	entityID := em.CreateEntity()
 
 	reanimComp := &components.ReanimComponent{
-		Reanim: &reanim.ReanimXML{FPS: 12},
+		ReanimXML: &reanim.ReanimXML{FPS: 12},
 	}
 	ecs.AddComponent(em, entityID, reanimComp)
 

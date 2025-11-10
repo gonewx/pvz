@@ -32,29 +32,29 @@ func createTestReanimComponent(image *ebiten.Image, imageName string) *component
 		// Story 13.2: 移除 CurrentFrame 字段（已废弃）
 		// Return a minimal ReanimComponent with no images
 		return &components.ReanimComponent{
-			Reanim:      &reanim.ReanimXML{FPS: 12},
+			ReanimXML:      &reanim.ReanimXML{FPS: 12},
 			PartImages:  map[string]*ebiten.Image{},
-			CurrentAnim: "idle",
+			CurrentAnimations: []string{"idle"},
 			// CurrentFrame 已移除（Story 13.2）
 			FrameAccumulator:  0.0,
-			VisibleFrameCount: 0,
+			// VisibleFrameCount (removed): 0,
 			IsLooping:         true,
 			IsFinished:        false,
 			AnimVisiblesMap:   map[string][]int{},
 			MergedTracks:      map[string][]reanim.Frame{},
-			AnimTracks:        []reanim.Track{},
-			CenterOffsetX:     0,
-			CenterOffsetY:     0,
-			AnimStates:        map[string]*components.AnimState{},
+			// AnimTracks (removed):        []reanim.Track{},
+			// CenterOffsetX (removed):     0,
+			// CenterOffsetY (removed):     0,
+			// AnimStates (removed):        map[string]*components.AnimState{},
 		}
 	}
 
-	bounds := image.Bounds()
-	imageWidth := float64(bounds.Dx())
-	imageHeight := float64(bounds.Dy())
+// 	bounds := image.Bounds()
+// 	imageWidth := float64(bounds.Dx())
+// 	imageHeight := float64(bounds.Dy())
 
-	centerX := imageWidth / 2
-	centerY := imageHeight / 2
+	// centerX := imageWidth / 2
+	// centerY := imageHeight / 2
 
 	frame := reanim.Frame{
 		FrameNum: new(int),
@@ -86,20 +86,20 @@ func createTestReanimComponent(image *ebiten.Image, imageName string) *component
 
 	// Story 13.2: 移除 CurrentFrame 字段（已废弃）
 	return &components.ReanimComponent{
-		Reanim:      reanimXML,
+		ReanimXML:      reanimXML,
 		PartImages:  partImages,
-		CurrentAnim: "idle",
+		CurrentAnimations: []string{"idle"},
 		// CurrentFrame 已移除（Story 13.2）
 		FrameAccumulator:  0.0,
-		VisibleFrameCount: 1,
+		// VisibleFrameCount (removed): 1,
 		IsLooping:         true,
 		IsFinished:        false,
 		AnimVisiblesMap:   map[string][]int{"anim_idle": {0}},
 		MergedTracks: map[string][]reanim.Frame{
 			imageName: {frame},
 		},
-		AnimTracks:    []reanim.Track{track},
-		CenterOffsetX: centerX,
-		CenterOffsetY: centerY,
+		// AnimTracks (removed):    []reanim.Track{track},
+		// CenterOffsetX (removed): centerX,
+		// CenterOffsetY (removed): centerY,
 	}
 }

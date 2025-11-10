@@ -13,15 +13,18 @@ import (
 
 // ReanimSystemInterface 定义 ReanimSystem 的接口，用于工厂函数依赖注入
 // 这样可以避免循环依赖，同时方便测试
-// Story 13.8: 简化接口，只保留核心 API
 type ReanimSystemInterface interface {
-	// 核心动画播放 API
 	PlayAnimation(entityID ecs.EntityID, animName string) error
-	PlayCombo(entityID ecs.EntityID, unitID, comboName string) error
+	PlayAnimationNoLoop(entityID ecs.EntityID, animName string) error
 	// RenderToTexture 将指定实体的 Reanim 渲染到目标纹理（离屏渲染）
 	RenderToTexture(entityID ecs.EntityID, target *ebiten.Image) error
 	// PrepareStaticPreview prepares a Reanim entity for static preview (Story 11.1)
 	PrepareStaticPreview(entityID ecs.EntityID, reanimName string) error
+	// ApplyReanimConfig 将 Reanim 配置应用到指定实体 (Story 13.5)
+	ApplyReanimConfig(entityID ecs.EntityID, cfg *config.ReanimConfig) error
+	// Story 13.6: 配置驱动的动画播放
+	PlayCombo(entityID ecs.EntityID, unitID, comboName string) error
+	PlayDefaultAnimation(entityID ecs.EntityID, unitID string) error
 }
 
 // NewPlantEntity 创建植物实体
@@ -102,12 +105,14 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 		// 添加 ReanimComponent
 		em.AddComponent(entityID, &components.ReanimComponent{
 			ReanimName: "SunFlower",
-			ReanimXML:  reanimXML,
+			Reanim:     reanimXML,
 			PartImages: partImages,
+			// ✅ 添加白名单，排除眨眼轨道
+			VisibleTracks: config.PlantPreviewVisibleTracks["SunFlower"],
 		})
 
-		// Story 13.8: 使用 PlayCombo API 播放默认动画
-		if err := rs.PlayCombo(entityID, "sunflower", ""); err != nil {
+		// Story 13.6: 使用配置驱动的动画播放
+		if err := rs.PlayDefaultAnimation(entityID, "sunflower"); err != nil {
 			return 0, fmt.Errorf("failed to play SunFlower default animation: %w", err)
 		}
 		log.Printf("[PlantFactory] 向日葵 %d: 成功添加 ReanimComponent 并初始化动画", entityID)
@@ -144,29 +149,103 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 			IsReady:     false,
 		})
 
-		// Story 13.6: 使用集中配置文件创建豌豆射手动画
-		// 从 ResourceManager 获取豌豆射手的 Reanim 数据和部件图片
-		reanimXML := rm.GetReanimXML("PeaShooterSingle")
-		partImages := rm.GetReanimPartImages("PeaShooterSingle")
+		// Story 13.5: 使用配置文件创建豌豆射手动画
+		// 加载豌豆射手的 Reanim 配置
+		reanimConfig, err := config.LoadReanimConfig("data/reanim_configs/peashooter.yaml")
+		if err != nil {
+			// 如果配置文件加载失败，回退到旧的硬编码方式（向后兼容）
+			log.Printf("[PlantFactory] 加载豌豆射手配置文件失败，使用硬编码配置: %v", err)
 
-		if reanimXML == nil || partImages == nil {
-			return 0, fmt.Errorf("failed to load PeaShooterSingle Reanim resources")
+			// 从 ResourceManager 获取豌豆射手的 Reanim 数据和部件图片
+			reanimXML := rm.GetReanimXML("PeaShooterSingle")
+			partImages := rm.GetReanimPartImages("PeaShooterSingle")
+
+			if reanimXML == nil || partImages == nil {
+				return 0, fmt.Errorf("failed to load PeaShooterSingle Reanim resources")
+			}
+
+			// 添加 ReanimComponent（硬编码配置）
+			em.AddComponent(entityID, &components.ReanimComponent{
+				ReanimName: "PeaShooterSingle",
+				Reanim:     reanimXML,
+				PartImages: partImages,
+				VisibleTracks: map[string]bool{
+					"stalk_bottom":        true,
+					"stalk_top":           true,
+					"backleaf":            true,
+					"backleaf_left_tip":   true,
+					"backleaf_right_tip":  true,
+					"frontleaf":           true,
+					"frontleaf_right_tip": true,
+					"frontleaf_tip_left":  true,
+					"anim_sprout":         true,
+					"anim_head_idle":      true,
+					"anim_face":           true,
+					"idle_mouth":          true,
+					"anim_stem":           true,
+				},
+			})
+
+			// Story 13.6: 使用配置驱动的动画播放
+			if err := rs.PlayDefaultAnimation(entityID, "peashooter"); err != nil {
+				return 0, fmt.Errorf("failed to play PeaShooter default animation: %w", err)
+			}
+
+			// 配置父子关系
+			if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](em, entityID); ok {
+				reanimComp.ParentTracks = map[string]string{
+					"anim_face": "anim_stem",
+				}
+			}
+		} else {
+			// 使用配置文件（推荐方式）
+			log.Printf("[PlantFactory] 豌豆射手 %d: 使用配置文件创建动画", entityID)
+
+			// 从 ResourceManager 获取豌豆射手的 Reanim 数据和部件图片
+			reanimXML := rm.GetReanimXML("PeaShooterSingle")
+			partImages := rm.GetReanimPartImages("PeaShooterSingle")
+
+			if reanimXML == nil || partImages == nil {
+				return 0, fmt.Errorf("failed to load PeaShooterSingle Reanim resources")
+			}
+
+			// 添加基础的 ReanimComponent
+			em.AddComponent(entityID, &components.ReanimComponent{
+				ReanimName: "PeaShooterSingle",
+				Reanim:     reanimXML,
+				PartImages: partImages,
+				// VisibleTracks 白名单（向后兼容，配置文件可能会覆盖）
+				VisibleTracks: map[string]bool{
+					"stalk_bottom":        true,
+					"stalk_top":           true,
+					"backleaf":            true,
+					"backleaf_left_tip":   true,
+					"backleaf_right_tip":  true,
+					"frontleaf":           true,
+					"frontleaf_right_tip": true,
+					"frontleaf_tip_left":  true,
+					"anim_sprout":         true,
+					"anim_head_idle":      true,
+					"anim_face":           true,
+					"idle_mouth":          true,
+					"anim_stem":           true,
+				},
+			})
+
+			// 应用配置文件（播放动画、设置轨道绑定、父子关系等）
+			if err := rs.ApplyReanimConfig(entityID, reanimConfig); err != nil {
+				return 0, fmt.Errorf("failed to apply peashooter config: %w", err)
+			}
+
+			log.Printf("[PlantFactory] 豌豆射手 %d: 成功应用配置文件", entityID)
 		}
 
-		// 添加基础的 ReanimComponent
-		em.AddComponent(entityID, &components.ReanimComponent{
-			ReanimName: "PeaShooterSingle",
-			ReanimXML:  reanimXML,
-			PartImages: partImages,
-		})
-
-		// Story 13.8: 使用 PlayCombo API 播放默认动画
-		// PlayCombo 会自动从 data/reanim_config.yaml 读取配置
-		if err := rs.PlayCombo(entityID, "peashooter", ""); err != nil {
-			return 0, fmt.Errorf("failed to play peashooter default animation: %w", err)
+		// 第一次 PlayAnimation 后，固定中心偏移量（避免动画切换时的位置跳动）
+		if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](em, entityID); ok {
+			reanimComp.FixedCenterOffset = true
+			log.Printf("[PlantFactory] 豌豆射手 %d 固定中心偏移为: (%.1f, %.1f)", entityID, reanimComp.CenterOffsetX, reanimComp.CenterOffsetY)
 		}
-
-		log.Printf("[PlantFactory] 豌豆射手 %d: 成功使用集中配置文件创建动画", entityID)
+		log.Printf("[PlantFactory] 豌豆射手 %d: 成功添加 ReanimComponent 并初始化动画", entityID)
 	}
 
 	return entityID, nil
@@ -232,12 +311,12 @@ func NewWallnutEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameSta
 	// 添加 ReanimComponent
 	em.AddComponent(entityID, &components.ReanimComponent{
 		ReanimName: "Wallnut",
-		ReanimXML:  reanimXML,
+		Reanim:     reanimXML,
 		PartImages: partImages,
 	})
 
-	// Story 13.8: 使用 PlayCombo API 播放默认动画
-	if err := rs.PlayCombo(entityID, "wallnut", ""); err != nil {
+	// Story 13.6: 使用配置驱动的动画播放
+	if err := rs.PlayDefaultAnimation(entityID, "wallnut"); err != nil {
 		return 0, fmt.Errorf("failed to play WallNut default animation: %w", err)
 	}
 
@@ -291,12 +370,12 @@ func NewCherryBombEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.Game
 	// 添加 ReanimComponent
 	em.AddComponent(entityID, &components.ReanimComponent{
 		ReanimName: "CherryBomb",
-		ReanimXML:  reanimXML,
+		Reanim:     reanimXML,
 		PartImages: partImages,
 	})
 
-	// Story 13.8: 使用 PlayCombo API 播放默认动画
-	if err := rs.PlayCombo(entityID, "cherrybomb", ""); err != nil {
+	// Story 13.6: 使用配置驱动的动画播放
+	if err := rs.PlayDefaultAnimation(entityID, "cherrybomb"); err != nil {
 		return 0, fmt.Errorf("failed to play CherryBomb default animation: %w", err)
 	}
 	log.Printf("[PlantFactory] 樱桃炸弹 %d: 成功添加 ReanimComponent 并初始化引信动画", entityID)

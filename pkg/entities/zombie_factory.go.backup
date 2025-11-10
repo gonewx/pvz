@@ -55,18 +55,39 @@ func NewZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs ReanimSystemIn
 		return 0, fmt.Errorf("failed to load Zombie Reanim resources")
 	}
 
-	// 添加基础 ReanimComponent
+	// 添加 ReanimComponent
+	// 普通僵尸：使用白名单方式，只显示基础身体部件和右手（anim_innerarm）
 	em.AddComponent(entityID, &components.ReanimComponent{
 		ReanimName: "Zombie",
-		ReanimXML:  reanimXML,
+		Reanim:     reanimXML,
 		PartImages: partImages,
+		VisibleTracks: map[string]bool{
+			// 基础身体部件
+			"Zombie_body":           true,
+			"Zombie_neck":           true,
+			"Zombie_outerarm_upper": true,
+			"Zombie_outerarm_lower": true,
+			"Zombie_outerarm_hand":  true,
+			"Zombie_outerleg_upper": true,
+			"Zombie_outerleg_lower": true,
+			"Zombie_outerleg_foot":  true,
+			"Zombie_innerleg_upper": true,
+			"Zombie_innerleg_lower": true,
+			"Zombie_innerleg_foot":  true,
+			// 头部
+			"anim_head1": true, // 头部
+			"anim_head2": true, // 下巴
+			// 右手（内侧手臂）
+			"anim_innerarm1": true, // 内侧手臂上部
+			"anim_innerarm2": true, // 内侧手臂下部
+			"anim_innerarm3": true, // 内侧手
+		},
 	})
 
-	// Story 13.8: 僵尸使用配置驱动的动画组合（自动隐藏装备轨道）
-	// 普通僵尸需要隐藏铁桶、路障、铁门等特殊装备
+	// Story 13.6: 使用配置驱动的动画播放
 	// 激活后会由 WaveSpawnSystem.ActivateWave() 切换为 walk 动画
-	if err := rs.PlayCombo(entityID, "zombie", "idle"); err != nil {
-		return 0, fmt.Errorf("failed to play Zombie idle combo: %w", err)
+	if err := rs.PlayDefaultAnimation(entityID, "zombie"); err != nil {
+		return 0, fmt.Errorf("failed to play Zombie default animation: %w", err)
 	}
 
 	// 添加速度组件（初始速度为0，待命状态）
@@ -143,18 +164,41 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs Reanim
 		return 0, fmt.Errorf("failed to load Zombie Reanim resources for Conehead")
 	}
 
-	// 添加 ReanimComponent（路障僵尸：基础部件 + 路障）
-	// Story 13.7: 使用配置驱动，不再硬编码 VisibleTracks
+	// 添加 ReanimComponent
+	// 路障僵尸：基础部件 + 路障
 	em.AddComponent(entityID, &components.ReanimComponent{
 		ReanimName: "Zombie",
-		ReanimXML:  reanimXML,
+		Reanim:     reanimXML,
 		PartImages: partImages,
+		VisibleTracks: map[string]bool{
+			// 基础身体部件
+			"Zombie_body":           true,
+			"Zombie_neck":           true,
+			"Zombie_outerarm_upper": true,
+			"Zombie_outerarm_lower": true,
+			"Zombie_outerarm_hand":  true,
+			"Zombie_outerleg_upper": true,
+			"Zombie_outerleg_lower": true,
+			"Zombie_outerleg_foot":  true,
+			"Zombie_innerleg_upper": true,
+			"Zombie_innerleg_lower": true,
+			"Zombie_innerleg_foot":  true,
+			// 头部
+			"anim_head1": true, // 头部
+			"anim_head2": true, // 下巴
+			// 右手（内侧手臂）
+			"anim_innerarm1": true,
+			"anim_innerarm2": true,
+			"anim_innerarm3": true,
+			// 路障
+			"anim_cone": true,
+		},
 	})
 
-	// Story 13.8: 路障僵尸使用配置驱动的动画组合（自动显示路障，隐藏其他装备）
+	// Story 13.6: 使用配置驱动的动画播放
 	// 激活后会由 WaveSpawnSystem.ActivateWave() 切换为 walk 动画
-	if err := rs.PlayCombo(entityID, "zombie_conehead", "idle"); err != nil {
-		return 0, fmt.Errorf("failed to play ZombieConeHead idle combo: %w", err)
+	if err := rs.PlayDefaultAnimation(entityID, "zombie"); err != nil {
+		return 0, fmt.Errorf("failed to play ZombieConeHead default animation: %w", err)
 	}
 
 	// 添加速度组件（初始速度为0，待命状态）
@@ -237,18 +281,41 @@ func NewBucketheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs Rean
 		return 0, fmt.Errorf("failed to load Zombie Reanim resources for Buckethead")
 	}
 
-	// 添加 ReanimComponent（铁桶僵尸：基础部件 + 铁桶）
-	// Story 13.7: 使用配置驱动，不再硬编码 VisibleTracks
+	// 添加 ReanimComponent
+	// 铁桶僵尸：基础部件 + 铁桶
 	em.AddComponent(entityID, &components.ReanimComponent{
 		ReanimName: "Zombie",
-		ReanimXML:  reanimXML,
+		Reanim:     reanimXML,
 		PartImages: partImages,
+		VisibleTracks: map[string]bool{
+			// 基础身体部件
+			"Zombie_body":           true,
+			"Zombie_neck":           true,
+			"Zombie_outerarm_upper": true,
+			"Zombie_outerarm_lower": true,
+			"Zombie_outerarm_hand":  true,
+			"Zombie_outerleg_upper": true,
+			"Zombie_outerleg_lower": true,
+			"Zombie_outerleg_foot":  true,
+			"Zombie_innerleg_upper": true,
+			"Zombie_innerleg_lower": true,
+			"Zombie_innerleg_foot":  true,
+			// 头部
+			"anim_head1": true, // 头部
+			"anim_head2": true, // 下巴
+			// 右手（内侧手臂）
+			"anim_innerarm1": true,
+			"anim_innerarm2": true,
+			"anim_innerarm3": true,
+			// 铁桶
+			"anim_bucket": true,
+		},
 	})
 
-	// Story 13.8: 铁桶僵尸使用配置驱动的动画组合（自动显示铁桶，隐藏其他装备）
+	// Story 13.6: 使用配置驱动的动画播放
 	// 激活后会由 WaveSpawnSystem.ActivateWave() 切换为 walk 动画
-	if err := rs.PlayCombo(entityID, "zombie_buckethead", "idle"); err != nil {
-		return 0, fmt.Errorf("failed to play ZombieBucketHead idle combo: %w", err)
+	if err := rs.PlayDefaultAnimation(entityID, "zombie"); err != nil {
+		return 0, fmt.Errorf("failed to play ZombieBucketHead default animation: %w", err)
 	}
 
 	// 添加速度组件（初始速度为0，待命状态）

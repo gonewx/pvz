@@ -5,6 +5,7 @@ import (
 
 	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -21,7 +22,7 @@ func (m *mockReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string)
 	if m.em != nil {
 		if reanimComp, ok := m.em.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{})); ok {
 			reanim := reanimComp.(*components.ReanimComponent)
-			reanim.CurrentAnim = animName
+			// reanim.CurrentAnim = animName
 			reanim.CurrentAnimations = []string{animName}
 			reanim.FrameAccumulator = 0.0
 			reanim.IsLooping = true
@@ -37,7 +38,7 @@ func (m *mockReanimSystem) PlayAnimationNoLoop(entityID ecs.EntityID, animName s
 	if m.em != nil {
 		if reanimComp, ok := m.em.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{})); ok {
 			reanim := reanimComp.(*components.ReanimComponent)
-			reanim.CurrentAnim = animName
+			// reanim.CurrentAnim = animName
 			reanim.CurrentAnimations = []string{animName}
 			reanim.FrameAccumulator = 0.0
 			reanim.IsLooping = false
@@ -60,10 +61,49 @@ func (m *mockReanimSystem) PrepareStaticPreview(entityID ecs.EntityID, reanimNam
 	if m.em != nil {
 		if reanimComp, ok := m.em.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{})); ok {
 			reanim := reanimComp.(*components.ReanimComponent)
-			reanim.CurrentAnim = "static_preview"
+			// reanim.CurrentAnim = "static_preview"
 			reanim.CurrentAnimations = []string{"static_preview"}
 			reanim.IsLooping = false
 			reanim.IsFinished = true
+		}
+	}
+	return nil
+}
+
+// ApplyReanimConfig 应用 Reanim 配置到指定实体 (Story 13.5)
+// Mock implementation - 在测试中不需要真正应用配置，只需返回成功
+func (m *mockReanimSystem) ApplyReanimConfig(entityID ecs.EntityID, cfg *config.ReanimConfig) error {
+	// Mock implementation - 测试中不需要真正的配置应用
+	return nil
+}
+
+// PlayCombo 播放配置驱动的动画组合 (Story 13.6)
+// Mock implementation - 在测试中设置基本的动画状态
+func (m *mockReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string) error {
+	// Mock implementation - 简化版本，直接播放第一个动画
+	if m.em != nil {
+		if reanimComp, ok := m.em.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{})); ok {
+			reanim := reanimComp.(*components.ReanimComponent)
+			// reanim.CurrentAnim = comboName
+			reanim.CurrentAnimations = []string{comboName}
+			reanim.IsLooping = true
+			reanim.IsFinished = false
+		}
+	}
+	return nil
+}
+
+// PlayDefaultAnimation 播放默认动画 (Story 13.6)
+// Mock implementation - 在测试中设置基本的默认动画状态
+func (m *mockReanimSystem) PlayDefaultAnimation(entityID ecs.EntityID, unitID string) error {
+	// Mock implementation - 播放名为 "default" 的动画
+	if m.em != nil {
+		if reanimComp, ok := m.em.GetComponent(entityID, reflect.TypeOf(&components.ReanimComponent{})); ok {
+			reanim := reanimComp.(*components.ReanimComponent)
+			// reanim.CurrentAnim = "anim_idle"
+			reanim.CurrentAnimations = []string{"anim_idle"}
+			reanim.IsLooping = true
+			reanim.IsFinished = false
 		}
 	}
 	return nil

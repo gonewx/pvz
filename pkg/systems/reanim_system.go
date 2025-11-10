@@ -11,278 +11,662 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// ==================================================================
-// Story 6.5: Reanim Track Type Constants (轨道类型常量)
-// ==================================================================
+// ReanimSystem 是 Reanim 动画系统
+// 基于 animation_showcase/AnimationCell 重写，简化并修复 Epic 13 遗留问题
 //
-// These constants define the track types used in the Reanim system.
-// Based on analysis of 5 Reanim files (87 tracks total):
-// - 76% are hybrid tracks (images + f values + transforms)
-// - 23% are animation definition tracks (only f values)
-// - <1% are pure visual tracks (only images)
-// - <1% are logical tracks (no images, only transforms)
-//
-// Reference: docs/reanim/reanim-hybrid-track-discovery.md
-
-// AnimationDefinitionTracks are tracks that only define time windows.
-// They have FrameNum values but no images or transforms.
-// Example: anim_idle, anim_shooting, anim_head_idle, anim_full_idle
-var AnimationDefinitionTracks = map[string]bool{
-	"anim_idle":      true,
-	"anim_shooting":  true,
-	"anim_head_idle": true,
-	"anim_full_idle": true,
-}
-
-// LogicalTracks are tracks that define attachment points or parent transforms.
-// They have position/transform data but no images.
-// Example: anim_stem (parent bone for head parts), _ground (ground attachment point)
-var LogicalTracks = map[string]bool{
-	"anim_stem": true,
-	"_ground":   true,
-}
-
-// ReanimSystem is the Reanim animation system that manages skeletal animations
-// for entities with ReanimComponent.
-//
-// This system is responsible for:
-// - Advancing animation frames based on FPS
-// - Implementing frame inheritance (cumulative transformations)
-// - Managing animation loops
-// - Supporting two playback modes: synchronous (GlobalFrame) and asynchronous (per-animation Frame)
-//
-// All animation logic is centralized in this system, following the ECS
-// architecture principle of data-behavior separation.
+// Story 13.8 重构目标：
+// - API 数量从 50+ 减少到 2 个核心 API
+// - 代码行数从 2808 减少到 ~1000 行
+// - 与 AnimationCell 保持一致的逻辑
 type ReanimSystem struct {
 	entityManager *ecs.EntityManager
-
-	// Story 13.6: 配置管理器（用于配置驱动的动画播放）
 	configManager *config.ReanimConfigManager
+
+	// 游戏 TPS（用于帧推进计算）
+	targetTPS float64
 }
 
-// NewReanimSystem creates a new Reanim animation system.
-//
-// Parameters:
-//   - em: the EntityManager that manages all entities and components
-//
-// Returns:
-//   - A pointer to the newly created ReanimSystem
+// NewReanimSystem 创建新的 Reanim 动画系统
 func NewReanimSystem(em *ecs.EntityManager) *ReanimSystem {
 	return &ReanimSystem{
 		entityManager: em,
+		targetTPS:     60.0, // 默认 60 TPS
 	}
 }
 
-// Update updates all Reanim components by advancing animation frames.
-//
-// Story 13.2: 统一的帧推进逻辑，不再区分同步/异步模式
-// 所有动画使用独立的 AnimState.LogicalFrame
-//
-// Parameters:
-//   - deltaTime: time elapsed since last update (in seconds)
-func (s *ReanimSystem) Update(deltaTime float64) {
-	// Query all entities with ReanimComponent
-	entities := ecs.GetEntitiesWith1[*components.ReanimComponent](s.entityManager)
-
-	for _, id := range entities {
-		// Get the ReanimComponent
-		reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id)
-		if !exists {
-			continue
-		}
-
-		// Skip if no Reanim data
-		if reanimComp.Reanim == nil {
-			continue
-		}
-
-		// Skip if animation is paused
-		if reanimComp.IsPaused {
-			continue
-		}
-
-		// ✅ 统一的帧推进逻辑（Story 13.2）
-		s.updateAnimationStates(reanimComp, deltaTime)
-	}
+// SetConfigManager 设置配置管理器
+func (s *ReanimSystem) SetConfigManager(cm *config.ReanimConfigManager) {
+	s.configManager = cm
 }
 
-// updateAnimationStates 更新所有动画状态的独立帧索引（Story 13.2）
-//
-// 每个动画维护自己的 LogicalFrame、Accumulator 和循环状态
-//
-// Parameters:
-//   - comp: ReanimComponent to update
-//   - deltaTime: time elapsed since last update (in seconds)
-func (s *ReanimSystem) updateAnimationStates(comp *components.ReanimComponent, deltaTime float64) {
-	frameTime := 1.0 / float64(comp.Reanim.FPS)
-
-	for _, state := range comp.AnimStates {
-		// 跳过非激活动画
-		if !state.IsActive {
-			// 处理延迟逻辑（如果需要）
-			if state.DelayDuration > 0 {
-				state.DelayTimer += deltaTime
-				if state.DelayTimer >= state.DelayDuration {
-					state.IsActive = true
-					state.DelayTimer = 0
-					state.LogicalFrame = state.StartFrame
-				}
-			}
-			continue
-		}
-
-		// 更新帧累加器
-		state.Accumulator += deltaTime
-
-		// 推进帧
-		for state.Accumulator >= frameTime {
-			state.Accumulator -= frameTime
-			state.LogicalFrame++
-
-			// 检查循环
-			endFrame := state.StartFrame + state.FrameCount
-			if state.LogicalFrame >= endFrame {
-				if state.IsLooping {
-					state.LogicalFrame = state.StartFrame
-					// 如果有延迟，停止并重置延迟计时器
-					if state.DelayDuration > 0 {
-						state.IsActive = false
-						state.DelayTimer = 0
-					}
-				} else {
-					state.LogicalFrame = endFrame - 1
-					state.IsActive = false
-					break
-				}
-			}
-		}
-	}
+// SetTargetTPS 设置目标 TPS（用于帧推进计算）
+func (s *ReanimSystem) SetTargetTPS(tps float64) {
+	s.targetTPS = tps
 }
 
-// getAnimDefinitionTrack returns the animation definition track for the given animation name.
+// ==================================================================
+// 核心 API (Core APIs)
+// ==================================================================
+
+// PlayAnimation 播放单个动画（基础 API，不读配置）
+// 用于简单场景，不需要配置文件的支持
 //
-// Animation definition tracks are tracks whose names start with "anim_" (e.g., "anim_idle", "anim_shooting").
-// These tracks control the overall animation visibility and timing.
+// 参数：
+//   - entityID: 实体 ID
+//   - animName: 动画名称（如 "anim_idle"）
 //
-// Important: This method validates that the found track is actually an animation definition track
-// (has FrameNum but no image/transform data). This prevents accidentally using part tracks or
-// transform tracks as animation definitions.
-//
-// Parameters:
-//   - comp: the ReanimComponent containing the Reanim data
-//   - animName: the name of the animation to find (e.g., "anim_idle")
-//
-// Returns:
-//   - A pointer to the Track if found and valid, nil otherwise
-func (s *ReanimSystem) getAnimDefinitionTrack(comp *components.ReanimComponent, animName string) *reanim.Track {
-	if comp.Reanim == nil {
-		return nil
+// 返回：
+//   - error: 如果实体不存在或没有 ReanimComponent，返回错误
+func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) error {
+	comp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !ok {
+		return fmt.Errorf("entity %d does not have ReanimComponent", entityID)
 	}
 
-	// Iterate through all tracks to find the one with the matching name
-	for i := range comp.Reanim.Tracks {
-		track := &comp.Reanim.Tracks[i]
-		if track.Name == animName {
-			// Story 8.6 QA修正: 移除多余的动画定义轨道限制
-			// 原因: 某些植物（如向日葵）的 reanim 文件中，动画轨道同时包含动画定义和部件渲染数据
-			// 这是原版游戏的正常结构，不应该被限制
-			// 只要轨道名称匹配，就认为是有效的动画定义
-
-			// 对于标准动画定义轨道（只包含 FrameNum），直接返回
-			if s.isAnimationDefinitionTrack(track) {
-				return track
-			}
-
-			// 对于包含图片/变换的轨道，也允许作为动画定义使用
-			// 这种情况在原版游戏中很常见，例如：
-			// - SunFlower.reanim 的 anim_idle 轨道
-			// - FinalWave.reanim 的单轨道动画
-			log.Printf("[ReanimSystem] Using animation track '%s' (contains images/transforms, valid for animation definition)", animName)
-			return track
-		}
+	if comp.ReanimXML == nil {
+		return fmt.Errorf("entity %d has no ReanimXML data", entityID)
 	}
+
+	// ✅ Story 13.8 Bug Fix #9: 自动初始化基础字段（如果尚未初始化）
+	// 原因：zombie_factory 等调用者只设置 ReanimXML 和 PartImages
+	// rebuildAnimationData 需要 MergedTracks 存在
+	if comp.MergedTracks == nil {
+		comp.MergedTracks = reanim.BuildMergedTracks(comp.ReanimXML)
+		comp.VisualTracks, comp.LogicalTracks = s.analyzeTrackTypes(comp.ReanimXML)
+		comp.AnimationFPS = float64(comp.ReanimXML.FPS)
+		comp.IsLooping = true
+		comp.LastRenderFrame = -1
+	}
+
+	// ✅ 单个动画模式：清空配置相关字段
+	// 单个动画模式下，不使用 HiddenTracks, ParentTracks, TrackAnimationBinding
+	// 这些都依赖 Reanim 文件本身的定义
+	comp.HiddenTracks = nil
+	comp.ParentTracks = nil
+	comp.TrackAnimationBinding = nil
+
+	// 设置当前动画列表
+	comp.CurrentAnimations = []string{animName}
+	comp.CurrentFrame = 0
+	comp.FrameAccumulator = 0
+	comp.IsFinished = false
+
+	// 重建动画数据
+	s.rebuildAnimationData(comp)
+
+	// 计算并缓存 CenterOffset（基于第一帧）
+	s.calculateCenterOffset(comp)
+
+	// 标记缓存失效
+	comp.LastRenderFrame = -1
 
 	return nil
 }
 
-// isAnimationDefinitionTrack validates if a track is an animation definition track.
+// PlayCombo 播放配置组合（推荐 API，应用所有配置）
+// 从配置管理器读取 combo 配置，应用所有设置（hidden_tracks, parent_tracks, binding）
 //
-// Reanim files have multiple track types:
-//  1. Animation definition tracks: only FrameNum, no images, no transforms
-//     Examples: anim_idle, anim_shooting, anim_full_idle
-//  2. Part tracks: have images and transforms
-//     Examples: backleaf, frontleaf, stalk_bottom, anim_face
-//  3. Transform tracks: have transforms but no images (for bone transforms)
-//     Examples: anim_stem
-//  4. Hybrid tracks: have images + transforms + FrameNum (overlay animations)
-//     Examples: anim_blink, idle_shoot_blink
+// 参数：
+//   - entityID: 实体 ID
+//   - unitID: 单位 ID（如 "peashooter", "sunflower"）
+//   - comboName: 组合名称（如 "attack", "idle"）。如果为空，使用第一个 combo
 //
-// This method returns true only for type 1 (animation definition tracks).
-func (s *ReanimSystem) isAnimationDefinitionTrack(track *reanim.Track) bool {
-	hasImageRef := false
-	hasTransform := false
-	hasFrameNum := false
+// 返回：
+//   - error: 如果实体不存在、配置缺失，返回错误
+func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string) error {
+	comp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !ok {
+		return fmt.Errorf("entity %d does not have ReanimComponent", entityID)
+	}
 
-	for _, frame := range track.Frames {
-		// Check for image references
-		if frame.ImagePath != "" {
-			hasImageRef = true
+	if comp.ReanimXML == nil {
+		return fmt.Errorf("entity %d has no ReanimXML data", entityID)
+	}
+
+	// ✅ Story 13.8 Bug Fix: 自动初始化基础字段（如果尚未初始化）
+	// 原因：plant_card_factory 等调用者只设置 ReanimXML 和 PartImages
+	// 需要 PlayCombo 自动初始化 MergedTracks, VisualTracks 等字段
+	if comp.MergedTracks == nil {
+		comp.ReanimName = unitID
+		comp.MergedTracks = reanim.BuildMergedTracks(comp.ReanimXML)
+		comp.VisualTracks, comp.LogicalTracks = s.analyzeTrackTypes(comp.ReanimXML)
+		comp.AnimationFPS = float64(comp.ReanimXML.FPS)
+		comp.IsLooping = true
+		comp.LastRenderFrame = -1
+		log.Printf("[ReanimSystem] PlayCombo: 初始化实体 %d, ReanimName='%s', VisualTracks=%d, LogicalTracks=%d, FPS=%.1f",
+			entityID, comp.ReanimName, len(comp.VisualTracks), len(comp.LogicalTracks), comp.AnimationFPS)
+	}
+
+	if s.configManager == nil {
+		return fmt.Errorf("config manager not set, cannot play combo")
+	}
+
+	// 获取单位配置
+	unitConfig, err := s.configManager.GetUnit(unitID)
+	if err != nil {
+		return fmt.Errorf("failed to get config for unit %s: %w", unitID, err)
+	}
+
+	// 查找 combo 配置
+	var combo *config.AnimationComboConfig
+	if comboName == "" {
+		// 使用第一个 combo
+		if len(unitConfig.AnimationCombos) > 0 {
+			combo = &unitConfig.AnimationCombos[0]
 		}
-		// Check for transform data
-		if frame.X != nil || frame.Y != nil || frame.ScaleX != nil || frame.ScaleY != nil {
-			hasTransform = true
-		}
-		// Check for FrameNum
-		if frame.FrameNum != nil {
-			hasFrameNum = true
+	} else {
+		// 查找指定 combo
+		for i := range unitConfig.AnimationCombos {
+			if unitConfig.AnimationCombos[i].Name == comboName {
+				combo = &unitConfig.AnimationCombos[i]
+				break
+			}
 		}
 	}
 
-	// Animation definition track: has FrameNum, but no images or transforms
-	return hasFrameNum && !hasImageRef && !hasTransform
+	if combo == nil {
+		return fmt.Errorf("no combo found for unit %s, combo %s", unitID, comboName)
+	}
+
+	// 1. 设置动画列表
+	comp.CurrentAnimations = combo.Animations
+	comp.CurrentFrame = 0
+	comp.FrameAccumulator = 0
+	comp.IsFinished = false
+	log.Printf("[ReanimSystem] PlayCombo: entity %d, unit %s, combo %s → animations: %v",
+		entityID, unitID, comboName, combo.Animations)
+
+	// 2. 应用父子关系
+	if len(combo.ParentTracks) > 0 {
+		comp.ParentTracks = combo.ParentTracks
+		log.Printf("[ReanimSystem] PlayCombo: applied %d parent tracks", len(combo.ParentTracks))
+	} else {
+		comp.ParentTracks = nil
+	}
+
+	// 3. 应用隐藏轨道
+	if len(combo.HiddenTracks) > 0 {
+		comp.HiddenTracks = make(map[string]bool)
+		for _, track := range combo.HiddenTracks {
+			comp.HiddenTracks[track] = true
+		}
+		log.Printf("[ReanimSystem] PlayCombo: hiding %d tracks", len(combo.HiddenTracks))
+	} else {
+		comp.HiddenTracks = nil
+	}
+
+	// 4. 重建动画数据
+	s.rebuildAnimationData(comp)
+
+	// 5. 分析轨道绑定
+	if combo.BindingStrategy == "auto" {
+		comp.TrackAnimationBinding = s.analyzeTrackBinding(comp)
+		log.Printf("[ReanimSystem] PlayCombo: auto-generated %d track bindings", len(comp.TrackAnimationBinding))
+	} else if combo.BindingStrategy == "manual" && len(combo.ManualBindings) > 0 {
+		comp.TrackAnimationBinding = combo.ManualBindings
+		log.Printf("[ReanimSystem] PlayCombo: applied %d manual bindings", len(combo.ManualBindings))
+	} else {
+		comp.TrackAnimationBinding = nil
+	}
+
+	// 标记缓存失效
+	// 计算并缓存 CenterOffset（基于第一帧）
+	s.calculateCenterOffset(comp)
+
+	comp.LastRenderFrame = -1
+
+	return nil
 }
 
 // ==================================================================
-// Story 6.5: Track Type Helper Functions (轨道类型辅助函数)
+// 系统更新 (System Update)
 // ==================================================================
 
-// isAnimationDefinitionTrackByName checks if a track is an animation definition track by name.
-// This is a fast check using the hardcoded list of known animation definition tracks.
-func (s *ReanimSystem) isAnimationDefinitionTrackByName(trackName string) bool {
-	return AnimationDefinitionTracks[trackName]
+// Update 更新所有 Reanim 组件的动画帧
+// 基于 AnimationCell.Update() 的逻辑
+// ✅ Story 13.8 Bug Fix #10: 完全匹配参考实现
+//   - currentFrame 无限增长，不在 Update 中做循环检查
+//   - 循环逻辑完全由 findControllingAnimation 的取模处理
+//   - 支持多动画组合（不同轨道可以有不同的帧数）
+func (s *ReanimSystem) Update(deltaTime float64) {
+	entities := ecs.GetEntitiesWith1[*components.ReanimComponent](s.entityManager)
+
+	// Debug: 检查是否有 sodroll 实体
+	for _, id := range entities {
+		comp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id)
+		if exists && comp.ReanimName == "sodroll" && comp.CurrentFrame < 3 {
+			log.Printf("[ReanimSystem] 🟫 Update: sodroll entity %d, frame=%d, FPS=%.1f",
+				id, comp.CurrentFrame, comp.AnimationFPS)
+		}
+	}
+
+	for _, id := range entities {
+		comp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id)
+		if !exists {
+			continue
+		}
+
+		// 跳过没有数据的组件
+		if comp.ReanimXML == nil {
+			continue
+		}
+
+		// 跳过暂停的动画
+		if comp.IsPaused {
+			continue
+		}
+
+		// 使用帧累加器控制动画速度
+		// animationFPS: 从 Reanim 文件读取的动画帧率
+		// targetTPS: 目标游戏 TPS
+		// 计算公式：frameAccumulator += animationFPS / targetTPS
+		//
+		// ✅ 参考实现（animation_cell.go:331-347）：
+		// - currentFrame 无限增长（不做循环检查）
+		// - 循环由 findControllingAnimation 的 % 操作处理
+		// - 支持多动画组合（不同轨道不同帧数）
+		comp.FrameAccumulator += comp.AnimationFPS / s.targetTPS
+
+		if comp.FrameAccumulator >= 1.0 {
+			comp.CurrentFrame++
+			comp.FrameAccumulator -= 1.0
+			// ✅ 移除循环检查，让 findControllingAnimation 通过取模处理
+
+			// Bug Fix: 检查非循环动画是否已完成
+			if !comp.IsLooping && !comp.IsFinished {
+				// 计算动画的最大帧数（所有当前播放动画中的最大可见帧数）
+				maxVisibleFrames := 0
+				for _, animName := range comp.CurrentAnimations {
+					if animVisibles, exists := comp.AnimVisiblesMap[animName]; exists {
+						visibleCount := countVisibleFrames(animVisibles)
+						if visibleCount > maxVisibleFrames {
+							maxVisibleFrames = visibleCount
+						}
+					}
+				}
+
+				// 如果当前帧已经到达或超过最大帧数，标记动画完成
+				if maxVisibleFrames > 0 && comp.CurrentFrame >= maxVisibleFrames {
+					comp.IsFinished = true
+					// 将帧数钳制在最后一帧，防止越界
+					comp.CurrentFrame = maxVisibleFrames - 1
+					log.Printf("[ReanimSystem] 非循环动画完成: entity=%d, maxFrames=%d", id, maxVisibleFrames)
+				}
+			}
+		}
+	}
 }
 
-// isLogicalTrack checks if a track is a logical track (no images, only transforms).
-// Logical tracks like anim_stem define attachment points or parent bones.
-func (s *ReanimSystem) isLogicalTrack(trackName string) bool {
-	return LogicalTracks[trackName]
+// ==================================================================
+// 渲染缓存 (Render Cache)
+// ==================================================================
+
+// prepareRenderCache 准备渲染缓存
+// 基于 AnimationCell.updateRenderCache() 的逻辑
+// 关键修复：检查 HiddenTracks（Story 13.8 核心 Bug 修复）
+func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
+	// Debug: 无条件打印向日葵和 SodRoll 的缓存准备
+	if comp.ReanimName == "sunflower" && comp.CurrentFrame < 3 {
+		log.Printf("[ReanimSystem] 🌻 prepareRenderCache 被调用: frame=%d", comp.CurrentFrame)
+	}
+	if comp.ReanimName == "sodroll" && comp.CurrentFrame < 3 {
+		log.Printf("[ReanimSystem] 🟫 SodRoll prepareRenderCache 被调用: frame=%d, VisualTracks=%d",
+			comp.CurrentFrame, len(comp.VisualTracks))
+	}
+
+	// 重用切片避免分配
+	comp.CachedRenderData = comp.CachedRenderData[:0]
+
+	visibleCount := 0
+	skippedHidden := 0
+	skippedNoAnim := 0
+	skippedNoFrames := 0
+	skippedNoImage := 0
+
+	for _, trackName := range comp.VisualTracks {
+		// Debug: 打印向日葵的所有轨道名称
+		if comp.ReanimName == "sunflower" && comp.CurrentFrame == 0 {
+			log.Printf("[ReanimSystem] 🔍 sunflower 轨道: %s", trackName)
+		}
+
+		// ✅ 关键修复：检查隐藏轨道（黑名单）
+		if comp.HiddenTracks != nil && comp.HiddenTracks[trackName] {
+			skippedHidden++
+			continue
+		}
+
+		// 查找控制该轨道的动画
+		controllingAnim, physicalFrame := s.findControllingAnimation(comp, trackName)
+		if controllingAnim == "" {
+			skippedNoAnim++
+			// Debug: 记录没有控制动画的轨道
+			if comp.ReanimName == "sunflower" && comp.CurrentFrame == 0 {
+				log.Printf("[ReanimSystem] ⚠️ sunflower 轨道 %s: 没有找到控制动画", trackName)
+			}
+			continue
+		}
+
+		// Debug: 记录 anim_idle 相关轨道的控制信息
+		if comp.ReanimName == "sunflower" && comp.CurrentFrame < 3 && (trackName == "anim_idle" || controllingAnim == "anim_idle") {
+			log.Printf("[ReanimSystem] 📍 sunflower frame %d: 轨道 %s 由动画 %s 控制, physicalFrame=%d",
+				comp.CurrentFrame, trackName, controllingAnim, physicalFrame)
+		}
+
+		// 获取轨道的帧数组
+		mergedFrames, ok := comp.MergedTracks[trackName]
+		if !ok || physicalFrame >= len(mergedFrames) {
+			skippedNoFrames++
+			continue
+		}
+
+		frame := mergedFrames[physicalFrame]
+
+		// ✅ 图片继承逻辑：如果当前帧没有图片，向前搜索最近的有图片的帧
+		// 原版 PvZ 的 Reanim 系统会继承上一帧的图片（类似 Flash 的关键帧）
+		if frame.ImagePath == "" {
+			// 向前搜索有图片的帧
+			foundImage := false
+			for i := physicalFrame - 1; i >= 0; i-- {
+				if i < len(mergedFrames) && mergedFrames[i].ImagePath != "" {
+					// 继承前一帧的图片路径，但保留当前帧的变换属性
+					frame.ImagePath = mergedFrames[i].ImagePath
+					foundImage = true
+					// Debug: 向日葵 anim_idle 轨道的图片继承
+					if comp.ReanimName == "sunflower" && trackName == "anim_idle" && comp.CurrentFrame < 5 {
+						log.Printf("[ReanimSystem] 🔧 SunFlower anim_idle frame %d 继承图片: %s (从帧 %d)",
+							physicalFrame, frame.ImagePath, i)
+					}
+					break
+				}
+			}
+			// 如果整个轨道都没有图片，才跳过
+			if !foundImage {
+				skippedNoImage++
+				if comp.ReanimName == "sunflower" && trackName == "anim_idle" {
+					log.Printf("[ReanimSystem] ❌ SunFlower anim_idle frame %d: 整个轨道都没有图片!", physicalFrame)
+				}
+				continue
+			}
+		} else if comp.ReanimName == "sunflower" && trackName == "anim_idle" && comp.CurrentFrame < 5 {
+			// Debug: 原生图片
+			log.Printf("[ReanimSystem] ✅ SunFlower anim_idle frame %d 原生图片: %s", physicalFrame, frame.ImagePath)
+		}
+
+		// 计算父轨道偏移
+		offsetX, offsetY := 0.0, 0.0
+		if parentTrackName, hasParent := comp.ParentTracks[trackName]; hasParent {
+			childAnimName, _ := s.findControllingAnimation(comp, trackName)
+			parentAnimName, _ := s.findControllingAnimation(comp, parentTrackName)
+
+			// 只有当子轨道和父轨道使用不同动画时，才应用偏移
+			if childAnimName != parentAnimName && childAnimName != "" && parentAnimName != "" {
+				offsetX, offsetY = s.getParentOffset(comp, parentTrackName)
+			}
+		}
+
+		// 获取图片
+		img, ok := comp.PartImages[frame.ImagePath]
+		if !ok || img == nil {
+			// Debug: 记录找不到图片的情况
+			if comp.ReanimName == "sunflower" && trackName == "anim_idle" && comp.CurrentFrame < 5 {
+				log.Printf("[ReanimSystem] ⚠️ SunFlower anim_idle frame %d: 图片 %s 不存在于 PartImages", physicalFrame, frame.ImagePath)
+			}
+			continue
+		}
+
+		// Debug: 成功获取图片
+		if comp.ReanimName == "sunflower" && trackName == "anim_idle" && comp.CurrentFrame < 5 {
+			log.Printf("[ReanimSystem] ✅ SunFlower anim_idle frame %d: 成功获取图片 %s (尺寸: %dx%d)",
+				physicalFrame, frame.ImagePath, img.Bounds().Dx(), img.Bounds().Dy())
+		}
+
+		// 添加到缓存
+		comp.CachedRenderData = append(comp.CachedRenderData, components.RenderPartData{
+			Img:     img,
+			Frame:   frame,
+			OffsetX: offsetX,
+			OffsetY: offsetY,
+		})
+		visibleCount++
+	}
+
+	// Debug: 只在有变化时输出日志（避免刷屏）
+	// 特殊调试：向日葵每帧都打印（前 10 帧）
+	if comp.ReanimName == "sunflower" && comp.CurrentFrame < 10 {
+		log.Printf("[ReanimSystem] 🔍 SunFlower frame %d → %d visible parts (skipped: hidden=%d, noAnim=%d, noFrames=%d, noImage=%d)",
+			comp.CurrentFrame, visibleCount, skippedHidden, skippedNoAnim, skippedNoFrames, skippedNoImage)
+	} else if len(comp.CachedRenderData) > 0 && comp.CurrentFrame%30 == 0 {
+		log.Printf("[ReanimSystem] prepareRenderCache: %s frame %d → %d visible parts (skipped: hidden=%d, noAnim=%d, noFrames=%d, noImage=%d)",
+			comp.ReanimName, comp.CurrentFrame, visibleCount, skippedHidden, skippedNoAnim, skippedNoFrames, skippedNoImage)
+	}
 }
 
-// buildVisiblesArray builds the visibility array for the given animation.
+// GetRenderData 获取渲染数据（供 RenderSystem 使用）
+// 如果缓存失效，会自动重建缓存
+func (s *ReanimSystem) GetRenderData(entityID ecs.EntityID) []components.RenderPartData {
+	comp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !ok {
+		return nil
+	}
+
+	// 检查缓存是否失效
+	if comp.LastRenderFrame != comp.CurrentFrame {
+		s.prepareRenderCache(comp)
+		comp.LastRenderFrame = comp.CurrentFrame
+	}
+
+	return comp.CachedRenderData
+}
+
+// ==================================================================
+// 辅助方法 (Helper Methods)
+// ==================================================================
+
+// rebuildAnimationData 重建动画数据（AnimVisiblesMap）
+// 基于 AnimationCell.rebuildAnimationData()
+func (s *ReanimSystem) rebuildAnimationData(comp *components.ReanimComponent) {
+	comp.AnimVisiblesMap = make(map[string][]int)
+
+	for _, animName := range comp.CurrentAnimations {
+		animVisibles := buildVisiblesArray(comp.ReanimXML, comp.MergedTracks, animName)
+		comp.AnimVisiblesMap[animName] = animVisibles
+	}
+}
+
+// analyzeTrackBinding 自动分析轨道绑定
+// 基于 AnimationCell.analyzeTrackBinding()
+func (s *ReanimSystem) analyzeTrackBinding(comp *components.ReanimComponent) map[string]string {
+	binding := make(map[string]string)
+
+	// 1. 分析视觉轨道
+	for _, trackName := range comp.VisualTracks {
+		frames, ok := comp.MergedTracks[trackName]
+		if !ok {
+			continue
+		}
+
+		var bestAnim string
+		var bestScore float64
+
+		for _, animName := range comp.CurrentAnimations {
+			animVisibles := comp.AnimVisiblesMap[animName]
+			firstVisible, lastVisible := findVisibleWindow(animVisibles)
+
+			if firstVisible < 0 || lastVisible >= len(frames) {
+				continue
+			}
+
+			// 检查是否有图片
+			hasImage := false
+			for i := firstVisible; i <= lastVisible && i < len(frames); i++ {
+				if frames[i].ImagePath != "" {
+					hasImage = true
+					break
+				}
+			}
+
+			if !hasImage {
+				continue
+			}
+
+			// 计算评分
+			variance := calculatePositionVariance(frames, firstVisible, lastVisible)
+			score := 1.0 + variance
+
+			if score > bestScore {
+				bestScore = score
+				bestAnim = animName
+			}
+		}
+
+		if bestAnim != "" {
+			binding[trackName] = bestAnim
+		}
+	}
+
+	// 2. 分析逻辑轨道
+	for _, trackName := range comp.LogicalTracks {
+		frames, ok := comp.MergedTracks[trackName]
+		if !ok || len(frames) == 0 {
+			continue
+		}
+
+		var bestAnim string
+		var maxVariance float64
+
+		for _, animName := range comp.CurrentAnimations {
+			animVisibles := comp.AnimVisiblesMap[animName]
+			firstVisible, lastVisible := findVisibleWindow(animVisibles)
+
+			if firstVisible < 0 || lastVisible >= len(frames) {
+				continue
+			}
+
+			variance := calculatePositionVariance(frames, firstVisible, lastVisible)
+
+			if variance > maxVariance {
+				maxVariance = variance
+				bestAnim = animName
+			}
+		}
+
+		if bestAnim != "" && maxVariance > 0.1 {
+			binding[trackName] = bestAnim
+		}
+	}
+
+	return binding
+}
+
+// findControllingAnimation 查找控制指定轨道的动画
+// 基于 AnimationCell.findControllingAnimation()
+// 返回：动画名称、物理帧索引
+func (s *ReanimSystem) findControllingAnimation(comp *components.ReanimComponent, trackName string) (string, int) {
+	// 优先使用绑定
+	if comp.TrackAnimationBinding != nil {
+		if animName, exists := comp.TrackAnimationBinding[trackName]; exists {
+			animVisibles := comp.AnimVisiblesMap[animName]
+			visibleCount := countVisibleFrames(animVisibles)
+			if visibleCount > 0 {
+				animLogicalFrame := comp.CurrentFrame % visibleCount
+				physicalFrame := mapLogicalToPhysical(animLogicalFrame, animVisibles)
+				return animName, physicalFrame
+			}
+		}
+	}
+
+	// 默认使用第一个动画
+	if len(comp.CurrentAnimations) > 0 {
+		animName := comp.CurrentAnimations[0]
+		animVisibles := comp.AnimVisiblesMap[animName]
+		visibleCount := countVisibleFrames(animVisibles)
+		if visibleCount > 0 {
+			animLogicalFrame := comp.CurrentFrame % visibleCount
+			physicalFrame := mapLogicalToPhysical(animLogicalFrame, animVisibles)
+			return animName, physicalFrame
+		}
+	}
+
+	return "", -1
+}
+
+// getParentOffset 获取父轨道的偏移量
+// 基于 AnimationCell.getParentOffset() (animation_cell.go:454-499)
 //
-// The visibility array determines which frames should be visible during animation playback.
-// Each element corresponds to a frame: 0 = visible, -1 = hidden.
-// This is built from the animation definition track (e.g., "anim_idle").
-//
-// Frame inheritance is applied: if a frame's FrameNum is nil, it inherits the value
-// from the previous frame. The first frame defaults to 0 (visible) if not specified.
-//
-// Parameters:
-//   - comp: the ReanimComponent containing the Reanim data
-//   - animName: the name of the animation (e.g., "anim_idle")
-//
-// Returns:
-//   - An array of visibility values (length = standard frame count)
-func (s *ReanimSystem) buildVisiblesArray(comp *components.ReanimComponent, animName string) []int {
-	// Get the animation definition track
-	animTrack := s.getAnimDefinitionTrack(comp, animName)
+// ✅ Story 13.8 Bug Fix #8: 修复父子偏移计算逻辑
+//   - animation_showcase 逐步初始化坐标（先设为 0，有值则覆盖）
+//   - 旧实现同时检查两个指针，导致 nil 值处理不正确
+func (s *ReanimSystem) getParentOffset(comp *components.ReanimComponent, parentTrackName string) (float64, float64) {
+	parentFrames, ok := comp.MergedTracks[parentTrackName]
+	if !ok || len(parentFrames) == 0 {
+		return 0, 0
+	}
+
+	parentAnimName, parentPhysicalFrame := s.findControllingAnimation(comp, parentTrackName)
+	if parentAnimName == "" || parentPhysicalFrame < 0 {
+		return 0, 0
+	}
+
+	parentAnimVisibles := comp.AnimVisiblesMap[parentAnimName]
+	firstVisibleFrameIndex := -1
+	for i, v := range parentAnimVisibles {
+		if v == 0 {
+			firstVisibleFrameIndex = i
+			break
+		}
+	}
+
+	if firstVisibleFrameIndex < 0 || firstVisibleFrameIndex >= len(parentFrames) {
+		return 0, 0
+	}
+
+	// ✅ 与 animation_showcase 完全一致的逻辑（animation_cell.go:479-498）
+	// 先初始化为 0，然后逐步设置有效值
+	initX, initY := 0.0, 0.0
+	if parentFrames[firstVisibleFrameIndex].X != nil {
+		initX = *parentFrames[firstVisibleFrameIndex].X
+	}
+	if parentFrames[firstVisibleFrameIndex].Y != nil {
+		initY = *parentFrames[firstVisibleFrameIndex].Y
+	}
+
+	// 处理越界情况
+	if parentPhysicalFrame >= len(parentFrames) {
+		parentPhysicalFrame = len(parentFrames) - 1
+	}
+
+	currentX, currentY := initX, initY
+	if parentFrames[parentPhysicalFrame].X != nil {
+		currentX = *parentFrames[parentPhysicalFrame].X
+	}
+	if parentFrames[parentPhysicalFrame].Y != nil {
+		currentY = *parentFrames[parentPhysicalFrame].Y
+	}
+
+	return currentX - initX, currentY - initY
+}
+
+// ==================================================================
+// 全局辅助函数 (Global Helper Functions)
+// 基于 animation_showcase 的实现
+// ==================================================================
+
+// buildVisiblesArray 构建动画的可见性数组
+func buildVisiblesArray(reanimXML *reanim.ReanimXML, mergedTracks map[string][]reanim.Frame, animName string) []int {
+	var animTrack *reanim.Track
+	for i := range reanimXML.Tracks {
+		if reanimXML.Tracks[i].Name == animName {
+			animTrack = &reanimXML.Tracks[i]
+			break
+		}
+	}
+
 	if animTrack == nil {
 		return []int{}
 	}
 
-	// Determine the standard frame count (max frames across all tracks)
 	standardFrameCount := 0
-	for _, track := range comp.Reanim.Tracks {
+	for _, track := range reanimXML.Tracks {
 		if len(track.Frames) > standardFrameCount {
 			standardFrameCount = len(track.Frames)
 		}
@@ -292,932 +676,39 @@ func (s *ReanimSystem) buildVisiblesArray(comp *components.ReanimComponent, anim
 		return []int{}
 	}
 
-	// Build the visibility array with frame inheritance
 	visibles := make([]int, standardFrameCount)
-	currentValue := 0 // Default to visible for the first frame
+	currentValue := 0
 
 	for i := 0; i < standardFrameCount; i++ {
 		if i < len(animTrack.Frames) {
 			frame := animTrack.Frames[i]
-			// If FrameNum is specified, use it; otherwise inherit from previous frame
 			if frame.FrameNum != nil {
 				currentValue = *frame.FrameNum
 			}
 		}
-		// Assign the current value (either explicitly set or inherited)
 		visibles[i] = currentValue
 	}
 
 	return visibles
 }
 
-// getAnimationTracks returns all part tracks that should be rendered for the animation.
-//
-// This includes ALL tracks that contain image references, INCLUDING animation definition tracks.
-// Some plants (like SunFlower) have their head images in the anim_* tracks!
-// The order of tracks in the returned slice determines the rendering order (Z-order).
-//
-// Parameters:
-//   - comp: the ReanimComponent containing the Reanim data
-//
-// Returns:
-//   - A slice of tracks in rendering order
-func (s *ReanimSystem) getAnimationTracks(comp *components.ReanimComponent) []reanim.Track {
-	if comp.Reanim == nil {
-		return nil
-	}
-
-	var result []reanim.Track
-	for _, track := range comp.Reanim.Tracks {
-		// Include ALL tracks that have at least one frame with an image
-		// This includes both part tracks (e.g., "head", "body") and animation tracks (e.g., "anim_idle")
-		// because some plants store part images in animation tracks
-		hasImage := false
-		for _, frame := range track.Frames {
-			if frame.ImagePath != "" {
-				hasImage = true
-				break
-			}
-		}
-
-		if hasImage {
-			result = append(result, track)
+// countVisibleFrames 计算可见帧数
+func countVisibleFrames(animVisibles []int) int {
+	count := 0
+	for _, visible := range animVisibles {
+		if visible == 0 {
+			count++
 		}
 	}
-	return result
+	return count
 }
 
-// PlayAnimation starts playing the specified animation for the given entity (single animation mode).
-//
-// Story 13.2: 重构为只管理 AnimStates，移除 GlobalFrame 设置
-//
-// For playing multiple animations simultaneously, use PlayAnimations() instead.
-// For adding animations incrementally, use AddAnimation() instead.
-//
-// This method:
-// - Clears all existing animations (AnimStates map)
-// - Adds the new animation via addAnimation()
-// - Builds merged tracks and animation tracks
-// - Calculates center offset and best preview frame
-//
-// Parameters:
-//   - entityID: the ID of the entity to play the animation on
-//   - animName: the name of the animation to play (e.g., "anim_idle")
-//
-// Returns:
-//   - An error if the entity doesn't have a ReanimComponent or the animation doesn't exist
-func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) error {
-	// Story 13.6: DEPRECATED - 使用 PlayCombo() 或 PlayDefaultAnimation() 替代
-	log.Printf("⚠️  [DEPRECATED] PlayAnimation() 已废弃，请使用 PlayCombo() 或 PlayDefaultAnimation()")
-
-	// Get the ReanimComponent
-	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-	if !exists {
-		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
-	}
-
-	// Check if Reanim data is present
-	if reanimComp.Reanim == nil {
-		return fmt.Errorf("entity %d has a ReanimComponent but no Reanim data", entityID)
-	}
-
-	// ✅ Story 13.2: 移除 GlobalFrame 和 CurrentFrame 设置
-	// 设置基本动画状态
-	reanimComp.FrameAccumulator = 0.0
-	reanimComp.CurrentAnim = animName
-	reanimComp.CurrentAnimations = []string{animName}
-	reanimComp.IsLooping = true
-	reanimComp.IsFinished = false
-
-	// Build merged tracks with frame inheritance (required for rendering)
-	reanimComp.MergedTracks = reanim.BuildMergedTracks(reanimComp.Reanim)
-
-	// Clear all animations and add the new one
-	reanimComp.AnimStates = make(map[string]*components.AnimState)
-	if err := s.addAnimation(reanimComp, animName, true); err != nil {
-		return err
-	}
-
-	// 单动画时清空 TrackBindings（使用默认行为）
-	reanimComp.TrackBindings = nil
-
-	// Store animation tracks in rendering order
-	reanimComp.AnimTracks = s.getAnimationTracks(reanimComp)
-
-	// Calculate center offset based on the bounding box of visible parts
-	// Skip if FixedCenterOffset is true (prevents position jumping when switching animations)
-	if !reanimComp.FixedCenterOffset {
-		s.calculateCenterOffset(reanimComp)
-	} else {
-		log.Printf("[ReanimSystem] 动画 '%s' 使用固定中心偏移，跳过重新计算", animName)
-	}
-
-	// Story 10.3: Calculate best preview frame (frame with most visible parts)
-	// This is used by RenderPlantIcon to ensure preview shows the most complete representation
-	bestFrame := 0
-	maxVisibleParts := 0
-
-	for frameIdx := 0; frameIdx < reanimComp.VisibleFrameCount; frameIdx++ {
-		// Skip invisible frames
-		animVisibles := reanimComp.AnimVisiblesMap[animName]
-		if frameIdx < len(animVisibles) && animVisibles[frameIdx] == -1 {
-			continue
-		}
-
-		// Count visible parts in this frame
-		visiblePartsCount := 0
-		for _, mergedFrames := range reanimComp.MergedTracks {
-			if frameIdx < len(mergedFrames) && mergedFrames[frameIdx].ImagePath != "" {
-				visiblePartsCount++
-			}
-		}
-
-		// Update best frame if this frame has more visible parts
-		if visiblePartsCount > maxVisibleParts {
-			maxVisibleParts = visiblePartsCount
-			bestFrame = frameIdx
-		}
-	}
-
-	reanimComp.BestPreviewFrame = bestFrame
-
-	return nil
-}
-
-// PlayAnimationNoLoop starts playing the specified animation for the given entity WITHOUT looping.
-// This is used for one-shot animations like death animations.
-//
-// The animation will play once and stay at the last frame when it reaches the end.
-//
-// Parameters:
-//   - entityID: the ID of the entity to play the animation on
-//   - animName: the name of the animation to play (e.g., "anim_death")
-//
-// Returns:
-//   - An error if the entity doesn't have a ReanimComponent or the animation doesn't exist
-func (s *ReanimSystem) PlayAnimationNoLoop(entityID ecs.EntityID, animName string) error {
-	// Use the main PlayAnimation method to set up the animation
-	if err := s.PlayAnimation(entityID, animName); err != nil {
-		return err
-	}
-
-	// Override IsLooping to false for non-looping animations
-	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-	if !exists {
-		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
-	}
-	reanimComp.IsLooping = false
-
-	return nil
-}
-
-// ==================================================================
-// Story 6.9: Multi-Animation Overlay API (多动画叠加 API)
-// ==================================================================
-
-// addAnimation is an internal helper method that adds a single animation to the Anims map.
-//
-// This method:
-// 1. Validates that the animation exists in the Reanim data
-// 2. Initializes the Anims map if needed
-// 3. Builds AnimVisiblesMap if not already present
-// 4. Creates an AnimState and adds it to the Anims map
-// 5. Updates VisibleFrameCount for GlobalFrame loop control
-//
-// Parameters:
-//   - comp: the ReanimComponent to modify
-//   - animName: the name of the animation to add (e.g., "anim_idle", "anim_shooting")
-//   - isActive: whether the animation should start active (controls frame advancement)
-//
-// Returns:
-//   - An error if the animation doesn't exist in the Reanim data
-func (s *ReanimSystem) addAnimation(
-	comp *components.ReanimComponent,
-	animName string,
-	isActive bool,
-) error {
-	// Validate animation exists
-	animTrack := s.getAnimDefinitionTrack(comp, animName)
-	if animTrack == nil {
-		return fmt.Errorf("animation '%s' not found in Reanim data", animName)
-	}
-
-	// Initialize Anims map if needed
-	if comp.AnimStates == nil {
-		comp.AnimStates = make(map[string]*components.AnimState)
-	}
-
-	// Initialize AnimVisiblesMap if needed
-	if comp.AnimVisiblesMap == nil {
-		comp.AnimVisiblesMap = make(map[string][]int)
-	}
-
-	// Build AnimVisiblesMap for this animation if not already present
-	if comp.AnimVisiblesMap[animName] == nil {
-		comp.AnimVisiblesMap[animName] = s.buildVisiblesArray(comp, animName)
-	}
-
-	// Calculate frame count for this animation
-	frameCount := len(comp.AnimVisiblesMap[animName])
-
-	// Create AnimState
-	comp.AnimStates[animName] = &components.AnimState{
-		Name:              animName,
-		IsActive:          isActive,
-		IsLooping:         true, // Default: animations loop
-		LogicalFrame:      0,    // Story 13.2: 重命名自 Frame
-		Accumulator:       0.0,
-		StartFrame:        0,
-		FrameCount:        frameCount,
-		RenderWhenStopped: true, // Default: continue rendering when stopped
-		DelayTimer:        0.0,
-		DelayDuration:     0.0,
-	}
-
-	// Update VisibleFrameCount (used for GlobalFrame loop control in sync mode)
-	// Use the maximum frame count among all animations
-	if frameCount > comp.VisibleFrameCount {
-		comp.VisibleFrameCount = frameCount
-	}
-
-	return nil
-}
-
-// PlayAnimations plays multiple animations simultaneously (multi-animation mode).
-//
-// Story 13.2: 重构为只管理 AnimStates，移除 GlobalFrame 设置
-// Story 13.1: 多动画时自动分析轨道绑定
-//
-// This method clears all existing animations before adding the new ones.
-//
-// Parameters:
-//   - entityID: the ID of the entity
-//   - animNames: slice of animation names to play (e.g., []string{"anim_shooting", "anim_head_idle"})
-//
-// Returns:
-//   - An error if the entity doesn't have a ReanimComponent or any animation doesn't exist
-//
-// Example:
-//
-//	// Play both body and head animations for PeaShooter attack
-//	rs.PlayAnimations(entityID, []string{"anim_shooting", "anim_head_idle"})
-func (s *ReanimSystem) PlayAnimations(entityID ecs.EntityID, animNames []string) error {
-	// Story 13.6: DEPRECATED - 使用 PlayCombo() 替代
-	log.Printf("⚠️  [DEPRECATED] PlayAnimations() 已废弃，请使用 PlayCombo()")
-
-	// Get the ReanimComponent
-	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-	if !exists {
-		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
-	}
-
-	// Check if Reanim data is present
-	if reanimComp.Reanim == nil {
-		return fmt.Errorf("entity %d has a ReanimComponent but no Reanim data", entityID)
-	}
-
-	// Validate at least one animation is specified
-	if len(animNames) == 0 {
-		return fmt.Errorf("at least one animation name must be specified")
-	}
-
-	// ✅ Story 13.2: 移除 GlobalFrame 和 CurrentFrame 设置
-	// 设置基本动画状态
-	primaryAnimName := animNames[0]
-	reanimComp.FrameAccumulator = 0.0
-	reanimComp.CurrentAnim = primaryAnimName
-	reanimComp.CurrentAnimations = animNames
-	reanimComp.IsLooping = true
-	reanimComp.IsFinished = false
-
-	// 多动画支持说明（Story 13.1）
-	if len(animNames) > 1 {
-		log.Printf("[ReanimSystem] PlayAnimations 收到 %d 个动画，将使用 TrackBindings 机制进行轨道绑定",
-			len(animNames))
-	}
-
-	// Build merged tracks with frame inheritance (required for rendering)
-	reanimComp.MergedTracks = reanim.BuildMergedTracks(reanimComp.Reanim)
-
-	// Clear all animations and add the new ones
-	reanimComp.AnimStates = make(map[string]*components.AnimState)
-	for _, animName := range animNames {
-		if err := s.addAnimation(reanimComp, animName, true); err != nil {
-			return fmt.Errorf("failed to add animation '%s': %w", animName, err)
-		}
-	}
-
-	// ==================================================================
-	// Story 13.1: Auto Track Binding (自动轨道绑定)
-	// ==================================================================
-	//
-	// 多动画时自动分析轨道绑定
-	if len(animNames) > 1 {
-		bindings := s.AnalyzeTrackBinding(reanimComp, animNames)
-		reanimComp.TrackBindings = bindings
-
-		// 输出绑定结果（用于调试）
-		log.Printf("[ReanimSystem] 自动轨道绑定 (entity %d):", entityID)
-		for track, anim := range bindings {
-			log.Printf("  - %s -> %s", track, anim)
-		}
-	} else {
-		// 单个动画时，清空绑定（使用默认行为）
-		reanimComp.TrackBindings = nil
-	}
-
-	// Store animation tracks in rendering order
-	reanimComp.AnimTracks = s.getAnimationTracks(reanimComp)
-
-	// Calculate center offset based on the bounding box of visible parts
-	if !reanimComp.FixedCenterOffset {
-		s.calculateCenterOffset(reanimComp)
-	}
-
-	// Calculate best preview frame
-	// Use the primary animation for preview calculation
-	bestFrame := 0
-	maxVisibleParts := 0
-
-	for frameIdx := 0; frameIdx < reanimComp.VisibleFrameCount; frameIdx++ {
-		// Skip invisible frames
-		animVisibles := reanimComp.AnimVisiblesMap[primaryAnimName]
-		if frameIdx < len(animVisibles) && animVisibles[frameIdx] == -1 {
-			continue
-		}
-
-		// Count visible parts in this frame
-		visiblePartsCount := 0
-		for _, mergedFrames := range reanimComp.MergedTracks {
-			if frameIdx < len(mergedFrames) && mergedFrames[frameIdx].ImagePath != "" {
-				visiblePartsCount++
-			}
-		}
-
-		// Update best frame if this frame has more visible parts
-		if visiblePartsCount > maxVisibleParts {
-			maxVisibleParts = visiblePartsCount
-			bestFrame = frameIdx
-		}
-	}
-
-	reanimComp.BestPreviewFrame = bestFrame
-
-	log.Printf("[ReanimSystem] PlayAnimations: entity %d playing %d animations: %v",
-		entityID, len(animNames), animNames)
-
-	return nil
-}
-
-// AddAnimation adds an animation to the currently playing animations (incremental mode).
-//
-// Story 6.9: Enables adding animations without clearing existing ones.
-// This is useful for dynamically layering effects (e.g., adding a burning effect on top of walk animation).
-//
-// Unlike PlayAnimation/PlayAnimations which clear all animations first, this method
-// preserves existing animations and adds a new one.
-//
-// Parameters:
-//   - entityID: the ID of the entity
-//   - animName: the name of the animation to add (e.g., "anim_burning")
-//
-// Returns:
-//   - An error if the entity doesn't have a ReanimComponent or the animation doesn't exist
-//
-// Example:
-//
-//	// Start with walk animation
-//	rs.PlayAnimation(entityID, "anim_walk")
-//	// Add burning effect on top
-//	rs.AddAnimation(entityID, "anim_burning")
-func (s *ReanimSystem) AddAnimation(entityID ecs.EntityID, animName string) error {
-	// Get the ReanimComponent
-	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-	if !exists {
-		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
-	}
-
-	// Check if Reanim data is present
-	if reanimComp.Reanim == nil {
-		return fmt.Errorf("entity %d has a ReanimComponent but no Reanim data", entityID)
-	}
-
-	// Add the animation (preserves existing animations)
-	if err := s.addAnimation(reanimComp, animName, true); err != nil {
-		return fmt.Errorf("failed to add animation '%s': %w", animName, err)
-	}
-
-	log.Printf("[ReanimSystem] AddAnimation: entity %d added animation '%s' (total: %d)",
-		entityID, animName, len(reanimComp.AnimStates))
-
-	return nil
-}
-
-// RemoveAnimation removes a specific animation from the currently playing animations.
-//
-// Story 6.9: Enables removing individual animations without affecting others.
-// This is useful for removing temporary effects (e.g., removing burning effect when it expires).
-//
-// Parameters:
-//   - entityID: the ID of the entity
-//   - animName: the name of the animation to remove (e.g., "anim_burning")
-//
-// Returns:
-//   - An error if the entity doesn't have a ReanimComponent
-//
-// Note: It is safe to call this method even if the animation doesn't exist (no-op).
-//
-// Example:
-//
-//	// Remove burning effect
-//	rs.RemoveAnimation(entityID, "anim_burning")
-func (s *ReanimSystem) RemoveAnimation(entityID ecs.EntityID, animName string) error {
-	// Get the ReanimComponent
-	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-	if !exists {
-		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
-	}
-
-	// Remove from AnimStates map (safe even if animName doesn't exist)
-	delete(reanimComp.AnimStates, animName)
-
-	log.Printf("[ReanimSystem] RemoveAnimation: entity %d removed animation '%s' (remaining: %d)",
-		entityID, animName, len(reanimComp.AnimStates))
-
-	return nil
-}
-
-// InitializeDirectRender initializes a ReanimComponent for direct rendering without animation definitions.
-// This is used for entities like Sun that have only track definitions (no <anim> tags).
-// All tracks will be rendered simultaneously, and all frames are visible.
-//
-// This method calculates CenterOffset to center the animation visually (suitable for grid-based entities).
-//
-// Parameters:
-//   - entityID: the entity to initialize
-//
-// Returns:
-//   - An error if the entity doesn't have a ReanimComponent
-func (s *ReanimSystem) InitializeDirectRender(entityID ecs.EntityID) error {
-	return s.initializeDirectRenderInternal(entityID, true)
-}
-
-// InitializeSceneAnimation initializes a ReanimComponent for scene animations.
-// Scene animations (like SodRoll) have absolute coordinates defined in the reanim file,
-// and do not need CenterOffset adjustment.
-//
-// Parameters:
-//   - entityID: the entity to initialize
-//
-// Returns:
-//   - An error if the entity doesn't have a ReanimComponent
-func (s *ReanimSystem) InitializeSceneAnimation(entityID ecs.EntityID) error {
-	return s.initializeDirectRenderInternal(entityID, false)
-}
-
-// initializeDirectRenderInternal is the internal implementation shared by both
-// InitializeDirectRender and InitializeSceneAnimation.
-//
-// Parameters:
-//   - entityID: the entity to initialize
-//   - calculateCenter: whether to calculate CenterOffset (true for entities, false for scenes)
-//
-// Returns:
-//   - An error if the entity doesn't have a ReanimComponent
-func (s *ReanimSystem) initializeDirectRenderInternal(entityID ecs.EntityID, calculateCenter bool) error {
-	// Get the ReanimComponent
-	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-	if !exists {
-		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
-	}
-
-	// Check if Reanim data is present
-	if reanimComp.Reanim == nil {
-		return fmt.Errorf("entity %d has a ReanimComponent but no Reanim data", entityID)
-	}
-
-	log.Printf("[ReanimSystem] InitializeDirectRender for entity %d", entityID)
-
-	// Set animation state (required for rendering)
-	reanimComp.CurrentAnim = "direct_render" // Non-empty string to pass RenderSystem check
-	reanimComp.FrameAccumulator = 0.0
-	reanimComp.IsFinished = false
-
-	// Calculate standard frame count (max frames across all tracks)
-	standardFrameCount := 0
-	for _, track := range reanimComp.Reanim.Tracks {
-		if len(track.Frames) > standardFrameCount {
-			standardFrameCount = len(track.Frames)
-		}
-	}
-	if standardFrameCount == 0 {
-		standardFrameCount = 1 // At least 1 frame
-	}
-
-	log.Printf("[ReanimSystem] Standard frame count: %d", standardFrameCount)
-
-	// Initialize AnimVisiblesMap if needed
-	if reanimComp.AnimVisiblesMap == nil {
-		reanimComp.AnimVisiblesMap = make(map[string][]int)
-	}
-
-	// Build AnimVisibles: all frames are visible (all 0s)
-	animVisibles := make([]int, standardFrameCount)
-	for i := range animVisibles {
-		animVisibles[i] = 0 // 0 = visible
-	}
-	reanimComp.AnimVisiblesMap["direct_render"] = animVisibles
-
-	// Story 6.8 修复：创建 AnimStates map（必需，否则 shouldRenderTrack 会因 len(activeAnims)==0 失败）
-	if reanimComp.AnimStates == nil {
-		reanimComp.AnimStates = make(map[string]*components.AnimState)
-	}
-	reanimComp.AnimStates["direct_render"] = &components.AnimState{
-		Name:              "direct_render",
-		IsActive:          true, // 必须为 true
-		IsLooping:         true,
-		LogicalFrame:      0,
-		Accumulator:       0.0,
-		StartFrame:        0,
-		FrameCount:        standardFrameCount,
-		RenderWhenStopped: true,
-		DelayTimer:        0.0,
-		DelayDuration:     0.0,
-	}
-
-	// Set visible frame count
-	reanimComp.VisibleFrameCount = standardFrameCount
-
-	// Build merged tracks with frame inheritance
-	reanimComp.MergedTracks = reanim.BuildMergedTracks(reanimComp.Reanim)
-
-	// Store all tracks in rendering order
-	reanimComp.AnimTracks = s.getAnimationTracks(reanimComp)
-
-	log.Printf("[ReanimSystem] Built %d merged tracks, %d anim tracks", len(reanimComp.MergedTracks), len(reanimComp.AnimTracks))
-
-	// Calculate center offset based on the bounding box of visible parts in the first frame
-	// Skip this for scene animations (they have absolute coordinates)
-	if calculateCenter {
-		s.calculateCenterOffset(reanimComp)
-	} else {
-		// Scene animations: no center offset needed
-		reanimComp.CenterOffsetX = 0
-		reanimComp.CenterOffsetY = 0
-		log.Printf("[ReanimSystem] Scene animation: CenterOffset set to (0, 0)")
-	}
-
-	return nil
-}
-
-// calculateCenterOffset calculates the offset needed to center the animation visually.
-// It computes the bounding box of all visible parts in the first logical frame (frame 0),
-// then calculates the center of that bounding box as the offset.
-//
-// IMPORTANT: This function now considers the actual image dimensions when calculating
-// the bounding box, ensuring that the entire visual area of each part is included.
-func (s *ReanimSystem) calculateCenterOffset(comp *components.ReanimComponent) {
-	// Find the first visible frame (physical frame index)
-	physicalIndex := -1
-	logicalFrame := 0
-	animVisibles := comp.AnimVisiblesMap[comp.CurrentAnim]
-	for i := 0; i < len(animVisibles); i++ {
-		if animVisibles[i] == 0 {
-			if logicalFrame == 0 {
-				physicalIndex = i
-				break
-			}
-			logicalFrame++
-		}
-	}
-
-	if physicalIndex < 0 {
-		// No visible frames, use zero offset
-		comp.CenterOffsetX = 0
-		comp.CenterOffsetY = 0
-		return
-	}
-
-	// Calculate bounding box of all visible parts in the first frame
-	// IMPORTANT: We now include the actual image dimensions, not just the position points
-	minX, maxX := 9999.0, -9999.0
-	minY, maxY := 9999.0, -9999.0
-	hasVisibleParts := false
-
-	for _, track := range comp.AnimTracks {
-		// 如果设置了 VisibleTracks，只计算白名单中的轨道
-		if comp.VisibleTracks != nil && len(comp.VisibleTracks) > 0 {
-			if !comp.VisibleTracks[track.Name] {
-				continue
-			}
-		}
-
-		mergedFrames, ok := comp.MergedTracks[track.Name]
-		if !ok || physicalIndex >= len(mergedFrames) {
-			continue
-		}
-
-		frame := mergedFrames[physicalIndex]
-
-		// Skip hidden frames (f=-1), UNLESS in VisibleTracks whitelist
-		if frame.FrameNum != nil && *frame.FrameNum == -1 {
-			// 检查是否在白名单中
-			inVisibleTracks := false
-			if comp.VisibleTracks != nil && len(comp.VisibleTracks) > 0 {
-				inVisibleTracks = comp.VisibleTracks[track.Name]
-			}
-			if !inVisibleTracks {
-				continue // 非白名单轨道，遵守 f=-1，跳过
-			}
-			// 白名单轨道，忽略 f=-1，继续计算边界
-		}
-
-		// Skip frames without images
-		if frame.ImagePath == "" {
-			continue
-		}
-
-		// Get part position
-		x, y := 0.0, 0.0
-		if frame.X != nil {
-			x = *frame.X
-		}
-		if frame.Y != nil {
-			y = *frame.Y
-		}
-
-		// Get part scale (default to 1.0)
-		scaleX, scaleY := 1.0, 1.0
-		if frame.ScaleX != nil {
-			scaleX = *frame.ScaleX
-		}
-		if frame.ScaleY != nil {
-			scaleY = *frame.ScaleY
-		}
-
-		// Get image dimensions
-		img, exists := comp.PartImages[frame.ImagePath]
-		if !exists || img == nil {
-			// If image not found, fall back to position-only calculation
-			if x < minX {
-				minX = x
-			}
-			if x > maxX {
-				maxX = x
-			}
-			if y < minY {
-				minY = y
-			}
-			if y > maxY {
-				maxY = y
-			}
-			hasVisibleParts = true
-			continue
-		}
-
-		// Calculate actual bounding box including image dimensions
-		bounds := img.Bounds()
-		imgWidth := float64(bounds.Dx()) * scaleX
-		imgHeight := float64(bounds.Dy()) * scaleY
-
-		// The part's bounding box extends from (x, y) to (x + width, y + height)
-		partMinX := x
-		partMaxX := x + imgWidth
-		partMinY := y
-		partMaxY := y + imgHeight
-
-		// Update overall bounding box
-		if partMinX < minX {
-			minX = partMinX
-		}
-		if partMaxX > maxX {
-			maxX = partMaxX
-		}
-		if partMinY < minY {
-			minY = partMinY
-		}
-		if partMaxY > maxY {
-			maxY = partMaxY
-		}
-		hasVisibleParts = true
-	}
-
-	if !hasVisibleParts {
-		// No visible parts, use zero offset
-		comp.CenterOffsetX = 0
-		comp.CenterOffsetY = 0
-		return
-	}
-
-	// Calculate center of bounding box
-	comp.CenterOffsetX = (minX + maxX) / 2
-	comp.CenterOffsetY = (minY + maxY) / 2
-
-	// DEBUG: 输出中心偏移量（用于调试动画切换时的位置跳动问题）
-	log.Printf("[ReanimSystem] 动画 '%s' 中心偏移: (%.1f, %.1f), 包围盒: [%.1f, %.1f] -> [%.1f, %.1f]",
-		comp.CurrentAnim, comp.CenterOffsetX, comp.CenterOffsetY, minX, minY, maxX, maxY)
-}
-
-// HideTrack hides a specific animation track (part) for the given entity.
-// This is used for dynamic part visibility changes (e.g., zombie losing arms/head).
-//
-// Parameters:
-//   - entityID: the ID of the entity
-//   - trackName: the name of the track to hide (e.g., "Zombie_outerarm_hand")
-//
-// Returns:
-//   - An error if the entity doesn't have a ReanimComponent or VisibleTracks is not initialized
-func (s *ReanimSystem) HideTrack(entityID ecs.EntityID, trackName string) error {
-	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-	if !exists {
-		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
-	}
-
-	// If VisibleTracks is not initialized, we can't hide tracks
-	if reanimComp.VisibleTracks == nil {
-		return fmt.Errorf("entity %d uses blacklist mode (VisibleTracks is nil), HideTrack not supported", entityID)
-	}
-
-	// Remove from visible tracks (whitelist mode)
-	delete(reanimComp.VisibleTracks, trackName)
-	return nil
-}
-
-// ShowTrack shows a specific animation track (part) for the given entity.
-// This is used to restore previously hidden parts.
-//
-// Parameters:
-//   - entityID: the ID of the entity
-//   - trackName: the name of the track to show (e.g., "Zombie_outerarm_hand")
-//
-// Returns:
-//   - An error if the entity doesn't have a ReanimComponent or VisibleTracks is not initialized
-func (s *ReanimSystem) ShowTrack(entityID ecs.EntityID, trackName string) error {
-	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-	if !exists {
-		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
-	}
-
-	// If VisibleTracks is not initialized, we can't show tracks
-	if reanimComp.VisibleTracks == nil {
-		return fmt.Errorf("entity %d uses blacklist mode (VisibleTracks is nil), ShowTrack not supported", entityID)
-	}
-
-	// Add to visible tracks (whitelist mode)
-	reanimComp.VisibleTracks[trackName] = true
-	return nil
-}
-
-// IsTrackVisible checks if a specific animation track (part) is currently visible.
-//
-// Parameters:
-//   - entityID: the ID of the entity
-//   - trackName: the name of the track to check
-//
-// Returns:
-//   - bool: true if the track is visible, false otherwise
-//   - error: error if the entity doesn't have a ReanimComponent
-func (s *ReanimSystem) IsTrackVisible(entityID ecs.EntityID, trackName string) (bool, error) {
-	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-	if !exists {
-		return false, fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
-	}
-
-	// If VisibleTracks is not initialized, assume blacklist mode (all visible by default)
-	if reanimComp.VisibleTracks == nil || len(reanimComp.VisibleTracks) == 0 {
-		return true, nil
-	}
-
-	// Whitelist mode: check if track is in the visible list
-	return reanimComp.VisibleTracks[trackName], nil
-}
-
-// RenderToTexture 将指定实体的 Reanim 渲染到目标纹理（离屏渲染）
-// 用于生成植物卡片的预览图标
-//
-// 实现说明：
-// 为了避免重复复杂的渲染逻辑，这个方法会临时创建一个 RenderSystem
-// 并调用其 renderReanimEntity 方法渲染到目标纹理
-//
-// Parameters:
-//   - entityID: the ID of the entity to render
-//   - target: the target texture to render to (should be pre-created with appropriate size)
-//
-// Returns:
-//   - error: if the entity doesn't have required components or rendering fails
-func (s *ReanimSystem) RenderToTexture(entityID ecs.EntityID, target *ebiten.Image) error {
-	// 验证实体拥有必要的组件
-	_, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
-	_, hasReanim := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-
-	if !hasPos || !hasReanim {
-		return fmt.Errorf("entity %d missing required components for rendering", entityID)
-	}
-
-	// 创建临时的 RenderSystem 实例进行渲染
-	// 注意：RenderSystem 不需要复杂初始化，只需要 EntityManager
-	tempRenderSystem := NewRenderSystem(s.entityManager)
-
-	// 渲染到目标纹理
-	// cameraX = 0 因为我们渲染的是一个孤立的图标，不需要考虑摄像机
-	tempRenderSystem.renderReanimEntity(target, entityID, 0)
-
-	return nil
-}
-
-// GetTrackPosition 获取指定轨道在当前帧的世界坐标位置
-// 用于定位游戏逻辑需要的特殊点位（如子弹发射点）
-//
-// Story 13.2: 使用主动画的 LogicalFrame 替代 CurrentFrame
-//
-// Parameters:
-//   - entityID: the ID of the entity
-//   - trackName: the name of the track (e.g., "anim_stem")
-//
-// Returns:
-//   - x, y: 轨道在世界坐标系中的位置（已应用实体位置和中心偏移）
-//   - error: if the entity doesn't have required components or track doesn't exist
-func (s *ReanimSystem) GetTrackPosition(entityID ecs.EntityID, trackName string) (float64, float64, error) {
-	// 获取必要的组件
-	pos, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
-	reanim, hasReanim := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-
-	if !hasPos || !hasReanim {
-		return 0, 0, fmt.Errorf("entity %d missing required components", entityID)
-	}
-
-	// Story 13.2: 获取主动画的 LogicalFrame
-	mainAnimState, ok := reanim.AnimStates[reanim.CurrentAnim]
-	if !ok {
-		return 0, 0, fmt.Errorf("entity %d has no active animation '%s'", entityID, reanim.CurrentAnim)
-	}
-
-	currentLogicalFrame := mainAnimState.LogicalFrame
-
-	// 将逻辑帧映射到物理帧索引
-	physicalIndex := s.findPhysicalFrameIndex(reanim, currentLogicalFrame)
-	if physicalIndex < 0 {
-		return 0, 0, fmt.Errorf("invalid frame index")
-	}
-
-	// 获取轨道的累积帧数据
-	mergedFrames, ok := reanim.MergedTracks[trackName]
-	if !ok || physicalIndex >= len(mergedFrames) {
-		return 0, 0, fmt.Errorf("track '%s' not found or frame out of range", trackName)
-	}
-
-	frame := mergedFrames[physicalIndex]
-
-	// 检查轨道在当前帧是否可见
-	// 如果 frame.FrameNum 不为 nil 且值为 -1，表示轨道隐藏
-	// 但是：如果轨道在 VisibleTracks 白名单中，跳过 f=-1 检查（强制可见）
-	isInWhitelist := false
-	if reanim.VisibleTracks != nil {
-		isInWhitelist = reanim.VisibleTracks[trackName]
-	}
-
-	if !isInWhitelist && frame.FrameNum != nil && *frame.FrameNum == -1 {
-		return 0, 0, fmt.Errorf("track '%s' is hidden at current logical frame %d", trackName, currentLogicalFrame)
-	}
-
-	// 获取轨道的局部位置（相对于动画原点）
-	localX, localY := 0.0, 0.0
-	if frame.X != nil {
-		localX = *frame.X
-	}
-	if frame.Y != nil {
-		localY = *frame.Y
-	}
-
-	// 如果X或Y为nil，说明轨道没有位置数据（可能是定位器轨道在未初始化状态）
-	if frame.X == nil || frame.Y == nil {
-		return 0, 0, fmt.Errorf("track '%s' has no position data at current logical frame %d", trackName, currentLogicalFrame)
-	}
-
-	// DEBUG: 输出世界坐标计算过程
-	// log.Printf("[DEBUG] GetTrackPosition 坐标计算: localX=%.1f, pos.X=%.1f, CenterOffsetX=%.1f",
-	// 	localX, pos.X, reanim.CenterOffsetX)
-
-	// 转换为世界坐标
-	// worldPos = entityPos + (trackLocalPos - centerOffset)
-	worldX := pos.X + (localX - reanim.CenterOffsetX)
-	worldY := pos.Y + (localY - reanim.CenterOffsetY)
-
-	// log.Printf("[DEBUG] GetTrackPosition 结果: worldX = %.1f + (%.1f - %.1f) = %.1f",
-	// 	pos.X, localX, reanim.CenterOffsetX, worldX)
-
-	return worldX, worldY, nil
-}
-
-// findPhysicalFrameIndex 将逻辑帧号映射到物理帧索引
-// 这是 RenderSystem 中同名方法的复制，因为需要在 ReanimSystem 中使用
-func (s *ReanimSystem) findPhysicalFrameIndex(reanim *components.ReanimComponent, logicalFrameNum int) int {
-	animVisibles := reanim.AnimVisiblesMap[reanim.CurrentAnim]
+// mapLogicalToPhysical 将逻辑帧号映射到物理帧号
+func mapLogicalToPhysical(logicalFrameNum int, animVisibles []int) int {
 	if len(animVisibles) == 0 {
-		return -1
+		return logicalFrameNum
 	}
 
-	// 逻辑帧按区间映射：从第一个0开始到下一个非0之前
 	logicalIndex := 0
 	for i := 0; i < len(animVisibles); i++ {
 		if animVisibles[i] == 0 {
@@ -1231,144 +722,296 @@ func (s *ReanimSystem) findPhysicalFrameIndex(reanim *components.ReanimComponent
 	return -1
 }
 
-// PrepareStaticPreview prepares a Reanim entity for static preview (e.g., plant card icons).
-//
-// This method is specifically designed for static preview scenarios (plant cards, almanac, shop),
-// as opposed to PlayAnimation which is for dynamic playback.
-//
-// Key differences from PlayAnimation:
-// - PlayAnimation: requires animation definition tracks, used for dynamic playback
-// - PrepareStaticPreview: works with part tracks only, used for static rendering
-//
-// Strategy:
-// 1. Does not depend on animation definition tracks, directly analyzes all part tracks
-// 2. Finds the "first complete visible frame" (all parts have images and f>=0)
-// 3. If not found, uses heuristic strategy (middle of animation, ~40% position)
-// 4. Checks config.PlantPreviewFrameOverride for manual override (Story 11.1 - Strategy 3)
-// 5. Sets static preview state (IsLooping=false, IsFinished=true)
-//
-// Parameters:
-//   - entityID: the ID of the entity to prepare for static preview
-//   - reanimName: the Reanim resource name (e.g., "SunFlower", "PeaShooterSingle")
-//
-// Returns:
-//   - An error if the entity doesn't have a ReanimComponent
-func (s *ReanimSystem) PrepareStaticPreview(entityID ecs.EntityID, reanimName string) error {
-	// Get the ReanimComponent
-	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-	if !exists {
-		return fmt.Errorf("entity %d does not have a ReanimComponent", entityID)
-	}
-
-	// Check if Reanim data is present
-	if reanimComp.Reanim == nil {
-		return fmt.Errorf("entity %d has a ReanimComponent but no Reanim data", entityID)
-	}
-
-	// 1. Build merged tracks for preview (does not depend on animation definition track)
-	reanimComp.MergedTracks = s.buildMergedTracksForPreview(reanimComp)
-
-	// Store all part tracks for rendering
-	reanimComp.AnimTracks = s.getPartTracks(reanimComp)
-
-	// 2. Strategy 1: Find the first complete visible frame
-	bestFrame := s.findFirstCompleteVisibleFrame(reanimComp)
-
-	log.Printf("[ReanimSystem] findFirstCompleteVisibleFrame for %s: bestFrame=%d", reanimName, bestFrame)
-
-	// DEBUG: 输出所有轨道在 bestFrame 的状态
-	if bestFrame >= 0 {
-		log.Printf("[ReanimSystem] Tracks at bestFrame %d:", bestFrame)
-		for trackName, frames := range reanimComp.MergedTracks {
-			if bestFrame < len(frames) {
-				frame := frames[bestFrame]
-				fValue := -999
-				if frame.FrameNum != nil {
-					fValue = *frame.FrameNum
-				}
-				log.Printf("  - %s: ImagePath=%s, f=%d", trackName, frame.ImagePath, fValue)
+// findVisibleWindow 查找动画的可见时间窗口
+func findVisibleWindow(animVisibles []int) (int, int) {
+	firstVisible, lastVisible := -1, -1
+	for i, v := range animVisibles {
+		if v == 0 {
+			if firstVisible == -1 {
+				firstVisible = i
 			}
+			lastVisible = i
+		}
+	}
+	return firstVisible, lastVisible
+}
+
+// calculatePositionVariance 计算位置方差
+func calculatePositionVariance(frames []reanim.Frame, startIdx, endIdx int) float64 {
+	if startIdx < 0 || endIdx >= len(frames) || startIdx > endIdx {
+		return 0.0
+	}
+
+	sumX, sumY := 0.0, 0.0
+	count := 0
+	for i := startIdx; i <= endIdx; i++ {
+		if frames[i].X != nil && frames[i].Y != nil {
+			sumX += *frames[i].X
+			sumY += *frames[i].Y
+			count++
 		}
 	}
 
-	// 3. Strategy 2: If not found, use heuristic fallback
-	if bestFrame < 0 {
-		bestFrame = s.findPreviewFrameHeuristic(reanimComp)
-		log.Printf("[ReanimSystem] No complete frame found, using heuristic frame %d", bestFrame)
+	if count == 0 {
+		return 0.0
 	}
 
-	// 4. Strategy 3: Check config override (manual frame specification)
-	if overrideFrame, hasOverride := config.PlantPreviewFrameOverride[reanimName]; hasOverride {
-		log.Printf("[ReanimSystem] Using config override frame %d for %s (auto-selected was %d)",
-			overrideFrame, reanimName, bestFrame)
-		bestFrame = overrideFrame
-	}
+	meanX := sumX / float64(count)
+	meanY := sumY / float64(count)
 
-	// 5. Apply preview frame
-	reanimComp.BestPreviewFrame = bestFrame
-
-	// 6. Calculate center offset for this specific frame
-	s.calculateCenterOffsetForFrame(reanimComp, bestFrame)
-
-	// 7. Build AnimVisibles array for static preview
-	// IMPORTANT: We need to ensure that CurrentFrame (logical) maps to bestFrame (physical).
-	// Strategy: Mark all frames as hidden (-1) except the bestFrame as visible (0).
-	// This way, logical frame 0 will map to physical frame bestFrame.
-	maxFrames := 0
-	for _, frames := range reanimComp.MergedTracks {
-		if len(frames) > maxFrames {
-			maxFrames = len(frames)
+	variance := 0.0
+	for i := startIdx; i <= endIdx; i++ {
+		if frames[i].X != nil && frames[i].Y != nil {
+			dx := *frames[i].X - meanX
+			dy := *frames[i].Y - meanY
+			variance += dx*dx + dy*dy
 		}
 	}
 
-	// Initialize AnimVisiblesMap if needed
-	if reanimComp.AnimVisiblesMap == nil {
-		reanimComp.AnimVisiblesMap = make(map[string][]int)
+	return variance / float64(count)
+}
+
+// ==================================================================
+// 兼容性方法（临时保留，用于过渡）
+// ==================================================================
+
+// InitReanimComponent 初始化 Reanim 组件的基础数据
+// 用于实体工厂创建实体时的初始化
+func (s *ReanimSystem) InitReanimComponent(
+	entityID ecs.EntityID,
+	reanimName string,
+	reanimXML *reanim.ReanimXML,
+	partImages map[string]*ebiten.Image,
+	mergedTracks map[string][]reanim.Frame,
+	visualTracks []string,
+	logicalTracks []string,
+) error {
+	comp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !ok {
+		return fmt.Errorf("entity %d does not have ReanimComponent", entityID)
 	}
 
-	// Create AnimVisibles array with only bestFrame marked as visible
-	animVisibles := make([]int, maxFrames)
-	for i := 0; i < maxFrames; i++ {
-		if i == bestFrame {
-			animVisibles[i] = 0 // Best frame is visible
-		} else {
-			animVisibles[i] = -1 // Other frames are hidden
-		}
-	}
-	reanimComp.AnimVisiblesMap["static_preview"] = animVisibles
-	reanimComp.VisibleFrameCount = 1 // Only one frame is visible
-
-	// 8. Set static preview state (do not start animation loop)
-	reanimComp.IsLooping = false
-	reanimComp.IsFinished = true
-	reanimComp.CurrentAnim = "static_preview" // Marker for static preview mode
-
-	log.Printf("[ReanimSystem] PrepareStaticPreview: bestFrame=%d (physical), totalFrames=%d",
-		bestFrame, maxFrames)
+	comp.ReanimName = reanimName
+	comp.ReanimXML = reanimXML
+	comp.PartImages = partImages
+	comp.MergedTracks = mergedTracks
+	comp.VisualTracks = visualTracks
+	comp.LogicalTracks = logicalTracks
+	comp.AnimationFPS = float64(reanimXML.FPS)
+	comp.IsLooping = true
+	comp.LastRenderFrame = -1
 
 	return nil
 }
 
-// getPartTracks returns all part tracks (tracks with images).
+// PrepareStaticPreview prepares a Reanim entity for static preview (e.g., plant card icons).
+// Story 13.8: 简化版本，使用配置驱动的方式
 //
-// This excludes pure animation definition tracks (only FrameNum, no images/transforms).
-// Part tracks include:
-// - Part tracks with images: backleaf, stalk_bottom, head, etc.
-// - Hybrid tracks with images + transforms: some anim_* tracks in certain plants
+// 策略：
+// 1. 播放默认动画组合
+// 2. 将当前帧设置为中间帧（最佳预览帧）
+// 3. 暂停动画播放（IsPaused = true）
 //
 // Parameters:
-//   - reanimComp: the ReanimComponent containing the Reanim data
+//   - entityID: the ID of the entity to prepare for static preview
+//   - reanimName: the Reanim resource name (e.g., "sunflower", "peashooter")
 //
 // Returns:
-//   - A slice of tracks that have at least one frame with an image
-func (s *ReanimSystem) getPartTracks(reanimComp *components.ReanimComponent) []reanim.Track {
-	if reanimComp.Reanim == nil {
-		return nil
+//   - An error if preparation fails
+func (s *ReanimSystem) PrepareStaticPreview(entityID ecs.EntityID, reanimName string) error {
+	// 使用 PlayCombo 播放默认动画
+	if err := s.PlayCombo(entityID, reanimName, ""); err != nil {
+		return fmt.Errorf("failed to play default animation: %w", err)
 	}
 
-	var result []reanim.Track
-	for _, track := range reanimComp.Reanim.Tracks {
-		// Check if this track has at least one frame with an image
+	// 获取组件
+	comp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !ok {
+		return fmt.Errorf("entity %d does not have ReanimComponent", entityID)
+	}
+
+	// 查找最佳预览帧（使用第一个动画的中间帧）
+	if len(comp.CurrentAnimations) > 0 {
+		animName := comp.CurrentAnimations[0]
+		if visibles, ok := comp.AnimVisiblesMap[animName]; ok && len(visibles) > 0 {
+			// 使用中间帧作为预览帧
+			bestFrame := len(visibles) / 2
+			comp.CurrentFrame = bestFrame
+			log.Printf("[ReanimSystem] PrepareStaticPreview: %s set to frame %d/%d",
+				reanimName, bestFrame, len(visibles))
+		}
+	}
+
+	// 暂停动画播放（静态预览）
+	comp.IsPaused = true
+	comp.IsLooping = false
+
+	// 强制更新渲染缓存
+	s.prepareRenderCache(comp)
+
+	return nil
+}
+
+// RenderToTexture 将指定实体的 Reanim 渲染到目标纹理（离屏渲染）
+// 用于生成植物卡片图标等静态纹理
+//
+// 参数：
+//   - entityID: 实体 ID
+//   - target: 目标纹理（调用者创建）
+//
+// 返回：
+//   - error: 如果实体不存在或没有必要组件，返回错误
+func (s *ReanimSystem) RenderToTexture(entityID ecs.EntityID, target *ebiten.Image) error {
+	// 验证实体拥有必要的组件
+	pos, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+	_, hasReanim := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+
+	if !hasPos || !hasReanim {
+		return fmt.Errorf("entity %d missing required components for rendering", entityID)
+	}
+
+	// 获取渲染数据（自动更新缓存）
+	renderData := s.GetRenderData(entityID)
+	if len(renderData) == 0 {
+		return fmt.Errorf("entity %d has no render data", entityID)
+	}
+
+	// Step 1: 计算所有可见部件的 bounding box（用于居中）
+	// 这是 Story 13.8 Bug Fix：替代旧的 CenterOffset 机制
+	minX, maxX := 9999.0, -9999.0
+	minY, maxY := 9999.0, -9999.0
+	hasVisibleParts := false
+
+	for _, partData := range renderData {
+		if partData.Img == nil {
+			continue
+		}
+
+		frame := partData.Frame
+		if frame.FrameNum != nil && *frame.FrameNum == -1 {
+			continue
+		}
+
+		// 计算部件位置
+		partX := getFloat(frame.X) + partData.OffsetX
+		partY := getFloat(frame.Y) + partData.OffsetY
+
+		// 获取图片尺寸
+		bounds := partData.Img.Bounds()
+		w := float64(bounds.Dx())
+		h := float64(bounds.Dy())
+
+		// 考虑缩放
+		scaleX := getFloat(frame.ScaleX)
+		scaleY := getFloat(frame.ScaleY)
+		if scaleX == 0 {
+			scaleX = 1.0
+		}
+		if scaleY == 0 {
+			scaleY = 1.0
+		}
+
+		// 计算部件的 bounding box（考虑图片尺寸）
+		partMinX := partX
+		partMaxX := partX + w*scaleX
+		partMinY := partY
+		partMaxY := partY + h*scaleY
+
+		if partMinX < minX {
+			minX = partMinX
+		}
+		if partMaxX > maxX {
+			maxX = partMaxX
+		}
+		if partMinY < minY {
+			minY = partMinY
+		}
+		if partMaxY > maxY {
+			maxY = partMaxY
+		}
+
+		hasVisibleParts = true
+	}
+
+	// Step 2: 计算居中偏移
+	// 目标：将 bounding box 的中心对齐到实体的 Position
+	centerOffsetX := 0.0
+	centerOffsetY := 0.0
+	if hasVisibleParts {
+		boundingWidth := maxX - minX
+		boundingHeight := maxY - minY
+		centerOffsetX = -(minX + boundingWidth/2)
+		centerOffsetY = -(minY + boundingHeight/2)
+	}
+
+	// Step 3: 渲染所有部件（应用居中偏移）
+	for _, partData := range renderData {
+		if partData.Img == nil {
+			continue
+		}
+
+		frame := partData.Frame
+
+		// 跳过隐藏帧（FrameNum == -1）
+		if frame.FrameNum != nil && *frame.FrameNum == -1 {
+			continue
+		}
+
+		// 计算部件位置（相对于实体原点）
+		partX := getFloat(frame.X) + partData.OffsetX
+		partY := getFloat(frame.Y) + partData.OffsetY
+
+		// 应用变换
+		opts := &ebiten.DrawImageOptions{}
+
+		// 1. 缩放（先应用缩放，再应用旋转和平移）
+		scaleX := getFloat(frame.ScaleX)
+		scaleY := getFloat(frame.ScaleY)
+		if scaleX == 0 {
+			scaleX = 1.0
+		}
+		if scaleY == 0 {
+			scaleY = 1.0
+		}
+		opts.GeoM.Scale(scaleX, scaleY)
+
+		// 2. 旋转（如果需要）
+		// 注意：Reanim 使用弧度制
+		// 这里暂不处理旋转，因为大部分植物图标不需要
+
+		// 3. 平移到最终位置（应用居中偏移）
+		// 使用 Position 作为基准点（离屏渲染，不减去摄像机偏移）
+		finalX := pos.X + partX + centerOffsetX
+		finalY := pos.Y + partY + centerOffsetY
+		opts.GeoM.Translate(finalX, finalY)
+
+		// 绘制部件
+		target.DrawImage(partData.Img, opts)
+	}
+
+	return nil
+}
+
+// analyzeTrackTypes 分析轨道类型（视觉轨道 vs 逻辑轨道）
+// 基于 animation_showcase/animation_cell.go:670-700
+//
+// ✅ Story 13.8 Bug Fix #7: 修复僵尸动画错误
+//   - animation_showcase 只跳过植物的 4 个动画定义轨道
+//   - 僵尸的 anim_walk/anim_eat 等应该被分类为 logicalTracks（无图片）
+//   - 与 animation_showcase 保持完全一致
+func (s *ReanimSystem) analyzeTrackTypes(reanimXML *reanim.ReanimXML) (visualTracks []string, logicalTracks []string) {
+	// ✅ Bug Fix: 先检查轨道是否有图片，再决定是否跳过
+	// 原因：向日葵的 anim_idle 轨道包含头部图像，不应该被跳过
+	// animation_showcase 的逻辑可能不适用于所有植物
+	animationDefinitionTracks := map[string]bool{
+		"anim_idle":      true,
+		"anim_shooting":  true,
+		"anim_head_idle": true,
+		"anim_full_idle": true,
+	}
+
+	for _, track := range reanimXML.Tracks {
+		// 先检查轨道是否包含图片
 		hasImage := false
 		for _, frame := range track.Frames {
 			if frame.ImagePath != "" {
@@ -1377,1432 +1020,99 @@ func (s *ReanimSystem) getPartTracks(reanimComp *components.ReanimComponent) []r
 			}
 		}
 
+		// ✅ 关键修复：如果轨道包含图片，即使名称在 animationDefinitionTracks 中，
+		// 也应该作为视觉轨道处理（例如向日葵的 anim_idle 轨道）
 		if hasImage {
-			result = append(result, track)
+			visualTracks = append(visualTracks, track.Name)
+		} else if animationDefinitionTracks[track.Name] {
+			// 只有在没有图片的情况下，才跳过动画定义轨道
+			logicalTracks = append(logicalTracks, track.Name)
+		} else {
+			// 其他无图片轨道也作为逻辑轨道
+			logicalTracks = append(logicalTracks, track.Name)
 		}
 	}
-	return result
+
+	return visualTracks, logicalTracks
 }
 
-// buildMergedTracksForPreview builds merged frame arrays for all part tracks WITHOUT depending on animation definition tracks.
-//
-// This differs from buildMergedTracks in that:
-// - buildMergedTracks: used for dynamic playback, depends on animation definition track visibility
-// - buildMergedTracksForPreview: used for static preview, directly processes all part tracks with frame inheritance
-//
-// Parameters:
-//   - reanimComp: the ReanimComponent containing the Reanim data
-//
-// Returns:
-//   - A map of track name to merged frame array
-//
-// Design Decision (Story 11.1 - QA Feedback):
-// This method directly calls buildMergedTracks, which is SAFE and CORRECT because:
-//
-// 1. buildMergedTracks processes ALL tracks in the Reanim file, not just animation definition tracks
-// 2. For each track, it applies frame inheritance (cumulative transformations) to build merged frames
-// 3. The merged frames include all part tracks (with images) AND animation definition tracks (frame numbers only)
-// 4. Static preview only USES the part tracks (filtered by VisibleTracks whitelist during rendering)
-// 5. Animation definition tracks in merged data are harmless - they are simply ignored during rendering
-//
-// The alternative (implementing a separate buildMergedTracksForPreview that filters out animation
-// definition tracks) would be UNNECESSARY complexity because:
-// - It duplicates ~50 lines of frame inheritance logic
-// - The filtering already happens at render time via VisibleTracks whitelist
-// - Performance impact is negligible (few extra map entries)
-//
-// This design follows the DRY principle and maintains consistency with the existing animation system.
-func (s *ReanimSystem) buildMergedTracksForPreview(reanimComp *components.ReanimComponent) map[string][]reanim.Frame {
-	// Reuse the existing buildMergedTracks logic, which already processes ALL tracks
-	// including part tracks, regardless of animation definition tracks
-	return reanim.BuildMergedTracks(reanimComp.Reanim)
-}
-
-// findFirstCompleteVisibleFrame finds the first frame where all parts are visible.
-//
-// A "complete visible frame" is defined as:
-// - All part tracks have data at this frame
-// - Each part has an image (ImagePath != "")
-// - Each part is not hidden (f >= 0)
-//
-// Parameters:
-//   - reanimComp: the ReanimComponent containing the merged tracks
-//
-// Returns:
-//   - The frame index of the first complete frame, or -1 if not found
-func (s *ReanimSystem) findFirstCompleteVisibleFrame(reanimComp *components.ReanimComponent) int {
-	if len(reanimComp.MergedTracks) == 0 {
-		return -1
-	}
-
-	// Determine max frame count
-	maxFrames := 0
-	for _, frames := range reanimComp.MergedTracks {
-		if len(frames) > maxFrames {
-			maxFrames = len(frames)
-		}
-	}
-
-	if maxFrames == 0 {
-		return -1
-	}
-
-	// Get all RENDERABLE part track names (exclude empty tracks, logical tracks, and definition tracks)
-	// Also consider VisibleTracks whitelist if set
-	var partTrackNames []string
-	for trackName, frames := range reanimComp.MergedTracks {
-		if len(frames) == 0 {
-			continue
-		}
-
-		// Skip logical tracks (no images, like anim_stem, _ground)
-		if LogicalTracks[trackName] {
-			continue
-		}
-
-		// Check if track has at least one frame with an image
-		hasImage := false
-		for _, frame := range frames {
-			if frame.ImagePath != "" {
-				hasImage = true
-				break
-			}
-		}
-		if !hasImage {
-			continue // Skip tracks without images (pure animation definition tracks)
-		}
-
-		// If VisibleTracks is set, only include whitelisted tracks
-		if reanimComp.VisibleTracks != nil && len(reanimComp.VisibleTracks) > 0 {
-			if !reanimComp.VisibleTracks[trackName] {
-				continue // Not in whitelist, skip
-			}
-		}
-
-		partTrackNames = append(partTrackNames, trackName)
-	}
-
-	// Iterate through frames to find the first complete one
-	for frameIdx := 0; frameIdx < maxFrames; frameIdx++ {
-		allPartsVisible := true
-
-		for _, trackName := range partTrackNames {
-			mergedFrames := reanimComp.MergedTracks[trackName]
-			if frameIdx >= len(mergedFrames) {
-				allPartsVisible = false
-				break
-			}
-
-			frame := mergedFrames[frameIdx]
-
-			// Check if part has an image (should always be true due to filtering above, but double-check)
-			if frame.ImagePath == "" {
-				allPartsVisible = false
-				break
-			}
-
-			// Check if part is not hidden (f != -1)
-			// Exception: if track is in VisibleTracks whitelist, ignore f=-1
-			if frame.FrameNum != nil && *frame.FrameNum == -1 {
-				// Check if in whitelist
-				inWhitelist := false
-				if reanimComp.VisibleTracks != nil && len(reanimComp.VisibleTracks) > 0 {
-					inWhitelist = reanimComp.VisibleTracks[trackName]
-				}
-				if !inWhitelist {
-					allPartsVisible = false
-					break
-				}
-				// In whitelist, ignore f=-1, continue
-			}
-		}
-
-		if allPartsVisible {
-			return frameIdx
-		}
-	}
-
-	return -1
-}
-
-// findPreviewFrameHeuristic selects a preview frame using heuristic strategy.
-//
-// Strategy: Choose the frame at ~40% of the animation length.
-//
-// Rationale:
-// - Animation structure pattern:
-//   - First 10%: fade-in/preparation (some parts may be invisible)
-//   - Middle 30-60%: core action (relatively stable)
-//   - Last part: fade-out/transition
-//
-// - 40% position is usually in the stable region of the core action
-//
-// Parameters:
-//   - reanimComp: the ReanimComponent containing the merged tracks
-//
-// Returns:
-//   - The frame index at ~40% of the animation length, or 0 if no frames exist
-func (s *ReanimSystem) findPreviewFrameHeuristic(reanimComp *components.ReanimComponent) int {
-	if len(reanimComp.MergedTracks) == 0 {
-		return 0
-	}
-
-	// Determine max frame count
-	maxFrames := 0
-	for _, frames := range reanimComp.MergedTracks {
-		if len(frames) > maxFrames {
-			maxFrames = len(frames)
-		}
-	}
-
-	if maxFrames == 0 {
-		return 0
-	}
-
-	// Choose frame at 40% position
-	heuristicFrame := int(float64(maxFrames) * 0.4)
-
-	// Ensure frame is within bounds
-	if heuristicFrame >= maxFrames {
-		heuristicFrame = maxFrames - 1
-	}
-	if heuristicFrame < 0 {
-		heuristicFrame = 0
-	}
-
-	return heuristicFrame
-}
-
-// calculateCenterOffsetForFrame calculates the center offset for a specific frame.
-//
-// This is similar to calculateCenterOffset, but allows specifying which frame to use
-// instead of always using the first frame. This is needed for static previews where
-// we want to center based on the selected preview frame.
-//
-// Parameters:
-//   - comp: the ReanimComponent containing the merged tracks
-//   - frameIndex: the frame index to calculate center offset for
-func (s *ReanimSystem) calculateCenterOffsetForFrame(comp *components.ReanimComponent, frameIndex int) {
-	// Calculate bounding box of all visible parts in the specified frame
-	minX, maxX := 9999.0, -9999.0
-	minY, maxY := 9999.0, -9999.0
-	hasVisibleParts := false
-
-	for _, track := range comp.AnimTracks {
-		// If VisibleTracks is set, only calculate for whitelisted tracks
-		if comp.VisibleTracks != nil && len(comp.VisibleTracks) > 0 {
-			if !comp.VisibleTracks[track.Name] {
-				continue
-			}
-		}
-
-		mergedFrames, ok := comp.MergedTracks[track.Name]
-		if !ok || frameIndex >= len(mergedFrames) {
-			continue
-		}
-
-		frame := mergedFrames[frameIndex]
-
-		// Skip hidden frames (f=-1), UNLESS in VisibleTracks whitelist
-		if frame.FrameNum != nil && *frame.FrameNum == -1 {
-			// Check if in whitelist
-			inVisibleTracks := false
-			if comp.VisibleTracks != nil && len(comp.VisibleTracks) > 0 {
-				inVisibleTracks = comp.VisibleTracks[track.Name]
-			}
-			if !inVisibleTracks {
-				continue // Non-whitelisted track, respect f=-1, skip
-			}
-			// Whitelisted track, ignore f=-1, continue calculation
-		}
-
-		// Skip frames without images
-		if frame.ImagePath == "" {
-			continue
-		}
-
-		// Get part position
-		x, y := 0.0, 0.0
-		if frame.X != nil {
-			x = *frame.X
-		}
-		if frame.Y != nil {
-			y = *frame.Y
-		}
-
-		// Get part scale (default to 1.0)
-		scaleX, scaleY := 1.0, 1.0
-		if frame.ScaleX != nil {
-			scaleX = *frame.ScaleX
-		}
-		if frame.ScaleY != nil {
-			scaleY = *frame.ScaleY
-		}
-
-		// Get image dimensions
-		img, exists := comp.PartImages[frame.ImagePath]
-		if !exists || img == nil {
-			// If image not found, fall back to position-only calculation
-			if x < minX {
-				minX = x
-			}
-			if x > maxX {
-				maxX = x
-			}
-			if y < minY {
-				minY = y
-			}
-			if y > maxY {
-				maxY = y
-			}
-			hasVisibleParts = true
-			continue
-		}
-
-		// Calculate actual bounding box including image dimensions
-		bounds := img.Bounds()
-		imgWidth := float64(bounds.Dx()) * scaleX
-		imgHeight := float64(bounds.Dy()) * scaleY
-
-		// Calculate bounding box corners
-		// IMPORTANT: Reanim images have anchor point at TOP-LEFT corner (0,0)
-		// NOT at center! (See render_system.go line 400-404)
-		left := x
-		right := x + imgWidth
-		top := y
-		bottom := y + imgHeight
-
-		// Update bounding box
-		if left < minX {
-			minX = left
-		}
-		if right > maxX {
-			maxX = right
-		}
-		if top < minY {
-			minY = top
-		}
-		if bottom > maxY {
-			maxY = bottom
-		}
-
-		hasVisibleParts = true
-	}
-
-	if !hasVisibleParts {
-		// No visible parts, use zero offset
+// calculateCenterOffset 计算并缓存 CenterOffset
+// 在第一帧计算所有可见部件的 bounding box 中心,避免每帧重新计算导致位置抖动
+func (s *ReanimSystem) calculateCenterOffset(comp *components.ReanimComponent) {
+	// 确保已初始化
+	if comp.MergedTracks == nil || len(comp.VisualTracks) == 0 {
 		comp.CenterOffsetX = 0
 		comp.CenterOffsetY = 0
 		return
 	}
 
-	// Calculate center offset
-	centerX := (minX + maxX) / 2
-	centerY := (minY + maxY) / 2
+	// 强制帧索引为 0,计算第一帧的 bounding box
+	comp.CurrentFrame = 0
 
-	comp.CenterOffsetX = centerX
-	comp.CenterOffsetY = centerY
+	// 准备第一帧的渲染数据
+	s.prepareRenderCache(comp)
 
-	log.Printf("[ReanimSystem] 计算中心偏移（帧%d） - 边界框: X[%.1f, %.1f], Y[%.1f, %.1f], 中心偏移: (%.1f, %.1f)",
-		frameIndex, minX, maxX, minY, maxY, centerX, centerY)
-}
-
-// GetTrackTransform 获取指定轨道的当前变换矩阵（局部坐标）
-//
-// Story 10.5: 用于动画帧事件监听，获取部件实时位置
-// Story 13.2: 使用主动画的 LogicalFrame
-//
-// 参数：
-//   - entityID: 实体 ID
-//   - trackName: 轨道名称（如 "idle_mouth", "anim_stem"）
-//
-// 返回：
-//   - x, y: 轨道当前帧的局部坐标（相对于实体中心）
-//   - error: 如果实体无动画组件或轨道不存在
-//
-// 使用场景：
-//   - 子弹发射：在关键帧获取嘴部位置，精确创建子弹
-//   - 特效锚点：在动画特定帧创建粒子效果
-//   - 碰撞检测：获取部件实时位置进行精确碰撞判定
-//
-// 注意：
-//   - 返回的是局部坐标，需要加上实体世界坐标才能得到最终位置
-//   - 如果轨道在当前动画中不存在，返回错误
-func (rs *ReanimSystem) GetTrackTransform(entityID ecs.EntityID, trackName string) (x, y float64, err error) {
-	// 获取 Reanim 组件
-	reanim, ok := ecs.GetComponent[*components.ReanimComponent](rs.entityManager, entityID)
-	if !ok {
-		return 0, 0, fmt.Errorf("entity %d does not have ReanimComponent", entityID)
+	if len(comp.CachedRenderData) == 0 {
+		comp.CenterOffsetX = 0
+		comp.CenterOffsetY = 0
+		return
 	}
 
-	// 使用 MergedTracks（已合并帧继承的轨道）
-	mergedFrames, ok := reanim.MergedTracks[trackName]
-	if !ok {
-		return 0, 0, fmt.Errorf("track '%s' not found in animation '%s'", trackName, reanim.CurrentAnim)
-	}
+	// 计算 bounding box
+	minX, maxX := 9999.0, -9999.0
+	minY, maxY := 9999.0, -9999.0
 
-	// Story 13.2: 获取主动画的 LogicalFrame
-	mainAnimState, hasMainAnim := reanim.AnimStates[reanim.CurrentAnim]
-	if !hasMainAnim {
-		return 0, 0, fmt.Errorf("entity %d has no active animation '%s'", entityID, reanim.CurrentAnim)
-	}
-
-	currentFrame := mainAnimState.LogicalFrame
-	if currentFrame < 0 || currentFrame >= len(mergedFrames) {
-		// 帧号越界，使用最后一帧
-		currentFrame = len(mergedFrames) - 1
-		if currentFrame < 0 {
-			return 0, 0, fmt.Errorf("track '%s' has no frames", trackName)
-		}
-	}
-
-	// 获取当前帧的变换
-	frame := mergedFrames[currentFrame]
-
-	// 提取坐标（默认为 0, 0）
-	x = 0.0
-	y = 0.0
-	if frame.X != nil {
-		x = *frame.X
-	}
-	if frame.Y != nil {
-		y = *frame.Y
-	}
-
-	return x, y, nil
-}
-
-// ==================================================================
-// Track-Level Playback Control (Story 12.1)
-// ==================================================================
-
-// SetTrackPlayOnce configures a track to play once and then lock at its final frame.
-// This is used for one-time animations like tombstone rising or sign dropping.
-//
-// Parameters:
-//   - entity: The entity ID with ReanimComponent
-//   - trackName: Name of the track (e.g., "SelectorScreen_Adventure_button")
-//
-// The track will play normally until it reaches its last visible frame, then lock.
-// Locked tracks will not update in subsequent frames.
-func (rs *ReanimSystem) SetTrackPlayOnce(entity ecs.EntityID, trackName string) error {
-	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](rs.entityManager, entity)
-	if !ok {
-		return fmt.Errorf("entity %d has no ReanimComponent", entity)
-	}
-
-	// Initialize TrackConfigs map if needed
-	if reanimComp.TrackConfigs == nil {
-		reanimComp.TrackConfigs = make(map[string]*components.TrackPlaybackConfig)
-	}
-
-	// Create or update config
-	if reanimComp.TrackConfigs[trackName] == nil {
-		reanimComp.TrackConfigs[trackName] = &components.TrackPlaybackConfig{}
-	}
-	reanimComp.TrackConfigs[trackName].PlayOnce = true
-
-	return nil
-}
-
-// PauseTrack pauses playback of a specific track.
-// The track will stop updating but can be resumed later.
-func (rs *ReanimSystem) PauseTrack(entity ecs.EntityID, trackName string) error {
-	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](rs.entityManager, entity)
-	if !ok {
-		return fmt.Errorf("entity %d has no ReanimComponent", entity)
-	}
-
-	// Initialize TrackConfigs map if needed
-	if reanimComp.TrackConfigs == nil {
-		reanimComp.TrackConfigs = make(map[string]*components.TrackPlaybackConfig)
-	}
-
-	// Create or update config
-	if reanimComp.TrackConfigs[trackName] == nil {
-		reanimComp.TrackConfigs[trackName] = &components.TrackPlaybackConfig{}
-	}
-	reanimComp.TrackConfigs[trackName].IsPaused = true
-
-	return nil
-}
-
-// ResumeTrack resumes playback of a paused track.
-func (rs *ReanimSystem) ResumeTrack(entity ecs.EntityID, trackName string) error {
-	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](rs.entityManager, entity)
-	if !ok {
-		return fmt.Errorf("entity %d has no ReanimComponent", entity)
-	}
-
-	if reanimComp.TrackConfigs == nil || reanimComp.TrackConfigs[trackName] == nil {
-		return nil // No config, track is already playing
-	}
-
-	reanimComp.TrackConfigs[trackName].IsPaused = false
-	return nil
-}
-
-// ==================================================================
-// Story 13.1: Track Binding Helper Functions (轨道绑定辅助函数)
-// ==================================================================
-
-// getVisualTracks 获取所有有图片的轨道列表（视觉轨道）
-//
-// 视觉轨道定义：至少有一帧包含 ImagePath 的轨道
-// 排除：逻辑轨道（如 anim_stem, _ground）、纯动画定义轨道（如 anim_idle）
-//
-// 参数：
-//   - comp: ReanimComponent
-//
-// 返回：
-//   - 视觉轨道名称列表
-func (s *ReanimSystem) getVisualTracks(comp *components.ReanimComponent) []string {
-	var visualTracks []string
-
-	// Story 13.4 QA Fix: 优先使用 AnimTracks 保证顺序（渲染 Z-order）
-	// 修复 map 迭代顺序随机导致的缓存顺序错误和渲染顺序不一致
-	if len(comp.AnimTracks) > 0 {
-		for _, track := range comp.AnimTracks {
-			trackName := track.Name
-
-			// 跳过逻辑轨道
-			if LogicalTracks[trackName] {
-				continue
-			}
-
-			// 跳过动画定义轨道
-			if AnimationDefinitionTracks[trackName] {
-				continue
-			}
-
-			// 检查 MergedTracks 中是否有该轨道
-			mergedFrames, exists := comp.MergedTracks[trackName]
-			if !exists {
-				continue
-			}
-
-			// 检查是否至少有一帧包含图片
-			hasImage := false
-			for _, frame := range mergedFrames {
-				if frame.ImagePath != "" {
-					hasImage = true
-					break
-				}
-			}
-
-			if hasImage {
-				visualTracks = append(visualTracks, trackName)
-			}
-		}
-		return visualTracks
-	}
-
-	// 降级：如果没有 AnimTracks，遍历 MergedTracks（顺序不确定）
-	for trackName, mergedFrames := range comp.MergedTracks {
-		// 跳过逻辑轨道
-		if LogicalTracks[trackName] {
+	for _, partData := range comp.CachedRenderData {
+		if partData.Img == nil {
 			continue
 		}
 
-		// 跳过动画定义轨道
-		if AnimationDefinitionTracks[trackName] {
+		frame := partData.Frame
+		if frame.FrameNum != nil && *frame.FrameNum == -1 {
 			continue
 		}
 
-		// 检查是否至少有一帧包含图片
-		hasImage := false
-		for _, frame := range mergedFrames {
-			if frame.ImagePath != "" {
-				hasImage = true
-				break
-			}
+		// 计算部件位置
+		partX := getFloat(frame.X) + partData.OffsetX
+		partY := getFloat(frame.Y) + partData.OffsetY
+
+		// 获取图片尺寸
+		bounds := partData.Img.Bounds()
+		w := float64(bounds.Dx())
+		h := float64(bounds.Dy())
+
+		// 考虑缩放
+		scaleX := getFloat(frame.ScaleX)
+		scaleY := getFloat(frame.ScaleY)
+		if scaleX == 0 {
+			scaleX = 1.0
+		}
+		if scaleY == 0 {
+			scaleY = 1.0
 		}
 
-		if hasImage {
-			visualTracks = append(visualTracks, trackName)
+		// 计算部件的 bounding box（考虑图片尺寸）
+		partMinX := partX
+		partMaxX := partX + w*scaleX
+		partMinY := partY
+		partMaxY := partY + h*scaleY
+
+		if partMinX < minX {
+			minX = partMinX
+		}
+		if partMaxX > maxX {
+			maxX = partMaxX
+		}
+		if partMinY < minY {
+			minY = partMinY
+		}
+		if partMaxY > maxY {
+			maxY = partMaxY
 		}
 	}
 
-	return visualTracks
+	// 计算中心点坐标
+	comp.CenterOffsetX = (minX + maxX) / 2
+	comp.CenterOffsetY = (minY + maxY) / 2
 }
 
-// findVisibleWindow 查找动画的可见窗口（首个可见帧和末尾可见帧）
-//
-// 参数：
-//   - animVisibles: 动画可见性数组（0 = 可见，-1 = 隐藏）
-//
-// 返回：
-//   - firstVisible: 第一个可见帧的索引
-//   - lastVisible: 最后一个可见帧的索引
-//   - 如果动画完全不可见，返回 (-1, -1)
-func (s *ReanimSystem) findVisibleWindow(animVisibles []int) (int, int) {
-	firstVisible := -1
-	lastVisible := -1
-
-	for i, visibility := range animVisibles {
-		if visibility == 0 {
-			if firstVisible == -1 {
-				firstVisible = i
-			}
-			lastVisible = i
-		}
-	}
-
-	return firstVisible, lastVisible
-}
-
-// calculatePositionVariance 计算位置方差（用于衡量轨道运动幅度）
-//
-// 算法原理：
-// 1. 计算指定帧范围内所有帧的平均位置（avgX, avgY）
-// 2. 计算每帧位置与平均位置的欧氏距离平方和
-// 3. 返回方差的平方根（标准差）
-//
-// 方差越大，说明轨道在该动画中运动越明显
-//
-// 参数：
-//   - frames: 轨道的帧数组（MergedTracks）
-//   - start: 起始帧索引
-//   - end: 结束帧索引（包含）
-//
-// 返回：
-//   - 位置方差（标准差）
-func (s *ReanimSystem) calculatePositionVariance(frames []reanim.Frame, start, end int) float64 {
-	if start < 0 || end >= len(frames) || start > end {
-		return 0
-	}
-
-	// 计算平均位置
-	avgX, avgY := 0.0, 0.0
-	count := 0
-	for i := start; i <= end && i < len(frames); i++ {
-		if frames[i].X != nil && frames[i].Y != nil {
-			avgX += *frames[i].X
-			avgY += *frames[i].Y
-			count++
-		}
-	}
-
-	if count == 0 {
-		return 0
-	}
-
-	avgX /= float64(count)
-	avgY /= float64(count)
-
-	// 计算方差
-	variance := 0.0
-	for i := start; i <= end && i < len(frames); i++ {
-		if frames[i].X != nil && frames[i].Y != nil {
-			dx := *frames[i].X - avgX
-			dy := *frames[i].Y - avgY
-			variance += dx*dx + dy*dy
-		}
-	}
-
-	return variance / float64(count) // 返回方差（不开方，保持敏感度）
-}
-
-// ==================================================================
-// Story 13.1: Track Binding Analysis API (轨道绑定分析 API)
-// ==================================================================
-
-// AnalyzeTrackBinding 自动分析轨道到动画的绑定关系
-//
-// 算法原理：
-// 1. 对于每个视觉轨道，遍历所有动画
-// 2. 计算轨道在该动画时间窗口内的位置方差（运动幅度）
-// 3. 将轨道绑定到方差最大的动画（运动最明显 = 最可能属于该动画）
-//
-// 参数：
-//   - comp: ReanimComponent
-//   - animNames: 要分析的动画列表（如 ["anim_shooting", "anim_head_idle"]）
-//
-// 返回：
-//   - map[string]string: 轨道绑定（轨道名 -> 动画名）
-//
-// 示例：
-//
-//	bindings := rs.AnalyzeTrackBinding(comp, []string{"anim_shooting", "anim_head_idle"})
-//	// 可能返回：{"anim_face": "anim_head_idle", "stalk_bottom": "anim_shooting"}
-func (s *ReanimSystem) AnalyzeTrackBinding(
-	comp *components.ReanimComponent,
-	animNames []string,
-) map[string]string {
-	bindings := make(map[string]string)
-
-	// 获取所有视觉轨道（有图片的轨道）
-	visualTracks := s.getVisualTracks(comp)
-
-	for _, trackName := range visualTracks {
-		mergedFrames, ok := comp.MergedTracks[trackName]
-		if !ok || len(mergedFrames) == 0 {
-			continue
-		}
-
-		bestAnim := ""
-		bestScore := 0.0
-
-		for _, animName := range animNames {
-			animVisibles, hasAnim := comp.AnimVisiblesMap[animName]
-			if !hasAnim || len(animVisibles) == 0 {
-				continue
-			}
-
-			// 查找该动画的可见窗口
-			firstVisible, lastVisible := s.findVisibleWindow(animVisibles)
-
-			if firstVisible < 0 || lastVisible >= len(mergedFrames) {
-				continue
-			}
-
-			// 检查轨道在该动画时间窗口内是否有图片
-			hasImage := false
-			for i := firstVisible; i <= lastVisible && i < len(mergedFrames); i++ {
-				if mergedFrames[i].ImagePath != "" {
-					hasImage = true
-					break
-				}
-			}
-
-			if !hasImage {
-				continue
-			}
-
-			// 计算位置方差
-			variance := s.calculatePositionVariance(mergedFrames, firstVisible, lastVisible)
-			score := 1.0 + variance
-
-			if score > bestScore {
-				bestScore = score
-				bestAnim = animName
-			}
-		}
-
-		if bestAnim != "" {
-			bindings[trackName] = bestAnim
-		}
-	}
-
-	return bindings
-}
-
-// SetTrackBindings 手动设置轨道绑定关系
-//
-// 参数：
-//   - entityID: 实体 ID
-//   - bindings: 轨道绑定（轨道名 -> 动画名）
-//
-// 返回：
-//   - error: 如果轨道或动画不存在
-//
-// 示例：
-//
-//	rs.SetTrackBindings(entityID, map[string]string{
-//	    "anim_face": "anim_head_idle",
-//	    "stalk_bottom": "anim_shooting",
-//	})
-func (s *ReanimSystem) SetTrackBindings(
-	entityID ecs.EntityID,
-	bindings map[string]string,
-) error {
-	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-	if !exists {
-		return fmt.Errorf("entity %d does not have ReanimComponent", entityID)
-	}
-
-	// 验证绑定的有效性
-	for trackName, animName := range bindings {
-		// 检查轨道是否存在
-		if _, ok := reanimComp.MergedTracks[trackName]; !ok {
-			return fmt.Errorf("track '%s' does not exist", trackName)
-		}
-
-		// 检查动画是否存在
-		if _, ok := reanimComp.AnimVisiblesMap[animName]; !ok {
-			return fmt.Errorf("animation '%s' does not exist", animName)
-		}
-	}
-
-	// 应用绑定
-	reanimComp.TrackBindings = bindings
-
-	return nil
-}
-
-// ==================================================================
-// Story 13.3: Parent-Child Offset System API (父子偏移系统 API)
-// ==================================================================
-
-// SetParentTracks 设置实体的父子轨道关系（批量设置）
-//
-// 参数：
-//   - entityID: 实体 ID
-//   - parentTracks: 父子关系映射（map[子轨道]父轨道）
-//
-// 返回：
-//   - error: 如果实体没有 ReanimComponent
-//
-// 示例：
-//
-//	rs.SetParentTracks(entityID, map[string]string{
-//	    "anim_face": "anim_stem",  // 头部跟随茎干
-//	})
-func (s *ReanimSystem) SetParentTracks(
-	entityID ecs.EntityID,
-	parentTracks map[string]string,
-) error {
-	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-	if !exists {
-		return fmt.Errorf("entity %d does not have ReanimComponent", entityID)
-	}
-
-	// 应用父子关系
-	reanimComp.ParentTracks = parentTracks
-
-	log.Printf("[ReanimSystem] SetParentTracks: entity %d, %d parent-child relationships configured",
-		entityID, len(parentTracks))
-
-	return nil
-}
-
-// SetParentTrack 设置单个轨道的父轨道
-//
-// 参数：
-//   - entityID: 实体 ID
-//   - childTrack: 子轨道名称
-//   - parentTrack: 父轨道名称
-//
-// 返回：
-//   - error: 如果实体没有 ReanimComponent
-//
-// 示例：
-//
-//	rs.SetParentTrack(entityID, "anim_face", "anim_stem")
-func (s *ReanimSystem) SetParentTrack(
-	entityID ecs.EntityID,
-	childTrack, parentTrack string,
-) error {
-	reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-	if !exists {
-		return fmt.Errorf("entity %d does not have ReanimComponent", entityID)
-	}
-
-	// 初始化 ParentTracks map（如果需要）
-	if reanimComp.ParentTracks == nil {
-		reanimComp.ParentTracks = make(map[string]string)
-	}
-
-	// 设置父子关系
-	reanimComp.ParentTracks[childTrack] = parentTrack
-
-	log.Printf("[ReanimSystem] SetParentTrack: entity %d, '%s' -> '%s'",
-		entityID, childTrack, parentTrack)
-
-	return nil
-}
-
-// ==================================================================
-// Story 13.3: Parent-Child Offset Calculation (父子偏移计算)
-// ==================================================================
-
-// getParentOffset 计算父轨道的当前偏移量（相对于初始位置）
-//
-// 算法原理：
-// 1. 找到父轨道控制的动画（通过 TrackBindings）
-// 2. 获取父轨道在该动画时间窗口内的第一个可见帧位置（初始位置）
-// 3. 获取父轨道的当前位置
-// 4. 计算偏移：offset = current - initial
-//
-// 参数：
-//   - parentTrackName: 父轨道名称（如 "anim_stem"）
-//   - comp: ReanimComponent 引用
-//
-// 返回：
-//   - offsetX: X 轴偏移量
-//   - offsetY: Y 轴偏移量
-func (s *ReanimSystem) getParentOffset(parentTrackName string, comp *components.ReanimComponent) (float64, float64) {
-	// 步骤 1: 找到父轨道控制的动画
-	parentAnim, exists := comp.TrackBindings[parentTrackName]
-	if !exists {
-		// 父轨道未绑定动画，使用主动画
-		parentAnim = comp.CurrentAnim
-	}
-
-	// 步骤 2: 获取父轨道的初始位置（第一个可见帧）
-	initX, initY, err := s.getFirstVisiblePosition(parentTrackName, parentAnim, comp)
-	if err != nil {
-		// 父轨道没有初始位置，返回零偏移
-		return 0, 0
-	}
-
-	// 步骤 3: 获取父轨道的当前位置
-	currentX, currentY, err := s.getCurrentPosition(parentTrackName, parentAnim, comp)
-	if err != nil {
-		// 父轨道没有当前位置，返回零偏移
-		return 0, 0
-	}
-
-	// 步骤 4: 计算偏移量
-	offsetX := currentX - initX
-	offsetY := currentY - initY
-
-	// DEBUG: 输出偏移计算（仅在需要调试时取消注释）
-	// log.Printf("[ReanimSystem] 父轨道 '%s' 偏移: 初始(%.1f, %.1f) -> 当前(%.1f, %.1f) = 偏移(%.1f, %.1f)",
-	// 	parentTrackName, initX, initY, currentX, currentY, offsetX, offsetY)
-
-	return offsetX, offsetY
-}
-
-// getFirstVisiblePosition 获取轨道在动画时间窗口内的第一个可见帧位置
-//
-// 参数：
-//   - trackName: 轨道名称（如 "anim_stem"）
-//   - animName: 动画名称（如 "anim_shooting"）
-//   - comp: ReanimComponent 引用
-//
-// 返回：
-//   - x, y: 第一个可见帧的位置
-//   - error: 如果找不到可见帧或轨道不存在
-func (s *ReanimSystem) getFirstVisiblePosition(
-	trackName, animName string,
-	comp *components.ReanimComponent,
-) (float64, float64, error) {
-	// 获取轨道的累积帧数据
-	mergedFrames, ok := comp.MergedTracks[trackName]
-	if !ok || len(mergedFrames) == 0 {
-		return 0, 0, fmt.Errorf("track '%s' not found or has no frames", trackName)
-	}
-
-	// 获取动画的可见性数组
-	animVisibles, ok := comp.AnimVisiblesMap[animName]
-	if !ok || len(animVisibles) == 0 {
-		return 0, 0, fmt.Errorf("animation '%s' has no visibility data", animName)
-	}
-
-	// 查找第一个可见帧（visibility = 0）
-	for physicalIdx, visibility := range animVisibles {
-		if visibility == 0 && physicalIdx < len(mergedFrames) {
-			frame := mergedFrames[physicalIdx]
-
-			// 检查帧是否有位置数据
-			if frame.X == nil || frame.Y == nil {
-				continue // 跳过没有位置数据的帧
-			}
-
-			return *frame.X, *frame.Y, nil
-		}
-	}
-
-	return 0, 0, fmt.Errorf("track '%s' has no visible frames in animation '%s'", trackName, animName)
-}
-
-// getCurrentPosition 获取轨道的当前位置
-//
-// 参数：
-//   - trackName: 轨道名称（如 "anim_stem"）
-//   - animName: 动画名称（如 "anim_shooting"）
-//   - comp: ReanimComponent 引用
-//
-// 返回：
-//   - x, y: 当前帧的位置
-//   - error: 如果轨道不存在或当前帧越界
-func (s *ReanimSystem) getCurrentPosition(
-	trackName, animName string,
-	comp *components.ReanimComponent,
-) (float64, float64, error) {
-	// 获取动画状态
-	animState, ok := comp.AnimStates[animName]
-	if !ok {
-		return 0, 0, fmt.Errorf("animation '%s' is not active", animName)
-	}
-
-	logicalFrame := animState.LogicalFrame
-
-	// 获取动画的可见性数组
-	animVisibles, ok := comp.AnimVisiblesMap[animName]
-	if !ok || len(animVisibles) == 0 {
-		return 0, 0, fmt.Errorf("animation '%s' has no visibility data", animName)
-	}
-
-	// 将逻辑帧映射到物理帧
-	physicalFrame := s.mapLogicalToPhysical(logicalFrame, animVisibles)
-	if physicalFrame < 0 {
-		return 0, 0, fmt.Errorf("invalid logical frame %d for animation '%s'", logicalFrame, animName)
-	}
-
-	// 获取轨道的累积帧数据
-	mergedFrames, ok := comp.MergedTracks[trackName]
-	if !ok || len(mergedFrames) == 0 {
-		return 0, 0, fmt.Errorf("track '%s' not found or has no frames", trackName)
-	}
-
-	// 检查物理帧是否越界
-	if physicalFrame >= len(mergedFrames) {
-		return 0, 0, fmt.Errorf("physical frame %d out of range for track '%s' (len=%d)",
-			physicalFrame, trackName, len(mergedFrames))
-	}
-
-	frame := mergedFrames[physicalFrame]
-
-	// 检查帧是否有位置数据
-	if frame.X == nil || frame.Y == nil {
-		return 0, 0, fmt.Errorf("track '%s' has no position data at frame %d", trackName, physicalFrame)
-	}
-
-	return *frame.X, *frame.Y, nil
-}
-
-// mapLogicalToPhysical 将逻辑帧号映射到物理帧索引
-//
-// 逻辑帧是可见帧的序号（0, 1, 2, ...）
-// 物理帧是数组中的实际索引，包括隐藏帧
-//
-// 参数：
-//   - logicalFrame: 逻辑帧号（从 0 开始）
-//   - animVisibles: 动画可见性数组（0 = 可见，-1 = 隐藏）
-//
-// 返回：
-//   - 物理帧索引，如果越界返回 -1
-func (s *ReanimSystem) mapLogicalToPhysical(logicalFrame int, animVisibles []int) int {
-	logicalIndex := 0
-	for physicalIdx, visibility := range animVisibles {
-		if visibility == 0 {
-			if logicalIndex == logicalFrame {
-				return physicalIdx
-			}
-			logicalIndex++
-		}
-	}
-	return -1 // 逻辑帧越界
-}
-
-// ==================================================================
-// Story 13.4: Render Cache Optimization (渲染缓存优化)
-// ==================================================================
-
-// getCurrentLogicalFrame 获取组件当前的逻辑帧索引（用于缓存失效检测）
-//
-// 返回主动画（CurrentAnimations[0]）的当前逻辑帧
-// 如果没有动画播放，返回 0
-//
-// 参数：
-//   - comp: ReanimComponent 引用
-//
-// 返回：
-//   - 当前逻辑帧索引
-func (s *ReanimSystem) getCurrentLogicalFrame(comp *components.ReanimComponent) int {
-	// 如果没有播放任何动画，返回 0
-	if len(comp.CurrentAnimations) == 0 {
-		return 0
-	}
-
-	// 使用第一个动画作为主动画
-	primaryAnim := comp.CurrentAnimations[0]
-
-	// 获取该动画的状态
-	animState, exists := comp.AnimStates[primaryAnim]
-	if !exists {
-		return 0
-	}
-
-	return animState.LogicalFrame
-}
-
-// getParentOffsetIfNeeded 如果需要，计算父子偏移
-//
-// 检查轨道是否有父轨道，并且子父使用不同的动画
-// 如果满足条件，返回父轨道的偏移量；否则返回 (0, 0)
-//
-// 参数：
-//   - trackName: 轨道名称
-//   - comp: ReanimComponent 引用
-//
-// 返回：
-//   - offsetX: 父轨道的 X 偏移
-//   - offsetY: 父轨道的 Y 偏移
-func (s *ReanimSystem) getParentOffsetIfNeeded(trackName string, comp *components.ReanimComponent) (float64, float64) {
-	// 检查是否有父轨道
-	if comp.ParentTracks == nil {
-		return 0, 0
-	}
-
-	parentName, hasParent := comp.ParentTracks[trackName]
-	if !hasParent {
-		return 0, 0 // 无父轨道
-	}
-
-	// 检查轨道绑定
-	if comp.TrackBindings == nil {
-		return 0, 0
-	}
-
-	childAnim, childExists := comp.TrackBindings[trackName]
-	parentAnim, parentExists := comp.TrackBindings[parentName]
-
-	if !childExists || !parentExists {
-		return 0, 0
-	}
-
-	// 如果子父使用相同的动画，不应用偏移
-	if childAnim == parentAnim {
-		return 0, 0
-	}
-
-	// 调用 Story 13.3 的函数计算父轨道偏移
-	return s.getParentOffset(parentName, comp)
-}
-
-// prepareRenderCache 为指定组件构建渲染数据缓存（Story 13.4）
-//
-// 遍历所有可见轨道，计算并缓存渲染数据：
-// - 图片引用（从 PartImages 获取）
-// - 帧数据（变换信息）
-// - 父子偏移（Story 13.3）
-//
-// 重用 CachedRenderData 切片，避免频繁分配内存
-//
-// 参数：
-//   - comp: ReanimComponent 引用
-func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
-	// 步骤 1: 清空现有缓存（重用切片，避免分配）
-	comp.CachedRenderData = comp.CachedRenderData[:0]
-
-	// 步骤 2: 获取可见轨道列表
-	visualTracks := s.getVisualTracks(comp)
-
-	// 步骤 3: 遍历每个轨道，构建缓存
-	for _, trackName := range visualTracks {
-		var animName string
-		var logicalFrame int
-
-		// 3.1: 找到控制该轨道的动画
-		// 支持两种模式：TrackBindings 模式和传统模式
-		if comp.TrackBindings != nil && len(comp.TrackBindings) > 0 {
-			// TrackBindings 模式（Story 13.1）
-			var exists bool
-			animName, exists = comp.TrackBindings[trackName]
-			if !exists {
-				continue // 跳过未绑定的轨道
-			}
-		} else {
-			// 传统模式：所有轨道使用相同的主动画
-			animName = comp.CurrentAnim
-			if animName == "" {
-				continue
-			}
-		}
-
-		// 3.2: 获取动画的当前逻辑帧
-		animState, stateExists := comp.AnimStates[animName]
-		if !stateExists {
-			continue
-		}
-		logicalFrame = animState.LogicalFrame
-
-		// 3.3: 映射到物理帧
-		animVisibles, visiblesExist := comp.AnimVisiblesMap[animName]
-		if !visiblesExist {
-			continue
-		}
-		physicalFrame := s.mapLogicalToPhysical(logicalFrame, animVisibles)
-		if physicalFrame == -1 {
-			continue // 逻辑帧越界
-		}
-
-		// 3.4: 获取帧数据
-		mergedFrames, tracksExist := comp.MergedTracks[trackName]
-		if !tracksExist || physicalFrame >= len(mergedFrames) {
-			continue // 越界保护
-		}
-		frame := mergedFrames[physicalFrame]
-
-		// 3.5: 获取图片引用
-		if frame.ImagePath == "" {
-			continue // 跳过无图片路径的帧
-		}
-		img, imgExists := comp.PartImages[frame.ImagePath]
-		if !imgExists || img == nil {
-			continue // 跳过无图片的帧
-		}
-
-		// 3.6: 计算父子偏移（Story 13.3）
-		offsetX, offsetY := s.getParentOffsetIfNeeded(trackName, comp)
-
-		// 3.7: 加入缓存
-		comp.CachedRenderData = append(comp.CachedRenderData, components.RenderPartData{
-			Img:     img,
-			Frame:   frame,
-			OffsetX: offsetX,
-			OffsetY: offsetY,
-		})
-	}
-}
-
-// ==================================================================
-// Story 13.5: Configuration-Based Animation Setup (配置驱动的动画设置)
-// ==================================================================
-
-// ApplyReanimConfig 将 Reanim 配置应用到指定实体
-//
-// 此方法根据 YAML 配置文件设置实体的动画组合、轨道绑定、父子关系等。
-// 配置文件格式详见：docs/reanim/reanim-config-guide.md
-//
-// 参数：
-//   - entityID: 实体 ID
-//   - config: Reanim 配置对象（从 YAML 文件加载）
-//
-// 返回：
-//   - error: 应用失败时的错误
-//
-// 使用示例：
-//
-//	config, err := config.LoadReanimConfig("data/reanim_configs/peashooter.yaml")
-//	if err != nil {
-//	    return err
-//	}
-//	if err := reanimSystem.ApplyReanimConfig(entityID, config); err != nil {
-//	    return err
-//	}
-func (s *ReanimSystem) ApplyReanimConfig(entityID ecs.EntityID, cfg *config.ReanimConfig) error {
-	// 验证实体是否有 ReanimComponent
-	comp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-	if !exists {
-		return fmt.Errorf("实体 %d 没有 ReanimComponent", entityID)
-	}
-
-	// 验证配置
-	if cfg == nil {
-		return fmt.Errorf("配置对象为空")
-	}
-
-	// 应用每个动画组合配置
-	for i, combo := range cfg.AnimationCombos {
-		// 验证组合配置
-		if len(combo.Animations) == 0 {
-			return fmt.Errorf("动画组合 #%d '%s' 的动画列表为空", i, combo.Name)
-		}
-
-		// 1. 播放动画
-		if err := s.PlayAnimations(entityID, combo.Animations); err != nil {
-			return fmt.Errorf("播放动画组合 '%s' 失败: %w", combo.Name, err)
-		}
-
-		// 2. 设置轨道绑定
-		if err := s.applyTrackBindings(entityID, comp, &combo); err != nil {
-			return fmt.Errorf("设置轨道绑定失败（组合 '%s'）: %w", combo.Name, err)
-		}
-
-		// 3. 设置父子关系
-		if len(combo.ParentTracks) > 0 {
-			if err := s.SetParentTracks(entityID, combo.ParentTracks); err != nil {
-				return fmt.Errorf("设置父子关系失败（组合 '%s'）: %w", combo.Name, err)
-			}
-		}
-
-		// 4. 设置隐藏轨道
-		if len(combo.HiddenTracks) > 0 {
-			if err := s.applyHiddenTracks(entityID, comp, combo.HiddenTracks); err != nil {
-				return fmt.Errorf("设置隐藏轨道失败（组合 '%s'）: %w", combo.Name, err)
-			}
-		}
-
-		// 注意：目前只应用第一个组合配置
-		// 未来可以扩展为支持多个组合的切换
-		break
-	}
-
-	return nil
-}
-
-// applyTrackBindings 根据配置应用轨道绑定
-func (s *ReanimSystem) applyTrackBindings(
-	entityID ecs.EntityID,
-	comp *components.ReanimComponent,
-	combo *config.AnimationComboConfig,
-) error {
-	// 如果没有指定策略，默认使用 auto
-	strategy := combo.BindingStrategy
-	if strategy == "" {
-		strategy = "auto"
-	}
-
-	switch strategy {
-	case "auto":
-		// 自动绑定已在 PlayAnimations() 中处理
-		// 不需要额外操作
-		return nil
-
-	case "manual":
-		// 手动绑定：使用配置中的绑定关系
-		if len(combo.ManualBindings) == 0 {
-			return fmt.Errorf("manual 绑定策略但未提供 manual_bindings")
-		}
-		if err := s.SetTrackBindings(entityID, combo.ManualBindings); err != nil {
-			return fmt.Errorf("设置手动绑定失败: %w", err)
-		}
-		return nil
-
-	default:
-		return fmt.Errorf("无效的绑定策略 '%s'，只能是 'auto' 或 'manual'", strategy)
-	}
-}
-
-// applyHiddenTracks 应用隐藏轨道配置
-func (s *ReanimSystem) applyHiddenTracks(
-	entityID ecs.EntityID,
-	comp *components.ReanimComponent,
-	hiddenTracks []string,
-) error {
-	// 初始化 VisibleTracks（如果需要）
-	if comp.VisibleTracks == nil {
-		comp.VisibleTracks = make(map[string]bool)
-	}
-
-	// 将指定的轨道标记为隐藏
-	for _, trackName := range hiddenTracks {
-		comp.VisibleTracks[trackName] = false
-	}
-
-	return nil
-}
-
-// ========================================
-// Story 13.6: 配置驱动的动画播放 API
-// ========================================
-
-// SetConfigManager 设置配置管理器
-//
-// 此方法由游戏初始化逻辑调用，设置全局配置管理器。
-// 调用此方法后，PlayCombo 和 PlayDefaultAnimation 才能正常工作。
-//
-// 参数：
-//   - manager: 配置管理器实例
-func (s *ReanimSystem) SetConfigManager(manager *config.ReanimConfigManager) {
-	s.configManager = manager
-	log.Printf("[ReanimSystem] 配置管理器已设置")
-}
-
-// PlayCombo 播放配置文件中定义的动画组合
-//
-// 此方法是配置驱动动画播放的核心 API，替代了旧的 PlayAnimation/PlayAnimations。
-// 它自动处理动画组合、轨道绑定、父子关系等复杂逻辑。
-//
-// 参数：
-//   - entityID: 实体 ID
-//   - unitID: 动画单元 ID（如 "peashooter", "zombie"）
-//   - comboName: 组合名称（如 "attack", "idle", "walk"）
-//
-// 返回：
-//   - error: 配置不存在或应用失败时返回错误
-//
-// 示例：
-//
-//	// 播放豌豆射手攻击动画（anim_shooting + anim_head_idle）
-//	rs.PlayCombo(peashooterID, "peashooter", "attack")
-//
-//	// 播放僵尸行走动画
-//	rs.PlayCombo(zombieID, "zombie", "walk")
-//
-// 内部逻辑：
-//  1. 从配置管理器获取组合配置
-//  2. 调用 PlayAnimations(combo.Animations)
-//  3. 应用轨道绑定（如果 binding_strategy = auto，已在 PlayAnimations 中处理）
-//  4. 应用父子关系（SetParentTracks）
-//  5. 应用隐藏轨道（通过 VisibleTracks）
-func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string) error {
-	// 0. 验证配置管理器已设置
-	if s.configManager == nil {
-		return fmt.Errorf("配置管理器未设置，请先调用 SetConfigManager()")
-	}
-
-	// 1. 获取组合配置
-	combo, err := s.configManager.GetCombo(unitID, comboName)
-	if err != nil {
-		return fmt.Errorf("获取动画组合失败: %w", err)
-	}
-
-	// 2. 播放动画（自动处理轨道绑定）
-	if err := s.PlayAnimations(entityID, combo.Animations); err != nil {
-		return fmt.Errorf("播放动画失败: %w", err)
-	}
-
-	// 3. 应用父子关系（如果配置了）
-	if len(combo.ParentTracks) > 0 {
-		if err := s.SetParentTracks(entityID, combo.ParentTracks); err != nil {
-			return fmt.Errorf("应用父子关系失败: %w", err)
-		}
-	}
-
-	// 4. 应用隐藏轨道（如果配置了）
-	if len(combo.HiddenTracks) > 0 {
-		reanimComp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-		if exists {
-			// 初始化 VisibleTracks（如果尚未初始化）
-			if reanimComp.VisibleTracks == nil {
-				reanimComp.VisibleTracks = make(map[string]bool)
-				// 默认所有轨道可见
-				for trackName := range reanimComp.MergedTracks {
-					reanimComp.VisibleTracks[trackName] = true
-				}
-			}
-
-			// 隐藏指定的轨道
-			for _, trackName := range combo.HiddenTracks {
-				reanimComp.VisibleTracks[trackName] = false
-			}
-		}
-	}
-
-	log.Printf("[ReanimSystem] PlayCombo: entity %d playing %s/%s (%v)",
-		entityID, unitID, comboName, combo.Animations)
-
-	return nil
-}
-
-// PlayDefaultAnimation 播放配置文件中定义的默认动画
-//
-// 此方法是 PlayCombo 的便捷版本，自动播放默认动画。
-// 通常用于实体初始化时播放待机动画。
-//
-// 参数：
-//   - entityID: 实体 ID
-//   - unitID: 动画单元 ID（如 "peashooter", "zombie"）
-//
-// 返回：
-//   - error: 配置不存在或应用失败时返回错误
-//
-// 示例：
-//
-//	// 播放豌豆射手默认动画（通常是 anim_idle）
-//	rs.PlayDefaultAnimation(peashooterID, "peashooter")
-//
-//	// 播放僵尸默认动画
-//	rs.PlayDefaultAnimation(zombieID, "zombie")
-//
-// 等效于：
-//
-//	animName, _ := configManager.GetDefaultAnimation(unitID)
-//	rs.PlayAnimation(entityID, animName)
-func (s *ReanimSystem) PlayDefaultAnimation(entityID ecs.EntityID, unitID string) error {
-	// 0. 验证配置管理器已设置
-	if s.configManager == nil {
-		return fmt.Errorf("配置管理器未设置，请先调用 SetConfigManager()")
-	}
-
-	// 1. 获取默认动画名称
-	animName, err := s.configManager.GetDefaultAnimation(unitID)
-	if err != nil {
-		return fmt.Errorf("获取默认动画失败: %w", err)
-	}
-
-	// 2. 播放动画
-	if err := s.PlayAnimation(entityID, animName); err != nil {
-		return fmt.Errorf("播放默认动画失败: %w", err)
-	}
-
-	log.Printf("[ReanimSystem] PlayDefaultAnimation: entity %d playing %s (default: %s)",
-		entityID, unitID, animName)
-
-	return nil
-}

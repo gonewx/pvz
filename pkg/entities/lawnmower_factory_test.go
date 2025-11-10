@@ -70,6 +70,32 @@ func (m *MockLawnmowerReanimSystem) PrepareStaticPreview(entityID ecs.EntityID, 
 	return nil
 }
 
+// ApplyReanimConfig 应用 Reanim 配置到指定实体 (Story 13.5)
+func (m *MockLawnmowerReanimSystem) ApplyReanimConfig(entityID ecs.EntityID, cfg *config.ReanimConfig) error {
+	// Mock implementation for testing
+	return nil
+}
+
+// PlayCombo 播放配置驱动的动画组合 (Story 13.6)
+func (m *MockLawnmowerReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string) error {
+	// Mock implementation for testing
+	if m.PlayedAnimations == nil {
+		m.PlayedAnimations = make(map[ecs.EntityID]string)
+	}
+	m.PlayedAnimations[entityID] = comboName
+	return nil
+}
+
+// PlayDefaultAnimation 播放默认动画 (Story 13.6)
+func (m *MockLawnmowerReanimSystem) PlayDefaultAnimation(entityID ecs.EntityID, unitID string) error {
+	// Mock implementation for testing
+	if m.PlayedAnimations == nil {
+		m.PlayedAnimations = make(map[ecs.EntityID]string)
+	}
+	m.PlayedAnimations[entityID] = "default"
+	return nil
+}
+
 // TestNewLawnmowerEntity 测试除草车实体创建
 func TestNewLawnmowerEntity(t *testing.T) {
 	em := ecs.NewEntityManager()
@@ -107,8 +133,8 @@ func TestNewLawnmowerEntity(t *testing.T) {
 	if !ok {
 		t.Fatal("Lawnmower entity should have ReanimComponent")
 	}
-	if reanimComp.Reanim == nil {
-		t.Error("ReanimComponent should have Reanim data")
+	if reanimComp.ReanimXML == nil {
+		t.Error("ReanimComponent should have ReanimXML data")
 	}
 	if reanimComp.PartImages == nil {
 		t.Error("ReanimComponent should have PartImages")

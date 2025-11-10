@@ -242,18 +242,22 @@ func (rprs *RewardPanelRenderSystem) drawPlantCard(screen *ebiten.Image, panel *
 	}
 
 	// 获取 Reanim 名称
-	reanimName := rprs.getReanimName(plantType)
-	if reanimName == "" {
+	resourceName := rprs.getReanimName(plantType)
+	if resourceName == "" {
 		log.Printf("[RewardPanelRenderSystem] No reanim name for plant type: %d", plantType)
 		return
 	}
+
+	// Story 13.8: 获取配置ID（小写）
+	configID := rprs.getConfigID(plantType)
 
 	// 使用 ReanimSystem 渲染植物图标
 	plantIcon, err := entities.RenderPlantIcon(
 		rprs.entityManager,
 		rprs.resourceManager,
 		rprs.reanimSystem,
-		reanimName,
+		resourceName,
+		configID,
 	)
 	if err != nil {
 		log.Printf("[RewardPanelRenderSystem] Failed to render plant icon: %v", err)
@@ -404,6 +408,22 @@ func (rprs *RewardPanelRenderSystem) getReanimName(plantType components.PlantTyp
 		return "CherryBomb"
 	case components.PlantWallnut:
 		return "Wallnut" // 修复：与资源加载时的名称一致（小写n）
+	default:
+		return ""
+	}
+}
+
+// getConfigID 返回配置文件中的ID（Story 13.8）
+func (rprs *RewardPanelRenderSystem) getConfigID(plantType components.PlantType) string {
+	switch plantType {
+	case components.PlantSunflower:
+		return "sunflower"
+	case components.PlantPeashooter:
+		return "peashooter"
+	case components.PlantCherryBomb:
+		return "cherrybomb"
+	case components.PlantWallnut:
+		return "wallnut"
 	default:
 		return ""
 	}
@@ -669,7 +689,10 @@ func (rprs *RewardPanelRenderSystem) drawFallbackButton(screen *ebiten.Image, al
 // findPhysicalFrameIndex 将逻辑帧号映射到物理帧索引（简化版）。
 func (rprs *RewardPanelRenderSystem) findPhysicalFrameIndex(reanim *components.ReanimComponent, logicalFrameNum int) int {
 	// 获取当前动画的 AnimVisibles
-	animVisibles := reanim.AnimVisiblesMap[reanim.CurrentAnim]
+	if len(reanim.CurrentAnimations) == 0 {
+		return -1
+	}
+	animVisibles := reanim.AnimVisiblesMap[reanim.CurrentAnimations[0]]
 	if len(animVisibles) == 0 {
 		return -1
 	}

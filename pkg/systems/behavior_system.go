@@ -264,10 +264,7 @@ func (s *BehaviorSystem) handleSunflowerBehavior(entityID ecs.EntityID, deltaTim
 		log.Printf("[BehaviorSystem] 阳光实体创建完成，ID=%d, 状态: Rising, 速度: (%.1f, %.1f)",
 			sunID, sunVel.VX, sunVel.VY)
 
-		// 初始化阳光动画（Sun.reanim 是效果动画，使用场景动画模式，不计算 CenterOffset）
-		if err := s.reanimSystem.InitializeSceneAnimation(sunID); err != nil {
-			log.Printf("[BehaviorSystem] WARNING: 初始化阳光动画失败: %v", err)
-		}
+		// Story 13.8: 简单实体的动画已在 createSimpleReanimComponent 中初始化，无需额外初始化
 
 		// 重置计时器
 		timer.CurrentTime = 0
@@ -407,26 +404,35 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 	}
 
 	// 2. 隐藏头部轨道（头掉落效果）
-	// 隐藏所有头部相关轨道
-	headTracks := []string{"anim_head1", "anim_head2"}
-	for _, trackName := range headTracks {
-		if err := s.reanimSystem.HideTrack(entityID, trackName); err != nil {
-			log.Printf("[BehaviorSystem] 警告：僵尸 %d 隐藏轨道 %s 失败: %v", entityID, trackName, err)
+	// Story 13.8: 直接修改 HiddenTracks 字段而不调用废弃的 HideTrack API
+	if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
+		if reanim.HiddenTracks == nil {
+			reanim.HiddenTracks = make(map[string]bool)
 		}
+		// 隐藏所有头部相关轨道
+		headTracks := []string{"anim_head1", "anim_head2"}
+		for _, trackName := range headTracks {
+			reanim.HiddenTracks[trackName] = true
+		}
+		log.Printf("[BehaviorSystem] 僵尸 %d 头部掉落，隐藏轨道: %v", entityID, headTracks)
 	}
-	log.Printf("[BehaviorSystem] 僵尸 %d 头部掉落", entityID)
 
 	// 3. 移除 VelocityComponent（停止移动）
 	ecs.RemoveComponent[*components.VelocityComponent](s.entityManager, entityID)
 	log.Printf("[BehaviorSystem] 僵尸 %d 移除速度组件，停止移动", entityID)
 
 	// 4. 使用 ReanimSystem 播放死亡动画（不循环）
-	// 尝试播放 anim_death 动画（从Zombie.reanim）
-	if err := s.reanimSystem.PlayAnimationNoLoop(entityID, "anim_death"); err != nil {
+	// Story 13.8: 使用配置驱动的动画组合（自动隐藏装备轨道）
+	if err := s.reanimSystem.PlayCombo(entityID, "zombie", "death"); err != nil {
 		log.Printf("[BehaviorSystem] 僵尸 %d 播放死亡动画失败: %v，直接删除", entityID, err)
 		// 错误处理：如果死亡动画播放失败，直接删除僵尸
 		s.entityManager.DestroyEntity(entityID)
 		return
+	}
+
+	// 设置为不循环
+	if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
+		reanim.IsLooping = false
 	}
 
 	log.Printf("[BehaviorSystem] 僵尸 %d 死亡动画已开始播放 (anim_death, 不循环)", entityID)
@@ -510,8 +516,8 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 		// 如果有僵尸在同一行，发射子弹
 		if hasZombieInLine {
 			// Story 13.6: 使用配置驱动的动画播放
-			// 播放配置文件中定义的攻击动画组合（anim_shooting + anim_head_idle）
-			err := s.reanimSystem.PlayCombo(entityID, "peashooter", "attack")
+			// 播放配置文件中定义的攻击动画组合
+			err := s.reanimSystem.PlayCombo(entityID, "peashootersingle", "attack_with_sway")
 			if err != nil {
 				log.Printf("[BehaviorSystem] 切换到攻击动画失败: %v", err)
 			} else {
@@ -598,25 +604,14 @@ func (s *BehaviorSystem) handleZombieDyingBehavior(entityID ecs.EntityID) {
 	}
 
 	// 检查死亡动画是否完成
-	// 使用 IsFinished 标志来判断非循环动画是否已完成
+	// Story 13.8: 使用 IsFinished 标志来判断非循环动画是否已完成
 	if reanim.IsFinished {
-		// Story 13.2: 使用主动画的 LogicalFrame 替代 CurrentFrame
-		currentFrame := 0
-		if state, ok := reanim.AnimStates[reanim.CurrentAnim]; ok {
-			currentFrame = state.LogicalFrame
-		}
-		log.Printf("[BehaviorSystem] 僵尸 %d 死亡动画完成 (frame %d/%d)，删除实体",
-			entityID, currentFrame, reanim.VisibleFrameCount)
+		// Story 13.8: 使用 CurrentFrame 替代 AnimStates
+		log.Printf("[BehaviorSystem] 僵尸 %d 死亡动画完成 (frame %d)，删除实体",
+			entityID, reanim.CurrentFrame)
 		// Story 5.5: 僵尸死亡，增加计数
 		s.gameState.IncrementZombiesKilled()
 		s.entityManager.DestroyEntity(entityID)
-	} else {
-		// 调试日志：定期输出动画状态（每10帧输出一次）
-		// Story 13.2: 使用主动画的 LogicalFrame 替代 CurrentFrame
-		// if state, ok := reanim.AnimStates[reanim.CurrentAnim]; ok && state.LogicalFrame%10 == 0 {
-		// 	log.Printf("[BehaviorSystem] 僵尸 %d 死亡动画进行中: Frame=%d/%d, IsLooping=%v, IsFinished=%v",
-		// 		entityID, state.LogicalFrame, reanim.VisibleFrameCount, reanim.IsLooping, reanim.IsFinished)
-		// }
 	}
 }
 
@@ -635,12 +630,16 @@ func (s *BehaviorSystem) updateZombieDamageState(entityID ecs.EntityID, health *
 		health.ArmLost = true
 
 		// 隐藏手臂轨道（手臂掉落效果）
-		armTracks := []string{"Zombie_outerarm_hand", "Zombie_outerarm_upper", "Zombie_outerarm_lower"}
-		for _, trackName := range armTracks {
-			if err := s.reanimSystem.HideTrack(entityID, trackName); err != nil {
-				log.Printf("[BehaviorSystem] 警告：僵尸 %d 隐藏轨道 %s 失败: %v", entityID, trackName, err)
-				return
+		// Story 13.8: 直接修改 HiddenTracks 字段而不调用废弃的 HideTrack API
+		if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
+			if reanim.HiddenTracks == nil {
+				reanim.HiddenTracks = make(map[string]bool)
 			}
+			armTracks := []string{"Zombie_outerarm_hand", "Zombie_outerarm_upper", "Zombie_outerarm_lower"}
+			for _, trackName := range armTracks {
+				reanim.HiddenTracks[trackName] = true
+			}
+			log.Printf("[BehaviorSystem] 僵尸 %d 手臂掉落，隐藏轨道: %v", entityID, armTracks)
 		}
 
 		log.Printf("[BehaviorSystem] 僵尸 %d 手臂掉落 (HP=%d/%d)",
@@ -754,7 +753,7 @@ func (s *BehaviorSystem) changeZombieAnimation(zombieID ecs.EntityID, newState c
 	behavior.ZombieAnimState = newState
 
 	// 根据状态确定组合名称
-	// Story 13.6: 使用配置驱动的动画播放
+	// Story 13.8: 使用配置驱动的动画播放
 	var comboName string
 	switch newState {
 	case components.ZombieAnimIdle:
@@ -764,13 +763,23 @@ func (s *BehaviorSystem) changeZombieAnimation(zombieID ecs.EntityID, newState c
 	case components.ZombieAnimEating:
 		comboName = "eat"
 	case components.ZombieAnimDying:
-		// 死亡动画可能没有配置，降级到 PlayAnimation
+		// Story 13.8: 根据僵尸类型使用不同的 unitID
+		var unitID string
+		switch behavior.Type {
+		case components.BehaviorZombieConehead:
+			unitID = "zombie_conehead"
+		case components.BehaviorZombieBuckethead:
+			unitID = "zombie_buckethead"
+		default:
+			unitID = "zombie"
+		}
+
 		if s.reanimSystem != nil {
-			err := s.reanimSystem.PlayAnimation(zombieID, "anim_death")
+			err := s.reanimSystem.PlayCombo(zombieID, unitID, "death")
 			if err != nil {
 				log.Printf("[BehaviorSystem] 僵尸 %d 切换死亡动画失败: %v", zombieID, err)
 			} else {
-				log.Printf("[BehaviorSystem] 僵尸 %d 切换死亡动画", zombieID)
+				log.Printf("[BehaviorSystem] 僵尸 %d (%s) 切换死亡动画", zombieID, unitID)
 			}
 		}
 		return
@@ -778,13 +787,24 @@ func (s *BehaviorSystem) changeZombieAnimation(zombieID ecs.EntityID, newState c
 		return
 	}
 
+	// 根据僵尸类型选择正确的 unitID
+	var unitID string
+	switch behavior.Type {
+	case components.BehaviorZombieConehead:
+		unitID = "zombie_conehead"
+	case components.BehaviorZombieBuckethead:
+		unitID = "zombie_buckethead"
+	default:
+		unitID = "zombie"
+	}
+
 	// 使用 ReanimSystem 播放新动画组合
 	if s.reanimSystem != nil {
-		err := s.reanimSystem.PlayCombo(zombieID, "zombie", comboName)
+		err := s.reanimSystem.PlayCombo(zombieID, unitID, comboName)
 		if err != nil {
 			log.Printf("[BehaviorSystem] 僵尸 %d 切换动画失败: %v", zombieID, err)
 		} else {
-			log.Printf("[BehaviorSystem] 僵尸 %d 切换动画: %s（配置驱动）", zombieID, comboName)
+			log.Printf("[BehaviorSystem] 僵尸 %d (%s) 切换动画: %s（配置驱动）", zombieID, unitID, comboName)
 		}
 	}
 }
@@ -1127,13 +1147,14 @@ func (s *BehaviorSystem) handleConeheadZombieBehavior(entityID ecs.EntityID, del
 				// 1. 改变行为类型为普通僵尸
 				behavior.Type = components.BehaviorZombieBasic
 
-				// 2. Story 6.3: 从可见轨道列表中移除路障
+				// 2. Story 13.8: 隐藏路障轨道（使用 HiddenTracks 黑名单）
 				reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 				if ok {
-					if reanim.VisibleTracks != nil {
-						delete(reanim.VisibleTracks, "anim_cone") // 移除路障
-						log.Printf("[BehaviorSystem] 路障僵尸 %d 移除 anim_cone 轨道", entityID)
+					if reanim.HiddenTracks == nil {
+						reanim.HiddenTracks = make(map[string]bool)
 					}
+					reanim.HiddenTracks["anim_cone"] = true // 隐藏路障
+					log.Printf("[BehaviorSystem] 路障僵尸 %d 隐藏 anim_cone 轨道", entityID)
 				}
 
 				// 3. 移除护甲组件（可选，但保留可能对调试有帮助）
@@ -1182,13 +1203,14 @@ func (s *BehaviorSystem) handleBucketheadZombieBehavior(entityID ecs.EntityID, d
 				// 1. 改变行为类型为普通僵尸
 				behavior.Type = components.BehaviorZombieBasic
 
-				// 2. Story 6.3: 从可见轨道列表中移除铁桶
+				// 2. Story 13.8: 隐藏铁桶轨道（使用 HiddenTracks 黑名单）
 				reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 				if ok {
-					if reanim.VisibleTracks != nil {
-						delete(reanim.VisibleTracks, "anim_bucket") // 移除铁桶
-						log.Printf("[BehaviorSystem] 铁桶僵尸 %d 移除 anim_bucket 轨道", entityID)
+					if reanim.HiddenTracks == nil {
+						reanim.HiddenTracks = make(map[string]bool)
 					}
+					reanim.HiddenTracks["anim_bucket"] = true // 隐藏铁桶
+					log.Printf("[BehaviorSystem] 铁桶僵尸 %d 隐藏 anim_bucket 轨道", entityID)
 				}
 
 				// 3. 移除护甲组件（可选，但保留可能对调试有帮助）
@@ -1548,11 +1570,8 @@ func (s *BehaviorSystem) updatePlantAttackAnimation(entityID ecs.EntityID, delta
 
 	// Story 10.5: 关键帧事件监听 - 子弹发射时机同步
 	if plant.PendingProjectile {
-		// Story 13.2: 使用主动画的 LogicalFrame 替代 CurrentFrame
-		currentFrame := 0
-		if state, ok := reanim.AnimStates[reanim.CurrentAnim]; ok {
-			currentFrame = state.LogicalFrame
-		}
+		// Story 13.8: 直接使用 CurrentFrame
+		currentFrame := reanim.CurrentFrame
 		// 精确匹配发射帧（零延迟）
 		if currentFrame == config.PeashooterShootingFireFrame {
 			log.Printf("[BehaviorSystem] 豌豆射手 %d 到达关键帧(%d)，发射子弹！",
@@ -1615,7 +1634,8 @@ func (s *BehaviorSystem) updatePlantAttackAnimation(entityID ecs.EntityID, delta
 			return
 		}
 
-		err := s.reanimSystem.PlayDefaultAnimation(entityID, unitID)
+		// Story 13.8: 使用 PlayCombo 播放默认动画组合
+		err := s.reanimSystem.PlayCombo(entityID, unitID, "")
 		if err != nil {
 			log.Printf("[BehaviorSystem] 切换回空闲动画失败: %v", err)
 		} else {

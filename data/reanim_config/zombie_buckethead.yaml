@@ -4,8 +4,25 @@ reanim_file: data/reanim/Zombie.reanim
 default_animation: anim_idle
 scale: 1
 images:
+    IMAGE_REANIM_ZOMBIE_BODY: assets/reanim/Zombie_body.png
+    IMAGE_REANIM_ZOMBIE_BUCKET1: assets/reanim/Zombie_bucket1.png
+    IMAGE_REANIM_ZOMBIE_HEAD: assets/reanim/Zombie_head.png
+    IMAGE_REANIM_ZOMBIE_INNERARM_HAND: assets/reanim/Zombie_innerarm_hand.png
+    IMAGE_REANIM_ZOMBIE_INNERARM_LOWER: assets/reanim/Zombie_innerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_INNERARM_UPPER: assets/reanim/Zombie_innerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_INNERLEG_FOOT: assets/reanim/Zombie_innerleg_foot.png
+    IMAGE_REANIM_ZOMBIE_INNERLEG_LOWER: assets/reanim/Zombie_innerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_INNERLEG_UPPER: assets/reanim/Zombie_innerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_JAW: assets/reanim/Zombie_jaw.png
+    IMAGE_REANIM_ZOMBIE_NECK: assets/reanim/Zombie_neck.png
     IMAGE_REANIM_ZOMBIE_OUTERARM_HAND: assets/reanim/Zombie_outerarm_hand.png
     IMAGE_REANIM_ZOMBIE_OUTERARM_LOWER: assets/reanim/Zombie_outerarm_lower.png
+    IMAGE_REANIM_ZOMBIE_OUTERARM_UPPER: assets/reanim/Zombie_outerarm_upper.png
+    IMAGE_REANIM_ZOMBIE_OUTERLEG_FOOT: assets/reanim/Zombie_outerleg_foot.png
+    IMAGE_REANIM_ZOMBIE_OUTERLEG_LOWER: assets/reanim/Zombie_outerleg_lower.png
+    IMAGE_REANIM_ZOMBIE_OUTERLEG_UPPER: assets/reanim/Zombie_outerleg_upper.png
+    IMAGE_REANIM_ZOMBIE_TIE: assets/reanim/Zombie_tie.png
+    IMAGE_REANIM_ZOMBIE_TONGUE: assets/reanim/Zombie_tongue.png
 available_animations:
     - name: anim_idle
       display_name: idle
@@ -15,62 +32,66 @@ available_animations:
       display_name: eat
     - name: anim_death
       display_name: death
+
+# 动画组合配置：铁桶僵尸需要显示铁桶，隐藏其他装备
 animation_combos:
     - name: idle
-      display_name: 铁桶僵尸待机
+      display_name: 待机
       animations:
-        - anim_idle
+          - anim_idle
       binding_strategy: auto
       hidden_tracks:
-        - Zombie_duckytube
-        - Zombie_flaghand
-        - Zombie_innerarm_screendoor
-        - Zombie_innerarm_screendoor_hand
-        - Zombie_mustache
-        - Zombie_outerarm_screendoor
-        - Zombie_tie
-        - Zombie_whitewater
-        - Zombie_whitewater2
-        - _ground
-        - anim_cone
-        - anim_dance
-        - anim_death
-        - anim_death2
-        - anim_eat
-        - anim_hair
-        - anim_idle2
-        - anim_screendoor
-        - anim_superlongdeath
-        - anim_swim
-        - anim_tongue
-        - anim_walk
-        - anim_walk2
-        - anim_waterdeath
+          - anim_cone         # 隐藏路障
+          - anim_screendoor   # 隐藏铁门
+          - Zombie_flaghand   # 隐藏旗帜手
+          - Zombie_innerarm_screendoor
+          - Zombie_innerarm_screendoor_hand
+          - Zombie_outerarm_screendoor
+          - Zombie_duckytube
+          - Zombie_mustache
+          # 注意：不隐藏 anim_bucket（铁桶僵尸需要显示铁桶）
+
     - name: walk
-      display_name: 铁桶僵尸行走
+      display_name: 行走
       animations:
-        - anim_walk
+          - anim_walk
       binding_strategy: auto
       hidden_tracks:
-        - Zombie_duckytube
-        - Zombie_flaghand
-        - Zombie_innerarm_screendoor
-        - Zombie_innerarm_screendoor_hand
-        - Zombie_mustache
-        - Zombie_outerarm_screendoor
-        - Zombie_tie
-        - Zombie_whitewater
-        - Zombie_whitewater2
-        - _ground
-        - anim_cone
-        - anim_dance
-        - anim_death
-        - anim_death2
-        - anim_eat
-        - anim_hair
-        - anim_idle2
-        - anim_screendoor
-        - anim_superlongdeath
-        - anim_swim
-        - anim_tongue
-        - anim_waterdeath
+          - anim_cone
+          - anim_screendoor
+          - Zombie_flaghand
+          - Zombie_innerarm_screendoor
+          - Zombie_innerarm_screendoor_hand
+          - Zombie_outerarm_screendoor
+          - Zombie_duckytube
+          - Zombie_mustache
+
+    - name: eat
+      display_name: 啃食
+      animations:
+          - anim_eat
+      binding_strategy: auto
+      hidden_tracks:
+          - anim_cone
+          - anim_screendoor
+          - Zombie_flaghand
+          - Zombie_innerarm_screendoor
+          - Zombie_innerarm_screendoor_hand
+          - Zombie_outerarm_screendoor
+          - Zombie_duckytube
+          - Zombie_mustache
+
+    - name: death
+      display_name: 死亡
+      animations:
+          - anim_death
+      binding_strategy: auto
+      hidden_tracks:
+          - anim_cone
+          - anim_screendoor
+          - Zombie_flaghand
+          - Zombie_innerarm_screendoor
+          - Zombie_innerarm_screendoor_hand
+          - Zombie_outerarm_screendoor
+          - Zombie_duckytube
+          - Zombie_mustache

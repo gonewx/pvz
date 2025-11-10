@@ -1,10 +1,15 @@
 id: sun
 name: Sun
 reanim_file: data/reanim/Sun.reanim
-default_animation: anim_idle
+default_animation: ""
 scale: 1
 images:
     IMAGE_REANIM_SUN1: assets/reanim/Sun1.png
     IMAGE_REANIM_SUN2: assets/reanim/Sun2.png
     IMAGE_REANIM_SUN3: assets/reanim/Sun3.png
 available_animations: []
+animation_combos:
+  - name: "idle"
+    display_name: "闪烁"
+    animations: ["Sun1", "Sun2", "Sun3"]
+    binding_strategy: "auto"

@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
@@ -227,16 +228,27 @@ func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.O
 		reanimXML := oas.resourceManager.GetReanimXML("Zombie")
 		partImages := oas.resourceManager.GetReanimPartImages("Zombie")
 		if reanimXML != nil && partImages != nil {
+			// Story 13.8: 使用新的简化结构
 			reanimComp := &components.ReanimComponent{
-				Reanim:      reanimXML,
-				PartImages:  partImages,
-				CurrentAnim: "anim_idle",
-				IsLooping:   true,
+				ReanimName:        "Zombie",
+				ReanimXML:         reanimXML,
+				PartImages:        partImages,
+				MergedTracks:      map[string][]reanim.Frame{}, // 稍后由 PlayAnimation 初始化
+				VisualTracks:      []string{},
+				LogicalTracks:     []string{},
+				CurrentFrame:      0,
+				FrameAccumulator:  0,
+				AnimationFPS:      12,
+				CurrentAnimations: []string{},
+				AnimVisiblesMap:   map[string][]int{},
+				TrackAnimationBinding: map[string]string{},
+				IsLooping:         true,
+				IsFinished:        false,
 			}
 			ecs.AddComponent(oas.entityManager, zombieEntity, reanimComp)
 
-			// 初始化 Reanim（设置锚点为底部中心）
-			if err := oas.reanimSystem.InitializeDirectRender(zombieEntity); err != nil {
+			// Story 13.8: 使用配置驱动的动画组合（自动隐藏装备轨道）
+			if err := oas.reanimSystem.PlayCombo(zombieEntity, "zombie", "idle"); err != nil {
 				log.Printf("[OpeningAnimationSystem] Failed to initialize zombie reanim: %v", err)
 			}
 		}

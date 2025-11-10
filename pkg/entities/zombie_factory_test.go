@@ -81,25 +81,26 @@ func TestNewZombieEntity(t *testing.T) {
 				t.Error("Zombie entity should have ReanimComponent")
 			} else {
 				reanim := reanimComp.(*components.ReanimComponent)
-				if reanim.Reanim == nil {
-					t.Error("ReanimComponent.Reanim should not be nil")
+				if reanim.ReanimXML == nil {
+					t.Error("ReanimComponent.ReanimXML should not be nil")
 				}
 				if reanim.PartImages == nil {
 					t.Error("ReanimComponent.PartImages should not be nil")
 				}
-				if reanim.CurrentAnim == "" {
-					t.Error("ReanimComponent.CurrentAnim should not be empty")
+				if len(reanim.CurrentAnimations) == 0 {
+					t.Error("ReanimComponent.CurrentAnimations should not be empty")
 				}
 			}
 
 			// 验证 VelocityComponent
+			// Story 8.3: 僵尸预生成时速度为 0，等待激活
 			velComp, ok := em.GetComponent(zombieID, reflect.TypeOf(&components.VelocityComponent{}))
 			if !ok {
 				t.Error("Zombie entity should have VelocityComponent")
 			} else {
 				vel := velComp.(*components.VelocityComponent)
-				if vel.VX != -30.0 {
-					t.Errorf("Expected VX -30.0, got %.1f", vel.VX)
+				if vel.VX != 0.0 {
+					t.Errorf("Expected VX 0.0 (待命状态), got %.1f", vel.VX)
 				}
 				if vel.VY != 0.0 {
 					t.Errorf("Expected VY 0.0, got %.1f", vel.VY)
@@ -263,8 +264,8 @@ func TestNewConeheadZombieEntity(t *testing.T) {
 				t.Error("Conehead zombie entity should have ReanimComponent")
 			} else {
 				reanim := reanimComp.(*components.ReanimComponent)
-				if reanim.Reanim == nil {
-					t.Error("ReanimComponent.Reanim should not be nil")
+				if reanim.ReanimXML == nil {
+					t.Error("ReanimComponent.ReanimXML should not be nil")
 				}
 				if reanim.PartImages == nil {
 					t.Error("ReanimComponent.PartImages should not be nil")
@@ -363,8 +364,8 @@ func TestNewBucketheadZombieEntity(t *testing.T) {
 				t.Error("Buckethead zombie entity should have ReanimComponent")
 			} else {
 				reanim := reanimComp.(*components.ReanimComponent)
-				if reanim.Reanim == nil {
-					t.Error("ReanimComponent.Reanim should not be nil")
+				if reanim.ReanimXML == nil {
+					t.Error("ReanimComponent.ReanimXML should not be nil")
 				}
 				if reanim.PartImages == nil {
 					t.Error("ReanimComponent.PartImages should not be nil")

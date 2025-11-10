@@ -175,12 +175,10 @@ func CreateFinalWaveEntity(em *ecs.EntityManager, rm ResourceLoader, reanimSyste
 
 	// 添加 ReanimComponent（动画组件）
 	reanimComp := &components.ReanimComponent{
-		Reanim:            reanimXML,
+		ReanimXML: reanimXML,
 		PartImages:        partImages,
-		CurrentAnim:       "anim",
 		CurrentAnimations: []string{"anim"},
 		IsLooping:         false, // 最后一波警告只播放一次
-		VisibleTracks:     make(map[string]bool),
 		MergedTracks:      make(map[string][]reanim.Frame),
 		FrameAccumulator:  0.0,
 	}

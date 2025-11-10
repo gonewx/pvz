@@ -39,7 +39,7 @@ animation_combos:
       display_name: 攻击+摇晃
       animations:
         - anim_shooting
-        - anim_head_idle
+        - anim_idle
       binding_strategy: auto
       parent_tracks:
         anim_face: anim_stem

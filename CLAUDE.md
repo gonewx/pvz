@@ -336,6 +336,49 @@ reanimSystem.SetConfigManager(configManager)
 | 鼠标输入 | 屏幕坐标 | `ebiten.CursorPosition()` |
 | 渲染绘制 | 屏幕坐标 | `screen.DrawImage()` |
 
+### Reanim 坐标系统和锚点 (Epic 13 重要经验)
+
+**关键发现：渲染系统把 Reanim 文件中的坐标当作图片左上角使用**
+
+#### 渲染公式
+
+```go
+// RenderSystem 的实际渲染位置计算
+baseScreenX = pos.X - cameraX - CenterOffsetX
+partX = frame.X  // 来自 Reanim 文件的 X 坐标
+finalScreenX = baseScreenX + partX
+
+// 转换为世界坐标
+worldX = finalScreenX + cameraX = pos.X - CenterOffsetX + partX
+```
+
+**关键点：**
+- `frame.X`（Reanim 文件中的 X）被当作**图片左上角**的相对坐标
+- 图片使用左上角锚点渲染（`x0 = tx, y0 = ty`）
+- 不需要手动转换中心到左上角
+
+**问题：**草皮叠加层应该铺到哪里？
+
+**关键设计决策：**
+- 草皮卷是一个圆柱体（SodRoll），滚动时逐渐展开草皮
+- 草皮应该铺到**草皮卷的中心位置**（圆柱体的中心线），而不是左边缘或右边缘
+- 物理上合理：草皮从卷的中心展开，铺设在地面上
+
+**错误理解：**
+```go
+// ❌ 错误：草皮铺到草皮卷的左边缘
+grassRightEdge := pos.X - CenterOffsetX + SodRoll.X
+// 结果：草皮铺设不足，未覆盖应该覆盖的区域
+```
+
+**正确实现：**
+```go
+// ✅ 正确：草皮铺到草皮卷的中心（sodding_system.go:calculateCurrentCenterX）
+sodRollCenterX := SodRoll.X + scaledHalfWidth  // 图片中心
+worldRightEdgeX := pos.X - CenterOffsetX + sodRollCenterX
+// GetSodRollCenterX() 返回此值，用于裁剪草皮叠加层的可见宽度
+```
+
 ## 文档参考
 
 ### 用户文档
@@ -379,3 +422,4 @@ reanimSystem.SetConfigManager(configManager)
 - 绘制任何元素时，都要考虑是否需要坐标转换。
 - 验证粒子系统的实现， 可以使用类似 `go run cmd/particles/main.go --verbose --effect="Planting"  > /tmp/p.log 2>&1` 的命令运行，并查看日志
 - 如果没有动画轨道,那可能是简单的动画组件,应该按配置的名称,直接播放就行
+- 将刚刚的经验记录起来

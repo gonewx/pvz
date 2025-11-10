@@ -33,25 +33,30 @@ func NewPlantCardEntity(em *ecs.EntityManager, rm *game.ResourceManager, rs Rean
 
 	// 根据植物类型设置属性
 	var sunCost int
-	var reanimName string
+	var resourceName string // 资源名称（用于 ResourceManager 缓存查找）
+	var configID string     // 配置ID（用于配置文件查找）
 	var cooldownTime float64
 
 	switch plantType {
 	case components.PlantSunflower:
 		sunCost = config.SunflowerSunCost // 50
-		reanimName = "SunFlower"
+		resourceName = "SunFlower"        // 资源管理器中的缓存键
+		configID = "sunflower"            // 配置文件中的 ID
 		cooldownTime = config.SunflowerRechargeTime // 7.5
 	case components.PlantPeashooter:
-		sunCost = config.PeashooterSunCost           // 100
-		reanimName = "PeaShooterSingle"              // Story 10.3: 修正为普通豌豆射手资源
+		sunCost = config.PeashooterSunCost // 100
+		resourceName = "PeaShooterSingle"  // 资源管理器中的缓存键
+		configID = "peashooter"            // 配置文件中的 ID
 		cooldownTime = config.PeashooterRechargeTime // 7.5
 	case components.PlantWallnut:
 		sunCost = config.WallnutCost // 50
-		reanimName = "Wallnut"
+		resourceName = "Wallnut"     // 资源管理器中的缓存键
+		configID = "wallnut"         // 配置文件中的 ID
 		cooldownTime = config.WallnutRechargeTime // 30.0
 	case components.PlantCherryBomb:
 		sunCost = config.CherryBombSunCost // 150
-		reanimName = "CherryBomb"
+		resourceName = "CherryBomb"        // 资源管理器中的缓存键
+		configID = "cherrybomb"            // 配置文件中的 ID
 		cooldownTime = config.CherryBombCooldown // 50.0
 	default:
 		em.DestroyEntity(entity)
@@ -69,11 +74,12 @@ func NewPlantCardEntity(em *ecs.EntityManager, rm *game.ResourceManager, rs Rean
 	}
 
 	// 渲染植物预览图标（Reanim 离屏渲染）
-	plantIcon, err := RenderPlantIcon(em, rm, rs, reanimName)
+	// Story 13.8: 分别传入资源名称和配置ID
+	plantIcon, err := RenderPlantIcon(em, rm, rs, resourceName, configID)
 	if err != nil {
 		em.DestroyEntity(entity)
 		em.RemoveMarkedEntities()
-		log.Printf("[PlantCardFactory] Failed to render plant icon for %s: %v", reanimName, err)
+		log.Printf("[PlantCardFactory] Failed to render plant icon for %s: %v", resourceName, err)
 		return 0, fmt.Errorf("failed to render plant icon: %w", err)
 	}
 
@@ -133,10 +139,11 @@ func NewPlantCardEntity(em *ecs.EntityManager, rm *game.ResourceManager, rs Rean
 //   - em: 实体管理器
 //   - rm: 资源管理器
 //   - rs: Reanim 系统接口
-//   - reanimName: 植物的 Reanim 资源名称 (如 "SunFlower", "PeaShooter")
+//   - resourceName: Reanim 资源名称（用于ResourceManager缓存查找，如 "SunFlower", "PeaShooterSingle"）
+//   - configID: 配置文件ID（用于配置查找，如 "sunflower", "peashooter"）
 //
 // 返回: 渲染好的植物图标纹理和可能的错误
-func RenderPlantIcon(em *ecs.EntityManager, rm *game.ResourceManager, rs ReanimSystemInterface, reanimName string) (*ebiten.Image, error) {
+func RenderPlantIcon(em *ecs.EntityManager, rm *game.ResourceManager, rs ReanimSystemInterface, resourceName string, configID string) (*ebiten.Image, error) {
 	// 1. 创建临时实体
 	tempEntity := em.CreateEntity()
 	defer func() {
@@ -144,13 +151,13 @@ func RenderPlantIcon(em *ecs.EntityManager, rm *game.ResourceManager, rs ReanimS
 		em.RemoveMarkedEntities()
 	}()
 
-	// 2. 加载 Reanim 资源
-	reanimXML := rm.GetReanimXML(reanimName)
-	partImages := rm.GetReanimPartImages(reanimName)
+	// 2. 加载 Reanim 资源（使用资源名称）
+	reanimXML := rm.GetReanimXML(resourceName)
+	partImages := rm.GetReanimPartImages(resourceName)
 
 	if reanimXML == nil || partImages == nil {
-		log.Printf("[PlantCardFactory] Failed to load Reanim resources for %s", reanimName)
-		return nil, fmt.Errorf("failed to load Reanim resources for %s", reanimName)
+		log.Printf("[PlantCardFactory] Failed to load Reanim resources for %s", resourceName)
+		return nil, fmt.Errorf("failed to load Reanim resources for %s", resourceName)
 	}
 
 	// 3. 创建离屏渲染目标纹理
@@ -167,26 +174,24 @@ func RenderPlantIcon(em *ecs.EntityManager, rm *game.ResourceManager, rs ReanimS
 	})
 
 	// 为预览图标添加 VisibleTracks 白名单
-	// Story 11.1: 使用配置文件中的预览轨道白名单
-	visibleTracks := config.PlantPreviewVisibleTracks[reanimName]
+	// Story 11.1: 使用配置文件中的预览轨道白名单（使用资源名称作为键）
+	visibleTracks := config.PlantPreviewVisibleTracks[resourceName]
 	if visibleTracks == nil {
 		// 如果配置中没有此植物的白名单，使用空白名单（允许所有轨道）
 		visibleTracks = make(map[string]bool)
-		log.Printf("[PlantCardFactory] Warning: No preview track config for %s, using all tracks", reanimName)
+		log.Printf("[PlantCardFactory] Warning: No preview track config for %s, using all tracks", resourceName)
 	}
 
 	ecs.AddComponent(em, tempEntity, &components.ReanimComponent{
-		Reanim:        reanimXML,
-		PartImages:    partImages,
-		VisibleTracks: visibleTracks, // Story 10.3: 添加白名单确保预览完整显示
+		ReanimName: resourceName, // 添加资源名称，用于调试日志
+		ReanimXML:  reanimXML,
+		PartImages: partImages,
 	})
 
-	// 5. Story 11.1: 使用静态预览方法准备实体
-	// 原因：部分植物（如向日葵）没有 anim_idle 动画定义轨道
-	// PlayAnimation 需要动画定义轨道，而 PrepareStaticPreview 直接处理部件轨道
-	// 解决方案：使用专门为静态预览设计的 PrepareStaticPreview 方法
-	if err := rs.PrepareStaticPreview(tempEntity, reanimName); err != nil {
-		log.Printf("[PlantCardFactory] Warning: Failed to prepare preview for %s: %v", reanimName, err)
+	// 5. Story 13.8: 使用配置ID准备静态预览
+	// 原因：PrepareStaticPreview → PlayCombo 需要配置文件中的 ID
+	if err := rs.PrepareStaticPreview(tempEntity, configID); err != nil {
+		log.Printf("[PlantCardFactory] Warning: Failed to prepare preview for %s (config ID: %s): %v", resourceName, configID, err)
 		// 继续执行，使用默认姿态
 	}
 
@@ -197,11 +202,11 @@ func RenderPlantIcon(em *ecs.EntityManager, rm *game.ResourceManager, rs ReanimS
 	// 注意：需要临时调用 ReanimSystem 的渲染逻辑
 	// 这里使用一个辅助方法来渲染单个实体
 	if err := rs.RenderToTexture(tempEntity, iconTexture); err != nil {
-		log.Printf("[PlantCardFactory] Failed to render %s to texture: %v", reanimName, err)
+		log.Printf("[PlantCardFactory] Failed to render %s to texture: %v", resourceName, err)
 		return nil, fmt.Errorf("failed to render plant to texture: %w", err)
 	}
 
-	log.Printf("[PlantCardFactory] Rendered plant icon: %s (%dx%d)", reanimName, iconWidth, iconHeight)
+	log.Printf("[PlantCardFactory] Rendered plant icon: %s (config: %s, size: %dx%d)", resourceName, configID, iconWidth, iconHeight)
 
 	return iconTexture, nil
 }

@@ -32,7 +32,7 @@ const (
 const (
 	// GridWorldStartX 是草坪网格在背景图片中的起始X坐标（世界坐标）
 	// 计算方式：屏幕坐标 + 游戏摄像机位置
-	GridWorldStartX = GridScreenStartX + GameCameraX // 43 + 220 = 263
+	GridWorldStartX = GridScreenStartX + GameCameraX
 
 	// GridWorldStartY 是草坪网格在背景图片中的起始Y坐标（世界坐标）
 	// Y轴不受摄像机水平移动影响，因此世界坐标等于屏幕坐标
@@ -59,11 +59,11 @@ const (
 
 	// SodRoll 动画起点X（相对于网格起点的偏移）
 	// 调整此值可以改变草皮卷从哪里开始滚动
-	SodRollStartOffsetX = -35.0 // 相对于 GridWorldStartX 的偏移量
+	SodRollStartOffsetX = 0.0 // 相对于 GridWorldStartX 的偏移量
 
 	// SodRoll 动画Y偏移（相对于目标行中心）
 	// 调整此值可以改变草皮卷的垂直位置
-	SodRollOffsetY = -8.0 // 相对于行中心的Y偏移量
+	SodRollOffsetY = -15.0 // 相对于行中心的Y偏移量
 
 	// 草皮叠加图X偏移（相对于网格起点）
 	// 调整此值可以改变草皮显示的水平位置

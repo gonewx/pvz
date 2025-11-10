@@ -9,35 +9,29 @@ import (
 // createSimpleReanimComponent 为单图片实体创建简单的 ReanimComponent
 // 这个辅助函数将单张图片包装成一个简单的单帧 Reanim 动画
 // 所有简单实体（阳光、子弹、特效等）都使用这个函数创建 ReanimComponent
+// Story 13.8: 重写以适配新的 ReanimComponent 结构
 func createSimpleReanimComponent(image *ebiten.Image, imageName string) *components.ReanimComponent {
 	// 处理 nil 图片的情况
 	if image == nil {
 		return &components.ReanimComponent{
-			Reanim:            &reanim.ReanimXML{FPS: 12},
+			ReanimName:        "simple_nil",
+			ReanimXML:         &reanim.ReanimXML{FPS: 12},
 			PartImages:        map[string]*ebiten.Image{},
-			CurrentAnim:       "idle",
-			CurrentAnimations: []string{"idle"},
+			MergedTracks:      map[string][]reanim.Frame{},
+			VisualTracks:      []string{},
+			LogicalTracks:     []string{},
+			CurrentFrame:      0,
 			FrameAccumulator:  0.0,
-			VisibleFrameCount: 0,
+			AnimationFPS:      12,
+			CurrentAnimations: []string{"idle"},
+			AnimVisiblesMap:   map[string][]int{"idle": {}},
+			TrackAnimationBinding: map[string]string{},
 			IsLooping:         true,
 			IsFinished:        false,
-			AnimVisiblesMap:   map[string][]int{"idle": {}},
-			MergedTracks:      map[string][]reanim.Frame{},
-			AnimTracks:        []reanim.Track{},
-			CenterOffsetX:     0,
-			CenterOffsetY:     0,
 		}
 	}
 
-	bounds := image.Bounds()
-	imageWidth := float64(bounds.Dx())
-	imageHeight := float64(bounds.Dy())
-
 	// 创建一个简单的单帧 Reanim
-	// 使用中心对齐锚点
-	centerX := imageWidth / 2
-	centerY := imageHeight / 2
-
 	frame := reanim.Frame{
 		FrameNum: new(int),
 		X:        new(float64),
@@ -66,38 +60,47 @@ func createSimpleReanimComponent(image *ebiten.Image, imageName string) *compone
 		imageName: image,
 	}
 
+	mergedTracks := map[string][]reanim.Frame{
+		imageName: {frame},
+	}
+
+	// Story 13.8: 新的 ReanimComponent 结构
 	return &components.ReanimComponent{
-		Reanim:            reanimXML,
-		PartImages:        partImages,
-		CurrentAnim:       "idle",
-		CurrentAnimations: []string{"idle"},
+		// 基础数据
+		ReanimName:   "simple_" + imageName,
+		ReanimXML:    reanimXML,
+		PartImages:   partImages,
+		MergedTracks: mergedTracks,
+
+		// 轨道分类
+		VisualTracks:  []string{imageName}, // 单图片实体只有一个视觉轨道
+		LogicalTracks: []string{},          // 简单实体没有逻辑轨道
+
+		// 播放状态
+		CurrentFrame:      0,
 		FrameAccumulator:  0.0,
-		VisibleFrameCount: 1,
-		IsLooping:         true,
-		IsFinished:        false,
+		AnimationFPS:      12,
+		CurrentAnimations: []string{"idle"},
+
+		// 动画数据
 		AnimVisiblesMap: map[string][]int{
-			"idle": {0},
+			"idle": {0}, // 单帧动画
 		},
-		MergedTracks: map[string][]reanim.Frame{
-			imageName: {frame},
+		TrackAnimationBinding: map[string]string{
+			imageName: "idle", // 轨道绑定到 idle 动画
 		},
-		AnimTracks:    []reanim.Track{track},
-		CenterOffsetX: centerX,
-		CenterOffsetY: centerY,
-		// Story 13.2: 初始化 AnimStates（简单实体的单帧动画）
-		AnimStates: map[string]*components.AnimState{
-			"idle": {
-				Name:              "idle",
-				IsActive:          true, // 必须为 true
-				IsLooping:         true,
-				LogicalFrame:      0, // Story 13.2: Frame -> LogicalFrame
-				Accumulator:       0.0,
-				StartFrame:        0,
-				FrameCount:        1,
-				RenderWhenStopped: true,
-				DelayTimer:        0.0,
-				DelayDuration:     0.0,
-			},
-		},
+
+		// 配置字段（简单实体不需要）
+		ParentTracks: nil,
+		HiddenTracks: nil,
+
+		// 渲染缓存
+		CachedRenderData: []components.RenderPartData{},
+		LastRenderFrame:  -1,
+
+		// 控制标志
+		IsPaused:   false,
+		IsLooping:  true,
+		IsFinished: false,
 	}
 }

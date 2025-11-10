@@ -74,7 +74,7 @@ const (
 	PeaBulletOffsetX = 35.0
 
 	// PeaBulletOffsetY 子弹相对豌豆射手中心的垂直偏移量（像素）
-	PeaBulletOffsetY = -18.0
+	PeaBulletOffsetY = -35.0
 
 	// PeaBulletWidth 豌豆子弹碰撞盒宽度（像素）
 	PeaBulletWidth = 28.0
