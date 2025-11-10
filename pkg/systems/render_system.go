@@ -67,6 +67,15 @@ func (s *RenderSystem) SetReanimSystem(reanimSystem *ReanimSystem) {
 	s.reanimSystem = reanimSystem
 }
 
+// DrawEntity 绘制单个实体（公开方法，用于特殊场景如主菜单）
+// 参数:
+//   - screen: 绘制目标屏幕
+//   - id: 实体ID
+//   - cameraX: 摄像机的世界坐标X位置
+func (s *RenderSystem) DrawEntity(screen *ebiten.Image, id ecs.EntityID, cameraX float64) {
+	s.drawEntity(screen, id, cameraX)
+}
+
 // Draw 绘制所有拥有位置和精灵组件的实体（包括阳光）
 // 渲染顺序（从底到顶）：植物 → 僵尸/子弹 → 阳光
 // 注意：此方法包含阳光渲染，如果需要在UI层之后渲染阳光，请使用 DrawGameWorld + DrawSuns

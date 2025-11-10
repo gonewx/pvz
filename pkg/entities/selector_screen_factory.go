@@ -29,7 +29,17 @@ import (
 //
 // Story 12.1: Main Menu Tombstone System Enhancement
 func NewSelectorScreenEntity(em *ecs.EntityManager, rm *game.ResourceManager) (ecs.EntityID, error) {
-	return NewSelectorScreenPartialEntity(em, rm, nil, "", 0, 0)
+	// 创建实体（不指定可见轨道和动画，让系统自动处理）
+	entity, err := NewSelectorScreenPartialEntity(em, rm, nil, "", 0, 0)
+	if err != nil {
+		return 0, err
+	}
+
+	// Story 13.8: 添加 Reanim 组件后，需要调用 ReanimSystem 初始化动画
+	// 但是在这里我们无法访问 ReanimSystem，所以在 MainMenuScene 中初始化
+	// 注意：这与植物工厂不同，植物工厂会接收 ReanimSystem 作为参数
+
+	return entity, nil
 }
 
 // NewSelectorScreenPartialEntity creates a SelectorScreen Reanim entity with specific visible tracks.
@@ -70,6 +80,12 @@ func NewSelectorScreenPartialEntity(
 	entityID := em.CreateEntity()
 
 	// 4. Add ReanimComponent (Story 13.8: 简化为新的结构)
+	visualTracks := extractVisualTracks(reanimXML, visibleTracks)
+	log.Printf("[SelectorScreen] extractVisualTracks 返回: %d 个轨道", len(visualTracks))
+	if len(visualTracks) > 0 {
+		log.Printf("[SelectorScreen] 前5个轨道: %v", visualTracks[:min(5, len(visualTracks))])
+	}
+
 	reanimComp := &components.ReanimComponent{
 		// 基础数据
 		ReanimName:   "SelectorScreen", // For config lookup and debugging
@@ -78,7 +94,7 @@ func NewSelectorScreenPartialEntity(
 		MergedTracks: reanim.BuildMergedTracks(reanimXML),
 
 		// 轨道分类
-		VisualTracks:  extractVisualTracks(reanimXML, visibleTracks),
+		VisualTracks:  visualTracks,
 		LogicalTracks: []string{},
 
 		// 播放状态
@@ -101,7 +117,7 @@ func NewSelectorScreenPartialEntity(
 
 		// 控制标志
 		IsPaused:   false,
-		IsLooping:  true,
+		IsLooping:  false,
 		IsFinished: false,
 	}
 
@@ -154,4 +170,12 @@ func buildHiddenTracks(reanimXML *reanim.ReanimXML, visibleTracks map[string]boo
 		}
 	}
 	return hiddenTracks
+}
+
+// min 返回两个整数中的较小值
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

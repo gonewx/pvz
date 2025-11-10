@@ -67,14 +67,23 @@ available_animations:
     - name: anim_cloud5
       display_name: cloud5
 animation_combos:
-    - name: all
-      display_name: 正式
+    - name: opening
+      display_name: 开场动画（不循环）
+      animations:
+        - anim_open
+        - anim_sign
+        - anim_idle
+      binding_strategy: auto
+      loop: false
+    - name: clouds
+      display_name: 云朵循环
       animations:
         - anim_grass
         - anim_cloud1
-        - anim_cloud7
         - anim_cloud2
         - anim_cloud4
-        - anim_cloud6
         - anim_cloud5
+        - anim_cloud6
+        - anim_cloud7
       binding_strategy: auto
+      loop: true

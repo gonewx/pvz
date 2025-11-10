@@ -41,6 +41,9 @@ type AnimationComboConfig struct {
 	// Animations 播放的动画列表
 	Animations []string `yaml:"animations"`
 
+	// Loop 是否循环播放（默认 true）
+	Loop *bool `yaml:"loop,omitempty"`
+
 	// BindingStrategy 轨道绑定策略（"auto" 或 "manual"）
 	// auto: 自动分析轨道绑定，manual: 手动指定绑定
 	BindingStrategy string `yaml:"binding_strategy,omitempty"`
