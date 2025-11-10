@@ -1023,12 +1023,16 @@ func (s *GameScene) loadSoddingResources() {
 		newBackground.DrawImage(s.background, op)
 
 		// 2. 预渲染叠加层草皮
-		// 如果是两阶段渲染模式，使用 sodRowImageAnim（IMAGE_SOD3ROW）渲染所有启用行
-		// 否则使用 sodRowImage 渲染 preSoddedLanes
+		// 设计原理：
+		// - preSoddedLanes：控制底层背景预渲染哪些行（动画开始前就可见）
+		// - 叠加层：始终包含所有启用行的草皮，用于动画时逐渐显示
+		//
+		// 示例：
+		// Level 1-1: preSoddedLanes=[], enabledLanes=[3]
+		//   → 底层无草皮，叠加层有第3行草皮，通过裁剪逐渐显示
+		// Level 1-2: preSoddedLanes=[2,4], enabledLanes=[2,3,4]
+		//   → 底层有2/4行草皮，叠加层有2/3/4行草皮，动画显示第3行
 		lanesToPreRender := enabledLanes
-		if !hasTwoStageRendering && len(preSoddedLanes) > 0 {
-			lanesToPreRender = preSoddedLanes
-		}
 
 		if len(lanesToPreRender) > 0 {
 			// 检查是否是连续的3行
@@ -1565,9 +1569,12 @@ func (s *GameScene) drawBackground(screen *ebiten.Image) {
 				// 计算可见宽度（从世界坐标 0 到草皮卷中心）
 				visibleWorldWidth := int(sodRollCenterX)
 
-				// 特殊处理：如果使用预渲染图片且动画未启动，显示整个预渲染背景
-				// 这样可以在动画开始前显示预铺的草皮（如 1-2 关的第3行）
-				if usingPreSoddedImage && !s.soddingSystem.HasStarted() {
+				// 特殊处理：如果有预铺草皮（preSoddedLanes）且动画未启动，显示整个预渲染背景
+				// 这样可以在动画开始前显示预铺的草皮（如 1-2 关的第2/4行）
+				// Level 1-1: preSoddedLanes=[] → 动画前不显示叠加层
+				// Level 1-2: preSoddedLanes=[2,4] → 动画前显示预铺草皮
+				hasPreSoddedLanes := len(s.gameState.CurrentLevel.PreSoddedLanes) > 0
+				if usingPreSoddedImage && !s.soddingSystem.HasStarted() && hasPreSoddedLanes {
 					bgBounds := overlayBg.Bounds()
 					visibleWorldWidth = bgBounds.Dx()
 				}
