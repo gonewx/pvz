@@ -26,12 +26,12 @@ type WindowConfig struct {
 
 // GridConfig 网格布局配置
 type GridConfig struct {
-	Columns      int `yaml:"columns"`
-	CellWidth    int `yaml:"cell_width"`
-	CellHeight   int `yaml:"cell_height"`
-	Padding      int `yaml:"padding"`
-	ScrollSpeed  int `yaml:"scroll_speed"`
-	RowsPerPage  int `yaml:"rows_per_page"` // 每页显示的行数
+	Columns     int `yaml:"columns"`
+	CellWidth   int `yaml:"cell_width"`
+	CellHeight  int `yaml:"cell_height"`
+	Padding     int `yaml:"padding"`
+	ScrollSpeed int `yaml:"scroll_speed"`
+	RowsPerPage int `yaml:"rows_per_page"` // 每页显示的行数
 }
 
 // PlaybackConfig 播放配置
@@ -43,14 +43,14 @@ type PlaybackConfig struct {
 
 // AnimationUnitConfig 动画单元配置
 type AnimationUnitConfig struct {
-	ID                   string                `yaml:"id"`
-	Name                 string                `yaml:"name"`
-	ReanimFile           string                `yaml:"reanim_file"`
-	DefaultAnimation     string                `yaml:"default_animation"`
-	Scale                float64               `yaml:"scale"`
-	Images               map[string]string     `yaml:"images"`
-	AvailableAnimations  []AnimationInfo       `yaml:"available_animations"`
-	AnimationCombos      []AnimationComboConfig `yaml:"animation_combos"`
+	ID                  string                 `yaml:"id"`
+	Name                string                 `yaml:"name"`
+	ReanimFile          string                 `yaml:"reanim_file"`
+	DefaultAnimation    string                 `yaml:"default_animation"`
+	Scale               float64                `yaml:"scale"`
+	Images              map[string]string      `yaml:"images"`
+	AvailableAnimations []AnimationInfo        `yaml:"available_animations"`
+	AnimationCombos     []AnimationComboConfig `yaml:"animation_combos"`
 }
 
 // AnimationInfo 动画信息

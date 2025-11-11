@@ -241,9 +241,9 @@ func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.O
 				AnimationFPS:      12,
 				CurrentAnimations: []string{},
 				AnimVisiblesMap:   map[string][]int{},
-				TrackAnimationBinding: map[string]string{},
-				IsLooping:         true,
-				IsFinished:        false,
+				// ✅ Story 13.10: TrackAnimationBinding 已删除
+				IsLooping:  true,
+				IsFinished: false,
 			}
 			ecs.AddComponent(oas.entityManager, zombieEntity, reanimComp)
 

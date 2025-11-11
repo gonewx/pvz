@@ -93,34 +93,42 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	} else {
 		scene.selectorScreenEntity = selectorEntity
 
-		// Story 13.8: 初始化 SelectorScreen 动画
-		// 策略：所有动画在初始化时一起播放，但循环状态不同
-		// - 开场动画（anim_open, anim_sign, anim_idle）：非循环，播放一次后停留在最后一帧
-		// - 云朵和草动画（anim_grass, anim_cloud*）：循环播放
+		// ✅ Story 13.10 Bug Fix: 重新分析轨道类型
+		// selector_screen_factory 把所有轨道都放进了 VisualTracks（包括动画定义轨道）
+		// 需要使用 ReanimSystem 重新分类，将动画定义轨道移到 LogicalTracks
+		reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](scene.entityManager, selectorEntity)
+		if ok && reanimComp.ReanimXML != nil {
+			visualTracks, logicalTracks := scene.reanimSystem.AnalyzeTrackTypes(reanimComp.ReanimXML)
+			reanimComp.VisualTracks = visualTracks
+			reanimComp.LogicalTracks = logicalTracks
+			log.Printf("[MainMenuScene] 重新分析轨道类型: VisualTracks=%d, LogicalTracks=%d", len(visualTracks), len(logicalTracks))
+		}
 
-		// 1. 先播放开场动画
+		// Story 13.8: 初始化 SelectorScreen 动画
+		// ✅ Story 13.10 修正：不要同时播放所有动画，而是只播放开场动画
+		// 云朵和草动画应该在开场动画完成后再播放
+		// 策略：开场阶段只播放 anim_open，循环阶段再添加其他动画
+
+		// 1. 先播放开场动画（只播放 anim_open）
 		if err := scene.reanimSystem.PlayAnimation(selectorEntity, "anim_open"); err != nil {
 			log.Printf("[MainMenuScene] Warning: Failed to play anim_open: %v", err)
 		}
 
-		// 2. 添加其他开场动画
-		scene.reanimSystem.AddAnimation(selectorEntity, "anim_sign")
-		scene.reanimSystem.AddAnimation(selectorEntity, "anim_idle")
+		// 2. 不再添加 anim_sign 和 anim_idle（这些会覆盖背景）
+		// scene.reanimSystem.AddAnimation(selectorEntity, "anim_sign")
+		// scene.reanimSystem.AddAnimation(selectorEntity, "anim_idle")
 
-		// 3. 添加云朵和草的循环动画
-		cloudAnims := []string{"anim_grass", "anim_cloud1", "anim_cloud2", "anim_cloud4",
-			"anim_cloud5", "anim_cloud6", "anim_cloud7"}
-		for _, animName := range cloudAnims {
-			scene.reanimSystem.AddAnimation(selectorEntity, animName)
-		}
+		// 3. 云朵和草动画在开场完成后才添加（见 Update() 中的 cloudAnimsResumed 逻辑）
 
-		// 4. 完成动画设置（生成轨道绑定）
+		// 4. 完成动画设置（初始化动画帧索引）
+		// ✅ Story 13.10: FinalizeAnimations 不再生成轨道绑定
+		// 现在只负责初始化 AnimationFrameIndices，确保每个动画有独立的帧计数器
 		if err := scene.reanimSystem.FinalizeAnimations(selectorEntity); err != nil {
 			log.Printf("[MainMenuScene] Warning: Failed to finalize animations: %v", err)
 		}
 
 		// 5. 获取 ReanimComponent 并设置循环状态
-		reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](scene.entityManager, selectorEntity)
+		reanimComp, ok = ecs.GetComponent[*components.ReanimComponent](scene.entityManager, selectorEntity)
 		if ok {
 			// 🔍 调试：输出 AnimationFPS 的值
 			log.Printf("[MainMenuScene] 🔍 DEBUG: AnimationFPS = %.1f (全局 FPS)", reanimComp.AnimationFPS)
@@ -155,28 +163,16 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 			reanimComp.AnimationLoopStates["anim_sign"] = false
 			reanimComp.AnimationLoopStates["anim_idle"] = false
 
-			// 云朵和草动画设置为循环
-			for _, animName := range cloudAnims {
-				reanimComp.AnimationLoopStates[animName] = true
-			}
-
-			// ✅ 云朵和草动画初始化为暂停状态
-			// 这样它们的初始帧（第 0 帧）在开场动画期间可见
-			// 但动画本身不会播放，直到开场动画完成后才恢复
-			for _, animName := range cloudAnims {
-				reanimComp.AnimationPausedStates[animName] = true
-			}
+			// ✅ Story 13.10: 云朵动画在开场完成后才添加，这里不需要初始化
+			// 云朵动画会在 Update() 中检测到 IsFinished 后动态添加
 
 			// 全局设置为循环模式（但具体每个动画由 AnimationLoopStates 控制）
 			reanimComp.IsLooping = true
 
-			// ✅ 手动修复：将 leaf_SelectorScreen_Leaves 绑定到 anim_grass
-			if reanimComp.TrackAnimationBinding == nil {
-				reanimComp.TrackAnimationBinding = make(map[string]string)
-			}
-			reanimComp.TrackAnimationBinding["leaf_SelectorScreen_Leaves"] = "anim_grass"
+			// ✅ Story 13.10: 不再需要手动绑定轨道
+			// 新的渲染逻辑直接从动画遍历到轨道，自然覆盖
 
-			log.Printf("[MainMenuScene] ✅ SelectorScreen 动画初始化完成（开场动画非循环，云朵循环但暂停）")
+			log.Printf("[MainMenuScene] ✅ SelectorScreen 动画初始化完成（开场动画非循环）")
 		}
 
 		// 修复：SelectorScreen 是全屏 UI，应该使用左上角对齐（Reanim 原始坐标）
@@ -251,18 +247,44 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 	if m.reanimSystem != nil {
 		m.reanimSystem.Update(deltaTime)
 
-		// ✅ 检测开场动画完成，恢复云朵动画播放
+		// ✅ 检测开场动画完成，切换到循环动画
 		if !m.cloudAnimsResumed && m.selectorScreenEntity != 0 {
 			reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
 			if ok && reanimComp.IsFinished {
-				// 开场动画已完成，恢复云朵和草动画的播放
+				// 开场动画已完成，添加循环动画
+				// 策略：
+				//   1. 保留 anim_open（停留在最后一帧，提供背景）
+				//   2. 添加 anim_idle（提供按钮动画）
+				//   3. 添加云朵和草动画（在上层）
+				// 原因：anim_idle 从物理帧 41 开始，但背景轨道在帧 41 被隐藏了（f=-1）
+				//       anim_open（帧 0-12）提供背景，anim_idle（帧 41+）提供按钮动画
+
+				// ✅ 不移除、不暂停 anim_open，让它自然停留在最后一帧（非循环动画完成后不更新）
+
+				// 1. 添加 anim_idle（提供按钮和装饰物动画）
+				if err := m.reanimSystem.AddAnimation(m.selectorScreenEntity, "anim_idle"); err != nil {
+					log.Printf("[MainMenuScene] Warning: Failed to add anim_idle: %v", err)
+				}
+				reanimComp.AnimationLoopStates["anim_idle"] = true
+
+				// 2. 添加云朵和草动画（在 anim_idle 之后渲染，形成图层）
 				cloudAnims := []string{"anim_grass", "anim_cloud1", "anim_cloud2", "anim_cloud4",
 					"anim_cloud5", "anim_cloud6", "anim_cloud7"}
+
 				for _, animName := range cloudAnims {
-					reanimComp.AnimationPausedStates[animName] = false
+					if err := m.reanimSystem.AddAnimation(m.selectorScreenEntity, animName); err != nil {
+						log.Printf("[MainMenuScene] Warning: Failed to add animation %s: %v", animName, err)
+					}
+					reanimComp.AnimationLoopStates[animName] = true
 				}
+
+				// 3. 重新完成动画设置（初始化新动画的帧索引）
+				if err := m.reanimSystem.FinalizeAnimations(m.selectorScreenEntity); err != nil {
+					log.Printf("[MainMenuScene] Warning: Failed to finalize animations: %v", err)
+				}
+
 				m.cloudAnimsResumed = true
-				log.Printf("[MainMenuScene] ✅ 开场动画完成，恢复云朵动画播放")
+				log.Printf("[MainMenuScene] ✅ 开场动画完成，已切换到循环模式（保留 anim_open 背景 + anim_idle + 云朵）")
 			}
 		}
 	}

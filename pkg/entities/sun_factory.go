@@ -69,7 +69,7 @@ func newSunEntityInternal(manager *ecs.EntityManager, rm *game.ResourceManager, 
 		// Story 8.2 QA修复：阳光的 Sun.reanim 只有 track，没有 anim 定义
 		// 只添加基础 ReanimComponent，动画初始化由 ReanimSystem.InitializeDirectRender() 完成
 		manager.AddComponent(id, &components.ReanimComponent{
-			ReanimXML: reanimXML,
+			ReanimXML:  reanimXML,
 			PartImages: reanimPartImages,
 			IsLooping:  true, // 循环播放
 		})

@@ -130,11 +130,8 @@ type ReanimComponent struct {
 	// 用于逻辑帧到物理帧的映射
 	AnimVisiblesMap map[string][]int
 
-	// TrackAnimationBinding 定义每个轨道由哪个动画控制
-	// Key: 轨道名（如 "anim_face", "anim_stem"）
-	// Value: 控制该轨道的动画名（如 "anim_head_idle", "anim_shooting"）
-	// 用于支持"头部用动画 A，身体用动画 B"的复杂组合
-	TrackAnimationBinding map[string]string
+	// ✅ Story 13.10: TrackAnimationBinding 已删除
+	// 新的渲染逻辑不再需要轨道绑定机制，直接从动画遍历到轨道
 
 	// ==========================================================================
 	// 配置字段 (Configuration)

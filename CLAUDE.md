@@ -244,9 +244,55 @@ animation_combos:                   # 动画组合配置
   - name: "attack"                  # 组合名称
     display_name: "攻击+摇晃"
     animations: ["anim_shooting", "anim_head_idle"]  # 多动画组合
-    binding_strategy: "auto"        # 自动轨道绑定
     parent_tracks:                  # 父子关系定义
       anim_face: "anim_stem"       # 头部跟随茎干
+```
+
+### 渲染架构（Story 13.10 - 正向渲染逻辑）
+
+**核心设计理念**：动画是主体，轨道是数据源
+
+从 Story 13.10 开始，Reanim 系统采用**正向渲染逻辑**（动画→轨道），完全删除了轨道绑定机制（TrackAnimationBinding）。
+
+**旧逻辑（已废弃）**：
+```go
+// ❌ 反向逻辑：从轨道查找控制动画
+for _, trackName := range visualTracks {
+    controllingAnim := findControllingAnimation(trackName)  // 需要复杂的绑定分析
+    frame := getFrame(controllingAnim, trackName)
+    render(frame)
+}
+```
+
+**新逻辑（当前实现）**：
+```go
+// ✅ 正向逻辑：从动画遍历轨道
+for _, animName := range currentAnimations {
+    physicalFrame := getPhysicalFrame(animName)
+    if isAnimationVisible(animName, physicalFrame) {
+        for _, trackName := range visualTracks {
+            frame := tracks[trackName][physicalFrame]
+            if frame.ImagePath != "" {
+                render(frame)  // 后面的动画自然覆盖前面的
+            }
+        }
+    }
+}
+```
+
+**优势**：
+- ✅ **无需轨道绑定**：删除了 analyzeTrackBinding、findControllingAnimation 等复杂机制（净减少约 241 行代码）
+- ✅ **自然的图层覆盖**：后播放的动画自动覆盖前面的动画，符合 Reanim 格式的原始设计
+- ✅ **多阶段动画**：轨道可以在不同动画阶段显示不同内容（如草叶子：开场滑入，循环摇摆）
+- ✅ **代码更简洁**：渲染逻辑从 ~150 行减少到 ~80 行
+
+**示例：SelectorScreen 多动画渲染**
+```
+CurrentAnimations = ["anim_open", "anim_grass"]
+
+渲染结果：
+├─ 背景（SelectorScreen_BG）：来自 anim_open（anim_grass 未覆盖）
+└─ 叶子（leaf_SelectorScreen_Leaves）：来自 anim_grass（覆盖了 anim_open）
 ```
 
 ### 配置驱动的动画播放 API
@@ -258,8 +304,8 @@ animation_combos:                   # 动画组合配置
 rs.PlayCombo(entityID, "peashooter", "attack")
 // 自动处理：
 // - 播放 anim_shooting + anim_head_idle
-// - 自动轨道绑定
 // - 应用父子关系（头部跟随身体）
+// - 使用正向渲染逻辑（动画→轨道）
 
 // ✅ 推荐：使用 PlayDefaultAnimation 播放默认动画
 rs.PlayDefaultAnimation(entityID, "peashooter")

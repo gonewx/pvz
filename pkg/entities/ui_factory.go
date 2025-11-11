@@ -153,7 +153,7 @@ func createReanimComponent(rm *game.ResourceManager, unitName string) (*componen
 
 	// 创建组件
 	return &components.ReanimComponent{
-		ReanimXML: reanimXML,
+		ReanimXML:  reanimXML,
 		PartImages: partImages,
 	}, nil
 }

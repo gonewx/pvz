@@ -776,10 +776,10 @@ func (s *TutorialSystem) showFinalWaveWarning() {
 
 	// 添加 Reanim 组件
 	ecs.AddComponent(s.entityManager, finalWaveEntity, &components.ReanimComponent{
-		ReanimXML:      reanimXML,
-		PartImages:  partImages,
+		ReanimXML:         reanimXML,
+		PartImages:        partImages,
 		CurrentAnimations: []string{"FinalWave"}, // FinalWave.reanim 中的轨道名称
-		IsLooping:   false,       // 播放一次后自动停止（会被 PlayAnimation 覆盖）
+		IsLooping:         false,                 // 播放一次后自动停止（会被 PlayAnimation 覆盖）
 	})
 
 	// 添加 FinalWaveWarningComponent（用于自动删除）

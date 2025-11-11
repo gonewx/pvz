@@ -101,7 +101,7 @@ func NewGame(configPath string) (*Game, error) {
 		totalPages:     totalPages,
 		cellsPerPage:   cellsPerPage,
 		showHelp:       true,
-		helpPosition:   HelpTopRight, // 默认右上角
+		helpPosition:   HelpTopRight,    // 默认右上角
 		displayMode:    DisplayModeGrid, // 默认网格模式
 		textFont:       font,
 	}
@@ -415,7 +415,7 @@ func (g *Game) drawSingleCell(screen *ebiten.Image) {
 		float32(virtualY),
 		float32(virtualWidth),
 		float32(virtualHeight),
-		3, // 边框宽度
+		3,                              // 边框宽度
 		color.RGBA{100, 100, 100, 255}, // 灰色边框
 		false,
 	)

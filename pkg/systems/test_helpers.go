@@ -32,16 +32,16 @@ func createTestReanimComponent(image *ebiten.Image, imageName string) *component
 		// Story 13.2: 移除 CurrentFrame 字段（已废弃）
 		// Return a minimal ReanimComponent with no images
 		return &components.ReanimComponent{
-			ReanimXML:      &reanim.ReanimXML{FPS: 12},
-			PartImages:  map[string]*ebiten.Image{},
+			ReanimXML:         &reanim.ReanimXML{FPS: 12},
+			PartImages:        map[string]*ebiten.Image{},
 			CurrentAnimations: []string{"idle"},
 			// CurrentFrame 已移除（Story 13.2）
-			FrameAccumulator:  0.0,
+			FrameAccumulator: 0.0,
 			// VisibleFrameCount (removed): 0,
-			IsLooping:         true,
-			IsFinished:        false,
-			AnimVisiblesMap:   map[string][]int{},
-			MergedTracks:      map[string][]reanim.Frame{},
+			IsLooping:       true,
+			IsFinished:      false,
+			AnimVisiblesMap: map[string][]int{},
+			MergedTracks:    map[string][]reanim.Frame{},
 			// AnimTracks (removed):        []reanim.Track{},
 			// CenterOffsetX (removed):     0,
 			// CenterOffsetY (removed):     0,
@@ -49,9 +49,9 @@ func createTestReanimComponent(image *ebiten.Image, imageName string) *component
 		}
 	}
 
-// 	bounds := image.Bounds()
-// 	imageWidth := float64(bounds.Dx())
-// 	imageHeight := float64(bounds.Dy())
+	// 	bounds := image.Bounds()
+	// 	imageWidth := float64(bounds.Dx())
+	// 	imageHeight := float64(bounds.Dy())
 
 	// centerX := imageWidth / 2
 	// centerY := imageHeight / 2
@@ -86,15 +86,15 @@ func createTestReanimComponent(image *ebiten.Image, imageName string) *component
 
 	// Story 13.2: 移除 CurrentFrame 字段（已废弃）
 	return &components.ReanimComponent{
-		ReanimXML:      reanimXML,
-		PartImages:  partImages,
+		ReanimXML:         reanimXML,
+		PartImages:        partImages,
 		CurrentAnimations: []string{"idle"},
 		// CurrentFrame 已移除（Story 13.2）
-		FrameAccumulator:  0.0,
+		FrameAccumulator: 0.0,
 		// VisibleFrameCount (removed): 1,
-		IsLooping:         true,
-		IsFinished:        false,
-		AnimVisiblesMap:   map[string][]int{"anim_idle": {0}},
+		IsLooping:       true,
+		IsFinished:      false,
+		AnimVisiblesMap: map[string][]int{"anim_idle": {0}},
 		MergedTracks: map[string][]reanim.Frame{
 			imageName: {frame},
 		},

@@ -104,8 +104,8 @@ func NewSelectorScreenPartialEntity(
 		CurrentAnimations: []string{animName},
 
 		// 动画数据
-		AnimVisiblesMap:       reanim.BuildAnimVisiblesMap(reanimXML),
-		TrackAnimationBinding: make(map[string]string),
+		AnimVisiblesMap: reanim.BuildAnimVisiblesMap(reanimXML),
+		// ✅ Story 13.10: TrackAnimationBinding 已删除
 
 		// 配置字段
 		ParentTracks: nil,

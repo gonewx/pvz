@@ -16,9 +16,10 @@ import (
 //   - The overlay is drawn on top of the base using alpha blending
 //
 // Usage Example (SelectorScreen backgrounds):
-//   base := rm.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_BG_CENTER")
-//   overlay := rm.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_BG_CENTER_OVERLAY")
-//   composited := utils.CompositeImages(base, overlay)
+//
+//	base := rm.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_BG_CENTER")
+//	overlay := rm.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_BG_CENTER_OVERLAY")
+//	composited := utils.CompositeImages(base, overlay)
 //
 // This function is reusable across the project for any image layering needs.
 func CompositeImages(baseImage, overlayImage *ebiten.Image) *ebiten.Image {
@@ -48,17 +49,18 @@ func CompositeImages(baseImage, overlayImage *ebiten.Image) *ebiten.Image {
 // Parameters:
 //   - baseImage: The source image (e.g., JPG with black background)
 //   - maskImage: The alpha mask image (8-bit or RGBA PNG)
-//     - White pixels in mask = fully opaque
-//     - Black pixels in mask = fully transparent
-//     - Gray pixels = partial transparency
+//   - White pixels in mask = fully opaque
+//   - Black pixels in mask = fully transparent
+//   - Gray pixels = partial transparency
 //
 // Returns:
 //   - A new image with the mask applied
 //
 // Usage Example:
-//   jpg := rm.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_BG_CENTER")      // JPG with black bg
-//   mask := rm.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_BG_CENTER_OVERLAY") // PNG mask
-//   result := utils.ApplyAlphaMask(jpg, mask)  // JPG with transparent background
+//
+//	jpg := rm.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_BG_CENTER")      // JPG with black bg
+//	mask := rm.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_BG_CENTER_OVERLAY") // PNG mask
+//	result := utils.ApplyAlphaMask(jpg, mask)  // JPG with transparent background
 //
 // Note: This function uses Ebitengine's ColorScale to apply the mask at draw time,
 // avoiding the need to read pixels before the game starts.

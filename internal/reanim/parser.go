@@ -54,8 +54,8 @@ func ParseReanimFile(path string) (*ReanimXML, error) {
 //
 // 返回：
 //   - map[string][]int: 动画时间窗口映射
-//     - Key: 动画名称（如 "anim_cloud1"）
-//     - Value: 时间窗口数组，0 表示可见，-1 表示隐藏
+//   - Key: 动画名称（如 "anim_cloud1"）
+//   - Value: 时间窗口数组，0 表示可见，-1 表示隐藏
 func BuildAnimVisiblesMap(reanimXML *ReanimXML) map[string][]int {
 	if reanimXML == nil {
 		return nil

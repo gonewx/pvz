@@ -32,7 +32,7 @@ type AnimationCell struct {
 	partImages map[string]*ebiten.Image
 
 	// 可切换的动画项（包含普通动画和组合动画）
-	switchableAnimations []SwitchableAnimation
+	switchableAnimations  []SwitchableAnimation
 	currentAnimationIndex int // 当前播放的动画索引（用于切换）
 
 	// 当前播放状态
@@ -44,15 +44,15 @@ type AnimationCell struct {
 	// 动画播放数据
 	visualTracks          []string
 	logicalTracks         []string
-	currentAnimations     []string              // 当前播放的动画列表
-	animVisiblesMap       map[string][]int      // 每个动画的可见性数组
-	trackAnimationBinding map[string]string     // 轨道到动画的绑定
-	parentTracks          map[string]string     // 父子关系
-	hiddenTracks          map[string]bool       // 隐藏的轨道
-	manualHiddenTracks    map[string]bool       // 手动隐藏的轨道（用于单个模式）
+	currentAnimations     []string          // 当前播放的动画列表
+	animVisiblesMap       map[string][]int  // 每个动画的可见性数组
+	trackAnimationBinding map[string]string // 轨道到动画的绑定
+	parentTracks          map[string]string // 父子关系
+	hiddenTracks          map[string]bool   // 隐藏的轨道
+	manualHiddenTracks    map[string]bool   // 手动隐藏的轨道（用于单个模式）
 
 	// 渲染缓存（优化性能）
-	lastRenderFrame int
+	lastRenderFrame  int
 	cachedRenderData []renderPartData
 
 	// 渲染配置
@@ -66,8 +66,8 @@ type AnimationCell struct {
 
 // renderPartData 缓存的渲染数据
 type renderPartData struct {
-	img            *ebiten.Image
-	frame          reanim.Frame
+	img              *ebiten.Image
+	frame            reanim.Frame
 	offsetX, offsetY float64
 }
 

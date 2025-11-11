@@ -45,8 +45,8 @@ type SoddingSystem struct {
 	lastFrameCenterX float64 // 动画结束时的实际中心X
 
 	// 缓存最后一帧的边缘位置（用于调试绘制）
-	lastFrameLeftEdge   float64
-	lastFrameRightEdge  float64
+	lastFrameLeftEdge  float64
+	lastFrameRightEdge float64
 
 	// 动画完成回调
 	onAnimationComplete func() // 动画完成时调用
@@ -449,9 +449,9 @@ func (s *SoddingSystem) calculateCurrentEdges() (float64, float64, float64) {
 	// 计算左、中、右边缘（相对坐标）
 	// 注意：渲染系统直接把 SodRoll.X 当作图片左上角使用
 	// 所以这里不需要转换，直接用 SodRoll.X
-	leftEdge := *sodRollX                       // 图片左边缘 = SodRoll.X（渲染系统当作左上角）
-	centerX := *sodRollX + scaledHalfWidth      // 图片中心
-	rightEdge := *sodRollX + scaledHalfWidth*2  // 图片右边缘
+	leftEdge := *sodRollX                      // 图片左边缘 = SodRoll.X（渲染系统当作左上角）
+	centerX := *sodRollX + scaledHalfWidth     // 图片中心
+	rightEdge := *sodRollX + scaledHalfWidth*2 // 图片右边缘
 
 	// 转换为世界坐标
 	// 渲染公式：图片左上角世界坐标 = pos.X - CenterOffsetX + SodRoll.X
@@ -461,7 +461,6 @@ func (s *SoddingSystem) calculateCurrentEdges() (float64, float64, float64) {
 
 	return worldLeftEdge, worldCenterX, worldRightEdge
 }
-
 
 // calculateCurrentCenterX 计算草皮可见区域右边缘的X坐标（世界坐标）
 // 通过追踪 SodRoll 轨道的X坐标和sx缩放，计算草皮卷左边缘作为草皮右边缘

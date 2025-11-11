@@ -40,6 +40,7 @@ images:
 available_animations:
     - name: anim_open
       display_name: open
+      speed: 0.5
     - name: anim_sign
       display_name: sign
     - name: anim_idle
@@ -72,24 +73,3 @@ available_animations:
     - name: anim_cloud5
       display_name: cloud5
       speed: 0.05
-animation_combos:
-    - name: opening
-      display_name: 开场动画（不循环）
-      animations:
-        - anim_open
-        - anim_sign
-        - anim_idle
-      binding_strategy: auto
-      loop: false
-    - name: clouds
-      display_name: 云朵循环
-      animations:
-        - anim_grass
-        - anim_cloud1
-        - anim_cloud7
-        - anim_cloud2
-        - anim_cloud4
-        - anim_cloud6
-        - anim_cloud5
-      binding_strategy: auto
-      loop: true

@@ -79,11 +79,10 @@ func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) err
 	}
 
 	// ✅ 单个动画模式：清空配置相关字段
-	// 单个动画模式下，不使用 HiddenTracks, ParentTracks, TrackAnimationBinding
+	// 单个动画模式下，不使用 HiddenTracks, ParentTracks
 	// 这些都依赖 Reanim 文件本身的定义
 	comp.HiddenTracks = nil
 	comp.ParentTracks = nil
-	comp.TrackAnimationBinding = nil
 
 	// 设置当前动画列表
 	comp.CurrentAnimations = []string{animName}
@@ -135,6 +134,16 @@ func (s *ReanimSystem) AddAnimation(entityID ecs.EntityID, animName string) erro
 	// ✅ 添加动画到列表（而不是替换）
 	comp.CurrentAnimations = append(comp.CurrentAnimations, animName)
 
+	// ✅ Story 13.10 Bug Fix: 初始化新动画的帧索引
+	// 如果 AnimationFrameIndices 已经存在但没有该动画的条目，添加初始值
+	if comp.AnimationFrameIndices == nil {
+		comp.AnimationFrameIndices = make(map[string]float64)
+	}
+	if _, exists := comp.AnimationFrameIndices[animName]; !exists {
+		comp.AnimationFrameIndices[animName] = 0.0
+		log.Printf("[ReanimSystem] AddAnimation: initialized frame index for '%s' = 0.0", animName)
+	}
+
 	// 重建动画数据（为新动画构建 AnimVisiblesMap）
 	s.rebuildAnimationData(comp)
 
@@ -147,9 +156,9 @@ func (s *ReanimSystem) AddAnimation(entityID ecs.EntityID, animName string) erro
 	return nil
 }
 
-// FinalizeAnimations 完成动画设置（生成轨道绑定）
-// 在使用 PlayAnimation + AddAnimation 添加完所有动画后调用
-// 自动分析轨道绑定，确定哪个轨道由哪个动画控制
+// FinalizeAnimations 完成动画设置
+// ✅ Story 13.10: 不再需要生成轨道绑定，已删除
+// 新的渲染逻辑直接从动画遍历到轨道，无需绑定关系
 //
 // 参数：
 //   - entityID: 实体 ID
@@ -162,14 +171,25 @@ func (s *ReanimSystem) FinalizeAnimations(entityID ecs.EntityID) error {
 		return fmt.Errorf("entity %d does not have ReanimComponent", entityID)
 	}
 
-	// 自动生成轨道绑定
-	comp.TrackAnimationBinding = s.analyzeTrackBinding(comp)
+	// ✅ Story 13.10 Bug Fix: 初始化 AnimationFrameIndices
+	// 确保每个动画都有独立的帧索引
+	// ⚠️  注意：只初始化尚未存在的动画，不覆盖已有的帧索引
+	//         这样非循环动画（如 anim_open）在完成后保持在最后一帧
+	if comp.AnimationFrameIndices == nil {
+		comp.AnimationFrameIndices = make(map[string]float64)
+	}
+	for _, animName := range comp.CurrentAnimations {
+		// ✅ 只初始化尚未存在的动画
+		if _, exists := comp.AnimationFrameIndices[animName]; !exists {
+			comp.AnimationFrameIndices[animName] = 0.0
+		}
+	}
 
 	// 标记缓存失效
 	comp.LastRenderFrame = -1
 
-	log.Printf("[ReanimSystem] FinalizeAnimations: entity %d, generated %d track bindings",
-		entityID, len(comp.TrackAnimationBinding))
+	log.Printf("[ReanimSystem] FinalizeAnimations: entity %d, animations: %v, initialized frame indices",
+		entityID, comp.CurrentAnimations)
 
 	return nil
 }
@@ -302,18 +322,9 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 	// 4. 重建动画数据
 	s.rebuildAnimationData(comp)
 
-	// 5. 分析轨道绑定
-	if combo.BindingStrategy == "auto" {
-		comp.TrackAnimationBinding = s.analyzeTrackBinding(comp)
-		log.Printf("[ReanimSystem] PlayCombo: auto-generated %d track bindings", len(comp.TrackAnimationBinding))
-	} else if combo.BindingStrategy == "manual" && len(combo.ManualBindings) > 0 {
-		comp.TrackAnimationBinding = combo.ManualBindings
-		log.Printf("[ReanimSystem] PlayCombo: applied %d manual bindings", len(combo.ManualBindings))
-	} else {
-		comp.TrackAnimationBinding = nil
-	}
+	// ✅ Story 13.10: 不再需要分析轨道绑定
+	// 新的渲染逻辑直接从动画遍历到轨道，无需绑定关系
 
-	// 标记缓存失效
 	// 计算并缓存 CenterOffset（基于第一帧）
 	s.calculateCenterOffset(comp)
 
@@ -334,6 +345,15 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 //   - 支持多动画组合（不同轨道可以有不同的帧数）
 func (s *ReanimSystem) Update(deltaTime float64) {
 	entities := ecs.GetEntitiesWith1[*components.ReanimComponent](s.entityManager)
+
+	// Debug: 输出 SelectorScreen 的更新信息（前 5 次）
+	for _, id := range entities {
+		comp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id)
+		if exists && comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 5 {
+			log.Printf("[ReanimSystem] 🔍 Update: SelectorScreen entity %d, frame=%d, animations=%v",
+				id, comp.CurrentFrame, comp.CurrentAnimations)
+		}
+	}
 
 	// Debug: 检查是否有 sodroll 实体
 	for _, id := range entities {
@@ -375,6 +395,36 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 			if comp.AnimationPausedStates != nil {
 				if isPaused, exists := comp.AnimationPausedStates[animName]; exists && isPaused {
 					continue // 跳过暂停的动画
+				}
+			}
+
+			// ✅ Story 13.10 Bug Fix: 跳过已完成的非循环动画
+			// 如果该动画是非循环的，检查是否已完成
+			isLooping := comp.IsLooping // 默认使用全局循环状态
+			if comp.AnimationLoopStates != nil {
+				if loopState, hasState := comp.AnimationLoopStates[animName]; hasState {
+					isLooping = loopState
+				}
+			}
+			if !isLooping {
+				// 检查该动画是否已完成
+				if animVisibles, exists := comp.AnimVisiblesMap[animName]; exists {
+					visibleCount := countVisibleFrames(animVisibles)
+					currentFrame := comp.AnimationFrameIndices[animName]
+
+					// 🔍 调试：打印 SelectorScreen 的 anim_open 帧信息
+					if comp.ReanimName == "SelectorScreen" && animName == "anim_open" && int(currentFrame) < 15 {
+						log.Printf("[ReanimSystem] 🔍 检查 anim_open: currentFrame=%.2f, visibleCount=%d, isLooping=%v",
+							currentFrame, visibleCount, isLooping)
+					}
+
+					if visibleCount > 0 && int(currentFrame) >= visibleCount {
+						// 非循环动画已完成，停止更新帧
+						if comp.ReanimName == "SelectorScreen" && animName == "anim_open" {
+							log.Printf("[ReanimSystem] ✅ anim_open 已完成，停止更新帧")
+						}
+						continue
+					}
 				}
 			}
 
@@ -483,8 +533,8 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 // ==================================================================
 
 // prepareRenderCache 准备渲染缓存
-// 基于 AnimationCell.updateRenderCache() 的逻辑
-// 关键修复：检查 HiddenTracks（Story 13.8 核心 Bug 修复）
+// ✅ Story 13.10: 反转渲染逻辑 - 从"以轨道为中心"改为"以动画为中心"
+// 新逻辑：外层循环动画，内层循环轨道，后面的动画自然覆盖前面的动画
 func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 	// Debug: 无条件打印向日葵和 SodRoll 的缓存准备
 	if comp.ReanimName == "sunflower" && comp.CurrentFrame < 3 {
@@ -500,139 +550,221 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 
 	visibleCount := 0
 	skippedHidden := 0
-	skippedNoAnim := 0
+	skippedPaused := 0
 	skippedNoFrames := 0
 	skippedNoImage := 0
 
-	for _, trackName := range comp.VisualTracks {
-		// Debug: 打印向日葵的所有轨道名称
-		if comp.ReanimName == "sunflower" && comp.CurrentFrame == 0 {
-			log.Printf("[ReanimSystem] 🔍 sunflower 轨道: %s", trackName)
-		}
+	// ✅ 调试：记录每个动画渲染的轨道数
+	animRenderCount := make(map[string]int)
 
-		// ✅ 关键修复：检查隐藏轨道（黑名单）
-		if comp.HiddenTracks != nil && comp.HiddenTracks[trackName] {
-			skippedHidden++
-			continue
-		}
-
-		// 查找控制该轨道的动画
-		controllingAnim, logicalFrame := s.findControllingAnimation(comp, trackName)
-		if controllingAnim == "" {
-			skippedNoAnim++
-			// Debug: 记录没有控制动画的轨道
-			if comp.ReanimName == "sunflower" && comp.CurrentFrame == 0 {
-				log.Printf("[ReanimSystem] ⚠️ sunflower 轨道 %s: 没有找到控制动画", trackName)
+	// ✅ 关键改变：外层循环动画（不是轨道）
+	for _, animName := range comp.CurrentAnimations {
+		// 检查动画是否暂停
+		if comp.AnimationPausedStates != nil {
+			if isPaused, exists := comp.AnimationPausedStates[animName]; exists && isPaused {
+				skippedPaused++
+				continue
 			}
-			continue
 		}
 
-		// Debug: 记录 anim_idle 相关轨道的控制信息
-		if comp.ReanimName == "sunflower" && comp.CurrentFrame < 3 && (trackName == "anim_idle" || controllingAnim == "anim_idle") {
-			log.Printf("[ReanimSystem] 📍 sunflower frame %d: 轨道 %s 由动画 %s 控制, logicalFrame=%.2f",
-				comp.CurrentFrame, trackName, controllingAnim, logicalFrame)
+		// 获取该动画的当前逻辑帧（支持独立帧索引）
+		var logicalFrame float64
+		if comp.AnimationFrameIndices != nil {
+			if frame, exists := comp.AnimationFrameIndices[animName]; exists {
+				logicalFrame = frame
+			} else {
+				logicalFrame = float64(comp.CurrentFrame) // 后备：使用共享帧
+			}
+		} else {
+			logicalFrame = float64(comp.CurrentFrame) // 后备：使用共享帧
 		}
 
-		// 获取轨道的帧数组和动画可见性数组
-		mergedFrames, ok := comp.MergedTracks[trackName]
-		if !ok || len(mergedFrames) == 0 {
-			skippedNoFrames++
-			continue
-		}
-
-		animVisibles, ok := comp.AnimVisiblesMap[controllingAnim]
+		// 获取动画的可见性数组
+		animVisibles, ok := comp.AnimVisiblesMap[animName]
 		if !ok {
-			skippedNoFrames++
 			continue
 		}
 
-		// ✅ 使用帧插值获取平滑的帧数据
-		frame := s.getInterpolatedFrame(controllingAnim, logicalFrame, animVisibles, mergedFrames)
+		// 映射逻辑帧到物理帧
+		physicalFrame := mapLogicalToPhysical(int(logicalFrame), animVisibles)
+		if physicalFrame < 0 {
+			continue
+		}
 
-		// ✅ 图片继承逻辑：如果插值后的帧没有图片，向前搜索最近的有图片的帧
-		// 原版 PvZ 的 Reanim 系统会继承上一帧的图片（类似 Flash 的关键帧）
-		if frame.ImagePath == "" {
-			// 获取整数帧索引用于图片继承搜索
-			physicalFrame := mapLogicalToPhysical(int(logicalFrame), animVisibles)
-			if physicalFrame < 0 {
-				skippedNoImage++
+		// 检查动画定义轨道是否可见（f != -1）
+		animDefTrack, ok := comp.MergedTracks[animName]
+		if !ok || physicalFrame >= len(animDefTrack) {
+			continue
+		}
+
+		defFrame := animDefTrack[physicalFrame]
+		if defFrame.FrameNum != nil && *defFrame.FrameNum == -1 {
+			// ✅ 调试：记录隐藏的动画
+			if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 10 {
+				log.Printf("[ReanimSystem] 🚫 动画 %s 在物理帧 %d 隐藏 (f=-1)，跳过整个动画", animName, physicalFrame)
+			}
+			continue // 动画隐藏，跳过整个动画
+		}
+
+		// ✅ 调试：记录可见的动画
+		if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 10 {
+			log.Printf("[ReanimSystem] ✅ 动画 %s 在物理帧 %d 可见 (f=%v), 逻辑帧=%.2f",
+				animName, physicalFrame, defFrame.FrameNum, logicalFrame)
+		}
+
+		// ✅ 内层循环：遍历所有视觉轨道
+		for _, trackName := range comp.VisualTracks {
+			// Debug: 打印向日葵的所有轨道名称
+			if comp.ReanimName == "sunflower" && comp.CurrentFrame == 0 {
+				log.Printf("[ReanimSystem] 🔍 sunflower 动画 %s, 轨道: %s", animName, trackName)
+			}
+
+			// 检查隐藏轨道（黑名单）
+			if comp.HiddenTracks != nil && comp.HiddenTracks[trackName] {
+				skippedHidden++
 				continue
 			}
 
-			// 向前搜索有图片的帧
-			foundImage := false
-			for i := physicalFrame - 1; i >= 0; i-- {
-				if i < len(mergedFrames) && mergedFrames[i].ImagePath != "" {
-					// 继承前一帧的图片路径，但保留当前帧的变换属性
-					frame.ImagePath = mergedFrames[i].ImagePath
-					foundImage = true
-					// Debug: 向日葵 anim_idle 轨道的图片继承
-					if comp.ReanimName == "sunflower" && trackName == "anim_idle" && comp.CurrentFrame < 5 {
-						log.Printf("[ReanimSystem] 🔧 SunFlower anim_idle frame %d 继承图片: %s (从帧 %d)",
-							physicalFrame, frame.ImagePath, i)
+			// 获取视觉轨道在该物理帧的数据
+			mergedFrames, ok := comp.MergedTracks[trackName]
+			if !ok || physicalFrame >= len(mergedFrames) {
+				skippedNoFrames++
+				continue
+			}
+
+			// ✅ Story 13.10 Bug Fix: 检查视觉轨道在该帧是否被隐藏（f=-1）或没有图片
+			// 关键设计：如果后面的动画在某轨道没有有效数据，不渲染，保留前面动画的渲染结果
+			currentTrackFrame := mergedFrames[physicalFrame]
+			if currentTrackFrame.FrameNum != nil && *currentTrackFrame.FrameNum == -1 {
+				// 视觉轨道在该帧被明确隐藏（f=-1），跳过该动画对这个轨道的渲染
+				skippedHidden++
+				continue
+			}
+
+			// ✅ 使用帧插值获取平滑的帧数据
+			frame := s.getInterpolatedFrame(animName, logicalFrame, animVisibles, mergedFrames)
+
+			// ✅ 图片继承逻辑：如果插值后的帧没有图片，向前搜索最近的有图片的帧
+			// 原版 PvZ 的 Reanim 系统会继承上一帧的图片（类似 Flash 的关键帧）
+			// 但是：**只在当前动画的物理帧范围内搜索**，不跨动画继承
+			hasValidImage := false
+			if frame.ImagePath == "" {
+				// 向前搜索有图片的帧（只搜索当前动画的可见帧范围）
+				for i := physicalFrame - 1; i >= 0; i-- {
+					// 检查该帧是否在当前动画的可见范围内
+					isFrameVisible := false
+					for _, visibleFrame := range animVisibles {
+						if visibleFrame == i {
+							isFrameVisible = true
+							break
+						}
 					}
-					break
+					if !isFrameVisible {
+						// 该帧不在当前动画的可见范围，停止搜索
+						break
+					}
+
+					if i < len(mergedFrames) && mergedFrames[i].ImagePath != "" {
+						// 继承前一帧的图片路径，但保留当前帧的变换属性
+						frame.ImagePath = mergedFrames[i].ImagePath
+						hasValidImage = true
+						break
+					}
 				}
+			} else {
+				hasValidImage = true
 			}
-			// 如果整个轨道都没有图片，才跳过
-			if !foundImage {
+
+			// 如果当前动画在这个轨道没有有效图片，跳过，不渲染，保留前面动画的渲染
+			if !hasValidImage {
 				skippedNoImage++
-				if comp.ReanimName == "sunflower" && trackName == "anim_idle" {
-					log.Printf("[ReanimSystem] ❌ SunFlower anim_idle frame %d: 整个轨道都没有图片!", physicalFrame)
+				continue
+			}
+
+			// ✅ 图片继承逻辑：如果插值后的帧没有图片，向前搜索最近的有图片的帧
+			// 原版 PvZ 的 Reanim 系统会继承上一帧的图片（类似 Flash 的关键帧）
+			if frame.ImagePath == "" {
+				// 向前搜索有图片的帧
+				foundImage := false
+				for i := physicalFrame - 1; i >= 0; i-- {
+					if i < len(mergedFrames) && mergedFrames[i].ImagePath != "" {
+						// 继承前一帧的图片路径，但保留当前帧的变换属性
+						frame.ImagePath = mergedFrames[i].ImagePath
+						foundImage = true
+						// Debug: 向日葵 anim_idle 轨道的图片继承
+						if comp.ReanimName == "sunflower" && trackName == "anim_idle" && comp.CurrentFrame < 5 {
+							log.Printf("[ReanimSystem] 🔧 SunFlower anim_idle frame %d 继承图片: %s (从帧 %d)",
+								physicalFrame, frame.ImagePath, i)
+						}
+						break
+					}
+				}
+				// 如果整个轨道都没有图片，才跳过
+				if !foundImage {
+					skippedNoImage++
+					if comp.ReanimName == "sunflower" && trackName == "anim_idle" {
+						log.Printf("[ReanimSystem] ❌ SunFlower anim_idle frame %d: 整个轨道都没有图片!", physicalFrame)
+					}
+					continue
+				}
+			} else if comp.ReanimName == "sunflower" && trackName == "anim_idle" && comp.CurrentFrame < 5 {
+				// Debug: 原生图片
+				log.Printf("[ReanimSystem] ✅ SunFlower anim_idle frame %.2f 原生图片: %s", logicalFrame, frame.ImagePath)
+			}
+
+			// 获取图片
+			img, ok := comp.PartImages[frame.ImagePath]
+			if !ok || img == nil {
+				// Debug: 记录找不到图片的情况
+				if comp.ReanimName == "sunflower" && trackName == "anim_idle" && comp.CurrentFrame < 5 {
+					log.Printf("[ReanimSystem] ⚠️ SunFlower anim_idle frame %.2f: 图片 %s 不存在于 PartImages", logicalFrame, frame.ImagePath)
 				}
 				continue
 			}
-		} else if comp.ReanimName == "sunflower" && trackName == "anim_idle" && comp.CurrentFrame < 5 {
-			// Debug: 原生图片
-			log.Printf("[ReanimSystem] ✅ SunFlower anim_idle frame %.2f 原生图片: %s", logicalFrame, frame.ImagePath)
-		}
 
-		// 计算父轨道偏移
-		offsetX, offsetY := 0.0, 0.0
-		if parentTrackName, hasParent := comp.ParentTracks[trackName]; hasParent {
-			childAnimName, _ := s.findControllingAnimation(comp, trackName)
-			parentAnimName, _ := s.findControllingAnimation(comp, parentTrackName)
-
-			// 只有当子轨道和父轨道使用不同动画时，才应用偏移
-			if childAnimName != parentAnimName && childAnimName != "" && parentAnimName != "" {
-				offsetX, offsetY = s.getParentOffset(comp, parentTrackName)
-			}
-		}
-
-		// 获取图片
-		img, ok := comp.PartImages[frame.ImagePath]
-		if !ok || img == nil {
-			// Debug: 记录找不到图片的情况
+			// Debug: 成功获取图片
 			if comp.ReanimName == "sunflower" && trackName == "anim_idle" && comp.CurrentFrame < 5 {
-				log.Printf("[ReanimSystem] ⚠️ SunFlower anim_idle frame %.2f: 图片 %s 不存在于 PartImages", logicalFrame, frame.ImagePath)
+				log.Printf("[ReanimSystem] ✅ SunFlower anim_idle frame %.2f: 成功获取图片 %s (尺寸: %dx%d)",
+					logicalFrame, frame.ImagePath, img.Bounds().Dx(), img.Bounds().Dy())
 			}
-			continue
-		}
 
-		// Debug: 成功获取图片
-		if comp.ReanimName == "sunflower" && trackName == "anim_idle" && comp.CurrentFrame < 5 {
-			log.Printf("[ReanimSystem] ✅ SunFlower anim_idle frame %.2f: 成功获取图片 %s (尺寸: %dx%d)",
-				logicalFrame, frame.ImagePath, img.Bounds().Dx(), img.Bounds().Dy())
-		}
+			// 计算父轨道偏移
+			offsetX, offsetY := 0.0, 0.0
+			if parentTrackName, hasParent := comp.ParentTracks[trackName]; hasParent {
+				// ✅ 传入当前动画名，避免需要查找控制动画
+				offsetX, offsetY = s.getParentOffsetForAnimation(comp, parentTrackName, animName)
+			}
 
-		// 添加到缓存
-		comp.CachedRenderData = append(comp.CachedRenderData, components.RenderPartData{
-			Img:     img,
-			Frame:   frame,
-			OffsetX: offsetX,
-			OffsetY: offsetY,
-		})
-		visibleCount++
+			// 添加到缓存
+			// ✅ 关键：后面的动画会自然覆盖前面的（因为是追加到同一个数组）
+			comp.CachedRenderData = append(comp.CachedRenderData, components.RenderPartData{
+				Img:     img,
+				Frame:   frame,
+				OffsetX: offsetX,
+				OffsetY: offsetY,
+			})
+			visibleCount++
+			animRenderCount[animName]++
+		}
+	}
+
+	// ✅ 调试：输出每个动画渲染的轨道数（前 10 帧）
+	if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 10 {
+		log.Printf("[ReanimSystem] 📊 Frame %d 渲染统计 (总计: %d 个 parts):", comp.CurrentFrame, visibleCount)
+		for _, animName := range comp.CurrentAnimations {
+			count := animRenderCount[animName] // 默认为 0
+			log.Printf("    - 动画 %s: 渲染了 %d 个轨道", animName, count)
+		}
 	}
 
 	// Debug: 只在有变化时输出日志（避免刷屏）
 	// 特殊调试：向日葵每帧都打印（前 10 帧）
 	if comp.ReanimName == "sunflower" && comp.CurrentFrame < 10 {
-		log.Printf("[ReanimSystem] 🔍 SunFlower frame %d → %d visible parts (skipped: hidden=%d, noAnim=%d, noFrames=%d, noImage=%d)",
-			comp.CurrentFrame, visibleCount, skippedHidden, skippedNoAnim, skippedNoFrames, skippedNoImage)
+		log.Printf("[ReanimSystem] 🔍 SunFlower frame %d → %d visible parts (skipped: hidden=%d, paused=%d, noFrames=%d, noImage=%d)",
+			comp.CurrentFrame, visibleCount, skippedHidden, skippedPaused, skippedNoFrames, skippedNoImage)
 	} else if len(comp.CachedRenderData) > 0 && comp.CurrentFrame%30 == 0 {
-		log.Printf("[ReanimSystem] prepareRenderCache: %s frame %d → %d visible parts (skipped: hidden=%d, noAnim=%d, noFrames=%d, noImage=%d)",
-			comp.ReanimName, comp.CurrentFrame, visibleCount, skippedHidden, skippedNoAnim, skippedNoFrames, skippedNoImage)
+		log.Printf("[ReanimSystem] prepareRenderCache: %s frame %d → %d visible parts (skipped: hidden=%d, paused=%d, noFrames=%d, noImage=%d)",
+			comp.ReanimName, comp.CurrentFrame, visibleCount, skippedHidden, skippedPaused, skippedNoFrames, skippedNoImage)
 	}
 }
 
@@ -668,202 +800,8 @@ func (s *ReanimSystem) rebuildAnimationData(comp *components.ReanimComponent) {
 	}
 }
 
-// analyzeTrackBinding 自动分析轨道绑定
-// 基于 AnimationCell.analyzeTrackBinding()
-func (s *ReanimSystem) analyzeTrackBinding(comp *components.ReanimComponent) map[string]string {
-	binding := make(map[string]string)
-
-	// 1. 分析视觉轨道
-	for _, trackName := range comp.VisualTracks {
-		frames, ok := comp.MergedTracks[trackName]
-		if !ok {
-			continue
-		}
-
-		var bestAnim string
-		var bestScore float64
-
-		for _, animName := range comp.CurrentAnimations {
-			animVisibles := comp.AnimVisiblesMap[animName]
-			firstVisible, lastVisible := findVisibleWindow(animVisibles)
-
-			if firstVisible < 0 || lastVisible >= len(frames) {
-				continue
-			}
-
-			// 检查是否有图片
-			hasImage := false
-			for i := firstVisible; i <= lastVisible && i < len(frames); i++ {
-				if frames[i].ImagePath != "" {
-					hasImage = true
-					break
-				}
-			}
-
-			if !hasImage {
-				continue
-			}
-
-			// 计算评分
-			variance := calculatePositionVariance(frames, firstVisible, lastVisible)
-			score := 1.0 + variance
-
-			if score > bestScore {
-				bestScore = score
-				bestAnim = animName
-			}
-		}
-
-		if bestAnim != "" {
-			binding[trackName] = bestAnim
-		}
-	}
-
-	// 2. 分析逻辑轨道
-	for _, trackName := range comp.LogicalTracks {
-		frames, ok := comp.MergedTracks[trackName]
-		if !ok || len(frames) == 0 {
-			continue
-		}
-
-		var bestAnim string
-		var maxVariance float64
-
-		for _, animName := range comp.CurrentAnimations {
-			animVisibles := comp.AnimVisiblesMap[animName]
-			firstVisible, lastVisible := findVisibleWindow(animVisibles)
-
-			if firstVisible < 0 || lastVisible >= len(frames) {
-				continue
-			}
-
-			variance := calculatePositionVariance(frames, firstVisible, lastVisible)
-
-			if variance > maxVariance {
-				maxVariance = variance
-				bestAnim = animName
-			}
-		}
-
-		if bestAnim != "" && maxVariance > 0.1 {
-			binding[trackName] = bestAnim
-		}
-	}
-
-	return binding
-}
-
-// findControllingAnimation 查找控制指定轨道的动画
-// 基于 AnimationCell.findControllingAnimation()
-// 返回：动画名称、浮点逻辑帧索引（用于插值）
-func (s *ReanimSystem) findControllingAnimation(comp *components.ReanimComponent, trackName string) (string, float64) {
-	// 优先使用绑定
-	if comp.TrackAnimationBinding != nil {
-		if animName, exists := comp.TrackAnimationBinding[trackName]; exists {
-			animVisibles := comp.AnimVisiblesMap[animName]
-			visibleCount := countVisibleFrames(animVisibles)
-			if visibleCount > 0 {
-				// ✅ 检查该动画是否被暂停
-				// 如果暂停，返回第 0 帧（初始帧），使动画保持静止但可见
-				if comp.AnimationPausedStates != nil {
-					if isPaused, hasPausedState := comp.AnimationPausedStates[animName]; hasPausedState && isPaused {
-						return animName, 0.0
-					}
-				}
-
-				// ✅ 从 AnimationFrameIndices 获取该动画的独立帧索引（浮点数）
-				var currentFrame float64
-				if comp.AnimationFrameIndices != nil {
-					if frameIndex, exists := comp.AnimationFrameIndices[animName]; exists {
-						currentFrame = frameIndex
-					} else {
-						currentFrame = float64(comp.CurrentFrame) // 后备：使用共享帧
-					}
-				} else {
-					currentFrame = float64(comp.CurrentFrame) // 后备：使用共享帧
-				}
-
-				// ✅ 检查该动画的单独循环状态
-				isLooping := comp.IsLooping // 默认使用全局循环状态
-				if comp.AnimationLoopStates != nil {
-					if loopState, hasState := comp.AnimationLoopStates[animName]; hasState {
-						isLooping = loopState // 使用该动画的独立循环状态
-					}
-				}
-
-				var animLogicalFrame float64
-				if isLooping {
-					// 循环模式：使用浮点取模
-					animLogicalFrame = currentFrame
-					for animLogicalFrame >= float64(visibleCount) {
-						animLogicalFrame -= float64(visibleCount)
-					}
-				} else {
-					animLogicalFrame = currentFrame
-					// 如果超出范围，钳制到最后一帧
-					if animLogicalFrame >= float64(visibleCount) {
-						animLogicalFrame = float64(visibleCount - 1)
-					}
-				}
-				return animName, animLogicalFrame
-			}
-		}
-	}
-
-	// 默认使用第一个动画
-	if len(comp.CurrentAnimations) > 0 {
-		animName := comp.CurrentAnimations[0]
-		animVisibles := comp.AnimVisiblesMap[animName]
-		visibleCount := countVisibleFrames(animVisibles)
-		if visibleCount > 0 {
-			// ✅ 检查该动画是否被暂停
-			// 如果暂停，返回第 0 帧（初始帧），使动画保持静止但可见
-			if comp.AnimationPausedStates != nil {
-				if isPaused, hasPausedState := comp.AnimationPausedStates[animName]; hasPausedState && isPaused {
-					return animName, 0.0
-				}
-			}
-
-			// ✅ 从 AnimationFrameIndices 获取该动画的独立帧索引（浮点数）
-			var currentFrame float64
-			if comp.AnimationFrameIndices != nil {
-				if frameIndex, exists := comp.AnimationFrameIndices[animName]; exists {
-					currentFrame = frameIndex
-				} else {
-					currentFrame = float64(comp.CurrentFrame) // 后备：使用共享帧
-				}
-			} else {
-				currentFrame = float64(comp.CurrentFrame) // 后备：使用共享帧
-			}
-
-			// ✅ 检查该动画的单独循环状态
-			isLooping := comp.IsLooping // 默认使用全局循环状态
-			if comp.AnimationLoopStates != nil {
-				if loopState, hasState := comp.AnimationLoopStates[animName]; hasState {
-					isLooping = loopState // 使用该动画的独立循环状态
-				}
-			}
-
-			var animLogicalFrame float64
-			if isLooping {
-				// 循环模式：使用浮点取模
-				animLogicalFrame = currentFrame
-				for animLogicalFrame >= float64(visibleCount) {
-					animLogicalFrame -= float64(visibleCount)
-				}
-			} else {
-				animLogicalFrame = currentFrame
-				// 如果超出范围，钳制到最后一帧
-				if animLogicalFrame >= float64(visibleCount) {
-					animLogicalFrame = float64(visibleCount - 1)
-				}
-			}
-			return animName, animLogicalFrame
-		}
-	}
-
-	return "", -1.0
-}
+// ✅ Story 13.10: analyzeTrackBinding 和 findControllingAnimation 已删除
+// 新的渲染逻辑不再需要轨道绑定机制，直接从动画到轨道渲染
 
 // getInterpolatedFrame 获取插值后的帧数据
 // 参数：
@@ -871,6 +809,7 @@ func (s *ReanimSystem) findControllingAnimation(comp *components.ReanimComponent
 //   - logicalFrame: 浮点逻辑帧索引（如 2.7 表示第 2 帧和第 3 帧之间，插值因子 0.7）
 //   - animVisibles: 动画可见性数组
 //   - mergedFrames: 轨道的累加帧数组
+//
 // 返回：插值后的帧数据
 func (s *ReanimSystem) getInterpolatedFrame(
 	animName string,
@@ -879,9 +818,9 @@ func (s *ReanimSystem) getInterpolatedFrame(
 	mergedFrames []reanim.Frame,
 ) reanim.Frame {
 	// 1. 获取整数部分和小数部分
-	frame1Index := int(logicalFrame)                    // 当前帧索引
-	frame2Index := frame1Index + 1                      // 下一帧索引
-	t := logicalFrame - float64(frame1Index)            // 插值因子 (0.0 - 1.0)
+	frame1Index := int(logicalFrame)         // 当前帧索引
+	frame2Index := frame1Index + 1           // 下一帧索引
+	t := logicalFrame - float64(frame1Index) // 插值因子 (0.0 - 1.0)
 
 	// 2. 映射逻辑帧到物理帧
 	physicalFrame1 := mapLogicalToPhysical(frame1Index, animVisibles)
@@ -956,32 +895,43 @@ func (s *ReanimSystem) getInterpolatedFrame(
 	return result
 }
 
-// getParentOffset 获取父轨道的偏移量
-// 基于 AnimationCell.getParentOffset() (animation_cell.go:454-499)
+// getParentOffsetForAnimation 获取父轨道的偏移量（新版本，接受动画名参数）
+// ✅ Story 13.10: 不再需要 findControllingAnimation，直接使用传入的 animName
 //
-// ✅ Story 13.8 Bug Fix #8: 修复父子偏移计算逻辑
-//   - animation_showcase 逐步初始化坐标（先设为 0，有值则覆盖）
-//   - 旧实现同时检查两个指针，导致 nil 值处理不正确
-// ✅ 支持浮点帧索引和帧插值
-func (s *ReanimSystem) getParentOffset(comp *components.ReanimComponent, parentTrackName string) (float64, float64) {
+// 参数：
+//   - comp: Reanim 组件
+//   - parentTrackName: 父轨道名称
+//   - animName: 当前动画名称（用于获取父轨道的物理帧）
+//
+// 返回：
+//   - offsetX, offsetY: 父轨道的偏移量
+func (s *ReanimSystem) getParentOffsetForAnimation(comp *components.ReanimComponent, parentTrackName string, animName string) (float64, float64) {
 	parentFrames, ok := comp.MergedTracks[parentTrackName]
 	if !ok || len(parentFrames) == 0 {
 		return 0, 0
 	}
 
-	parentAnimName, parentLogicalFrame := s.findControllingAnimation(comp, parentTrackName)
-	if parentAnimName == "" || parentLogicalFrame < 0 {
-		return 0, 0
+	// 获取动画的逻辑帧索引
+	var logicalFrame float64
+	if comp.AnimationFrameIndices != nil {
+		if frame, exists := comp.AnimationFrameIndices[animName]; exists {
+			logicalFrame = frame
+		} else {
+			logicalFrame = float64(comp.CurrentFrame) // 后备：使用共享帧
+		}
+	} else {
+		logicalFrame = float64(comp.CurrentFrame) // 后备：使用共享帧
 	}
 
-	parentAnimVisibles := comp.AnimVisiblesMap[parentAnimName]
-	if len(parentAnimVisibles) == 0 {
+	// 获取动画的可见性数组
+	animVisibles, ok := comp.AnimVisiblesMap[animName]
+	if !ok || len(animVisibles) == 0 {
 		return 0, 0
 	}
 
 	// 获取第一个可见帧的索引
 	firstVisibleFrameIndex := -1
-	for i, v := range parentAnimVisibles {
+	for i, v := range animVisibles {
 		if v == 0 {
 			firstVisibleFrameIndex = i
 			break
@@ -989,7 +939,7 @@ func (s *ReanimSystem) getParentOffset(comp *components.ReanimComponent, parentT
 	}
 
 	// 映射到物理帧
-	firstPhysicalFrame := mapLogicalToPhysical(firstVisibleFrameIndex, parentAnimVisibles)
+	firstPhysicalFrame := mapLogicalToPhysical(firstVisibleFrameIndex, animVisibles)
 	if firstPhysicalFrame < 0 || firstPhysicalFrame >= len(parentFrames) {
 		return 0, 0
 	}
@@ -1005,7 +955,7 @@ func (s *ReanimSystem) getParentOffset(comp *components.ReanimComponent, parentT
 	}
 
 	// ✅ 使用帧插值获取父轨道当前帧的平滑位置
-	currentFrame := s.getInterpolatedFrame(parentAnimName, parentLogicalFrame, parentAnimVisibles, parentFrames)
+	currentFrame := s.getInterpolatedFrame(animName, logicalFrame, animVisibles, parentFrames)
 
 	currentX, currentY := initX, initY
 	if currentFrame.X != nil {
@@ -1372,6 +1322,14 @@ func (s *ReanimSystem) RenderToTexture(entityID ecs.EntityID, target *ebiten.Ima
 //   - animation_showcase 只跳过植物的 4 个动画定义轨道
 //   - 僵尸的 anim_walk/anim_eat 等应该被分类为 logicalTracks（无图片）
 //   - 与 animation_showcase 保持完全一致
+//
+// AnalyzeTrackTypes 分析并分类 Reanim 轨道为视觉轨道和逻辑轨道
+// 视觉轨道：包含图片数据，需要渲染
+// 逻辑轨道：不包含图片数据，用于控制动画可见性
+func (s *ReanimSystem) AnalyzeTrackTypes(reanimXML *reanim.ReanimXML) (visualTracks []string, logicalTracks []string) {
+	return s.analyzeTrackTypes(reanimXML)
+}
+
 func (s *ReanimSystem) analyzeTrackTypes(reanimXML *reanim.ReanimXML) (visualTracks []string, logicalTracks []string) {
 	// ✅ Bug Fix: 先检查轨道是否有图片，再决定是否跳过
 	// 原因：向日葵的 anim_idle 轨道包含头部图像，不应该被跳过
@@ -1488,4 +1446,3 @@ func (s *ReanimSystem) calculateCenterOffset(comp *components.ReanimComponent) {
 	comp.CenterOffsetX = (minX + maxX) / 2
 	comp.CenterOffsetY = (minY + maxY) / 2
 }
-

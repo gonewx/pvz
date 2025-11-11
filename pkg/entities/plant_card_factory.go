@@ -39,24 +39,24 @@ func NewPlantCardEntity(em *ecs.EntityManager, rm *game.ResourceManager, rs Rean
 
 	switch plantType {
 	case components.PlantSunflower:
-		sunCost = config.SunflowerSunCost // 50
-		resourceName = "SunFlower"        // 资源管理器中的缓存键
-		configID = "sunflower"            // 配置文件中的 ID
+		sunCost = config.SunflowerSunCost           // 50
+		resourceName = "SunFlower"                  // 资源管理器中的缓存键
+		configID = "sunflower"                      // 配置文件中的 ID
 		cooldownTime = config.SunflowerRechargeTime // 7.5
 	case components.PlantPeashooter:
-		sunCost = config.PeashooterSunCost // 100
-		resourceName = "PeaShooterSingle"  // 资源管理器中的缓存键
-		configID = "peashooter"            // 配置文件中的 ID
+		sunCost = config.PeashooterSunCost           // 100
+		resourceName = "PeaShooterSingle"            // 资源管理器中的缓存键
+		configID = "peashooter"                      // 配置文件中的 ID
 		cooldownTime = config.PeashooterRechargeTime // 7.5
 	case components.PlantWallnut:
-		sunCost = config.WallnutCost // 50
-		resourceName = "Wallnut"     // 资源管理器中的缓存键
-		configID = "wallnut"         // 配置文件中的 ID
+		sunCost = config.WallnutCost              // 50
+		resourceName = "Wallnut"                  // 资源管理器中的缓存键
+		configID = "wallnut"                      // 配置文件中的 ID
 		cooldownTime = config.WallnutRechargeTime // 30.0
 	case components.PlantCherryBomb:
-		sunCost = config.CherryBombSunCost // 150
-		resourceName = "CherryBomb"        // 资源管理器中的缓存键
-		configID = "cherrybomb"            // 配置文件中的 ID
+		sunCost = config.CherryBombSunCost       // 150
+		resourceName = "CherryBomb"              // 资源管理器中的缓存键
+		configID = "cherrybomb"                  // 配置文件中的 ID
 		cooldownTime = config.CherryBombCooldown // 50.0
 	default:
 		em.DestroyEntity(entity)

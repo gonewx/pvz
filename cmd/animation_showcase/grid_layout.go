@@ -26,9 +26,9 @@ type GridLayout struct {
 	padding    int
 
 	// 滚动
-	scrollY      float64
-	scrollSpeed  float64
-	maxScrollY   float64
+	scrollY     float64
+	scrollSpeed float64
+	maxScrollY  float64
 
 	// 窗口大小
 	windowWidth  int

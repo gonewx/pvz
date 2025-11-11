@@ -71,7 +71,7 @@ func NewLawnmowerEntity(
 	// 添加 ReanimComponent
 	// 除草车：显示所有部件（包括车身、轮子、引擎等）
 	em.AddComponent(entityID, &components.ReanimComponent{
-		ReanimXML: reanimXML,
+		ReanimXML:  reanimXML,
 		PartImages: partImages,
 		IsLooping:  true, // 除草车动画循环播放
 	})

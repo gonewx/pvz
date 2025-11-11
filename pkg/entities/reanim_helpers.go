@@ -25,9 +25,9 @@ func createSimpleReanimComponent(image *ebiten.Image, imageName string) *compone
 			AnimationFPS:      12,
 			CurrentAnimations: []string{"idle"},
 			AnimVisiblesMap:   map[string][]int{"idle": {}},
-			TrackAnimationBinding: map[string]string{},
-			IsLooping:         true,
-			IsFinished:        false,
+			// ✅ Story 13.10: TrackAnimationBinding 已删除
+			IsLooping:  true,
+			IsFinished: false,
 		}
 	}
 
@@ -86,9 +86,7 @@ func createSimpleReanimComponent(image *ebiten.Image, imageName string) *compone
 		AnimVisiblesMap: map[string][]int{
 			"idle": {0}, // 单帧动画
 		},
-		TrackAnimationBinding: map[string]string{
-			imageName: "idle", // 轨道绑定到 idle 动画
-		},
+		// ✅ Story 13.10: TrackAnimationBinding 已删除
 
 		// 配置字段（简单实体不需要）
 		ParentTracks: nil,
