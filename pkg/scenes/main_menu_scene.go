@@ -42,6 +42,14 @@ type MainMenuScene struct {
 	buttonHitboxes []config.MenuButtonHitbox
 	hoveredButton  string // Current hovered button track name (empty = no hover)
 	currentLevel   string // Current highest level from save (format: "X-Y")
+
+	// Story 12.1 Task 5: Button highlight images
+	buttonNormalImages    map[string]*ebiten.Image // Map: track name -> normal button image
+	buttonHighlightImages map[string]*ebiten.Image // Map: track name -> highlight button image
+	lastHoveredButton     string                   // Track the last hovered button for sound effect (play only once)
+
+	// Cloud animation management
+	cloudAnimsResumed bool // Track whether cloud animations have been resumed after opening animation
 }
 
 // NewMainMenuScene creates and returns a new MainMenuScene instance.
@@ -114,8 +122,33 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 		// 5. 获取 ReanimComponent 并设置循环状态
 		reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](scene.entityManager, selectorEntity)
 		if ok {
-			// 初始化 AnimationLoopStates
+			// 🔍 调试：输出 AnimationFPS 的值
+			log.Printf("[MainMenuScene] 🔍 DEBUG: AnimationFPS = %.1f (全局 FPS)", reanimComp.AnimationFPS)
+
+			// 初始化 AnimationLoopStates、AnimationPausedStates 和 AnimationFPSOverrides
 			reanimComp.AnimationLoopStates = make(map[string]bool)
+			reanimComp.AnimationPausedStates = make(map[string]bool)
+			reanimComp.AnimationFPSOverrides = make(map[string]float64)
+			reanimComp.AnimationSpeedOverrides = make(map[string]float64)
+
+			// ✅ 从配置中加载每个动画的独立 FPS 和速度倍率
+			if configManager := rm.GetReanimConfigManager(); configManager != nil {
+				unitConfig, err := configManager.GetUnit("selectorscreen")
+				if err == nil {
+					for _, animInfo := range unitConfig.AvailableAnimations {
+						if animInfo.FPS > 0 {
+							reanimComp.AnimationFPSOverrides[animInfo.Name] = animInfo.FPS
+							log.Printf("[MainMenuScene] 动画 %s 使用独立 FPS = %.1f", animInfo.Name, animInfo.FPS)
+						}
+						if animInfo.Speed > 0 {
+							reanimComp.AnimationSpeedOverrides[animInfo.Name] = animInfo.Speed
+							log.Printf("[MainMenuScene] 动画 %s 使用速度倍率 = %.2f", animInfo.Name, animInfo.Speed)
+						}
+					}
+				} else {
+					log.Printf("[MainMenuScene] Warning: 无法加载 selectorscreen 配置: %v", err)
+				}
+			}
 
 			// 开场动画设置为非循环
 			reanimComp.AnimationLoopStates["anim_open"] = false
@@ -127,6 +160,13 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 				reanimComp.AnimationLoopStates[animName] = true
 			}
 
+			// ✅ 云朵和草动画初始化为暂停状态
+			// 这样它们的初始帧（第 0 帧）在开场动画期间可见
+			// 但动画本身不会播放，直到开场动画完成后才恢复
+			for _, animName := range cloudAnims {
+				reanimComp.AnimationPausedStates[animName] = true
+			}
+
 			// 全局设置为循环模式（但具体每个动画由 AnimationLoopStates 控制）
 			reanimComp.IsLooping = true
 
@@ -136,7 +176,7 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 			}
 			reanimComp.TrackAnimationBinding["leaf_SelectorScreen_Leaves"] = "anim_grass"
 
-			log.Printf("[MainMenuScene] ✅ SelectorScreen 动画初始化完成（开场动画非循环，云朵循环）")
+			log.Printf("[MainMenuScene] ✅ SelectorScreen 动画初始化完成（开场动画非循环，云朵循环但暂停）")
 		}
 
 		// 修复：SelectorScreen 是全屏 UI，应该使用左上角对齐（Reanim 原始坐标）
@@ -150,6 +190,11 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 
 	// Story 12.1: Initialize button hitboxes
 	scene.buttonHitboxes = config.MenuButtonHitboxes
+
+	// Story 12.1 Task 5: Load button highlight images
+	scene.buttonNormalImages = make(map[string]*ebiten.Image)
+	scene.buttonHighlightImages = make(map[string]*ebiten.Image)
+	scene.loadButtonImages(rm)
 
 	// Story 12.1: Load current level from save
 	gameState := game.GetGameState()
@@ -205,6 +250,21 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 	// Story 12.1: Update Reanim system (animate clouds, flowers, etc.)
 	if m.reanimSystem != nil {
 		m.reanimSystem.Update(deltaTime)
+
+		// ✅ 检测开场动画完成，恢复云朵动画播放
+		if !m.cloudAnimsResumed && m.selectorScreenEntity != 0 {
+			reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
+			if ok && reanimComp.IsFinished {
+				// 开场动画已完成，恢复云朵和草动画的播放
+				cloudAnims := []string{"anim_grass", "anim_cloud1", "anim_cloud2", "anim_cloud4",
+					"anim_cloud5", "anim_cloud6", "anim_cloud7"}
+				for _, animName := range cloudAnims {
+					reanimComp.AnimationPausedStates[animName] = false
+				}
+				m.cloudAnimsResumed = true
+				log.Printf("[MainMenuScene] ✅ 开场动画完成，恢复云朵动画播放")
+			}
+		}
 	}
 
 	// Get mouse position
@@ -256,6 +316,168 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 
 	// Remember mouse state for next frame
 	m.wasMousePressed = isMousePressed
+
+	// Story 12.1 Task 5: Update button highlight based on hover state
+	m.updateButtonHighlight()
+}
+
+// loadButtonImages loads normal and highlight images for all menu buttons.
+//
+// This method extracts normal button images from the SelectorScreen ReanimComponent
+// and loads the corresponding highlight images from the resource manager.
+//
+// Story 12.1 Task 5: Button Highlight Effect
+func (m *MainMenuScene) loadButtonImages(rm *game.ResourceManager) {
+	// Get ReanimComponent from SelectorScreen entity
+	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
+	if !ok || reanimComp == nil {
+		log.Printf("[MainMenuScene] Warning: Failed to get ReanimComponent for button image loading")
+		return
+	}
+
+	// Define button track name to resource ID mappings
+	// Note: Track names don't match actual game modes (see menu_config.go for details)
+	buttonMappings := map[string]struct {
+		normalImageRef      string // Image reference in PartImages (from .reanim file)
+		highlightResourceID string // Resource ID for highlight image
+	}{
+		"SelectorScreen_Adventure_button": {
+			normalImageRef:      "IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_BUTTON",
+			highlightResourceID: "IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_HIGHLIGHT",
+		},
+		"SelectorScreen_Survival_button": {
+			normalImageRef:      "IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_BUTTON",
+			highlightResourceID: "IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_HIGHLIGHT",
+		},
+		"SelectorScreen_Challenges_button": {
+			normalImageRef:      "IMAGE_REANIM_SELECTORSCREEN_CHALLENGES_BUTTON",
+			highlightResourceID: "IMAGE_REANIM_SELECTORSCREEN_CHALLENGES_HIGHLIGHT",
+		},
+		"SelectorScreen_ZenGarden_button": {
+			normalImageRef:      "IMAGE_REANIM_SELECTORSCREEN_VASEBREAKER_BUTTON",
+			highlightResourceID: "IMAGE_REANIM_SELECTORSCREEN_VASEBREAKER_HIGHLIGHT",
+		},
+	}
+
+	// Load images for each button
+	for trackName, mapping := range buttonMappings {
+		// Get normal image from PartImages (already loaded by ReanimSystem)
+		if normalImg, exists := reanimComp.PartImages[mapping.normalImageRef]; exists {
+			m.buttonNormalImages[trackName] = normalImg
+			log.Printf("[MainMenuScene] Loaded normal image for %s", trackName)
+		} else {
+			log.Printf("[MainMenuScene] Warning: Normal image not found for %s (ref: %s)", trackName, mapping.normalImageRef)
+		}
+
+		// Load highlight image from resource manager
+		highlightImg, err := rm.LoadImageByID(mapping.highlightResourceID)
+		if err != nil {
+			log.Printf("[MainMenuScene] Warning: Failed to load highlight image for %s: %v", trackName, err)
+		} else {
+			m.buttonHighlightImages[trackName] = highlightImg
+			log.Printf("[MainMenuScene] Loaded highlight image for %s", trackName)
+		}
+	}
+
+	log.Printf("[MainMenuScene] Button image loading complete: %d normal, %d highlight",
+		len(m.buttonNormalImages), len(m.buttonHighlightImages))
+}
+
+// updateButtonHighlight updates the button appearance based on hover state.
+//
+// When the mouse hovers over an unlocked button, this method:
+// 1. Replaces the button image with its highlight version in the ReanimComponent
+// 2. Plays the stone grinding sound effect (SOUND_GRAVEBUTTON) once
+//
+// When the mouse leaves a button, it restores the normal image.
+//
+// Story 12.1 Task 5: Button Highlight Effect
+func (m *MainMenuScene) updateButtonHighlight() {
+	// Get ReanimComponent from SelectorScreen entity
+	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
+	if !ok || reanimComp == nil {
+		return
+	}
+
+	// Step 1: Restore the previously highlighted button (if any)
+	if m.lastHoveredButton != "" && m.lastHoveredButton != m.hoveredButton {
+		// Restore the old button to normal
+		if normalImg, exists := m.buttonNormalImages[m.lastHoveredButton]; exists {
+			// Find the correct image reference for this button and restore it
+			switch m.lastHoveredButton {
+			case "SelectorScreen_Adventure_button":
+				reanimComp.PartImages["IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_BUTTON"] = normalImg
+			case "SelectorScreen_Survival_button":
+				reanimComp.PartImages["IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_BUTTON"] = normalImg
+			case "SelectorScreen_Challenges_button":
+				reanimComp.PartImages["IMAGE_REANIM_SELECTORSCREEN_CHALLENGES_BUTTON"] = normalImg
+			case "SelectorScreen_ZenGarden_button":
+				reanimComp.PartImages["IMAGE_REANIM_SELECTORSCREEN_VASEBREAKER_BUTTON"] = normalImg
+			}
+		}
+	}
+
+	// Step 2: Apply highlight to the currently hovered button (if any and unlocked)
+	if m.hoveredButton != "" {
+		// Find the button type for unlock check
+		var buttonType config.MenuButtonType
+		var found bool
+		for _, hitbox := range m.buttonHitboxes {
+			if hitbox.TrackName == m.hoveredButton {
+				buttonType = hitbox.ButtonType
+				found = true
+				break
+			}
+		}
+
+		// Only apply highlight to unlocked buttons
+		if found && config.IsMenuModeUnlocked(buttonType, m.currentLevel) {
+			// Apply highlight image if available
+			if highlightImg, exists := m.buttonHighlightImages[m.hoveredButton]; exists {
+				// Find the correct image reference for this button and apply highlight
+				switch m.hoveredButton {
+				case "SelectorScreen_Adventure_button":
+					reanimComp.PartImages["IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_BUTTON"] = highlightImg
+				case "SelectorScreen_Survival_button":
+					reanimComp.PartImages["IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_BUTTON"] = highlightImg
+				case "SelectorScreen_Challenges_button":
+					reanimComp.PartImages["IMAGE_REANIM_SELECTORSCREEN_CHALLENGES_BUTTON"] = highlightImg
+				case "SelectorScreen_ZenGarden_button":
+					reanimComp.PartImages["IMAGE_REANIM_SELECTORSCREEN_VASEBREAKER_BUTTON"] = highlightImg
+				}
+			}
+
+			// Play sound effect once when entering a new button
+			if m.lastHoveredButton != m.hoveredButton {
+				m.playGraveButtonSound()
+			}
+
+			// Update last hovered button
+			m.lastHoveredButton = m.hoveredButton
+			return
+		}
+	}
+
+	// Step 3: If no button is hovered (or button is locked), clear last hovered
+	m.lastHoveredButton = ""
+}
+
+// playGraveButtonSound plays the stone grinding sound effect for button hover.
+//
+// Story 12.1 Task 5: Button Highlight Effect
+func (m *MainMenuScene) playGraveButtonSound() {
+	// Check if resource manager is available (nil in unit tests)
+	if m.resourceManager == nil {
+		return
+	}
+
+	player, err := m.resourceManager.LoadSoundEffect("assets/sounds/gravebutton.ogg")
+	if err != nil {
+		log.Printf("[MainMenuScene] Warning: Failed to load grave button sound: %v", err)
+		return
+	}
+	player.Rewind()
+	player.Play()
 }
 
 // Draw renders the main menu scene to the screen.

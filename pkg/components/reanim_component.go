@@ -70,7 +70,15 @@ type ReanimComponent struct {
 
 	// CurrentFrame 当前逻辑帧索引（所有动画共享）
 	// 从 0 开始，随着时间推进递增
+	// ⚠️ 注意：如果使用 AnimationFPSOverrides，此字段仅作为后备，
+	// 实际每个动画的帧索引存储在 AnimationFrameIndices 中
 	CurrentFrame int
+
+	// AnimationFrameIndices 存储每个动画的独立逻辑帧索引
+	// Key: 动画名称（如 "anim_open", "anim_cloud1"）
+	// Value: 该动画当前的逻辑帧索引（浮点数，支持亚帧精度）
+	// 用于支持不同动画以不同速度播放（如开场动画 2 FPS + 云朵动画 12 FPS）
+	AnimationFrameIndices map[string]float64
 
 	// FrameAccumulator 帧累加器，用于精确 FPS 控制
 	// 累加 deltaTime 直到达到一帧的时间 (1.0/fps)
@@ -90,6 +98,27 @@ type ReanimComponent struct {
 	// Value: true 表示循环播放，false 表示播放一次后停止
 	// 如果某个动画不在此 map 中，默认使用全局 IsLooping 值
 	AnimationLoopStates map[string]bool
+
+	// AnimationPausedStates 存储每个动画的暂停状态
+	// Key: 动画名称（如 "anim_cloud1", "anim_grass"）
+	// Value: true 表示暂停（不推进帧，但显示当前帧），false 表示正常播放
+	// 如果某个动画不在此 map 中，默认为 false（不暂停）
+	// 用于实现"云朵初始帧可见但延迟播放"等效果
+	AnimationPausedStates map[string]bool
+
+	// AnimationFPSOverrides 存储每个动画的独立 FPS
+	// Key: 动画名称（如 "anim_cloud1", "anim_open"）
+	// Value: 该动画的 FPS（如 6.0, 12.0, 24.0）
+	// 如果某个动画不在此 map 中，使用全局 AnimationFPS
+	// 用于实现不同动画以不同速度播放（如慢速开场动画 + 快速云朵动画）
+	AnimationFPSOverrides map[string]float64
+
+	// AnimationSpeedOverrides 存储每个动画的速度倍率
+	// Key: 动画名称（如 "anim_cloud1", "anim_grass"）
+	// Value: 速度倍率（0.0-1.0+），1.0=正常速度，0.5=50%速度，2.0=200%速度
+	// 如果某个动画不在此 map 中，默认为 1.0（正常速度）
+	// 用于在保持高 FPS（平滑）的同时控制动画播放速度
+	AnimationSpeedOverrides map[string]float64
 
 	// ==========================================================================
 	// 动画数据 (Animation Data)

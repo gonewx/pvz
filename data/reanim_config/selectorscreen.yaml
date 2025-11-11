@@ -56,16 +56,22 @@ available_animations:
       display_name: start
     - name: anim_cloud1
       display_name: cloud1
+      speed: 0.05
     - name: anim_cloud7
       display_name: cloud7
+      speed: 0.05
     - name: anim_cloud2
       display_name: cloud2
+      speed: 0.05
     - name: anim_cloud4
       display_name: cloud4
+      speed: 0.05
     - name: anim_cloud6
       display_name: cloud6
+      speed: 0.05
     - name: anim_cloud5
       display_name: cloud5
+      speed: 0.05
 animation_combos:
     - name: opening
       display_name: 开场动画（不循环）
@@ -80,10 +86,10 @@ animation_combos:
       animations:
         - anim_grass
         - anim_cloud1
+        - anim_cloud7
         - anim_cloud2
         - anim_cloud4
-        - anim_cloud5
         - anim_cloud6
-        - anim_cloud7
+        - anim_cloud5
       binding_strategy: auto
       loop: true

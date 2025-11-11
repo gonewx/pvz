@@ -41,8 +41,10 @@ type AnimationUnitConfig struct {
 
 // AnimationInfo 动画信息
 type AnimationInfo struct {
-	Name        string `yaml:"name"`
-	DisplayName string `yaml:"display_name"`
+	Name        string  `yaml:"name"`
+	DisplayName string  `yaml:"display_name"`
+	FPS         float64 `yaml:"fps,omitempty"`   // 可选：该动画的独立 FPS，若未指定则使用全局/Reanim 文件的 FPS
+	Speed       float64 `yaml:"speed,omitempty"` // 可选：动画速度倍率（0.0-1.0），1.0=正常速度，0.5=50%速度，默认 1.0
 }
 
 // 注意：AnimationComboConfig 已在 reanim_config.go 中定义，这里直接使用

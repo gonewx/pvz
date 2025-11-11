@@ -246,6 +246,28 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 	comp.FrameAccumulator = 0
 	comp.IsFinished = false
 
+	// ✅ 加载单个动画的 FPS 和速度倍率配置
+	// 从 unitConfig.AvailableAnimations 中读取每个动画的 FPS 和 Speed
+	// 并设置到 AnimationFPSOverrides 和 AnimationSpeedOverrides 中
+	if comp.AnimationFPSOverrides == nil {
+		comp.AnimationFPSOverrides = make(map[string]float64)
+	}
+	if comp.AnimationSpeedOverrides == nil {
+		comp.AnimationSpeedOverrides = make(map[string]float64)
+	}
+	for _, animInfo := range unitConfig.AvailableAnimations {
+		// 如果配置中指定了 FPS，应用到 AnimationFPSOverrides
+		if animInfo.FPS > 0 {
+			comp.AnimationFPSOverrides[animInfo.Name] = animInfo.FPS
+			log.Printf("[ReanimSystem] PlayCombo: 动画 %s 使用独立 FPS = %.1f", animInfo.Name, animInfo.FPS)
+		}
+		// 如果配置中指定了 Speed，应用到 AnimationSpeedOverrides
+		if animInfo.Speed > 0 {
+			comp.AnimationSpeedOverrides[animInfo.Name] = animInfo.Speed
+			log.Printf("[ReanimSystem] PlayCombo: 动画 %s 使用速度倍率 = %.2f", animInfo.Name, animInfo.Speed)
+		}
+	}
+
 	// 应用循环设置（如果配置中指定了）
 	if combo.Loop != nil {
 		comp.IsLooping = *combo.Loop
@@ -338,24 +360,67 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 			continue
 		}
 
-		// 使用帧累加器控制动画速度
-		// animationFPS: 从 Reanim 文件读取的动画帧率
-		// targetTPS: 目标游戏 TPS
-		// 计算公式：frameAccumulator += animationFPS / targetTPS
-		//
-		// ✅ 参考实现（animation_cell.go:331-347）：
-		// - currentFrame 无限增长（不做循环检查）
-		// - 循环由 findControllingAnimation 的 % 操作处理
-		// - 支持多动画组合（不同轨道不同帧数）
-		comp.FrameAccumulator += comp.AnimationFPS / s.targetTPS
+		// ✅ 为每个动画独立推进帧（支持不同动画不同 FPS）
+		// 初始化 AnimationFrameIndices（如果尚未初始化）
+		if comp.AnimationFrameIndices == nil {
+			comp.AnimationFrameIndices = make(map[string]float64)
+			for _, animName := range comp.CurrentAnimations {
+				comp.AnimationFrameIndices[animName] = 0.0
+			}
+		}
 
-		if comp.FrameAccumulator >= 1.0 {
-			comp.CurrentFrame++
-			comp.FrameAccumulator -= 1.0
-			// ✅ 移除循环检查，让 findControllingAnimation 通过取模处理
+		// 为每个动画独立推进帧
+		for _, animName := range comp.CurrentAnimations {
+			// 检查是否暂停
+			if comp.AnimationPausedStates != nil {
+				if isPaused, exists := comp.AnimationPausedStates[animName]; exists && isPaused {
+					continue // 跳过暂停的动画
+				}
+			}
 
-			// Bug Fix: 检查非循环动画是否已完成
-			if !comp.IsLooping && !comp.IsFinished {
+			// 获取该动画的 FPS
+			animFPS := comp.AnimationFPS // 默认使用全局 FPS
+			if comp.AnimationFPSOverrides != nil {
+				if fps, hasOverride := comp.AnimationFPSOverrides[animName]; hasOverride {
+					animFPS = fps
+				}
+			}
+
+			// ✅ 获取该动画的速度倍率
+			animSpeed := 1.0 // 默认正常速度
+			if comp.AnimationSpeedOverrides != nil {
+				if speed, hasOverride := comp.AnimationSpeedOverrides[animName]; hasOverride && speed > 0 {
+					animSpeed = speed
+				}
+			}
+
+			// 推进该动画的帧索引（应用速度倍率）
+			// frameIncrement = (FPS / targetTPS) * speedMultiplier
+			// 例如：FPS=12, TPS=60, speed=0.2 → increment = (12/60) * 0.2 = 0.04 帧/tick
+			frameIncrement := (animFPS / s.targetTPS) * animSpeed
+			comp.AnimationFrameIndices[animName] += frameIncrement
+		}
+
+		// 同步更新 CurrentFrame（用于后备和非循环动画检测）
+		// 使用第一个非暂停动画的帧索引
+		for _, animName := range comp.CurrentAnimations {
+			if comp.AnimationPausedStates != nil {
+				if isPaused, exists := comp.AnimationPausedStates[animName]; exists && isPaused {
+					continue
+				}
+			}
+			comp.CurrentFrame = int(comp.AnimationFrameIndices[animName])
+			break
+		}
+
+		// ✅ 检查非循环动画是否已完成
+		// 支持混合模式：即使全局 IsLooping=true，也要检测单个非循环动画的完成状态
+		if !comp.IsFinished {
+			// 检查是否所有非循环动画都已完成
+			allNonLoopingAnimsFinished := false
+
+			// 如果全局非循环（旧逻辑）
+			if !comp.IsLooping {
 				// 计算动画的最大帧数（所有当前播放动画中的最大可见帧数）
 				maxVisibleFrames := 0
 				for _, animName := range comp.CurrentAnimations {
@@ -369,11 +434,45 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 
 				// 如果当前帧已经到达或超过最大帧数，标记动画完成
 				if maxVisibleFrames > 0 && comp.CurrentFrame >= maxVisibleFrames {
-					comp.IsFinished = true
-					// 将帧数钳制在最后一帧，防止越界
-					comp.CurrentFrame = maxVisibleFrames - 1
-					log.Printf("[ReanimSystem] 非循环动画完成: entity=%d, ReanimName=%s, maxFrames=%d", id, comp.ReanimName, maxVisibleFrames)
+					allNonLoopingAnimsFinished = true
 				}
+			} else if comp.AnimationLoopStates != nil {
+				// ✅ 新逻辑：检测单个非循环动画是否完成（即使全局 IsLooping=true）
+				// 只检查非循环动画的完成状态
+				hasNonLoopingAnims := false
+				allNonLoopingComplete := true
+
+				for _, animName := range comp.CurrentAnimations {
+					// 获取该动画的循环状态
+					isLooping := comp.IsLooping // 默认使用全局状态
+					if loopState, hasState := comp.AnimationLoopStates[animName]; hasState {
+						isLooping = loopState
+					}
+
+					// 如果该动画是非循环的
+					if !isLooping {
+						hasNonLoopingAnims = true
+						if animVisibles, exists := comp.AnimVisiblesMap[animName]; exists {
+							visibleCount := countVisibleFrames(animVisibles)
+							// 检查该动画是否完成
+							if visibleCount > 0 && comp.CurrentFrame < visibleCount {
+								allNonLoopingComplete = false
+								break
+							}
+						}
+					}
+				}
+
+				// 如果有非循环动画且全部完成，设置 IsFinished
+				if hasNonLoopingAnims && allNonLoopingComplete {
+					allNonLoopingAnimsFinished = true
+				}
+			}
+
+			// 设置 IsFinished 标志
+			if allNonLoopingAnimsFinished {
+				comp.IsFinished = true
+				log.Printf("[ReanimSystem] 非循环动画完成: entity=%d, ReanimName=%s, CurrentFrame=%d", id, comp.ReanimName, comp.CurrentFrame)
 			}
 		}
 	}
@@ -418,7 +517,7 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 		}
 
 		// 查找控制该轨道的动画
-		controllingAnim, physicalFrame := s.findControllingAnimation(comp, trackName)
+		controllingAnim, logicalFrame := s.findControllingAnimation(comp, trackName)
 		if controllingAnim == "" {
 			skippedNoAnim++
 			// Debug: 记录没有控制动画的轨道
@@ -430,22 +529,36 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 
 		// Debug: 记录 anim_idle 相关轨道的控制信息
 		if comp.ReanimName == "sunflower" && comp.CurrentFrame < 3 && (trackName == "anim_idle" || controllingAnim == "anim_idle") {
-			log.Printf("[ReanimSystem] 📍 sunflower frame %d: 轨道 %s 由动画 %s 控制, physicalFrame=%d",
-				comp.CurrentFrame, trackName, controllingAnim, physicalFrame)
+			log.Printf("[ReanimSystem] 📍 sunflower frame %d: 轨道 %s 由动画 %s 控制, logicalFrame=%.2f",
+				comp.CurrentFrame, trackName, controllingAnim, logicalFrame)
 		}
 
-		// 获取轨道的帧数组
+		// 获取轨道的帧数组和动画可见性数组
 		mergedFrames, ok := comp.MergedTracks[trackName]
-		if !ok || physicalFrame >= len(mergedFrames) {
+		if !ok || len(mergedFrames) == 0 {
 			skippedNoFrames++
 			continue
 		}
 
-		frame := mergedFrames[physicalFrame]
+		animVisibles, ok := comp.AnimVisiblesMap[controllingAnim]
+		if !ok {
+			skippedNoFrames++
+			continue
+		}
 
-		// ✅ 图片继承逻辑：如果当前帧没有图片，向前搜索最近的有图片的帧
+		// ✅ 使用帧插值获取平滑的帧数据
+		frame := s.getInterpolatedFrame(controllingAnim, logicalFrame, animVisibles, mergedFrames)
+
+		// ✅ 图片继承逻辑：如果插值后的帧没有图片，向前搜索最近的有图片的帧
 		// 原版 PvZ 的 Reanim 系统会继承上一帧的图片（类似 Flash 的关键帧）
 		if frame.ImagePath == "" {
+			// 获取整数帧索引用于图片继承搜索
+			physicalFrame := mapLogicalToPhysical(int(logicalFrame), animVisibles)
+			if physicalFrame < 0 {
+				skippedNoImage++
+				continue
+			}
+
 			// 向前搜索有图片的帧
 			foundImage := false
 			for i := physicalFrame - 1; i >= 0; i-- {
@@ -471,7 +584,7 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 			}
 		} else if comp.ReanimName == "sunflower" && trackName == "anim_idle" && comp.CurrentFrame < 5 {
 			// Debug: 原生图片
-			log.Printf("[ReanimSystem] ✅ SunFlower anim_idle frame %d 原生图片: %s", physicalFrame, frame.ImagePath)
+			log.Printf("[ReanimSystem] ✅ SunFlower anim_idle frame %.2f 原生图片: %s", logicalFrame, frame.ImagePath)
 		}
 
 		// 计算父轨道偏移
@@ -491,15 +604,15 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 		if !ok || img == nil {
 			// Debug: 记录找不到图片的情况
 			if comp.ReanimName == "sunflower" && trackName == "anim_idle" && comp.CurrentFrame < 5 {
-				log.Printf("[ReanimSystem] ⚠️ SunFlower anim_idle frame %d: 图片 %s 不存在于 PartImages", physicalFrame, frame.ImagePath)
+				log.Printf("[ReanimSystem] ⚠️ SunFlower anim_idle frame %.2f: 图片 %s 不存在于 PartImages", logicalFrame, frame.ImagePath)
 			}
 			continue
 		}
 
 		// Debug: 成功获取图片
 		if comp.ReanimName == "sunflower" && trackName == "anim_idle" && comp.CurrentFrame < 5 {
-			log.Printf("[ReanimSystem] ✅ SunFlower anim_idle frame %d: 成功获取图片 %s (尺寸: %dx%d)",
-				physicalFrame, frame.ImagePath, img.Bounds().Dx(), img.Bounds().Dy())
+			log.Printf("[ReanimSystem] ✅ SunFlower anim_idle frame %.2f: 成功获取图片 %s (尺寸: %dx%d)",
+				logicalFrame, frame.ImagePath, img.Bounds().Dx(), img.Bounds().Dy())
 		}
 
 		// 添加到缓存
@@ -642,14 +755,34 @@ func (s *ReanimSystem) analyzeTrackBinding(comp *components.ReanimComponent) map
 
 // findControllingAnimation 查找控制指定轨道的动画
 // 基于 AnimationCell.findControllingAnimation()
-// 返回：动画名称、物理帧索引
-func (s *ReanimSystem) findControllingAnimation(comp *components.ReanimComponent, trackName string) (string, int) {
+// 返回：动画名称、浮点逻辑帧索引（用于插值）
+func (s *ReanimSystem) findControllingAnimation(comp *components.ReanimComponent, trackName string) (string, float64) {
 	// 优先使用绑定
 	if comp.TrackAnimationBinding != nil {
 		if animName, exists := comp.TrackAnimationBinding[trackName]; exists {
 			animVisibles := comp.AnimVisiblesMap[animName]
 			visibleCount := countVisibleFrames(animVisibles)
 			if visibleCount > 0 {
+				// ✅ 检查该动画是否被暂停
+				// 如果暂停，返回第 0 帧（初始帧），使动画保持静止但可见
+				if comp.AnimationPausedStates != nil {
+					if isPaused, hasPausedState := comp.AnimationPausedStates[animName]; hasPausedState && isPaused {
+						return animName, 0.0
+					}
+				}
+
+				// ✅ 从 AnimationFrameIndices 获取该动画的独立帧索引（浮点数）
+				var currentFrame float64
+				if comp.AnimationFrameIndices != nil {
+					if frameIndex, exists := comp.AnimationFrameIndices[animName]; exists {
+						currentFrame = frameIndex
+					} else {
+						currentFrame = float64(comp.CurrentFrame) // 后备：使用共享帧
+					}
+				} else {
+					currentFrame = float64(comp.CurrentFrame) // 后备：使用共享帧
+				}
+
 				// ✅ 检查该动画的单独循环状态
 				isLooping := comp.IsLooping // 默认使用全局循环状态
 				if comp.AnimationLoopStates != nil {
@@ -658,18 +791,21 @@ func (s *ReanimSystem) findControllingAnimation(comp *components.ReanimComponent
 					}
 				}
 
-				var animLogicalFrame int
+				var animLogicalFrame float64
 				if isLooping {
-					animLogicalFrame = comp.CurrentFrame % visibleCount
+					// 循环模式：使用浮点取模
+					animLogicalFrame = currentFrame
+					for animLogicalFrame >= float64(visibleCount) {
+						animLogicalFrame -= float64(visibleCount)
+					}
 				} else {
-					animLogicalFrame = comp.CurrentFrame
+					animLogicalFrame = currentFrame
 					// 如果超出范围，钳制到最后一帧
-					if animLogicalFrame >= visibleCount {
-						animLogicalFrame = visibleCount - 1
+					if animLogicalFrame >= float64(visibleCount) {
+						animLogicalFrame = float64(visibleCount - 1)
 					}
 				}
-				physicalFrame := mapLogicalToPhysical(animLogicalFrame, animVisibles)
-				return animName, physicalFrame
+				return animName, animLogicalFrame
 			}
 		}
 	}
@@ -680,6 +816,26 @@ func (s *ReanimSystem) findControllingAnimation(comp *components.ReanimComponent
 		animVisibles := comp.AnimVisiblesMap[animName]
 		visibleCount := countVisibleFrames(animVisibles)
 		if visibleCount > 0 {
+			// ✅ 检查该动画是否被暂停
+			// 如果暂停，返回第 0 帧（初始帧），使动画保持静止但可见
+			if comp.AnimationPausedStates != nil {
+				if isPaused, hasPausedState := comp.AnimationPausedStates[animName]; hasPausedState && isPaused {
+					return animName, 0.0
+				}
+			}
+
+			// ✅ 从 AnimationFrameIndices 获取该动画的独立帧索引（浮点数）
+			var currentFrame float64
+			if comp.AnimationFrameIndices != nil {
+				if frameIndex, exists := comp.AnimationFrameIndices[animName]; exists {
+					currentFrame = frameIndex
+				} else {
+					currentFrame = float64(comp.CurrentFrame) // 后备：使用共享帧
+				}
+			} else {
+				currentFrame = float64(comp.CurrentFrame) // 后备：使用共享帧
+			}
+
 			// ✅ 检查该动画的单独循环状态
 			isLooping := comp.IsLooping // 默认使用全局循环状态
 			if comp.AnimationLoopStates != nil {
@@ -688,22 +844,116 @@ func (s *ReanimSystem) findControllingAnimation(comp *components.ReanimComponent
 				}
 			}
 
-			var animLogicalFrame int
+			var animLogicalFrame float64
 			if isLooping {
-				animLogicalFrame = comp.CurrentFrame % visibleCount
+				// 循环模式：使用浮点取模
+				animLogicalFrame = currentFrame
+				for animLogicalFrame >= float64(visibleCount) {
+					animLogicalFrame -= float64(visibleCount)
+				}
 			} else {
-				animLogicalFrame = comp.CurrentFrame
+				animLogicalFrame = currentFrame
 				// 如果超出范围，钳制到最后一帧
-				if animLogicalFrame >= visibleCount {
-					animLogicalFrame = visibleCount - 1
+				if animLogicalFrame >= float64(visibleCount) {
+					animLogicalFrame = float64(visibleCount - 1)
 				}
 			}
-			physicalFrame := mapLogicalToPhysical(animLogicalFrame, animVisibles)
-			return animName, physicalFrame
+			return animName, animLogicalFrame
 		}
 	}
 
-	return "", -1
+	return "", -1.0
+}
+
+// getInterpolatedFrame 获取插值后的帧数据
+// 参数：
+//   - animName: 动画名称
+//   - logicalFrame: 浮点逻辑帧索引（如 2.7 表示第 2 帧和第 3 帧之间，插值因子 0.7）
+//   - animVisibles: 动画可见性数组
+//   - mergedFrames: 轨道的累加帧数组
+// 返回：插值后的帧数据
+func (s *ReanimSystem) getInterpolatedFrame(
+	animName string,
+	logicalFrame float64,
+	animVisibles []int,
+	mergedFrames []reanim.Frame,
+) reanim.Frame {
+	// 1. 获取整数部分和小数部分
+	frame1Index := int(logicalFrame)                    // 当前帧索引
+	frame2Index := frame1Index + 1                      // 下一帧索引
+	t := logicalFrame - float64(frame1Index)            // 插值因子 (0.0 - 1.0)
+
+	// 2. 映射逻辑帧到物理帧
+	physicalFrame1 := mapLogicalToPhysical(frame1Index, animVisibles)
+	physicalFrame2 := mapLogicalToPhysical(frame2Index, animVisibles)
+
+	// 3. 边界检查
+	if physicalFrame1 < 0 || physicalFrame1 >= len(mergedFrames) {
+		return reanim.Frame{} // 返回空帧
+	}
+	if physicalFrame2 < 0 || physicalFrame2 >= len(mergedFrames) {
+		// 如果下一帧越界，直接返回当前帧（不插值）
+		return mergedFrames[physicalFrame1]
+	}
+
+	// 4. 获取两个帧
+	f1 := mergedFrames[physicalFrame1]
+	f2 := mergedFrames[physicalFrame2]
+
+	// 5. 线性插值
+	result := reanim.Frame{
+		ImagePath: f1.ImagePath, // 图片引用不插值，使用第一帧的
+	}
+
+	// 插值位置 (X, Y)
+	if f1.X != nil && f2.X != nil {
+		interpolatedX := *f1.X + (*f2.X-*f1.X)*t
+		result.X = &interpolatedX
+	} else if f1.X != nil {
+		result.X = f1.X
+	}
+
+	if f1.Y != nil && f2.Y != nil {
+		interpolatedY := *f1.Y + (*f2.Y-*f1.Y)*t
+		result.Y = &interpolatedY
+	} else if f1.Y != nil {
+		result.Y = f1.Y
+	}
+
+	// 插值缩放 (ScaleX, ScaleY)
+	if f1.ScaleX != nil && f2.ScaleX != nil {
+		interpolatedScaleX := *f1.ScaleX + (*f2.ScaleX-*f1.ScaleX)*t
+		result.ScaleX = &interpolatedScaleX
+	} else if f1.ScaleX != nil {
+		result.ScaleX = f1.ScaleX
+	}
+
+	if f1.ScaleY != nil && f2.ScaleY != nil {
+		interpolatedScaleY := *f1.ScaleY + (*f2.ScaleY-*f1.ScaleY)*t
+		result.ScaleY = &interpolatedScaleY
+	} else if f1.ScaleY != nil {
+		result.ScaleY = f1.ScaleY
+	}
+
+	// 插值倾斜角度 (SkewX, SkewY)
+	if f1.SkewX != nil && f2.SkewX != nil {
+		interpolatedSkewX := *f1.SkewX + (*f2.SkewX-*f1.SkewX)*t
+		result.SkewX = &interpolatedSkewX
+	} else if f1.SkewX != nil {
+		result.SkewX = f1.SkewX
+	}
+
+	if f1.SkewY != nil && f2.SkewY != nil {
+		interpolatedSkewY := *f1.SkewY + (*f2.SkewY-*f1.SkewY)*t
+		result.SkewY = &interpolatedSkewY
+	} else if f1.SkewY != nil {
+		result.SkewY = f1.SkewY
+	}
+
+	// FrameNum 不插值（可见性标志），使用第一帧的
+	result.FrameNum = f1.FrameNum
+
+	return result
 }
 
 // getParentOffset 获取父轨道的偏移量
@@ -712,18 +962,24 @@ func (s *ReanimSystem) findControllingAnimation(comp *components.ReanimComponent
 // ✅ Story 13.8 Bug Fix #8: 修复父子偏移计算逻辑
 //   - animation_showcase 逐步初始化坐标（先设为 0，有值则覆盖）
 //   - 旧实现同时检查两个指针，导致 nil 值处理不正确
+// ✅ 支持浮点帧索引和帧插值
 func (s *ReanimSystem) getParentOffset(comp *components.ReanimComponent, parentTrackName string) (float64, float64) {
 	parentFrames, ok := comp.MergedTracks[parentTrackName]
 	if !ok || len(parentFrames) == 0 {
 		return 0, 0
 	}
 
-	parentAnimName, parentPhysicalFrame := s.findControllingAnimation(comp, parentTrackName)
-	if parentAnimName == "" || parentPhysicalFrame < 0 {
+	parentAnimName, parentLogicalFrame := s.findControllingAnimation(comp, parentTrackName)
+	if parentAnimName == "" || parentLogicalFrame < 0 {
 		return 0, 0
 	}
 
 	parentAnimVisibles := comp.AnimVisiblesMap[parentAnimName]
+	if len(parentAnimVisibles) == 0 {
+		return 0, 0
+	}
+
+	// 获取第一个可见帧的索引
 	firstVisibleFrameIndex := -1
 	for i, v := range parentAnimVisibles {
 		if v == 0 {
@@ -732,31 +988,31 @@ func (s *ReanimSystem) getParentOffset(comp *components.ReanimComponent, parentT
 		}
 	}
 
-	if firstVisibleFrameIndex < 0 || firstVisibleFrameIndex >= len(parentFrames) {
+	// 映射到物理帧
+	firstPhysicalFrame := mapLogicalToPhysical(firstVisibleFrameIndex, parentAnimVisibles)
+	if firstPhysicalFrame < 0 || firstPhysicalFrame >= len(parentFrames) {
 		return 0, 0
 	}
 
 	// ✅ 与 animation_showcase 完全一致的逻辑（animation_cell.go:479-498）
 	// 先初始化为 0，然后逐步设置有效值
 	initX, initY := 0.0, 0.0
-	if parentFrames[firstVisibleFrameIndex].X != nil {
-		initX = *parentFrames[firstVisibleFrameIndex].X
+	if parentFrames[firstPhysicalFrame].X != nil {
+		initX = *parentFrames[firstPhysicalFrame].X
 	}
-	if parentFrames[firstVisibleFrameIndex].Y != nil {
-		initY = *parentFrames[firstVisibleFrameIndex].Y
+	if parentFrames[firstPhysicalFrame].Y != nil {
+		initY = *parentFrames[firstPhysicalFrame].Y
 	}
 
-	// 处理越界情况
-	if parentPhysicalFrame >= len(parentFrames) {
-		parentPhysicalFrame = len(parentFrames) - 1
-	}
+	// ✅ 使用帧插值获取父轨道当前帧的平滑位置
+	currentFrame := s.getInterpolatedFrame(parentAnimName, parentLogicalFrame, parentAnimVisibles, parentFrames)
 
 	currentX, currentY := initX, initY
-	if parentFrames[parentPhysicalFrame].X != nil {
-		currentX = *parentFrames[parentPhysicalFrame].X
+	if currentFrame.X != nil {
+		currentX = *currentFrame.X
 	}
-	if parentFrames[parentPhysicalFrame].Y != nil {
-		currentY = *parentFrames[parentPhysicalFrame].Y
+	if currentFrame.Y != nil {
+		currentY = *currentFrame.Y
 	}
 
 	return currentX - initX, currentY - initY

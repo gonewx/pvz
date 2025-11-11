@@ -100,7 +100,7 @@ func NewSelectorScreenPartialEntity(
 		// 播放状态
 		CurrentFrame:      0,
 		FrameAccumulator:  0,
-		AnimationFPS:      12,
+		AnimationFPS:      float64(reanimXML.FPS), // ✅ 从 .reanim 文件读取 FPS，而不是硬编码
 		CurrentAnimations: []string{animName},
 
 		// 动画数据
