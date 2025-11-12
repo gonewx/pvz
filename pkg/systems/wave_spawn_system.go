@@ -30,7 +30,6 @@ import (
 type WaveSpawnSystem struct {
 	entityManager   *ecs.EntityManager
 	resourceManager *game.ResourceManager
-	reanimSystem    *ReanimSystem       // 用于初始化僵尸动画
 	levelConfig     *config.LevelConfig // Story 8.1: 关卡配置（用于验证行数限制）
 	gameState       *game.GameState     // 用于更新僵尸生成计数
 }
@@ -41,14 +40,14 @@ type WaveSpawnSystem struct {
 //
 //	em - 实体管理器
 //	rm - 资源管理器
-//	rs - Reanim系统（用于初始化僵尸动画）
 //	lc - 关卡配置（Story 8.1: 用于验证行数限制）
 //	gs - 游戏状态（用于更新僵尸生成计数）
-func NewWaveSpawnSystem(em *ecs.EntityManager, rm *game.ResourceManager, rs *ReanimSystem, lc *config.LevelConfig, gs *game.GameState) *WaveSpawnSystem {
+//
+// Story 14.3: Epic 14 - Removed ReanimSystem dependency, using AnimationCommand component
+func NewWaveSpawnSystem(em *ecs.EntityManager, rm *game.ResourceManager, lc *config.LevelConfig, gs *game.GameState) *WaveSpawnSystem {
 	return &WaveSpawnSystem{
 		entityManager:   em,
 		resourceManager: rm,
-		reanimSystem:    rs,
 		levelConfig:     lc,
 		gameState:       gs,
 	}
@@ -209,15 +208,17 @@ func (s *WaveSpawnSystem) ActivateWave(waveIndex int) int {
 				}
 			}
 
+			// Story 14.3: Epic 14 - 使用组件通信替代直接调用
 			// Story 13.8: 僵尸使用配置驱动的动画组合（自动隐藏装备轨道）
 			if behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID); ok {
 				if behavior.ZombieAnimState == components.ZombieAnimIdle {
 					behavior.ZombieAnimState = components.ZombieAnimWalking
-					if err := s.reanimSystem.PlayCombo(entityID, "zombie", "walk"); err != nil {
-						log.Printf("[WaveSpawnSystem] Warning: Failed to play walk combo for zombie %d: %v", entityID, err)
-					} else {
-						log.Printf("[WaveSpawnSystem] Zombie %d switched to walk animation (activated)", entityID)
-					}
+					ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
+						UnitID:    "zombie",
+						ComboName: "walk",
+						Processed: false,
+					})
+					log.Printf("[WaveSpawnSystem] Zombie %d 添加行走动画命令 (activated)", entityID)
 				}
 			}
 
@@ -263,12 +264,12 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 	var entityID ecs.EntityID
 	var err error
 
+	// Story 14.3: Epic 14 - 工厂函数不再接受 reanimSystem 参数
 	switch zombieType {
 	case "basic":
 		entityID, err = entities.NewZombieEntity(
 			s.entityManager,
 			s.resourceManager,
-			s.reanimSystem,
 			previewRow,
 			spawnX,
 		)
@@ -276,7 +277,6 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 		entityID, err = entities.NewConeheadZombieEntity(
 			s.entityManager,
 			s.resourceManager,
-			s.reanimSystem,
 			previewRow,
 			spawnX,
 		)
@@ -284,7 +284,6 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 		entityID, err = entities.NewBucketheadZombieEntity(
 			s.entityManager,
 			s.resourceManager,
-			s.reanimSystem,
 			previewRow,
 			spawnX,
 		)
@@ -328,20 +327,23 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 			log.Printf("[WaveSpawnSystem] Zombie %d 切换前动画: %s, 帧: %d", entityID, currentAnim, currentFrame)
 		}
 
+		// Story 14.3: Epic 14 - 使用组件通信替代直接调用
 		// Story 13.8: 僵尸使用配置驱动的动画组合（自动隐藏装备轨道）
-		if err := s.reanimSystem.PlayCombo(entityID, "zombie", "idle"); err != nil {
-			log.Printf("[WaveSpawnSystem] Warning: Failed to play idle combo for zombie %d: %v", entityID, err)
-		} else {
-			// 验证切换后的状态
-			if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
-				// Story 13.8: 使用新的简化结构
-				currentFrame := reanimComp.CurrentFrame
-				currentAnim := ""
-				if len(reanimComp.CurrentAnimations) > 0 {
-					currentAnim = reanimComp.CurrentAnimations[0]
-				}
-				log.Printf("[WaveSpawnSystem] Zombie %d 切换后动画: %s, 帧: %d (预生成阶段使用 idle)", entityID, currentAnim, currentFrame)
+		ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
+			UnitID:    "zombie",
+			ComboName: "idle",
+			Processed: false,
+		})
+
+		// 验证切换后的状态
+		if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
+			// Story 13.8: 使用新的简化结构
+			currentFrame := reanimComp.CurrentFrame
+			currentAnim := ""
+			if len(reanimComp.CurrentAnimations) > 0 {
+				currentAnim = reanimComp.CurrentAnimations[0]
 			}
+			log.Printf("[WaveSpawnSystem] Zombie %d 添加空闲动画命令: %s, 帧: %d (预生成阶段使用 idle)", entityID, currentAnim, currentFrame)
 		}
 	}
 
@@ -388,12 +390,12 @@ func (s *WaveSpawnSystem) spawnZombieWithOffset(zombieType string, lane int, ind
 	var entityID ecs.EntityID
 	var err error
 
+	// Story 14.3: Epic 14 - 工厂函数不再接受 reanimSystem 参数
 	switch zombieType {
 	case "basic":
 		entityID, err = entities.NewZombieEntity(
 			s.entityManager,
 			s.resourceManager,
-			s.reanimSystem,
 			row,
 			spawnX,
 		)
@@ -401,7 +403,6 @@ func (s *WaveSpawnSystem) spawnZombieWithOffset(zombieType string, lane int, ind
 		entityID, err = entities.NewConeheadZombieEntity(
 			s.entityManager,
 			s.resourceManager,
-			s.reanimSystem,
 			row,
 			spawnX,
 		)
@@ -409,7 +410,6 @@ func (s *WaveSpawnSystem) spawnZombieWithOffset(zombieType string, lane int, ind
 		entityID, err = entities.NewBucketheadZombieEntity(
 			s.entityManager,
 			s.resourceManager,
-			s.reanimSystem,
 			row,
 			spawnX,
 		)

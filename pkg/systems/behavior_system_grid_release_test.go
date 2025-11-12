@@ -15,7 +15,6 @@ func TestPlantDeathReleasesGrid(t *testing.T) {
 	// 创建测试环境
 	em := ecs.NewEntityManager()
 	rm := game.NewResourceManager(getTestAudioContext())
-	rs := NewReanimSystem(em)
 	gs := game.GetGameState()
 	lgs := NewLawnGridSystem(em, []int{1, 2, 3, 4, 5})
 
@@ -24,7 +23,7 @@ func TestPlantDeathReleasesGrid(t *testing.T) {
 	ecs.AddComponent(em, gridID, &components.LawnGridComponent{})
 
 	// 创建 BehaviorSystem（传入 LawnGridSystem）
-	bs := NewBehaviorSystem(em, rm, rs, gs, lgs, gridID)
+	bs := NewBehaviorSystem(em, rm, gs, lgs, gridID)
 
 	// 创建植物实体在网格 (2, 3)
 	plantID := em.CreateEntity()
@@ -86,14 +85,13 @@ func TestMultiplePlantsDeathReleasesGrid(t *testing.T) {
 	// 创建测试环境
 	em := ecs.NewEntityManager()
 	rm := game.NewResourceManager(getTestAudioContext())
-	rs := NewReanimSystem(em)
 	gs := game.GetGameState()
 	lgs := NewLawnGridSystem(em, []int{1, 2, 3, 4, 5})
 
 	gridID := em.CreateEntity()
 	ecs.AddComponent(em, gridID, &components.LawnGridComponent{})
 
-	bs := NewBehaviorSystem(em, rm, rs, gs, lgs, gridID)
+	bs := NewBehaviorSystem(em, rm, gs, lgs, gridID)
 
 	// 创建 3 个植物在不同网格位置
 	plantPositions := [][2]int{{0, 0}, {1, 1}, {2, 2}}
@@ -169,7 +167,6 @@ func TestCherryBombExplosionReleasesGrid(t *testing.T) {
 	// 创建测试环境
 	em := ecs.NewEntityManager()
 	rm := game.NewResourceManager(getTestAudioContext())
-	rs := NewReanimSystem(em)
 	gs := game.GetGameState()
 	lgs := NewLawnGridSystem(em, []int{1, 2, 3, 4, 5})
 
@@ -178,7 +175,7 @@ func TestCherryBombExplosionReleasesGrid(t *testing.T) {
 	ecs.AddComponent(em, gridID, &components.LawnGridComponent{})
 
 	// 创建 BehaviorSystem
-	bs := NewBehaviorSystem(em, rm, rs, gs, lgs, gridID)
+	bs := NewBehaviorSystem(em, rm, gs, lgs, gridID)
 
 	// 创建樱桃炸弹实体在网格 (4, 2)
 	cherryBombID := em.CreateEntity()

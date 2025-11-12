@@ -41,7 +41,8 @@ func init() {
 
 // createTestBehaviorSystem 创建测试用的 BehaviorSystem（包含必需的依赖）
 // Bug Fix: 所有测试需要传入 LawnGridSystem 和 lawnGridEntityID
-func createTestBehaviorSystem(em *ecs.EntityManager, rm *game.ResourceManager, rs *ReanimSystem, gs *game.GameState) *BehaviorSystem {
+// Story 14.3: Epic 14 - Removed ReanimSystem dependency
+func createTestBehaviorSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.GameState) *BehaviorSystem {
 	// 创建测试用的 LawnGridSystem
 	lgs := NewLawnGridSystem(em, []int{1, 2, 3, 4, 5})
 
@@ -50,7 +51,7 @@ func createTestBehaviorSystem(em *ecs.EntityManager, rm *game.ResourceManager, r
 	ecs.AddComponent(em, gridID, &components.LawnGridComponent{})
 
 	// 返回完整的 BehaviorSystem
-	return NewBehaviorSystem(em, rm, rs, gs, lgs, gridID)
+	return NewBehaviorSystem(em, rm, gs, lgs, gridID)
 }
 
 // TestZombieDeathParticleEffect 测试僵尸死亡时是否正确触发粒子效果
@@ -59,7 +60,6 @@ func TestZombieDeathParticleEffect(t *testing.T) {
 	// 准备测试环境
 	em := ecs.NewEntityManager()
 	rm := game.NewResourceManager(getTestAudioContext())
-	rs := NewReanimSystem(em)
 	gs := game.GetGameState()
 
 	// 加载粒子配置（模拟真实环境）
@@ -67,7 +67,7 @@ func TestZombieDeathParticleEffect(t *testing.T) {
 		t.Skipf("跳过测试：无法加载粒子资源: %v", err)
 	}
 
-	bs := createTestBehaviorSystem(em, rm, rs, gs)
+	bs := createTestBehaviorSystem(em, rm, gs)
 
 	// 创建测试僵尸实体
 	zombieID := em.CreateEntity()
@@ -163,7 +163,6 @@ func TestCherryBombExplosionParticleEffect(t *testing.T) {
 	em := ecs.NewEntityManager()
 	// 使用共享的 getTestAudioContext()
 	rm := game.NewResourceManager(getTestAudioContext())
-	rs := NewReanimSystem(em)
 	gs := game.GetGameState()
 
 	// 加载粒子配置（模拟真实环境）
@@ -171,7 +170,7 @@ func TestCherryBombExplosionParticleEffect(t *testing.T) {
 		t.Skipf("跳过测试：无法加载粒子资源: %v", err)
 	}
 
-	bs := createTestBehaviorSystem(em, rm, rs, gs)
+	bs := createTestBehaviorSystem(em, rm, gs)
 
 	// 创建测试樱桃炸弹实体
 	cherryBombID := em.CreateEntity()
@@ -259,10 +258,9 @@ func TestParticleEffectErrorHandling(t *testing.T) {
 	em := ecs.NewEntityManager()
 	// 使用共享的 getTestAudioContext()
 	rm := game.NewResourceManager(getTestAudioContext())
-	rs := NewReanimSystem(em)
 	gs := game.GetGameState()
 
-	bs := createTestBehaviorSystem(em, rm, rs, gs)
+	bs := createTestBehaviorSystem(em, rm, gs)
 
 	// 创建测试僵尸实体
 	zombieID := em.CreateEntity()
@@ -313,10 +311,9 @@ func TestZombieDeathNoPosition(t *testing.T) {
 	em := ecs.NewEntityManager()
 	// 使用共享的 getTestAudioContext()
 	rm := game.NewResourceManager(getTestAudioContext())
-	rs := NewReanimSystem(em)
 	gs := game.GetGameState()
 
-	bs := createTestBehaviorSystem(em, rm, rs, gs)
+	bs := createTestBehaviorSystem(em, rm, gs)
 
 	// 创建测试僵尸实体（故意不添加 PositionComponent）
 	zombieID := em.CreateEntity()
@@ -352,14 +349,13 @@ func TestCherryBombExplosionNoPosition(t *testing.T) {
 	em := ecs.NewEntityManager()
 	// 使用共享的 getTestAudioContext()
 	rm := game.NewResourceManager(getTestAudioContext())
-	rs := NewReanimSystem(em)
 	gs := game.GetGameState()
 
 	if _, err := rm.LoadParticleConfig("PeaSplat"); err != nil {
 		t.Skipf("跳过测试：无法加载粒子资源: %v", err)
 	}
 
-	bs := createTestBehaviorSystem(em, rm, rs, gs)
+	bs := createTestBehaviorSystem(em, rm, gs)
 
 	// 创建测试樱桃炸弹实体（有 PlantComponent 但无 PositionComponent）
 	cherryBombID := em.CreateEntity()

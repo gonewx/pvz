@@ -314,8 +314,7 @@ func TestCheckFinalWaveWarningTriggerOnce(t *testing.T) {
 		resourceManager:           rm,
 		finalWaveWarningTriggered: false,
 		finalWaveWarningLeadTime:  3.0,
-		// reanimSystem 可以为 nil - triggerFinalWaveWarning 会处理错误
-		reanimSystem: nil,
+		// Story 14.3: Epic 14 - Removed reanimSystem dependency
 	}
 
 	// 第一次检查：应触发

@@ -17,7 +17,6 @@ import (
 type BehaviorSystem struct {
 	entityManager    *ecs.EntityManager
 	resourceManager  *game.ResourceManager
-	reanimSystem     *ReanimSystem   // Story 6.3: 用于切换僵尸动画状态
 	gameState        *game.GameState // Story 5.5: 用于僵尸死亡计数
 	logFrameCounter  int             // 日志输出计数器（避免全局变量）
 	lawnGridSystem   *LawnGridSystem // Bug Fix: 用于植物死亡时释放网格占用
@@ -31,15 +30,13 @@ const LogOutputFrameInterval = 100 // 日志输出间隔（每N帧输出一次�
 // 参数:
 //   - em: EntityManager 实例
 //   - rm: ResourceManager 实例
-//   - rs: ReanimSystem 实例 (Story 6.3: 用于切换僵尸动画)
 //   - gs: GameState 实例 (Story 5.5: 用于僵尸死亡计数)
 //   - lgs: LawnGridSystem 实例 (Bug Fix: 用于植物死亡时释放网格占用)
 //   - lawnGridID: 草坪网格实体ID (Bug Fix)
-func NewBehaviorSystem(em *ecs.EntityManager, rm *game.ResourceManager, rs *ReanimSystem, gs *game.GameState, lgs *LawnGridSystem, lawnGridID ecs.EntityID) *BehaviorSystem {
+func NewBehaviorSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.GameState, lgs *LawnGridSystem, lawnGridID ecs.EntityID) *BehaviorSystem {
 	return &BehaviorSystem{
 		entityManager:    em,
 		resourceManager:  rm,
-		reanimSystem:     rs,
 		gameState:        gs,
 		lawnGridSystem:   lgs,
 		lawnGridEntityID: lawnGridID,
@@ -421,14 +418,15 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 	ecs.RemoveComponent[*components.VelocityComponent](s.entityManager, entityID)
 	log.Printf("[BehaviorSystem] 僵尸 %d 移除速度组件，停止移动", entityID)
 
-	// 4. 使用 ReanimSystem 播放死亡动画（不循环）
+	// 4. 使用 AnimationCommand 组件播放死亡动画（不循环）
+	// Story 14.3: Epic 14 - 使用组件通信替代直接调用
 	// Story 13.8: 使用配置驱动的动画组合（自动隐藏装备轨道）
-	if err := s.reanimSystem.PlayCombo(entityID, "zombie", "death"); err != nil {
-		log.Printf("[BehaviorSystem] 僵尸 %d 播放死亡动画失败: %v，直接删除", entityID, err)
-		// 错误处理：如果死亡动画播放失败，直接删除僵尸
-		s.entityManager.DestroyEntity(entityID)
-		return
-	}
+	ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
+		UnitID:    "zombie",
+		ComboName: "death",
+		Processed: false,
+	})
+	log.Printf("[BehaviorSystem] 僵尸 %d 添加死亡动画命令", entityID)
 
 	// 设置为不循环
 	if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
@@ -515,21 +513,23 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 
 		// 如果有僵尸在同一行，发射子弹
 		if hasZombieInLine {
+			// Story 14.3: Epic 14 - 使用组件通信替代直接调用
 			// Story 13.6: 使用配置驱动的动画播放
 			// 播放配置文件中定义的攻击动画组合
-			err := s.reanimSystem.PlayCombo(entityID, "peashootersingle", "attack_with_sway")
-			if err != nil {
-				log.Printf("[BehaviorSystem] 切换到攻击动画失败: %v", err)
-			} else {
-				// 设置为非循环模式（单次播放）
-				if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
-					reanim.IsLooping = false
-				}
+			ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
+				UnitID:    "peashootersingle",
+				ComboName: "attack_with_sway",
+				Processed: false,
+			})
 
-				log.Printf("[BehaviorSystem] 豌豆射手 %d 切换到攻击动画（配置驱动）", entityID)
-				// 设置攻击动画状态，用于动画完成后切换回 idle
-				plant.AttackAnimState = components.AttackAnimAttacking
+			// 设置为非循环模式（单次播放）
+			if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
+				reanim.IsLooping = false
 			}
+
+			log.Printf("[BehaviorSystem] 豌豆射手 %d 切换到攻击动画（配置驱动）", entityID)
+			// 设置攻击动画状态，用于动画完成后切换回 idle
+			plant.AttackAnimState = components.AttackAnimAttacking
 
 			// Story 10.5: 设置"等待发射"状态，但不立即创建子弹
 			// 子弹将在攻击动画的关键帧（Frame 5）创建
@@ -774,14 +774,13 @@ func (s *BehaviorSystem) changeZombieAnimation(zombieID ecs.EntityID, newState c
 			unitID = "zombie"
 		}
 
-		if s.reanimSystem != nil {
-			err := s.reanimSystem.PlayCombo(zombieID, unitID, "death")
-			if err != nil {
-				log.Printf("[BehaviorSystem] 僵尸 %d 切换死亡动画失败: %v", zombieID, err)
-			} else {
-				log.Printf("[BehaviorSystem] 僵尸 %d (%s) 切换死亡动画", zombieID, unitID)
-			}
-		}
+		// Story 14.3: Epic 14 - 使用组件通信替代直接调用
+		ecs.AddComponent(s.entityManager, zombieID, &components.AnimationCommandComponent{
+			UnitID:    unitID,
+			ComboName: "death",
+			Processed: false,
+		})
+		log.Printf("[BehaviorSystem] 僵尸 %d (%s) 添加死亡动画命令", zombieID, unitID)
 		return
 	default:
 		return
@@ -798,15 +797,14 @@ func (s *BehaviorSystem) changeZombieAnimation(zombieID ecs.EntityID, newState c
 		unitID = "zombie"
 	}
 
-	// 使用 ReanimSystem 播放新动画组合
-	if s.reanimSystem != nil {
-		err := s.reanimSystem.PlayCombo(zombieID, unitID, comboName)
-		if err != nil {
-			log.Printf("[BehaviorSystem] 僵尸 %d 切换动画失败: %v", zombieID, err)
-		} else {
-			log.Printf("[BehaviorSystem] 僵尸 %d (%s) 切换动画: %s（配置驱动）", zombieID, unitID, comboName)
-		}
-	}
+	// Story 14.3: Epic 14 - 使用组件通信替代直接调用
+	// 使用 AnimationCommand 组件播放新动画组合
+	ecs.AddComponent(s.entityManager, zombieID, &components.AnimationCommandComponent{
+		UnitID:    unitID,
+		ComboName: comboName,
+		Processed: false,
+	})
+	log.Printf("[BehaviorSystem] 僵尸 %d (%s) 添加动画命令: %s（配置驱动）", zombieID, unitID, comboName)
 }
 
 // startEatingPlant 开始啃食植物
@@ -1634,13 +1632,14 @@ func (s *BehaviorSystem) updatePlantAttackAnimation(entityID ecs.EntityID, delta
 			return
 		}
 
-		// Story 13.8: 使用 PlayCombo 播放默认动画组合
-		err := s.reanimSystem.PlayCombo(entityID, unitID, "")
-		if err != nil {
-			log.Printf("[BehaviorSystem] 切换回空闲动画失败: %v", err)
-		} else {
-			plant.AttackAnimState = components.AttackAnimIdle
-			log.Printf("[BehaviorSystem] 植物 %d 攻击动画完成，切换回空闲动画（配置驱动）", entityID)
-		}
+		// Story 14.3: Epic 14 - 使用组件通信替代直接调用
+		// Story 13.8: 使用 AnimationCommand 组件播放默认动画组合
+		ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
+			UnitID:    unitID,
+			ComboName: "",
+			Processed: false,
+		})
+		plant.AttackAnimState = components.AttackAnimIdle
+		log.Printf("[BehaviorSystem] 植物 %d 攻击动画完成，添加空闲动画命令（配置驱动）", entityID)
 	}
 }

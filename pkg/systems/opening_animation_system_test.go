@@ -65,10 +65,9 @@ func TestOpeningAnimationSystem_NewOpeningAnimationSystem(t *testing.T) {
 
 			// 创建 CameraSystem 和 ReanimSystem
 			cameraSystem := NewCameraSystem(em, gs)
-			reanimSystem := NewReanimSystem(em)
 
 			// 创建 OpeningAnimationSystem
-			system := NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem, reanimSystem)
+			system := NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem)
 
 			// 验证系统是否按预期创建
 			if tt.shouldBeNil {
@@ -122,8 +121,7 @@ func TestOpeningAnimationSystem_StateMachine(t *testing.T) {
 	}
 
 	cameraSystem := NewCameraSystem(em, gs)
-	reanimSystem := NewReanimSystem(em)
-	system := NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem, reanimSystem)
+	system := NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem)
 
 	if system == nil {
 		t.Fatal("系统创建失败")
@@ -232,8 +230,7 @@ func TestOpeningAnimationSystem_Skip(t *testing.T) {
 	}
 
 	cameraSystem := NewCameraSystem(em, gs)
-	reanimSystem := NewReanimSystem(em)
-	system := NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem, reanimSystem)
+	system := NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem)
 
 	if system == nil {
 		t.Fatal("系统创建失败")
@@ -315,8 +312,7 @@ func TestOpeningAnimationSystem_IsCompleted(t *testing.T) {
 	}
 
 	cameraSystem := NewCameraSystem(em, gs)
-	reanimSystem := NewReanimSystem(em)
-	system := NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem, reanimSystem)
+	system := NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem)
 
 	if system == nil {
 		t.Fatal("系统创建失败")
@@ -385,8 +381,7 @@ func TestOpeningAnimationSystem_GetUniqueZombieTypes(t *testing.T) {
 			}
 
 			cameraSystem := NewCameraSystem(em, gs)
-			reanimSystem := NewReanimSystem(em)
-			system := NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem, reanimSystem)
+			system := NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem)
 
 			if system == nil {
 				t.Fatal("系统创建失败")

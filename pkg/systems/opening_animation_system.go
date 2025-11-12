@@ -29,13 +29,12 @@ type OpeningAnimationSystem struct {
 	resourceManager *game.ResourceManager
 	levelConfig     *config.LevelConfig
 	cameraSystem    *CameraSystem
-	reanimSystem    *ReanimSystem // Story 8.3: 用于初始化僵尸预览动画
 	openingEntity   ecs.EntityID
 }
 
 // NewOpeningAnimationSystem 创建开场动画系统。
 // 如果关卡不需要开场动画，返回 nil。
-func NewOpeningAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.ResourceManager, levelConfig *config.LevelConfig, cameraSystem *CameraSystem, reanimSystem *ReanimSystem) *OpeningAnimationSystem {
+func NewOpeningAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.ResourceManager, levelConfig *config.LevelConfig, cameraSystem *CameraSystem) *OpeningAnimationSystem {
 	// 检查 levelConfig 是否为 nil
 	if levelConfig == nil {
 		log.Println("[OpeningAnimationSystem] levelConfig is nil, 不创建开场动画系统")
@@ -62,7 +61,6 @@ func NewOpeningAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *ga
 		resourceManager: rm,
 		levelConfig:     levelConfig,
 		cameraSystem:    cameraSystem,
-		reanimSystem:    reanimSystem,
 		openingEntity:   0,
 	}
 
@@ -247,10 +245,12 @@ func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.O
 			}
 			ecs.AddComponent(oas.entityManager, zombieEntity, reanimComp)
 
-			// Story 13.8: 使用配置驱动的动画组合（自动隐藏装备轨道）
-			if err := oas.reanimSystem.PlayCombo(zombieEntity, "zombie", "idle"); err != nil {
-				log.Printf("[OpeningAnimationSystem] Failed to initialize zombie reanim: %v", err)
-			}
+			// Story 13.8: 使用 AnimationCommand 组件播放配置的动画组合（自动隐藏装备轨道）
+			ecs.AddComponent(oas.entityManager, zombieEntity, &components.AnimationCommandComponent{
+				UnitID:    "zombie",
+				ComboName: "idle",
+				Processed: false,
+			})
 		}
 
 		// 保存僵尸实体ID

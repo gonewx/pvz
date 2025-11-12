@@ -38,7 +38,6 @@ type LevelSystem struct {
 	gameState            *game.GameState
 	waveSpawnSystem      *WaveSpawnSystem
 	resourceManager      *game.ResourceManager  // 用于加载 FinalWave 音效
-	reanimSystem         *ReanimSystem          // 用于创建 FinalWave 动画实体
 	rewardSystem         *RewardAnimationSystem // 用于触发奖励动画（Story 8.3）
 	lawnmowerSystem      *LawnmowerSystem       // 用于检查除草车状态（Story 10.2）
 	lastWaveWarningShown bool                   // 已废弃：使用 finalWaveWarningTriggered 代替
@@ -59,16 +58,16 @@ type LevelSystem struct {
 //	gs - 游戏状态单例
 //	waveSpawnSystem - 波次生成系统（依赖注入）
 //	rm - 资源管理器（用于加载音效）
-//	rs - Reanim系统（用于创建动画实体）
 //	rewardSystem - 奖励动画系统（可选，Story 8.3）
 //	lawnmowerSystem - 除草车系统（可选，Story 10.2）
-func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *WaveSpawnSystem, rm *game.ResourceManager, rs *ReanimSystem, rewardSystem *RewardAnimationSystem, lawnmowerSystem *LawnmowerSystem) *LevelSystem {
+//
+// Story 14.3: Epic 14 - Removed ReanimSystem dependency, using AnimationCommand component
+func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *WaveSpawnSystem, rm *game.ResourceManager, rewardSystem *RewardAnimationSystem, lawnmowerSystem *LawnmowerSystem) *LevelSystem {
 	return &LevelSystem{
 		entityManager:             em,
 		gameState:                 gs,
 		waveSpawnSystem:           waveSpawnSystem,
 		resourceManager:           rm,
-		reanimSystem:              rs,
 		rewardSystem:              rewardSystem,
 		lawnmowerSystem:           lawnmowerSystem,
 		lastWaveWarningShown:      false, // 已废弃，保留向后兼容
@@ -497,11 +496,14 @@ func (s *LevelSystem) triggerFinalWaveWarning() {
 		return
 	}
 
+	// Story 14.3: Epic 14 - 使用组件通信替代直接调用
 	// Story 13.6: FinalWave 动画播放 (P2 - 降级方案，保持原有实现)
 	// 播放动画（FinalWave.reanim 中的动画名称为 "FinalWave"）
-	if err := s.reanimSystem.PlayAnimation(warningEntity, "FinalWave"); err != nil {
-		log.Printf("[LevelSystem] WARNING: Failed to play FinalWave animation: %v", err)
-	}
+	ecs.AddComponent(s.entityManager, warningEntity, &components.AnimationCommandComponent{
+		AnimationName: "FinalWave",
+		Processed:     false,
+	})
+	log.Printf("[LevelSystem] 添加 FinalWave 动画命令 (entity: %d)", warningEntity)
 
 	log.Printf("[LevelSystem] Created FinalWave warning entity (ID: %d)", warningEntity)
 }
@@ -567,10 +569,10 @@ func (s *LevelSystem) showLastWaveWarning() {
 
 	// 创建 FinalWave 动画实体（显示在屏幕中心）
 	// 动画会自动播放一次后消失
+	// Story 14.3: Epic 14 - 工厂函数不再接受 reanimSystem 参数
 	finalWaveEntityID, err := entities.CreateFinalWaveEntity(
 		s.entityManager,
 		s.resourceManager,
-		s.reanimSystem,
 		400.0, // X坐标（屏幕中心，世界坐标）
 		300.0, // Y坐标（屏幕中心）
 	)
@@ -578,6 +580,11 @@ func (s *LevelSystem) showLastWaveWarning() {
 	if err != nil {
 		log.Printf("[LevelSystem] ERROR: Failed to create FinalWave entity: %v", err)
 	} else {
+		// Story 14.3: Epic 14 - 使用组件通信初始化动画
+		ecs.AddComponent(s.entityManager, finalWaveEntityID, &components.AnimationCommandComponent{
+			AnimationName: "anim",
+			Processed:     false,
+		})
 		log.Printf("[LevelSystem] Created FinalWave warning entity (ID: %d)", finalWaveEntityID)
 	}
 }
