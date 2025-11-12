@@ -24,6 +24,11 @@ type ReanimSystem struct {
 
 	// 游戏 TPS（用于帧推进计算）
 	targetTPS float64
+
+	// ✅ Story 14.2: 命令清理配置
+	enableCommandCleanup bool    // 是否启用自动清理
+	cleanupInterval      float64 // 清理间隔（秒）
+	cleanupTimer         float64 // 清理计时器
 }
 
 // NewReanimSystem 创建新的 Reanim 动画系统
@@ -31,6 +36,10 @@ func NewReanimSystem(em *ecs.EntityManager) *ReanimSystem {
 	return &ReanimSystem{
 		entityManager: em,
 		targetTPS:     60.0, // 默认 60 TPS
+		// ✅ Story 14.2: 默认禁用自动清理（便于调试）
+		enableCommandCleanup: false,
+		cleanupInterval:      1.0, // 每秒清理一次
+		cleanupTimer:         0.0,
 	}
 }
 
@@ -42,6 +51,14 @@ func (s *ReanimSystem) SetConfigManager(cm *config.ReanimConfigManager) {
 // SetTargetTPS 设置目标 TPS（用于帧推进计算）
 func (s *ReanimSystem) SetTargetTPS(tps float64) {
 	s.targetTPS = tps
+}
+
+// SetCommandCleanup 设置命令清理策略（可选 API）
+// Story 14.2: 用于配置动画命令组件的自动清理
+func (s *ReanimSystem) SetCommandCleanup(enable bool, interval float64) {
+	s.enableCommandCleanup = enable
+	s.cleanupInterval = interval
+	log.Printf("[ReanimSystem] 命令清理配置: enable=%v, interval=%.2f秒", enable, interval)
 }
 
 // ==================================================================
@@ -156,7 +173,8 @@ func (s *ReanimSystem) AddAnimation(entityID ecs.EntityID, animName string) erro
 	return nil
 }
 
-// FinalizeAnimations 完成动画设置
+// finalizeAnimations 完成动画设置（内部方法）
+// ⚠️ 已集成到 PlayAnimation/AddAnimation 中，通常不需要单独调用
 // ✅ Story 13.10: 不再需要生成轨道绑定，已删除
 // 新的渲染逻辑直接从动画遍历到轨道，无需绑定关系
 //
@@ -165,7 +183,7 @@ func (s *ReanimSystem) AddAnimation(entityID ecs.EntityID, animName string) erro
 //
 // 返回：
 //   - error: 如果实体不存在或没有 ReanimComponent，返回错误
-func (s *ReanimSystem) FinalizeAnimations(entityID ecs.EntityID) error {
+func (s *ReanimSystem) finalizeAnimations(entityID ecs.EntityID) error {
 	comp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 	if !ok {
 		return fmt.Errorf("entity %d does not have ReanimComponent", entityID)
@@ -188,7 +206,7 @@ func (s *ReanimSystem) FinalizeAnimations(entityID ecs.EntityID) error {
 	// 标记缓存失效
 	comp.LastRenderFrame = -1
 
-	log.Printf("[ReanimSystem] FinalizeAnimations: entity %d, animations: %v, initialized frame indices",
+	log.Printf("[ReanimSystem] finalizeAnimations: entity %d, animations: %v, initialized frame indices",
 		entityID, comp.CurrentAnimations)
 
 	return nil
@@ -337,6 +355,84 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 // 系统更新 (System Update)
 // ==================================================================
 
+// processAnimationCommands 处理所有待执行的动画命令
+//
+// Story 14.2: 组件驱动的动画命令处理机制
+//
+// 设计说明：
+//   - 在 Update() 开头调用，优先处理命令
+//   - 查询所有带有 AnimationCommandComponent 的实体
+//   - 执行未处理的命令（Processed == false）
+//   - 标记为已处理（Processed = true）
+//   - 可选：定期清理已处理的命令组件
+//
+// 执行逻辑：
+//  1. 如果 AnimationName 非空 → 调用 PlayAnimation()
+//  2. 否则 → 调用 PlayCombo(UnitID, ComboName)
+//
+// 错误处理：
+//   - 记录错误日志但不中断处理流程
+//   - 即使执行失败也标记 Processed = true（避免无限重试）
+//
+// 性能优化：
+//   - 使用泛型 ECS API (GetEntitiesWith1)
+//   - 跳过已处理的命令
+//   - 批量处理（一次 Update 处理多个命令）
+func (s *ReanimSystem) processAnimationCommands() {
+	// 1. 查询所有带有 AnimationCommand 的实体
+	entities := ecs.GetEntitiesWith1[*components.AnimationCommandComponent](s.entityManager)
+
+	// 2. 统计信息（用于调试）
+	processedCount := 0
+	errorCount := 0
+
+	// 3. 处理每个命令
+	for _, id := range entities {
+		cmd, ok := ecs.GetComponent[*components.AnimationCommandComponent](s.entityManager, id)
+		if !ok {
+			continue
+		}
+
+		// 跳过已处理的命令
+		if cmd.Processed {
+			continue
+		}
+
+		// 执行命令
+		var err error
+		if cmd.AnimationName != "" {
+			// 模式 1: 单动画模式
+			log.Printf("[ReanimSystem] 执行单动画命令: entity=%d, anim=%s", id, cmd.AnimationName)
+			err = s.PlayAnimation(id, cmd.AnimationName)
+		} else if cmd.UnitID != "" {
+			// 模式 2: 配置组合模式
+			log.Printf("[ReanimSystem] 执行组合命令: entity=%d, unit=%s, combo=%s", id, cmd.UnitID, cmd.ComboName)
+			err = s.PlayCombo(id, cmd.UnitID, cmd.ComboName)
+		} else {
+			// 错误：无效命令
+			log.Printf("[ReanimSystem] ⚠️ 无效命令: entity=%d, UnitID 和 AnimationName 都为空", id)
+			err = fmt.Errorf("invalid command: both UnitID and AnimationName are empty")
+		}
+
+		// 处理错误
+		if err != nil {
+			log.Printf("[ReanimSystem] ❌ 命令执行失败: entity=%d, unit=%s, combo=%s, anim=%s, err=%v",
+				id, cmd.UnitID, cmd.ComboName, cmd.AnimationName, err)
+			errorCount++
+		} else {
+			processedCount++
+		}
+
+		// 标记为已处理（即使失败也标记，避免无限重试）
+		cmd.Processed = true
+	}
+
+	// 4. 日志统计（仅在有命令时输出）
+	if processedCount > 0 || errorCount > 0 {
+		log.Printf("[ReanimSystem] 命令处理完成: 成功=%d, 失败=%d", processedCount, errorCount)
+	}
+}
+
 // Update 更新所有 Reanim 组件的动画帧
 // 基于 AnimationCell.Update() 的逻辑
 // ✅ Story 13.8 Bug Fix #10: 完全匹配参考实现
@@ -344,6 +440,9 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 //   - 循环逻辑完全由 findControllingAnimation 的取模处理
 //   - 支持多动画组合（不同轨道可以有不同的帧数）
 func (s *ReanimSystem) Update(deltaTime float64) {
+	// ✅ Story 14.2: 优先处理动画命令
+	s.processAnimationCommands()
+
 	entities := ecs.GetEntitiesWith1[*components.ReanimComponent](s.entityManager)
 
 	// Debug: 输出 SelectorScreen 的更新信息（前 5 次）
@@ -391,9 +490,17 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 
 		// 为每个动画独立推进帧
 		for _, animName := range comp.CurrentAnimations {
+			// 🔍 调试：打印所有动画的处理情况
+			if comp.ReanimName == "SelectorScreen" && (animName == "anim_idle" || animName == "anim_grass") {
+				log.Printf("[ReanimSystem] 🔍 处理动画: %s, 帧索引: %.2f", animName, comp.AnimationFrameIndices[animName])
+			}
+
 			// 检查是否暂停
 			if comp.AnimationPausedStates != nil {
 				if isPaused, exists := comp.AnimationPausedStates[animName]; exists && isPaused {
+					if comp.ReanimName == "SelectorScreen" && (animName == "anim_idle" || animName == "anim_grass") {
+						log.Printf("[ReanimSystem] ⏸️  动画 %s 已暂停，跳过", animName)
+					}
 					continue // 跳过暂停的动画
 				}
 			}
@@ -405,6 +512,11 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 				if loopState, hasState := comp.AnimationLoopStates[animName]; hasState {
 					isLooping = loopState
 				}
+			}
+
+			// 🔍 调试：打印循环状态
+			if comp.ReanimName == "SelectorScreen" && (animName == "anim_idle" || animName == "anim_grass") {
+				log.Printf("[ReanimSystem] 🔍 动画 %s 循环状态: isLooping=%v", animName, isLooping)
 			}
 			if !isLooping {
 				// 检查该动画是否已完成
@@ -449,18 +561,70 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 			// 例如：FPS=12, TPS=60, speed=0.2 → increment = (12/60) * 0.2 = 0.04 帧/tick
 			frameIncrement := (animFPS / s.targetTPS) * animSpeed
 			comp.AnimationFrameIndices[animName] += frameIncrement
+
+			// ✅ 循环动画处理：帧索引超过最大帧数时，取模回到开头
+			if isLooping {
+				if animVisibles, exists := comp.AnimVisiblesMap[animName]; exists {
+					visibleCount := countVisibleFrames(animVisibles)
+					if visibleCount > 0 && comp.AnimationFrameIndices[animName] >= float64(visibleCount) {
+						// 对循环动画取模，保持在有效范围内
+						comp.AnimationFrameIndices[animName] = float64(int(comp.AnimationFrameIndices[animName]) % visibleCount)
+
+						// 🔍 调试：记录循环重置
+						if comp.ReanimName == "SelectorScreen" && (animName == "anim_idle" || animName == "anim_grass") {
+							log.Printf("[ReanimSystem] 🔁 动画 %s 循环重置到 %.2f", animName, comp.AnimationFrameIndices[animName])
+						}
+					}
+				}
+			}
 		}
 
 		// 同步更新 CurrentFrame（用于后备和非循环动画检测）
-		// 使用第一个非暂停动画的帧索引
+		// 使用第一个**活跃的**（正在播放的）动画的帧索引
+		// ✅ Story 13.10 Bug Fix: 跳过已完成的非循环动画
+		foundActiveAnim := false
 		for _, animName := range comp.CurrentAnimations {
+			// 跳过暂停的动画
 			if comp.AnimationPausedStates != nil {
 				if isPaused, exists := comp.AnimationPausedStates[animName]; exists && isPaused {
 					continue
 				}
 			}
+
+			// ✅ 跳过已完成的非循环动画
+			isLooping := comp.IsLooping
+			if comp.AnimationLoopStates != nil {
+				if loopState, hasState := comp.AnimationLoopStates[animName]; hasState {
+					isLooping = loopState
+				}
+			}
+			if !isLooping {
+				// 检查该动画是否已完成
+				if animVisibles, exists := comp.AnimVisiblesMap[animName]; exists {
+					visibleCount := countVisibleFrames(animVisibles)
+					currentFrame := comp.AnimationFrameIndices[animName]
+					if visibleCount > 0 && int(currentFrame) >= visibleCount {
+						// 非循环动画已完成，跳过
+						if comp.ReanimName == "SelectorScreen" {
+							log.Printf("[ReanimSystem] ⏭️  跳过已完成的动画 %s（帧 %.2f >= %d）", animName, currentFrame, visibleCount)
+						}
+						continue
+					}
+				}
+			}
+
+			// 使用这个活跃动画的帧索引更新 CurrentFrame
 			comp.CurrentFrame = int(comp.AnimationFrameIndices[animName])
+			foundActiveAnim = true
+			if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 5 {
+				log.Printf("[ReanimSystem] ✅ 使用动画 %s 更新 CurrentFrame = %d", animName, comp.CurrentFrame)
+			}
 			break
+		}
+
+		// 🔍 调试：如果没有找到活跃动画，记录一下
+		if !foundActiveAnim && comp.ReanimName == "SelectorScreen" {
+			log.Printf("[ReanimSystem] ⚠️  没有找到活跃动画，CurrentFrame 保持不变 = %d", comp.CurrentFrame)
 		}
 
 		// ✅ 检查非循环动画是否已完成
@@ -504,10 +668,17 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 						hasNonLoopingAnims = true
 						if animVisibles, exists := comp.AnimVisiblesMap[animName]; exists {
 							visibleCount := countVisibleFrames(animVisibles)
+							// ✅ Story 13.10 Bug Fix: 使用 AnimationFrameIndices 而不是 CurrentFrame
+							animFrame := comp.AnimationFrameIndices[animName]
 							// 检查该动画是否完成
-							if visibleCount > 0 && comp.CurrentFrame < visibleCount {
+							if visibleCount > 0 && int(animFrame) < visibleCount {
 								allNonLoopingComplete = false
+								if comp.ReanimName == "SelectorScreen" {
+									log.Printf("[ReanimSystem] 🔍 非循环动画 %s 尚未完成: 帧 %.2f < %d", animName, animFrame, visibleCount)
+								}
 								break
+							} else if comp.ReanimName == "SelectorScreen" {
+								log.Printf("[ReanimSystem] ✅ 非循环动画 %s 已完成: 帧 %.2f >= %d", animName, animFrame, visibleCount)
 							}
 						}
 					}
@@ -525,6 +696,52 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 				log.Printf("[ReanimSystem] 非循环动画完成: entity=%d, ReanimName=%s, CurrentFrame=%d", id, comp.ReanimName, comp.CurrentFrame)
 			}
 		}
+	}
+
+	// ✅ Story 14.2: 清理已处理的命令（可选）
+	s.cleanupProcessedCommands(deltaTime)
+}
+
+// cleanupProcessedCommands 清理已处理的命令组件（可选功能）
+//
+// Story 14.2: 命令清理机制
+//
+// 设计说明：
+//   - 定期调用（如每秒一次）以释放内存
+//   - 仅在调试模式下保留命令历史
+//   - 可配置清理策略
+//
+// 调用时机：
+//   - 在 Update() 结尾调用
+//   - 使用计时器控制频率（避免每帧都清理）
+func (s *ReanimSystem) cleanupProcessedCommands(deltaTime float64) {
+	// 检查是否启用清理（可通过配置控制）
+	if !s.enableCommandCleanup {
+		return
+	}
+
+	// 更新清理计时器
+	s.cleanupTimer += deltaTime
+	if s.cleanupTimer < s.cleanupInterval {
+		return // 未到清理时间
+	}
+	s.cleanupTimer = 0
+
+	// 查询并移除已处理的命令
+	entities := ecs.GetEntitiesWith1[*components.AnimationCommandComponent](s.entityManager)
+	removedCount := 0
+
+	for _, id := range entities {
+		cmd, ok := ecs.GetComponent[*components.AnimationCommandComponent](s.entityManager, id)
+		if ok && cmd.Processed {
+			// 移除组件（使用泛型 API）
+			ecs.RemoveComponent[*components.AnimationCommandComponent](s.entityManager, id)
+			removedCount++
+		}
+	}
+
+	if removedCount > 0 {
+		log.Printf("[ReanimSystem] 清理已处理命令: 移除=%d", removedCount)
 	}
 }
 
@@ -544,6 +761,11 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 		log.Printf("[ReanimSystem] 🟫 SodRoll prepareRenderCache 被调用: frame=%d, VisualTracks=%d",
 			comp.CurrentFrame, len(comp.VisualTracks))
 	}
+	// ✅ Debug: SelectorScreen 每次都打印（前 30 帧）
+	if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 30 {
+		log.Printf("[ReanimSystem] 🎬 SelectorScreen prepareRenderCache 被调用: frame=%d, animations=%v",
+			comp.CurrentFrame, comp.CurrentAnimations)
+	}
 
 	// 重用切片避免分配
 	comp.CachedRenderData = comp.CachedRenderData[:0]
@@ -554,104 +776,102 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 	skippedNoFrames := 0
 	skippedNoImage := 0
 
-	// ✅ 调试：记录每个动画渲染的轨道数
-	animRenderCount := make(map[string]int)
+	// ✅ 调试：记录每个轨道渲染的来源动画
+	trackRenderSource := make(map[string]string)
 
-	// ✅ 关键改变：外层循环动画（不是轨道）
-	for _, animName := range comp.CurrentAnimations {
-		// 检查动画是否暂停
-		if comp.AnimationPausedStates != nil {
-			if isPaused, exists := comp.AnimationPausedStates[animName]; exists && isPaused {
-				skippedPaused++
-				continue
-			}
-		}
-
-		// 获取该动画的当前逻辑帧（支持独立帧索引）
-		var logicalFrame float64
-		if comp.AnimationFrameIndices != nil {
-			if frame, exists := comp.AnimationFrameIndices[animName]; exists {
-				logicalFrame = frame
-			} else {
-				logicalFrame = float64(comp.CurrentFrame) // 后备：使用共享帧
-			}
-		} else {
-			logicalFrame = float64(comp.CurrentFrame) // 后备：使用共享帧
-		}
-
-		// 获取动画的可见性数组
-		animVisibles, ok := comp.AnimVisiblesMap[animName]
-		if !ok {
-			continue
-		}
-
-		// 映射逻辑帧到物理帧
-		physicalFrame := mapLogicalToPhysical(int(logicalFrame), animVisibles)
-		if physicalFrame < 0 {
-			continue
-		}
-
-		// 检查动画定义轨道是否可见（f != -1）
-		animDefTrack, ok := comp.MergedTracks[animName]
-		if !ok || physicalFrame >= len(animDefTrack) {
-			continue
-		}
-
-		defFrame := animDefTrack[physicalFrame]
-		if defFrame.FrameNum != nil && *defFrame.FrameNum == -1 {
-			// ✅ 调试：记录隐藏的动画
-			if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 10 {
-				log.Printf("[ReanimSystem] 🚫 动画 %s 在物理帧 %d 隐藏 (f=-1)，跳过整个动画", animName, physicalFrame)
-			}
-			continue // 动画隐藏，跳过整个动画
-		}
-
-		// ✅ 调试：记录可见的动画
+	// ✅ 架构重构：外层循环轨道（按 reanim 文件定义顺序），内层循环动画
+	// 这样可以确保云朵轨道（Track 16-21）在按钮轨道（Track 27+）之前添加到 CachedRenderData
+	// 从而在渲染时云朵在下面，按钮在上面
+	for _, trackName := range comp.VisualTracks {
+		// Debug: SelectorScreen 打印轨道处理情况（前10帧）
 		if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 10 {
-			log.Printf("[ReanimSystem] ✅ 动画 %s 在物理帧 %d 可见 (f=%v), 逻辑帧=%.2f",
-				animName, physicalFrame, defFrame.FrameNum, logicalFrame)
+			log.Printf("[ReanimSystem] 🎨 处理轨道: %s", trackName)
 		}
 
-		// ✅ 内层循环：遍历所有视觉轨道
-		for _, trackName := range comp.VisualTracks {
-			// Debug: 打印向日葵的所有轨道名称
-			if comp.ReanimName == "sunflower" && comp.CurrentFrame == 0 {
-				log.Printf("[ReanimSystem] 🔍 sunflower 动画 %s, 轨道: %s", animName, trackName)
+		// 检查隐藏轨道（黑名单）
+		if comp.HiddenTracks != nil && comp.HiddenTracks[trackName] {
+			skippedHidden++
+			continue
+		}
+
+		// 获取该轨道的合并帧数据
+		mergedFrames, ok := comp.MergedTracks[trackName]
+		if !ok {
+			skippedNoFrames++
+			continue
+		}
+
+		// 用于存储该轨道的最终选中数据（后面的动画会覆盖前面的）
+		var selectedFrame reanim.Frame
+		var selectedImg *ebiten.Image
+		var selectedOffsetX, selectedOffsetY float64
+		var hasValidSelection bool
+
+		// 内层循环：遍历所有动画，找到最后一个有效的数据
+		for _, animName := range comp.CurrentAnimations {
+			// 检查动画是否暂停
+			if comp.AnimationPausedStates != nil {
+				if isPaused, exists := comp.AnimationPausedStates[animName]; exists && isPaused {
+					skippedPaused++
+					continue
+				}
 			}
 
-			// 检查隐藏轨道（黑名单）
-			if comp.HiddenTracks != nil && comp.HiddenTracks[trackName] {
-				skippedHidden++
+			// 获取该动画的当前逻辑帧（支持独立帧索引）
+			var logicalFrame float64
+			if comp.AnimationFrameIndices != nil {
+				if frame, exists := comp.AnimationFrameIndices[animName]; exists {
+					logicalFrame = frame
+				} else {
+					logicalFrame = float64(comp.CurrentFrame)
+				}
+			} else {
+				logicalFrame = float64(comp.CurrentFrame)
+			}
+
+			// 获取动画的可见性数组
+			animVisibles, ok := comp.AnimVisiblesMap[animName]
+			if !ok {
 				continue
 			}
 
-			// 获取视觉轨道在该物理帧的数据
-			mergedFrames, ok := comp.MergedTracks[trackName]
-			if !ok || physicalFrame >= len(mergedFrames) {
-				skippedNoFrames++
+			// 映射逻辑帧到物理帧
+			physicalFrame := mapLogicalToPhysical(int(logicalFrame), animVisibles)
+			if physicalFrame < 0 || physicalFrame >= len(mergedFrames) {
 				continue
 			}
 
-			// ✅ Story 13.10 Bug Fix: 检查视觉轨道在该帧是否被隐藏（f=-1）或没有图片
-			// 关键设计：如果后面的动画在某轨道没有有效数据，不渲染，保留前面动画的渲染结果
+			// 检查动画定义轨道是否可见（f != -1）
+			animDefTrack, ok := comp.MergedTracks[animName]
+			if !ok || physicalFrame >= len(animDefTrack) {
+				continue
+			}
+
+			defFrame := animDefTrack[physicalFrame]
+			if defFrame.FrameNum != nil && *defFrame.FrameNum == -1 {
+				// 动画隐藏，跳过整个动画
+				continue
+			}
+
+			// 检查视觉轨道在该帧是否被隐藏（f=-1）
 			currentTrackFrame := mergedFrames[physicalFrame]
 			if currentTrackFrame.FrameNum != nil && *currentTrackFrame.FrameNum == -1 {
-				// 视觉轨道在该帧被明确隐藏（f=-1），跳过该动画对这个轨道的渲染
+				// 视觉轨道在该帧被隐藏，跳过
 				skippedHidden++
+				if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 10 {
+					log.Printf("[ReanimSystem]   - 动画 %s: 轨道被隐藏 (f=-1)", animName)
+				}
 				continue
 			}
 
-			// ✅ 使用帧插值获取平滑的帧数据
+			// 使用帧插值获取平滑的帧数据
 			frame := s.getInterpolatedFrame(animName, logicalFrame, animVisibles, mergedFrames)
 
-			// ✅ 图片继承逻辑：如果插值后的帧没有图片，向前搜索最近的有图片的帧
-			// 原版 PvZ 的 Reanim 系统会继承上一帧的图片（类似 Flash 的关键帧）
-			// 但是：**只在当前动画的物理帧范围内搜索**，不跨动画继承
+			// 图片继承逻辑：如果插值后的帧没有图片，向前搜索最近的有图片的帧
 			hasValidImage := false
 			if frame.ImagePath == "" {
 				// 向前搜索有图片的帧（只搜索当前动画的可见帧范围）
 				for i := physicalFrame - 1; i >= 0; i-- {
-					// 检查该帧是否在当前动画的可见范围内
 					isFrameVisible := false
 					for _, visibleFrame := range animVisibles {
 						if visibleFrame == i {
@@ -660,12 +880,10 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 						}
 					}
 					if !isFrameVisible {
-						// 该帧不在当前动画的可见范围，停止搜索
 						break
 					}
 
 					if i < len(mergedFrames) && mergedFrames[i].ImagePath != "" {
-						// 继承前一帧的图片路径，但保留当前帧的变换属性
 						frame.ImagePath = mergedFrames[i].ImagePath
 						hasValidImage = true
 						break
@@ -675,85 +893,60 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 				hasValidImage = true
 			}
 
-			// 如果当前动画在这个轨道没有有效图片，跳过，不渲染，保留前面动画的渲染
+			// 如果当前动画在这个轨道没有有效图片，跳过
 			if !hasValidImage {
 				skippedNoImage++
+				if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 10 {
+					log.Printf("[ReanimSystem]   - 动画 %s: 无有效图片", animName)
+				}
 				continue
-			}
-
-			// ✅ 图片继承逻辑：如果插值后的帧没有图片，向前搜索最近的有图片的帧
-			// 原版 PvZ 的 Reanim 系统会继承上一帧的图片（类似 Flash 的关键帧）
-			if frame.ImagePath == "" {
-				// 向前搜索有图片的帧
-				foundImage := false
-				for i := physicalFrame - 1; i >= 0; i-- {
-					if i < len(mergedFrames) && mergedFrames[i].ImagePath != "" {
-						// 继承前一帧的图片路径，但保留当前帧的变换属性
-						frame.ImagePath = mergedFrames[i].ImagePath
-						foundImage = true
-						// Debug: 向日葵 anim_idle 轨道的图片继承
-						if comp.ReanimName == "sunflower" && trackName == "anim_idle" && comp.CurrentFrame < 5 {
-							log.Printf("[ReanimSystem] 🔧 SunFlower anim_idle frame %d 继承图片: %s (从帧 %d)",
-								physicalFrame, frame.ImagePath, i)
-						}
-						break
-					}
-				}
-				// 如果整个轨道都没有图片，才跳过
-				if !foundImage {
-					skippedNoImage++
-					if comp.ReanimName == "sunflower" && trackName == "anim_idle" {
-						log.Printf("[ReanimSystem] ❌ SunFlower anim_idle frame %d: 整个轨道都没有图片!", physicalFrame)
-					}
-					continue
-				}
-			} else if comp.ReanimName == "sunflower" && trackName == "anim_idle" && comp.CurrentFrame < 5 {
-				// Debug: 原生图片
-				log.Printf("[ReanimSystem] ✅ SunFlower anim_idle frame %.2f 原生图片: %s", logicalFrame, frame.ImagePath)
 			}
 
 			// 获取图片
 			img, ok := comp.PartImages[frame.ImagePath]
 			if !ok || img == nil {
-				// Debug: 记录找不到图片的情况
-				if comp.ReanimName == "sunflower" && trackName == "anim_idle" && comp.CurrentFrame < 5 {
-					log.Printf("[ReanimSystem] ⚠️ SunFlower anim_idle frame %.2f: 图片 %s 不存在于 PartImages", logicalFrame, frame.ImagePath)
-				}
 				continue
-			}
-
-			// Debug: 成功获取图片
-			if comp.ReanimName == "sunflower" && trackName == "anim_idle" && comp.CurrentFrame < 5 {
-				log.Printf("[ReanimSystem] ✅ SunFlower anim_idle frame %.2f: 成功获取图片 %s (尺寸: %dx%d)",
-					logicalFrame, frame.ImagePath, img.Bounds().Dx(), img.Bounds().Dy())
 			}
 
 			// 计算父轨道偏移
 			offsetX, offsetY := 0.0, 0.0
 			if parentTrackName, hasParent := comp.ParentTracks[trackName]; hasParent {
-				// ✅ 传入当前动画名，避免需要查找控制动画
 				offsetX, offsetY = s.getParentOffsetForAnimation(comp, parentTrackName, animName)
 			}
 
-			// 添加到缓存
-			// ✅ 关键：后面的动画会自然覆盖前面的（因为是追加到同一个数组）
+			// 更新选中数据（后面的动画会覆盖前面的）
+			selectedFrame = frame
+			selectedImg = img
+			selectedOffsetX = offsetX
+			selectedOffsetY = offsetY
+			hasValidSelection = true
+			trackRenderSource[trackName] = animName
+
+			// Debug: SelectorScreen 记录选中的动画
+			if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 10 {
+				log.Printf("[ReanimSystem]   - 动画 %s: ✅ 有效数据，选中", animName)
+			}
+		}
+
+		// 如果该轨道有有效选中数据，添加到缓存
+		if hasValidSelection {
 			comp.CachedRenderData = append(comp.CachedRenderData, components.RenderPartData{
-				Img:     img,
-				Frame:   frame,
-				OffsetX: offsetX,
-				OffsetY: offsetY,
+				Img:     selectedImg,
+				Frame:   selectedFrame,
+				OffsetX: selectedOffsetX,
+				OffsetY: selectedOffsetY,
 			})
 			visibleCount++
-			animRenderCount[animName]++
 		}
 	}
 
-	// ✅ 调试：输出每个动画渲染的轨道数（前 10 帧）
+	// ✅ 调试：输出每个轨道的渲染来源（前 10 帧）
 	if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 10 {
-		log.Printf("[ReanimSystem] 📊 Frame %d 渲染统计 (总计: %d 个 parts):", comp.CurrentFrame, visibleCount)
-		for _, animName := range comp.CurrentAnimations {
-			count := animRenderCount[animName] // 默认为 0
-			log.Printf("    - 动画 %s: 渲染了 %d 个轨道", animName, count)
+		log.Printf("[ReanimSystem] 📊 Frame %d 渲染统计 (总计: %d 个轨道):", comp.CurrentFrame, visibleCount)
+		for _, trackName := range comp.VisualTracks {
+			if source, ok := trackRenderSource[trackName]; ok {
+				log.Printf("    - 轨道 %s: 来自动画 %s", trackName, source)
+			}
 		}
 	}
 
@@ -776,10 +969,42 @@ func (s *ReanimSystem) GetRenderData(entityID ecs.EntityID) []components.RenderP
 		return nil
 	}
 
-	// 检查缓存是否失效
-	if comp.LastRenderFrame != comp.CurrentFrame {
+	// ✅ Bug Fix: 支持慢速动画的帧插值
+	// 问题：使用整数 CurrentFrame 判断缓存失效，导致慢速动画（如 speed=0.05）
+	//       的插值帧被忽略（帧 0.05、0.10...0.95 都被当作帧 0）
+	// 解决：检查任意动画的浮点帧索引是否改变，确保插值生效
+	needRebuild := false
+
+	// 方法 1: 检查 AnimationFrameIndices 中是否有任何帧索引发生变化
+	if comp.AnimationFrameIndices != nil && len(comp.AnimationFrameIndices) > 0 {
+		// 计算所有动画的帧索引之和（作为缓存键）
+		currentFrameSum := 0.0
+		for _, frameIdx := range comp.AnimationFrameIndices {
+			currentFrameSum += frameIdx
+		}
+
+		// 如果帧索引和发生变化，或者是首次渲染
+		if comp.LastRenderFrame == -1 || float64(comp.LastRenderFrame) != currentFrameSum {
+			needRebuild = true
+			comp.LastRenderFrame = int(currentFrameSum * 1000) // 使用千分之一精度作为缓存键
+		}
+	} else {
+		// 后备逻辑：使用整数 CurrentFrame（兼容旧代码）
+		if comp.LastRenderFrame != comp.CurrentFrame {
+			needRebuild = true
+			comp.LastRenderFrame = comp.CurrentFrame
+		}
+	}
+
+	// Debug: SelectorScreen 前30帧打印
+	if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 30 {
+		log.Printf("[ReanimSystem] 🎨 GetRenderData: frame=%d, lastRenderFrame=%d, needRebuild=%v",
+			comp.CurrentFrame, comp.LastRenderFrame, needRebuild)
+	}
+
+	// 重建缓存
+	if needRebuild {
 		s.prepareRenderCache(comp)
-		comp.LastRenderFrame = comp.CurrentFrame
 	}
 
 	return comp.CachedRenderData
@@ -1027,19 +1252,28 @@ func countVisibleFrames(animVisibles []int) int {
 }
 
 // mapLogicalToPhysical 将逻辑帧号映射到物理帧号
+// ✅ 修复：非循环动画完成后，返回最后一帧而不是 -1（保持最后一帧显示）
 func mapLogicalToPhysical(logicalFrameNum int, animVisibles []int) int {
 	if len(animVisibles) == 0 {
 		return logicalFrameNum
 	}
 
 	logicalIndex := 0
+	lastVisiblePhysicalFrame := -1
 	for i := 0; i < len(animVisibles); i++ {
 		if animVisibles[i] == 0 {
+			lastVisiblePhysicalFrame = i // 记录最后一个可见帧的物理索引
 			if logicalIndex == logicalFrameNum {
 				return i
 			}
 			logicalIndex++
 		}
+	}
+
+	// ✅ 修复：如果逻辑帧超出范围，返回最后一个可见帧（用于非循环动画停留在最后一帧）
+	// 这样 anim_open 完成后会保持显示，不会消失
+	if lastVisiblePhysicalFrame >= 0 {
+		return lastVisiblePhysicalFrame
 	}
 
 	return -1
@@ -1323,13 +1557,10 @@ func (s *ReanimSystem) RenderToTexture(entityID ecs.EntityID, target *ebiten.Ima
 //   - 僵尸的 anim_walk/anim_eat 等应该被分类为 logicalTracks（无图片）
 //   - 与 animation_showcase 保持完全一致
 //
-// AnalyzeTrackTypes 分析并分类 Reanim 轨道为视觉轨道和逻辑轨道
+// analyzeTrackTypes 分析并分类 Reanim 轨道为视觉轨道和逻辑轨道
 // 视觉轨道：包含图片数据，需要渲染
 // 逻辑轨道：不包含图片数据，用于控制动画可见性
-func (s *ReanimSystem) AnalyzeTrackTypes(reanimXML *reanim.ReanimXML) (visualTracks []string, logicalTracks []string) {
-	return s.analyzeTrackTypes(reanimXML)
-}
-
+// ⚠️ 私有方法：仅供 ReanimSystem 内部使用
 func (s *ReanimSystem) analyzeTrackTypes(reanimXML *reanim.ReanimXML) (visualTracks []string, logicalTracks []string) {
 	// ✅ Bug Fix: 先检查轨道是否有图片，再决定是否跳过
 	// 原因：向日葵的 anim_idle 轨道包含头部图像，不应该被跳过
