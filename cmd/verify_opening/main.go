@@ -127,14 +127,14 @@ func NewOpeningVerifyGame() (*OpeningVerifyGame, error) {
 
 	// Create systems
 	reanimSystem := systems.NewReanimSystem(em)
-	behaviorSystem := systems.NewBehaviorSystem(em, rm, reanimSystem, gs, lawnGridSystem, lawnGridEntity)
+	behaviorSystem := systems.NewBehaviorSystem(em, rm, gs, lawnGridSystem, lawnGridEntity)
 	renderSystem := systems.NewRenderSystem(em)
 	cameraSystem := systems.NewCameraSystem(em, gs)
 
 	// Create opening animation system
 	var openingSystem *systems.OpeningAnimationSystem
 	if levelConfig.OpeningType == "standard" && !levelConfig.SkipOpening {
-		openingSystem = systems.NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem, reanimSystem)
+		openingSystem = systems.NewOpeningAnimationSystem(em, gs, rm, levelConfig, cameraSystem)
 		log.Println("Opening animation system created")
 	} else {
 		log.Printf("Opening animation skipped: OpeningType=%s, SkipOpening=%v",

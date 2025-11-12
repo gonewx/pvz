@@ -80,7 +80,7 @@ func main() {
 	rewardSys := systems.NewRewardAnimationSystem(em, gs, rm, nil, reanimSys, particleSys, renderSys)
 
 	// 创建 LevelSystem（用于验证系统集成）
-	_ = systems.NewLevelSystem(em, gs, nil, rm, reanimSys, rewardSys, nil)
+	_ = systems.NewLevelSystem(em, gs, nil, rm, rewardSys, nil)
 
 	log.Printf("✅ Systems initialized\n")
 
@@ -142,7 +142,7 @@ func main() {
 		// 手动触发奖励动画（模拟 LevelSystem.triggerRewardIfNeeded）
 		if lastUnlocked != "" {
 			log.Printf("✅ Triggering reward animation for: %s", lastUnlocked)
-			rewardSys.TriggerReward(lastUnlocked)
+			rewardSys.TriggerReward("plant", lastUnlocked)
 
 			// 清除标记
 			gs.GetPlantUnlockManager().ClearLastUnlocked()
