@@ -39,72 +39,17 @@ func (m *MockLawnmowerResourceLoader) GetReanimPartImages(name string) map[strin
 	return nil
 }
 
-// MockLawnmowerReanimSystem 用于测试的 Reanim 系统
-type MockLawnmowerReanimSystem struct {
-	PlayedAnimations map[ecs.EntityID]string
-}
-
-func (m *MockLawnmowerReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) error {
-	if m.PlayedAnimations == nil {
-		m.PlayedAnimations = make(map[ecs.EntityID]string)
-	}
-	m.PlayedAnimations[entityID] = animName
-	return nil
-}
-
-func (m *MockLawnmowerReanimSystem) PlayAnimationNoLoop(entityID ecs.EntityID, animName string) error {
-	if m.PlayedAnimations == nil {
-		m.PlayedAnimations = make(map[ecs.EntityID]string)
-	}
-	m.PlayedAnimations[entityID] = animName
-	return nil
-}
-
-func (m *MockLawnmowerReanimSystem) RenderToTexture(entityID ecs.EntityID, target *ebiten.Image) error {
-	// Mock implementation for testing
-	return nil
-}
-
-func (m *MockLawnmowerReanimSystem) PrepareStaticPreview(entityID ecs.EntityID, reanimName string) error {
-	// Mock implementation for testing (Story 11.1)
-	return nil
-}
-
-// ApplyReanimConfig 应用 Reanim 配置到指定实体 (Story 13.5)
-func (m *MockLawnmowerReanimSystem) ApplyReanimConfig(entityID ecs.EntityID, cfg *config.ReanimConfig) error {
-	// Mock implementation for testing
-	return nil
-}
-
-// PlayCombo 播放配置驱动的动画组合 (Story 13.6)
-func (m *MockLawnmowerReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string) error {
-	// Mock implementation for testing
-	if m.PlayedAnimations == nil {
-		m.PlayedAnimations = make(map[ecs.EntityID]string)
-	}
-	m.PlayedAnimations[entityID] = comboName
-	return nil
-}
-
-// PlayDefaultAnimation 播放默认动画 (Story 13.6)
-func (m *MockLawnmowerReanimSystem) PlayDefaultAnimation(entityID ecs.EntityID, unitID string) error {
-	// Mock implementation for testing
-	if m.PlayedAnimations == nil {
-		m.PlayedAnimations = make(map[ecs.EntityID]string)
-	}
-	m.PlayedAnimations[entityID] = "default"
-	return nil
-}
+// ✅ Epic 14: MockLawnmowerReanimSystem 已删除
+// 新架构中工厂函数不再需要 ReanimSystem，改用 AnimationCommand 组件
 
 // TestNewLawnmowerEntity 测试除草车实体创建
 func TestNewLawnmowerEntity(t *testing.T) {
 	em := ecs.NewEntityManager()
 	rm := &MockLawnmowerResourceLoader{}
-	rs := &MockLawnmowerReanimSystem{}
 
 	// 测试创建第3行的除草车
 	lane := 3
-	entityID, err := NewLawnmowerEntity(em, rm, rs, lane)
+	entityID, err := NewLawnmowerEntity(em, rm, lane)
 
 	// 验证创建成功
 	if err != nil {
@@ -161,10 +106,17 @@ func TestNewLawnmowerEntity(t *testing.T) {
 		t.Errorf("Expected Speed=%.1f, got %.1f", config.LawnmowerSpeed, lawnmower.Speed)
 	}
 
-	// 验证动画初始化
-	// LawnMower.reanim 包含两个动画：anim_normal（静止）和 anim_tricked（移动）
-	if rs.PlayedAnimations[entityID] != "anim_normal" {
-		t.Errorf("Expected anim_normal, got %s", rs.PlayedAnimations[entityID])
+	// ✅ Epic 14: 验证 AnimationCommand 组件（替代直接动画调用）
+	// LawnMower 初始化时应该添加 AnimationCommand 来播放 anim_normal 动画
+	animCmd, ok := ecs.GetComponent[*components.AnimationCommandComponent](em, entityID)
+	if !ok {
+		t.Fatal("Lawnmower entity should have AnimationCommandComponent")
+	}
+	if animCmd.AnimationName != "anim_normal" {
+		t.Errorf("Expected AnimationName='anim_normal', got '%s'", animCmd.AnimationName)
+	}
+	if animCmd.Processed {
+		t.Error("AnimationCommand should not be processed yet (Processed=false)")
 	}
 }
 
@@ -172,11 +124,10 @@ func TestNewLawnmowerEntity(t *testing.T) {
 func TestNewLawnmowerEntityAllLanes(t *testing.T) {
 	em := ecs.NewEntityManager()
 	rm := &MockLawnmowerResourceLoader{}
-	rs := &MockLawnmowerReanimSystem{}
 
 	// 创建所有5行的除草车
 	for lane := 1; lane <= 5; lane++ {
-		entityID, err := NewLawnmowerEntity(em, rm, rs, lane)
+		entityID, err := NewLawnmowerEntity(em, rm, lane)
 		if err != nil {
 			t.Fatalf("Failed to create lawnmower for lane %d: %v", lane, err)
 		}
@@ -196,12 +147,11 @@ func TestNewLawnmowerEntityAllLanes(t *testing.T) {
 func TestNewLawnmowerEntityInvalidLane(t *testing.T) {
 	em := ecs.NewEntityManager()
 	rm := &MockLawnmowerResourceLoader{}
-	rs := &MockLawnmowerReanimSystem{}
 
 	// 测试无效行号
 	invalidLanes := []int{0, 6, -1, 10}
 	for _, lane := range invalidLanes {
-		_, err := NewLawnmowerEntity(em, rm, rs, lane)
+		_, err := NewLawnmowerEntity(em, rm, lane)
 		if err == nil {
 			t.Errorf("Expected error for invalid lane %d, got nil", lane)
 		}
@@ -212,23 +162,18 @@ func TestNewLawnmowerEntityInvalidLane(t *testing.T) {
 func TestNewLawnmowerEntityNilParameters(t *testing.T) {
 	em := ecs.NewEntityManager()
 	rm := &MockLawnmowerResourceLoader{}
-	rs := &MockLawnmowerReanimSystem{}
 
 	// 测试 nil EntityManager
-	_, err := NewLawnmowerEntity(nil, rm, rs, 3)
+	_, err := NewLawnmowerEntity(nil, rm, 3)
 	if err == nil {
 		t.Error("Expected error for nil EntityManager")
 	}
 
 	// 测试 nil ResourceLoader
-	_, err = NewLawnmowerEntity(em, nil, rs, 3)
+	_, err = NewLawnmowerEntity(em, nil, 3)
 	if err == nil {
 		t.Error("Expected error for nil ResourceLoader")
 	}
 
-	// 测试 nil ReanimSystem
-	_, err = NewLawnmowerEntity(em, rm, nil, 3)
-	if err == nil {
-		t.Error("Expected error for nil ReanimSystem")
-	}
+	// ✅ Epic 14: 移除了 ReanimSystem 参数，因此不再需要测试 nil ReanimSystem
 }

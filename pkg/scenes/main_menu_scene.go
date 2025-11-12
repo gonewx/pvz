@@ -79,8 +79,7 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	}
 
 	scene.renderSystem = systems.NewRenderSystem(scene.entityManager)
-
-	// Story 13.4: Enable render cache optimization
+	// ✅ 修复：设置 ReanimSystem 引用，以便 RenderSystem 调用 GetRenderData()
 	scene.renderSystem.SetReanimSystem(scene.reanimSystem)
 	log.Printf("[MainMenuScene] Initialized ECS systems")
 
@@ -93,42 +92,25 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	} else {
 		scene.selectorScreenEntity = selectorEntity
 
-		// ✅ Story 13.10 Bug Fix: 重新分析轨道类型
-		// selector_screen_factory 把所有轨道都放进了 VisualTracks（包括动画定义轨道）
-		// 需要使用 ReanimSystem 重新分类，将动画定义轨道移到 LogicalTracks
-		reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](scene.entityManager, selectorEntity)
-		if ok && reanimComp.ReanimXML != nil {
-			visualTracks, logicalTracks := scene.reanimSystem.AnalyzeTrackTypes(reanimComp.ReanimXML)
-			reanimComp.VisualTracks = visualTracks
-			reanimComp.LogicalTracks = logicalTracks
-			log.Printf("[MainMenuScene] 重新分析轨道类型: VisualTracks=%d, LogicalTracks=%d", len(visualTracks), len(logicalTracks))
-		}
+		// ✅ Epic 14: 移除 AnalyzeTrackTypes 调用（已私有化，由 ReanimSystem 内部处理）
+		// PlayAnimation/AddAnimation 会自动调用 analyzeTrackTypes
 
-		// Story 13.8: 初始化 SelectorScreen 动画
-		// ✅ Story 13.10 修正：不要同时播放所有动画，而是只播放开场动画
-		// 云朵和草动画应该在开场动画完成后再播放
-		// 策略：开场阶段只播放 anim_open，循环阶段再添加其他动画
+		// ✅ Epic 14: 使用 AnimationCommand 触发开场动画
+		ecs.AddComponent(scene.entityManager, selectorEntity, &components.AnimationCommandComponent{
+			AnimationName: "anim_open",
+			Processed:     false,
+		})
 
-		// 1. 先播放开场动画（只播放 anim_open）
-		if err := scene.reanimSystem.PlayAnimation(selectorEntity, "anim_open"); err != nil {
-			log.Printf("[MainMenuScene] Warning: Failed to play anim_open: %v", err)
-		}
+		// 处理 AnimationCommand（立即初始化动画）
+		scene.reanimSystem.Update(0)
 
 		// 2. 不再添加 anim_sign 和 anim_idle（这些会覆盖背景）
-		// scene.reanimSystem.AddAnimation(selectorEntity, "anim_sign")
-		// scene.reanimSystem.AddAnimation(selectorEntity, "anim_idle")
-
 		// 3. 云朵和草动画在开场完成后才添加（见 Update() 中的 cloudAnimsResumed 逻辑）
 
-		// 4. 完成动画设置（初始化动画帧索引）
-		// ✅ Story 13.10: FinalizeAnimations 不再生成轨道绑定
-		// 现在只负责初始化 AnimationFrameIndices，确保每个动画有独立的帧计数器
-		if err := scene.reanimSystem.FinalizeAnimations(selectorEntity); err != nil {
-			log.Printf("[MainMenuScene] Warning: Failed to finalize animations: %v", err)
-		}
+		// 4. ✅ Epic 14: 移除 FinalizeAnimations 调用（已私有化，由 PlayAnimation/AddAnimation 内部处理）
 
 		// 5. 获取 ReanimComponent 并设置循环状态
-		reanimComp, ok = ecs.GetComponent[*components.ReanimComponent](scene.entityManager, selectorEntity)
+		reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](scene.entityManager, selectorEntity)
 		if ok {
 			// 🔍 调试：输出 AnimationFPS 的值
 			log.Printf("[MainMenuScene] 🔍 DEBUG: AnimationFPS = %.1f (全局 FPS)", reanimComp.AnimationFPS)
@@ -261,27 +243,39 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 
 				// ✅ 不移除、不暂停 anim_open，让它自然停留在最后一帧（非循环动画完成后不更新）
 
-				// 1. 添加 anim_idle（提供按钮和装饰物动画）
-				if err := m.reanimSystem.AddAnimation(m.selectorScreenEntity, "anim_idle"); err != nil {
-					log.Printf("[MainMenuScene] Warning: Failed to add anim_idle: %v", err)
-				}
-				reanimComp.AnimationLoopStates["anim_idle"] = true
+				// ✅ 渲染顺序说明：
+				//   在 Reanim 系统中，动画的添加顺序影响 CachedRenderData 的顺序
+				//   但最终的视觉图层由每个轨道/图片本身的绘制顺序决定
+				//
+				//   理论顺序（从底到顶）：
+				//   1. anim_open (背景)
+				//   2. 云朵动画 (中间层)
+				//   3. anim_grass (草)
+				//   4. anim_idle (按钮，最上层)
 
-				// 2. 添加云朵和草动画（在 anim_idle 之后渲染，形成图层）
-				cloudAnims := []string{"anim_grass", "anim_cloud1", "anim_cloud2", "anim_cloud4",
+				// 1. 先添加云朵动画
+				cloudAnims := []string{"anim_cloud1", "anim_cloud2", "anim_cloud4",
 					"anim_cloud5", "anim_cloud6", "anim_cloud7"}
 
 				for _, animName := range cloudAnims {
 					if err := m.reanimSystem.AddAnimation(m.selectorScreenEntity, animName); err != nil {
-						log.Printf("[MainMenuScene] Warning: Failed to add animation %s: %v", animName, err)
+						log.Printf("[MainMenuScene] Warning: Failed to add %s: %v", animName, err)
 					}
 					reanimComp.AnimationLoopStates[animName] = true
 				}
 
-				// 3. 重新完成动画设置（初始化新动画的帧索引）
-				if err := m.reanimSystem.FinalizeAnimations(m.selectorScreenEntity); err != nil {
-					log.Printf("[MainMenuScene] Warning: Failed to finalize animations: %v", err)
+				// 2. 添加 anim_grass
+				if err := m.reanimSystem.AddAnimation(m.selectorScreenEntity, "anim_grass"); err != nil {
+					log.Printf("[MainMenuScene] Warning: Failed to add anim_grass: %v", err)
 				}
+				reanimComp.AnimationLoopStates["anim_grass"] = true
+
+				// 3. 最后添加 anim_idle（按钮应该在最上层）
+				if err := m.reanimSystem.AddAnimation(m.selectorScreenEntity, "anim_idle"); err != nil {
+					log.Printf("[MainMenuScene] Warning: Failed to add anim_idle: %v", err)
+				}
+
+				// 3. ✅ Epic 14: FinalizeAnimations 已集成到 AddAnimation 内部
 
 				m.cloudAnimsResumed = true
 				log.Printf("[MainMenuScene] ✅ 开场动画完成，已切换到循环模式（保留 anim_open 背景 + anim_idle + 云朵）")

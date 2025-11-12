@@ -41,12 +41,10 @@ func TestNewZombieEntity(t *testing.T) {
 		},
 	}
 
-	mockRS := &mockReanimSystem{em: em}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// 创建僵尸实体
-			zombieID, err := NewZombieEntity(em, rm, mockRS, tt.row, tt.spawnX)
+			zombieID, err := NewZombieEntity(em, rm, tt.row, tt.spawnX)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("NewZombieEntity() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -87,8 +85,20 @@ func TestNewZombieEntity(t *testing.T) {
 				if reanim.PartImages == nil {
 					t.Error("ReanimComponent.PartImages should not be nil")
 				}
-				if len(reanim.CurrentAnimations) == 0 {
-					t.Error("ReanimComponent.CurrentAnimations should not be empty")
+				// ✅ Epic 14: 不再检查 CurrentAnimations
+				// 新架构中使用 AnimationCommandComponent，CurrentAnimations 在 ReanimSystem.Update() 处理后才填充
+			}
+
+			// ✅ Epic 14: 验证 AnimationCommandComponent（替代直接调用 ReanimSystem）
+			animCmd, ok := ecs.GetComponent[*components.AnimationCommandComponent](em, zombieID)
+			if !ok {
+				t.Error("Zombie entity should have AnimationCommandComponent")
+			} else {
+				if animCmd.AnimationName == "" {
+					t.Error("AnimationCommandComponent should have AnimationName")
+				}
+				if animCmd.Processed {
+					t.Error("AnimationCommand should not be processed yet (Processed=false)")
 				}
 			}
 
@@ -160,11 +170,9 @@ func TestNewZombieEntity_ErrorHandling(t *testing.T) {
 		},
 	}
 
-	mockRS := &mockReanimSystem{em: em}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			zombieID, err := NewZombieEntity(tt.em, tt.rm, mockRS, 0, 1450.0)
+			zombieID, err := NewZombieEntity(tt.em, tt.rm, 0, 1450.0)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewZombieEntity() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -201,12 +209,10 @@ func TestNewConeheadZombieEntity(t *testing.T) {
 		},
 	}
 
-	mockRS := &mockReanimSystem{em: em}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// 创建路障僵尸实体
-			zombieID, err := NewConeheadZombieEntity(em, rm, mockRS, tt.row, tt.spawnX)
+			zombieID, err := NewConeheadZombieEntity(em, rm, tt.row, tt.spawnX)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("NewConeheadZombieEntity() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -301,12 +307,10 @@ func TestNewBucketheadZombieEntity(t *testing.T) {
 		},
 	}
 
-	mockRS := &mockReanimSystem{em: em}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// 创建铁桶僵尸实体
-			zombieID, err := NewBucketheadZombieEntity(em, rm, mockRS, tt.row, tt.spawnX)
+			zombieID, err := NewBucketheadZombieEntity(em, rm, tt.row, tt.spawnX)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("NewBucketheadZombieEntity() error = %v, wantErr %v", err, tt.wantErr)
 			}

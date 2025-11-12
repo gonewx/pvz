@@ -281,9 +281,8 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 		scene.reanimSystem.SetConfigManager(configManager)
 	}
 
-	// Story 13.4: Enable render cache optimization
+	// ✅ 修复：设置 ReanimSystem 引用，以便 RenderSystem 调用 GetRenderData()
 	scene.renderSystem.SetReanimSystem(scene.reanimSystem)
-	log.Printf("[GameScene] Enabled render cache optimization")
 
 	// Initialize input system with sun counter target position and lawn grid system (Story 2.4 + Story 3.3)
 	// Story 6.3: Pass reanimSystem to InputSystem for plant animation initialization
@@ -310,11 +309,10 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	scene.sunSpawnSystem = systems.NewSunSpawnSystem(
 		scene.entityManager,
 		rm,
-		scene.reanimSystem, // Story 8.2 QA修复：传入 ReanimSystem 用于初始化阳光动画
-		250.0,              // minX - 草坪左边界
-		900.0,              // maxX - 草坪右边界
-		100.0,              // minTargetY - 草坪上边界
-		550.0,              // maxTargetY - 草坪下边界
+		250.0, // minX - 草坪左边界
+		900.0, // maxX - 草坪右边界
+		100.0, // minTargetY - 草坪上边界
+		550.0, // maxTargetY - 草坪下边界
 	)
 
 	// Story 8.2 QA改进：关卡加载后，加载草皮相关资源
@@ -332,13 +330,12 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	scene.plantPreviewRenderSystem = systems.NewPlantPreviewRenderSystem(scene.entityManager, scene.plantPreviewSystem)
 
 	// Story 3.4: Initialize behavior system (sunflower sun production, etc.)
-	// Story 6.3: Pass ReanimSystem for zombie animation state changes
+	// Story 14.3: Epic 14 - Removed ReanimSystem dependency, using AnimationCommand component
 	// Story 5.5: Pass GameState for zombie death counting
 	// Bug Fix: Pass LawnGridSystem for plant death grid release
 	scene.behaviorSystem = systems.NewBehaviorSystem(
 		scene.entityManager,
 		rm,
-		scene.reanimSystem,
 		scene.gameState,
 		scene.lawnGridSystem,
 		scene.lawnGridEntityID,
@@ -351,7 +348,8 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 
 	// Story 5.5: Initialize level management systems
 	// 1. Create WaveSpawnSystem (LevelSystem depends on it)
-	scene.waveSpawnSystem = systems.NewWaveSpawnSystem(scene.entityManager, rm, scene.reanimSystem, scene.gameState.CurrentLevel, scene.gameState)
+	// Story 14.3: Epic 14 - Removed ReanimSystem dependency
+	scene.waveSpawnSystem = systems.NewWaveSpawnSystem(scene.entityManager, rm, scene.gameState.CurrentLevel, scene.gameState)
 	log.Printf("[GameScene] Initialized wave spawn system")
 
 	// Pre-spawn all zombies for the level (they will be activated wave by wave)
@@ -380,7 +378,7 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	log.Printf("[GameScene] Initialized reward animation system (fully encapsulated)")
 
 	// Story 8.3: Create OpeningAnimationSystem (conditionally, may return nil)
-	scene.openingSystem = systems.NewOpeningAnimationSystem(scene.entityManager, scene.gameState, rm, levelConfig, scene.cameraSystem, scene.reanimSystem)
+	scene.openingSystem = systems.NewOpeningAnimationSystem(scene.entityManager, scene.gameState, rm, levelConfig, scene.cameraSystem)
 	if scene.openingSystem != nil {
 		log.Printf("[GameScene] Initialized opening animation system")
 	} else {
@@ -389,14 +387,15 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 
 	// Story 10.2: Create LawnmowerSystem (除草车系统 - 最后防线)
 	// Story 10.3: 传递 ReanimSystem 用于播放僵尸死亡动画
-	scene.lawnmowerSystem = systems.NewLawnmowerSystem(scene.entityManager, rm, scene.reanimSystem, scene.gameState)
+	scene.lawnmowerSystem = systems.NewLawnmowerSystem(scene.entityManager, rm, scene.gameState)
 	log.Printf("[GameScene] Initialized lawnmower system")
 
 	// Story 10.2: 除草车实体将在铺草皮动画完成后创建（见铺草皮回调）
 	// 原版行为：草皮铺完后才显示除草车
 
 	// 2. Create LevelSystem (需要 RewardAnimationSystem 和 LawnmowerSystem)
-	scene.levelSystem = systems.NewLevelSystem(scene.entityManager, scene.gameState, scene.waveSpawnSystem, rm, scene.reanimSystem, scene.rewardSystem, scene.lawnmowerSystem)
+	// Story 14.3: Epic 14 - Removed ReanimSystem dependency
+	scene.levelSystem = systems.NewLevelSystem(scene.entityManager, scene.gameState, scene.waveSpawnSystem, rm, scene.rewardSystem, scene.lawnmowerSystem)
 	log.Printf("[GameScene] Initialized level system")
 
 	// Story 11.3: Create FinalWaveWarningSystem (最后一波提示系统)
@@ -413,7 +412,7 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 
 	// Story 8.2: Initialize tutorial system (if this is a tutorial level)
 	if scene.gameState.CurrentLevel != nil && scene.gameState.CurrentLevel.OpeningType == "tutorial" && len(scene.gameState.CurrentLevel.TutorialSteps) > 0 {
-		scene.tutorialSystem = systems.NewTutorialSystem(scene.entityManager, scene.gameState, scene.resourceManager, scene.reanimSystem, scene.lawnGridSystem, scene.sunSpawnSystem, scene.waveSpawnSystem, scene.gameState.CurrentLevel)
+		scene.tutorialSystem = systems.NewTutorialSystem(scene.entityManager, scene.gameState, scene.resourceManager, scene.lawnGridSystem, scene.sunSpawnSystem, scene.waveSpawnSystem, scene.gameState.CurrentLevel)
 		log.Printf("[GameScene] Tutorial system activated for level %s", scene.gameState.CurrentLevel.ID)
 
 		// 禁用自动阳光生成（第一次收集阳光后由 TutorialSystem 启用）
@@ -434,7 +433,7 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	}
 
 	// Story 8.2 QA改进：初始化铺草皮动画系统
-	scene.soddingSystem = systems.NewSoddingSystem(scene.entityManager, scene.resourceManager, scene.reanimSystem)
+	scene.soddingSystem = systems.NewSoddingSystem(scene.entityManager, scene.resourceManager)
 	log.Printf("[GameScene] Initialized sodding animation system")
 
 	// 按钮系统初始化（ECS 架构）
@@ -2145,7 +2144,6 @@ func (s *GameScene) initLawnmowers() {
 		lawnmowerID, err := entities.NewLawnmowerEntity(
 			s.entityManager,
 			s.resourceManager,
-			s.reanimSystem,
 			lane,
 		)
 

@@ -259,14 +259,14 @@ func NewWallnutEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameSta
 //   - em: 实体管理器
 //   - rm: 资源管理器（用于加载樱桃炸弹图像和 Reanim 资源）
 //   - gs: 游戏状态（用于获取摄像机位置）
-//   - rs: Reanim 系统（用于初始化动画）
 //   - col: 网格列索引 (0-8)
 //   - row: 网格行索引 (0-4)
 //
 // 返回:
 //   - ecs.EntityID: 创建的樱桃炸弹实体ID，如果失败返回 0
 //   - error: 如果创建失败返回错误信息
-func NewCherryBombEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState, rs ReanimSystemInterface, col, row int) (ecs.EntityID, error) {
+// Story 14.3: Epic 14 - 移除 ReanimSystem 依赖，动画通过 AnimationCommand 组件初始化
+func NewCherryBombEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState, col, row int) (ecs.EntityID, error) {
 	// 计算格子中心坐标（使用世界坐标系统）
 	worldCenterX := config.GridWorldStartX + float64(col)*config.CellWidth + config.CellWidth/2
 	worldCenterY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
@@ -295,10 +295,13 @@ func NewCherryBombEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.Game
 		PartImages: partImages,
 	})
 
-	// Story 13.8: 使用 PlayCombo API 播放默认动画
-	if err := rs.PlayCombo(entityID, "cherrybomb", ""); err != nil {
-		return 0, fmt.Errorf("failed to play CherryBomb default animation: %w", err)
-	}
+	// ✅ Epic 14: 使用 AnimationCommand 触发动画（替代直接调用 ReanimSystem）
+	// 添加动画命令组件，让 ReanimSystem 在 Update 中处理
+	// 樱桃炸弹播放 anim_idle（引信动画）
+	ecs.AddComponent(em, entityID, &components.AnimationCommandComponent{
+		AnimationName: "anim_idle",
+		Processed:     false,
+	})
 	log.Printf("[PlantFactory] 樱桃炸弹 %d: 成功添加 ReanimComponent 并初始化引信动画", entityID)
 
 	// 添加植物组件（用于碰撞检测和网格位置追踪）

@@ -430,7 +430,6 @@ func TestNewCherryBombEntity(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := game.GetGameState()
 	gs.CameraX = 215
-	mockRS := &mockReanimSystem{em: em}
 
 	tests := []struct {
 		name string
@@ -456,8 +455,8 @@ func TestNewCherryBombEntity(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// 创建樱桃炸弹实体
-			cherryBombID, err := NewCherryBombEntity(em, rm, gs, mockRS, tt.col, tt.row)
+			// 创建樱桃炸弹实体（Epic 14: 已删除 mockRS 参数）
+			cherryBombID, err := NewCherryBombEntity(em, rm, gs, tt.col, tt.row)
 			if err != nil {
 				t.Fatalf("Failed to create cherry bomb entity: %v", err)
 			}
@@ -492,9 +491,20 @@ func TestNewCherryBombEntity(t *testing.T) {
 				if reanim.PartImages == nil {
 					t.Error("ReanimComponent.PartImages should not be nil")
 				}
-				// 验证初始动画设置为 anim_idle（引信动画）
-				if len(reanim.CurrentAnimations) == 0 || reanim.CurrentAnimations[0] != "anim_idle" {
-					t.Errorf("CurrentAnimations[0] should be 'anim_idle', got %v", reanim.CurrentAnimations)
+				// ✅ Epic 14: 不再检查 CurrentAnimations
+				// 新架构中使用 AnimationCommandComponent，CurrentAnimations 在 ReanimSystem.Update() 处理后才填充
+			}
+
+			// ✅ Epic 14: 验证 AnimationCommandComponent（替代直接调用 ReanimSystem）
+			animCmd, ok := ecs.GetComponent[*components.AnimationCommandComponent](em, cherryBombID)
+			if !ok {
+				t.Error("Cherry bomb entity should have AnimationCommandComponent")
+			} else {
+				if animCmd.AnimationName != "anim_idle" {
+					t.Errorf("AnimationCommandComponent.AnimationName should be 'anim_idle', got '%s'", animCmd.AnimationName)
+				}
+				if animCmd.Processed {
+					t.Error("AnimationCommand should not be processed yet (Processed=false)")
 				}
 			}
 

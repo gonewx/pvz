@@ -141,15 +141,13 @@ func NewFallingPartEffect(em *ecs.EntityManager, partImage *ebiten.Image, x, y, 
 // 返回:
 //   - ecs.EntityID: 创建的动画实体ID，如果失败返回 0
 //   - error: 如果创建失败返回错误信息
-func CreateFinalWaveEntity(em *ecs.EntityManager, rm ResourceLoader, reanimSystem ReanimSystemInterface, x, y float64) (ecs.EntityID, error) {
+// Story 14.3: Epic 14 - 移除 ReanimSystem 依赖，动画通过 AnimationCommand 组件初始化
+func CreateFinalWaveEntity(em *ecs.EntityManager, rm ResourceLoader, x, y float64) (ecs.EntityID, error) {
 	if em == nil {
 		return 0, fmt.Errorf("entity manager cannot be nil")
 	}
 	if rm == nil {
 		return 0, fmt.Errorf("resource manager cannot be nil")
-	}
-	if reanimSystem == nil {
-		return 0, fmt.Errorf("reanim system cannot be nil")
 	}
 
 	// 加载 FinalWave.reanim 数据
@@ -184,9 +182,9 @@ func CreateFinalWaveEntity(em *ecs.EntityManager, rm ResourceLoader, reanimSyste
 	}
 	ecs.AddComponent(em, entityID, reanimComp)
 
-	// Story 13.6: 特效动画播放 (P2 - 降级方案，保持原有实现)
-	// 初始化 Reanim 动画
-	reanimSystem.PlayAnimation(entityID, "anim")
+	// Story 14.3: Epic 14 - 动画初始化通过 AnimationCommand 组件完成
+	// 工厂函数只负责创建实体和添加基础组件，不初始化动画
+	// 调用者（如 LevelSystem）应在创建后添加 AnimationCommand 组件
 
 	// 添加生命周期组件（动画播放完毕后自动删除）
 	// FinalWave.reanim 有 27 帧，FPS=12，播放时长约 2.25 秒

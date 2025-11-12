@@ -23,7 +23,8 @@ import (
 //   - error: 如果创建失败返回错误信息
 //
 // 注意：僵尸默认创建时速度为0（待命状态），需要通过 WaveSpawnSystem.ActivateWave() 激活
-func NewZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs ReanimSystemInterface, row int, spawnX float64) (ecs.EntityID, error) {
+// Story 14.3: Epic 14 - 移除 ReanimSystem 依赖，动画通过 AnimationCommand 组件初始化
+func NewZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spawnX float64) (ecs.EntityID, error) {
 	if em == nil {
 		return 0, fmt.Errorf("entity manager cannot be nil")
 	}
@@ -62,12 +63,13 @@ func NewZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs ReanimSystemIn
 		PartImages: partImages,
 	})
 
-	// Story 13.8: 僵尸使用配置驱动的动画组合（自动隐藏装备轨道）
-	// 普通僵尸需要隐藏铁桶、路障、铁门等特殊装备
-	// 激活后会由 WaveSpawnSystem.ActivateWave() 切换为 walk 动画
-	if err := rs.PlayCombo(entityID, "zombie", "idle"); err != nil {
-		return 0, fmt.Errorf("failed to play Zombie idle combo: %w", err)
-	}
+	// ✅ Epic 14: 使用 AnimationCommand 触发动画（替代直接调用 ReanimSystem）
+	// 添加动画命令组件，让 ReanimSystem 在 Update 中处理
+	// 默认播放 anim_idle 动画，WaveSpawnSystem 激活时会切换到 anim_walk
+	ecs.AddComponent(em, entityID, &components.AnimationCommandComponent{
+		AnimationName: "anim_idle",
+		Processed:     false,
+	})
 
 	// 添加速度组件（初始速度为0，待命状态）
 	// Story 8.3: 僵尸在预生成时不移动，等待 WaveSpawnSystem.ActivateWave() 激活
@@ -111,7 +113,8 @@ func NewZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs ReanimSystemIn
 // 返回:
 //   - ecs.EntityID: 创建的路障僵尸实体ID，如果失败返回 0
 //   - error: 如果创建失败返回错误信息
-func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs ReanimSystemInterface, row int, spawnX float64) (ecs.EntityID, error) {
+// Story 14.3: Epic 14 - 移除 ReanimSystem 依赖，动画通过 AnimationCommand 组件初始化
+func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spawnX float64) (ecs.EntityID, error) {
 	if em == nil {
 		return 0, fmt.Errorf("entity manager cannot be nil")
 	}
@@ -151,11 +154,13 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs Reanim
 		PartImages: partImages,
 	})
 
-	// Story 13.8: 路障僵尸使用配置驱动的动画组合（自动显示路障，隐藏其他装备）
-	// 激活后会由 WaveSpawnSystem.ActivateWave() 切换为 walk 动画
-	if err := rs.PlayCombo(entityID, "zombie_conehead", "idle"); err != nil {
-		return 0, fmt.Errorf("failed to play ZombieConeHead idle combo: %w", err)
-	}
+	// ✅ Epic 14: 使用 AnimationCommand 触发动画（替代直接调用 ReanimSystem）
+	// 添加动画命令组件，让 ReanimSystem 在 Update 中处理
+	// 默认播放 anim_idle 动画，WaveSpawnSystem 激活时会切换到 anim_walk
+	ecs.AddComponent(em, entityID, &components.AnimationCommandComponent{
+		AnimationName: "anim_idle",
+		Processed:     false,
+	})
 
 	// 添加速度组件（初始速度为0，待命状态）
 	// Story 8.3: 僵尸在预生成时不移动，等待 WaveSpawnSystem.ActivateWave() 激活
@@ -205,7 +210,8 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs Reanim
 // 返回:
 //   - ecs.EntityID: 创建的铁桶僵尸实体ID，如果失败返回 0
 //   - error: 如果创建失败返回错误信息
-func NewBucketheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs ReanimSystemInterface, row int, spawnX float64) (ecs.EntityID, error) {
+// Story 14.3: Epic 14 - 移除 ReanimSystem 依赖，动画通过 AnimationCommand 组件初始化
+func NewBucketheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spawnX float64) (ecs.EntityID, error) {
 	if em == nil {
 		return 0, fmt.Errorf("entity manager cannot be nil")
 	}
@@ -245,11 +251,13 @@ func NewBucketheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, rs Rean
 		PartImages: partImages,
 	})
 
-	// Story 13.8: 铁桶僵尸使用配置驱动的动画组合（自动显示铁桶，隐藏其他装备）
-	// 激活后会由 WaveSpawnSystem.ActivateWave() 切换为 walk 动画
-	if err := rs.PlayCombo(entityID, "zombie_buckethead", "idle"); err != nil {
-		return 0, fmt.Errorf("failed to play ZombieBucketHead idle combo: %w", err)
-	}
+	// ✅ Epic 14: 使用 AnimationCommand 触发动画（替代直接调用 ReanimSystem）
+	// 添加动画命令组件，让 ReanimSystem 在 Update 中处理
+	// 默认播放 anim_idle 动画，WaveSpawnSystem 激活时会切换到 anim_walk
+	ecs.AddComponent(em, entityID, &components.AnimationCommandComponent{
+		AnimationName: "anim_idle",
+		Processed:     false,
+	})
 
 	// 添加速度组件（初始速度为0，待命状态）
 	// Story 8.3: 僵尸在预生成时不移动，等待 WaveSpawnSystem.ActivateWave() 激活
