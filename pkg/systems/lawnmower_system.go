@@ -21,7 +21,6 @@ import (
 type LawnmowerSystem struct {
 	entityManager   *ecs.EntityManager
 	resourceManager *game.ResourceManager // 用于播放音效
-	reanimSystem    *ReanimSystem         // Story 10.3: 用于播放僵尸死亡动画
 	gameState       *game.GameState       // 用于增加消灭僵尸计数
 	stateEntityID   ecs.EntityID          // 全局状态实体ID
 }
@@ -30,12 +29,11 @@ type LawnmowerSystem struct {
 // 参数:
 //   - em: EntityManager 实例
 //   - rm: ResourceManager 实例（用于播放音效和粒子效果）
-//   - rs: ReanimSystem 实例（Story 10.3: 用于播放僵尸死亡动画）
 //   - gs: GameState 实例（用于记录游戏统计）
 //
 // 返回:
 //   - *LawnmowerSystem: 除草车系统实例
-func NewLawnmowerSystem(em *ecs.EntityManager, rm *game.ResourceManager, rs *ReanimSystem, gs *game.GameState) *LawnmowerSystem {
+func NewLawnmowerSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.GameState) *LawnmowerSystem {
 	// 创建全局状态实体
 	stateEntity := em.CreateEntity()
 	ecs.AddComponent(em, stateEntity, &components.LawnmowerStateComponent{
@@ -45,7 +43,6 @@ func NewLawnmowerSystem(em *ecs.EntityManager, rm *game.ResourceManager, rs *Rea
 	return &LawnmowerSystem{
 		entityManager:   em,
 		resourceManager: rm,
-		reanimSystem:    rs,
 		gameState:       gs,
 		stateEntityID:   stateEntity,
 	}
@@ -334,19 +331,17 @@ func (s *LawnmowerSystem) triggerZombieDeath(zombieID ecs.EntityID) {
 	}
 
 	// 3. 播放死亡动画（单次播放，不循环）
-	// Story 13.8: 使用配置驱动的动画组合（自动隐藏装备轨道）
-	if s.reanimSystem != nil {
-		err := s.reanimSystem.PlayCombo(zombieID, "zombie", "death")
-		if err != nil {
-			log.Printf("[LawnmowerSystem] 僵尸 %d 播放死亡动画失败: %v", zombieID, err)
-		} else {
-			// 设置为不循环
-			if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, zombieID); ok {
-				reanim.IsLooping = false
-			}
-			log.Printf("[LawnmowerSystem] 僵尸 %d 开始播放死亡动画", zombieID)
-		}
+	// Story 13.8: 使用 AnimationCommand 组件播放配置的动画组合（自动隐藏装备轨道）
+	ecs.AddComponent(s.entityManager, zombieID, &components.AnimationCommandComponent{
+		UnitID:    "zombie",
+		ComboName: "death",
+		Processed: false,
+	})
+	// 设置为不循环
+	if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, zombieID); ok {
+		reanim.IsLooping = false
 	}
+	log.Printf("[LawnmowerSystem] 僵尸 %d 开始播放死亡动画", zombieID)
 
 	// 4. 触发粒子效果（手臂和头部掉落）
 	// 这与 BehaviorSystem 的逻辑一致

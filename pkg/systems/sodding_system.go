@@ -28,7 +28,6 @@ import (
 type SoddingSystem struct {
 	entityManager   *ecs.EntityManager
 	resourceManager *game.ResourceManager
-	reanimSystem    *ReanimSystem
 
 	// 动画实体ID
 	sodRollEntityIDs   []ecs.EntityID // Story 8.6 QA修正: 每行一个草皮卷实体
@@ -57,11 +56,10 @@ type SoddingSystem struct {
 }
 
 // NewSoddingSystem 创建铺草皮动画系统
-func NewSoddingSystem(entityManager *ecs.EntityManager, rm *game.ResourceManager, reanimSystem *ReanimSystem) *SoddingSystem {
+func NewSoddingSystem(entityManager *ecs.EntityManager, rm *game.ResourceManager) *SoddingSystem {
 	return &SoddingSystem{
 		entityManager:      entityManager,
 		resourceManager:    rm,
-		reanimSystem:       reanimSystem,
 		isAnimationPlaying: false,
 		animationTimer:     0,
 		animationDuration:  0, // 将在 StartAnimation 时从 reanim 数据计算
@@ -225,12 +223,13 @@ func (s *SoddingSystem) createSodRollEntity(posX, posY float64, lane int) ecs.En
 	// 初始化 SodRoll 动画
 	// Story 13.8: 使用配置驱动的 PlayCombo API
 	// 配置文件: data/reanim_config/sodroll.yaml
-	if err := s.reanimSystem.PlayCombo(entityID, "sodroll", "roll"); err != nil {
-		log.Printf("[SoddingSystem] ERROR: Failed to play SodRoll animation for lane %d: %v", lane, err)
-		log.Printf("[SoddingSystem] Animation may not display correctly")
-	} else {
-		log.Printf("[SoddingSystem] SodRoll animation started successfully for lane %d", lane)
-	}
+	// Epic 14: 使用 AnimationCommand 组件触发动画
+	ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
+		UnitID:    "sodroll",
+		ComboName: "roll",
+		Processed: false,
+	})
+	log.Printf("[SoddingSystem] SodRoll animation command added for lane %d", lane)
 
 	return entityID
 }

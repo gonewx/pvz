@@ -579,7 +579,8 @@ func (s *InputSystem) createPlantEntity(plantType components.PlantType, col, row
 		return entities.NewWallnutEntity(s.entityManager, s.resourceManager, s.gameState, s.reanimSystem, col, row)
 	}
 	if plantType == components.PlantCherryBomb {
-		return entities.NewCherryBombEntity(s.entityManager, s.resourceManager, s.gameState, s.reanimSystem, col, row)
+		// ✅ Epic 14: 移除 reanimSystem 参数
+		return entities.NewCherryBombEntity(s.entityManager, s.resourceManager, s.gameState, col, row)
 	}
 	// 其他植物使用通用工厂函数
 	return entities.NewPlantEntity(s.entityManager, s.resourceManager, s.gameState, s.reanimSystem, plantType, col, row)

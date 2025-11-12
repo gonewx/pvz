@@ -4,6 +4,7 @@ import (
 	"log"
 	"math/rand"
 
+	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
@@ -13,24 +14,22 @@ import (
 type SunSpawnSystem struct {
 	entityManager   *ecs.EntityManager
 	resourceManager *game.ResourceManager
-	reanimSystem    *ReanimSystem // Story 8.2 QA修复：用于初始化阳光动画
-	spawnTimer      float64       // 当前计时器
-	spawnInterval   float64       // 生成间隔(秒)
-	minX            float64       // 阳光生成的最小X坐标
-	maxX            float64       // 阳光生成的最大X坐标
-	minTargetY      float64       // 阳光落地的最小Y坐标
-	maxTargetY      float64       // 阳光落地的最大Y坐标
-	enabled         bool          // Story 8.2: 是否启用自动生成（教学关卡初始禁用）
+	spawnTimer      float64 // 当前计时器
+	spawnInterval   float64 // 生成间隔(秒)
+	minX            float64 // 阳光生成的最小X坐标
+	maxX            float64 // 阳光生成的最大X坐标
+	minTargetY      float64 // 阳光落地的最小Y坐标
+	maxTargetY      float64 // 阳光落地的最大Y坐标
+	enabled         bool    // Story 8.2: 是否启用自动生成（教学关卡初始禁用）
 }
 
 // NewSunSpawnSystem 创建一个新的阳光生成系统
 // 参数:
 //   - em: EntityManager 实例
 //   - rm: ResourceManager 实例
-//   - rs: ReanimSystem 实例（用于初始化阳光动画）
 //   - minX, maxX: 阳光生成的水平范围
 //   - minTargetY, maxTargetY: 阳光落地的垂直范围
-func NewSunSpawnSystem(em *ecs.EntityManager, rm *game.ResourceManager, rs *ReanimSystem, minX, maxX, minTargetY, maxTargetY float64) *SunSpawnSystem {
+func NewSunSpawnSystem(em *ecs.EntityManager, rm *game.ResourceManager, minX, maxX, minTargetY, maxTargetY float64) *SunSpawnSystem {
 	// 基础间隔: 8秒 ±2秒随机变化
 	baseInterval := 8.0
 	randomOffset := -2.0 + rand.Float64()*4.0 // -2 到 +2 秒
@@ -41,7 +40,6 @@ func NewSunSpawnSystem(em *ecs.EntityManager, rm *game.ResourceManager, rs *Rean
 	return &SunSpawnSystem{
 		entityManager:   em,
 		resourceManager: rm,
-		reanimSystem:    rs,
 		spawnTimer:      0,
 		spawnInterval:   initialInterval, // 原版游戏机制: 8秒±1秒随机
 		minX:            minX,
@@ -127,10 +125,12 @@ func (s *SunSpawnSystem) Update(deltaTime float64) {
 		log.Printf("[SunSpawnSystem] Created sun entity ID: %d", sunID)
 
 		// Bug Fix: Sun.reanim 只有轨道(Sun1, Sun2, Sun3),没有动画定义
-		// 使用 PlayCombo 播放配置的"idle"组合（包含所有3个轨道）
-		if err := s.reanimSystem.PlayCombo(sunID, "sun", "idle"); err != nil {
-			log.Printf("[SunSpawnSystem] WARNING: Failed to play sun animation combo: %v", err)
-		}
+		// 使用 AnimationCommand 组件播放配置的"idle"组合（包含所有3个轨道）
+		ecs.AddComponent(s.entityManager, sunID, &components.AnimationCommandComponent{
+			UnitID:    "sun",
+			ComboName: "idle",
+			Processed: false,
+		})
 	}
 }
 

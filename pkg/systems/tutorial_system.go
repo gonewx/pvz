@@ -17,7 +17,6 @@ type TutorialSystem struct {
 	entityManager        *ecs.EntityManager
 	gameState            *game.GameState
 	resourceManager      *game.ResourceManager
-	reanimSystem         *ReanimSystem    // 用于初始化僵尸动画
 	lawnGridSystem       *LawnGridSystem  // 用于控制草坪闪烁效果（Story 8.2）
 	sunSpawnSystem       *SunSpawnSystem  // 用于启用阳光自动生成（Story 8.2）
 	waveSpawnSystem      *WaveSpawnSystem // 用于激活预生成的僵尸（替代自己创建僵尸）
@@ -51,7 +50,6 @@ type TutorialSystem struct {
 //   - em: EntityManager 实例
 //   - gs: GameState 实例
 //   - rm: ResourceManager 实例
-//   - rs: ReanimSystem 实例
 //   - lgs: LawnGridSystem 实例（用于控制草坪闪烁）
 //   - sss: SunSpawnSystem 实例（用于启用阳光自动生成）
 //   - wss: WaveSpawnSystem 实例（用于激活预生成的僵尸）
@@ -59,7 +57,7 @@ type TutorialSystem struct {
 //
 // 返回：
 //   - *TutorialSystem: 系统实例
-func NewTutorialSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.ResourceManager, rs *ReanimSystem, lgs *LawnGridSystem, sss *SunSpawnSystem, wss *WaveSpawnSystem, levelConfig *config.LevelConfig) *TutorialSystem {
+func NewTutorialSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.ResourceManager, lgs *LawnGridSystem, sss *SunSpawnSystem, wss *WaveSpawnSystem, levelConfig *config.LevelConfig) *TutorialSystem {
 	// 创建教学实体
 	tutorialEntity := em.CreateEntity()
 	ecs.AddComponent(em, tutorialEntity, &components.TutorialComponent{
@@ -75,7 +73,6 @@ func NewTutorialSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.Resou
 		entityManager:        em,
 		gameState:            gs,
 		resourceManager:      rm,
-		reanimSystem:         rs,
 		lawnGridSystem:       lgs,
 		sunSpawnSystem:       sss, // 保存 SunSpawnSystem 引用
 		waveSpawnSystem:      wss, // 保存 WaveSpawnSystem 引用
@@ -654,12 +651,12 @@ func (s *TutorialSystem) spawnSkyFallingSun() {
 	log.Printf("[TutorialSystem] Created tutorial sun entity ID=%d at X=%.1f, targetY=%.1f", sunID, startX, targetY)
 
 	// Bug Fix: Sun.reanim 只有轨道(Sun1, Sun2, Sun3),没有动画定义
-	// 使用 PlayCombo 播放配置的"idle"组合（包含所有3个轨道）
-	if s.reanimSystem != nil {
-		if err := s.reanimSystem.PlayCombo(sunID, "sun", "idle"); err != nil {
-			log.Printf("[TutorialSystem] WARNING: Failed to play sun animation combo: %v", err)
-		}
-	}
+	// 使用 AnimationCommand 组件播放配置的"idle"组合（包含所有3个轨道）
+	ecs.AddComponent(s.entityManager, sunID, &components.AnimationCommandComponent{
+		UnitID:    "sun",
+		ComboName: "idle",
+		Processed: false,
+	})
 }
 
 // spawnTutorialZombies 开始生成教学关卡的僵尸波次
@@ -793,10 +790,10 @@ func (s *TutorialSystem) showFinalWaveWarning() {
 		State: components.UINormal,
 	})
 
-	// 使用 PlayAnimation 播放动画（只播放一次）
-	if err := s.reanimSystem.PlayAnimation(finalWaveEntity, "FinalWave"); err != nil {
-		log.Printf("[TutorialSystem] WARNING: Failed to play FinalWave animation: %v", err)
-	} else {
-		log.Printf("[TutorialSystem] Final wave warning displayed at (%.1f, %.1f)", centerX, centerY)
-	}
+	// 使用 AnimationCommand 组件播放动画（只播放一次）
+	ecs.AddComponent(s.entityManager, finalWaveEntity, &components.AnimationCommandComponent{
+		AnimationName: "FinalWave",
+		Processed:     false,
+	})
+	log.Printf("[TutorialSystem] Final wave warning displayed at (%.1f, %.1f)", centerX, centerY)
 }

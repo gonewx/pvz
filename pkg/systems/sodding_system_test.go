@@ -13,8 +13,7 @@ func TestCreateSodRollParticleEmitter(t *testing.T) {
 	// 创建测试环境
 	em := ecs.NewEntityManager()
 	rm := game.NewResourceManager(nil)
-	rs := NewReanimSystem(em)
-	ss := NewSoddingSystem(em, rm, rs)
+	ss := NewSoddingSystem(em, rm)
 
 	// 启动动画(启用粒子)
 	ss.StartAnimation(nil, []int{3}, []int{3}, 0, 127, true)
@@ -35,8 +34,7 @@ func TestParticleEmitterNotCreatedWhenDisabled(t *testing.T) {
 	// 创建测试环境
 	em := ecs.NewEntityManager()
 	rm := game.NewResourceManager(nil)
-	rs := NewReanimSystem(em)
-	ss := NewSoddingSystem(em, rm, rs)
+	ss := NewSoddingSystem(em, rm)
 
 	// 启动动画(禁用粒子)
 	ss.StartAnimation(nil, []int{3}, []int{3}, 0, 127, false)
@@ -50,8 +48,7 @@ func TestParticleEmitterStopsAfterAnimation(t *testing.T) {
 	// 创建测试环境
 	em := ecs.NewEntityManager()
 	rm := game.NewResourceManager(nil)
-	rs := NewReanimSystem(em)
-	ss := NewSoddingSystem(em, rm, rs)
+	ss := NewSoddingSystem(em, rm)
 
 	// 启动动画(启用粒子)
 	ss.StartAnimation(nil, []int{3}, []int{3}, 0, 127, true)

@@ -42,7 +42,7 @@ import (
 //   - docs/stories/6.3.story.md
 type RenderSystem struct {
 	entityManager     *ecs.EntityManager
-	reanimSystem      *ReanimSystem         // Story 13.4: ReanimSystem 引用（用于渲染缓存优化）
+	reanimSystem      *ReanimSystem         // ✅ 修复：添加 ReanimSystem 引用以调用 GetRenderData()
 	debugPrinted      map[ecs.EntityID]bool // 记录已打印调试信息的实体
 	particleVertices  []ebiten.Vertex       // 粒子顶点数组（复用，避免每帧分配）
 	particleIndices   []uint16              // 粒子索引数组（复用，避免每帧分配）
@@ -53,7 +53,6 @@ type RenderSystem struct {
 func NewRenderSystem(em *ecs.EntityManager) *RenderSystem {
 	return &RenderSystem{
 		entityManager:     em,
-		reanimSystem:      nil, // Story 13.4: 默认为 nil，需要调用 SetReanimSystem 启用缓存优化
 		debugPrinted:      make(map[ecs.EntityID]bool),
 		particleVertices:  make([]ebiten.Vertex, 0, 4000), // 预分配容量：支持 1000 个粒子（每粒子 4 顶点）
 		particleIndices:   make([]uint16, 0, 6000),        // 预分配容量：支持 1000 个粒子（每粒子 6 索引）
@@ -61,10 +60,10 @@ func NewRenderSystem(em *ecs.EntityManager) *RenderSystem {
 	}
 }
 
-// SetReanimSystem 设置 ReanimSystem 引用（Story 13.4）
-// 启用渲染缓存优化，提升 20%+ 性能
-func (s *RenderSystem) SetReanimSystem(reanimSystem *ReanimSystem) {
-	s.reanimSystem = reanimSystem
+// SetReanimSystem 设置 ReanimSystem 引用（用于调用 GetRenderData）
+// ✅ 修复：Epic 14 引入的问题 - RenderSystem 需要调用 ReanimSystem.GetRenderData() 更新缓存
+func (s *RenderSystem) SetReanimSystem(rs *ReanimSystem) {
+	s.reanimSystem = rs
 }
 
 // DrawEntity 绘制单个实体（公开方法，用于特殊场景如主菜单）
@@ -345,13 +344,17 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		effectiveCameraX = 0 // UI 元素使用屏幕坐标，不应用摄像机偏移
 	}
 
-	// 获取渲染数据（自动更新缓存）
-	if s.reanimSystem == nil {
-		return // 没有 ReanimSystem，无法渲染
+	// ✅ 修复：调用 GetRenderData() 更新渲染缓存
+	// Epic 14 之前的错误：直接读取 CachedRenderData 导致缓存从不更新，主菜单黑屏
+	var renderData []components.RenderPartData
+	if s.reanimSystem != nil {
+		renderData = s.reanimSystem.GetRenderData(id)
+	} else {
+		// 后备：直接读取缓存（兼容旧代码）
+		renderData = reanimComp.CachedRenderData
 	}
 
-	renderData := s.reanimSystem.GetRenderData(id)
-	if len(renderData) == 0 {
+	if renderData == nil || len(renderData) == 0 {
 		return // 没有渲染数据
 	}
 

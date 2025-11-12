@@ -12,9 +12,8 @@ import (
 func TestSunSpawnSystem_SpawnAfter8Seconds(t *testing.T) {
 	em := ecs.NewEntityManager()
 	rm := game.NewResourceManager(nil)
-	rs := NewReanimSystem(em) // Story 8.2 QA修复：添加 ReanimSystem 参数
 
-	system := NewSunSpawnSystem(em, rm, rs, 250.0, 900.0, 100.0, 550.0)
+	system := NewSunSpawnSystem(em, rm, 250.0, 900.0, 100.0, 550.0)
 
 	// 更新8秒
 	system.Update(8.0)
@@ -37,9 +36,8 @@ func TestSunSpawnSystem_SpawnAfter8Seconds(t *testing.T) {
 func TestSunSpawnSystem_MultipleCycles(t *testing.T) {
 	em := ecs.NewEntityManager()
 	rm := game.NewResourceManager(nil)
-	rs := NewReanimSystem(em) // Story 8.2 QA修复：添加 ReanimSystem 参数
 
-	system := NewSunSpawnSystem(em, rm, rs, 250.0, 900.0, 100.0, 550.0)
+	system := NewSunSpawnSystem(em, rm, 250.0, 900.0, 100.0, 550.0)
 
 	// 更新24秒（应该生成3个阳光）
 	for i := 0; i < 24; i++ {
