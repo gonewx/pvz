@@ -560,7 +560,14 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 			// frameIncrement = (FPS / targetTPS) * speedMultiplier
 			// 例如：FPS=12, TPS=60, speed=0.2 → increment = (12/60) * 0.2 = 0.04 帧/tick
 			frameIncrement := (animFPS / s.targetTPS) * animSpeed
+			oldFrameIndex := comp.AnimationFrameIndices[animName]
 			comp.AnimationFrameIndices[animName] += frameIncrement
+
+			// Debug: 豌豆射手的帧推进（前10帧）
+			if (comp.ReanimName == "peashooter" || comp.ReanimName == "peashootersingle") && int(oldFrameIndex) < 10 {
+				log.Printf("[ReanimSystem] 帧推进: anim=%s, %.2f -> %.2f (increment=%.4f, FPS=%.1f, speed=%.2f)",
+					animName, oldFrameIndex, comp.AnimationFrameIndices[animName], frameIncrement, animFPS, animSpeed)
+			}
 
 			// ✅ 循环动画处理：帧索引超过最大帧数时，取模回到开头
 			if isLooping {
@@ -616,6 +623,11 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 			// 使用这个活跃动画的帧索引更新 CurrentFrame
 			comp.CurrentFrame = int(comp.AnimationFrameIndices[animName])
 			foundActiveAnim = true
+			// Debug: 豌豆射手的帧更新（前10帧）
+			if (comp.ReanimName == "peashooter" || comp.ReanimName == "peashootersingle") && comp.CurrentFrame < 10 {
+				log.Printf("[ReanimSystem] CurrentFrame更新: anim=%s, frameIndex=%.2f, CurrentFrame=%d",
+					animName, comp.AnimationFrameIndices[animName], comp.CurrentFrame)
+			}
 			if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 5 {
 				log.Printf("[ReanimSystem] ✅ 使用动画 %s 更新 CurrentFrame = %d", animName, comp.CurrentFrame)
 			}
@@ -912,6 +924,11 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 			offsetX, offsetY := 0.0, 0.0
 			if parentTrackName, hasParent := comp.ParentTracks[trackName]; hasParent {
 				offsetX, offsetY = s.getParentOffsetForAnimation(comp, parentTrackName, animName)
+				// Debug: 豌豆射手的父偏移（前10帧）
+				if (comp.ReanimName == "peashooter" || comp.ReanimName == "peashootersingle") && comp.CurrentFrame < 10 {
+					log.Printf("[ReanimSystem] ParentOffset: track=%s, parent=%s, anim=%s, offset=(%.2f, %.2f)",
+						trackName, parentTrackName, animName, offsetX, offsetY)
+				}
 			}
 
 			// 更新选中数据（后面的动画会覆盖前面的）
@@ -1016,12 +1033,26 @@ func (s *ReanimSystem) GetRenderData(entityID ecs.EntityID) []components.RenderP
 
 // rebuildAnimationData 重建动画数据（AnimVisiblesMap）
 // 基于 AnimationCell.rebuildAnimationData()
+// ✅ Bug Fix: 同时为父轨道创建可见性数组
 func (s *ReanimSystem) rebuildAnimationData(comp *components.ReanimComponent) {
 	comp.AnimVisiblesMap = make(map[string][]int)
 
+	// 1. 为当前播放的动画创建可见性数组
 	for _, animName := range comp.CurrentAnimations {
 		animVisibles := buildVisiblesArray(comp.ReanimXML, comp.MergedTracks, animName)
 		comp.AnimVisiblesMap[animName] = animVisibles
+	}
+
+	// 2. ✅ Bug Fix: 为 ParentTracks 中的父轨道创建可见性数组
+	// 父轨道不在 CurrentAnimations 中，但计算父偏移时需要它们的可见性数组
+	if comp.ParentTracks != nil {
+		for _, parentTrackName := range comp.ParentTracks {
+			// 如果该父轨道还没有可见性数组，创建一个
+			if _, exists := comp.AnimVisiblesMap[parentTrackName]; !exists {
+				animVisibles := buildVisiblesArray(comp.ReanimXML, comp.MergedTracks, parentTrackName)
+				comp.AnimVisiblesMap[parentTrackName] = animVisibles
+			}
+		}
 	}
 }
 
@@ -1133,6 +1164,10 @@ func (s *ReanimSystem) getInterpolatedFrame(
 func (s *ReanimSystem) getParentOffsetForAnimation(comp *components.ReanimComponent, parentTrackName string, animName string) (float64, float64) {
 	parentFrames, ok := comp.MergedTracks[parentTrackName]
 	if !ok || len(parentFrames) == 0 {
+		// Debug: 父轨道不存在
+		if comp.ReanimName == "peashooter" && comp.CurrentFrame < 3 {
+			log.Printf("[ReanimSystem] ⚠️ 父轨道不存在: parent=%s", parentTrackName)
+		}
 		return 0, 0
 	}
 
@@ -1148,23 +1183,22 @@ func (s *ReanimSystem) getParentOffsetForAnimation(comp *components.ReanimCompon
 		logicalFrame = float64(comp.CurrentFrame) // 后备：使用共享帧
 	}
 
-	// 获取动画的可见性数组
-	animVisibles, ok := comp.AnimVisiblesMap[animName]
-	if !ok || len(animVisibles) == 0 {
+	// 获取父轨道的可见性数组
+	// ✅ Bug Fix: 应该使用父轨道自己的可见性数组，而不是子动画的
+	parentAnimVisibles, ok := comp.AnimVisiblesMap[parentTrackName]
+	if !ok || len(parentAnimVisibles) == 0 {
+		// Debug: 父轨道的可见性数组不存在
+		if comp.ReanimName == "peashooter" && comp.CurrentFrame < 3 {
+			log.Printf("[ReanimSystem] ⚠️ 父轨道可见性数组不存在: parent=%s, AnimVisiblesMap keys=%v",
+				parentTrackName, getMapKeys(comp.AnimVisiblesMap))
+		}
 		return 0, 0
 	}
 
-	// 获取第一个可见帧的索引
-	firstVisibleFrameIndex := -1
-	for i, v := range animVisibles {
-		if v == 0 {
-			firstVisibleFrameIndex = i
-			break
-		}
-	}
-
-	// 映射到物理帧
-	firstPhysicalFrame := mapLogicalToPhysical(firstVisibleFrameIndex, animVisibles)
+	// 获取第一个可见帧的物理索引
+	// ✅ Bug Fix: 第一个可见帧的逻辑帧号总是 0
+	// 不需要遍历查找，直接使用逻辑帧号 0 映射到物理帧
+	firstPhysicalFrame := mapLogicalToPhysical(0, parentAnimVisibles)
 	if firstPhysicalFrame < 0 || firstPhysicalFrame >= len(parentFrames) {
 		return 0, 0
 	}
@@ -1180,7 +1214,8 @@ func (s *ReanimSystem) getParentOffsetForAnimation(comp *components.ReanimCompon
 	}
 
 	// ✅ 使用帧插值获取父轨道当前帧的平滑位置
-	currentFrame := s.getInterpolatedFrame(animName, logicalFrame, animVisibles, parentFrames)
+	// 使用父轨道自己的可见性数组
+	currentFrame := s.getInterpolatedFrame(parentTrackName, logicalFrame, parentAnimVisibles, parentFrames)
 
 	currentX, currentY := initX, initY
 	if currentFrame.X != nil {
@@ -1190,7 +1225,24 @@ func (s *ReanimSystem) getParentOffsetForAnimation(comp *components.ReanimCompon
 		currentY = *currentFrame.Y
 	}
 
+	// Debug: 父偏移计算详情（前3帧）
+	if comp.ReanimName == "peashooter" && comp.CurrentFrame < 3 {
+		log.Printf("[ReanimSystem] GetParentOffset[%s]: parent=%s, anim=%s, logicalFrame=%.2f, firstPhysical=%d",
+			comp.ReanimName, parentTrackName, animName, logicalFrame, firstPhysicalFrame)
+		log.Printf("[ReanimSystem]   init=(%.2f, %.2f), current=(%.2f, %.2f), offset=(%.2f, %.2f)",
+			initX, initY, currentX, currentY, currentX-initX, currentY-initY)
+	}
+
 	return currentX - initX, currentY - initY
+}
+
+// getMapKeys 获取 map 的所有 key（辅助函数，用于调试）
+func getMapKeys(m map[string][]int) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 // ==================================================================
