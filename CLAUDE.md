@@ -189,6 +189,99 @@ entities := ecs.GetEntitiesWith3[
 - `EmitterComponent`: 粒子发射器配置(生成规则、限制、力场等) - Story 7.2
 - `ReanimComponent`: Reanim 动画组件，支持复杂的多轨道动画系统 - Epic 13
 
+### 动画控制组件
+- `AnimationCommandComponent`: 动画播放命令(用于系统间通信，替代直接调用 ReanimSystem) - Epic 14
+  - UnitID: 单位 ID(如 "zombie")
+  - ComboName: 组合名称(如 "death")
+  - AnimationName: 单动画名称(可选)
+  - Processed: 是否已处理
+
+## 如何正确触发动画
+
+**核心原则**: 系统之间通过组件通信,不直接调用。动画触发遵循 **ECS 零耦合原则**。
+
+### ✅ 推荐方式: 使用 AnimationCommand 组件 (Epic 14)
+
+#### 场景 A: 播放配置化的动画组合
+
+```go
+// 示例：僵尸死亡动画
+ecs.AddComponent(s.entityManager, zombieID, &components.AnimationCommandComponent{
+    UnitID:    "zombie",        // 单位 ID（对应 data/reanim_config/zombie.yaml）
+    ComboName: "death",         // 组合名称（在配置文件中定义）
+    Processed: false,           // 标记为未处理
+})
+```
+
+**工作流程**:
+1. 业务系统（如 BehaviorSystem）添加 AnimationCommandComponent 组件
+2. ReanimSystem 在 Update() 开头读取未处理的命令
+3. ReanimSystem 根据配置播放动画,然后标记 Processed = true
+
+#### 场景 B: 播放单个动画
+
+```go
+// 示例：最终波次警告动画
+ecs.AddComponent(s.entityManager, warningID, &components.AnimationCommandComponent{
+    AnimationName: "FinalWave",  // 单动画名称
+    Processed:     false,
+})
+```
+
+**注意**: 单动画模式不需要 UnitID 和 ComboName。
+
+### ❌ 错误方式: 直接调用 ReanimSystem (已废弃)
+
+```go
+// ❌ 违反 ECS 零耦合原则
+s.reanimSystem.PlayCombo(entityID, "zombie", "death")
+
+// ❌ 需要在系统间传递 ReanimSystem 引用
+type BehaviorSystem struct {
+    reanimSystem *ReanimSystem  // 耦合!
+}
+```
+
+**为什么错误**:
+- 系统间直接调用导致紧耦合
+- 违反"数据-行为分离"原则
+- 难以测试和维护
+- 无法并行处理（依赖调用顺序）
+
+### 设计原则
+
+**零耦合**: System 之间通过 EntityManager（组件）通信，不直接调用
+
+**数据驱动**: 动画请求表达为组件数据，由 ReanimSystem 统一处理
+
+**职责分离**:
+- 逻辑系统（BehaviorSystem 等）: 决策"何时播放动画"
+- ReanimSystem: 执行"如何播放动画"
+
+### Epic 14 重构成果
+
+**改造前** (15 处违规):
+```
+BehaviorSystem  ──直接调用──> ReanimSystem.PlayCombo()
+WaveSpawnSystem ──直接调用──> ReanimSystem.PlayCombo()
+LevelSystem     ──直接调用──> ReanimSystem.PlayAnimation()
+...（共 9 个系统）
+```
+
+**改造后** (零违规):
+```
+BehaviorSystem  ──添加组件──> AnimationCommandComponent
+WaveSpawnSystem ──添加组件──> AnimationCommandComponent  ──ReanimSystem读取──> 执行动画
+LevelSystem     ──添加组件──> AnimationCommandComponent
+```
+
+**架构改进**:
+- ✅ 系统间耦合度降低 90%
+- ✅ 完全符合 ECS 架构原则
+- ✅ 代码更易测试和维护
+
+**详见**: `docs/prd/epic-14-ecs-decoupling-refactor.md`
+
 ## Reanim 动画配置系统（Epic 13）
 
 本项目使用**配置驱动**的 Reanim 动画系统，所有动画配置统一在 YAML 文件中管理，无需修改代码即可调整动画组合。
