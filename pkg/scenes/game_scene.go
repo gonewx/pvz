@@ -924,7 +924,10 @@ func (s *GameScene) loadSoddingResources() {
 	// - 底层背景：未铺草皮背景 + preSoddedLanes 草皮（IMAGE_SOD1ROW）
 	// - 叠加层：未铺草皮背景 + 所有启用行草皮（sodRowImageAnim 如 IMAGE_SOD3ROW）
 	// - 动画播放时：叠加层渐进显示，覆盖底层的 IMAGE_SOD1ROW，展现完整的 IMAGE_SOD3ROW
-	if s.gameState.CurrentLevel != nil && s.background != nil && s.gameState.CurrentLevel.ShowSoddingAnim {
+	//
+	// Level 1-3: preSoddedLanes=[2,3,4], ShowSoddingAnim=false
+	// - 直接渲染3行草皮到背景，无需动画
+	if s.gameState.CurrentLevel != nil && s.background != nil && (s.gameState.CurrentLevel.ShowSoddingAnim || len(s.gameState.CurrentLevel.PreSoddedLanes) > 0) {
 		enabledLanes := s.gameState.CurrentLevel.EnabledLanes
 		preSoddedLanes := s.gameState.CurrentLevel.PreSoddedLanes
 		hasTwoStageRendering := s.gameState.CurrentLevel.SodRowImageAnim != ""
@@ -1306,8 +1309,17 @@ func (s *GameScene) Update(deltaTime float64) {
 				s.soddingAnimStarted = true
 			}
 		} else if !shouldPlayAnim {
-			// 不播放铺草皮动画，直接标记为已完成
-			log.Printf("[GameScene] 关卡配置禁用铺草皮动画，跳过")
+			// 不播放铺草皮动画，但如果有 preSoddedLanes，需要显示预渲染的草皮
+			preSoddedLanes := s.gameState.CurrentLevel.PreSoddedLanes
+			if len(preSoddedLanes) > 0 {
+				// 有预铺草皮配置，需要显示草皮但不播放动画
+				// 将预渲染的背景副本（preSoddedImage）设置为永久可见
+				log.Printf("[GameScene] 关卡配置禁用动画，但有预铺草皮 %v，显示预渲染背景", preSoddedLanes)
+				// 注意：preSoddedImage 已在初始化时渲染好，这里不需要额外操作
+				// 只需确保在 Draw() 中能正确显示
+			} else {
+				log.Printf("[GameScene] 关卡配置禁用铺草皮动画，无预铺草皮，跳过")
+			}
 			s.soddingAnimStarted = true
 			// 立即初始化除草车（无需等待动画）
 			s.initLawnmowers()
