@@ -44,6 +44,11 @@ type AnimationComboConfig struct {
 	// Loop 是否循环播放（默认 true）
 	Loop *bool `yaml:"loop,omitempty"`
 
+	// AnimationLoopStates 每个动画的独立循环状态（可选）
+	// 格式：动画名 -> 是否循环
+	// 如果设置，将覆盖全局 Loop 设置
+	AnimationLoopStates map[string]bool `yaml:"animation_loop_states,omitempty"`
+
 	// BindingStrategy 轨道绑定策略（"auto" 或 "manual"）
 	// auto: 自动分析轨道绑定，manual: 手动指定绑定
 	BindingStrategy string `yaml:"binding_strategy,omitempty"`

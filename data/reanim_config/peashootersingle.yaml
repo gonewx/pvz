@@ -35,8 +35,18 @@ available_animations:
     - name: anim_blink
       display_name: blink
 animation_combos:
+    - name: idle
+      display_name: 待机
+      loop: true  # 待机动画循环播放
+      animations:
+        - anim_full_idle
+      binding_strategy: auto
+      hidden_tracks:
+        - anim_blink
+        - idle_shoot_blink
     - name: attack_with_sway
       display_name: 攻击+摇晃
+      loop: true  # 攻击动画循环播放
       animations:
         - anim_shooting
         - anim_idle

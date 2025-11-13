@@ -162,7 +162,7 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 
 		// Story 13.8: 使用 PlayCombo API 播放默认动画
 		// PlayCombo 会自动从 data/reanim_config.yaml 读取配置
-		if err := rs.PlayCombo(entityID, "peashooter", ""); err != nil {
+		if err := rs.PlayCombo(entityID, "peashootersingle", ""); err != nil {
 			return 0, fmt.Errorf("failed to play peashooter default animation: %w", err)
 		}
 
