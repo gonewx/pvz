@@ -176,8 +176,8 @@ func (ps *ParticleSystem) updateEmitters(dt float64) {
 		// Update emitter age
 		emitter.Age += dt
 
-		// Story 10.4: 应用 SystemPosition (发射器位置插值)
-		// Story 11.4: 修复 - SystemPosition 应该是相对于初始位置的偏移，而不是绝对位置
+		// 应用 SystemPosition (发射器位置插值)
+		// 修复 - SystemPosition 应该是相对于初始位置的偏移，而不是绝对位置
 		// 例如：SodRoll.xml 配置 <X>0 740</X><Y>30 0</Y>，发射器从初始位置(228, 320)移动到(228+740, 320+0)
 		if len(emitter.SystemPositionXKeyframes) > 0 || len(emitter.SystemPositionYKeyframes) > 0 {
 			// 归一化时间 t（0-1），基于发射器年龄和系统持续时间
@@ -318,7 +318,7 @@ func (ps *ParticleSystem) updateEmitters(dt float64) {
 			}
 		}
 
-		// Story 7.4: Auto-cleanup emitter entities when finished
+		// Auto-cleanup emitter entities when finished
 		// Delete emitter if it's inactive and has no active particles
 		if !emitter.Active && len(emitter.ActiveParticles) == 0 {
 			ps.EntityManager.DestroyEntity(emitterID)
@@ -365,7 +365,7 @@ func (ps *ParticleSystem) updateParticles(dt float64) {
 		// Update particle age
 		particle.Age += dt
 
-		// Story 7.5: Update system age (for SystemAlpha calculation)
+		// Update system age (for SystemAlpha calculation)
 		// 修复：EmitterAge 应该是 "发射器创建时的年龄 + 粒子自己的年龄"
 		// 而不是独立的计数器（粒子在创建时已经记录了发射器的初始年龄）
 		particle.EmitterAge += dt
@@ -404,7 +404,7 @@ func (ps *ParticleSystem) updateParticles(dt float64) {
 			position.Y += particle.VelocityY * dt
 		}
 
-		// Story 7.5: Ground collision detection (ZombieHead 弹跳效果)
+		// Ground collision detection (ZombieHead 弹跳效果)
 		if particle.GroundY > 0 && position.Y >= particle.GroundY {
 			// 粒子穿过地面，触发碰撞（只在真正穿过时碰撞）
 			if particle.VelocityY > 0 { // 只有向下运动时才碰撞
@@ -506,7 +506,7 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 	// DEBUG: 输出最终使用的角度
 	log.Printf("[LaunchAngle] 最终角度=%.1f° (范围 [%.1f, %.1f])", angle, angleMin, angleMax)
 
-	// Story 7.6: Apply emitter's angle offset (e.g., 180° to flip direction)
+	// Apply emitter's angle offset (e.g., 180° to flip direction)
 	// This keeps particle system decoupled from business logic (zombie direction)
 	// Business logic (BehaviorSystem) calculates offset based on entity direction
 	angle += emitter.AngleOffset
@@ -615,7 +615,7 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 			emitter.EmitterOffsetX, emitter.EmitterOffsetY, spawnX, spawnY)
 	}
 
-	// Story 10.4: 动态计算 EmitterBox（支持关键帧插值）
+	// 动态计算 EmitterBox（支持关键帧插值）
 	// 修复：正确处理非对称范围和负数偏移
 	// 例如：SodRoll.xml 的 EmitterBoxY="[-130 0] [-100 0]"
 	//   → minY 从 -130 插值到 -100
@@ -748,7 +748,7 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 		}
 	}
 
-	// Story 7.5: Parse collision properties (ZombieHead 弹跳效果)
+	// Parse collision properties (ZombieHead 弹跳效果)
 	var collisionReflectX, collisionReflectY float64
 	var collisionReflectCurve []particlePkg.Keyframe
 	var collisionSpinMin, collisionSpinMax float64
@@ -822,14 +822,14 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 		ScaleInterpolation: scaleInterp,
 		SpinInterpolation:  spinInterp,
 
-		Image:       particleImage, // Story 7.4: Loaded from ResourceManager
-		ImageFrames: imageFrames,   // Story 7.4: 精灵图帧数（列数）
+		Image:       particleImage, // Loaded from ResourceManager
+		ImageFrames: imageFrames,   // 精灵图帧数（列数）
 		ImageRows:   imageRows,     // BUG修复：精灵图行数（用于正确计算单帧高度）
-		FrameNum:    frameNum,      // Story 7.4: 当前帧编号
+		FrameNum:    frameNum,      // 当前帧编号
 		Additive:    additive,
 		Fields:      config.Fields, // Copy force fields from config
 
-		// Story 7.5: Collision properties
+		// Collision properties
 		CollisionReflectX:     collisionReflectX,
 		CollisionReflectY:     collisionReflectY,
 		CollisionReflectCurve: collisionReflectCurve,
@@ -838,7 +838,7 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 		CollisionSpinCurve:    collisionSpinCurve,
 		GroundY:               groundY,
 
-		// Story 7.5: System-level alpha (ZombieHead 系统淡出)
+		// System-level alpha (ZombieHead 系统淡出)
 		SystemAlphaKeyframes: emitter.SystemAlphaKeyframes,
 		SystemAlphaInterp:    emitter.SystemAlphaInterp,
 		EmitterAge:           emitter.Age,            // 使用发射器的当前年龄（修复：粒子应该基于发射器年龄，而不是自己的独立计数器）
@@ -906,7 +906,7 @@ func (ps *ParticleSystem) applyInterpolation(p *components.ParticleComponent) {
 		p.RotationSpeed = particlePkg.EvaluateKeyframes(p.SpinKeyframes, t, p.SpinInterpolation)
 	}
 
-	// Story 7.5: Apply SystemAlpha (ZombieHead 系统级淡出)
+	// Apply SystemAlpha (ZombieHead 系统级淡出)
 	// SystemAlpha 基于发射器年龄，而不是粒子年龄
 	if len(p.SystemAlphaKeyframes) > 0 && p.EmitterDuration > 0 {
 		// 计算系统时间归一化值（0-1）

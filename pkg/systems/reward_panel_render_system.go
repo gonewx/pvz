@@ -63,7 +63,7 @@ func NewRewardPanelRenderSystem(em *ecs.EntityManager, gs *game.GameState, rm *g
 		gameState:         gs,
 		resourceManager:   rm,
 		reanimSystem:      rs,
-		screenWidth:       800, // TODO: 从配置获取
+		screenWidth:       800,
 		screenHeight:      600,
 		titleFont:         titleFont,
 		plantInfoFont:     plantInfoFont,
@@ -84,7 +84,7 @@ func (rprs *RewardPanelRenderSystem) Draw(screen *ebiten.Image) {
 			continue
 		}
 
-		// Story 8.4: 奖励面板作为独立模块，直接渲染所有元素
+		// 奖励面板作为独立模块，直接渲染所有元素
 		// 不再依赖外部 PlantCardRenderSystem
 		rprs.drawPanel(screen, entity, panelComp)
 	}
@@ -205,7 +205,7 @@ func (rprs *RewardPanelRenderSystem) drawRewardCard(screen *ebiten.Image, panel 
 }
 
 // drawPlantCard 绘制植物卡片（独立渲染，不依赖外部系统）。
-// Story 8.4: 使用统一的植物卡片渲染函数
+// 使用统一的植物卡片渲染函数
 func (rprs *RewardPanelRenderSystem) drawPlantCard(screen *ebiten.Image, panel *components.RewardPanelComponent) {
 	// 降低透明度阈值，让卡片更早显示（与面板淡入同步）
 	if panel.FadeAlpha < 0.01 {
@@ -248,7 +248,7 @@ func (rprs *RewardPanelRenderSystem) drawPlantCard(screen *ebiten.Image, panel *
 		return
 	}
 
-	// Story 13.8: 获取配置ID（小写）
+	// 获取配置ID（小写）
 	configID := rprs.getConfigID(plantType)
 
 	// 使用 ReanimSystem 渲染植物图标
@@ -376,7 +376,7 @@ func (rprs *RewardPanelRenderSystem) updatePlantCardEntity(panelEntity ecs.Entit
 	// 更新卡片缩放和透明度（同步面板的淡入淡出效果）
 	if cardComp, ok := ecs.GetComponent[*components.PlantCardComponent](rprs.entityManager, cardEntity); ok {
 		cardComp.CardScale = cardScale
-		cardComp.Alpha = panel.FadeAlpha // Story 8.4: 同步面板透明度，使卡片与面板一起淡入淡出
+		cardComp.Alpha = panel.FadeAlpha // 同步面板透明度，使卡片与面板一起淡入淡出
 	}
 }
 
@@ -403,7 +403,7 @@ func (rprs *RewardPanelRenderSystem) getReanimName(plantType components.PlantTyp
 	case components.PlantSunflower:
 		return "SunFlower" // 修复：与资源加载时的名称一致
 	case components.PlantPeashooter:
-		return "PeaShooterSingle" // Story 10.3: 修正为普通豌豆射手资源
+		return "PeaShooterSingle" // 修正为普通豌豆射手资源
 	case components.PlantCherryBomb:
 		return "CherryBomb"
 	case components.PlantWallnut:

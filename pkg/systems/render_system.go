@@ -61,7 +61,6 @@ func NewRenderSystem(em *ecs.EntityManager) *RenderSystem {
 }
 
 // SetReanimSystem 设置 ReanimSystem 引用（用于调用 GetRenderData）
-// ✅ 修复：Epic 14 引入的问题 - RenderSystem 需要调用 ReanimSystem.GetRenderData() 更新缓存
 func (s *RenderSystem) SetReanimSystem(rs *ReanimSystem) {
 	s.reanimSystem = rs
 }
@@ -92,7 +91,7 @@ func (s *RenderSystem) Draw(screen *ebiten.Image, cameraX float64) {
 //   - screen: 绘制目标屏幕
 //   - cameraX: 摄像机的世界坐标X位置
 func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
-	// Story 6.3: 所有实体都使用 ReanimComponent 渲染
+	// 所有实体都使用 ReanimComponent 渲染
 	// 查询拥有 PositionComponent 和 ReanimComponent 的实体
 	entities := ecs.GetEntitiesWith2[
 		*components.PositionComponent,
@@ -148,6 +147,12 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 		}
 
 		// 渲染其他所有实体（僵尸、子弹、SodRoll 等特效）
+		// DEBUG: 追踪哪些实体被添加到渲染列表
+		if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id); ok {
+			if reanim.ReanimName == "simple_pea" {
+				log.Printf("[RenderSystem] 🎯 子弹 %d 被添加到 zombiesAndProjectiles 渲染列表", id)
+			}
+		}
 		zombiesAndProjectiles = append(zombiesAndProjectiles, id)
 	}
 
@@ -182,7 +187,7 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 //   - screen: 绘制目标屏幕
 //   - cameraX: 摄像机的世界坐标X位置
 func (s *RenderSystem) DrawSuns(screen *ebiten.Image, cameraX float64) {
-	// Story 6.3: 所有实体都使用 ReanimComponent 渲染
+	// 所有实体都使用 ReanimComponent 渲染
 	// 查询拥有 PositionComponent 和 ReanimComponent 的实体
 	entities := ecs.GetEntitiesWith2[
 		*components.PositionComponent,
@@ -217,7 +222,7 @@ func (s *RenderSystem) DrawSuns(screen *ebiten.Image, cameraX float64) {
 //   - id: 实体ID
 //   - cameraX: 摄像机的世界坐标X位置
 func (s *RenderSystem) drawEntity(screen *ebiten.Image, id ecs.EntityID, cameraX float64) {
-	// Story 6.3: 优先使用 ReanimComponent 渲染
+	// 优先使用 ReanimComponent 渲染
 	_, hasReanimComp := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id)
 	if hasReanimComp {
 		s.renderReanimEntity(screen, id, cameraX)
@@ -286,7 +291,7 @@ func getFloat(p *float64) float64 {
 // findPhysicalFrameIndex 将逻辑帧号映射到物理帧索引
 // 逻辑帧是可见帧的序号（0, 1, 2, ...），物理帧是 AnimVisibles 数组中的索引
 //
-// Story 12.1: 如果 AnimVisiblesMap 中当前动画的 AnimVisibles 为空，说明使用 PlayAllFrames 模式，
+// 如果 AnimVisiblesMap 中当前动画的 AnimVisibles 为空，说明使用 PlayAllFrames 模式，
 // CurrentFrame 直接就是物理帧索引，无需映射。
 //
 // 参数:
@@ -299,7 +304,7 @@ func (s *RenderSystem) findPhysicalFrameIndex(reanim *components.ReanimComponent
 	// 获取当前动画的 AnimVisibles
 	animVisibles := reanim.AnimVisiblesMap[reanim.CurrentAnimations[0]]
 
-	// Story 12.1: PlayAllFrames 模式 - CurrentFrame 直接是物理帧
+	// PlayAllFrames 模式 - CurrentFrame 直接是物理帧
 	// 这适用于 SelectorScreen 等不基于动画定义的复杂动画
 	if len(animVisibles) == 0 {
 		return logicalFrameNum // 直接返回，无需映射
@@ -322,7 +327,7 @@ func (s *RenderSystem) findPhysicalFrameIndex(reanim *components.ReanimComponent
 }
 
 // renderReanimEntity 渲染使用 ReanimComponent 的实体
-// Story 13.8: 完全重写，使用 CachedRenderData 简化实现
+// 完全重写，使用 CachedRenderData 简化实现
 //
 // 参数:
 //   - screen: 绘制目标屏幕
@@ -337,6 +342,12 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		return
 	}
 
+	// DEBUG: 追踪子弹渲染
+	if reanimComp.ReanimName == "simple_pea" {
+		log.Printf("[RenderSystem] 🎯 开始渲染子弹 %d: pos=(%.1f, %.1f), cameraX=%.1f",
+			id, pos.X, pos.Y, cameraX)
+	}
+
 	// 检查是否是 UI 元素（UI 元素不受摄像机影响）
 	_, isUI := ecs.GetComponent[*components.UIComponent](s.entityManager, id)
 	effectiveCameraX := cameraX
@@ -344,8 +355,7 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		effectiveCameraX = 0 // UI 元素使用屏幕坐标，不应用摄像机偏移
 	}
 
-	// ✅ 修复：调用 GetRenderData() 更新渲染缓存
-	// Epic 14 之前的错误：直接读取 CachedRenderData 导致缓存从不更新，主菜单黑屏
+	// 之前的错误：直接读取 CachedRenderData 导致缓存从不更新，主菜单黑屏
 	var renderData []components.RenderPartData
 	if s.reanimSystem != nil {
 		renderData = s.reanimSystem.GetRenderData(id)
@@ -354,7 +364,17 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		renderData = reanimComp.CachedRenderData
 	}
 
+	// DEBUG: 追踪子弹的渲染数据
+	if reanimComp.ReanimName == "simple_pea" {
+		log.Printf("[RenderSystem] 🎯 子弹 %d GetRenderData: len(renderData)=%d, reanimSystem=%v",
+			id, len(renderData), s.reanimSystem != nil)
+	}
+
 	if renderData == nil || len(renderData) == 0 {
+		// DEBUG: 追踪空渲染数据
+		if reanimComp.ReanimName == "simple_pea" {
+			log.Printf("[RenderSystem] 🎯 子弹 %d 渲染数据为空，跳过渲染", id)
+		}
 		return // 没有渲染数据
 	}
 
@@ -371,8 +391,17 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 	baseScreenY := pos.Y - reanimComp.CenterOffsetY
 
 	// 渲染每个部件
-	for _, partData := range renderData {
+	for i, partData := range renderData {
+		// DEBUG: 追踪子弹部件数据
+		if reanimComp.ReanimName == "simple_pea" {
+			log.Printf("[RenderSystem] 🎯 子弹 %d 部件[%d]: Img=%v, Frame.X=%v, Frame.Y=%v",
+				id, i, partData.Img != nil, partData.Frame.X, partData.Frame.Y)
+		}
+
 		if partData.Img == nil {
+			if reanimComp.ReanimName == "simple_pea" {
+				log.Printf("[RenderSystem] 🎯 子弹 %d 部件[%d] 图片为 nil，跳过", id, i)
+			}
 			continue
 		}
 
@@ -392,6 +421,14 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		w := float64(bounds.Dx())
 		h := float64(bounds.Dy())
 
+		// DEBUG: 追踪子弹的最终坐标
+		if reanimComp.ReanimName == "simple_pea" {
+			finalX := partX + baseScreenX
+			finalY := partY + baseScreenY
+			log.Printf("[RenderSystem] 🎯 子弹 %d 最终坐标: partX=%.1f, partY=%.1f, baseScreenX=%.1f, baseScreenY=%.1f, finalX=%.1f, finalY=%.1f, 图片尺寸=%.0fx%.0f",
+				id, partX, partY, baseScreenX, baseScreenY, finalX, finalY, w, h)
+		}
+
 		// 获取变换参数
 		scaleX := getFloat(frame.ScaleX)
 		scaleY := getFloat(frame.ScaleY)
@@ -409,7 +446,6 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		// a, b 控制 X 方向的变换
 		// c, d 控制 Y 方向的变换
 		//
-		// ✅ Story 13.8 Bug Fix #11: 修复 Skew 变换计算
 		//   - 参考实现：animation_cell.go:530-546
 		//   - Reanim 文件中 SkewX/SkewY 存储的是度数，需要转换为弧度
 		//   - 使用正确的 cos/sin 矩阵，而不是 tan
@@ -422,11 +458,9 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 			d = scaleY
 		} else {
 			// 有倾斜，使用完整的变换矩阵
-			// ✅ 修复 1: 将度数转换为弧度（Reanim 文件存储的是度数）
 			skewXRad := skewX * math.Pi / 180.0
 			skewYRad := skewY * math.Pi / 180.0
 
-			// ✅ 修复 2: 使用正确的 cos/sin 矩阵
 			// 标准 skew 矩阵：
 			// [a  c]   [cos(kx)*sx   -sin(ky)*sy]
 			// [b  d] = [sin(kx)*sx    cos(ky)*sy]
@@ -468,7 +502,7 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 }
 
 // ==================================================================
-// Story 6.5: Dual-Animation Rendering Helper Functions
+// Dual-Animation Rendering Helper Functions
 // ==================================================================
 
 // getStemOffset calculates the offset of anim_stem from its initial position.
@@ -973,7 +1007,7 @@ func (s *RenderSystem) buildParticleVertices(particle *components.ParticleCompon
 	colorA := float32(particle.Alpha)
 
 	// DEBUG: 粒子渲染调试日志（每个新粒子都打印会刷屏，已禁用）
-	// Story 7.4: 如需调试，可以临时启用此日志查看粒子渲染参数
+	// 如需调试，可以临时启用此日志查看粒子渲染参数
 	// if particle.Age < 0.1 {
 	// 	log.Printf("[RenderSystem] 新粒子渲染: 位置=(%.0f,%.0f) 屏幕位置=(%.0f,%.0f) 尺寸=%.1fx%.1f Scale=%.2f Alpha=%.2f 颜色RGB=(%.2f,%.2f,%.2f)",
 	// 		pos.X, pos.Y, pos.X-cameraX, pos.Y,

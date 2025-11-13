@@ -20,7 +20,7 @@ type SunSpawnSystem struct {
 	maxX            float64 // 阳光生成的最大X坐标
 	minTargetY      float64 // 阳光落地的最小Y坐标
 	maxTargetY      float64 // 阳光落地的最大Y坐标
-	enabled         bool    // Story 8.2: 是否启用自动生成（教学关卡初始禁用）
+	enabled         bool    // 是否启用自动生成（教学关卡初始禁用）
 }
 
 // NewSunSpawnSystem 创建一个新的阳光生成系统
@@ -52,7 +52,7 @@ func NewSunSpawnSystem(em *ecs.EntityManager, rm *game.ResourceManager, minX, ma
 
 // Update 更新阳光生成计时器
 func (s *SunSpawnSystem) Update(deltaTime float64) {
-	// Story 8.2: 检查是否启用（教学关卡初始禁用）
+	// 检查是否启用（教学关卡初始禁用）
 	if !s.enabled {
 		return
 	}
@@ -124,7 +124,7 @@ func (s *SunSpawnSystem) Update(deltaTime float64) {
 		sunID := entities.NewSunEntity(s.entityManager, s.resourceManager, startX, targetY)
 		log.Printf("[SunSpawnSystem] Created sun entity ID: %d", sunID)
 
-		// Bug Fix: Sun.reanim 只有轨道(Sun1, Sun2, Sun3),没有动画定义
+		// Sun.reanim 只有轨道(Sun1, Sun2, Sun3),没有动画定义
 		// 使用 AnimationCommand 组件播放配置的"idle"组合（包含所有3个轨道）
 		ecs.AddComponent(s.entityManager, sunID, &components.AnimationCommandComponent{
 			UnitID:    "sun",

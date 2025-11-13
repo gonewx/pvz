@@ -17,10 +17,10 @@ import (
 type BehaviorSystem struct {
 	entityManager    *ecs.EntityManager
 	resourceManager  *game.ResourceManager
-	gameState        *game.GameState // Story 5.5: 用于僵尸死亡计数
+	gameState        *game.GameState // 用于僵尸死亡计数
 	logFrameCounter  int             // 日志输出计数器（避免全局变量）
-	lawnGridSystem   *LawnGridSystem // Bug Fix: 用于植物死亡时释放网格占用
-	lawnGridEntityID ecs.EntityID    // Bug Fix: 草坪网格实体ID
+	lawnGridSystem   *LawnGridSystem // 用于植物死亡时释放网格占用
+	lawnGridEntityID ecs.EntityID    // 草坪网格实体ID
 }
 
 // 日志输出间隔常量
@@ -30,9 +30,9 @@ const LogOutputFrameInterval = 100 // 日志输出间隔（每N帧输出一次�
 // 参数:
 //   - em: EntityManager 实例
 //   - rm: ResourceManager 实例
-//   - gs: GameState 实例 (Story 5.5: 用于僵尸死亡计数)
-//   - lgs: LawnGridSystem 实例 (Bug Fix: 用于植物死亡时释放网格占用)
-//   - lawnGridID: 草坪网格实体ID (Bug Fix)
+//   - gs: GameState 实例 (用于僵尸死亡计数)
+//   - lgs: LawnGridSystem 实例 (用于植物死亡时释放网格占用)
+//   - lawnGridID: 草坪网格实体ID
 func NewBehaviorSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.GameState, lgs *LawnGridSystem, lawnGridID ecs.EntityID) *BehaviorSystem {
 	return &BehaviorSystem{
 		entityManager:    em,
@@ -99,7 +99,7 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 		}
 	}
 
-	// Story 10.3: 更新植物攻击动画状态（在所有行为处理之后）
+	// 更新植物攻击动画状态（在所有行为处理之后）
 	for _, entityID := range plantEntityList {
 		s.updatePlantAttackAnimation(entityID, deltaTime)
 	}
@@ -261,7 +261,7 @@ func (s *BehaviorSystem) handleSunflowerBehavior(entityID ecs.EntityID, deltaTim
 		log.Printf("[BehaviorSystem] 阳光实体创建完成，ID=%d, 状态: Rising, 速度: (%.1f, %.1f)",
 			sunID, sunVel.VX, sunVel.VY)
 
-		// Story 13.8: 简单实体的动画已在 createSimpleReanimComponent 中初始化，无需额外初始化
+		// 简单实体的动画已在 createSimpleReanimComponent 中初始化，无需额外初始化
 
 		// 重置计时器
 		timer.CurrentTime = 0
@@ -275,7 +275,7 @@ func (s *BehaviorSystem) handleSunflowerBehavior(entityID ecs.EntityID, deltaTim
 // handleZombieBasicBehavior 处理普通僵尸的行为逻辑
 // 普通僵尸会以恒定速度从右向左移动
 func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaTime float64) {
-	// Story 8.3: 检查僵尸是否已激活（开场动画期间僵尸未激活，不应移动）
+	// 检查僵尸是否已激活（开场动画期间僵尸未激活，不应移动）
 	if waveState, ok := ecs.GetComponent[*components.ZombieWaveStateComponent](s.entityManager, entityID); ok {
 		if !waveState.IsActivated {
 			// DEBUG: 记录未激活的僵尸被跳过
@@ -285,7 +285,7 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 		}
 	}
 
-	// 检查生命值（Story 4.4: 僵尸死亡逻辑）
+	// 检查生命值（僵尸死亡逻辑）
 	health, ok := ecs.GetComponent[*components.HealthComponent](s.entityManager, entityID)
 	if ok {
 		// 更新僵尸的受伤状态（掉手臂、掉头）
@@ -305,7 +305,7 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 		return
 	}
 
-	// Story 5.1: 检测植物碰撞（在移动之前）
+	// 检测植物碰撞（在移动之前）
 	// 计算僵尸所在格子
 	// 注意：需要减去 ZombieVerticalOffset，因为僵尸Y坐标包含了偏移
 	zombieCol := int((position.X - config.GridWorldStartX) / config.CellWidth)
@@ -345,7 +345,7 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 
 // triggerZombieDeath 触发僵尸死亡状态转换
 // 当僵尸生命值 <= 0 时调用，将僵尸从正常行为状态切换到死亡动画播放状态
-// Story 7.4: 添加僵尸死亡粒子效果触发（头部掉落）
+// 添加僵尸死亡粒子效果触发（头部掉落）
 // 注意：手臂掉落粒子效果在 updateZombieDamageState 中触发（受伤时）
 func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 	// 1. 切换行为类型为 BehaviorZombieDying
@@ -357,12 +357,12 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 	behavior.Type = components.BehaviorZombieDying
 	log.Printf("[BehaviorSystem] 僵尸 %d 行为切换为 BehaviorZombieDying", entityID)
 
-	// Story 7.4: 获取僵尸位置，用于触发粒子效果
+	// 获取僵尸位置，用于触发粒子效果
 	position, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
 	if !ok {
 		log.Printf("[BehaviorSystem] 警告：僵尸 %d 缺少 PositionComponent，无法触发粒子效果", entityID)
 	} else {
-		// Story 7.6: 检测僵尸行进方向，计算粒子角度偏移
+		// 检测僵尸行进方向，计算粒子角度偏移
 		// 粒子效果应该在僵尸行进的反方向飞出
 		//
 		// 角度系统：标准屏幕坐标系（0°=右，90°=下，180°=左，270°=上）
@@ -384,13 +384,13 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 			log.Printf("[BehaviorSystem] 僵尸 %d 方向: VX=%.1f → 粒子角度偏移=%.0f°", entityID, velocity.VX, angleOffset)
 		}
 
-		// Story 7.4: 触发僵尸头部掉落粒子效果
+		// 触发僵尸头部掉落粒子效果
 		_, err := entities.CreateParticleEffect(
 			s.entityManager,
 			s.resourceManager,
 			"ZombieHead", // 粒子效果名称（不带.xml后缀）
 			position.X, position.Y,
-			angleOffset, // Story 7.6: 传递角度偏移
+			angleOffset, // 传递角度偏移
 		)
 		if err != nil {
 			log.Printf("[BehaviorSystem] 警告：创建僵尸头部掉落粒子效果失败: %v", err)
@@ -401,7 +401,7 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 	}
 
 	// 2. 隐藏头部轨道（头掉落效果）
-	// Story 13.8: 直接修改 HiddenTracks 字段而不调用废弃的 HideTrack API
+	// 直接修改 HiddenTracks 字段而不调用废弃的 HideTrack API
 	if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
 		if reanim.HiddenTracks == nil {
 			reanim.HiddenTracks = make(map[string]bool)
@@ -419,8 +419,8 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 	log.Printf("[BehaviorSystem] 僵尸 %d 移除速度组件，停止移动", entityID)
 
 	// 4. 使用 AnimationCommand 组件播放死亡动画（不循环）
-	// Story 14.3: Epic 14 - 使用组件通信替代直接调用
-	// Story 13.8: 使用配置驱动的动画组合（自动隐藏装备轨道）
+	// 使用组件通信替代直接调用
+	// 使用配置驱动的动画组合（自动隐藏装备轨道）
 	ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
 		UnitID:    "zombie",
 		ComboName: "death",
@@ -442,21 +442,34 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 	// 获取植物组件（用于状态管理）
 	plant, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, entityID)
 	if !ok {
+		log.Printf("[BehaviorSystem] ⚠️ 豌豆射手 %d 缺少 PlantComponent", entityID)
 		return
 	}
 
 	// 获取计时器组件
 	timer, ok := ecs.GetComponent[*components.TimerComponent](s.entityManager, entityID)
 	if !ok {
+		log.Printf("[BehaviorSystem] ⚠️ 豌豆射手 %d 缺少 TimerComponent", entityID)
 		return
 	}
 
 	// 更新计时器
 	timer.CurrentTime += deltaTime
 
-	// Story 10.3: 只有在空闲状态时才能触发新的攻击
+	// DEBUG: 每100帧输出一次状态
+	s.logFrameCounter++
+	if s.logFrameCounter%100 == 0 {
+		log.Printf("[BehaviorSystem] 🔫 豌豆射手 %d 状态: AttackState=%d, Timer=%.2f/%.2f, 僵尸数=%d",
+			entityID, plant.AttackAnimState, timer.CurrentTime, timer.TargetTime, len(zombieEntityList))
+	}
+
+	// 只有在空闲状态时才能触发新的攻击
 	// 确保攻击动画播放完毕后，才能进行下一次攻击
 	if plant.AttackAnimState != components.AttackAnimIdle {
+		// DEBUG: 记录非空闲状态
+		if s.logFrameCounter%100 == 0 {
+			log.Printf("[BehaviorSystem] 豌豆射手 %d 不在空闲状态（AttackState=%d），跳过攻击检测", entityID, plant.AttackAnimState)
+		}
 		return // 攻击动画正在播放，跳过攻击逻辑
 	}
 
@@ -513,8 +526,8 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 
 		// 如果有僵尸在同一行，发射子弹
 		if hasZombieInLine {
-			// Story 14.3: Epic 14 - 使用组件通信替代直接调用
-			// Story 13.6: 使用配置驱动的动画播放
+			// 使用组件通信替代直接调用
+			// 使用配置驱动的动画播放
 			// 播放配置文件中定义的攻击动画组合
 			ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
 				UnitID:    "peashootersingle",
@@ -531,7 +544,7 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 			// 设置攻击动画状态，用于动画完成后切换回 idle
 			plant.AttackAnimState = components.AttackAnimAttacking
 
-			// Story 10.5: 设置"等待发射"状态，但不立即创建子弹
+			// 设置"等待发射"状态，但不立即创建子弹
 			// 子弹将在攻击动画的关键帧（Frame 5）创建
 			plant.PendingProjectile = true
 			log.Printf("[BehaviorSystem] 豌豆射手 %d 进入攻击状态，等待关键帧(%d)发射子弹",
@@ -597,19 +610,19 @@ func (s *BehaviorSystem) handleZombieDyingBehavior(entityID ecs.EntityID) {
 	if !ok {
 		// 如果没有 ReanimComponent，直接删除僵尸
 		log.Printf("[BehaviorSystem] 死亡中的僵尸 %d 缺少 ReanimComponent，直接删除", entityID)
-		// Story 5.5: 僵尸死亡，增加计数
+		// 僵尸死亡，增加计数
 		s.gameState.IncrementZombiesKilled()
 		s.entityManager.DestroyEntity(entityID)
 		return
 	}
 
 	// 检查死亡动画是否完成
-	// Story 13.8: 使用 IsFinished 标志来判断非循环动画是否已完成
+	// 使用 IsFinished 标志来判断非循环动画是否已完成
 	if reanim.IsFinished {
-		// Story 13.8: 使用 CurrentFrame 替代 AnimStates
+		// 使用 CurrentFrame 替代 AnimStates
 		log.Printf("[BehaviorSystem] 僵尸 %d 死亡动画完成 (frame %d)，删除实体",
 			entityID, reanim.CurrentFrame)
-		// Story 5.5: 僵尸死亡，增加计数
+		// 僵尸死亡，增加计数
 		s.gameState.IncrementZombiesKilled()
 		s.entityManager.DestroyEntity(entityID)
 	}
@@ -630,7 +643,7 @@ func (s *BehaviorSystem) updateZombieDamageState(entityID ecs.EntityID, health *
 		health.ArmLost = true
 
 		// 隐藏手臂轨道（手臂掉落效果）
-		// Story 13.8: 直接修改 HiddenTracks 字段而不调用废弃的 HideTrack API
+		// 直接修改 HiddenTracks 字段而不调用废弃的 HideTrack API
 		if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
 			if reanim.HiddenTracks == nil {
 				reanim.HiddenTracks = make(map[string]bool)
@@ -753,7 +766,7 @@ func (s *BehaviorSystem) changeZombieAnimation(zombieID ecs.EntityID, newState c
 	behavior.ZombieAnimState = newState
 
 	// 根据状态确定组合名称
-	// Story 13.8: 使用配置驱动的动画播放
+	// 使用配置驱动的动画播放
 	var comboName string
 	switch newState {
 	case components.ZombieAnimIdle:
@@ -763,7 +776,7 @@ func (s *BehaviorSystem) changeZombieAnimation(zombieID ecs.EntityID, newState c
 	case components.ZombieAnimEating:
 		comboName = "eat"
 	case components.ZombieAnimDying:
-		// Story 13.8: 根据僵尸类型使用不同的 unitID
+		// 根据僵尸类型使用不同的 unitID
 		var unitID string
 		switch behavior.Type {
 		case components.BehaviorZombieConehead:
@@ -774,7 +787,7 @@ func (s *BehaviorSystem) changeZombieAnimation(zombieID ecs.EntityID, newState c
 			unitID = "zombie"
 		}
 
-		// Story 14.3: Epic 14 - 使用组件通信替代直接调用
+		// 使用组件通信替代直接调用
 		ecs.AddComponent(s.entityManager, zombieID, &components.AnimationCommandComponent{
 			UnitID:    unitID,
 			ComboName: "death",
@@ -797,7 +810,7 @@ func (s *BehaviorSystem) changeZombieAnimation(zombieID ecs.EntityID, newState c
 		unitID = "zombie"
 	}
 
-	// Story 14.3: Epic 14 - 使用组件通信替代直接调用
+	// 使用组件通信替代直接调用
 	// 使用 AnimationCommand 组件播放新动画组合
 	ecs.AddComponent(s.entityManager, zombieID, &components.AnimationCommandComponent{
 		UnitID:    unitID,
@@ -817,7 +830,7 @@ func (s *BehaviorSystem) startEatingPlant(zombieID, plantID ecs.EntityID) {
 	// 1. 移除僵尸的 VelocityComponent（停止移动）
 	ecs.RemoveComponent[*components.VelocityComponent](s.entityManager, zombieID)
 
-	// 2. Story 5.3: 在切换类型之前，先记住原始僵尸类型（用于选择正确的啃食动画）
+	// 2. 在切换类型之前，先记住原始僵尸类型（用于选择正确的啃食动画）
 	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
 	if !ok {
 		return
@@ -827,7 +840,7 @@ func (s *BehaviorSystem) startEatingPlant(zombieID, plantID ecs.EntityID) {
 	// 3. 切换 BehaviorComponent.Type 为 BehaviorZombieEating
 	behavior.Type = components.BehaviorZombieEating
 
-	// Story 6.3: 切换僵尸动画为啃食状态
+	// 切换僵尸动画为啃食状态
 	s.changeZombieAnimation(zombieID, components.ZombieAnimEating)
 
 	// 4. 添加 TimerComponent 用于伤害间隔
@@ -838,8 +851,8 @@ func (s *BehaviorSystem) startEatingPlant(zombieID, plantID ecs.EntityID) {
 		IsReady:     false,
 	})
 
-	// TODO(Story 6.3): 迁移到 ReanimComponent
-	// 5. Story 5.3: 根据原始僵尸类型加载对应的啃食动画
+	// 待迁移到 ReanimComponent
+	// 5. 根据原始僵尸类型加载对应的啃食动画
 	// var eatFrames []*ebiten.Image
 
 	_ = originalZombieType // 临时避免未使用警告
@@ -858,7 +871,7 @@ func (s *BehaviorSystem) startEatingPlant(zombieID, plantID ecs.EntityID) {
 			eatFrames = utils.LoadZombieEatAnimation(s.resourceManager)
 		}
 
-		// TODO(Story 6.3): 迁移到 ReanimComponent
+		// 待迁移到 ReanimComponent
 		// 6. 替换 AnimationComponent 为啃食动画
 		// animComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.AnimationComponent{}))
 		// if ok {
@@ -888,7 +901,7 @@ func (s *BehaviorSystem) stopEatingAndResume(zombieID ecs.EntityID) {
 		behavior.Type = components.BehaviorZombieBasic
 	}
 
-	// Story 6.3: 切换僵尸动画回行走状态
+	// 切换僵尸动画回行走状态
 	s.changeZombieAnimation(zombieID, components.ZombieAnimWalking)
 
 	// 3. 恢复 VelocityComponent
@@ -897,11 +910,11 @@ func (s *BehaviorSystem) stopEatingAndResume(zombieID ecs.EntityID) {
 		VY: 0,
 	})
 
-	// TODO(Story 6.3): 迁移到 ReanimComponent
+	// 待迁移到 ReanimComponent
 	// 4. 加载僵尸走路动画帧序列
 	// walkFrames := utils.LoadZombieWalkAnimation(s.resourceManager)
 
-	// TODO(Story 6.3): 迁移到 ReanimComponent
+	// 待迁移到 ReanimComponent
 	// 5. 替换 AnimationComponent 为走路动画
 	// animComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.AnimationComponent{}))
 	// if ok {
@@ -938,10 +951,10 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 		}
 	}
 
-	// Story 5.3: 检查护甲状态（护甲僵尸即使在啃食也需要检测护甲破坏）
+	// 检查护甲状态（护甲僵尸即使在啃食也需要检测护甲破坏）
 	armor, hasArmor := ecs.GetComponent[*components.ArmorComponent](s.entityManager, entityID)
 	if hasArmor {
-		// TODO(Story 6.3): 迁移到 ReanimComponent
+		// 待迁移到 ReanimComponent
 		// 如果护甲已破坏，切换为普通僵尸动画
 		// if armor.CurrentArmor <= 0 {
 		// 	// 加载普通僵尸啃食动画
@@ -1009,7 +1022,7 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 				if plantHealth.CurrentHealth <= 0 {
 					log.Printf("[BehaviorSystem] 植物 %d 被吃掉，删除实体", plantID)
 
-					// Bug Fix: 释放网格占用状态，允许重新种植
+					// 释放网格占用状态，允许重新种植
 					if plantComp, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, plantID); ok {
 						err := s.lawnGridSystem.ReleaseCell(s.lawnGridEntityID, plantComp.GridCol, plantComp.GridRow)
 						if err != nil {
@@ -1072,7 +1085,7 @@ func (s *BehaviorSystem) handleWallnutBehavior(entityID ecs.EntityID) {
 	// 计算生命值百分比
 	healthPercent := float64(health.CurrentHealth) / float64(health.MaxHealth)
 
-	// Story 6.3: 使用 ReanimComponent 实现外观状态切换
+	// 使用 ReanimComponent 实现外观状态切换
 	// 根据生命值百分比动态替换 PartImages 中的身体图片
 	reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 	if !ok {
@@ -1116,7 +1129,7 @@ func (s *BehaviorSystem) handleWallnutBehavior(entityID ecs.EntityID) {
 // handleConeheadZombieBehavior 处理路障僵尸的行为逻辑
 // 路障僵尸拥有护甲层，护甲耗尽后切换为普通僵尸外观和行为
 func (s *BehaviorSystem) handleConeheadZombieBehavior(entityID ecs.EntityID, deltaTime float64) {
-	// Story 8.3: 检查僵尸是否已激活（开场动画期间僵尸未激活，不应移动）
+	// 检查僵尸是否已激活（开场动画期间僵尸未激活，不应移动）
 	if waveState, ok := ecs.GetComponent[*components.ZombieWaveStateComponent](s.entityManager, entityID); ok {
 		if !waveState.IsActivated {
 			// 僵尸未激活，跳过所有行为逻辑（保持静止展示）
@@ -1145,7 +1158,7 @@ func (s *BehaviorSystem) handleConeheadZombieBehavior(entityID ecs.EntityID, del
 				// 1. 改变行为类型为普通僵尸
 				behavior.Type = components.BehaviorZombieBasic
 
-				// 2. Story 13.8: 隐藏路障轨道（使用 HiddenTracks 黑名单）
+				// 2. 隐藏路障轨道（使用 HiddenTracks 黑名单）
 				reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 				if ok {
 					if reanim.HiddenTracks == nil {
@@ -1172,7 +1185,7 @@ func (s *BehaviorSystem) handleConeheadZombieBehavior(entityID ecs.EntityID, del
 // handleBucketheadZombieBehavior 处理铁桶僵尸的行为逻辑
 // 铁桶僵尸拥有更高的护甲层，护甲耗尽后切换为普通僵尸外观和行为
 func (s *BehaviorSystem) handleBucketheadZombieBehavior(entityID ecs.EntityID, deltaTime float64) {
-	// Story 8.3: 检查僵尸是否已激活（开场动画期间僵尸未激活，不应移动）
+	// 检查僵尸是否已激活（开场动画期间僵尸未激活，不应移动）
 	if waveState, ok := ecs.GetComponent[*components.ZombieWaveStateComponent](s.entityManager, entityID); ok {
 		if !waveState.IsActivated {
 			// 僵尸未激活，跳过所有行为逻辑（保持静止展示）
@@ -1201,7 +1214,7 @@ func (s *BehaviorSystem) handleBucketheadZombieBehavior(entityID ecs.EntityID, d
 				// 1. 改变行为类型为普通僵尸
 				behavior.Type = components.BehaviorZombieBasic
 
-				// 2. Story 13.8: 隐藏铁桶轨道（使用 HiddenTracks 黑名单）
+				// 2. 隐藏铁桶轨道（使用 HiddenTracks 黑名单）
 				reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 				if ok {
 					if reanim.HiddenTracks == nil {
@@ -1360,7 +1373,7 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 		}
 	}
 
-	// Story 7.4: 创建爆炸粒子效果
+	// 创建爆炸粒子效果
 	// 触发爆炸粒子效果（使用已获取的position组件）
 	_, err := entities.CreateParticleEffect(
 		s.entityManager,
@@ -1375,7 +1388,7 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 		log.Printf("[BehaviorSystem] 樱桃炸弹 %d 触发爆炸粒子效果，位置: (%.1f, %.1f)", entityID, position.X, position.Y)
 	}
 
-	// Bug Fix: 释放樱桃炸弹占用的网格，允许重新种植
+	// 释放樱桃炸弹占用的网格，允许重新种植
 	if plantComp, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, entityID); ok {
 		err := s.lawnGridSystem.ReleaseCell(s.lawnGridEntityID, plantComp.GridCol, plantComp.GridRow)
 		if err != nil {
@@ -1502,17 +1515,32 @@ func (s *BehaviorSystem) queryProjectiles() []ecs.EntityID {
 		*components.VelocityComponent,
 	](s.entityManager)
 
+	// DEBUG: 记录候选实体数量
+	if len(candidates) > 0 {
+		log.Printf("[BehaviorSystem] queryProjectiles: 找到 %d 个候选实体（有 Behavior+Position+Velocity）", len(candidates))
+	}
+
 	// 过滤出子弹
 	var projectiles []ecs.EntityID
 	for _, entityID := range candidates {
 		behaviorComp, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
 		if !ok {
+			log.Printf("[BehaviorSystem] queryProjectiles: 实体 %d 没有 BehaviorComponent", entityID)
 			continue
 		}
+
+		// DEBUG: 记录每个候选实体的行为类型
+		log.Printf("[BehaviorSystem] queryProjectiles: 实体 %d 的行为类型 = %v（是子弹: %v）",
+			entityID, behaviorComp.Type, behaviorComp.Type == components.BehaviorPeaProjectile)
 
 		if behaviorComp.Type == components.BehaviorPeaProjectile {
 			projectiles = append(projectiles, entityID)
 		}
+	}
+
+	// DEBUG: 记录找到的子弹数量
+	if len(projectiles) > 0 {
+		log.Printf("[BehaviorSystem] queryProjectiles: 找到 %d 个子弹实体", len(projectiles))
 	}
 
 	return projectiles
@@ -1540,7 +1568,7 @@ func (s *BehaviorSystem) isZombieBehaviorType(behaviorType components.BehaviorTy
 }
 
 // ============================================================================
-// Story 10.3: 植物攻击动画系统（重新激活 - 2025-10-24）
+// 植物攻击动画系统（重新激活 - 2025-10-24）
 // ============================================================================
 //
 // 正确实现：使用简单的 PlayAnimation() 切换，依赖 VisibleTracks 机制显示完整身体
@@ -1552,8 +1580,8 @@ func (s *BehaviorSystem) isZombieBehaviorType(behaviorType components.BehaviorTy
 //
 
 // updatePlantAttackAnimation 检测攻击动画是否完成，自动切换回 idle
-// Story 10.3: 实现攻击动画状态机（Idle ↔ Attacking）
-// Story 10.5: 添加关键帧事件监听，在精确时刻发射子弹
+// 实现攻击动画状态机（Idle ↔ Attacking）
+// 添加关键帧事件监听，在精确时刻发射子弹
 func (s *BehaviorSystem) updatePlantAttackAnimation(entityID ecs.EntityID, deltaTime float64) {
 	plant, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, entityID)
 	if !ok || plant.AttackAnimState != components.AttackAnimAttacking {
@@ -1566,16 +1594,16 @@ func (s *BehaviorSystem) updatePlantAttackAnimation(entityID ecs.EntityID, delta
 		return
 	}
 
-	// Story 10.5: 关键帧事件监听 - 子弹发射时机同步
+	// 关键帧事件监听 - 子弹发射时机同步
 	if plant.PendingProjectile {
-		// Story 13.8: 直接使用 CurrentFrame
+		// 直接使用 CurrentFrame
 		currentFrame := reanim.CurrentFrame
 		// 精确匹配发射帧（零延迟）
 		if currentFrame == config.PeashooterShootingFireFrame {
 			log.Printf("[BehaviorSystem] 豌豆射手 %d 到达关键帧(%d)，发射子弹！",
 				entityID, currentFrame)
 
-			// Story 10.5: 使用固定偏移值计算子弹发射位置
+			// 使用固定偏移值计算子弹发射位置
 			// 注意：经过测试，Reanim 轨道坐标（如 idle_mouth, anim_stem）不直接提供嘴部位置
 			// - idle_mouth 轨道坐标为 (0, 0)（无运动数据）
 			// - anim_stem 轨道坐标为茎部中心，不是嘴部
@@ -1613,9 +1641,9 @@ func (s *BehaviorSystem) updatePlantAttackAnimation(entityID ecs.EntityID, delta
 		}
 	}
 
-	// Story 10.3: 检查攻击动画是否播放完毕，切换回 idle
+	// 检查攻击动画是否播放完毕，切换回 idle
 	if reanim.IsFinished {
-		// Story 13.6: 使用配置驱动的动画播放
+		// 使用配置驱动的动画播放
 		// 根据植物类型确定 unitID
 		var unitID string
 		switch plant.PlantType {
@@ -1632,8 +1660,8 @@ func (s *BehaviorSystem) updatePlantAttackAnimation(entityID ecs.EntityID, delta
 			return
 		}
 
-		// Story 14.3: Epic 14 - 使用组件通信替代直接调用
-		// Story 13.8: 使用 AnimationCommand 组件播放默认动画组合
+		// 使用组件通信替代直接调用
+		// 使用 AnimationCommand 组件播放默认动画组合
 		ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
 			UnitID:    unitID,
 			ComboName: "",

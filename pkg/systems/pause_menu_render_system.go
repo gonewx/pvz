@@ -9,7 +9,7 @@ import (
 )
 
 // PauseMenuRenderSystem 负责渲染暂停菜单
-// Story 10.1: 绘制半透明遮罩和暂停菜单面板（使用原版墓碑背景，双图层叠加）
+// 绘制半透明遮罩和暂停菜单面板（使用原版墓碑背景，双图层叠加）
 type PauseMenuRenderSystem struct {
 	entityManager     *ecs.EntityManager
 	windowWidth       int

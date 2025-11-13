@@ -143,7 +143,7 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 					// 这里为了简化，忽略错误
 				}
 
-				// Story 7.4: 触发豌豆击中溅射粒子效果
+				// 触发豌豆击中溅射粒子效果
 				// 获取子弹的 BehaviorComponent 以确定子弹类型
 				bulletBehavior, ok := ecs.GetComponent[*components.BehaviorComponent](ps.em, bulletID)
 				if ok {
@@ -153,7 +153,7 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 					if bulletBehavior.Type == components.BehaviorPeaProjectile {
 						particleEffectName = "PeaSplat" // 豌豆溅射效果
 					}
-					// TODO: 添加卷心菜子弹类型判断（当实现卷心菜投手后）
+					// 未来扩展: 卷心菜子弹类型
 					// else if bulletBehavior.Type == components.BehaviorCabbageProjectile {
 					//     particleEffectName = "CabbageSplat"
 					// }
@@ -176,7 +176,7 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 					}
 				}
 
-				// 2. 处理护甲伤害（Story 5.3: 优先扣除护甲值）
+				// 2. 处理护甲伤害（优先扣除护甲值）
 				armor, hasArmor := ecs.GetComponent[*components.ArmorComponent](ps.em, zombieID)
 				if hasArmor {
 					if armor.CurrentArmor > 0 {
@@ -198,7 +198,7 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 						ps.playHitSound()
 					}
 				} else {
-					// 3. 没有护甲，直接减少僵尸生命值（Story 4.4: 伤害计算）
+					// 3. 没有护甲，直接减少僵尸生命值（伤害计算）
 					zombieHealth, ok := ecs.GetComponent[*components.HealthComponent](ps.em, zombieID)
 					if ok {
 						zombieHealth.CurrentHealth -= config.PeaBulletDamage

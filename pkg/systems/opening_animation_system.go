@@ -135,7 +135,7 @@ func (oas *OpeningAnimationSystem) updateCameraMoveRightState(openingComp *compo
 		openingComp.State = "showZombies"
 		openingComp.ElapsedTime = 0
 
-		// Story 8.3: 不再生成预览僵尸
+		// 不再生成预览僵尸
 		// 直接使用 WaveSpawnSystem 预生成的关卡僵尸（IsActivated=false 保持静止）
 
 		log.Println("[OpeningAnimationSystem] State: cameraMoveRight → showZombies")
@@ -144,7 +144,7 @@ func (oas *OpeningAnimationSystem) updateCameraMoveRightState(openingComp *compo
 
 // updateShowZombiesState 处理展示僵尸状态。
 func (oas *OpeningAnimationSystem) updateShowZombiesState(openingComp *components.OpeningAnimationComponent) {
-	// Story 8.3: 不再生成预览僵尸，直接使用 WaveSpawnSystem 预生成的关卡僵尸
+	// 不再生成预览僵尸，直接使用 WaveSpawnSystem 预生成的关卡僵尸
 	// 僵尸在开场动画期间保持静止（BehaviorSystem 检查 IsActivated 标志）
 
 	// 等待一定时间展示僵尸
@@ -175,12 +175,10 @@ func (oas *OpeningAnimationSystem) updateCameraMoveLeftState(openingComp *compon
 
 // updateGameStartState 处理游戏开始状态。
 func (oas *OpeningAnimationSystem) updateGameStartState(openingComp *components.OpeningAnimationComponent) {
-	// Story 8.3: 不再需要清理预览僵尸（因为直接使用关卡僵尸）
+	// 不再需要清理预览僵尸（因为直接使用关卡僵尸）
 
 	// 标记开场动画完成
 	openingComp.IsCompleted = true
-
-	// TODO: 启用其他游戏系统（WaveSpawnSystem, InputSystem 等）
 
 	log.Println("[OpeningAnimationSystem] Opening animation completed, game starting!")
 }
@@ -226,7 +224,7 @@ func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.O
 		reanimXML := oas.resourceManager.GetReanimXML("Zombie")
 		partImages := oas.resourceManager.GetReanimPartImages("Zombie")
 		if reanimXML != nil && partImages != nil {
-			// Story 13.8: 使用新的简化结构
+			// 使用新的简化结构
 			reanimComp := &components.ReanimComponent{
 				ReanimName:        "Zombie",
 				ReanimXML:         reanimXML,
@@ -239,13 +237,12 @@ func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.O
 				AnimationFPS:      12,
 				CurrentAnimations: []string{},
 				AnimVisiblesMap:   map[string][]int{},
-				// ✅ Story 13.10: TrackAnimationBinding 已删除
-				IsLooping:  true,
-				IsFinished: false,
+				IsLooping:         true,
+				IsFinished:        false,
 			}
 			ecs.AddComponent(oas.entityManager, zombieEntity, reanimComp)
 
-			// Story 13.8: 使用 AnimationCommand 组件播放配置的动画组合（自动隐藏装备轨道）
+			// 使用 AnimationCommand 组件播放配置的动画组合（自动隐藏装备轨道）
 			ecs.AddComponent(oas.entityManager, zombieEntity, &components.AnimationCommandComponent{
 				UnitID:    "zombie",
 				ComboName: "idle",
@@ -318,7 +315,7 @@ func (oas *OpeningAnimationSystem) Skip() {
 	// 停止镜头动画
 	oas.cameraSystem.StopAnimation()
 
-	// Story 8.3: 不再需要清理预览僵尸（因为直接使用关卡僵尸）
+	// 不再需要清理预览僵尸（因为直接使用关卡僵尸）
 
 	// 设置跳过标志
 	openingComp.IsSkipped = true

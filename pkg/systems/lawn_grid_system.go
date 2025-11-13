@@ -11,8 +11,8 @@ import (
 
 // LawnGridSystem 管理草坪网格的占用状态
 // 负责跟踪哪些格子已被植物占用，并提供查询和更新方法
-// Story 8.1: 支持行数限制，禁用特定行
-// Story 8.2: 支持草坪闪烁效果（教学提示）
+// 支持行数限制，禁用特定行
+// 支持草坪闪烁效果（教学提示）
 type LawnGridSystem struct {
 	entityManager *ecs.EntityManager
 	EnabledLanes  []int // 启用的行列表（1-based），如 [1,2,3] 表示前3行可用

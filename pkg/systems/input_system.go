@@ -20,7 +20,7 @@ type InputSystem struct {
 	entityManager      *ecs.EntityManager
 	resourceManager    *game.ResourceManager
 	gameState          *game.GameState
-	reanimSystem       entities.ReanimSystemInterface // Story 6.3: Reanim 系统（用于初始化植物动画）
+	reanimSystem       entities.ReanimSystemInterface // Reanim 系统（用于初始化植物动画）
 	sunCounterX        float64                        // 阳光计数器X坐标（收集动画目标）
 	sunCounterY        float64                        // 阳光计数器Y坐标（收集动画目标）
 	collectSoundPlayer *audio.Player                  // 收集阳光音效播放器
@@ -30,7 +30,7 @@ type InputSystem struct {
 }
 
 // NewInputSystem 创建一个新的输入系统
-// Story 6.3: 添加 reanimSystem 参数用于初始化植物动画
+// 添加 reanimSystem 参数用于初始化植物动画
 func NewInputSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.GameState, rs entities.ReanimSystemInterface, sunCounterX, sunCounterY float64, lawnGridSystem *LawnGridSystem, lawnGridEntityID ecs.EntityID) *InputSystem {
 	system := &InputSystem{
 		entityManager:    em,
@@ -69,7 +69,7 @@ func NewInputSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.Ga
 //   - deltaTime: 时间增量（秒）
 //   - cameraX: 摄像机的世界坐标X位置（用于屏幕坐标到世界坐标的转换）
 func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
-	// Story 10.1: ESC 键切换暂停/恢复
+	// ESC 键切换暂停/恢复
 	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
 		s.gameState.TogglePause()
 		if s.gameState.IsPaused {
@@ -80,7 +80,7 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 		return // 处理暂停切换后立即返回，避免响应其他输入
 	}
 
-	// Story 10.1: 暂停时屏蔽游戏世界交互
+	// 暂停时屏蔽游戏世界交互
 	if s.gameState.IsPaused {
 		return // 暂停时不处理任何游戏输入
 	}
@@ -237,7 +237,7 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 			clickCenterX := pos.X
 			clickCenterY := pos.Y
 
-			// Bug Fix: 阳光的几何中心偏右，需要向左偏移 CenterOffset 对齐视觉中心
+			// 阳光的几何中心偏右，需要向左偏移 CenterOffset 对齐视觉中心
 			// 只对有 ReanimComponent 的阳光应用此修正
 			if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id); ok {
 				clickCenterX = pos.X - reanimComp.CenterOffsetX
@@ -487,7 +487,7 @@ func (s *InputSystem) handleLawnClick(mouseX, mouseY int) bool {
 	// DEBUG: 草坪点击日志（只在种植时保留，已优化）
 	// log.Printf("[InputSystem] 草坪点击: col=%d, row=%d", col, row)
 
-	// Story 8.1: 检查该行是否启用（教学关卡可能禁用部分行）
+	// 检查该行是否启用（教学关卡可能禁用部分行）
 	// 注意：row 是 0-based (0-4)，IsLaneEnabled 使用 1-based (1-5)
 	lane := row + 1
 	if !s.lawnGridSystem.IsLaneEnabled(lane) {
@@ -523,7 +523,7 @@ func (s *InputSystem) handleLawnClick(mouseX, mouseY int) bool {
 
 	log.Printf("[InputSystem] 成功创建植物实体 (ID: %d, Type: %v) 在 (%d, %d)", plantID, plantType, col, row)
 
-	// Story 10.4: 触发种植粒子效果
+	// 触发种植粒子效果
 	worldX, worldY := utils.GridToWorldCoords(
 		col, row,
 		config.GridWorldStartX, config.GridWorldStartY,
@@ -573,13 +573,12 @@ func (s *InputSystem) handleLawnClick(mouseX, mouseY int) bool {
 // createPlantEntity 创建植物实体的辅助方法
 // 根据植物类型选择合适的工厂函数
 func (s *InputSystem) createPlantEntity(plantType components.PlantType, col, row int) (ecs.EntityID, error) {
-	// Story 6.3: 传递 reanimSystem 给工厂函数以初始化动画
+	// 传递 reanimSystem 给工厂函数以初始化动画
 	// 坚果墙和樱桃炸弹使用专用的工厂函数
 	if plantType == components.PlantWallnut {
 		return entities.NewWallnutEntity(s.entityManager, s.resourceManager, s.gameState, s.reanimSystem, col, row)
 	}
 	if plantType == components.PlantCherryBomb {
-		// ✅ Epic 14: 移除 reanimSystem 参数
 		return entities.NewCherryBombEntity(s.entityManager, s.resourceManager, s.gameState, col, row)
 	}
 	// 其他植物使用通用工厂函数

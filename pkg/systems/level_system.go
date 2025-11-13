@@ -42,10 +42,10 @@ type LevelSystem struct {
 	lawnmowerSystem      *LawnmowerSystem       // 用于检查除草车状态（Story 10.2）
 	lastWaveWarningShown bool                   // 已废弃：使用 finalWaveWarningTriggered 代替
 
-	// Story 11.2: 关卡进度条支持
+	// 关卡进度条支持
 	progressBarEntityID ecs.EntityID // 进度条实体ID（如果存在）
 
-	// Story 11.3: 最后一波提示相关
+	// 最后一波提示相关
 	finalWaveWarningTriggered bool    // 是否已触发提示（防止重复）
 	finalWaveWarningLeadTime  float64 // 提前触发时间（秒，默认 3.0）
 }
@@ -61,7 +61,7 @@ type LevelSystem struct {
 //	rewardSystem - 奖励动画系统（可选，Story 8.3）
 //	lawnmowerSystem - 除草车系统（可选，Story 10.2）
 //
-// Story 14.3: Epic 14 - Removed ReanimSystem dependency, using AnimationCommand component
+// Removed ReanimSystem dependency, using AnimationCommand component
 func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *WaveSpawnSystem, rm *game.ResourceManager, rewardSystem *RewardAnimationSystem, lawnmowerSystem *LawnmowerSystem) *LevelSystem {
 	return &LevelSystem{
 		entityManager:             em,
@@ -71,8 +71,8 @@ func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *
 		rewardSystem:              rewardSystem,
 		lawnmowerSystem:           lawnmowerSystem,
 		lastWaveWarningShown:      false, // 已废弃，保留向后兼容
-		finalWaveWarningTriggered: false, // Story 11.3: 新标志位
-		finalWaveWarningLeadTime:  3.0,   // Story 11.3: 提前 3 秒
+		finalWaveWarningTriggered: false, // 新标志位
+		finalWaveWarningLeadTime:  3.0,   // 提前 3 秒
 	}
 }
 
@@ -106,7 +106,7 @@ func (s *LevelSystem) Update(deltaTime float64) {
 	// 检查并生成僵尸波次
 	s.checkAndSpawnWaves()
 
-	// Story 11.3: 检查是否需要显示最后一波提示（基于时间提前量）
+	// 检查是否需要显示最后一波提示（基于时间提前量）
 	s.checkFinalWaveWarning(deltaTime)
 
 	// 检查失败条件（必须在胜利条件之前，优先级更高）
@@ -115,7 +115,7 @@ func (s *LevelSystem) Update(deltaTime float64) {
 	// 检查胜利条件
 	s.checkVictoryCondition()
 
-	// Story 11.2: 检测第一波是否已激活（教学关卡）
+	// 检测第一波是否已激活（教学关卡）
 	// 教学关卡的第一波由 TutorialSystem 激活，需要手动检测并显示进度条
 	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.OpeningType == "tutorial" {
 		if s.gameState.IsWaveSpawned(0) && s.progressBarEntityID != 0 {
@@ -127,7 +127,7 @@ func (s *LevelSystem) Update(deltaTime float64) {
 		}
 	}
 
-	// Story 11.2: 更新进度条
+	// 更新进度条
 	s.UpdateProgressBar()
 }
 
@@ -153,7 +153,7 @@ func (s *LevelSystem) checkAndSpawnWaves() {
 	// 标记波次已激活
 	s.gameState.MarkWaveSpawned(waveIndex)
 
-	// Story 11.2: 第一波僵尸生成后显示完整进度条
+	// 第一波僵尸生成后显示完整进度条
 	if waveIndex == 0 {
 		s.ShowProgressBar()
 	}
@@ -169,7 +169,7 @@ func (s *LevelSystem) checkAndSpawnWaves() {
 //
 // 如果达成胜利条件，设置游戏结果为 "win"
 func (s *LevelSystem) checkVictoryCondition() {
-	// Story 10.2: 检查是否有活跃的除草车
+	// 检查是否有活跃的除草车
 	// 原版行为：除草车完全消失后，才显示胜利动画
 	hasActiveLawnmowers := false
 	if s.lawnmowerSystem != nil {
@@ -181,7 +181,7 @@ func (s *LevelSystem) checkVictoryCondition() {
 		s.gameState.SetGameResult("win")
 		log.Println("[LevelSystem] Victory! All zombies defeated!")
 
-		// Story 8.6: 保存关卡进度
+		// 保存关卡进度
 		if s.gameState.CurrentLevel != nil {
 			levelID := s.gameState.CurrentLevel.ID
 			rewardPlant := s.gameState.CurrentLevel.RewardPlant
@@ -195,7 +195,7 @@ func (s *LevelSystem) checkVictoryCondition() {
 			}
 		}
 
-		// Story 8.3: 检查是否有新植物解锁，触发奖励动画
+		// 检查是否有新植物解锁，触发奖励动画
 		s.triggerRewardIfNeeded()
 	}
 }
@@ -244,7 +244,7 @@ func (s *LevelSystem) triggerRewardIfNeeded() {
 // - 如果除���车未使用，僵尸到达左侧会触发除草车（不触发失败）
 // - 如果除草车已使用，僵尸再次到达左侧直接失败（无最后防线）
 func (s *LevelSystem) checkDefeatCondition() {
-	// Story 10.2: 如果启用了除草车系统，检查除草车状态
+	// 如果启用了除草车系统，检查除草车状态
 	if s.lawnmowerSystem != nil {
 		s.checkDefeatWithLawnmower()
 		return
@@ -365,7 +365,7 @@ func isZombieType(behaviorType components.BehaviorType) bool {
 }
 
 // ========================================
-// Story 11.3: 最后一波提示系统
+// 最后一波提示系统
 // ========================================
 
 // checkFinalWaveWarning 检查是否需要触发最后一波提示
@@ -496,8 +496,8 @@ func (s *LevelSystem) triggerFinalWaveWarning() {
 		return
 	}
 
-	// Story 14.3: Epic 14 - 使用组件通信替代直接调用
-	// Story 13.6: FinalWave 动画播放 (P2 - 降级方案，保持原有实现)
+	// 使用组件通信替代直接调用
+	// FinalWave 动画播放 (P2 - 降级方案，保持原有实现)
 	// 播放动画（FinalWave.reanim 中的动画名称为 "FinalWave"）
 	ecs.AddComponent(s.entityManager, warningEntity, &components.AnimationCommandComponent{
 		AnimationName: "FinalWave",
@@ -569,7 +569,7 @@ func (s *LevelSystem) showLastWaveWarning() {
 
 	// 创建 FinalWave 动画实体（显示在屏幕中心）
 	// 动画会自动播放一次后消失
-	// Story 14.3: Epic 14 - 工厂函数不再接受 reanimSystem 参数
+	// 工厂函数不再接受 reanimSystem 参数
 	finalWaveEntityID, err := entities.CreateFinalWaveEntity(
 		s.entityManager,
 		s.resourceManager,
@@ -580,7 +580,7 @@ func (s *LevelSystem) showLastWaveWarning() {
 	if err != nil {
 		log.Printf("[LevelSystem] ERROR: Failed to create FinalWave entity: %v", err)
 	} else {
-		// Story 14.3: Epic 14 - 使用组件通信初始化动画
+		// 使用组件通信初始化动画
 		ecs.AddComponent(s.entityManager, finalWaveEntityID, &components.AnimationCommandComponent{
 			AnimationName: "anim",
 			Processed:     false,
@@ -590,7 +590,7 @@ func (s *LevelSystem) showLastWaveWarning() {
 }
 
 // ========================================
-// Story 11.2: 关卡进度条支持
+// 关卡进度条支持
 // ========================================
 
 // SetProgressBarEntity 设置关卡进度条实体ID（由 GameScene 初始化时调用）

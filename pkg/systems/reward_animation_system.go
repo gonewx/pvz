@@ -114,7 +114,7 @@ func NewRewardAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *gam
 		panelEntity:       0,
 		glowEntity:        0,
 		isActive:          false,
-		screenWidth:       800, // TODO: 从配置获取
+		screenWidth:       800,
 		screenHeight:      600,
 		panelRenderSystem: panelRenderSystem, // 内部封装
 		sunFont:           fontSource,
@@ -204,7 +204,7 @@ func (ras *RewardAnimationSystem) TriggerReward(rewardType string, rewardID stri
 
 	// 根据奖励类型创建不同的实体
 	if rewardType == "plant" {
-		// Story 8.4: 使用 NewPlantCardEntity 创建卡片包
+		// 使用 NewPlantCardEntity 创建卡片包
 		// 这样可以自动获得：背景图、植物图标、阳光数字等完整渲染
 		plantType := ras.plantIDToType(rewardID)
 
@@ -279,7 +279,7 @@ func (ras *RewardAnimationSystem) TriggerReward(rewardType string, rewardID stri
 		}
 	}
 
-	// TODO: Phase 2 粒子背景框效果（需要查找合适的粒子配置）
+	// Phase 2: 粒子背景框效果（待实现）
 }
 
 // TriggerPlantReward 触发植物奖励动画（向后兼容方法）
@@ -755,7 +755,7 @@ func (ras *RewardAnimationSystem) updateClosingPhaseInternal(dt float64) {
 			}
 		} else {
 			log.Printf("[RewardAnimationSystem] 没有下一关，返回主菜单")
-			// TODO: 切换到主菜单场景
+
 			// ras.sceneManager.SwitchToMainMenu()
 		}
 
@@ -802,7 +802,7 @@ func (ras *RewardAnimationSystem) createRewardPanel(rewardType string, plantID s
 		rewardName = ras.gameState.LawnStrings.GetString(plantInfo.NameKey)
 		rewardDesc = ras.gameState.LawnStrings.GetString(plantInfo.DescriptionKey)
 
-		// 硬编码阳光值（TODO: 从配置文件读取）
+		// 阳光值（硬编码，待配置化）
 		sunCostMap := map[string]int{
 			"sunflower":  50,
 			"peashooter": 100,
@@ -821,10 +821,10 @@ func (ras *RewardAnimationSystem) createRewardPanel(rewardType string, plantID s
 		PlantDescription: rewardDesc, // 描述（植物或工具）
 		SunCost:          sunCost,    // 设置阳光值（工具为0）
 		CardScale:        1.0,        // 卡片固定大小，不做动画
-		FadeAlpha:        0.0,        // Story 8.4: 初始完全透明，用于淡入动画
-		// Story 8.4: 卡片位置由 RewardPanelRenderSystem 自动计算（水平居中）
+		FadeAlpha:        0.0,        // 初始完全透明，用于淡入动画
+		// 卡片位置由 RewardPanelRenderSystem 自动计算（水平居中）
 		IsVisible:     true,
-		AnimationTime: 0.0, // Story 8.4: 动画时间计数器，用于淡入效果
+		AnimationTime: 0.0, // 动画时间计数器，用于淡入效果
 	})
 
 	log.Printf("[RewardAnimationSystem] 奖励面板已创建：%s - %s", rewardName, rewardDesc)
@@ -955,7 +955,7 @@ func (ras *RewardAnimationSystem) getReanimName(plantID string) string {
 	case "sunflower":
 		return "SunFlower"
 	case "peashooter":
-		return "PeaShooterSingle" // Story 10.3: 修正为普通豌豆射手资源
+		return "PeaShooterSingle" // 修正为普通豌豆射手资源
 	case "cherrybomb":
 		return "CherryBomb"
 	case "wallnut":
@@ -1011,7 +1011,7 @@ func (ras *RewardAnimationSystem) cleanupGlowParticles() {
 		}
 
 		// 清理发射器实体（SeedPacket有2个发射器，Award有13个发射器，需要查找并清理所有相关发射器）
-		// Story 7.4: CreateParticleEffect 创建的所有发射器共享同一个 PositionComponent
+		// CreateParticleEffect 创建的所有发射器共享同一个 PositionComponent
 		// 我们需要找到所有共享同一位置的发射器实体
 		glowPos, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.glowEntity)
 		if ok {

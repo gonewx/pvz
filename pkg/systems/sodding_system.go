@@ -50,7 +50,7 @@ type SoddingSystem struct {
 	// 动画完成回调
 	onAnimationComplete func() // 动画完成时调用
 
-	// Story 11.4: 粒子发射器相关
+	// 粒子发射器相关
 	sodRollEmitterIDs []ecs.EntityID // Story 8.6 QA修正: 每行一个粒子发射器
 	particlesEnabled  bool           // 是否启用粒子特效
 }
@@ -157,7 +157,7 @@ func (s *SoddingSystem) StartAnimation(onComplete func(), enabledLanes, animLane
 
 	log.Printf("[SoddingSystem] Created %d SodRoll entities for lanes %v", len(s.sodRollEntityIDs), animLanes)
 
-	// Story 11.4: 如果启用粒子特效,为每个草皮卷创建独立的粒子发射器
+	// 如果启用粒子特效,为每个草皮卷创建独立的粒子发射器
 	// Story 8.6 QA修正: 每行一个粒子发射器
 	if enableParticles {
 		s.sodRollEmitterIDs = make([]ecs.EntityID, 0, len(s.sodRollEntityIDs))
@@ -201,7 +201,7 @@ func (s *SoddingSystem) createSodRollEntity(posX, posY float64, lane int) ecs.En
 	})
 
 	// 添加 ReanimComponent
-	// Story 13.8: 使用新的简化结构
+	// 使用新的简化结构
 	// 重要：MergedTracks 设置为 nil，让 PlayCombo 自动初始化
 	ecs.AddComponent(s.entityManager, entityID, &components.ReanimComponent{
 		ReanimXML:         reanimXML,
@@ -221,9 +221,9 @@ func (s *SoddingSystem) createSodRollEntity(posX, posY float64, lane int) ecs.En
 	})
 
 	// 初始化 SodRoll 动画
-	// Story 13.8: 使用配置驱动的 PlayCombo API
+	// 使用配置驱动的 PlayCombo API
 	// 配置文件: data/reanim_config/sodroll.yaml
-	// Epic 14: 使用 AnimationCommand 组件触发动画
+	// 使用 AnimationCommand 组件触发动画
 	ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
 		UnitID:    "sodroll",
 		ComboName: "roll",
@@ -248,7 +248,7 @@ func (s *SoddingSystem) Update(deltaTime float64) {
 
 	s.animationTimer += deltaTime
 
-	// Story 11.4: 更新粒子发射器位置(跟随草皮卷)
+	// 更新粒子发射器位置(跟随草皮卷)
 	// 注意：SodRoll.xml 中已配置 SystemPosition 字段，粒子系统会自动处理位置动画
 	// 但我们仍然可以手动同步以确保精确跟随草皮卷实际位置（可选）
 	// 目前依赖 XML 配置的 SystemPosition 自动插值
@@ -285,7 +285,7 @@ func (s *SoddingSystem) completeAnimation() {
 		s.sodRollEntityIDs = nil
 	}
 
-	// Story 11.4: 停止粒子发射器(但不立即销毁,等粒子自然消失)
+	// 停止粒子发射器(但不立即销毁,等粒子自然消失)
 	// Story 8.6 QA修正: 停止所有粒子发射器
 	if s.particlesEnabled && len(s.sodRollEmitterIDs) > 0 {
 		for _, emitterID := range s.sodRollEmitterIDs {
@@ -539,7 +539,7 @@ func (s *SoddingSystem) calculateCurrentCenterX() float64 {
 	return worldRightEdgeX
 }
 
-// Story 11.4: createSodRollParticleEmitterForEntity 为指定草皮卷实体创建粒子发射器
+// createSodRollParticleEmitterForEntity 为指定草皮卷实体创建粒子发射器
 // Story 8.6 QA修正: 每行一个粒子发射器
 // 参数:
 //   - entityID: 草皮卷实体ID

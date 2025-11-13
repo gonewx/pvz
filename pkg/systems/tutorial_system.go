@@ -650,7 +650,7 @@ func (s *TutorialSystem) spawnSkyFallingSun() {
 	sunID := entities.NewSunEntity(s.entityManager, s.resourceManager, startX, targetY)
 	log.Printf("[TutorialSystem] Created tutorial sun entity ID=%d at X=%.1f, targetY=%.1f", sunID, startX, targetY)
 
-	// Bug Fix: Sun.reanim 只有轨道(Sun1, Sun2, Sun3),没有动画定义
+	// Sun.reanim 只有轨道(Sun1, Sun2, Sun3),没有动画定义
 	// 使用 AnimationCommand 组件播放配置的"idle"组合（包含所有3个轨道）
 	ecs.AddComponent(s.entityManager, sunID, &components.AnimationCommandComponent{
 		UnitID:    "sun",
@@ -669,7 +669,6 @@ func (s *TutorialSystem) spawnTutorialZombies() {
 		return
 	}
 
-	// ✅ 修复：激活第一波预生成的僵尸，而不是自己创建僵尸
 	if len(levelConfig.Waves) > 0 && !s.gameState.IsWaveSpawned(0) {
 		// 使用 WaveSpawnSystem 激活第一波僵尸
 		activatedCount := s.waveSpawnSystem.ActivateWave(0)
@@ -677,7 +676,6 @@ func (s *TutorialSystem) spawnTutorialZombies() {
 
 		// 标记波次已生成
 		s.gameState.MarkWaveSpawned(0)
-		// ❌ 移除重复计数：WaveSpawnSystem.ActivateWave() 内部已经调用了 IncrementZombiesSpawned()
 		// s.gameState.IncrementZombiesSpawned(activatedCount) // BUG: 导致僵尸计数重复增加
 	}
 
@@ -731,14 +729,12 @@ func (s *TutorialSystem) manageWaveSpawning(dt float64) {
 				s.showFinalWaveWarning()
 			}
 
-			// ✅ 修复：使用 WaveSpawnSystem 激活预生成的僵尸，而不是自己创建僵尸
 			log.Printf("[TutorialSystem] Activating wave %d after %.1f seconds delay", currentWaveIndex+1, s.waveDelayTimer)
 			activatedCount := s.waveSpawnSystem.ActivateWave(currentWaveIndex)
 			log.Printf("[TutorialSystem] Spawned wave %d (%d zombies activated)", currentWaveIndex+1, activatedCount)
 
 			// 标记波次已生成
 			s.gameState.MarkWaveSpawned(currentWaveIndex)
-			// ❌ 移除重复计数：WaveSpawnSystem.ActivateWave() 内部已经调用了 IncrementZombiesSpawned()
 			// s.gameState.IncrementZombiesSpawned(activatedCount) // BUG: 导致僵尸计数重复增加
 
 			// 重置延迟计时器和标志

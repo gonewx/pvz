@@ -215,7 +215,7 @@ func (s *LawnmowerSystem) checkZombieCollisions() {
 			// 碰撞检测：僵尸 X 坐标在除草车 X ± CollisionRange 范围内
 			distance := math.Abs(zombiePos.X - lawnmowerPos.X)
 			if distance < config.LawnmowerCollisionRange {
-				// Story 10.3: 除草车碾压僵尸，触发死亡动画
+				// 除草车碾压僵尸，触发死亡动画
 				// 不再直接删除，而是播放死亡动画和粒子效果
 
 				// 注意：不在这里调用 IncrementZombiesKilled()
@@ -313,7 +313,7 @@ func (s *LawnmowerSystem) HasActiveLawnmowers() bool {
 }
 
 // triggerZombieDeath 触发僵尸死亡动画和粒子效果
-// Story 10.3: 除草车碾压僵尸时调用此方法，不再直接删除
+// 除草车碾压僵尸时调用此方法，不再直接删除
 func (s *LawnmowerSystem) triggerZombieDeath(zombieID ecs.EntityID) {
 	// 1. 切换行为类型为 BehaviorZombieDying
 	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
@@ -331,7 +331,7 @@ func (s *LawnmowerSystem) triggerZombieDeath(zombieID ecs.EntityID) {
 	}
 
 	// 3. 播放死亡动画（单次播放，不循环）
-	// Story 13.8: 使用 AnimationCommand 组件播放配置的动画组合（自动隐藏装备轨道）
+	// 使用 AnimationCommand 组件播放配置的动画组合（自动隐藏装备轨道）
 	ecs.AddComponent(s.entityManager, zombieID, &components.AnimationCommandComponent{
 		UnitID:    "zombie",
 		ComboName: "death",
@@ -351,7 +351,7 @@ func (s *LawnmowerSystem) triggerZombieDeath(zombieID ecs.EntityID) {
 		return
 	}
 
-	// Story 7.6: 除草车碾压的僵尸通常向左走，需要翻转粒子方向
+	// 除草车碾压的僵尸通常向左走，需要翻转粒子方向
 	angleOffset := 180.0 // 默认翻转（适合僵尸向左走）
 
 	// 触发僵尸手臂掉落粒子效果

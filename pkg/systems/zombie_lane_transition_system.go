@@ -60,7 +60,7 @@ func (s *ZombieLaneTransitionSystem) Update(deltaTime float64) {
 	}
 
 	for _, entityID := range entities {
-		// Story 8.3: 检查僵尸是否已激活（开场动画期间僵尸未激活，不应移动）
+		// 检查僵尸是否已激活（开场动画期间僵尸未激活，不应移动）
 		if waveState, ok := ecs.GetComponent[*components.ZombieWaveStateComponent](s.entityManager, entityID); ok {
 			if !waveState.IsActivated {
 				// 僵尸未激活，跳过行转换逻辑（保持静止展示）
@@ -88,7 +88,7 @@ func (s *ZombieLaneTransitionSystem) Update(deltaTime float64) {
 		// 必须与僵尸工厂函数的Y坐标计算公式保持一致
 		targetY := config.GridWorldStartY + float64(targetLaneComp.TargetRow)*config.CellHeight + config.CellHeight/2.0 + config.ZombieVerticalOffset
 
-		// Story 8.7: 根据转换模式选择不同的处理逻辑
+		// 根据转换模式选择不同的处理逻辑
 		switch targetLaneComp.TransitionMode {
 		case components.TransitionModeInstant:
 			// 瞬间调整模式：立即设置Y坐标
@@ -107,7 +107,7 @@ func (s *ZombieLaneTransitionSystem) Update(deltaTime float64) {
 
 // handleGradualTransition 处理渐变行转换模式
 //
-// Story 8.7: 此方法完全保留 Story 8.3 的原有渐变动画逻辑
+// 此方法完全保留 Story 8.3 的原有渐变动画逻辑
 //
 // 僵尸通过Y轴速度平滑移动到目标行（约3秒）
 //
@@ -153,7 +153,7 @@ func (s *ZombieLaneTransitionSystem) handleGradualTransition(
 
 // handleInstantTransition 处理瞬间行转换模式
 //
-// Story 8.7: 僵尸立即调整Y坐标到目标行，无过渡动画
+// 僵尸立即调整Y坐标到目标行，无过渡动画
 //
 // 参数：
 //

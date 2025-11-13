@@ -12,9 +12,8 @@ import (
 )
 
 // ReanimSystem 是 Reanim 动画系统
-// 基于 animation_showcase/AnimationCell 重写，简化并修复 Epic 13 遗留问题
+// 基于 animation_showcase/AnimationCell 重写，简化并修复 遗留问题
 //
-// Story 13.8 重构目标：
 // - API 数量从 50+ 减少到 2 个核心 API
 // - 代码行数从 2808 减少到 ~1000 行
 // - 与 AnimationCell 保持一致的逻辑
@@ -25,7 +24,6 @@ type ReanimSystem struct {
 	// 游戏 TPS（用于帧推进计算）
 	targetTPS float64
 
-	// ✅ Story 14.2: 命令清理配置
 	enableCommandCleanup bool    // 是否启用自动清理
 	cleanupInterval      float64 // 清理间隔（秒）
 	cleanupTimer         float64 // 清理计时器
@@ -34,9 +32,8 @@ type ReanimSystem struct {
 // NewReanimSystem 创建新的 Reanim 动画系统
 func NewReanimSystem(em *ecs.EntityManager) *ReanimSystem {
 	return &ReanimSystem{
-		entityManager: em,
-		targetTPS:     60.0, // 默认 60 TPS
-		// ✅ Story 14.2: 默认禁用自动清理（便于调试）
+		entityManager:        em,
+		targetTPS:            60.0, // 默认 60 TPS
 		enableCommandCleanup: false,
 		cleanupInterval:      1.0, // 每秒清理一次
 		cleanupTimer:         0.0,
@@ -54,7 +51,7 @@ func (s *ReanimSystem) SetTargetTPS(tps float64) {
 }
 
 // SetCommandCleanup 设置命令清理策略（可选 API）
-// Story 14.2: 用于配置动画命令组件的自动清理
+// 用于配置动画命令组件的自动清理
 func (s *ReanimSystem) SetCommandCleanup(enable bool, interval float64) {
 	s.enableCommandCleanup = enable
 	s.cleanupInterval = interval
@@ -84,7 +81,6 @@ func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) err
 		return fmt.Errorf("entity %d has no ReanimXML data", entityID)
 	}
 
-	// ✅ Story 13.8 Bug Fix #9: 自动初始化基础字段（如果尚未初始化）
 	// 原因：zombie_factory 等调用者只设置 ReanimXML 和 PartImages
 	// rebuildAnimationData 需要 MergedTracks 存在
 	if comp.MergedTracks == nil {
@@ -95,7 +91,6 @@ func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) err
 		comp.LastRenderFrame = -1
 	}
 
-	// ✅ 单个动画模式：清空配置相关字段
 	// 单个动画模式下，不使用 HiddenTracks, ParentTracks
 	// 这些都依赖 Reanim 文件本身的定义
 	comp.HiddenTracks = nil
@@ -106,7 +101,7 @@ func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) err
 	comp.CurrentFrame = 0
 	comp.FrameAccumulator = 0
 	comp.IsFinished = false
-	comp.IsLooping = true // ✅ 显式设置为循环播放
+	comp.IsLooping = true // 显式设置为循环播放
 
 	// 重建动画数据
 	s.rebuildAnimationData(comp)
@@ -139,7 +134,6 @@ func (s *ReanimSystem) AddAnimation(entityID ecs.EntityID, animName string) erro
 		return fmt.Errorf("entity %d has no ReanimXML data", entityID)
 	}
 
-	// ✅ 自动初始化基础字段（如果尚未初始化）
 	if comp.MergedTracks == nil {
 		comp.MergedTracks = reanim.BuildMergedTracks(comp.ReanimXML)
 		comp.VisualTracks, comp.LogicalTracks = s.analyzeTrackTypes(comp.ReanimXML)
@@ -148,10 +142,8 @@ func (s *ReanimSystem) AddAnimation(entityID ecs.EntityID, animName string) erro
 		comp.LastRenderFrame = -1
 	}
 
-	// ✅ 添加动画到列表（而不是替换）
 	comp.CurrentAnimations = append(comp.CurrentAnimations, animName)
 
-	// ✅ Story 13.10 Bug Fix: 初始化新动画的帧索引
 	// 如果 AnimationFrameIndices 已经存在但没有该动画的条目，添加初始值
 	if comp.AnimationFrameIndices == nil {
 		comp.AnimationFrameIndices = make(map[string]float64)
@@ -174,8 +166,6 @@ func (s *ReanimSystem) AddAnimation(entityID ecs.EntityID, animName string) erro
 }
 
 // finalizeAnimations 完成动画设置（内部方法）
-// ⚠️ 已集成到 PlayAnimation/AddAnimation 中，通常不需要单独调用
-// ✅ Story 13.10: 不再需要生成轨道绑定，已删除
 // 新的渲染逻辑直接从动画遍历到轨道，无需绑定关系
 //
 // 参数：
@@ -189,15 +179,12 @@ func (s *ReanimSystem) finalizeAnimations(entityID ecs.EntityID) error {
 		return fmt.Errorf("entity %d does not have ReanimComponent", entityID)
 	}
 
-	// ✅ Story 13.10 Bug Fix: 初始化 AnimationFrameIndices
 	// 确保每个动画都有独立的帧索引
-	// ⚠️  注意：只初始化尚未存在的动画，不覆盖已有的帧索引
 	//         这样非循环动画（如 anim_open）在完成后保持在最后一帧
 	if comp.AnimationFrameIndices == nil {
 		comp.AnimationFrameIndices = make(map[string]float64)
 	}
 	for _, animName := range comp.CurrentAnimations {
-		// ✅ 只初始化尚未存在的动画
 		if _, exists := comp.AnimationFrameIndices[animName]; !exists {
 			comp.AnimationFrameIndices[animName] = 0.0
 		}
@@ -232,7 +219,6 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 		return fmt.Errorf("entity %d has no ReanimXML data", entityID)
 	}
 
-	// ✅ Story 13.8 Bug Fix: 自动初始化基础字段（如果尚未初始化）
 	// 原因：plant_card_factory 等调用者只设置 ReanimXML 和 PartImages
 	// 需要 PlayCombo 自动初始化 MergedTracks, VisualTracks 等字段
 	if comp.MergedTracks == nil {
@@ -284,7 +270,6 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 	comp.FrameAccumulator = 0
 	comp.IsFinished = false
 
-	// ✅ 加载单个动画的 FPS 和速度倍率配置
 	// 从 unitConfig.AvailableAnimations 中读取每个动画的 FPS 和 Speed
 	// 并设置到 AnimationFPSOverrides 和 AnimationSpeedOverrides 中
 	if comp.AnimationFPSOverrides == nil {
@@ -340,7 +325,6 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 	// 4. 重建动画数据
 	s.rebuildAnimationData(comp)
 
-	// ✅ Story 13.10: 不再需要分析轨道绑定
 	// 新的渲染逻辑直接从动画遍历到轨道，无需绑定关系
 
 	// 计算并缓存 CenterOffset（基于第一帧）
@@ -357,7 +341,7 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 
 // processAnimationCommands 处理所有待执行的动画命令
 //
-// Story 14.2: 组件驱动的动画命令处理机制
+// 组件驱动的动画命令处理机制
 //
 // 设计说明：
 //   - 在 Update() 开头调用，优先处理命令
@@ -410,13 +394,13 @@ func (s *ReanimSystem) processAnimationCommands() {
 			err = s.PlayCombo(id, cmd.UnitID, cmd.ComboName)
 		} else {
 			// 错误：无效命令
-			log.Printf("[ReanimSystem] ⚠️ 无效命令: entity=%d, UnitID 和 AnimationName 都为空", id)
+			log.Printf("[ReanimSystem] 无效命令: entity=%d, UnitID 和 AnimationName 都为空", id)
 			err = fmt.Errorf("invalid command: both UnitID and AnimationName are empty")
 		}
 
 		// 处理错误
 		if err != nil {
-			log.Printf("[ReanimSystem] ❌ 命令执行失败: entity=%d, unit=%s, combo=%s, anim=%s, err=%v",
+			log.Printf("[ReanimSystem] 命令执行失败: entity=%d, unit=%s, combo=%s, anim=%s, err=%v",
 				id, cmd.UnitID, cmd.ComboName, cmd.AnimationName, err)
 			errorCount++
 		} else {
@@ -435,12 +419,10 @@ func (s *ReanimSystem) processAnimationCommands() {
 
 // Update 更新所有 Reanim 组件的动画帧
 // 基于 AnimationCell.Update() 的逻辑
-// ✅ Story 13.8 Bug Fix #10: 完全匹配参考实现
 //   - currentFrame 无限增长，不在 Update 中做循环检查
 //   - 循环逻辑完全由 findControllingAnimation 的取模处理
 //   - 支持多动画组合（不同轨道可以有不同的帧数）
 func (s *ReanimSystem) Update(deltaTime float64) {
-	// ✅ Story 14.2: 优先处理动画命令
 	s.processAnimationCommands()
 
 	entities := ecs.GetEntitiesWith1[*components.ReanimComponent](s.entityManager)
@@ -479,7 +461,6 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 			continue
 		}
 
-		// ✅ 为每个动画独立推进帧（支持不同动画不同 FPS）
 		// 初始化 AnimationFrameIndices（如果尚未初始化）
 		if comp.AnimationFrameIndices == nil {
 			comp.AnimationFrameIndices = make(map[string]float64)
@@ -505,7 +486,6 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 				}
 			}
 
-			// ✅ Story 13.10 Bug Fix: 跳过已完成的非循环动画
 			// 如果该动画是非循环的，检查是否已完成
 			isLooping := comp.IsLooping // 默认使用全局循环状态
 			if comp.AnimationLoopStates != nil {
@@ -533,7 +513,7 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 					if visibleCount > 0 && int(currentFrame) >= visibleCount {
 						// 非循环动画已完成，停止更新帧
 						if comp.ReanimName == "SelectorScreen" && animName == "anim_open" {
-							log.Printf("[ReanimSystem] ✅ anim_open 已完成，停止更新帧")
+							log.Printf("[ReanimSystem] anim_open 已完成，停止更新帧")
 						}
 						continue
 					}
@@ -548,7 +528,6 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 				}
 			}
 
-			// ✅ 获取该动画的速度倍率
 			animSpeed := 1.0 // 默认正常速度
 			if comp.AnimationSpeedOverrides != nil {
 				if speed, hasOverride := comp.AnimationSpeedOverrides[animName]; hasOverride && speed > 0 {
@@ -569,7 +548,6 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 					animName, oldFrameIndex, comp.AnimationFrameIndices[animName], frameIncrement, animFPS, animSpeed)
 			}
 
-			// ✅ 循环动画处理：帧索引超过最大帧数时，取模回到开头
 			if isLooping {
 				if animVisibles, exists := comp.AnimVisiblesMap[animName]; exists {
 					visibleCount := countVisibleFrames(animVisibles)
@@ -588,7 +566,6 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 
 		// 同步更新 CurrentFrame（用于后备和非循环动画检测）
 		// 使用第一个**活跃的**（正在播放的）动画的帧索引
-		// ✅ Story 13.10 Bug Fix: 跳过已完成的非循环动画
 		foundActiveAnim := false
 		for _, animName := range comp.CurrentAnimations {
 			// 跳过暂停的动画
@@ -598,7 +575,6 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 				}
 			}
 
-			// ✅ 跳过已完成的非循环动画
 			isLooping := comp.IsLooping
 			if comp.AnimationLoopStates != nil {
 				if loopState, hasState := comp.AnimationLoopStates[animName]; hasState {
@@ -629,17 +605,16 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 					animName, comp.AnimationFrameIndices[animName], comp.CurrentFrame)
 			}
 			if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 5 {
-				log.Printf("[ReanimSystem] ✅ 使用动画 %s 更新 CurrentFrame = %d", animName, comp.CurrentFrame)
+				log.Printf("[ReanimSystem] 使用动画 %s 更新 CurrentFrame = %d", animName, comp.CurrentFrame)
 			}
 			break
 		}
 
 		// 🔍 调试：如果没有找到活跃动画，记录一下
 		if !foundActiveAnim && comp.ReanimName == "SelectorScreen" {
-			log.Printf("[ReanimSystem] ⚠️  没有找到活跃动画，CurrentFrame 保持不变 = %d", comp.CurrentFrame)
+			log.Printf("[ReanimSystem]  没有找到活跃动画，CurrentFrame 保持不变 = %d", comp.CurrentFrame)
 		}
 
-		// ✅ 检查非循环动画是否已完成
 		// 支持混合模式：即使全局 IsLooping=true，也要检测单个非循环动画的完成状态
 		if !comp.IsFinished {
 			// 检查是否所有非循环动画都已完成
@@ -663,7 +638,6 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 					allNonLoopingAnimsFinished = true
 				}
 			} else if comp.AnimationLoopStates != nil {
-				// ✅ 新逻辑：检测单个非循环动画是否完成（即使全局 IsLooping=true）
 				// 只检查非循环动画的完成状态
 				hasNonLoopingAnims := false
 				allNonLoopingComplete := true
@@ -680,7 +654,6 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 						hasNonLoopingAnims = true
 						if animVisibles, exists := comp.AnimVisiblesMap[animName]; exists {
 							visibleCount := countVisibleFrames(animVisibles)
-							// ✅ Story 13.10 Bug Fix: 使用 AnimationFrameIndices 而不是 CurrentFrame
 							animFrame := comp.AnimationFrameIndices[animName]
 							// 检查该动画是否完成
 							if visibleCount > 0 && int(animFrame) < visibleCount {
@@ -690,7 +663,7 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 								}
 								break
 							} else if comp.ReanimName == "SelectorScreen" {
-								log.Printf("[ReanimSystem] ✅ 非循环动画 %s 已完成: 帧 %.2f >= %d", animName, animFrame, visibleCount)
+								log.Printf("[ReanimSystem] 非循环动画 %s 已完成: 帧 %.2f >= %d", animName, animFrame, visibleCount)
 							}
 						}
 					}
@@ -710,13 +683,12 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 		}
 	}
 
-	// ✅ Story 14.2: 清理已处理的命令（可选）
 	s.cleanupProcessedCommands(deltaTime)
 }
 
 // cleanupProcessedCommands 清理已处理的命令组件（可选功能）
 //
-// Story 14.2: 命令清理机制
+// 命令清理机制
 //
 // 设计说明：
 //   - 定期调用（如每秒一次）以释放内存
@@ -762,7 +734,6 @@ func (s *ReanimSystem) cleanupProcessedCommands(deltaTime float64) {
 // ==================================================================
 
 // prepareRenderCache 准备渲染缓存
-// ✅ Story 13.10: 反转渲染逻辑 - 从"以轨道为中心"改为"以动画为中心"
 // 新逻辑：外层循环动画，内层循环轨道，后面的动画自然覆盖前面的动画
 func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 	// Debug: 无条件打印向日葵和 SodRoll 的缓存准备
@@ -773,7 +744,6 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 		log.Printf("[ReanimSystem] 🟫 SodRoll prepareRenderCache 被调用: frame=%d, VisualTracks=%d",
 			comp.CurrentFrame, len(comp.VisualTracks))
 	}
-	// ✅ Debug: SelectorScreen 每次都打印（前 30 帧）
 	if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 30 {
 		log.Printf("[ReanimSystem] 🎬 SelectorScreen prepareRenderCache 被调用: frame=%d, animations=%v",
 			comp.CurrentFrame, comp.CurrentAnimations)
@@ -788,10 +758,8 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 	skippedNoFrames := 0
 	skippedNoImage := 0
 
-	// ✅ 调试：记录每个轨道渲染的来源动画
 	trackRenderSource := make(map[string]string)
 
-	// ✅ 架构重构：外层循环轨道（按 reanim 文件定义顺序），内层循环动画
 	// 这样可以确保云朵轨道（Track 16-21）在按钮轨道（Track 27+）之前添加到 CachedRenderData
 	// 从而在渲染时云朵在下面，按钮在上面
 	for _, trackName := range comp.VisualTracks {
@@ -844,6 +812,10 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 			// 获取动画的可见性数组
 			animVisibles, ok := comp.AnimVisiblesMap[animName]
 			if !ok {
+				if comp.ReanimName == "simple_pea" {
+					log.Printf("[ReanimSystem] simple_pea: AnimVisiblesMap[%s] 不存在, VisualTracks=%v, CurrentAnimations=%v",
+						animName, comp.VisualTracks, comp.CurrentAnimations)
+				}
 				continue
 			}
 
@@ -917,6 +889,14 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 			// 获取图片
 			img, ok := comp.PartImages[frame.ImagePath]
 			if !ok || img == nil {
+				if comp.ReanimName == "simple_pea" {
+					partImagesKeys := make([]string, 0, len(comp.PartImages))
+					for k := range comp.PartImages {
+						partImagesKeys = append(partImagesKeys, k)
+					}
+					log.Printf("[ReanimSystem] simple_pea: PartImages[%s] 不存在或为 nil (ok=%v, img==nil=%v), PartImages keys=%v",
+						frame.ImagePath, ok, (img == nil), partImagesKeys)
+				}
 				continue
 			}
 
@@ -941,7 +921,7 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 
 			// Debug: SelectorScreen 记录选中的动画
 			if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 10 {
-				log.Printf("[ReanimSystem]   - 动画 %s: ✅ 有效数据，选中", animName)
+				log.Printf("[ReanimSystem]   - 动画 %s: 有效数据，选中", animName)
 			}
 		}
 
@@ -957,7 +937,6 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 		}
 	}
 
-	// ✅ 调试：输出每个轨道的渲染来源（前 10 帧）
 	if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 10 {
 		log.Printf("[ReanimSystem] 📊 Frame %d 渲染统计 (总计: %d 个轨道):", comp.CurrentFrame, visibleCount)
 		for _, trackName := range comp.VisualTracks {
@@ -986,7 +965,6 @@ func (s *ReanimSystem) GetRenderData(entityID ecs.EntityID) []components.RenderP
 		return nil
 	}
 
-	// ✅ Bug Fix: 支持慢速动画的帧插值
 	// 问题：使用整数 CurrentFrame 判断缓存失效，导致慢速动画（如 speed=0.05）
 	//       的插值帧被忽略（帧 0.05、0.10...0.95 都被当作帧 0）
 	// 解决：检查任意动画的浮点帧索引是否改变，确保插值生效
@@ -1033,17 +1011,25 @@ func (s *ReanimSystem) GetRenderData(entityID ecs.EntityID) []components.RenderP
 
 // rebuildAnimationData 重建动画数据（AnimVisiblesMap）
 // 基于 AnimationCell.rebuildAnimationData()
-// ✅ Bug Fix: 同时为父轨道创建可见性数组
 func (s *ReanimSystem) rebuildAnimationData(comp *components.ReanimComponent) {
+	if comp.ReanimName == "simple_pea" {
+		log.Printf("[ReanimSystem] 🔍 rebuildAnimationData 被调用: ReanimName=%s, CurrentAnimations=%v, VisualTracks=%v",
+			comp.ReanimName, comp.CurrentAnimations, comp.VisualTracks)
+	}
+
 	comp.AnimVisiblesMap = make(map[string][]int)
 
 	// 1. 为当前播放的动画创建可见性数组
 	for _, animName := range comp.CurrentAnimations {
 		animVisibles := buildVisiblesArray(comp.ReanimXML, comp.MergedTracks, animName)
 		comp.AnimVisiblesMap[animName] = animVisibles
+
+		if comp.ReanimName == "simple_pea" {
+			log.Printf("[ReanimSystem] 🔍 buildVisiblesArray(%s) = %v (len=%d)", animName, animVisibles, len(animVisibles))
+		}
 	}
 
-	// 2. ✅ Bug Fix: 为 ParentTracks 中的父轨道创建可见性数组
+	// 为 ParentTracks 中的父轨道创建可见性数组
 	// 父轨道不在 CurrentAnimations 中，但计算父偏移时需要它们的可见性数组
 	if comp.ParentTracks != nil {
 		for _, parentTrackName := range comp.ParentTracks {
@@ -1056,7 +1042,6 @@ func (s *ReanimSystem) rebuildAnimationData(comp *components.ReanimComponent) {
 	}
 }
 
-// ✅ Story 13.10: analyzeTrackBinding 和 findControllingAnimation 已删除
 // 新的渲染逻辑不再需要轨道绑定机制，直接从动画到轨道渲染
 
 // getInterpolatedFrame 获取插值后的帧数据
@@ -1152,7 +1137,6 @@ func (s *ReanimSystem) getInterpolatedFrame(
 }
 
 // getParentOffsetForAnimation 获取父轨道的偏移量（新版本，接受动画名参数）
-// ✅ Story 13.10: 不再需要 findControllingAnimation，直接使用传入的 animName
 //
 // 参数：
 //   - comp: Reanim 组件
@@ -1166,7 +1150,7 @@ func (s *ReanimSystem) getParentOffsetForAnimation(comp *components.ReanimCompon
 	if !ok || len(parentFrames) == 0 {
 		// Debug: 父轨道不存在
 		if comp.ReanimName == "peashooter" && comp.CurrentFrame < 3 {
-			log.Printf("[ReanimSystem] ⚠️ 父轨道不存在: parent=%s", parentTrackName)
+			log.Printf("[ReanimSystem] 父轨道不存在: parent=%s", parentTrackName)
 		}
 		return 0, 0
 	}
@@ -1184,26 +1168,23 @@ func (s *ReanimSystem) getParentOffsetForAnimation(comp *components.ReanimCompon
 	}
 
 	// 获取父轨道的可见性数组
-	// ✅ Bug Fix: 应该使用父轨道自己的可见性数组，而不是子动画的
 	parentAnimVisibles, ok := comp.AnimVisiblesMap[parentTrackName]
 	if !ok || len(parentAnimVisibles) == 0 {
 		// Debug: 父轨道的可见性数组不存在
 		if comp.ReanimName == "peashooter" && comp.CurrentFrame < 3 {
-			log.Printf("[ReanimSystem] ⚠️ 父轨道可见性数组不存在: parent=%s, AnimVisiblesMap keys=%v",
+			log.Printf("[ReanimSystem] 父轨道可见性数组不存在: parent=%s, AnimVisiblesMap keys=%v",
 				parentTrackName, getMapKeys(comp.AnimVisiblesMap))
 		}
 		return 0, 0
 	}
 
 	// 获取第一个可见帧的物理索引
-	// ✅ Bug Fix: 第一个可见帧的逻辑帧号总是 0
 	// 不需要遍历查找，直接使用逻辑帧号 0 映射到物理帧
 	firstPhysicalFrame := mapLogicalToPhysical(0, parentAnimVisibles)
 	if firstPhysicalFrame < 0 || firstPhysicalFrame >= len(parentFrames) {
 		return 0, 0
 	}
 
-	// ✅ 与 animation_showcase 完全一致的逻辑（animation_cell.go:479-498）
 	// 先初始化为 0，然后逐步设置有效值
 	initX, initY := 0.0, 0.0
 	if parentFrames[firstPhysicalFrame].X != nil {
@@ -1213,7 +1194,6 @@ func (s *ReanimSystem) getParentOffsetForAnimation(comp *components.ReanimCompon
 		initY = *parentFrames[firstPhysicalFrame].Y
 	}
 
-	// ✅ 使用帧插值获取父轨道当前帧的平滑位置
 	// 使用父轨道自己的可见性数组
 	currentFrame := s.getInterpolatedFrame(parentTrackName, logicalFrame, parentAnimVisibles, parentFrames)
 
@@ -1304,7 +1284,6 @@ func countVisibleFrames(animVisibles []int) int {
 }
 
 // mapLogicalToPhysical 将逻辑帧号映射到物理帧号
-// ✅ 修复：非循环动画完成后，返回最后一帧而不是 -1（保持最后一帧显示）
 func mapLogicalToPhysical(logicalFrameNum int, animVisibles []int) int {
 	if len(animVisibles) == 0 {
 		return logicalFrameNum
@@ -1322,7 +1301,6 @@ func mapLogicalToPhysical(logicalFrameNum int, animVisibles []int) int {
 		}
 	}
 
-	// ✅ 修复：如果逻辑帧超出范围，返回最后一个可见帧（用于非循环动画停留在最后一帧）
 	// 这样 anim_open 完成后会保持显示，不会消失
 	if lastVisiblePhysicalFrame >= 0 {
 		return lastVisiblePhysicalFrame
@@ -1414,7 +1392,7 @@ func (s *ReanimSystem) InitReanimComponent(
 }
 
 // PrepareStaticPreview prepares a Reanim entity for static preview (e.g., plant card icons).
-// Story 13.8: 简化版本，使用配置驱动的方式
+// 简化版本，使用配置驱动的方式
 //
 // 策略：
 // 1. 播放默认动画组合
@@ -1486,7 +1464,7 @@ func (s *ReanimSystem) RenderToTexture(entityID ecs.EntityID, target *ebiten.Ima
 	}
 
 	// Step 1: 计算所有可见部件的 bounding box（用于居中）
-	// 这是 Story 13.8 Bug Fix：替代旧的 CenterOffset 机制
+	// 替代旧的 CenterOffset 机制
 	minX, maxX := 9999.0, -9999.0
 	minY, maxY := 9999.0, -9999.0
 	hasVisibleParts := false
@@ -1604,7 +1582,6 @@ func (s *ReanimSystem) RenderToTexture(entityID ecs.EntityID, target *ebiten.Ima
 // analyzeTrackTypes 分析轨道类型（视觉轨道 vs 逻辑轨道）
 // 基于 animation_showcase/animation_cell.go:670-700
 //
-// ✅ Story 13.8 Bug Fix #7: 修复僵尸动画错误
 //   - animation_showcase 只跳过植物的 4 个动画定义轨道
 //   - 僵尸的 anim_walk/anim_eat 等应该被分类为 logicalTracks（无图片）
 //   - 与 animation_showcase 保持完全一致
@@ -1612,9 +1589,7 @@ func (s *ReanimSystem) RenderToTexture(entityID ecs.EntityID, target *ebiten.Ima
 // analyzeTrackTypes 分析并分类 Reanim 轨道为视觉轨道和逻辑轨道
 // 视觉轨道：包含图片数据，需要渲染
 // 逻辑轨道：不包含图片数据，用于控制动画可见性
-// ⚠️ 私有方法：仅供 ReanimSystem 内部使用
 func (s *ReanimSystem) analyzeTrackTypes(reanimXML *reanim.ReanimXML) (visualTracks []string, logicalTracks []string) {
-	// ✅ Bug Fix: 先检查轨道是否有图片，再决定是否跳过
 	// 原因：向日葵的 anim_idle 轨道包含头部图像，不应该被跳过
 	// animation_showcase 的逻辑可能不适用于所有植物
 	animationDefinitionTracks := map[string]bool{
@@ -1634,7 +1609,6 @@ func (s *ReanimSystem) analyzeTrackTypes(reanimXML *reanim.ReanimXML) (visualTra
 			}
 		}
 
-		// ✅ 关键修复：如果轨道包含图片，即使名称在 animationDefinitionTracks 中，
 		// 也应该作为视觉轨道处理（例如向日葵的 anim_idle 轨道）
 		if hasImage {
 			visualTracks = append(visualTracks, track.Name)
