@@ -124,104 +124,86 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 	// 更新计时器
 	timer.CurrentTime += deltaTime
 
-	// DEBUG: 每100帧输出一次状态
-	s.logFrameCounter++
-	if s.logFrameCounter%100 == 0 {
-		log.Printf("[BehaviorSystem] 🔫 豌豆射手 %d 状态: AttackState=%d, Timer=%.2f/%.2f, 僵尸数=%d",
-			entityID, plant.AttackAnimState, timer.CurrentTime, timer.TargetTime, len(zombieEntityList))
+	// 获取豌豆射手的位置组件
+	peashooterPos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+	if !ok {
+		return
 	}
 
-	// 只有在空闲状态时才能触发新的攻击
-	// 确保攻击动画播放完毕后，才能进行下一次攻击
-	if plant.AttackAnimState != components.AttackAnimIdle {
-		// DEBUG: 记录非空闲状态
-		if s.logFrameCounter%100 == 0 {
-			log.Printf("[BehaviorSystem] 豌豆射手 %d 不在空闲状态（AttackState=%d），跳过攻击检测", entityID, plant.AttackAnimState)
-		}
-		return // 攻击动画正在播放，跳过攻击逻辑
-	}
+	// 计算豌豆射手所在的行
+	peashooterRow := utils.GetEntityRow(peashooterPos.Y, config.GridWorldStartY, config.CellHeight)
 
-	// 检查计时器是否就绪（达到攻击间隔）
-	if timer.CurrentTime >= timer.TargetTime {
-		// 获取豌豆射手的位置组件
-		peashooterPos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+	// 扫描同行僵尸：查找在豌豆射手正前方（右侧）且在攻击范围内的僵尸
+	hasZombieInLine := false
+	screenRightBoundary := config.GridWorldEndX + 50.0
+
+	for _, zombieID := range zombieEntityList {
+		zombiePos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
 		if !ok {
-			return
+			continue
 		}
 
-		// 计算豌豆射手所在的行
-		peashooterRow := utils.GetEntityRow(peashooterPos.Y, config.GridWorldStartY, config.CellHeight)
-
-		// 扫描同行僵尸：查找在豌豆射手正前方（右侧）且在攻击范围内的僵尸
-		hasZombieInLine := false
-
-		// DEBUG: 输出僵尸列表信息（每秒一次）
-		s.logFrameCounter++
-		if s.logFrameCounter >= LogOutputFrameInterval && len(zombieEntityList) > 0 {
-			log.Printf("[BehaviorSystem] 扫描僵尸: 总数=%d, 豌豆射手行=%d", len(zombieEntityList), peashooterRow)
-			s.logFrameCounter = 0
+		// 检查僵尸是否已死亡（过滤死亡状态的僵尸）
+		zombieBehavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
+		if !ok || zombieBehavior.Type == components.BehaviorZombieDying {
+			continue // 跳过死亡中的僵尸
 		}
 
-		for _, zombieID := range zombieEntityList {
-			zombiePos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
-			if !ok {
-				continue
-			}
+		// 计算僵尸所在的行
+		zombieRow := utils.GetEntityRow(zombiePos.Y, config.GridWorldStartY, config.CellHeight)
 
-			// 检查僵尸是否已死亡（过滤死亡状态的僵尸）
-			zombieBehavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
-			if !ok || zombieBehavior.Type == components.BehaviorZombieDying {
-				continue // 跳过死亡中的僵尸
-			}
-
-			// 计算僵尸所在的行
-			zombieRow := utils.GetEntityRow(zombiePos.Y, config.GridWorldStartY, config.CellHeight)
-
-			// 检查僵尸是否在同一行、在豌豆射手右侧、且已进入屏幕可见区域
-			// 只攻击屏幕内的僵尸（X坐标 < 屏幕右边界，约800）
-			// 使用 config.GridWorldEndX (971) 作为攻击范围右边界，确保僵尸进入草坪后才被攻击
-			screenRightBoundary := config.GridWorldEndX + 50.0 // 草坪边界右侧50像素内可攻击
-			if zombieRow == peashooterRow &&
-				zombiePos.X > peashooterPos.X &&
-				zombiePos.X < screenRightBoundary {
-				hasZombieInLine = true
-				// DEBUG: 只在找到目标时输出
-				log.Printf("[BehaviorSystem] 发现目标僵尸 %d: 位置=(%.1f, %.1f), 豌豆射手X=%.1f, 攻击边界=%.1f",
-					zombieID, zombiePos.X, zombiePos.Y, peashooterPos.X, screenRightBoundary)
-				break
-			}
+		// 检查僵尸是否在同一行、在豌豆射手右侧、且已进入屏幕可见区域
+		if zombieRow == peashooterRow &&
+			zombiePos.X > peashooterPos.X &&
+			zombiePos.X < screenRightBoundary {
+			hasZombieInLine = true
+			break
 		}
+	}
 
-		// 如果有僵尸在同一行，发射子弹
-		if hasZombieInLine {
-			// 使用组件通信替代直接调用
-			// 使用配置驱动的动画播放
-			// 播放配置文件中定义的攻击动画组合
+	// 如果正在攻击状态
+	if plant.AttackAnimState == components.AttackAnimAttacking {
+		// 检查是否还有僵尸
+		if !hasZombieInLine {
+			// 没有僵尸了，切换回空闲状态
+			log.Printf("[BehaviorSystem] 豌豆射手 %d 没有目标，切换回空闲状态", entityID)
 			ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
 				UnitID:    "peashootersingle",
-				ComboName: "attack_with_sway",
+				ComboName: "idle", // 使用配置驱动的 idle 组合（播放 anim_full_idle）
 				Processed: false,
 			})
-
-			// 设置为非循环模式（单次播放）
-			if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
-				reanim.IsLooping = false
+			plant.AttackAnimState = components.AttackAnimIdle
+			plant.PendingProjectile = false
+		} else {
+			// 有僵尸且计时器就绪，准备下一次发射
+			if timer.CurrentTime >= timer.TargetTime && !plant.PendingProjectile {
+				plant.PendingProjectile = true
+				timer.CurrentTime = 0
 			}
-
-			log.Printf("[BehaviorSystem] 豌豆射手 %d 切换到攻击动画（配置驱动）", entityID)
-			// 设置攻击动画状态，用于动画完成后切换回 idle
-			plant.AttackAnimState = components.AttackAnimAttacking
-
-			// 设置"等待发射"状态，但不立即创建子弹
-			// 子弹将在攻击动画的关键帧（Frame 5）创建
-			plant.PendingProjectile = true
-			log.Printf("[BehaviorSystem] 豌豆射手 %d 进入攻击状态，等待关键帧(%d)发射子弹",
-				entityID, config.PeashooterShootingFireFrame)
-
-			// 重置计时器
-			timer.CurrentTime = 0
 		}
-		// 如果没有僵尸，不发射子弹，计时器也不重置（保持就绪状态）
+		// 继续在攻击状态，updatePlantAttackAnimation 会处理子弹发射
+		return
+	}
+
+	// 空闲状态，检查是否有僵尸需要攻击
+	if timer.CurrentTime >= timer.TargetTime && hasZombieInLine {
+		// 切换到攻击动画
+		ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
+			UnitID:    "peashootersingle",
+			ComboName: "attack_with_sway",
+			Processed: false,
+		})
+
+		log.Printf("[BehaviorSystem] 豌豆射手 %d 切换到攻击动画（配置驱动）", entityID)
+		plant.AttackAnimState = components.AttackAnimAttacking
+
+		// 设置"等待发射"状态，但不立即创建子弹
+		plant.PendingProjectile = true
+		log.Printf("[BehaviorSystem] 豌豆射手 %d 进入攻击状态，等待关键帧(%d)发射子弹",
+			entityID, config.PeashooterShootingFireFrame)
+
+		// 重置计时器
+		timer.CurrentTime = 0
 	}
 }
 
@@ -442,7 +424,7 @@ func (s *BehaviorSystem) updatePlantAttackAnimation(entityID ecs.EntityID, delta
 		return
 	}
 
-	// 获取 ReanimComponent 检查动画是否完成
+	// 获取 ReanimComponent 检查动画状态
 	reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 	if !ok {
 		return
@@ -458,10 +440,6 @@ func (s *BehaviorSystem) updatePlantAttackAnimation(entityID ecs.EntityID, delta
 				entityID, currentFrame)
 
 			// 使用固定偏移值计算子弹发射位置
-			// 注意：经过测试，Reanim 轨道坐标（如 idle_mouth, anim_stem）不直接提供嘴部位置
-			// - idle_mouth 轨道坐标为 (0, 0)（无运动数据）
-			// - anim_stem 轨道坐标为茎部中心，不是嘴部
-			// 因此使用固定偏移值（相对于格子中心）来计算子弹起始位置
 			bulletOffsetX := config.PeaBulletOffsetX
 			bulletOffsetY := config.PeaBulletOffsetY
 
@@ -472,7 +450,6 @@ func (s *BehaviorSystem) updatePlantAttackAnimation(entityID ecs.EntityID, delta
 			}
 
 			// 子弹起始位置 = 植物位置 + 固定偏移
-			// 这个偏移是经过调优的，相对于格子中心的偏移
 			bulletStartX := pos.X + bulletOffsetX
 			bulletStartY := pos.Y + bulletOffsetY
 
@@ -495,33 +472,6 @@ func (s *BehaviorSystem) updatePlantAttackAnimation(entityID ecs.EntityID, delta
 		}
 	}
 
-	// 检查攻击动画是否播放完毕，切换回 idle
-	if reanim.IsFinished {
-		// 使用配置驱动的动画播放
-		// 根据植物类型确定 unitID
-		var unitID string
-		switch plant.PlantType {
-		case components.PlantPeashooter:
-			unitID = "peashooter"
-		case components.PlantSunflower:
-			unitID = "sunflower"
-		case components.PlantWallnut:
-			unitID = "wallnut"
-		case components.PlantCherryBomb:
-			unitID = "cherrybomb"
-		default:
-			log.Printf("[BehaviorSystem] 未知的植物类型: %v", plant.PlantType)
-			return
-		}
-
-		// 使用组件通信替代直接调用
-		// 使用 AnimationCommand 组件播放默认动画组合
-		ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
-			UnitID:    unitID,
-			ComboName: "",
-			Processed: false,
-		})
-		plant.AttackAnimState = components.AttackAnimIdle
-		log.Printf("[BehaviorSystem] 植物 %d 攻击动画完成，添加空闲动画命令（配置驱动）", entityID)
-	}
+	// 注意：攻击动画现在是循环的，不依赖 IsFinished 切换回空闲
+	// 切换回空闲状态的逻辑在 handlePeashooterBehavior 中（检测没有僵尸时）
 }

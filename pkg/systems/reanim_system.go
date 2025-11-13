@@ -270,6 +270,14 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 	comp.FrameAccumulator = 0
 	comp.IsFinished = false
 
+	// 重置每个动画的帧索引（修复：防止非循环动画检查误判为已完成）
+	if comp.AnimationFrameIndices == nil {
+		comp.AnimationFrameIndices = make(map[string]float64)
+	}
+	for _, animName := range comp.CurrentAnimations {
+		comp.AnimationFrameIndices[animName] = 0.0
+	}
+
 	// 从 unitConfig.AvailableAnimations 中读取每个动画的 FPS 和 Speed
 	// 并设置到 AnimationFPSOverrides 和 AnimationSpeedOverrides 中
 	if comp.AnimationFPSOverrides == nil {
@@ -298,6 +306,20 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 	} else {
 		// 默认循环
 		comp.IsLooping = true
+	}
+
+	// 应用独立的动画循环状态（如果配置中指定了）
+	if len(combo.AnimationLoopStates) > 0 {
+		if comp.AnimationLoopStates == nil {
+			comp.AnimationLoopStates = make(map[string]bool)
+		}
+		for animName, loopState := range combo.AnimationLoopStates {
+			comp.AnimationLoopStates[animName] = loopState
+			log.Printf("[ReanimSystem] PlayCombo: 动画 %s 独立循环状态 = %v", animName, loopState)
+		}
+	} else {
+		// 清除之前的独立循环状态
+		comp.AnimationLoopStates = nil
 	}
 
 	log.Printf("[ReanimSystem] PlayCombo: entity %d, unit %s, combo %s → animations: %v, loop: %v",
@@ -581,15 +603,20 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 					isLooping = loopState
 				}
 			}
+
+			// 对于非循环动画，即使已完成也要更新一次 CurrentFrame
+			// 这样 CurrentFrame 才能达到 maxVisibleFrames，触发 IsFinished
 			if !isLooping {
 				// 检查该动画是否已完成
 				if animVisibles, exists := comp.AnimVisiblesMap[animName]; exists {
 					visibleCount := countVisibleFrames(animVisibles)
 					currentFrame := comp.AnimationFrameIndices[animName]
-					if visibleCount > 0 && int(currentFrame) >= visibleCount {
-						// 非循环动画已完成，跳过
+					// 修复：允许 CurrentFrame 达到 visibleCount（而不是跳过）
+					// 只有当帧索引远超过 visibleCount 时才跳过（例如 > visibleCount + 1）
+					if visibleCount > 0 && int(currentFrame) > visibleCount {
+						// 非循环动画已完成且 CurrentFrame 已更新过，跳过
 						if comp.ReanimName == "SelectorScreen" {
-							log.Printf("[ReanimSystem] ⏭️  跳过已完成的动画 %s（帧 %.2f >= %d）", animName, currentFrame, visibleCount)
+							log.Printf("[ReanimSystem] ⏭️  跳过已完成的动画 %s（帧 %.2f > %d）", animName, currentFrame, visibleCount)
 						}
 						continue
 					}

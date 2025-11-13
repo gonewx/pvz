@@ -109,6 +109,7 @@ animation_combos:
       display_name: 死亡
       animations:
           - anim_death
+      loop: false
       binding_strategy: auto
       hidden_tracks:
           - anim_bucket
