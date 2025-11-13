@@ -172,8 +172,8 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 	log.Printf("[BehaviorSystem] 僵尸 %d 死亡动画已开始播放 (anim_death, 不循环)", entityID)
 }
 
-// handlePeashooterBehavior 处理豌豆射手的行为逻辑
-// 豌豆射手会周期性扫描同行僵尸并发射豌豆子弹
+// handleZombieDyingBehavior 处理僵尸死亡动画播放
+// 当死亡动画完成后，删除僵尸实体并增加击杀计数
 
 func (s *BehaviorSystem) handleZombieDyingBehavior(entityID ecs.EntityID) {
 	// 获取 ReanimComponent
