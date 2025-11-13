@@ -765,3 +765,31 @@ func TestMultipleBulletsParticleEffects(t *testing.T) {
 		t.Errorf("僵尸生命值应为 %d（击中2次），实际: %d", expectedHealth, health.CurrentHealth)
 	}
 }
+
+// countAllEntities 统计EntityManager中的所有实体数量（辅助函数）
+func countAllEntities(em *ecs.EntityManager) int {
+	// 通过查询所有可能的组件类型来统计实体数量
+	// 这是一个简化的实现，真实环境中EntityManager应该提供GetAllEntities方法
+	count := 0
+	seen := make(map[ecs.EntityID]bool)
+
+	// 查询所有拥有各种常见组件的实体
+	componentTypes := []reflect.Type{
+		reflect.TypeOf(&components.PositionComponent{}),
+		reflect.TypeOf(&components.BehaviorComponent{}),
+		reflect.TypeOf(&components.EmitterComponent{}),
+		reflect.TypeOf(&components.ParticleComponent{}),
+	}
+
+	for _, compType := range componentTypes {
+		entities := em.GetEntitiesWith(compType)
+		for _, entityID := range entities {
+			if !seen[entityID] {
+				seen[entityID] = true
+				count++
+			}
+		}
+	}
+
+	return count
+}
