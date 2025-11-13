@@ -350,7 +350,17 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 	// 新的渲染逻辑直接从动画遍历到轨道，无需绑定关系
 
 	// 计算并缓存 CenterOffset（基于第一帧）
-	s.calculateCenterOffset(comp)
+	// 检查配置中是否手动指定了 CenterOffset
+	if unitConfig != nil && len(unitConfig.CenterOffset) == 2 {
+		// 使用配置指定的 CenterOffset
+		comp.CenterOffsetX = unitConfig.CenterOffset[0]
+		comp.CenterOffsetY = unitConfig.CenterOffset[1]
+		log.Printf("[ReanimSystem] PlayCombo: 使用配置的 CenterOffset: %s → (%.1f, %.1f)",
+			unitID, comp.CenterOffsetX, comp.CenterOffsetY)
+	} else {
+		// 自动计算 CenterOffset
+		s.calculateCenterOffset(comp)
+	}
 
 	comp.LastRenderFrame = -1
 

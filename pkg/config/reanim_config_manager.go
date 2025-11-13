@@ -34,6 +34,7 @@ type AnimationUnitConfig struct {
 	Name                string                 `yaml:"name"`
 	ReanimFile          string                 `yaml:"reanim_file"`
 	DefaultAnimation    string                 `yaml:"default_animation"`
+	CenterOffset        []float64              `yaml:"center_offset,omitempty"` // 可选：手动指定 CenterOffset [x, y]，如果不指定则自动计算
 	Images              map[string]string      `yaml:"images"`
 	AvailableAnimations []AnimationInfo        `yaml:"available_animations"`
 	AnimationCombos     []AnimationComboConfig `yaml:"animation_combos"`

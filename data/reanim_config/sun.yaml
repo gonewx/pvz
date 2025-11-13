@@ -3,6 +3,9 @@ name: Sun
 reanim_file: data/reanim/Sun.reanim
 default_animation: ""
 scale: 1
+# 阳光不使用自动计算的 CenterOffset，直接使用 PositionComponent 作为渲染中心
+# Sun.reanim 的部件坐标已经是相对于阳光中心的，不需要额外偏移
+center_offset: [0, 0]
 images:
     IMAGE_REANIM_SUN1: assets/reanim/Sun1.png
     IMAGE_REANIM_SUN2: assets/reanim/Sun2.png

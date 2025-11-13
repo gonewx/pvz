@@ -124,6 +124,8 @@ func (s *ReanimSystem) analyzeTrackTypes(reanimXML *reanim.ReanimXML) (visualTra
 func (s *ReanimSystem) calculateCenterOffset(comp *components.ReanimComponent) {
 	// 确保已初始化
 	if comp.MergedTracks == nil || len(comp.VisualTracks) == 0 {
+		log.Printf("[ReanimSystem] calculateCenterOffset: %s → 提前返回（MergedTracks=%v, VisualTracks=%d）",
+			comp.ReanimName, comp.MergedTracks != nil, len(comp.VisualTracks))
 		comp.CenterOffsetX = 0
 		comp.CenterOffsetY = 0
 		return
@@ -136,6 +138,7 @@ func (s *ReanimSystem) calculateCenterOffset(comp *components.ReanimComponent) {
 	s.prepareRenderCache(comp)
 
 	if len(comp.CachedRenderData) == 0 {
+		log.Printf("[ReanimSystem] calculateCenterOffset: %s → 提前返回（CachedRenderData为空）", comp.ReanimName)
 		comp.CenterOffsetX = 0
 		comp.CenterOffsetY = 0
 		return
@@ -197,6 +200,10 @@ func (s *ReanimSystem) calculateCenterOffset(comp *components.ReanimComponent) {
 	// 计算中心点坐标
 	comp.CenterOffsetX = (minX + maxX) / 2
 	comp.CenterOffsetY = (minY + maxY) / 2
+
+	// DEBUG: 输出 CenterOffset 计算结果
+	log.Printf("[ReanimSystem] calculateCenterOffset: %s → CenterOffset=(%.1f, %.1f), BBox=(%.1f,%.1f)-(%.1f,%.1f)",
+		comp.ReanimName, comp.CenterOffsetX, comp.CenterOffsetY, minX, minY, maxX, maxY)
 }
 
 // ==================================================================

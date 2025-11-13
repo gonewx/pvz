@@ -13,7 +13,11 @@ import (
 
 func (s *BehaviorSystem) handleSunflowerBehavior(entityID ecs.EntityID, deltaTime float64) {
 	// 获取计时器组件
-	timer, _ := ecs.GetComponent[*components.TimerComponent](s.entityManager, entityID)
+	timer, ok := ecs.GetComponent[*components.TimerComponent](s.entityManager, entityID)
+	if !ok {
+		log.Printf("[BehaviorSystem] ⚠️ 向日葵 %d 缺少 TimerComponent!", entityID)
+		return
+	}
 
 	// 更新计时器
 	timer.CurrentTime += deltaTime
@@ -76,6 +80,14 @@ func (s *BehaviorSystem) handleSunflowerBehavior(entityID ecs.EntityID, deltaTim
 		// 创建向日葵生产的阳光实体
 		sunID := entities.NewPlantSunEntity(s.entityManager, s.resourceManager, sunStartX, sunStartY, sunTargetX, sunTargetY)
 
+		// 添加 AnimationCommand 组件来播放阳光动画（与自然生成的阳光一致）
+		// Sun.reanim 只有轨道(Sun1, Sun2, Sun3)，使用配置的"idle"组合播放动画
+		ecs.AddComponent(s.entityManager, sunID, &components.AnimationCommandComponent{
+			UnitID:    "sun",
+			ComboName: "idle",
+			Processed: false,
+		})
+
 		// 设置阳光的速度：抛物线运动
 		// 阳光先向上弹起，然后在重力作用下落到目标位置
 		sunVel, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, sunID)
@@ -94,8 +106,6 @@ func (s *BehaviorSystem) handleSunflowerBehavior(entityID ecs.EntityID, deltaTim
 
 		log.Printf("[BehaviorSystem] 阳光实体创建完成，ID=%d, 状态: Rising, 速度: (%.1f, %.1f)",
 			sunID, sunVel.VX, sunVel.VY)
-
-		// 简单实体的动画已在 createSimpleReanimComponent 中初始化，无需额外初始化
 
 		// 重置计时器
 		timer.CurrentTime = 0

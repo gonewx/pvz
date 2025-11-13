@@ -63,26 +63,26 @@ func newSunEntityInternal(manager *ecs.EntityManager, rm *game.ResourceManager, 
 		Y: startY, // 使用传入的起始Y坐标
 	})
 
-	// 添加 ReanimComponent（使用完整的阳光动画）
+	// 添加 ReanimComponent（使用完整的 Reanim 数据）
+	// Sun.reanim 包含 Sun1, Sun2, Sun3 三个轨道，通过配置文件播放 idle 组合
 	if reanimXML != nil && reanimPartImages != nil {
-		log.Printf("[SunFactory] Adding ReanimComponent with Reanim data")
-		// Story 8.2 QA修复：阳光的 Sun.reanim 只有 track，没有 anim 定义
-		// 只添加基础 ReanimComponent，动画初始化由 ReanimSystem.InitializeDirectRender() 完成
+		log.Printf("[SunFactory] Adding ReanimComponent with full Reanim data")
+		// 添加基础 ReanimComponent，动画通过 AnimationCommandComponent 初始化
 		manager.AddComponent(id, &components.ReanimComponent{
+			ReanimName: "Sun",
 			ReanimXML:  reanimXML,
 			PartImages: reanimPartImages,
 			IsLooping:  true, // 循环播放
 		})
 	} else {
 		// 降级方案：使用单张图片（如果 Reanim 加载失败）
-		log.Printf("[SunFactory] WARNING: Reanim not available, using fallback image")
+		log.Printf("[SunFactory] WARNING: Reanim not available, using fallback simple component")
 		sunImage, err := rm.LoadImageByID("IMAGE_REANIM_SUN1")
 		if err != nil {
-			// 如果仍然失败，使用备用图片
 			log.Printf("[SunFactory] ERROR: Failed to load IMAGE_REANIM_SUN1: %v", err)
 			sunImage, _ = rm.LoadImage("assets/images/SunBank.png")
 		}
-		manager.AddComponent(id, createSimpleReanimComponent(sunImage, "sun"))
+		manager.AddComponent(id, createSimpleReanimComponent(sunImage, "IMAGE_REANIM_SUN1"))
 	}
 
 	// 添加速度组件 (原版掉落速度: 60像素/秒)

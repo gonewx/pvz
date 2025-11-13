@@ -79,7 +79,11 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 
 	// 遍历所有植物实体，根据行为类型分发处理
 	for _, entityID := range plantEntityList {
-		behaviorComp, _ := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
+		behaviorComp, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
+		if !ok {
+			log.Printf("[BehaviorSystem] ⚠️ 植物实体 %d 缺少 BehaviorComponent", entityID)
+			continue
+		}
 
 		// 根据行为类型分发
 		switch behaviorComp.Type {
@@ -92,7 +96,10 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 		case components.BehaviorCherryBomb:
 			s.handleCherryBombBehavior(entityID, deltaTime)
 		default:
-			// 未知行为类型，忽略
+			// 未知行为类型，记录警告
+			if s.logFrameCounter%LogOutputFrameInterval == 1 {
+				log.Printf("[BehaviorSystem] ⚠️ 植物实体 %d 有未知行为类型: %v", entityID, behaviorComp.Type)
+			}
 		}
 	}
 
