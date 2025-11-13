@@ -38,6 +38,7 @@ import (
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/systems"
+	"github.com/decker502/pvz/pkg/systems/behavior"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -66,7 +67,7 @@ type OpeningVerifyGame struct {
 	cameraSystem   *systems.CameraSystem
 	openingSystem  *systems.OpeningAnimationSystem
 	renderSystem   *systems.RenderSystem
-	behaviorSystem *systems.BehaviorSystem
+	behaviorSystem *behavior.BehaviorSystem
 	reanimSystem   *systems.ReanimSystem
 
 	// Configuration
@@ -127,7 +128,7 @@ func NewOpeningVerifyGame() (*OpeningVerifyGame, error) {
 
 	// Create systems
 	reanimSystem := systems.NewReanimSystem(em)
-	behaviorSystem := systems.NewBehaviorSystem(em, rm, gs, lawnGridSystem, lawnGridEntity)
+	behaviorSystem := behavior.NewBehaviorSystem(em, rm, gs, lawnGridSystem, lawnGridEntity)
 	renderSystem := systems.NewRenderSystem(em)
 	cameraSystem := systems.NewCameraSystem(em, gs)
 

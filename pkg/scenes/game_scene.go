@@ -13,6 +13,7 @@ import (
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/modules"
 	"github.com/decker502/pvz/pkg/systems"
+	"github.com/decker502/pvz/pkg/systems/behavior"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
@@ -131,7 +132,7 @@ type GameScene struct {
 	lawnGridEntityID ecs.EntityID            // 草坪网格实体ID
 
 	// Story 3.4: Behavior System
-	behaviorSystem *systems.BehaviorSystem // 植物行为系统（向日葵生产阳光等）
+	behaviorSystem *behavior.BehaviorSystem // 植物行为系统（向日葵生产阳光等）
 
 	// Story 4.3: Physics System
 	physicsSystem *systems.PhysicsSystem // 物理系统（碰撞检测）
@@ -333,7 +334,7 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	// Story 14.3: Epic 14 - Removed ReanimSystem dependency, using AnimationCommand component
 	// Story 5.5: Pass GameState for zombie death counting
 	// Bug Fix: Pass LawnGridSystem for plant death grid release
-	scene.behaviorSystem = systems.NewBehaviorSystem(
+	scene.behaviorSystem = behavior.NewBehaviorSystem(
 		scene.entityManager,
 		rm,
 		scene.gameState,
@@ -1192,13 +1193,27 @@ func (s *GameScene) Update(deltaTime float64) {
 				// 动画完成回调：通知教学系统可以开始了
 				log.Printf("[GameScene] 铺草皮动画完成")
 
-				// Story 11.5 修复：Level 1-4 双背景叠加模式，动画完成后替换底层背景
-				// 原理：动画期间使用叠加层裁剪显示，完成后将底层背景完全替换为已铺草皮背景
+				// Story 11.5 修复：动画完成后处理草皮叠加层
+				// 原理：动画期间使用叠加层裁剪显示，完成后将草皮合并到底层背景
 				if s.soddedBackground != nil {
+					// Level 1-4: 有完整的已铺草皮背景，直接替换
 					log.Printf("[GameScene] 替换底层背景: IMAGE_BACKGROUND1UNSODDED → IMAGE_BACKGROUND1")
 					s.background = s.soddedBackground
-					s.soddedBackground = nil // 清空叠加层，停止叠加渲染
-					s.preSoddedImage = nil   // 同时清空预渲染图片，避免继续渲染
+					s.soddedBackground = nil
+					s.preSoddedImage = nil
+				} else if s.preSoddedImage != nil || s.sodRowImage != nil {
+					// Level 1-1, 1-2: 需要将草皮叠加层合并到底层背景
+					log.Printf("[GameScene] 合并草皮叠加层到底层背景")
+					mergedBg := s.createMergedBackground()
+					if mergedBg != nil {
+						// 原子操作：先替换背景，再清空叠加层，确保渲染不中断
+						s.background = mergedBg
+						s.preSoddedImage = nil
+						s.sodRowImage = nil
+					} else {
+						// 合并失败，保持叠加层不清空，避免草皮消失
+						log.Printf("[GameScene] 警告：合并背景失败，保持叠加层")
+					}
 				}
 
 				if s.tutorialSystem != nil {
@@ -1258,13 +1273,27 @@ func (s *GameScene) Update(deltaTime float64) {
 					// 动画完成回调：通知教学系统可以开始了
 					log.Printf("[GameScene] 铺草皮动画完成")
 
-					// Story 11.5 修复：Level 1-4 双背景叠加模式，动画完成后替换底层背景
-					// 原理：动画期间使用叠加层裁剪显示，完成后将底层背景完全替换为已铺草皮背景
+					// Story 11.5 修复：动画完成后处理草皮叠加层
+					// 原理：动画期间使用叠加层裁剪显示，完成后将草皮合并到底层背景
 					if s.soddedBackground != nil {
+						// Level 1-4: 有完整的已铺草皮背景，直接替换
 						log.Printf("[GameScene] 替换底层背景: IMAGE_BACKGROUND1UNSODDED → IMAGE_BACKGROUND1")
 						s.background = s.soddedBackground
-						s.soddedBackground = nil // 清空叠加层，停止叠加渲染
-						s.preSoddedImage = nil   // 同时清空预渲染图片，避免继续渲染
+						s.soddedBackground = nil
+						s.preSoddedImage = nil
+					} else if s.preSoddedImage != nil || s.sodRowImage != nil {
+						// Level 1-1, 1-2: 需要将草皮叠加层合并到底层背景
+						log.Printf("[GameScene] 合并草皮叠加层到底层背景")
+						mergedBg := s.createMergedBackground()
+						if mergedBg != nil {
+							// 原子操作：先替换背景，再清空叠加层，确保渲染不中断
+							s.background = mergedBg
+							s.preSoddedImage = nil
+							s.sodRowImage = nil
+						} else {
+							// 合并失败，保持叠加层不清空，避免草皮消失
+							log.Printf("[GameScene] 警告：合并背景失败，保持叠加层")
+						}
 					}
 
 					if s.tutorialSystem != nil {
@@ -1564,6 +1593,7 @@ func (s *GameScene) drawBackground(screen *ebiten.Image) {
 			if overlayBg != nil {
 				// 获取草皮卷当前位置（世界坐标X）
 				sodRollCenterX := s.soddingSystem.GetSodRollCenterX()
+				animProgress := s.soddingSystem.GetProgress()
 
 				// 计算可见宽度（从世界坐标 0 到草皮卷中心）
 				visibleWorldWidth := int(sodRollCenterX)
@@ -1574,6 +1604,12 @@ func (s *GameScene) drawBackground(screen *ebiten.Image) {
 				// Level 1-2: preSoddedLanes=[2,4] → 动画前显示预铺草皮
 				hasPreSoddedLanes := len(s.gameState.CurrentLevel.PreSoddedLanes) > 0
 				if usingPreSoddedImage && !s.soddingSystem.HasStarted() && hasPreSoddedLanes {
+					bgBounds := overlayBg.Bounds()
+					visibleWorldWidth = bgBounds.Dx()
+				}
+
+				// 优化：动画接近完成时（≥99%），直接显示完整叠加层，避免切换时闪烁
+				if animProgress >= 0.99 {
 					bgBounds := overlayBg.Bounds()
 					visibleWorldWidth = bgBounds.Dx()
 				}
@@ -1643,6 +1679,59 @@ func (s *GameScene) drawBackground(screen *ebiten.Image) {
 		// Fallback: Draw a green background to simulate grass
 		screen.Fill(color.RGBA{R: 34, G: 139, B: 34, A: 255}) // Forest green
 	}
+}
+
+// createMergedBackground 创建合并了草皮叠加层的背景图片
+// 在铺草皮动画完成后调用，将底层背景和草皮叠加层合并成一个新的完整背景
+// 返回合并后的背景图片，如果失败返回 nil
+func (s *GameScene) createMergedBackground() *ebiten.Image {
+	if s.background == nil {
+		log.Printf("[createMergedBackground] 错误：底层背景为空")
+		return nil
+	}
+
+	// 选择叠加图层（preSoddedImage 或 sodRowImage）
+	var overlayImg *ebiten.Image
+	if s.preSoddedImage != nil {
+		overlayImg = s.preSoddedImage
+		log.Printf("[createMergedBackground] 使用 preSoddedImage 作为叠加层")
+	} else if s.sodRowImage != nil {
+		overlayImg = s.sodRowImage
+		log.Printf("[createMergedBackground] 使用 sodRowImage 作为叠加层")
+	} else {
+		log.Printf("[createMergedBackground] 错误：没有可用的草皮叠加层")
+		return nil
+	}
+
+	// 获取背景尺寸
+	bgBounds := s.background.Bounds()
+	bgWidth := bgBounds.Dx()
+	bgHeight := bgBounds.Dy()
+
+	log.Printf("[createMergedBackground] 创建合并背景: 尺寸 %dx%d", bgWidth, bgHeight)
+
+	// 创建新的背景图片
+	mergedBg := ebiten.NewImage(bgWidth, bgHeight)
+
+	// 1. 绘制底层背景
+	op := &ebiten.DrawImageOptions{}
+	mergedBg.DrawImage(s.background, op)
+
+	// 2. 绘制草皮叠加层
+	// 使用 preSoddedImage 时，它已经包含了正确位置的草皮
+	// 使用 sodRowImage 时，需要根据配置的位置绘制
+	if s.preSoddedImage != nil {
+		// preSoddedImage 已经是完整的背景副本，直接使用
+		mergedBg.DrawImage(overlayImg, op)
+	} else if s.sodRowImage != nil {
+		// sodRowImage 需要放置在正确的位置
+		overlayOp := &ebiten.DrawImageOptions{}
+		overlayOp.GeoM.Translate(float64(s.sodOverlayX), float64(s.sodOverlayY))
+		mergedBg.DrawImage(overlayImg, overlayOp)
+	}
+
+	log.Printf("[createMergedBackground] 成功创建合并背景")
+	return mergedBg
 }
 
 // drawSeedBank renders the plant selection bar at the top left of the screen.
