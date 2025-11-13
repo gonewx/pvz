@@ -6,7 +6,17 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
+	"log"
 )
+
+// getAnimVisiblesMapKeys 辅助函数：获取 map 的 keys
+func getAnimVisiblesMapKeys(m map[string][]int) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
 
 // NewPeaProjectile 创建豌豆子弹实体
 // 豌豆子弹从豌豆射手口部发射，以恒定速度向右移动
@@ -46,7 +56,12 @@ func NewPeaProjectile(em *ecs.EntityManager, rm ResourceLoader, startX, startY f
 	// Story 6.3: 游戏世界实体统一使用 ReanimComponent 渲染
 	// 为单图片实体创建简化的 Reanim 包装（无动画轨道）
 	// 注意：UI 元素（植物卡片）仍使用 SpriteComponent，由专门的渲染系统处理
-	em.AddComponent(entityID, createSimpleReanimComponent(peaImage, "pea"))
+	reanimComp := createSimpleReanimComponent(peaImage, "pea")
+	em.AddComponent(entityID, reanimComp)
+
+	// ✅ Debug: 打印子弹创建信息
+	log.Printf("[ProjectileFactory] 创建子弹 %d: ReanimName=%s, VisualTracks=%v, CurrentAnimations=%v, AnimVisiblesMap keys=%v",
+		entityID, reanimComp.ReanimName, reanimComp.VisualTracks, reanimComp.CurrentAnimations, getAnimVisiblesMapKeys(reanimComp.AnimVisiblesMap))
 
 	// 添加速度组件（向右移动）
 	em.AddComponent(entityID, &components.VelocityComponent{

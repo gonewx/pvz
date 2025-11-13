@@ -32,6 +32,9 @@ func createSimpleReanimComponent(image *ebiten.Image, imageName string) *compone
 	}
 
 	// 创建一个简单的单帧 Reanim
+	// ✅ 修复：使用 "idle" 作为统一的轨道名称和动画名称，确保 buildVisiblesArray 能找到轨道
+	animName := "idle" // 统一使用 "idle" 作为简单实体的动画名称
+
 	frame := reanim.Frame{
 		FrameNum: new(int),
 		X:        new(float64),
@@ -47,7 +50,7 @@ func createSimpleReanimComponent(image *ebiten.Image, imageName string) *compone
 	frame.ImagePath = imageName
 
 	track := reanim.Track{
-		Name:   imageName,
+		Name:   animName, // 使用 "idle" 作为轨道名称，与动画名称一致
 		Frames: []reanim.Frame{frame},
 	}
 
@@ -61,10 +64,11 @@ func createSimpleReanimComponent(image *ebiten.Image, imageName string) *compone
 	}
 
 	mergedTracks := map[string][]reanim.Frame{
-		imageName: {frame},
+		animName: {frame}, // 使用 "idle" 作为轨道名称，与动画名称一致
 	}
 
 	// Story 13.8: 新的 ReanimComponent 结构
+	// ✅ 修复：确保轨道名称和动画名称一致，避免 buildVisiblesArray 找不到轨道
 	return &components.ReanimComponent{
 		// 基础数据
 		ReanimName:   "simple_" + imageName,
@@ -73,18 +77,18 @@ func createSimpleReanimComponent(image *ebiten.Image, imageName string) *compone
 		MergedTracks: mergedTracks,
 
 		// 轨道分类
-		VisualTracks:  []string{imageName}, // 单图片实体只有一个视觉轨道
-		LogicalTracks: []string{},          // 简单实体没有逻辑轨道
+		VisualTracks:  []string{animName}, // 使用 "idle" 作为视觉轨道名称
+		LogicalTracks: []string{},         // 简单实体没有逻辑轨道
 
 		// 播放状态
 		CurrentFrame:      0,
 		FrameAccumulator:  0.0,
 		AnimationFPS:      12,
-		CurrentAnimations: []string{"idle"},
+		CurrentAnimations: []string{animName}, // 使用统一的动画名称
 
 		// 动画数据
 		AnimVisiblesMap: map[string][]int{
-			"idle": {0}, // 单帧动画
+			animName: {0}, // 单帧动画，使用统一的动画名称
 		},
 		// ✅ Story 13.10: TrackAnimationBinding 已删除
 
