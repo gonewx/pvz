@@ -406,10 +406,22 @@ func (c *AnimationCell) Render(canvas *ebiten.Image, centerX, centerY float64) {
 		c.lastRenderFrame = c.currentFrame
 	}
 
+	if *verbose && c.currentFrame < 3 {
+		log.Printf("[Render] %s 第 %d 帧: 中心=(%.1f,%.1f), 缓存部件数=%d",
+			c.config.Name, c.currentFrame, centerX, centerY, len(c.cachedRenderData))
+	}
+
 	// 快速渲染缓存的部件
 	for i := range c.cachedRenderData {
 		data := &c.cachedRenderData[i]
-		c.drawPart(canvas, data.frame, data.img, c.centerX+data.offsetX, c.centerY+data.offsetY)
+		finalX := c.centerX + data.offsetX
+		finalY := c.centerY + data.offsetY
+
+		if *verbose && c.currentFrame < 3 {
+			log.Printf("[Render]   部件#%d: 渲染中心=(%.1f,%.1f)", i, finalX, finalY)
+		}
+
+		c.drawPart(canvas, data.frame, data.img, finalX, finalY)
 	}
 }
 
@@ -417,6 +429,11 @@ func (c *AnimationCell) Render(canvas *ebiten.Image, centerX, centerY float64) {
 func (c *AnimationCell) updateRenderCache() {
 	// 重用切片避免分配
 	c.cachedRenderData = c.cachedRenderData[:0]
+
+	if *verbose && c.currentFrame < 3 {
+		log.Printf("[updateRenderCache] %s 第 %d 帧, visualTracks=%d",
+			c.config.Name, c.currentFrame, len(c.visualTracks))
+	}
 
 	for _, trackName := range c.visualTracks {
 		// 检查配置中的隐藏轨道
@@ -429,18 +446,31 @@ func (c *AnimationCell) updateRenderCache() {
 		}
 
 		controllingAnim, physicalFrame := c.findControllingAnimation(trackName)
-		if controllingAnim == "" {
+		if *verbose && c.currentFrame < 3 {
+			log.Printf("[updateRenderCache]   轨道 %s: controllingAnim=%s, physicalFrame=%d",
+				trackName, controllingAnim, physicalFrame)
+		}
+
+		if physicalFrame < 0 {
 			continue
 		}
 
 		mergedFrames, ok := c.mergedTracks[trackName]
 		if !ok || physicalFrame >= len(mergedFrames) {
+			if *verbose && c.currentFrame < 3 {
+				log.Printf("[updateRenderCache]   轨道 %s: 轨道不存在或帧超界 (len=%d)",
+					trackName, len(mergedFrames))
+			}
 			continue
 		}
 
 		frame := mergedFrames[physicalFrame]
 
 		if frame.ImagePath == "" {
+			if *verbose && c.currentFrame < 3 {
+				log.Printf("[updateRenderCache]   轨道 %s: 第 %d 帧无图片",
+					trackName, physicalFrame)
+			}
 			continue
 		}
 
@@ -457,7 +487,18 @@ func (c *AnimationCell) updateRenderCache() {
 
 		img, ok := c.partImages[frame.ImagePath]
 		if !ok || img == nil {
+			if *verbose && c.currentFrame < 3 {
+				log.Printf("[updateRenderCache]   轨道 %s: 图片未加载 (%s)",
+					trackName, frame.ImagePath)
+			}
 			continue
+		}
+
+		if *verbose && c.currentFrame < 3 {
+			log.Printf("[updateRenderCache]   ✓ 添加部件: 轨道=%s, 图片=%s, 位置=(%.1f,%.1f), 缩放=(%.2f,%.2f)",
+				trackName, frame.ImagePath,
+				getFloat(frame.X), getFloat(frame.Y),
+				getFloat(frame.ScaleX), getFloat(frame.ScaleY))
 		}
 
 		c.cachedRenderData = append(c.cachedRenderData, renderPartData{
@@ -466,6 +507,11 @@ func (c *AnimationCell) updateRenderCache() {
 			offsetX: offsetX,
 			offsetY: offsetY,
 		})
+	}
+
+	if *verbose && c.currentFrame < 3 {
+		log.Printf("[updateRenderCache] %s 第 %d 帧: 缓存了 %d 个部件",
+			c.config.Name, c.currentFrame, len(c.cachedRenderData))
 	}
 }
 
@@ -489,7 +535,17 @@ func (c *AnimationCell) findControllingAnimation(trackName string) (string, int)
 		animName := c.currentAnimations[0]
 		animVisibles := c.animVisiblesMap[animName]
 		visibleCount := countVisibleFrames(animVisibles)
-		if visibleCount > 0 {
+
+		// 特殊情况：只有1个可见帧，说明这是"门控动画"（如 ZombiesWon 的 anim_screen）
+		// 不应该用它映射视觉轨道，而应该直接播放所有帧
+		if visibleCount == 1 {
+			// 回退到直接使用当前帧播放
+			mergedFrames, ok := c.mergedTracks[trackName]
+			if ok && len(mergedFrames) > 0 {
+				physicalFrame := c.currentFrame % len(mergedFrames)
+				return "", physicalFrame
+			}
+		} else if visibleCount > 0 {
 			animLogicalFrame := c.currentFrame % visibleCount
 			physicalFrame := mapLogicalToPhysical(animLogicalFrame, animVisibles)
 			return animName, physicalFrame

@@ -25,6 +25,7 @@ import (
 var (
 	configPath = flag.String("config", "cmd/animation_showcase/config.yaml", "配置文件路径")
 	verbose    = flag.Bool("verbose", false, "详细日志")
+	unit       = flag.String("unit", "", "直接播放指定动画单元（单个模式）")
 )
 
 // HelpPosition 帮助面板位置
@@ -69,7 +70,9 @@ type Game struct {
 }
 
 // NewGame 创建游戏实例
-func NewGame(configPath string) (*Game, error) {
+// configPath: 配置文件路径
+// unitName: 指定要播放的单元名称（为空则显示网格）
+func NewGame(configPath string, unitName string) (*Game, error) {
 	// 加载配置
 	config, err := LoadConfig(configPath)
 	if err != nil {
@@ -77,14 +80,6 @@ func NewGame(configPath string) (*Game, error) {
 	}
 
 	log.Printf("✓ 加载配置成功: %d 个动画单元", len(config.Animations))
-
-	// 计算分页参数（从配置读取）
-	rowsPerPage := config.Global.Grid.RowsPerPage
-	cellsPerPage := rowsPerPage * config.Global.Grid.Columns
-	totalPages := (len(config.Animations) + cellsPerPage - 1) / cellsPerPage
-
-	log.Printf("✓ 分页配置: 每页 %d 行 × %d 列 = %d 个单元, 共 %d 页",
-		rowsPerPage, config.Global.Grid.Columns, cellsPerPage, totalPages)
 
 	// 加载中文字体
 	font, err := loadFont("assets/fonts/SimHei.ttf", 14)
@@ -97,14 +92,69 @@ func NewGame(configPath string) (*Game, error) {
 	game := &Game{
 		config:         config,
 		allAnimConfigs: config.Animations,
-		currentPage:    0,
-		totalPages:     totalPages,
-		cellsPerPage:   cellsPerPage,
 		showHelp:       true,
-		helpPosition:   HelpTopRight,    // 默认右上角
-		displayMode:    DisplayModeGrid, // 默认网格模式
+		helpPosition:   HelpTopRight,
 		textFont:       font,
 	}
+
+	// 单个单元模式：直接播放指定单元
+	if unitName != "" {
+		// 查找指定单元
+		var unitConfig *AnimationUnitConfig
+		for i := range config.Animations {
+			if config.Animations[i].ID == unitName || config.Animations[i].Name == unitName {
+				unitConfig = &config.Animations[i]
+				break
+			}
+		}
+
+		if unitConfig == nil {
+			return nil, fmt.Errorf("未找到指定的动画单元: %s", unitName)
+		}
+
+		log.Printf("=== 单个单元模式: %s ===", unitConfig.Name)
+
+		// 创建单个动画单元
+		cell, err := NewAnimationCell(
+			unitConfig,
+			config.Global.Playback.FPS,
+			config.Global.Playback.TPS,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("加载动画单元失败: %w", err)
+		}
+
+		log.Printf("✓ 成功加载: %s (%s)", cell.GetName(), cell.GetCurrentAnimationName())
+
+		// 创建单元格布局（只包含一个单元）
+		cells := []*AnimationCell{cell}
+		game.layout = NewGridLayout(
+			&config.Global.Grid,
+			cells,
+			config.Global.Window.Width,
+			config.Global.Window.Height,
+			game.textFont,
+		)
+
+		// 设置为单个模式，并选中该单元
+		game.displayMode = DisplayModeSingle
+		game.layout.SetSelectedIndex(0)
+
+		return game, nil
+	}
+
+	// 网格模式：分页显示所有单元
+	rowsPerPage := config.Global.Grid.RowsPerPage
+	cellsPerPage := rowsPerPage * config.Global.Grid.Columns
+	totalPages := (len(config.Animations) + cellsPerPage - 1) / cellsPerPage
+
+	log.Printf("✓ 分页配置: 每页 %d 行 × %d 列 = %d 个单元, 共 %d 页",
+		rowsPerPage, config.Global.Grid.Columns, cellsPerPage, totalPages)
+
+	game.currentPage = 0
+	game.totalPages = totalPages
+	game.cellsPerPage = cellsPerPage
+	game.displayMode = DisplayModeGrid
 
 	// 加载第一页
 	if err := game.loadPage(0); err != nil {
@@ -203,7 +253,7 @@ func (g *Game) Update() error {
 	}
 
 	// 处理翻页（只用 PageDown/PageUp，且仅在网格模式下）
-	if g.displayMode == DisplayModeGrid {
+	if g.displayMode == DisplayModeGrid && g.totalPages > 0 {
 		if inpututil.IsKeyJustPressed(ebiten.KeyPageDown) {
 			// 下一页
 			if g.currentPage < g.totalPages-1 {
@@ -262,7 +312,7 @@ func (g *Game) Update() error {
 	}
 
 	// 数字键快速跳转（仅在网格模式下）
-	if g.displayMode == DisplayModeGrid {
+	if g.displayMode == DisplayModeGrid && g.totalPages > 0 {
 		for key := ebiten.Key0; key <= ebiten.Key9; key++ {
 			if inpututil.IsKeyJustPressed(key) {
 				pageNum := int(key - ebiten.Key0)
@@ -343,8 +393,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 // drawInfoBar 绘制顶部信息栏
 func (g *Game) drawInfoBar(screen *ebiten.Image) {
-	info := fmt.Sprintf("FPS: %.1f | 第 %d/%d 页 | 当前页: %d 个动画 | 选中: ",
-		ebiten.ActualTPS(), g.currentPage+1, g.totalPages, g.layout.GetCellCount())
+	var info string
+	if g.totalPages > 0 {
+		info = fmt.Sprintf("FPS: %.1f | 第 %d/%d 页 | 当前页: %d 个动画 | 选中: ",
+			ebiten.ActualTPS(), g.currentPage+1, g.totalPages, g.layout.GetCellCount())
+	} else {
+		info = fmt.Sprintf("FPS: %.1f | 单元数: %d | 选中: ",
+			ebiten.ActualTPS(), g.layout.GetCellCount())
+	}
 
 	selectedIndex := g.layout.GetSelectedIndex()
 	if selectedIndex >= 0 {
@@ -673,7 +729,7 @@ func main() {
 
 	log.Println("=== 动画展示系统启动 ===")
 
-	game, err := NewGame(*configPath)
+	game, err := NewGame(*configPath, *unit)
 	if err != nil {
 		log.Fatalf("初始化失败: %v", err)
 	}
