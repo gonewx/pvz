@@ -42,6 +42,7 @@ type GridLayout struct {
 
 	// 重用的渲染对象（避免每帧分配）
 	textDrawOpts text.DrawOptions
+	cellCanvas   *ebiten.Image // 单元格裁剪画布（重用，避免每帧创建）
 }
 
 // NewGridLayout 创建网格布局管理器
@@ -59,6 +60,7 @@ func NewGridLayout(config *GridConfig, cells []*AnimationCell, windowWidth, wind
 		windowHeight:  windowHeight,
 		selectedIndex: -1,
 		textFont:      textFont,
+		cellCanvas:    ebiten.NewImage(config.CellWidth, config.CellHeight), // 创建裁剪画布（重用）
 	}
 
 	layout.calculateMaxScroll()
@@ -119,8 +121,30 @@ func (g *GridLayout) Render(screen *ebiten.Image) {
 			false,
 		)
 
-		// 以单元格左上角为原点渲染动画
-		cell.Render(screen, x, y)
+		// 清空裁剪画布（重用，避免每帧创建新 Image）
+		g.cellCanvas.Clear()
+
+		// 根据对齐方式决定传入的坐标
+		// - "center"对齐: 传入单元格的中心坐标（默认行为）
+		// - "top-left"对齐: 传入单元格的左上角坐标（用于 SelectorScreen 等全屏 UI）
+		var renderX, renderY float64
+		if cell.GetAlignment() == "top-left" {
+			// 左上角对齐：传入单元格的左上角（相对于裁剪区域）
+			renderX = 0
+			renderY = 0
+		} else {
+			// 中心对齐（默认）：传入单元格的中心（相对于裁剪区域）
+			renderX = float64(g.cellWidth) / 2
+			renderY = float64(g.cellHeight) / 2
+		}
+
+		// 将动画渲染到裁剪画布上（防止大型动画超出边界遮挡其他单元格）
+		cell.Render(g.cellCanvas, renderX, renderY)
+
+		// 将裁剪后的内容绘制到主屏幕上
+		opts := &ebiten.DrawImageOptions{}
+		opts.GeoM.Translate(x, y)
+		screen.DrawImage(g.cellCanvas, opts)
 
 		// 绘制文本背景（深色半透明）
 		textBgY := y + float64(g.cellHeight) - 35

@@ -48,6 +48,7 @@ type AnimationUnitConfig struct {
 	ReanimFile          string                 `yaml:"reanim_file"`
 	DefaultAnimation    string                 `yaml:"default_animation"`
 	Scale               float64                `yaml:"scale"`
+	Alignment           string                 `yaml:"alignment"` // 对齐方式: "center"(默认) 或 "top-left"
 	Images              map[string]string      `yaml:"images"`
 	AvailableAnimations []AnimationInfo        `yaml:"available_animations"`
 	AnimationCombos     []AnimationComboConfig `yaml:"animation_combos"`

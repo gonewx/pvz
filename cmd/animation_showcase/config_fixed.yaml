@@ -1755,6 +1755,7 @@ animations:
     reanim_file: "data/reanim/SelectorScreen.reanim"
     default_animation: "anim_open"
     scale: 1.0
+    alignment: "top-left"  # 全屏 UI，使用左上角对齐（参考 main_menu_scene.go:164-169）
 
     images:
       IMAGE_REANIM_SELECTORSCREEN_CLOUD4: "assets/reanim/SelectorScreen_Cloud4.png"  # TODO: 修正路径

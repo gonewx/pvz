@@ -420,8 +420,22 @@ func (g *Game) drawSingleCell(screen *ebiten.Image) {
 		false,
 	)
 
-	// 以虚拟显示区域的左上角为原点渲染动画
-	cell.Render(screen, virtualX, virtualY)
+	// 根据对齐方式决定传入的坐标
+	// - "center"对齐: 传入虚拟区域的中心坐标（默认行为）
+	// - "top-left"对齐: 传入虚拟区域的左上角坐标（用于 SelectorScreen 等全屏 UI）
+	var renderX, renderY float64
+	if cell.GetAlignment() == "top-left" {
+		// 左上角对齐：传入虚拟区域的左上角
+		renderX = virtualX
+		renderY = virtualY
+	} else {
+		// 中心对齐（默认）：传入虚拟区域的中心
+		renderX = virtualX + virtualWidth/2
+		renderY = virtualY + virtualHeight/2
+	}
+
+	// 渲染动画
+	cell.Render(screen, renderX, renderY)
 
 	// 绘制信息栏
 	info := fmt.Sprintf("FPS: %.1f | 单元: %s | 动画: %s | 显示区域: 800x600 | 按 Enter 返回网格",

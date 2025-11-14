@@ -77,6 +77,9 @@ type AnimationCell struct {
 	centerOffsetX float64
 	centerOffsetY float64
 
+	// 对齐方式："center"(默认，使用中心锚点) 或 "top-left"(左上角对齐，如 SelectorScreen)
+	alignment string
+
 	// 详情模式（点击后显示）
 	detailMode bool
 }
@@ -166,7 +169,21 @@ func NewAnimationCell(config *AnimationUnitConfig, globalFPS int, targetTPS int)
 		visualTracks,
 	)
 
-	if *verbose {
+	// 处理对齐方式（参考 main_menu_scene.go:164-169）
+	// SelectorScreen 等全屏 UI 使用左上角对齐（Reanim 原始坐标）
+	cell.alignment = config.Alignment
+	if cell.alignment == "" {
+		cell.alignment = "center" // 默认中心对齐
+	}
+
+	if cell.alignment == "top-left" {
+		// 左上角对齐：禁用 CenterOffset
+		cell.centerOffsetX = 0
+		cell.centerOffsetY = 0
+		if *verbose {
+			log.Printf("[AnimationCell] %s: 使用左上角对齐 (CenterOffset=0)", config.Name)
+		}
+	} else if *verbose {
 		log.Printf("[AnimationCell] %s: CenterOffset=(%.1f, %.1f)",
 			config.Name, cell.centerOffsetX, cell.centerOffsetY)
 	}
@@ -378,10 +395,10 @@ func (c *AnimationCell) Update() {
 }
 
 // Render 渲染动画到指定画布
-// originX, originY: 渲染原点（左上角）坐标
-func (c *AnimationCell) Render(canvas *ebiten.Image, originX, originY float64) {
-	c.centerX = originX
-	c.centerY = originY
+// centerX, centerY: 动画的中心坐标（用于中心锚点方案）
+func (c *AnimationCell) Render(canvas *ebiten.Image, centerX, centerY float64) {
+	c.centerX = centerX
+	c.centerY = centerY
 
 	// 使用缓存：如果帧没有变化，使用缓存的渲染数据
 	if c.currentFrame != c.lastRenderFrame {
@@ -661,6 +678,11 @@ func (c *AnimationCell) GetCurrentAnimationName() string {
 // GetName 获取单元名称
 func (c *AnimationCell) GetName() string {
 	return c.config.Name
+}
+
+// GetAlignment 获取对齐方式
+func (c *AnimationCell) GetAlignment() string {
+	return c.alignment
 }
 
 // ToggleDetailMode 切换详情模式
