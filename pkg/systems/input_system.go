@@ -234,14 +234,13 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 			// - 渲染原点 = pos - CenterOffset
 			// - Sun1 中心 ≈ 渲染原点 + Sun1 偏移 ≈ 渲染原点
 			// - 因此点击中心 = pos - CenterOffset
-			clickCenterX := pos.X
-			clickCenterY := pos.Y
 
-			// 阳光的几何中心偏右，需要向左偏移 CenterOffset 对齐视觉中心
-			// 只对有 ReanimComponent 的阳光应用此修正
-			if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id); ok {
-				clickCenterX = pos.X - reanimComp.CenterOffsetX
-				clickCenterY = pos.Y - reanimComp.CenterOffsetY
+			// 使用坐标转换工具库计算点击中心
+			clickCenterX, clickCenterY, err := utils.GetClickableCenter(s.entityManager, id, pos)
+			if err != nil {
+				// 实体没有 ReanimComponent，使用 Position 作为默认中心
+				clickCenterX = pos.X
+				clickCenterY = pos.Y
 			}
 
 			halfWidth := clickable.Width / 2.0

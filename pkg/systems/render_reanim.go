@@ -6,6 +6,7 @@ import (
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -67,13 +68,6 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 			id, pos.X, pos.Y, cameraX)
 	}
 
-	// 检查是否是 UI 元素（UI 元素不受摄像机影响）
-	_, isUI := ecs.GetComponent[*components.UIComponent](s.entityManager, id)
-	effectiveCameraX := cameraX
-	if isUI {
-		effectiveCameraX = 0 // UI 元素使用屏幕坐标，不应用摄像机偏移
-	}
-
 	// 之前的错误：直接读取 CachedRenderData 导致缓存从不更新，主菜单黑屏
 	var renderData []components.RenderPartData
 	if s.reanimSystem != nil {
@@ -103,11 +97,12 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		flashIntensity = flashComp.Intensity
 	}
 
-	// 计算屏幕坐标（世界坐标 - 摄像机偏移 - 居中偏移）
-	// CenterOffsetX/Y 是预先计算好的 bounding box 中心坐标
-	// 减去 CenterOffset 使得 bounding box 中心对齐到 Position
-	baseScreenX := pos.X - effectiveCameraX - reanimComp.CenterOffsetX
-	baseScreenY := pos.Y - reanimComp.CenterOffsetY
+	// 使用坐标转换工具库计算屏幕坐标
+	baseScreenX, baseScreenY, err := utils.GetRenderScreenOrigin(s.entityManager, id, pos, cameraX)
+	if err != nil {
+		// 实体没有 ReanimComponent（理论上不会到这里，因为前面已经检查过）
+		return
+	}
 
 	// 渲染每个部件
 	for i, partData := range renderData {

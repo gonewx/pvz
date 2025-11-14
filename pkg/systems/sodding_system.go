@@ -8,6 +8,7 @@ import (
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/decker502/pvz/pkg/utils"
 )
 
 // SoddingSystem 管理铺草皮动画系统
@@ -452,13 +453,22 @@ func (s *SoddingSystem) calculateCurrentEdges() (float64, float64, float64) {
 	centerX := *sodRollX + scaledHalfWidth     // 图片中心
 	rightEdge := *sodRollX + scaledHalfWidth*2 // 图片右边缘
 
-	// 转换为世界坐标
-	// 渲染公式：图片左上角世界坐标 = pos.X - CenterOffsetX + SodRoll.X
-	worldLeftEdge := posComp.X - reanimComp.CenterOffsetX + leftEdge
-	worldCenterX := posComp.X - reanimComp.CenterOffsetX + centerX
-	worldRightEdge := posComp.X - reanimComp.CenterOffsetX + rightEdge
+	// 转换为世界坐标（使用坐标转换工具库）
+	worldLeftEdgeX, _, err := utils.ReanimLocalToWorld(s.entityManager, entityID, posComp, leftEdge, 0)
+	if err != nil {
+		// 实体没有 ReanimComponent（理论上不会到这里）
+		return 0, 0, 0
+	}
+	worldCenterX, _, err := utils.ReanimLocalToWorld(s.entityManager, entityID, posComp, centerX, 0)
+	if err != nil {
+		return 0, 0, 0
+	}
+	worldRightEdgeX, _, err := utils.ReanimLocalToWorld(s.entityManager, entityID, posComp, rightEdge, 0)
+	if err != nil {
+		return 0, 0, 0
+	}
 
-	return worldLeftEdge, worldCenterX, worldRightEdge
+	return worldLeftEdgeX, worldCenterX, worldRightEdgeX
 }
 
 // calculateCurrentCenterX 计算草皮可见区域右边缘的X坐标（世界坐标）
@@ -532,9 +542,12 @@ func (s *SoddingSystem) calculateCurrentCenterX() float64 {
 	// 渲染系统把 SodRoll.X 当作图片左上角，图片中心 = SodRoll.X + scaledHalfWidth
 	sodRollCenterX := *sodRollX + scaledHalfWidth
 
-	// 转换为世界坐标
-	// 使用和 calculateCurrentEdges 一致的坐标系统
-	worldRightEdgeX := posComp.X - reanimComp.CenterOffsetX + sodRollCenterX
+	// 转换为世界坐标（使用坐标转换工具库）
+	worldRightEdgeX, _, err := utils.ReanimLocalToWorld(s.entityManager, entityID, posComp, sodRollCenterX, 0)
+	if err != nil {
+		// 实体没有 ReanimComponent，返回起点
+		return s.animStartX
+	}
 
 	return worldRightEdgeX
 }
