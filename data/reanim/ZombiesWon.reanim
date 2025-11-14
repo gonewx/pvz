@@ -29,7 +29,7 @@
 </track>
 <track>
 <name>fullscreen</name>
-<t><x>0.1</x><y>0.1</y><sx>49.999</sx><sy>37.499</sy><a>0</a></t>
+<t><x>0.1</x><y>0.1</y><sx>49.999</sx><sy>37.499</sy><a>0</a><i>IMAGE_REANIM_ZOMBIESWON_SCREEN</i></t>
 <t><a>0.05</a></t>
 <t><a>0.09</a></t>
 <t><a>0.14</a></t>
@@ -57,7 +57,7 @@
 </track>
 <track>
 <name>fullscreen2</name>
-<t><x>0.1</x><y>0.1</y><sx>49.999</sx><sy>37.499</sy><a>0</a></t>
+<t><x>0.1</x><y>0.1</y><sx>49.999</sx><sy>37.499</sy><a>0</a><i>IMAGE_REANIM_ZOMBIESWON_SCREEN</i></t>
 <t><a>0.05</a></t>
 <t><a>0.09</a></t>
 <t><a>0.14</a></t>

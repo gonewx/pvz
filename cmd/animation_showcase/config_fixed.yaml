@@ -4367,7 +4367,8 @@ animations:
     scale: 1.0
 
     images:
-      IMAGE_REANIM_ZOMBIESWON: "assets/reanim/ZombiesWon.jpg"  # TODO: 修正路径
+      IMAGE_REANIM_ZOMBIESWON: "assets/reanim/ZombiesWon.jpg"
+      IMAGE_REANIM_ZOMBIESWON_SCREEN: "assets/reanim/ZombiesWonScreen.png"
 
     available_animations:
       - name: "anim_screen"
