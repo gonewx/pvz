@@ -298,6 +298,9 @@ func (s *LevelSystem) checkDefeatWithLawnmower() {
 				// 除草车已使用，游戏失败
 				s.gameState.SetGameResult("lose")
 				log.Printf("[LevelSystem] Defeat! Zombie (ID:%d) reached the left boundary on lane %d (lawnmower used)", entityID, lane)
+
+				// 触发僵尸胜利动画
+				s.triggerZombiesWon()
 				return
 			} else {
 				// 除草车未使用，不触发失败（让除草车触发）
@@ -334,6 +337,9 @@ func (s *LevelSystem) checkDefeatWithoutLawnmower() {
 		if pos.X < DefeatBoundaryX {
 			s.gameState.SetGameResult("lose")
 			log.Printf("[LevelSystem] Defeat! Zombie (ID:%d) reached the left boundary at X=%.0f", entityID, pos.X)
+
+			// 触发僵尸胜利动画
+			s.triggerZombiesWon()
 			return
 		}
 	}
@@ -725,4 +731,49 @@ func (s *LevelSystem) ShowProgressBar() {
 	// 切换到完整显示模式
 	progressBar.ShowLevelTextOnly = false
 	log.Println("[LevelSystem] Progress bar now showing full display (background + progress + flags)")
+}
+
+// ========================================
+// 僵尸胜利动画
+// ========================================
+
+// triggerZombiesWon 触发僵尸胜利动画
+//
+// 当僵尸到达左边界且所有除草车已用完时调用。
+// 显示 ZombiesWon.reanim 动画，覆盖整个屏幕。
+//
+// 执行步骤：
+//  1. 创建僵尸胜利动画实体（屏幕中央）
+//  2. 使用 AnimationCommandComponent 播放动画
+//
+// 注意：
+//   - 动画会一直显示直到玩家退出游戏
+//   - 使用单动画模式播放 "anim_screen"
+func (s *LevelSystem) triggerZombiesWon() {
+	log.Printf("[LevelSystem] Triggering zombies won animation!")
+
+	// 创建僵尸胜利动画实体（屏幕中央）
+	centerX := float64(config.ScreenWidth) / 2
+	centerY := float64(config.ScreenHeight) / 2
+
+	zombiesWonEntity, err := entities.NewZombiesWonEntity(
+		s.entityManager,
+		s.resourceManager,
+		centerX,
+		centerY,
+	)
+
+	if err != nil {
+		log.Printf("[LevelSystem] ERROR: Failed to create ZombiesWon entity: %v", err)
+		return
+	}
+
+	// 使用组件通信播放动画
+	// 直接使用单动画模式播放 anim_screen
+	ecs.AddComponent(s.entityManager, zombiesWonEntity, &components.AnimationCommandComponent{
+		AnimationName: "anim_screen", // 直接播放单个动画
+		Processed:     false,
+	})
+
+	log.Printf("[LevelSystem] Created ZombiesWon entity (ID: %d), playing anim_screen animation", zombiesWonEntity)
 }

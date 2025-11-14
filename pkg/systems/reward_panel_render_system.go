@@ -551,16 +551,7 @@ func (rprs *RewardPanelRenderSystem) drawPlantInfo(screen *ebiten.Image, panel *
 		// 绘制每一行
 		currentY := startY
 		for _, line := range lines {
-			// 2.1 先绘制阴影（黑色，稍微偏移）
-			shadowOp := &text.DrawOptions{}
-			shadowOp.GeoM.Translate(boxCenterX+2, currentY+2) // 阴影偏移2像素
-			shadowOp.PrimaryAlign = text.AlignCenter
-			shadowOp.SecondaryAlign = text.AlignStart
-			shadowOp.ColorScale.ScaleWithColor(color.RGBA{0, 0, 0, 128}) // 半透明黑色
-			shadowOp.ColorScale.ScaleAlpha(float32(panel.FadeAlpha))
-			text.Draw(screen, line, rprs.plantInfoFont, shadowOp)
-
-			// 2.2 再绘制主文字（深蓝黑色）
+			// 绘制主文字（深蓝黑色，无阴影）
 			descOp := &text.DrawOptions{}
 			descOp.GeoM.Translate(boxCenterX, currentY)
 			descOp.PrimaryAlign = text.AlignCenter                               // 水平居中

@@ -158,3 +158,55 @@ func createReanimComponent(rm *game.ResourceManager, unitName string) (*componen
 		PartImages: partImages,
 	}, nil
 }
+
+// NewZombiesWonEntity 创建僵尸胜利动画实体
+//
+// 当僵尸到达左边界且所有除草车已用完时，显示僵尸胜利画面。
+//
+// 参数：
+//   - em: 实体管理器
+//   - rm: 资源管理器（用于加载 ZombiesWon.reanim）
+//   - centerX: 屏幕中央 X 坐标（通常是 ScreenWidth/2）
+//   - centerY: 屏幕中央 Y 坐标（通常是 ScreenHeight/2）
+//
+// 返回：
+//   - ecs.EntityID: 僵尸胜利动画实体ID
+//   - error: 如果资源加载失败返回错误
+//
+// 注意：
+//   - 调用者需要在创建后添加 AnimationCommandComponent 来播放动画
+//   - 推荐使用单动画模式: AnimationName="anim_screen"
+func NewZombiesWonEntity(
+	em *ecs.EntityManager,
+	rm *game.ResourceManager,
+	centerX, centerY float64,
+) (ecs.EntityID, error) {
+	// 加载 ZombiesWon.reanim 动画
+	reanimComp, err := createReanimComponent(rm, "ZombiesWon")
+	if err != nil {
+		return 0, fmt.Errorf("failed to load ZombiesWon.reanim: %w", err)
+	}
+
+	// 创建实体
+	entityID := em.CreateEntity()
+
+	// 设置位置（屏幕中央）
+	posComp := &components.PositionComponent{
+		X: centerX,
+		Y: centerY,
+	}
+
+	// 添加 UI 组件（标记为 UI 元素，最上层渲染）
+	uiComp := &components.UIComponent{
+		State: components.UINormal,
+	}
+
+	// 添加所有组件
+	ecs.AddComponent(em, entityID, reanimComp)
+	ecs.AddComponent(em, entityID, posComp)
+	ecs.AddComponent(em, entityID, uiComp)
+
+	log.Printf("[UI Factory] Created zombies won entity (ID: %d) at (%.2f, %.2f)", entityID, centerX, centerY)
+
+	return entityID, nil
+}
