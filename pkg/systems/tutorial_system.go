@@ -767,12 +767,12 @@ func (s *TutorialSystem) showFinalWaveWarning() {
 		Y: centerY,
 	})
 
-	// 添加 Reanim 组件
+	// 添加 Reanim 组件（初始状态，将被 PlayCombo 覆盖）
 	ecs.AddComponent(s.entityManager, finalWaveEntity, &components.ReanimComponent{
 		ReanimXML:         reanimXML,
 		PartImages:        partImages,
-		CurrentAnimations: []string{"FinalWave"}, // FinalWave.reanim 中的轨道名称
-		IsLooping:         false,                 // 播放一次后自动停止（会被 PlayAnimation 覆盖）
+		CurrentAnimations: []string{}, // 将由 PlayCombo 设置
+		IsLooping:         true,       // 将由 PlayCombo 根据配置设置为 false
 	})
 
 	// 添加 FinalWaveWarningComponent（用于自动删除）
@@ -786,10 +786,11 @@ func (s *TutorialSystem) showFinalWaveWarning() {
 		State: components.UINormal,
 	})
 
-	// 使用 AnimationCommand 组件播放动画（只播放一次）
+	// 使用配置化的 combo 播放非循环动画
 	ecs.AddComponent(s.entityManager, finalWaveEntity, &components.AnimationCommandComponent{
-		AnimationName: "FinalWave",
-		Processed:     false,
+		UnitID:    "finalwave",
+		ComboName: "warning",
+		Processed: false,
 	})
-	log.Printf("[TutorialSystem] Final wave warning displayed at (%.1f, %.1f)", centerX, centerY)
+	log.Printf("[TutorialSystem] Final wave warning displayed at (%.1f, %.1f), using combo: finalwave/warning (loop: false)", centerX, centerY)
 }

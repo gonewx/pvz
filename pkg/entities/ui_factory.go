@@ -84,7 +84,8 @@ func NewLevelProgressBarEntity(
 //   - error: 如果资源加载失败返回错误
 //
 // 注意：
-//   - 调用者需要在创建后调用 ReanimSystem.PlayAnimation(entityID, "FinalWave")
+//   - 调用者需要在创建后添加 AnimationCommandComponent 来播放动画
+//   - 推荐使用 combo 配置: UnitID="finalwave", ComboName="warning" (loop: false)
 func NewFinalWaveWarningEntity(
 	em *ecs.EntityManager,
 	rm *game.ResourceManager,

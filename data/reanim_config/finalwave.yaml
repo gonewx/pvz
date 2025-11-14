@@ -1,8 +1,15 @@
 id: finalwave
 name: FinalWave
 reanim_file: data/reanim/FinalWave.reanim
-default_animation: anim_idle
+default_animation: FinalWave
 scale: 1
 images:
     IMAGE_REANIM_FINALWAVE: assets/reanim/FinalWave.png
-available_animations: []
+available_animations:
+  - name: FinalWave
+    display_name: 最后一波警告
+animation_combos:
+  - name: warning
+    display_name: 警告动画
+    animations: [FinalWave]
+    loop: false

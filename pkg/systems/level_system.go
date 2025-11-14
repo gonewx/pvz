@@ -497,13 +497,13 @@ func (s *LevelSystem) triggerFinalWaveWarning() {
 	}
 
 	// 使用组件通信替代直接调用
-	// FinalWave 动画播放 (P2 - 降级方案，保持原有实现)
-	// 播放动画（FinalWave.reanim 中的动画名称为 "FinalWave"）
+	// 使用配置化的 combo 播放非循环动画
 	ecs.AddComponent(s.entityManager, warningEntity, &components.AnimationCommandComponent{
-		AnimationName: "FinalWave",
-		Processed:     false,
+		UnitID:    "finalwave",
+		ComboName: "warning",
+		Processed: false,
 	})
-	log.Printf("[LevelSystem] 添加 FinalWave 动画命令 (entity: %d)", warningEntity)
+	log.Printf("[LevelSystem] 添加 FinalWave 动画命令 (entity: %d, combo: warning, loop: false)", warningEntity)
 
 	log.Printf("[LevelSystem] Created FinalWave warning entity (ID: %d)", warningEntity)
 }
