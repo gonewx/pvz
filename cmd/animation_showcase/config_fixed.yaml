@@ -24,7 +24,7 @@ animations:
   # Blover
   - id: "blover"
     name: "Blover"
-    reanim_file: "assets/effect/reanim/Blover.reanim"
+    reanim_file: "data/reanim/Blover.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -48,7 +48,7 @@ animations:
   # Cabbagepult
   - id: "cabbagepult"
     name: "Cabbagepult"
-    reanim_file: "assets/effect/reanim/Cabbagepult.reanim"
+    reanim_file: "data/reanim/Cabbagepult.reanim"
     default_animation: "anim_blink"
     scale: 1.0
 
@@ -82,7 +82,7 @@ animations:
   # Cactus
   - id: "cactus"
     name: "Cactus"
-    reanim_file: "assets/effect/reanim/Cactus.reanim"
+    reanim_file: "data/reanim/Cactus.reanim"
     default_animation: "anim_blink"
     scale: 1.0
 
@@ -124,7 +124,7 @@ animations:
   # Caltrop
   - id: "caltrop"
     name: "Caltrop"
-    reanim_file: "assets/effect/reanim/Caltrop.reanim"
+    reanim_file: "data/reanim/Caltrop.reanim"
     default_animation: "anim_attack"
     scale: 1.0
 
@@ -150,7 +150,7 @@ animations:
   # Cattail
   - id: "cattail"
     name: "Cattail"
-    reanim_file: "assets/effect/reanim/Cattail.reanim"
+    reanim_file: "data/reanim/Cattail.reanim"
     default_animation: "anim_blink"
     scale: 1.0
 
@@ -182,7 +182,7 @@ animations:
   # CherryBomb
   - id: "cherrybomb"
     name: "CherryBomb"
-    reanim_file: "assets/effect/reanim/CherryBomb.reanim"
+    reanim_file: "data/reanim/CherryBomb.reanim"
     default_animation: "anim_explode"
     scale: 1.0
 
@@ -214,7 +214,7 @@ animations:
   # Chomper
   - id: "chomper"
     name: "Chomper"
-    reanim_file: "assets/effect/reanim/Chomper.reanim"
+    reanim_file: "data/reanim/Chomper.reanim"
     default_animation: "anim_swallow"
     scale: 1.0
 
@@ -255,7 +255,7 @@ animations:
   # CobCannon
   - id: "cobcannon"
     name: "CobCannon"
-    reanim_file: "assets/effect/reanim/CobCannon.reanim"
+    reanim_file: "data/reanim/CobCannon.reanim"
     default_animation: "anim_unarmed_idle"
     scale: 1.0
 
@@ -288,7 +288,7 @@ animations:
   # Coffeebean
   - id: "coffeebean"
     name: "Coffeebean"
-    reanim_file: "assets/effect/reanim/Coffeebean.reanim"
+    reanim_file: "data/reanim/Coffeebean.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -318,7 +318,7 @@ animations:
   # Coin_gold
   - id: "coin_gold"
     name: "Coin_gold"
-    reanim_file: "assets/effect/reanim/Coin_gold.reanim"
+    reanim_file: "data/reanim/Coin_gold.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -331,7 +331,7 @@ animations:
   # Coin_silver
   - id: "coin_silver"
     name: "Coin_silver"
-    reanim_file: "assets/effect/reanim/Coin_silver.reanim"
+    reanim_file: "data/reanim/Coin_silver.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -344,7 +344,7 @@ animations:
   # Cornpult
   - id: "cornpult"
     name: "Cornpult"
-    reanim_file: "assets/effect/reanim/Cornpult.reanim"
+    reanim_file: "data/reanim/Cornpult.reanim"
     default_animation: "anim_blink"
     scale: 1.0
 
@@ -386,7 +386,7 @@ animations:
   # CrazyDave
   - id: "crazydave"
     name: "CrazyDave"
-    reanim_file: "assets/effect/reanim/CrazyDave.reanim"
+    reanim_file: "data/reanim/CrazyDave.reanim"
     default_animation: "anim_enter"
     scale: 1.0
 
@@ -471,7 +471,7 @@ animations:
   # Credits_Anyhour
   - id: "credits_anyhour"
     name: "Credits_Anyhour"
-    reanim_file: "assets/effect/reanim/Credits_Anyhour.reanim"
+    reanim_file: "data/reanim/Credits_Anyhour.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -484,7 +484,7 @@ animations:
   # Credits_BigBrain
   - id: "credits_bigbrain"
     name: "Credits_BigBrain"
-    reanim_file: "assets/effect/reanim/Credits_BigBrain.reanim"
+    reanim_file: "data/reanim/Credits_BigBrain.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -494,7 +494,7 @@ animations:
   # Credits_Bossdance
   - id: "credits_bossdance"
     name: "Credits_Bossdance"
-    reanim_file: "assets/effect/reanim/Credits_Bossdance.reanim"
+    reanim_file: "data/reanim/Credits_Bossdance.reanim"
     default_animation: "anim_dance"
     scale: 1.0
 
@@ -513,7 +513,7 @@ animations:
   # Credits_CrazyDave
   - id: "credits_crazydave"
     name: "Credits_CrazyDave"
-    reanim_file: "assets/effect/reanim/Credits_CrazyDave.reanim"
+    reanim_file: "data/reanim/Credits_CrazyDave.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -558,7 +558,7 @@ animations:
   # Credits_DiscoLights
   - id: "credits_discolights"
     name: "Credits_DiscoLights"
-    reanim_file: "assets/effect/reanim/Credits_DiscoLights.reanim"
+    reanim_file: "data/reanim/Credits_DiscoLights.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -568,7 +568,7 @@ animations:
   # Credits_Flower_petals
   - id: "credits_flower_petals"
     name: "Credits_Flower_petals"
-    reanim_file: "assets/effect/reanim/Credits_Flower_petals.reanim"
+    reanim_file: "data/reanim/Credits_Flower_petals.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -585,7 +585,7 @@ animations:
   # Credits_Football
   - id: "credits_football"
     name: "Credits_Football"
-    reanim_file: "assets/effect/reanim/Credits_Football.reanim"
+    reanim_file: "data/reanim/Credits_Football.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -594,7 +594,7 @@ animations:
   # Credits_Infantry
   - id: "credits_infantry"
     name: "Credits_Infantry"
-    reanim_file: "assets/effect/reanim/Credits_Infantry.reanim"
+    reanim_file: "data/reanim/Credits_Infantry.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -603,7 +603,7 @@ animations:
   # Credits_Jackbox
   - id: "credits_jackbox"
     name: "Credits_Jackbox"
-    reanim_file: "assets/effect/reanim/Credits_Jackbox.reanim"
+    reanim_file: "data/reanim/Credits_Jackbox.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -612,7 +612,7 @@ animations:
   # Credits_Main2
   - id: "credits_main2"
     name: "Credits_Main2"
-    reanim_file: "assets/effect/reanim/Credits_Main2.reanim"
+    reanim_file: "data/reanim/Credits_Main2.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -629,7 +629,7 @@ animations:
   # Credits_Main3
   - id: "credits_main3"
     name: "Credits_Main3"
-    reanim_file: "assets/effect/reanim/Credits_Main3.reanim"
+    reanim_file: "data/reanim/Credits_Main3.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -648,7 +648,7 @@ animations:
   # Credits_SolarPower
   - id: "credits_solarpower"
     name: "Credits_SolarPower"
-    reanim_file: "assets/effect/reanim/Credits_SolarPower.reanim"
+    reanim_file: "data/reanim/Credits_SolarPower.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -658,7 +658,7 @@ animations:
   # Credits_Throat
   - id: "credits_throat"
     name: "Credits_Throat"
-    reanim_file: "assets/effect/reanim/Credits_Throat.reanim"
+    reanim_file: "data/reanim/Credits_Throat.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -674,7 +674,7 @@ animations:
   # Credits_Tombstones
   - id: "credits_tombstones"
     name: "Credits_Tombstones"
-    reanim_file: "assets/effect/reanim/Credits_Tombstones.reanim"
+    reanim_file: "data/reanim/Credits_Tombstones.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -684,7 +684,7 @@ animations:
   # Credits_ZombieArmy1
   - id: "credits_zombiearmy1"
     name: "Credits_ZombieArmy1"
-    reanim_file: "assets/effect/reanim/Credits_ZombieArmy1.reanim"
+    reanim_file: "data/reanim/Credits_ZombieArmy1.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -693,7 +693,7 @@ animations:
   # Credits_ZombieArmy2
   - id: "credits_zombiearmy2"
     name: "Credits_ZombieArmy2"
-    reanim_file: "assets/effect/reanim/Credits_ZombieArmy2.reanim"
+    reanim_file: "data/reanim/Credits_ZombieArmy2.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -702,7 +702,7 @@ animations:
   # Diamond
   - id: "diamond"
     name: "Diamond"
-    reanim_file: "assets/effect/reanim/Diamond.reanim"
+    reanim_file: "data/reanim/Diamond.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -717,7 +717,7 @@ animations:
   # Digger_rising_dirt
   - id: "digger_rising_dirt"
     name: "Digger_rising_dirt"
-    reanim_file: "assets/effect/reanim/Digger_rising_dirt.reanim"
+    reanim_file: "data/reanim/Digger_rising_dirt.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -734,7 +734,7 @@ animations:
   # DoomShroom
   - id: "doomshroom"
     name: "DoomShroom"
-    reanim_file: "assets/effect/reanim/DoomShroom.reanim"
+    reanim_file: "data/reanim/DoomShroom.reanim"
     default_animation: "anim_sleep"
     scale: 1.0
 
@@ -756,7 +756,7 @@ animations:
   # FinalWave
   - id: "finalwave"
     name: "FinalWave"
-    reanim_file: "assets/effect/reanim/FinalWave.reanim"
+    reanim_file: "data/reanim/FinalWave.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -766,7 +766,7 @@ animations:
   # FirePea
   - id: "firepea"
     name: "FirePea"
-    reanim_file: "assets/effect/reanim/FirePea.reanim"
+    reanim_file: "data/reanim/FirePea.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -780,7 +780,7 @@ animations:
   # Fumeshroom
   - id: "fumeshroom"
     name: "Fumeshroom"
-    reanim_file: "assets/effect/reanim/Fumeshroom.reanim"
+    reanim_file: "data/reanim/Fumeshroom.reanim"
     default_animation: "anim_sleep"
     scale: 1.0
 
@@ -807,7 +807,7 @@ animations:
   # Garlic
   - id: "garlic"
     name: "Garlic"
-    reanim_file: "assets/effect/reanim/Garlic.reanim"
+    reanim_file: "data/reanim/Garlic.reanim"
     default_animation: "anim_blink"
     scale: 1.0
 
@@ -834,7 +834,7 @@ animations:
   # GatlingPea
   - id: "gatlingpea"
     name: "GatlingPea"
-    reanim_file: "assets/effect/reanim/GatlingPea.reanim"
+    reanim_file: "data/reanim/GatlingPea.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -871,7 +871,7 @@ animations:
   # GloomShroom
   - id: "gloomshroom"
     name: "GloomShroom"
-    reanim_file: "assets/effect/reanim/GloomShroom.reanim"
+    reanim_file: "data/reanim/GloomShroom.reanim"
     default_animation: "anim_blink"
     scale: 1.0
 
@@ -906,7 +906,7 @@ animations:
   # GoldMagnet
   - id: "goldmagnet"
     name: "GoldMagnet"
-    reanim_file: "assets/effect/reanim/GoldMagnet.reanim"
+    reanim_file: "data/reanim/GoldMagnet.reanim"
     default_animation: "anim_blink"
     scale: 1.0
 
@@ -942,7 +942,7 @@ animations:
   # Gravebuster
   - id: "gravebuster"
     name: "Gravebuster"
-    reanim_file: "assets/effect/reanim/Gravebuster.reanim"
+    reanim_file: "data/reanim/Gravebuster.reanim"
     default_animation: "anim_land"
     scale: 1.0
 
@@ -968,7 +968,7 @@ animations:
   # Hammer
   - id: "hammer"
     name: "Hammer"
-    reanim_file: "assets/effect/reanim/Hammer.reanim"
+    reanim_file: "data/reanim/Hammer.reanim"
     default_animation: "anim_open_pot"
     scale: 1.0
 
@@ -986,7 +986,7 @@ animations:
   # Hypnoshroom
   - id: "hypnoshroom"
     name: "Hypnoshroom"
-    reanim_file: "assets/effect/reanim/Hypnoshroom.reanim"
+    reanim_file: "data/reanim/Hypnoshroom.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -1006,7 +1006,7 @@ animations:
   # Iceshroom
   - id: "iceshroom"
     name: "Iceshroom"
-    reanim_file: "assets/effect/reanim/Iceshroom.reanim"
+    reanim_file: "data/reanim/Iceshroom.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -1032,7 +1032,7 @@ animations:
   # Imitater
   - id: "imitater"
     name: "Imitater"
-    reanim_file: "assets/effect/reanim/Imitater.reanim"
+    reanim_file: "data/reanim/Imitater.reanim"
     default_animation: "anim_blink"
     scale: 1.0
 
@@ -1064,7 +1064,7 @@ animations:
   # Jalapeno
   - id: "jalapeno"
     name: "Jalapeno"
-    reanim_file: "assets/effect/reanim/Jalapeno.reanim"
+    reanim_file: "data/reanim/Jalapeno.reanim"
     default_animation: "anim_blink"
     scale: 1.0
 
@@ -1089,7 +1089,7 @@ animations:
   # LawnMower
   - id: "lawnmower"
     name: "LawnMower"
-    reanim_file: "assets/effect/reanim/LawnMower.reanim"
+    reanim_file: "data/reanim/LawnMower.reanim"
     default_animation: "anim_normal"
     scale: 1.0
 
@@ -1116,7 +1116,7 @@ animations:
   # LawnMoweredZombie
   - id: "lawnmoweredzombie"
     name: "LawnMoweredZombie"
-    reanim_file: "assets/effect/reanim/LawnMoweredZombie.reanim"
+    reanim_file: "data/reanim/LawnMoweredZombie.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -1125,7 +1125,7 @@ animations:
   # Lilypad
   - id: "lilypad"
     name: "Lilypad"
-    reanim_file: "assets/effect/reanim/Lilypad.reanim"
+    reanim_file: "data/reanim/Lilypad.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -1143,7 +1143,7 @@ animations:
   # LoadBar_Zombiehead
   - id: "loadbar_zombiehead"
     name: "LoadBar_Zombiehead"
-    reanim_file: "assets/effect/reanim/LoadBar_Zombiehead.reanim"
+    reanim_file: "data/reanim/LoadBar_Zombiehead.reanim"
     default_animation: "anim_zombie"
     scale: 1.0
 
@@ -1161,7 +1161,7 @@ animations:
   # LoadBar_sprout
   - id: "loadbar_sprout"
     name: "LoadBar_sprout"
-    reanim_file: "assets/effect/reanim/LoadBar_sprout.reanim"
+    reanim_file: "data/reanim/LoadBar_sprout.reanim"
     default_animation: "anim_sprout"
     scale: 1.0
 
@@ -1178,7 +1178,7 @@ animations:
   # Magnetshroom
   - id: "magnetshroom"
     name: "Magnetshroom"
-    reanim_file: "assets/effect/reanim/Magnetshroom.reanim"
+    reanim_file: "data/reanim/Magnetshroom.reanim"
     default_animation: "anim_blink"
     scale: 1.0
 
@@ -1230,7 +1230,7 @@ animations:
   # Marigold
   - id: "marigold"
     name: "Marigold"
-    reanim_file: "assets/effect/reanim/Marigold.reanim"
+    reanim_file: "data/reanim/Marigold.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -1262,7 +1262,7 @@ animations:
   # Melonpult
   - id: "melonpult"
     name: "Melonpult"
-    reanim_file: "assets/effect/reanim/Melonpult.reanim"
+    reanim_file: "data/reanim/Melonpult.reanim"
     default_animation: "anim_blink"
     scale: 1.0
 
@@ -1292,7 +1292,7 @@ animations:
   # PeaShooter
   - id: "peashooter"
     name: "PeaShooter"
-    reanim_file: "assets/effect/reanim/PeaShooter.reanim"
+    reanim_file: "data/reanim/PeaShooter.reanim"
     default_animation: "anim_full_idle"
     scale: 1.0
 
@@ -1336,7 +1336,7 @@ animations:
   # PeaShooterSingle
   - id: "peashootersingle"
     name: "PeaShooterSingle"
-    reanim_file: "assets/effect/reanim/PeaShooterSingle.reanim"
+    reanim_file: "data/reanim/PeaShooterSingle.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -1393,7 +1393,7 @@ animations:
   # Plantern
   - id: "plantern"
     name: "Plantern"
-    reanim_file: "assets/effect/reanim/Plantern.reanim"
+    reanim_file: "data/reanim/Plantern.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -1419,7 +1419,7 @@ animations:
   # PoolCleaner
   - id: "poolcleaner"
     name: "PoolCleaner"
-    reanim_file: "assets/effect/reanim/PoolCleaner.reanim"
+    reanim_file: "data/reanim/PoolCleaner.reanim"
     default_animation: "anim_land"
     scale: 1.0
 
@@ -1449,7 +1449,7 @@ animations:
   # Portal_Circle
   - id: "portal_circle"
     name: "Portal_Circle"
-    reanim_file: "assets/effect/reanim/Portal_Circle.reanim"
+    reanim_file: "data/reanim/Portal_Circle.reanim"
     default_animation: "anim_appear"
     scale: 1.0
 
@@ -1471,7 +1471,7 @@ animations:
   # Portal_Square
   - id: "portal_square"
     name: "Portal_Square"
-    reanim_file: "assets/effect/reanim/Portal_Square.reanim"
+    reanim_file: "data/reanim/Portal_Square.reanim"
     default_animation: "anim_appear"
     scale: 1.0
 
@@ -1492,7 +1492,7 @@ animations:
   # Pot
   - id: "pot"
     name: "Pot"
-    reanim_file: "assets/effect/reanim/Pot.reanim"
+    reanim_file: "data/reanim/Pot.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -1517,7 +1517,7 @@ animations:
   # PotatoMine
   - id: "potatomine"
     name: "PotatoMine"
-    reanim_file: "assets/effect/reanim/PotatoMine.reanim"
+    reanim_file: "data/reanim/PotatoMine.reanim"
     default_animation: "anim_armed"
     scale: 1.0
 
@@ -1560,7 +1560,7 @@ animations:
   # Puff
   - id: "puff"
     name: "Puff"
-    reanim_file: "assets/effect/reanim/Puff.reanim"
+    reanim_file: "data/reanim/Puff.reanim"
     default_animation: "anim_puff"
     scale: 1.0
 
@@ -1578,7 +1578,7 @@ animations:
   # Puffshroom
   - id: "puffshroom"
     name: "Puffshroom"
-    reanim_file: "assets/effect/reanim/Puffshroom.reanim"
+    reanim_file: "data/reanim/Puffshroom.reanim"
     default_animation: "anim_sleep"
     scale: 1.0
 
@@ -1605,7 +1605,7 @@ animations:
   # Pumpkin
   - id: "pumpkin"
     name: "Pumpkin"
-    reanim_file: "assets/effect/reanim/Pumpkin.reanim"
+    reanim_file: "data/reanim/Pumpkin.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -1620,7 +1620,7 @@ animations:
   # Rain_circle
   - id: "rain_circle"
     name: "Rain_circle"
-    reanim_file: "assets/effect/reanim/Rain_circle.reanim"
+    reanim_file: "data/reanim/Rain_circle.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -1630,7 +1630,7 @@ animations:
   # Rain_splash
   - id: "rain_splash"
     name: "Rain_splash"
-    reanim_file: "assets/effect/reanim/Rain_splash.reanim"
+    reanim_file: "data/reanim/Rain_splash.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -1643,7 +1643,7 @@ animations:
   # Rake
   - id: "rake"
     name: "Rake"
-    reanim_file: "assets/effect/reanim/Rake.reanim"
+    reanim_file: "data/reanim/Rake.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -1655,7 +1655,7 @@ animations:
   # RoofCleaner
   - id: "roofcleaner"
     name: "RoofCleaner"
-    reanim_file: "assets/effect/reanim/RoofCleaner.reanim"
+    reanim_file: "data/reanim/RoofCleaner.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -1675,7 +1675,7 @@ animations:
   # ScaredyShroom
   - id: "scaredyshroom"
     name: "ScaredyShroom"
-    reanim_file: "assets/effect/reanim/ScaredyShroom.reanim"
+    reanim_file: "data/reanim/ScaredyShroom.reanim"
     default_animation: "anim_sleep"
     scale: 1.0
 
@@ -1718,7 +1718,7 @@ animations:
   # SeaShroom
   - id: "seashroom"
     name: "SeaShroom"
-    reanim_file: "assets/effect/reanim/SeaShroom.reanim"
+    reanim_file: "data/reanim/SeaShroom.reanim"
     default_animation: "anim_blink"
     scale: 1.0
 
@@ -1752,7 +1752,7 @@ animations:
   # SelectorScreen
   - id: "selectorscreen"
     name: "SelectorScreen"
-    reanim_file: "assets/effect/reanim/SelectorScreen.reanim"
+    reanim_file: "data/reanim/SelectorScreen.reanim"
     default_animation: "anim_open"
     scale: 1.0
 
@@ -1832,7 +1832,7 @@ animations:
   # SlotMachine
   - id: "slotmachine"
     name: "SlotMachine"
-    reanim_file: "assets/effect/reanim/SlotMachine.reanim"
+    reanim_file: "data/reanim/SlotMachine.reanim"
     default_animation: "anim_return"
     scale: 1.0
 
@@ -1850,7 +1850,7 @@ animations:
   # SnowPea
   - id: "snowpea"
     name: "SnowPea"
-    reanim_file: "assets/effect/reanim/SnowPea.reanim"
+    reanim_file: "data/reanim/SnowPea.reanim"
     default_animation: "anim_full_idle"
     scale: 1.0
 
@@ -1890,7 +1890,7 @@ animations:
   # SodRoll
   - id: "sodroll"
     name: "SodRoll"
-    reanim_file: "assets/effect/reanim/SodRoll.reanim"
+    reanim_file: "data/reanim/SodRoll.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -1901,7 +1901,7 @@ animations:
   # SpikeRock
   - id: "spikerock"
     name: "SpikeRock"
-    reanim_file: "assets/effect/reanim/SpikeRock.reanim"
+    reanim_file: "data/reanim/SpikeRock.reanim"
     default_animation: "anim_blink"
     scale: 1.0
 
@@ -1931,7 +1931,7 @@ animations:
   # SplitPea
   - id: "splitpea"
     name: "SplitPea"
-    reanim_file: "assets/effect/reanim/SplitPea.reanim"
+    reanim_file: "data/reanim/SplitPea.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -1972,7 +1972,7 @@ animations:
   # Squash
   - id: "squash"
     name: "Squash"
-    reanim_file: "assets/effect/reanim/Squash.reanim"
+    reanim_file: "data/reanim/Squash.reanim"
     default_animation: "anim_jumpdown"
     scale: 1.0
 
@@ -2003,7 +2003,7 @@ animations:
   # Starfruit
   - id: "starfruit"
     name: "Starfruit"
-    reanim_file: "assets/effect/reanim/Starfruit.reanim"
+    reanim_file: "data/reanim/Starfruit.reanim"
     default_animation: "anim_blink"
     scale: 1.0
 
@@ -2029,7 +2029,7 @@ animations:
   # StartReadySetPlant
   - id: "startreadysetplant"
     name: "StartReadySetPlant"
-    reanim_file: "assets/effect/reanim/StartReadySetPlant.reanim"
+    reanim_file: "data/reanim/StartReadySetPlant.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -2041,7 +2041,7 @@ animations:
   # Stinky
   - id: "stinky"
     name: "Stinky"
-    reanim_file: "assets/effect/reanim/Stinky.reanim"
+    reanim_file: "data/reanim/Stinky.reanim"
     default_animation: "anim_crawl"
     scale: 1.0
 
@@ -2074,7 +2074,7 @@ animations:
   # Sun
   - id: "sun"
     name: "Sun"
-    reanim_file: "assets/effect/reanim/Sun.reanim"
+    reanim_file: "data/reanim/Sun.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -2086,7 +2086,7 @@ animations:
   # SunFlower
   - id: "sunflower"
     name: "SunFlower"
-    reanim_file: "assets/effect/reanim/SunFlower.reanim"
+    reanim_file: "data/reanim/SunFlower.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -2131,7 +2131,7 @@ animations:
   # SunShroom
   - id: "sunshroom"
     name: "SunShroom"
-    reanim_file: "assets/effect/reanim/SunShroom.reanim"
+    reanim_file: "data/reanim/SunShroom.reanim"
     default_animation: "anim_bigsleep"
     scale: 1.0
 
@@ -2163,7 +2163,7 @@ animations:
   # Tallnut
   - id: "tallnut"
     name: "Tallnut"
-    reanim_file: "assets/effect/reanim/Tallnut.reanim"
+    reanim_file: "data/reanim/Tallnut.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -2183,7 +2183,7 @@ animations:
   # Tanglekelp
   - id: "tanglekelp"
     name: "Tanglekelp"
-    reanim_file: "assets/effect/reanim/Tanglekelp.reanim"
+    reanim_file: "data/reanim/Tanglekelp.reanim"
     default_animation: "anim_blink"
     scale: 1.0
 
@@ -2232,7 +2232,7 @@ animations:
   # TextFadeOn
   - id: "textfadeon"
     name: "TextFadeOn"
-    reanim_file: "assets/effect/reanim/TextFadeOn.reanim"
+    reanim_file: "data/reanim/TextFadeOn.reanim"
     default_animation: "anim_leave"
     scale: 1.0
 
@@ -2247,7 +2247,7 @@ animations:
   # ThreePeater
   - id: "threepeater"
     name: "ThreePeater"
-    reanim_file: "assets/effect/reanim/ThreePeater.reanim"
+    reanim_file: "data/reanim/ThreePeater.reanim"
     default_animation: "anim_shooting2"
     scale: 1.0
 
@@ -2306,7 +2306,7 @@ animations:
   # Torchwood
   - id: "torchwood"
     name: "Torchwood"
-    reanim_file: "assets/effect/reanim/Torchwood.reanim"
+    reanim_file: "data/reanim/Torchwood.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -2331,7 +2331,7 @@ animations:
   # TreeFood
   - id: "treefood"
     name: "TreeFood"
-    reanim_file: "assets/effect/reanim/TreeFood.reanim"
+    reanim_file: "data/reanim/TreeFood.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -2350,7 +2350,7 @@ animations:
   # TreeOfWisdom
   - id: "treeofwisdom"
     name: "TreeOfWisdom"
-    reanim_file: "assets/effect/reanim/TreeOfWisdom.reanim"
+    reanim_file: "data/reanim/TreeOfWisdom.reanim"
     default_animation: "anim_start"
     scale: 1.0
 
@@ -2490,7 +2490,7 @@ animations:
   # TreeOfWisdomClouds
   - id: "treeofwisdomclouds"
     name: "TreeOfWisdomClouds"
-    reanim_file: "assets/effect/reanim/TreeOfWisdomClouds.reanim"
+    reanim_file: "data/reanim/TreeOfWisdomClouds.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -2505,7 +2505,7 @@ animations:
   # TwinSunFlower
   - id: "twinsunflower"
     name: "TwinSunFlower"
-    reanim_file: "assets/effect/reanim/TwinSunFlower.reanim"
+    reanim_file: "data/reanim/TwinSunFlower.reanim"
     default_animation: "anim_blink"
     scale: 1.0
 
@@ -2539,7 +2539,7 @@ animations:
   # Umbrellaleaf
   - id: "umbrellaleaf"
     name: "Umbrellaleaf"
-    reanim_file: "assets/effect/reanim/Umbrellaleaf.reanim"
+    reanim_file: "data/reanim/Umbrellaleaf.reanim"
     default_animation: "anim_blink"
     scale: 1.0
 
@@ -2568,7 +2568,7 @@ animations:
   # Wallnut
   - id: "wallnut"
     name: "Wallnut"
-    reanim_file: "assets/effect/reanim/Wallnut.reanim"
+    reanim_file: "data/reanim/Wallnut.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -2593,7 +2593,7 @@ animations:
   # WinterMelon
   - id: "wintermelon"
     name: "WinterMelon"
-    reanim_file: "assets/effect/reanim/WinterMelon.reanim"
+    reanim_file: "data/reanim/WinterMelon.reanim"
     default_animation: "anim_blink"
     scale: 1.0
 
@@ -2623,7 +2623,7 @@ animations:
   # Z
   - id: "z"
     name: "Z"
-    reanim_file: "assets/effect/reanim/Z.reanim"
+    reanim_file: "data/reanim/Z.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -2633,7 +2633,7 @@ animations:
   # ZenGarden_bugspray
   - id: "zengarden_bugspray"
     name: "ZenGarden_bugspray"
-    reanim_file: "assets/effect/reanim/ZenGarden_bugspray.reanim"
+    reanim_file: "data/reanim/ZenGarden_bugspray.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -2648,7 +2648,7 @@ animations:
   # ZenGarden_fertilizer
   - id: "zengarden_fertilizer"
     name: "ZenGarden_fertilizer"
-    reanim_file: "assets/effect/reanim/ZenGarden_fertilizer.reanim"
+    reanim_file: "data/reanim/ZenGarden_fertilizer.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -2667,7 +2667,7 @@ animations:
   # ZenGarden_phonograph
   - id: "zengarden_phonograph"
     name: "ZenGarden_phonograph"
-    reanim_file: "assets/effect/reanim/ZenGarden_phonograph.reanim"
+    reanim_file: "data/reanim/ZenGarden_phonograph.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -2681,7 +2681,7 @@ animations:
   # ZenGarden_sprout
   - id: "zengarden_sprout"
     name: "ZenGarden_sprout"
-    reanim_file: "assets/effect/reanim/ZenGarden_sprout.reanim"
+    reanim_file: "data/reanim/ZenGarden_sprout.reanim"
     default_animation: "anim_sprout"
     scale: 1.0
 
@@ -2706,7 +2706,7 @@ animations:
   # ZenGarden_wateringcan
   - id: "zengarden_wateringcan"
     name: "ZenGarden_wateringcan"
-    reanim_file: "assets/effect/reanim/ZenGarden_wateringcan.reanim"
+    reanim_file: "data/reanim/ZenGarden_wateringcan.reanim"
     default_animation: "anim_water"
     scale: 1.0
 
@@ -2736,7 +2736,7 @@ animations:
   # Zombie
   - id: "zombie"
     name: "Zombie"
-    reanim_file: "assets/effect/reanim/Zombie.reanim"
+    reanim_file: "data/reanim/Zombie.reanim"
     default_animation: "anim_superlongdeath"
     scale: 1.0
 
@@ -2826,7 +2826,7 @@ animations:
   # Zombie_Boss_driver
   - id: "zombie_boss_driver"
     name: "Zombie_Boss_driver"
-    reanim_file: "assets/effect/reanim/Zombie_Boss_driver.reanim"
+    reanim_file: "data/reanim/Zombie_Boss_driver.reanim"
     default_animation: "anim_swell"
     scale: 1.0
 
@@ -2866,7 +2866,7 @@ animations:
   # Zombie_Credits_Conehead
   - id: "zombie_credits_conehead"
     name: "Zombie_Credits_Conehead"
-    reanim_file: "assets/effect/reanim/Zombie_Credits_Conehead.reanim"
+    reanim_file: "data/reanim/Zombie_Credits_Conehead.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -2912,7 +2912,7 @@ animations:
   # Zombie_Credits_Screendoor
   - id: "zombie_credits_screendoor"
     name: "Zombie_Credits_Screendoor"
-    reanim_file: "assets/effect/reanim/Zombie_Credits_Screendoor.reanim"
+    reanim_file: "data/reanim/Zombie_Credits_Screendoor.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -2958,7 +2958,7 @@ animations:
   # Zombie_FlagPole
   - id: "zombie_flagpole"
     name: "Zombie_FlagPole"
-    reanim_file: "assets/effect/reanim/Zombie_FlagPole.reanim"
+    reanim_file: "data/reanim/Zombie_FlagPole.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -2969,7 +2969,7 @@ animations:
   # Zombie_Jackson
   - id: "zombie_jackson"
     name: "Zombie_Jackson"
-    reanim_file: "assets/effect/reanim/Zombie_Jackson.reanim"
+    reanim_file: "data/reanim/Zombie_Jackson.reanim"
     default_animation: "anim_moonwalk"
     scale: 1.0
 
@@ -3019,7 +3019,7 @@ animations:
   # Zombie_balloon
   - id: "zombie_balloon"
     name: "Zombie_balloon"
-    reanim_file: "assets/effect/reanim/Zombie_balloon.reanim"
+    reanim_file: "data/reanim/Zombie_balloon.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -3071,7 +3071,7 @@ animations:
   # Zombie_bobsled
   - id: "zombie_bobsled"
     name: "Zombie_bobsled"
-    reanim_file: "assets/effect/reanim/Zombie_bobsled.reanim"
+    reanim_file: "data/reanim/Zombie_bobsled.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -3117,7 +3117,7 @@ animations:
   # Zombie_boss
   - id: "zombie_boss"
     name: "Zombie_boss"
-    reanim_file: "assets/effect/reanim/Zombie_boss.reanim"
+    reanim_file: "data/reanim/Zombie_boss.reanim"
     default_animation: "anim_enter"
     scale: 1.0
 
@@ -3210,7 +3210,7 @@ animations:
   # Zombie_boss_fireball
   - id: "zombie_boss_fireball"
     name: "Zombie_boss_fireball"
-    reanim_file: "assets/effect/reanim/Zombie_boss_fireball.reanim"
+    reanim_file: "data/reanim/Zombie_boss_fireball.reanim"
     default_animation: "anim_form"
     scale: 1.0
 
@@ -3231,7 +3231,7 @@ animations:
   # Zombie_boss_iceball
   - id: "zombie_boss_iceball"
     name: "Zombie_boss_iceball"
-    reanim_file: "assets/effect/reanim/Zombie_boss_iceball.reanim"
+    reanim_file: "data/reanim/Zombie_boss_iceball.reanim"
     default_animation: "anim_form"
     scale: 1.0
 
@@ -3254,7 +3254,7 @@ animations:
   # Zombie_bungi
   - id: "zombie_bungi"
     name: "Zombie_bungi"
-    reanim_file: "assets/effect/reanim/Zombie_bungi.reanim"
+    reanim_file: "data/reanim/Zombie_bungi.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -3302,7 +3302,7 @@ animations:
   # Zombie_catapult
   - id: "zombie_catapult"
     name: "Zombie_catapult"
-    reanim_file: "assets/effect/reanim/Zombie_catapult.reanim"
+    reanim_file: "data/reanim/Zombie_catapult.reanim"
     default_animation: "anim_walk"
     scale: 1.0
 
@@ -3355,7 +3355,7 @@ animations:
   # Zombie_charred
   - id: "zombie_charred"
     name: "Zombie_charred"
-    reanim_file: "assets/effect/reanim/Zombie_charred.reanim"
+    reanim_file: "data/reanim/Zombie_charred.reanim"
     default_animation: "anim_blink"
     scale: 1.0
 
@@ -3387,7 +3387,7 @@ animations:
   # Zombie_charred_catapult
   - id: "zombie_charred_catapult"
     name: "Zombie_charred_catapult"
-    reanim_file: "assets/effect/reanim/Zombie_charred_catapult.reanim"
+    reanim_file: "data/reanim/Zombie_charred_catapult.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -3411,7 +3411,7 @@ animations:
   # Zombie_charred_digger
   - id: "zombie_charred_digger"
     name: "Zombie_charred_digger"
-    reanim_file: "assets/effect/reanim/Zombie_charred_digger.reanim"
+    reanim_file: "data/reanim/Zombie_charred_digger.reanim"
     default_animation: "anim_crumble"
     scale: 1.0
 
@@ -3446,7 +3446,7 @@ animations:
   # Zombie_charred_gargantuar
   - id: "zombie_charred_gargantuar"
     name: "Zombie_charred_gargantuar"
-    reanim_file: "assets/effect/reanim/Zombie_charred_gargantuar.reanim"
+    reanim_file: "data/reanim/Zombie_charred_gargantuar.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -3476,7 +3476,7 @@ animations:
   # Zombie_charred_imp
   - id: "zombie_charred_imp"
     name: "Zombie_charred_imp"
-    reanim_file: "assets/effect/reanim/Zombie_charred_imp.reanim"
+    reanim_file: "data/reanim/Zombie_charred_imp.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -3497,7 +3497,7 @@ animations:
   # Zombie_charred_zamboni
   - id: "zombie_charred_zamboni"
     name: "Zombie_charred_zamboni"
-    reanim_file: "assets/effect/reanim/Zombie_charred_zamboni.reanim"
+    reanim_file: "data/reanim/Zombie_charred_zamboni.reanim"
     default_animation: "anim_blink"
     scale: 1.0
 
@@ -3532,7 +3532,7 @@ animations:
   # Zombie_credits_dance
   - id: "zombie_credits_dance"
     name: "Zombie_credits_dance"
-    reanim_file: "assets/effect/reanim/Zombie_credits_dance.reanim"
+    reanim_file: "data/reanim/Zombie_credits_dance.reanim"
     default_animation: "anim_dance1"
     scale: 1.0
 
@@ -3600,7 +3600,7 @@ animations:
   # Zombie_dancer
   - id: "zombie_dancer"
     name: "Zombie_dancer"
-    reanim_file: "assets/effect/reanim/Zombie_dancer.reanim"
+    reanim_file: "data/reanim/Zombie_dancer.reanim"
     default_animation: "anim_walk"
     scale: 1.0
 
@@ -3648,7 +3648,7 @@ animations:
   # Zombie_digger
   - id: "zombie_digger"
     name: "Zombie_digger"
-    reanim_file: "assets/effect/reanim/Zombie_digger.reanim"
+    reanim_file: "data/reanim/Zombie_digger.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -3711,7 +3711,7 @@ animations:
   # Zombie_dolphinrider
   - id: "zombie_dolphinrider"
     name: "Zombie_dolphinrider"
-    reanim_file: "assets/effect/reanim/Zombie_dolphinrider.reanim"
+    reanim_file: "data/reanim/Zombie_dolphinrider.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -3772,7 +3772,7 @@ animations:
   # Zombie_football
   - id: "zombie_football"
     name: "Zombie_football"
-    reanim_file: "assets/effect/reanim/Zombie_football.reanim"
+    reanim_file: "data/reanim/Zombie_football.reanim"
     default_animation: "anim_death"
     scale: 1.0
 
@@ -3820,7 +3820,7 @@ animations:
   # Zombie_gargantuar
   - id: "zombie_gargantuar"
     name: "Zombie_gargantuar"
-    reanim_file: "assets/effect/reanim/Zombie_gargantuar.reanim"
+    reanim_file: "data/reanim/Zombie_gargantuar.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -3876,7 +3876,7 @@ animations:
   # Zombie_hand
   - id: "zombie_hand"
     name: "Zombie_hand"
-    reanim_file: "assets/effect/reanim/Zombie_hand.reanim"
+    reanim_file: "data/reanim/Zombie_hand.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -3901,7 +3901,7 @@ animations:
   # Zombie_imp
   - id: "zombie_imp"
     name: "Zombie_imp"
-    reanim_file: "assets/effect/reanim/Zombie_imp.reanim"
+    reanim_file: "data/reanim/Zombie_imp.reanim"
     default_animation: "anim_land"
     scale: 1.0
 
@@ -3939,7 +3939,7 @@ animations:
   # Zombie_jackbox
   - id: "zombie_jackbox"
     name: "Zombie_jackbox"
-    reanim_file: "assets/effect/reanim/Zombie_jackbox.reanim"
+    reanim_file: "data/reanim/Zombie_jackbox.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -3985,7 +3985,7 @@ animations:
   # Zombie_ladder
   - id: "zombie_ladder"
     name: "Zombie_ladder"
-    reanim_file: "assets/effect/reanim/Zombie_ladder.reanim"
+    reanim_file: "data/reanim/Zombie_ladder.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -4039,7 +4039,7 @@ animations:
   # Zombie_paper
   - id: "zombie_paper"
     name: "Zombie_paper"
-    reanim_file: "assets/effect/reanim/Zombie_paper.reanim"
+    reanim_file: "data/reanim/Zombie_paper.reanim"
     default_animation: "anim_death"
     scale: 1.0
 
@@ -4103,7 +4103,7 @@ animations:
   # Zombie_pogo
   - id: "zombie_pogo"
     name: "Zombie_pogo"
-    reanim_file: "assets/effect/reanim/Zombie_pogo.reanim"
+    reanim_file: "data/reanim/Zombie_pogo.reanim"
     default_animation: "anim_pogo"
     scale: 1.0
 
@@ -4160,7 +4160,7 @@ animations:
   # Zombie_polevaulter
   - id: "zombie_polevaulter"
     name: "Zombie_polevaulter"
-    reanim_file: "assets/effect/reanim/Zombie_polevaulter.reanim"
+    reanim_file: "data/reanim/Zombie_polevaulter.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -4212,7 +4212,7 @@ animations:
   # Zombie_snorkle
   - id: "zombie_snorkle"
     name: "Zombie_snorkle"
-    reanim_file: "assets/effect/reanim/Zombie_snorkle.reanim"
+    reanim_file: "data/reanim/Zombie_snorkle.reanim"
     default_animation: "anim_aquarium_death"
     scale: 1.0
 
@@ -4276,7 +4276,7 @@ animations:
   # Zombie_surprise
   - id: "zombie_surprise"
     name: "Zombie_surprise"
-    reanim_file: "assets/effect/reanim/Zombie_surprise.reanim"
+    reanim_file: "data/reanim/Zombie_surprise.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
@@ -4286,7 +4286,7 @@ animations:
   # Zombie_yeti
   - id: "zombie_yeti"
     name: "Zombie_yeti"
-    reanim_file: "assets/effect/reanim/Zombie_yeti.reanim"
+    reanim_file: "data/reanim/Zombie_yeti.reanim"
     default_animation: "anim_death"
     scale: 1.0
 
@@ -4325,7 +4325,7 @@ animations:
   # Zombie_zamboni
   - id: "zombie_zamboni"
     name: "Zombie_zamboni"
-    reanim_file: "assets/effect/reanim/Zombie_zamboni.reanim"
+    reanim_file: "data/reanim/Zombie_zamboni.reanim"
     default_animation: "anim_drive"
     scale: 1.0
 
@@ -4361,7 +4361,7 @@ animations:
   # ZombiesWon
   - id: "zombieswon"
     name: "ZombiesWon"
-    reanim_file: "assets/effect/reanim/ZombiesWon.reanim"
+    reanim_file: "data/reanim/ZombiesWon.reanim"
     default_animation: "anim_screen"
     scale: 1.0
 
@@ -4375,7 +4375,7 @@ animations:
   # fire
   - id: "fire"
     name: "fire"
-    reanim_file: "assets/effect/reanim/fire.reanim"
+    reanim_file: "data/reanim/fire.reanim"
     default_animation: "anim_flame"
     scale: 1.0
 
@@ -4402,7 +4402,7 @@ animations:
   # splash
   - id: "splash"
     name: "splash"
-    reanim_file: "assets/effect/reanim/splash.reanim"
+    reanim_file: "data/reanim/splash.reanim"
     default_animation: "anim_idle"
     scale: 1.0
 
