@@ -19,43 +19,6 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
-const (
-	// UI Layout Constants - positions and sizes for UI elements
-	// Seed Bank (植物选择栏)
-	SeedBankX      = 10
-	SeedBankY      = 0
-	SeedBankWidth  = 500
-	SeedBankHeight = 87
-
-	// Sun Counter (阳光计数器) - relative to SeedBank position
-	SunCounterOffsetX  = 40 // 相对于 SeedBank 的 X 偏移量
-	SunCounterOffsetY  = 64 // 相对于 SeedBank 的 Y 偏移量
-	SunCounterWidth    = 130
-	SunCounterHeight   = 60
-	SunCounterFontSize = 18.0 // 阳光数值字体大小（像素）- 增大以提高可读性
-
-	// Plant Cards (植物卡片) - relative to SeedBank position
-	PlantCardStartOffsetX = 84 // 第一张卡片相对于 SeedBank 的 X 偏移量
-	PlantCardOffsetY      = 8  // 卡片相对于 SeedBank 的 Y 偏移量
-	PlantCardSpacing      = 60 // 卡片槽之间的间距（包含卡槽边框，每个卡槽约76px宽）
-	// PlantCardScale 已移至 config.PlantCardScale（统一配置管理）
-	PlantCardScale = config.PlantCardScale // 卡片缩放因子（0.50）
-
-	// Story 8.4: 卡片内部配置（图标缩放、偏移等）已移至 config.plant_card_config.go，不再在此定义
-
-	// Shovel (铲子) - positioned to the right of seed bank
-	ShovelX      = 620 // To the right of seed bank (bar5.png width=612 + small gap)
-	ShovelY      = 8
-	ShovelWidth  = 70
-	ShovelHeight = 74
-
-	// Animation Constants
-	// The background image is wider than the window, we show only a portion
-	IntroAnimDuration = 3.0 // Duration of intro animation in seconds
-	CameraScrollSpeed = 100 // Pixels per second for intro animation
-	// GameCameraX 已移至 config.GameCameraX (统一配置管理)
-)
-
 // GameScene represents the main gameplay screen.
 // This is where the actual Plants vs Zombies gameplay will occur.
 // It manages the game state, UI elements, and the ECS system.
@@ -254,10 +217,10 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	// TODO(Story 6.3): 迁移到 ReanimSystem
 	// scene.animationSystem = systems.NewAnimationSystem(scene.entityManager)
 
-	// Calculate sun collection target position from sun counter UI position
-	// This ensures the suns fly to the exact center of the sun counter display
-	sunCollectionTargetX := float64(SeedBankX + SunCounterOffsetX)
-	sunCollectionTargetY := float64(SeedBankY + SunCounterOffsetY)
+	// Calculate sun collection target position from sun pool icon position
+	// This ensures the suns fly to the exact center of the sun pool icon (not the text)
+	sunCollectionTargetX := float64(config.SeedBankX + config.SunPoolOffsetX)
+	sunCollectionTargetY := float64(config.SeedBankY + config.SunPoolOffsetY)
 
 	// Story 3.3 & 8.1: Initialize lawn grid system and entity with enabled lanes
 	// Now CurrentLevel is loaded, so we can read EnabledLanes correctly
@@ -486,8 +449,8 @@ func (s *GameScene) initPlantCardSystems(rm *game.ResourceManager) {
 		s.reanimSystem,
 		levelConfig,
 		s.plantCardFont,
-		SeedBankX,
-		SeedBankY,
+		config.SeedBankX,
+		config.SeedBankY,
 	)
 	if err != nil {
 		log.Printf("[GameScene] Error: Failed to initialize plant selection module: %v", err)
@@ -664,7 +627,7 @@ func (s *GameScene) loadResources() {
 	}
 
 	// Load font for sun counter (使用黑体)
-	font, err := s.resourceManager.LoadFont("assets/fonts/SimHei.ttf", SunCounterFontSize)
+	font, err := s.resourceManager.LoadFont("assets/fonts/SimHei.ttf", config.SunCounterFontSize)
 	if err != nil {
 		log.Printf("Warning: Failed to load sun counter font: %v", err)
 		log.Printf("Will use fallback debug text rendering")
@@ -1406,7 +1369,7 @@ func (s *GameScene) Update(deltaTime float64) {
 // Both phases use an ease-out quadratic easing function for smooth motion.
 func (s *GameScene) updateIntroAnimation(deltaTime float64) {
 	s.introAnimTimer += deltaTime
-	progress := s.introAnimTimer / IntroAnimDuration
+	progress := s.introAnimTimer / config.IntroAnimDuration
 
 	if progress >= 1.0 {
 		// Animation complete, camera settled at gameplay position
@@ -1752,13 +1715,13 @@ func (s *GameScene) drawSeedBank(screen *ebiten.Image) {
 	if s.seedBank != nil {
 		// Draw the seed bank image at the top left corner
 		op := &ebiten.DrawImageOptions{}
-		op.GeoM.Translate(SeedBankX, SeedBankY)
+		op.GeoM.Translate(config.SeedBankX, config.SeedBankY)
 		screen.DrawImage(s.seedBank, op)
 	} else {
 		// Fallback: Draw a dark brown rectangle
 		ebitenutil.DrawRect(screen,
-			SeedBankX, SeedBankY,
-			SeedBankWidth, SeedBankHeight,
+			config.SeedBankX, config.SeedBankY,
+			config.SeedBankWidth, config.SeedBankHeight,
 			color.RGBA{R: 101, G: 67, B: 33, A: 255}) // Dark brown
 	}
 }
@@ -1778,8 +1741,8 @@ func (s *GameScene) drawSunCounter(screen *ebiten.Image) {
 
 		// Calculate centered position
 		// Base position is relative to SeedBank
-		centerX := float64(SeedBankX + SunCounterOffsetX)
-		centerY := float64(SeedBankY + SunCounterOffsetY)
+		centerX := float64(config.SeedBankX + config.SunCounterOffsetX)
+		centerY := float64(config.SeedBankY + config.SunCounterOffsetY)
 
 		// Adjust X to center the text horizontally
 		sunDisplayX := centerX - textWidth/2
@@ -1796,8 +1759,8 @@ func (s *GameScene) drawSunCounter(screen *ebiten.Image) {
 	} else {
 		// Fallback: Use debug text if font failed to load
 		// Note: Debug text doesn't support centering easily
-		sunDisplayX := SeedBankX + SunCounterOffsetX
-		sunDisplayY := SeedBankY + SunCounterOffsetY
+		sunDisplayX := config.SeedBankX + config.SunCounterOffsetX
+		sunDisplayY := config.SeedBankY + config.SunCounterOffsetY
 		ebitenutil.DebugPrintAt(screen, sunText, sunDisplayX, sunDisplayY)
 	}
 }
@@ -1821,20 +1784,20 @@ func (s *GameScene) drawShovel(screen *ebiten.Image) {
 	// Draw shovel slot background first
 	if s.shovelSlot != nil {
 		op := &ebiten.DrawImageOptions{}
-		op.GeoM.Translate(ShovelX, ShovelY)
+		op.GeoM.Translate(config.ShovelX, config.ShovelY)
 		screen.DrawImage(s.shovelSlot, op)
 	}
 
 	// Draw shovel icon on top of the slot
 	if s.shovel != nil {
 		op := &ebiten.DrawImageOptions{}
-		op.GeoM.Translate(ShovelX, ShovelY)
+		op.GeoM.Translate(config.ShovelX, config.ShovelY)
 		screen.DrawImage(s.shovel, op)
 	} else if s.shovelSlot == nil {
 		// Fallback: Draw a gray rectangle if both images are missing
 		ebitenutil.DrawRect(screen,
-			ShovelX, ShovelY,
-			ShovelWidth, ShovelHeight,
+			config.ShovelX, config.ShovelY,
+			config.ShovelWidth, config.ShovelHeight,
 			color.RGBA{R: 128, G: 128, B: 128, A: 255}) // Gray
 	}
 }

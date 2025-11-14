@@ -130,6 +130,18 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		partX := getFloat(frame.X) + partData.OffsetX
 		partY := getFloat(frame.Y) + partData.OffsetY
 
+		// 应用实体级别的缩放（ScaleComponent）到部件位置
+		// 这样整个实体的所有部件会统一缩放，不会分散
+		entityScaleX := 1.0
+		entityScaleY := 1.0
+		if scaleComp, hasScaleComp := ecs.GetComponent[*components.ScaleComponent](s.entityManager, id); hasScaleComp {
+			entityScaleX = scaleComp.ScaleX
+			entityScaleY = scaleComp.ScaleY
+			// 缩放部件的相对位置
+			partX *= entityScaleX
+			partY *= entityScaleY
+		}
+
 		// 获取图片尺寸
 		bounds := partData.Img.Bounds()
 		w := float64(bounds.Dx())
@@ -152,6 +164,11 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		if scaleY == 0 {
 			scaleY = 1.0
 		}
+
+		// 应用实体级别的缩放（ScaleComponent）到图片大小
+		// 最终缩放 = Frame.ScaleX * ScaleComponent.ScaleX
+		scaleX *= entityScaleX
+		scaleY *= entityScaleY
 
 		skewX := getFloat(frame.SkewX)
 		skewY := getFloat(frame.SkewY)

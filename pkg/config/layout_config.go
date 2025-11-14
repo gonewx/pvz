@@ -117,6 +117,71 @@ const (
 
 	// ========== UI元素位置配置参数（可手工调节） ==========
 
+	// SeedBankX 种子栏X坐标（屏幕坐标，像素）
+	SeedBankX = 10
+
+	// SeedBankY 种子栏Y坐标（屏幕坐标，像素）
+	SeedBankY = 0
+
+	// SeedBankWidth 种子栏宽度（像素）
+	SeedBankWidth = 500
+
+	// SeedBankHeight 种子栏高度（像素）
+	SeedBankHeight = 87
+
+	// SunCounterOffsetX 阳光计数器相对于 SeedBank 的 X 偏移量（像素）
+	SunCounterOffsetX = 40
+
+	// SunCounterOffsetY 阳光计数器相对于 SeedBank 的 Y 偏移量（像素）
+	// 这是文字显示位置
+	SunCounterOffsetY = 64
+
+	// SunCounterWidth 阳光计数器宽度（像素）
+	SunCounterWidth = 130
+
+	// SunCounterHeight 阳光计数器高度（像素）
+	SunCounterHeight = 60
+
+	// SunCounterFontSize 阳光数值字体大小（像素）
+	SunCounterFontSize = 18.0
+
+	// SunPoolOffsetX 阳光池图标相对于 SeedBank 的 X 偏移量（像素）
+	// 阳光收集目标位置（与文字对齐）
+	SunPoolOffsetX = 40
+
+	// SunPoolOffsetY 阳光池图标相对于 SeedBank 的 Y 偏移量（像素）
+	// 阳光收集目标位置（在文字上方，池子中心）
+	SunPoolOffsetY = 32
+
+	// PlantCardStartOffsetX 第一张植物卡片相对于 SeedBank 的 X 偏移量（像素）
+	PlantCardStartOffsetX = 84
+
+	// PlantCardOffsetY 植物卡片相对于 SeedBank 的 Y 偏移量（像素）
+	PlantCardOffsetY = 8
+
+	// PlantCardSpacing 卡片槽之间的间距（像素）
+	// 包含卡槽边框，每个卡槽约76px宽
+	PlantCardSpacing = 60
+
+	// ShovelX 铲子X坐标（屏幕坐标，像素）
+	// 位于种子栏右侧（bar5.png width=612 + small gap）
+	ShovelX = 620
+
+	// ShovelY 铲子Y坐标（屏幕坐标，像素）
+	ShovelY = 8
+
+	// ShovelWidth 铲子宽度（像素）
+	ShovelWidth = 70
+
+	// ShovelHeight 铲子高度（像素）
+	ShovelHeight = 74
+
+	// IntroAnimDuration 开场动画时长（秒）
+	IntroAnimDuration = 3.0
+
+	// CameraScrollSpeed 开场动画摄像机滚动速度（像素/秒）
+	CameraScrollSpeed = 100
+
 	// MenuButtonOffsetFromRight 菜单按钮距离屏幕右边缘的距离（像素）
 	MenuButtonOffsetFromRight = 145.0
 

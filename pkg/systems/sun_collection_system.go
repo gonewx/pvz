@@ -42,36 +42,54 @@ func (s *SunCollectionSystem) Update(deltaTime float64) {
 		if !ok {
 			continue
 		}
-		pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, id)
-		if !ok {
-			continue
-		}
 
 		// 只处理正在收集的阳光
 		if sun.State != components.SunCollecting {
 			continue
 		}
 
-		// 计算到目标位置的距离
-		// 注意：targetX/Y 是屏幕坐标，需要转换为世界坐标进行比较
-		// 世界坐标 = 屏幕坐标 + cameraX（仅X轴）
-		targetWorldX := s.targetX + s.gameState.CameraX
-		targetWorldY := s.targetY // Y轴不受摄像机影响
+		// 检查收集动画是否完成
+		// 优先使用新的缓动动画系统（Progress >= 1.0）
+		animComp, hasAnimComp := ecs.GetComponent[*components.SunCollectionAnimationComponent](s.entityManager, id)
+		if hasAnimComp {
+			// 新的缓动动画系统：使用 Progress 判断完成
+			if animComp.Progress >= 1.0 {
+				// 增加阳光数值（在阳光到达时才增加，而非点击时）
+				// 自然掉落的阳光固定为 25 点
+				oldSun := s.gameState.GetSun()
+				s.gameState.AddSun(25)
+				log.Printf("[SunCollectionSystem] 阳光到达目标 (Progress=%.2f)! 阳光数量: %d -> %d, 删除实体", animComp.Progress, oldSun, s.gameState.GetSun())
 
-		dx := targetWorldX - pos.X
-		dy := targetWorldY - pos.Y
-		distance := math.Sqrt(dx*dx + dy*dy)
+				// 删除阳光实体
+				s.entityManager.DestroyEntity(id)
+			}
+		} else {
+			// 兼容旧代码：使用距离检测（如果没有缓动组件）
+			pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, id)
+			if !ok {
+				continue
+			}
 
-		// 如果距离小于阈值（10像素），认为已到达
-		if distance < 10.0 {
-			// 增加阳光数值（在阳光到达时才增加，而非点击时）
-			// 自然掉落的阳光固定为 25 点
-			oldSun := s.gameState.GetSun()
-			s.gameState.AddSun(25)
-			log.Printf("[SunCollectionSystem] 阳光到达目标! 阳光数量: %d -> %d, 删除实体", oldSun, s.gameState.GetSun())
+			// 计算到目标位置的距离
+			// 注意：targetX/Y 是屏幕坐标，需要转换为世界坐标进行比较
+			// 世界坐标 = 屏幕坐标 + cameraX（仅X轴）
+			targetWorldX := s.targetX + s.gameState.CameraX
+			targetWorldY := s.targetY // Y轴不受摄像机影响
 
-			// 删除阳光实体
-			s.entityManager.DestroyEntity(id)
+			dx := targetWorldX - pos.X
+			dy := targetWorldY - pos.Y
+			distance := math.Sqrt(dx*dx + dy*dy)
+
+			// 如果距离小于阈值（10像素），认为已到达
+			if distance < 10.0 {
+				// 增加阳光数值
+				oldSun := s.gameState.GetSun()
+				s.gameState.AddSun(25)
+				log.Printf("[SunCollectionSystem] 阳光到达目标 (旧系统, 距离=%.1f)! 阳光数量: %d -> %d, 删除实体", distance, oldSun, s.gameState.GetSun())
+
+				// 删除阳光实体
+				s.entityManager.DestroyEntity(id)
+			}
 		}
 	}
 }

@@ -2,7 +2,6 @@ package systems
 
 import (
 	"log"
-	"math"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
@@ -281,37 +280,30 @@ func (s *InputSystem) handleSunClick(sunID ecs.EntityID, pos *components.Positio
 	// 4. 移除 LifetimeComponent，防止收集过程中过期消失
 	ecs.RemoveComponent[*components.LifetimeComponent](s.entityManager, sunID)
 
-	// 5. 计算飞向阳光计数器的速度向量
+	// 5. 添加收集动画组件（缓动动画）
 	// 注意：sunCounterX/Y 是屏幕坐标，需要转换为世界坐标
 	// 世界坐标 = 屏幕坐标 + cameraX（仅X轴）
 	targetWorldX := s.sunCounterX + s.gameState.CameraX
 	targetWorldY := s.sunCounterY // Y轴不受摄像机影响
 
-	dx := targetWorldX - pos.X
-	dy := targetWorldY - pos.Y
-	distance := math.Sqrt(dx*dx + dy*dy)
+	ecs.AddComponent(s.entityManager, sunID, &components.SunCollectionAnimationComponent{
+		StartX:   pos.X,
+		StartY:   pos.Y,
+		TargetX:  targetWorldX,
+		TargetY:  targetWorldY,
+		Progress: 0.0,
+		Duration: 0.6, // 动画时长0.6秒（原速度600px/s，平均距离约360px）
+	})
 
-	// 飞行速度: 600像素/秒
-	speed := 600.0
-	vx := (dx / distance) * speed
-	vy := (dy / distance) * speed
-
-	// 6. 更新 VelocityComponent（如果不存在则添加）
-	vel, exists := ecs.GetComponent[*components.VelocityComponent](s.entityManager, sunID)
-	if exists {
-		// 更新现有速度
-		vel.VX = vx
-		vel.VY = vy
-	} else {
-		// 添加新的速度组件（理论上应该已存在，但防御性编程）
-		ecs.AddComponent(s.entityManager, sunID, &components.VelocityComponent{
-			VX: vx,
-			VY: vy,
-		})
-	}
+	// 6. 添加缩放组件（用于收集过程中的缩小效果）
+	ecs.AddComponent(s.entityManager, sunID, &components.ScaleComponent{
+		ScaleX: 1.0, // 初始缩放 = 1.0（原始大小）
+		ScaleY: 1.0,
+	})
 
 	// 注意: 阳光数值会在 SunCollectionSystem 检测到阳光到达目标位置时增加
 	// 这样可以确保视觉效果（阳光飞行 → 到达 → 数值增加）的正确时序
+	// 运动逻辑由 SunMovementSystem 根据 SunCollectionAnimationComponent 计算缓动位置和缩放
 }
 
 // handlePlantCardClick 处理植物卡片点击逻辑

@@ -3,6 +3,7 @@ package systems
 import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/utils"
 )
 
 // 重力加速度常量（像素/秒²）
@@ -82,11 +83,36 @@ func (s *SunMovementSystem) Update(deltaTime float64) {
 			// 无需任何操作
 
 		case components.SunCollecting:
-			// 正在被收集:执行飞向阳光计数器的动画
-			pos.X += vel.VX * deltaTime
-			pos.Y += vel.VY * deltaTime
-			// log.Printf("[SunMovementSystem] 阳光收集中 位置:(%.1f, %.1f) 速度:(%.1f, %.1f)",
-			// pos.X, pos.Y, vel.VX, vel.VY)
+			// 正在被收集：执行飞向阳光计数器的缓动动画
+			// 检查是否有 SunCollectionAnimationComponent（新的缓动动画系统）
+			animComp, hasAnimComp := ecs.GetComponent[*components.SunCollectionAnimationComponent](s.entityManager, id)
+			if hasAnimComp {
+				// 新的缓动动画系统
+				// 1. 递增进度
+				animComp.Progress += deltaTime / animComp.Duration
+				if animComp.Progress > 1.0 {
+					animComp.Progress = 1.0
+				}
+
+				// 2. 使用缓动函数计算缓动后的进度（EaseOutCubic：开始快，结束慢）
+				easedProgress := utils.EaseOutCubic(animComp.Progress)
+
+				// 3. 使用线性插值计算新位置
+				pos.X = utils.Lerp(animComp.StartX, animComp.TargetX, easedProgress)
+				pos.Y = utils.Lerp(animComp.StartY, animComp.TargetY, easedProgress)
+
+				// 4. 更新缩放（从 1.0 渐变到 0.6，营造"被吸入"效果）
+				scale, hasScale := ecs.GetComponent[*components.ScaleComponent](s.entityManager, id)
+				if hasScale {
+					// 缩放也使用缓动进度，确保与位置同步
+					scale.ScaleX = utils.Lerp(1.0, 0.6, easedProgress)
+					scale.ScaleY = utils.Lerp(1.0, 0.6, easedProgress)
+				}
+			} else {
+				// 兼容旧代码：使用速度向量（如果没有缓动组件）
+				pos.X += vel.VX * deltaTime
+				pos.Y += vel.VY * deltaTime
+			}
 		}
 	}
 }

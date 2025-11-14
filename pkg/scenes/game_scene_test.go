@@ -3,6 +3,7 @@ package scenes
 import (
 	"testing"
 
+	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 )
@@ -136,36 +137,36 @@ func TestGameSceneResourceLoadingFallback(t *testing.T) {
 // with reasonable values.
 func TestGameSceneConstants(t *testing.T) {
 	// Test that constants are defined and have non-negative values
-	if SeedBankX < 0 {
+	if config.SeedBankX < 0 {
 		t.Error("SeedBankX should be non-negative")
 	}
-	if SeedBankY < 0 {
+	if config.SeedBankY < 0 {
 		t.Error("SeedBankY should be non-negative")
 	}
-	if SeedBankWidth <= 0 {
+	if config.SeedBankWidth <= 0 {
 		t.Error("SeedBankWidth should be positive")
 	}
-	if SeedBankHeight <= 0 {
+	if config.SeedBankHeight <= 0 {
 		t.Error("SeedBankHeight should be positive")
 	}
 
-	if SunCounterWidth <= 0 {
+	if config.SunCounterWidth <= 0 {
 		t.Error("SunCounterWidth should be positive")
 	}
-	if SunCounterHeight <= 0 {
+	if config.SunCounterHeight <= 0 {
 		t.Error("SunCounterHeight should be positive")
 	}
 
-	if ShovelX < 0 {
+	if config.ShovelX < 0 {
 		t.Error("ShovelX should be non-negative")
 	}
-	if ShovelY < 0 {
+	if config.ShovelY < 0 {
 		t.Error("ShovelY should be non-negative")
 	}
-	if ShovelWidth <= 0 {
+	if config.ShovelWidth <= 0 {
 		t.Error("ShovelWidth should be positive")
 	}
-	if ShovelHeight <= 0 {
+	if config.ShovelHeight <= 0 {
 		t.Error("ShovelHeight should be positive")
 	}
 
