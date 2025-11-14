@@ -33,6 +33,10 @@ type PlantComponent struct {
 	// Story 10.5: 使用配置关键帧方案（方案 B），在 config.PeashooterShootingFireFrame 帧创建子弹
 	PendingProjectile bool
 
+	// LastFiredFrame 上次发射子弹时的帧号
+	// 用于防止在同一个关键帧内重复发射子弹（循环动画问题）
+	LastFiredFrame int
+
 	// LastMouthX 上一帧 idle_mouth 轨道的 X 坐标（局部坐标）
 	// 用于检测 X 坐标从增大变为减小（达到峰值，触发子弹发射）
 	// idle_mouth 是嘴部部件，在攻击动画中随头部伸出而向右移动

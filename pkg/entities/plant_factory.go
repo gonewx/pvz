@@ -66,6 +66,7 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 		GridRow:         row,
 		GridCol:         col,
 		AttackAnimState: components.AttackAnimIdle, // Story 10.3: 初始化为空闲状态
+		LastFiredFrame:  -1,                        // 初始化为 -1，表示还未发射过
 		BlinkTimer:      3.0,                       // Story 6.4: 初始化眨眼计时器为3秒
 	})
 
@@ -128,6 +129,7 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 			GridCol:           col, // ✅ 添加缺失的 GridCol
 			AttackAnimState:   components.AttackAnimIdle,
 			PendingProjectile: false,
+			LastFiredFrame:    -1, // 初始化为 -1，表示还未发射过
 			LastMouthX:        0,
 		})
 

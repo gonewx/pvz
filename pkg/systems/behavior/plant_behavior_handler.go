@@ -187,8 +187,21 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 		} else {
 			// 有僵尸且计时器就绪，准备下一次发射
 			if timer.CurrentTime >= timer.TargetTime && !plant.PendingProjectile {
+				// 获取当前动画帧号
+				reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+				if ok && reanim.CurrentFrame == config.PeashooterShootingFireFrame {
+					// 当前帧恰好是关键帧，延后一帧再设置 PendingProjectile
+					// 避免在同一帧内立即发射
+					log.Printf("[BehaviorSystem] ⏸️ 豌豆射手 %d 计时器就绪但当前在关键帧(%d)，延后1帧",
+						entityID, config.PeashooterShootingFireFrame)
+					return
+				}
+
 				plant.PendingProjectile = true
+				plant.LastFiredFrame = -1 // 重置发射帧号，允许新的射击周期
 				timer.CurrentTime = 0
+				log.Printf("[BehaviorSystem] 🎯 豌豆射手 %d 计时器就绪(%.3f)，设置 PendingProjectile=true, 重置 LastFiredFrame=-1（攻击状态中）",
+					entityID, timer.CurrentTime)
 			}
 		}
 		// 继续在攻击状态，updatePlantAttackAnimation 会处理子弹发射
@@ -197,6 +210,15 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 
 	// 空闲状态，检查是否有僵尸需要攻击
 	if timer.CurrentTime >= timer.TargetTime && hasZombieInLine {
+		// 获取当前动画帧号（如果有的话）
+		reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+		if ok && reanim.CurrentFrame == config.PeashooterShootingFireFrame {
+			// 当前帧恰好是关键帧（从空闲切换时不太可能，但还是检查一下）
+			log.Printf("[BehaviorSystem] ⏸️ 豌豆射手 %d 空闲状态计时器就绪但当前在关键帧(%d)，延后1帧",
+				entityID, config.PeashooterShootingFireFrame)
+			return
+		}
+
 		// 切换到攻击动画
 		ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
 			UnitID:    "peashootersingle",
@@ -204,12 +226,13 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 			Processed: false,
 		})
 
-		log.Printf("[BehaviorSystem] 豌豆射手 %d 切换到攻击动画（配置驱动）", entityID)
+		log.Printf("[BehaviorSystem] 🎯 豌豆射手 %d 切换到攻击动画（配置驱动），计时器=%.3f", entityID, timer.CurrentTime)
 		plant.AttackAnimState = components.AttackAnimAttacking
 
 		// 设置"等待发射"状态，但不立即创建子弹
 		plant.PendingProjectile = true
-		log.Printf("[BehaviorSystem] 豌豆射手 %d 进入攻击状态，等待关键帧(%d)发射子弹",
+		plant.LastFiredFrame = -1 // 重置发射帧号，允许新的射击周期
+		log.Printf("[BehaviorSystem] 豌豆射手 %d 进入攻击状态，等待关键帧(%d)发射子弹，设置 PendingProjectile=true, LastFiredFrame=-1",
 			entityID, config.PeashooterShootingFireFrame)
 
 		// 重置计时器
@@ -444,10 +467,23 @@ func (s *BehaviorSystem) updatePlantAttackAnimation(entityID ecs.EntityID, delta
 	if plant.PendingProjectile {
 		// 直接使用 CurrentFrame
 		currentFrame := reanim.CurrentFrame
+
+		// 防止在同一个关键帧内重复发射（循环动画问题）
+		if currentFrame == plant.LastFiredFrame {
+			// 仍在上次发射的同一帧，跳过
+			return
+		}
+
 		// 精确匹配发射帧（零延迟）
 		if currentFrame == config.PeashooterShootingFireFrame {
-			log.Printf("[BehaviorSystem] 豌豆射手 %d 到达关键帧(%d)，发射子弹！",
-				entityID, currentFrame)
+			// 获取计时器信息用于调试
+			timer, _ := ecs.GetComponent[*components.TimerComponent](s.entityManager, entityID)
+			timerValue := 0.0
+			if timer != nil {
+				timerValue = timer.CurrentTime
+			}
+			log.Printf("[BehaviorSystem] 🔫 豌豆射手 %d 到达关键帧(%d)，发射子弹！计时器=%.3f, 动画帧索引=%v",
+				entityID, currentFrame, timerValue, reanim.AnimationFrameIndices)
 
 			// 使用固定偏移值计算子弹发射位置
 			bulletOffsetX := config.PeaBulletOffsetX
@@ -479,6 +515,9 @@ func (s *BehaviorSystem) updatePlantAttackAnimation(entityID ecs.EntityID, delta
 
 			// 清除"等待发射"状态
 			plant.PendingProjectile = false
+			// 记录本次发射的帧号，防止在同一帧内重复发射
+			plant.LastFiredFrame = currentFrame
+			log.Printf("[BehaviorSystem] ✅ 豌豆射手 %d 清除 PendingProjectile=false, LastFiredFrame=%d", entityID, currentFrame)
 		}
 	}
 
