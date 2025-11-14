@@ -1,0 +1,83 @@
+# 测试配置文件 - 用于验证 Story 16.3 的坐标系统统一化
+
+# 全局配置
+global:
+  # 窗口配置
+  window:
+    width: 800
+    height: 600
+    title: "Animation Showcase - Test"
+
+  # 网格布局配置
+  grid:
+    columns: 2
+    cell_width: 350
+    cell_height: 350
+    padding: 20
+    scroll_speed: 30
+    rows_per_page: 1
+
+  # 动画播放配置
+  playback:
+    tps: 60
+    fps: 12
+    scale: 1.0
+
+# 动画单元配置列表
+animations:
+  # 豌豆射手
+  - id: "peashooter"
+    name: "豌豆射手"
+    reanim_file: "data/reanim/PeaShooterSingle.reanim"
+    default_animation: "anim_idle"
+    scale: 1.5
+
+    images:
+      IMAGE_REANIM_PEASHOOTER_BACKLEAF: "assets/reanim/PeaShooter_backleaf.png"
+      IMAGE_REANIM_PEASHOOTER_BACKLEAF_LEFTTIP: "assets/reanim/PeaShooter_backleaf_lefttip.png"
+      IMAGE_REANIM_PEASHOOTER_BACKLEAF_RIGHTTIP: "assets/reanim/PeaShooter_backleaf_righttip.png"
+      IMAGE_REANIM_PEASHOOTER_FRONTLEAF: "assets/reanim/PeaShooter_frontleaf.png"
+      IMAGE_REANIM_PEASHOOTER_FRONTLEAF_LEFTTIP: "assets/reanim/PeaShooter_frontleaf_lefttip.png"
+      IMAGE_REANIM_PEASHOOTER_FRONTLEAF_RIGHTTIP: "assets/reanim/PeaShooter_frontleaf_righttip.png"
+      IMAGE_REANIM_PEASHOOTER_STALK_BOTTOM: "assets/reanim/PeaShooter_stalk_bottom.png"
+      IMAGE_REANIM_PEASHOOTER_STALK_TOP: "assets/reanim/PeaShooter_stalk_top.png"
+      IMAGE_REANIM_PEASHOOTER_HEAD: "assets/reanim/PeaShooter_Head.png"
+      IMAGE_REANIM_PEASHOOTER_MOUTH: "assets/reanim/PeaShooter_mouth.png"
+      IMAGE_REANIM_PEASHOOTER_BLINK1: "assets/reanim/PeaShooter_blink1.png"
+      IMAGE_REANIM_PEASHOOTER_BLINK2: "assets/reanim/PeaShooter_blink2.png"
+      IMAGE_REANIM_ANIM_SPROUT: "assets/reanim/PeaShooter_sprout.png"
+      IMAGE_REANIM_PEASHOOTER_HEADLEAF_NEAREST: "assets/reanim/PeaShooter_headleaf_nearest.png"
+      IMAGE_REANIM_PEASHOOTER_HEADLEAF_FARTHEST: "assets/reanim/PeaShooter_headleaf_farthest.png"
+      IMAGE_REANIM_PEASHOOTER_HEADLEAF_2RDFARTHEST: "assets/reanim/PeaShooter_headleaf_2rdfarthest.png"
+      IMAGE_REANIM_PEASHOOTER_HEADLEAF_3RDFARTHEST: "assets/reanim/PeaShooter_headleaf_3rdfarthest.png"
+
+    available_animations:
+      - name: "anim_idle"
+        display_name: "待机"
+      - name: "anim_shooting"
+        display_name: "攻击"
+
+  # 僵尸
+  - id: "zombie"
+    name: "僵尸"
+    reanim_file: "data/reanim/Zombie.reanim"
+    default_animation: "anim_walk"
+    scale: 1.5
+
+    images:
+      IMAGE_REANIM_ZOMBIE_OUTERARM_HAND: "assets/reanim/Zombie_outerarm_hand.png"
+      IMAGE_REANIM_ZOMBIE_OUTERARM_LOWER: "assets/reanim/Zombie_outerarm_lower.png"
+      IMAGE_REANIM_ZOMBIE_OUTERARM_UPPER: "assets/reanim/Zombie_outerarm_upper.png"
+      IMAGE_REANIM_ZOMBIE_HEAD: "assets/reanim/Zombie_head.png"
+      IMAGE_REANIM_ZOMBIE_JAW: "assets/reanim/Zombie_jaw.png"
+      IMAGE_REANIM_ZOMBIE_BODY: "assets/reanim/Zombie_body.png"
+      IMAGE_REANIM_ZOMBIE_INNERARM_HAND: "assets/reanim/Zombie_innerarm_hand.png"
+      IMAGE_REANIM_ZOMBIE_INNERARM_LOWER: "assets/reanim/Zombie_innerarm_lower.png"
+      IMAGE_REANIM_ZOMBIE_INNERARM_UPPER: "assets/reanim/Zombie_innerarm_upper.png"
+      IMAGE_REANIM_ZOMBIE_FOOT: "assets/reanim/Zombie_foot.png"
+
+    available_animations:
+      - name: "anim_walk"
+        display_name: "行走"
+      - name: "anim_death"
+        display_name: "死亡"

@@ -236,6 +236,104 @@ func (rc *RenderContext) GetScreenOrigin(entityID ecs.EntityID, pos *PositionCom
 - ✅ 完整 GoDoc 注释
 - ✅ 使用示例
 
+## Animation Showcase 工具统一化 (Story 16.3)
+
+### 背景
+
+在 Story 16.1 和 16.2 完成后，游戏核心系统已统一使用中心锚点方案和坐标转换工具库。然而，Animation Showcase 调试工具仍使用旧的左上角锚点方案，导致：
+
+1. **坐标系统不一致**：
+   - 游戏系统：中心锚点 + CenterOffset
+   - Showcase 工具：左上角锚点，无 CenterOffset
+
+2. **认知负担增加**：
+   - 开发者在两套坐标系统间切换思维
+   - 调试困难：Showcase 中的坐标与游戏中的坐标不对应
+
+3. **维护成本高**：
+   - 需要理解和维护两套不同的坐标计算逻辑
+
+### 解决方案
+
+**采用方案 B**：提取核心坐标公式（保持 Showcase 独立性）
+
+❌ **方案 A（不采用）**：直接复用 `coordinates.go` 工具库
+- 问题：Showcase 不使用 ECS EntityManager
+- 工具库依赖 `em *ecs.EntityManager`
+- 违反独立工具原则
+
+✅ **方案 B（已采用）**：提取核心公式
+1. 在 `AnimationCell` 结构体中添加 `centerOffsetX/Y` 字段
+2. 实现独立的 `calculateCenterOffset()` 函数（复用游戏系统计算逻辑）
+3. 修改 `drawPart()` 使用中心锚点公式
+
+### 实施细节
+
+**修改的文件**：
+- `cmd/animation_showcase/animation_cell.go`
+  - 添加 `centerOffsetX/Y` 字段 (line 66-67)
+  - 实现 `calculateCenterOffset()` 函数 (line 686-779)
+  - 修改 `drawPart()` 使用中心锚点 (line 521-594)
+  - 更新文件头注释说明坐标方案 (line 4-13)
+
+**坐标公式统一**：
+```go
+// Animation Showcase (新实现)
+renderOriginX := centerX - ac.centerOffsetX*ac.scale
+renderOriginY := centerY - ac.centerOffsetY*ac.scale
+x := getFloat(frame.X)*ac.scale + renderOriginX
+y := getFloat(frame.Y)*ac.scale + renderOriginY
+
+// 游戏系统 (参考)
+baseScreenX := pos.X - cameraX - reanimComp.CenterOffsetX
+partX := getFloat(frame.X) + partData.OffsetX
+finalX := baseScreenX + partX
+```
+
+**核心差异**：
+- Showcase：不使用 ECS，centerX/Y 直接传入
+- 游戏系统：从 PositionComponent 获取坐标
+- 公式本质相同：**渲染原点 = 中心 - CenterOffset**
+
+### 成果
+
+✅ **坐标系统完全统一**：
+- 游戏系统、Animation Showcase 都使用中心锚点
+- 消除了坐标系统的二元性
+
+✅ **降低认知负担**：
+- 开发者只需理解一套坐标方案
+- Showcase 工具与游戏系统行为一致
+
+✅ **便于调试**：
+- Showcase 中的坐标直接对应游戏中的坐标
+- CenterOffset 值在两个系统中一致
+
+✅ **保持独立性**：
+- Showcase 工具不依赖 ECS 框架
+- 可独立运行和测试
+
+### 验证结果
+
+**测试运行**：
+```bash
+go run cmd/animation_showcase/*.go --config=cmd/animation_showcase/config_test.yaml --verbose
+```
+
+**日志输出**：
+```
+[AnimationCell] 豌豆射手: CenterOffset=(0.0, 0.0)
+[AnimationCell] 僵尸: CenterOffset=(39.0, 56.7)
+✓ 成功加载 2 个动画单元
+✓ 启动完成，开始运行
+```
+
+**质量检查**：
+- ✅ `gofmt` 格式化通过
+- ✅ `go vet` 检查通过
+- ✅ 编译成功
+- ✅ 程序正常运行
+
 ## References
 
 1. **Epic 16**: 坐标系统重构
@@ -257,10 +355,11 @@ func (rc *RenderContext) GetScreenOrigin(entityID ecs.EntityID, pos *PositionCom
 ## Timeline
 
 - **2025-11-14**: ADR 创建
-- **2025-11-14**: Story 16.1 实施完成
-- **未来**: Story 16.2 - 重构核心系统以使用工具库
+- **2025-11-14**: Story 16.1 实施完成 - 创建坐标转换工具库
+- **2025-11-14**: Story 16.2 实施完成 - 重构核心系统使用工具库
+- **2025-11-14**: Story 16.3 实施完成 - 统一 Animation Showcase 工具坐标方案
 
 ---
 
 **最后更新**: 2025-11-14
-**文档版本**: 1.0
+**文档版本**: 1.1 (添加 Showcase 工具统一化章节)

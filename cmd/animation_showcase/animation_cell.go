@@ -1,5 +1,16 @@
 // cmd/animation_showcase/animation_cell.go
 // 动画展示单元 - 管理单个 Reanim 动画的加载、播放和渲染
+//
+// 坐标系统说明（Story 16.3 统一化）：
+//   - 使用中心锚点方案（与游戏系统 pkg/systems/render_reanim.go 一致）
+//   - CenterOffset 在初始化时计算一次，基于第一帧所有可见部件的 bounding box 中心
+//   - 渲染公式：渲染原点 = 中心 - CenterOffset，部件坐标 = 渲染原点 + frame.X
+//   - 与游戏系统使用相同的坐标转换逻辑，降低认知负担，便于调试
+//
+// 参考：
+//   - pkg/utils/coordinates.go - 坐标转换工具库
+//   - pkg/systems/reanim_helpers.go:calculateCenterOffset - CenterOffset 计算逻辑
+//   - docs/architecture/adr/001-coordinate-transformation-library.md - 坐标系统设计文档
 
 package main
 
@@ -59,6 +70,12 @@ type AnimationCell struct {
 	scale   float64
 	centerX float64
 	centerY float64
+
+	// 中心锚点偏移（用于对齐游戏系统坐标方案）
+	// 在初始化时计算一次，基于第一帧所有可见部件的 bounding box 中心
+	// 与游戏系统 pkg/systems/reanim_helpers.go:calculateCenterOffset 的逻辑一致
+	centerOffsetX float64
+	centerOffsetY float64
 
 	// 详情模式（点击后显示）
 	detailMode bool
@@ -139,6 +156,20 @@ func NewAnimationCell(config *AnimationUnitConfig, globalFPS int, targetTPS int)
 
 	// 构建可切换的动画列表（包含普通动画和组合动画）
 	cell.buildSwitchableAnimations()
+
+	// 计算中心锚点偏移（CenterOffset）
+	// 基于第一帧所有可见部件的 bounding box 中心
+	// 与游戏系统坐标方案保持一致
+	cell.centerOffsetX, cell.centerOffsetY = calculateCenterOffset(
+		mergedTracks,
+		partImages,
+		visualTracks,
+	)
+
+	if *verbose {
+		log.Printf("[AnimationCell] %s: CenterOffset=(%.1f, %.1f)",
+			config.Name, cell.centerOffsetX, cell.centerOffsetY)
+	}
 
 	// 设置默认动画并更新索引
 	defaultIndex := cell.findAnimationIndex(config.DefaultAnimation)
@@ -499,6 +530,9 @@ func (c *AnimationCell) getParentOffset(parentTrackName string) (float64, float6
 }
 
 // drawPart 绘制单个部件
+// 使用中心锚点方案（与游戏系统一致）：
+//   - 渲染原点 = 中心 - CenterOffset * scale
+//   - 部件坐标 = 渲染原点 + frame.X * scale
 func (ac *AnimationCell) drawPart(canvas *ebiten.Image, frame reanim.Frame, img *ebiten.Image, centerX, centerY float64) {
 	bounds := img.Bounds()
 	w := bounds.Dx()
@@ -506,8 +540,14 @@ func (ac *AnimationCell) drawPart(canvas *ebiten.Image, frame reanim.Frame, img 
 	fw := float64(w)
 	fh := float64(h)
 
-	x := getFloat(frame.X)*ac.scale + centerX
-	y := getFloat(frame.Y)*ac.scale + centerY
+	// 使用中心锚点方案（与游戏系统坐标方案一致）
+	// 渲染原点 = 中心 - CenterOffset
+	renderOriginX := centerX - ac.centerOffsetX*ac.scale
+	renderOriginY := centerY - ac.centerOffsetY*ac.scale
+
+	// 部件坐标 = 渲染原点 + frame.X
+	x := getFloat(frame.X)*ac.scale + renderOriginX
+	y := getFloat(frame.Y)*ac.scale + renderOriginY
 
 	scaleX := ac.scale
 	scaleY := ac.scale
@@ -665,6 +705,118 @@ func (c *AnimationCell) ResetTrackVisibility() {
 }
 
 // === 工具函数 ===
+
+// calculateCenterOffset 计算动画的中心偏移量
+// 逻辑与游戏系统的 pkg/systems/reanim_helpers.go:calculateCenterOffset 一致
+//
+// 该函数遍历所有视觉轨道的第一帧，计算所有可见部件的 bounding box，
+// 然后返回 bounding box 的中心坐标作为 CenterOffset。
+//
+// CenterOffset 用于实现中心锚点方案：
+//   - 渲染原点 = 中心 - CenterOffset
+//   - 部件坐标 = 渲染原点 + frame.X
+//
+// 参数:
+//   - mergedTracks: 合并后的轨道数据
+//   - partImages: 图片资源映射
+//   - visualTracks: 视觉轨道列表
+//
+// 返回:
+//   - centerOffsetX, centerOffsetY: BoundingBox 中心坐标
+func calculateCenterOffset(
+	mergedTracks map[string][]reanim.Frame,
+	partImages map[string]*ebiten.Image,
+	visualTracks []string,
+) (float64, float64) {
+	// 边界检查
+	if mergedTracks == nil || len(visualTracks) == 0 {
+		return 0, 0
+	}
+
+	// 计算第一帧（索引 0）的 bounding box
+	minX, maxX := 9999.0, -9999.0
+	minY, maxY := 9999.0, -9999.0
+	hasVisibleParts := false
+
+	for _, trackName := range visualTracks {
+		frames, ok := mergedTracks[trackName]
+		if !ok || len(frames) == 0 {
+			continue
+		}
+
+		// 获取第一帧
+		frame := frames[0]
+
+		// 跳过隐藏帧
+		if frame.FrameNum != nil && *frame.FrameNum == -1 {
+			continue
+		}
+
+		// 跳过无图片的帧
+		if frame.ImagePath == "" {
+			continue
+		}
+
+		// 获取图片
+		img, ok := partImages[frame.ImagePath]
+		if !ok || img == nil {
+			continue
+		}
+
+		// 计算部件位置
+		partX := getFloat(frame.X)
+		partY := getFloat(frame.Y)
+
+		// 获取图片尺寸
+		bounds := img.Bounds()
+		w := float64(bounds.Dx())
+		h := float64(bounds.Dy())
+
+		// 考虑缩放
+		scaleX := getFloat(frame.ScaleX)
+		scaleY := getFloat(frame.ScaleY)
+		if scaleX == 0 {
+			scaleX = 1.0
+		}
+		if scaleY == 0 {
+			scaleY = 1.0
+		}
+
+		// 计算部件的 bounding box（考虑图片尺寸）
+		// 注意：这里使用左上角锚点，因为 frame.X/Y 代表图片左上角
+		partMinX := partX
+		partMaxX := partX + w*scaleX
+		partMinY := partY
+		partMaxY := partY + h*scaleY
+
+		// 更新全局 bounding box
+		if partMinX < minX {
+			minX = partMinX
+		}
+		if partMaxX > maxX {
+			maxX = partMaxX
+		}
+		if partMinY < minY {
+			minY = partMinY
+		}
+		if partMaxY > maxY {
+			maxY = partMaxY
+		}
+
+		hasVisibleParts = true
+	}
+
+	// 如果没有可见部件，返回 (0, 0)
+	if !hasVisibleParts {
+		return 0, 0
+	}
+
+	// 计算并返回 bounding box 中心
+	centerOffsetX := (minX + maxX) / 2.0
+	centerOffsetY := (minY + maxY) / 2.0
+
+	return centerOffsetX, centerOffsetY
+}
 
 // analyzeTrackTypes 分析轨道类型（视觉轨道和逻辑轨道）
 func analyzeTrackTypes(reanimXML *reanim.ReanimXML) (visualTracks []string, logicalTracks []string) {
