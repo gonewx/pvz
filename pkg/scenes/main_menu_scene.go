@@ -95,16 +95,16 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 		// ✅ Epic 14: 移除 AnalyzeTrackTypes 调用（已私有化，由 ReanimSystem 内部处理）
 		// PlayAnimation/AddAnimation 会自动调用 analyzeTrackTypes
 
-		// ✅ Epic 14: 使用 AnimationCommand 触发开场动画
+		// ✅ Epic 14: 使用 AnimationCommand 触发开场组合动画（anim_open + anim_sign）
 		ecs.AddComponent(scene.entityManager, selectorEntity, &components.AnimationCommandComponent{
-			AnimationName: "anim_open",
-			Processed:     false,
+			UnitID:    "selectorscreen",
+			ComboName: "opening", // 使用配置的组合动画（包含 anim_open 和 anim_sign）
+			Processed: false,
 		})
 
 		// 处理 AnimationCommand（立即初始化动画）
 		scene.reanimSystem.Update(0)
 
-		// 2. 不再添加 anim_sign 和 anim_idle（这些会覆盖背景）
 		// 3. 云朵和草动画在开场完成后才添加（见 Update() 中的 cloudAnimsResumed 逻辑）
 
 		// 4. ✅ Epic 14: 移除 FinalizeAnimations 调用（已私有化，由 PlayAnimation/AddAnimation 内部处理）
@@ -140,7 +140,7 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 				}
 			}
 
-			// 开场动画设置为非循环
+			// 开场动画设置为非循环（opening 组合包含 anim_open 和 anim_sign）
 			reanimComp.AnimationLoopStates["anim_open"] = false
 			reanimComp.AnimationLoopStates["anim_sign"] = false
 			reanimComp.AnimationLoopStates["anim_idle"] = false

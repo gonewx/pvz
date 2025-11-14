@@ -40,7 +40,7 @@ images:
 available_animations:
     - name: anim_open
       display_name: open
-      speed: 0.5
+      speed: 1
     - name: anim_sign
       display_name: sign
     - name: anim_idle
@@ -73,3 +73,9 @@ available_animations:
     - name: anim_cloud5
       display_name: cloud5
       speed: 0.05
+
+animation_combos:
+    - name: "opening"
+      display_name: "开场展开"
+      animations: ["anim_sign", "anim_open"]
+      description: "主菜单的完整开场动画，包括背景展开和木牌装饰"
