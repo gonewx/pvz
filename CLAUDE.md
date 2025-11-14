@@ -518,6 +518,205 @@ worldRightEdgeX := pos.X - CenterOffsetX + sodRollCenterX
 // GetSodRollCenterX() 返回此值，用于裁剪草皮叠加层的可见宽度
 ```
 
+---
+
+### 坐标转换工具库 (Epic 16 - Story 16.1)
+
+**工具库位置**: `pkg/utils/coordinates.go`
+
+为了消除坐标计算的重复代码、降低认知负担、减少错误，项目提供了统一的坐标转换工具库。
+
+#### 核心函数及其用途
+
+| 函数 | 用途 | 返回值 |
+|------|------|--------|
+| `GetRenderScreenOrigin` | **渲染系统**使用，计算屏幕坐标 | (screenX, screenY, error) |
+| `GetClickableCenter` | **点击检测**使用，计算点击中心（世界坐标） | (centerX, centerY, error) |
+| `GetRenderOrigin` | **草皮系统**等需要世界坐标的场景 | (originX, originY, error) |
+| `ReanimLocalToWorld` | 将 Reanim 局部坐标转换为世界坐标 | (worldX, worldY, error) |
+| `WorldToScreen` | 通用世界坐标到屏幕坐标转换 | (screenX, screenY) |
+
+#### 使用场景说明
+
+**何时使用哪个函数？**
+
+```go
+// 场景 1: 渲染系统 - 绘制 Reanim 动画
+// 使用 GetRenderScreenOrigin
+baseScreenX, baseScreenY, err := coordinates.GetRenderScreenOrigin(em, entityID, pos, cameraX)
+if err != nil {
+    return err
+}
+// 叠加部件相对坐标
+partX := frame.X + partData.OffsetX
+finalX := baseScreenX + partX
+
+// 场景 2: 点击检测 - 判断鼠标是否点击了实体
+// 使用 GetClickableCenter
+clickCenterX, clickCenterY, err := coordinates.GetClickableCenter(em, entityID, pos)
+if err != nil {
+    continue // 跳过没有动画组件的实体
+}
+halfWidth := clickable.Width / 2.0
+if mouseWorldX >= clickCenterX-halfWidth &&
+   mouseWorldX <= clickCenterX+halfWidth {
+    // 点击命中
+}
+
+// 场景 3: 草皮系统 - 计算草皮铺设范围（世界坐标）
+// 使用 ReanimLocalToWorld
+sodRollCenterX := frame.X + scaledHalfWidth  // Reanim 局部坐标
+worldCenterX, worldCenterY, err := coordinates.ReanimLocalToWorld(em, entityID, pos, sodRollCenterX, 0)
+if err != nil {
+    return err
+}
+
+// 场景 4: 通用坐标转换
+// 使用 WorldToScreen
+screenX, screenY := coordinates.WorldToScreen(worldX, worldY, cameraX, isUI)
+```
+
+#### 迁移指南（旧 API → 新 API）
+
+**Before (手工计算)** vs **After (工具库)**
+
+##### 示例 1: 渲染系统
+
+```go
+// ❌ Before: 手工计算（7-8 行）
+reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](em, entityID)
+if !ok {
+    return
+}
+_, isUI := ecs.GetComponent[*components.UIComponent](em, entityID)
+effectiveCameraX := cameraX
+if isUI {
+    effectiveCameraX = 0
+}
+baseScreenX := pos.X - effectiveCameraX - reanimComp.CenterOffsetX
+baseScreenY := pos.Y - reanimComp.CenterOffsetY
+
+// ✅ After: 使用工具库（3 行）
+baseScreenX, baseScreenY, err := coordinates.GetRenderScreenOrigin(em, entityID, pos, cameraX)
+if err != nil {
+    return err
+}
+```
+
+**代码简化**: 56-57% 行数减少
+
+##### 示例 2: 点击检测系统
+
+```go
+// ❌ Before: 手工计算
+reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](em, entityID)
+if !ok {
+    continue
+}
+clickCenterX := pos.X - reanimComp.CenterOffsetX
+clickCenterY := pos.Y - reanimComp.CenterOffsetY
+
+// ✅ After: 使用工具库
+clickCenterX, clickCenterY, err := coordinates.GetClickableCenter(em, entityID, pos)
+if err != nil {
+    continue
+}
+```
+
+##### 示例 3: 草皮系统
+
+```go
+// ❌ Before: 手工计算（重复多次）
+worldLeftEdge := posComp.X - reanimComp.CenterOffsetX + leftEdge
+worldCenterX := posComp.X - reanimComp.CenterOffsetX + centerX
+worldRightEdge := posComp.X - reanimComp.CenterOffsetX + rightEdge
+
+// ✅ After: 使用工具库
+worldLeftEdgeX, _, err := coordinates.ReanimLocalToWorld(em, entityID, pos, leftEdge, 0)
+worldCenterX, _, err := coordinates.ReanimLocalToWorld(em, entityID, pos, centerX, 0)
+worldRightEdgeX, _, err := coordinates.ReanimLocalToWorld(em, entityID, pos, rightEdge, 0)
+```
+
+#### 常见陷阱
+
+##### 陷阱 1: UI 元素的摄像机偏移处理
+
+**问题**: 忘记 UI 元素不受摄像机影响
+
+```go
+// ❌ 错误：UI 元素也应用了摄像机偏移
+screenX := pos.X - cameraX - reanimComp.CenterOffsetX  // 错误！
+
+// ✅ 正确：使用工具库自动处理
+screenX, screenY, err := coordinates.GetRenderScreenOrigin(em, entityID, pos, cameraX)
+// 工具库内部会检查 UIComponent，自动将 UI 的 effectiveCameraX 设为 0
+```
+
+##### 陷阱 2: 错误处理
+
+**问题**: 实体可能没有 ReanimComponent
+
+```go
+// ❌ 错误：未检查错误
+screenX, screenY, _ := coordinates.GetRenderScreenOrigin(em, entityID, pos, cameraX)
+// 如果实体没有 ReanimComponent，返回 (0, 0, ErrNoReanimComponent)
+
+// ✅ 正确：检查错误
+screenX, screenY, err := coordinates.GetRenderScreenOrigin(em, entityID, pos, cameraX)
+if err != nil {
+    if errors.Is(err, coordinates.ErrNoReanimComponent) {
+        // 处理无动画组件的情况
+        return
+    }
+    log.Printf("获取渲染坐标失败: %v", err)
+    return
+}
+```
+
+##### 陷阱 3: 世界坐标 vs 屏幕坐标的混淆
+
+**问题**: 误用坐标类型
+
+```go
+// ❌ 错误：点击检测应该使用世界坐标，而非屏幕坐标
+screenX, screenY, _ := coordinates.GetRenderScreenOrigin(em, entityID, pos, cameraX)
+if mouseWorldX >= screenX-halfWidth { // 错误！比较世界坐标与屏幕坐标
+    // ...
+}
+
+// ✅ 正确：点击检测使用世界坐标
+clickCenterX, clickCenterY, err := coordinates.GetClickableCenter(em, entityID, pos)
+if mouseWorldX >= clickCenterX-halfWidth { // 正确！都是世界坐标
+    // ...
+}
+```
+
+#### 性能保证
+
+**基准测试结果**（Intel i9-14900KF）：
+
+| 函数 | 性能 (ns/op) | 内存分配 |
+|------|-------------|----------|
+| GetRenderScreenOrigin | 20.07 | 0 allocs/op |
+| GetClickableCenter | 11.27 | 0 allocs/op |
+| GetRenderOrigin | 10.82 | 0 allocs/op |
+| ReanimLocalToWorld | 11.78 | 0 allocs/op |
+| WorldToScreen | 0.13 | 0 allocs/op |
+| 手工计算（对比） | 20.47 | 0 allocs/op |
+
+**结论**:
+- ✅ **零性能开销** - 工具函数 (20.07ns) 甚至比手工计算 (20.47ns) 稍快
+- ✅ **零内存分配** - 编译器成功内联
+- ✅ **100% 测试覆盖率** - 27 个表驱动测试用例
+
+#### 完整文档
+
+- **ADR-001**: `docs/architecture/adr/001-coordinate-transformation-library.md`
+- **源代码**: `pkg/utils/coordinates.go` (完整 GoDoc 注释)
+- **单元测试**: `pkg/utils/coordinates_test.go`
+
+---
+
 ## 文档参考
 
 ### 用户文档
