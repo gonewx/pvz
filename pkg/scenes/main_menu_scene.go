@@ -813,25 +813,22 @@ func (m *MainMenuScene) updateButtonVisibility() {
 	// Note: SelectorScreen_Survival_button track corresponds to Challenges mode
 	if config.IsMenuModeUnlocked(config.MenuButtonChallenges, m.currentLevel) {
 		hiddenTracks["SelectorScreen_Survival_shadow"] = true
-	} else {
-		hiddenTracks["SelectorScreen_Survival_button"] = true
 	}
+	// 未解锁时：不隐藏按钮和阴影（显示墓碑状态）
 
 	// Vasebreaker mode (unlocked at 5-10)
 	// Note: SelectorScreen_Challenges_button track corresponds to Vasebreaker mode
 	if config.IsMenuModeUnlocked(config.MenuButtonVasebreaker, m.currentLevel) {
 		hiddenTracks["SelectorScreen_Challenges_shadow"] = true
-	} else {
-		hiddenTracks["SelectorScreen_Challenges_button"] = true
 	}
+	// 未解锁时：不隐藏按钮和阴影（显示墓碑状态）
 
 	// Survival mode (unlocked at 5-10)
 	// Note: SelectorScreen_ZenGarden_button track corresponds to Survival mode
 	if config.IsMenuModeUnlocked(config.MenuButtonSurvival, m.currentLevel) {
 		hiddenTracks["SelectorScreen_ZenGarden_shadow"] = true
-	} else {
-		hiddenTracks["SelectorScreen_ZenGarden_button"] = true
 	}
+	// 未解锁时：不隐藏按钮和阴影（显示墓碑状态）
 
 	// Step 3: Apply merged HiddenTracks to ReanimComponent
 	reanimComp.HiddenTracks = hiddenTracks
