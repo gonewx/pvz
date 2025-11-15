@@ -189,7 +189,7 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	}
 
 	// Story 12.1: Update button visibility based on unlock status
-	// scene.updateButtonVisibility()
+	scene.updateButtonVisibility()
 
 	// Load background image (fallback if SelectorScreen fails)
 	// img, err := rm.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_BG")
@@ -294,7 +294,21 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 
 	// Story 12.1: Check SelectorScreen button hitboxes
 	m.hoveredButton = "" // Reset hovered button
+
+	// Get ReanimComponent to check hidden tracks
+	var hiddenTracks map[string]bool
+	if m.selectorScreenEntity != 0 {
+		if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity); ok {
+			hiddenTracks = reanimComp.HiddenTracks
+		}
+	}
+
 	for _, hitbox := range m.buttonHitboxes {
+		// 跳过被隐藏的按钮轨道
+		if hiddenTracks != nil && hiddenTracks[hitbox.TrackName] {
+			continue
+		}
+
 		// Check if mouse is in hitbox
 		if isPointInRect(float64(mouseX), float64(mouseY), hitbox.X, hitbox.Y, hitbox.Width, hitbox.Height) {
 			m.hoveredButton = hitbox.TrackName
@@ -335,6 +349,9 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 
 	// Story 12.1 Task 5: Update button highlight based on hover state
 	m.updateButtonHighlight()
+
+	// Story 12.1 Task 5: Update mouse cursor based on hover state
+	m.updateMouseCursor()
 }
 
 // loadButtonImages loads normal and highlight images for all menu buttons.
@@ -360,6 +377,10 @@ func (m *MainMenuScene) loadButtonImages(rm *game.ResourceManager) {
 		"SelectorScreen_Adventure_button": {
 			normalImageRef:      "IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_BUTTON",
 			highlightResourceID: "IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_HIGHLIGHT",
+		},
+		"SelectorScreen_StartAdventure_button": {
+			normalImageRef:      "IMAGE_REANIM_SELECTORSCREEN_STARTADVENTURE_BUTTON1",
+			highlightResourceID: "IMAGE_REANIM_SELECTORSCREEN_STARTADVENTURE_HIGHLIGHT",
 		},
 		"SelectorScreen_Survival_button": {
 			normalImageRef:      "IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_BUTTON",
@@ -420,21 +441,38 @@ func (m *MainMenuScene) updateButtonHighlight() {
 		// Restore the old button to normal
 		if normalImg, exists := m.buttonNormalImages[m.lastHoveredButton]; exists {
 			// Find the correct image reference for this button and restore it
+			var imageRef string
 			switch m.lastHoveredButton {
 			case "SelectorScreen_Adventure_button":
-				reanimComp.PartImages["IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_BUTTON"] = normalImg
+				imageRef = "IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_BUTTON"
+				reanimComp.PartImages[imageRef] = normalImg
+			case "SelectorScreen_StartAdventure_button":
+				imageRef = "IMAGE_REANIM_SELECTORSCREEN_STARTADVENTURE_BUTTON1"
+				reanimComp.PartImages[imageRef] = normalImg
 			case "SelectorScreen_Survival_button":
-				reanimComp.PartImages["IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_BUTTON"] = normalImg
+				imageRef = "IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_BUTTON"
+				reanimComp.PartImages[imageRef] = normalImg
 			case "SelectorScreen_Challenges_button":
-				reanimComp.PartImages["IMAGE_REANIM_SELECTORSCREEN_CHALLENGES_BUTTON"] = normalImg
+				imageRef = "IMAGE_REANIM_SELECTORSCREEN_CHALLENGES_BUTTON"
+				reanimComp.PartImages[imageRef] = normalImg
 			case "SelectorScreen_ZenGarden_button":
-				reanimComp.PartImages["IMAGE_REANIM_SELECTORSCREEN_VASEBREAKER_BUTTON"] = normalImg
+				imageRef = "IMAGE_REANIM_SELECTORSCREEN_VASEBREAKER_BUTTON"
+				reanimComp.PartImages[imageRef] = normalImg
 			}
+
+			// 强制重建渲染缓存（修改 LastRenderFrame 触发缓存失效）
+			reanimComp.LastRenderFrame = -1
 		}
 	}
 
 	// Step 2: Apply highlight to the currently hovered button (if any and unlocked)
 	if m.hoveredButton != "" {
+		// 检查轨道是否被隐藏（如果被隐藏则不需要高亮）
+		if reanimComp.HiddenTracks != nil && reanimComp.HiddenTracks[m.hoveredButton] {
+			m.lastHoveredButton = ""
+			return
+		}
+
 		// Find the button type for unlock check
 		var buttonType config.MenuButtonType
 		var found bool
@@ -451,16 +489,27 @@ func (m *MainMenuScene) updateButtonHighlight() {
 			// Apply highlight image if available
 			if highlightImg, exists := m.buttonHighlightImages[m.hoveredButton]; exists {
 				// Find the correct image reference for this button and apply highlight
+				var imageRef string
 				switch m.hoveredButton {
 				case "SelectorScreen_Adventure_button":
-					reanimComp.PartImages["IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_BUTTON"] = highlightImg
+					imageRef = "IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_BUTTON"
+					reanimComp.PartImages[imageRef] = highlightImg
+				case "SelectorScreen_StartAdventure_button":
+					imageRef = "IMAGE_REANIM_SELECTORSCREEN_STARTADVENTURE_BUTTON1"
+					reanimComp.PartImages[imageRef] = highlightImg
 				case "SelectorScreen_Survival_button":
-					reanimComp.PartImages["IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_BUTTON"] = highlightImg
+					imageRef = "IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_BUTTON"
+					reanimComp.PartImages[imageRef] = highlightImg
 				case "SelectorScreen_Challenges_button":
-					reanimComp.PartImages["IMAGE_REANIM_SELECTORSCREEN_CHALLENGES_BUTTON"] = highlightImg
+					imageRef = "IMAGE_REANIM_SELECTORSCREEN_CHALLENGES_BUTTON"
+					reanimComp.PartImages[imageRef] = highlightImg
 				case "SelectorScreen_ZenGarden_button":
-					reanimComp.PartImages["IMAGE_REANIM_SELECTORSCREEN_VASEBREAKER_BUTTON"] = highlightImg
+					imageRef = "IMAGE_REANIM_SELECTORSCREEN_VASEBREAKER_BUTTON"
+					reanimComp.PartImages[imageRef] = highlightImg
 				}
+
+				// 强制重建渲染缓存（修改 LastRenderFrame 触发缓存失效）
+				reanimComp.LastRenderFrame = -1
 			}
 
 			// Play sound effect once when entering a new button
@@ -476,6 +525,35 @@ func (m *MainMenuScene) updateButtonHighlight() {
 
 	// Step 3: If no button is hovered (or button is locked), clear last hovered
 	m.lastHoveredButton = ""
+}
+
+// updateMouseCursor updates the mouse cursor shape based on hover state.
+//
+// When the mouse hovers over an unlocked button, the cursor changes to a pointer hand.
+// Otherwise, the cursor is set to the default arrow shape.
+//
+// Story 12.1 Task 5: Button Highlight Effect
+func (m *MainMenuScene) updateMouseCursor() {
+	// Default cursor shape
+	cursorShape := ebiten.CursorShapeDefault
+
+	// Check if hovering over a button
+	if m.hoveredButton != "" {
+		// Find the button type for unlock check
+		for _, hitbox := range m.buttonHitboxes {
+			if hitbox.TrackName == m.hoveredButton {
+				// Check if button is unlocked
+				if config.IsMenuModeUnlocked(hitbox.ButtonType, m.currentLevel) {
+					// Set pointer cursor for unlocked buttons
+					cursorShape = ebiten.CursorShapePointer
+				}
+				break
+			}
+		}
+	}
+
+	// Apply cursor shape
+	ebiten.SetCursorShape(cursorShape)
 }
 
 // playGraveButtonSound plays the stone grinding sound effect for button hover.
@@ -695,13 +773,72 @@ func (m *MainMenuScene) updateButtonVisibility() {
 		return
 	}
 
-	// 实验：完全移除 HiddenTracks 白名单，让所有轨道依赖动画定义轨道的 f 值自然控制
-	// 这样可以验证 anim_grass, anim_open 等动画定义轨道是否能正确控制纯视觉轨道
-	reanimComp.HiddenTracks = nil
+	// Step 1: Load hidden tracks from config file (static baseline)
+	hiddenTracks := make(map[string]bool)
 
-	log.Printf("[MainMenuScene] 实验模式：移除 HiddenTracks 白名单，所有轨道依赖 f 值控制")
-	log.Printf("[MainMenuScene] Button visibility (level=%s): Adventure=%v, Challenges=%v, Vasebreaker=%v, Survival=%v",
+	if configManager := m.resourceManager.GetReanimConfigManager(); configManager != nil {
+		unitConfig, err := configManager.GetUnit("selectorscreen")
+		if err == nil {
+			// Find "opening" combo and load its hidden_tracks
+			for _, combo := range unitConfig.AnimationCombos {
+				if combo.Name == "opening" {
+					for _, track := range combo.HiddenTracks {
+						hiddenTracks[track] = true
+						log.Printf("[MainMenuScene] Config hidden track: %s", track)
+					}
+					break
+				}
+			}
+		} else {
+			log.Printf("[MainMenuScene] Warning: Failed to load selectorscreen config: %v", err)
+		}
+	}
+
+	// Step 2: Merge with code logic (dynamic control based on progress)
+
+	// 2.1 Hide adventure mode button based on progress
+	// New user (1-1): Hide "Adventure" button, show "Start Adventure" button
+	// Has progress: Hide "Start Adventure" button, show "Adventure" button
+	if m.currentLevel == "1-1" {
+		hiddenTracks["SelectorScreen_Adventure_button"] = true
+		hiddenTracks["SelectorScreen_Adventure_shadow"] = true
+	} else {
+		hiddenTracks["SelectorScreen_StartAdventure_button"] = true
+		hiddenTracks["SelectorScreen_StartAdventure_shadow"] = true
+	}
+
+	// 2.2 Hide/show other mode buttons based on unlock status
+
+	// Challenges mode (unlocked at 3-2)
+	// Note: SelectorScreen_Survival_button track corresponds to Challenges mode
+	if config.IsMenuModeUnlocked(config.MenuButtonChallenges, m.currentLevel) {
+		hiddenTracks["SelectorScreen_Survival_shadow"] = true
+	} else {
+		hiddenTracks["SelectorScreen_Survival_button"] = true
+	}
+
+	// Vasebreaker mode (unlocked at 5-10)
+	// Note: SelectorScreen_Challenges_button track corresponds to Vasebreaker mode
+	if config.IsMenuModeUnlocked(config.MenuButtonVasebreaker, m.currentLevel) {
+		hiddenTracks["SelectorScreen_Challenges_shadow"] = true
+	} else {
+		hiddenTracks["SelectorScreen_Challenges_button"] = true
+	}
+
+	// Survival mode (unlocked at 5-10)
+	// Note: SelectorScreen_ZenGarden_button track corresponds to Survival mode
+	if config.IsMenuModeUnlocked(config.MenuButtonSurvival, m.currentLevel) {
+		hiddenTracks["SelectorScreen_ZenGarden_shadow"] = true
+	} else {
+		hiddenTracks["SelectorScreen_ZenGarden_button"] = true
+	}
+
+	// Step 3: Apply merged HiddenTracks to ReanimComponent
+	reanimComp.HiddenTracks = hiddenTracks
+
+	log.Printf("[MainMenuScene] Updated button visibility (level=%s, %d hidden tracks): Adventure=%v, Challenges=%v, Vasebreaker=%v, Survival=%v",
 		m.currentLevel,
+		len(hiddenTracks),
 		config.IsMenuModeUnlocked(config.MenuButtonAdventure, m.currentLevel),
 		config.IsMenuModeUnlocked(config.MenuButtonChallenges, m.currentLevel),
 		config.IsMenuModeUnlocked(config.MenuButtonVasebreaker, m.currentLevel),
