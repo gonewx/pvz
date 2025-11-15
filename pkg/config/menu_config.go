@@ -59,6 +59,14 @@ var MenuButtonHitboxes = []MenuButtonHitbox{
 		Height:     120,
 	},
 	{
+		TrackName:  "SelectorScreen_StartAdventure_button", // 新用户版本的冒险按钮
+		ButtonType: MenuButtonAdventure,
+		X:          405,
+		Y:          79.7,
+		Width:      330,
+		Height:     120,
+	},
+	{
 		TrackName:  "SelectorScreen_Survival_button",
 		ButtonType: MenuButtonChallenges, // 注意：轨道名称是 Survival，但实际对应玩玩小游戏
 		X:          406,

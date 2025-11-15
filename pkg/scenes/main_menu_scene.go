@@ -485,6 +485,7 @@ func (m *MainMenuScene) updateButtonHighlight() {
 		}
 
 		// Only apply highlight to unlocked buttons
+		// 未解锁的按钮不高亮（阴影覆盖在上面，高亮也看不到）
 		if found && config.IsMenuModeUnlocked(buttonType, m.currentLevel) {
 			// Apply highlight image if available
 			if highlightImg, exists := m.buttonHighlightImages[m.hoveredButton]; exists {
@@ -539,17 +540,9 @@ func (m *MainMenuScene) updateMouseCursor() {
 
 	// Check if hovering over a button
 	if m.hoveredButton != "" {
-		// Find the button type for unlock check
-		for _, hitbox := range m.buttonHitboxes {
-			if hitbox.TrackName == m.hoveredButton {
-				// Check if button is unlocked
-				if config.IsMenuModeUnlocked(hitbox.ButtonType, m.currentLevel) {
-					// Set pointer cursor for unlocked buttons
-					cursorShape = ebiten.CursorShapePointer
-				}
-				break
-			}
-		}
+		// ✅ 修复：所有可见的按钮（包括未解锁的）都显示手形鼠标
+		// 未解锁的按钮也可以点击，点击后会提示未解锁
+		cursorShape = ebiten.CursorShapePointer
 	}
 
 	// Apply cursor shape
@@ -799,12 +792,15 @@ func (m *MainMenuScene) updateButtonVisibility() {
 	// 2.1 Hide adventure mode button based on progress
 	// New user (1-1): Hide "Adventure" button, show "Start Adventure" button
 	// Has progress: Hide "Start Adventure" button, show "Adventure" button
+	// Adventure mode is always unlocked, so both buttons hide their shadows
 	if m.currentLevel == "1-1" {
 		hiddenTracks["SelectorScreen_Adventure_button"] = true
 		hiddenTracks["SelectorScreen_Adventure_shadow"] = true
+		hiddenTracks["SelectorScreen_StartAdventure_shadow"] = true // ✅ Adventure 总是解锁，隐藏 StartAdventure 阴影
 	} else {
 		hiddenTracks["SelectorScreen_StartAdventure_button"] = true
 		hiddenTracks["SelectorScreen_StartAdventure_shadow"] = true
+		hiddenTracks["SelectorScreen_Adventure_shadow"] = true // ✅ Adventure 总是解锁，隐藏 Adventure 阴影
 	}
 
 	// 2.2 Hide/show other mode buttons based on unlock status

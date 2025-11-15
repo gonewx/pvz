@@ -135,6 +135,7 @@ func NewSelectorScreenPartialEntity(
 
 // extractVisualTracks 从 ReanimXML 中提取视觉轨道列表
 // 如果提供了 visibleTracks，则只包含指定的轨道
+// 否则只包含有图片引用的轨道（过滤掉纯逻辑轨道）
 func extractVisualTracks(reanimXML *reanim.ReanimXML, visibleTracks map[string]bool) []string {
 	if reanimXML == nil {
 		return []string{}
@@ -148,10 +149,50 @@ func extractVisualTracks(reanimXML *reanim.ReanimXML, visibleTracks map[string]b
 				tracks = append(tracks, track.Name)
 			}
 		} else {
-			// 否则包含所有轨道
-			tracks = append(tracks, track.Name)
+			// 否则只包含有图片引用的视觉轨道（过滤掉纯逻辑轨道）
+			// 检查轨道是否至少有一帧包含 ImagePath
+			hasImage := false
+			for _, frame := range track.Frames {
+				if frame.ImagePath != "" {
+					hasImage = true
+					break
+				}
+			}
+			if hasImage {
+				tracks = append(tracks, track.Name)
+			}
 		}
 	}
+
+	// ✅ 修复 SelectorScreen 按钮阴影渲染顺序
+	// Reanim 文件中顺序: shadow → button
+	// 期望渲染顺序: button → shadow（阴影覆盖按钮，产生"墓碑"效果）
+	// 交换每对 shadow-button 的顺序
+	if len(tracks) > 0 {
+		// 构建 shadow → button 的映射
+		shadowButtonPairs := map[string]string{
+			"SelectorScreen_Adventure_shadow":       "SelectorScreen_Adventure_button",
+			"SelectorScreen_Survival_shadow":        "SelectorScreen_Survival_button",
+			"SelectorScreen_Challenges_shadow":      "SelectorScreen_Challenges_button",
+			"SelectorScreen_ZenGarden_shadow":       "SelectorScreen_ZenGarden_button",
+			"SelectorScreen_StartAdventure_shadow":  "SelectorScreen_StartAdventure_button",
+			"almanac_key_shadow":                    "", // 没有对应的按钮
+		}
+
+		// 交换每对的顺序
+		for i := 0; i < len(tracks)-1; i++ {
+			shadowTrack := tracks[i]
+			if buttonTrack, isShadow := shadowButtonPairs[shadowTrack]; isShadow && buttonTrack != "" {
+				// 检查下一个是否是对应的 button
+				if i+1 < len(tracks) && tracks[i+1] == buttonTrack {
+					// 交换 shadow 和 button
+					tracks[i], tracks[i+1] = tracks[i+1], tracks[i]
+					i++ // 跳过已交换的 button
+				}
+			}
+		}
+	}
+
 	return tracks
 }
 
