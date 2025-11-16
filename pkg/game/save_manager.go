@@ -20,6 +20,7 @@ type SaveData struct {
 	HighestLevel   string   `yaml:"highestLevel"`   // 最高完成关卡ID，如 "1-3"
 	UnlockedPlants []string `yaml:"unlockedPlants"` // 已解锁植物ID列表
 	UnlockedTools  []string `yaml:"unlockedTools"`  // 已解锁工具ID列表，如 ["shovel"]
+	HasStartedGame bool     `yaml:"hasStartedGame"` // 是否已开始过游戏（用于区分新用户和老用户）
 }
 
 // SaveManager 保存管理器
@@ -136,6 +137,22 @@ func (sm *SaveManager) SetHighestLevel(levelID string) {
 	if levelID != "" {
 		sm.data.HighestLevel = levelID
 	}
+}
+
+// GetHasStartedGame 获取是否已开始过游戏的标记
+//
+// 返回：
+//   - bool: true 表示用户已开始过游戏（显示 Adventure 按钮和关卡数字）
+//           false 表示新用户（显示 StartAdventure 按钮，不显示关卡数字）
+func (sm *SaveManager) GetHasStartedGame() bool {
+	return sm.data.HasStartedGame
+}
+
+// SetHasStartedGame 设置已开始游戏的标记
+//
+// 当用户首次点击"开始冒险吧"按钮时调用
+func (sm *SaveManager) SetHasStartedGame() {
+	sm.data.HasStartedGame = true
 }
 
 // GetUnlockedPlants 获取已解锁植物列表

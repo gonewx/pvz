@@ -171,12 +171,12 @@ func extractVisualTracks(reanimXML *reanim.ReanimXML, visibleTracks map[string]b
 	if len(tracks) > 0 {
 		// 构建 shadow → button 的映射
 		shadowButtonPairs := map[string]string{
-			"SelectorScreen_Adventure_shadow":       "SelectorScreen_Adventure_button",
-			"SelectorScreen_Survival_shadow":        "SelectorScreen_Survival_button",
-			"SelectorScreen_Challenges_shadow":      "SelectorScreen_Challenges_button",
-			"SelectorScreen_ZenGarden_shadow":       "SelectorScreen_ZenGarden_button",
-			"SelectorScreen_StartAdventure_shadow":  "SelectorScreen_StartAdventure_button",
-			"almanac_key_shadow":                    "", // 没有对应的按钮
+			"SelectorScreen_Adventure_shadow":      "SelectorScreen_Adventure_button",
+			"SelectorScreen_Survival_shadow":       "SelectorScreen_Survival_button",
+			"SelectorScreen_Challenges_shadow":     "SelectorScreen_Challenges_button",
+			"SelectorScreen_ZenGarden_shadow":      "SelectorScreen_ZenGarden_button",
+			"SelectorScreen_StartAdventure_shadow": "SelectorScreen_StartAdventure_button",
+			"almanac_key_shadow":                   "", // 没有对应的按钮
 		}
 
 		// 交换每对的顺序

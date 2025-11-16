@@ -42,6 +42,7 @@ type MainMenuScene struct {
 	buttonHitboxes []config.MenuButtonHitbox
 	hoveredButton  string // Current hovered button track name (empty = no hover)
 	currentLevel   string // Current highest level from save (format: "X-Y")
+	hasStartedGame bool   // Whether user has started the game (true = show Adventure button, false = show StartAdventure button)
 
 	// Story 12.1 Task 5: Button highlight images
 	buttonNormalImages    map[string]*ebiten.Image // Map: track name -> normal button image
@@ -50,6 +51,9 @@ type MainMenuScene struct {
 
 	// Cloud animation management
 	cloudAnimsResumed bool // Track whether cloud animations have been resumed after opening animation
+
+	// Story 12.1 Task 6: Debug logging
+	levelNumbersDebugLogged bool // Track whether debug info has been logged (only log once)
 }
 
 // NewMainMenuScene creates and returns a new MainMenuScene instance.
@@ -182,10 +186,12 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 		if scene.currentLevel == "" {
 			scene.currentLevel = "1-1" // Default for new players
 		}
-		log.Printf("[MainMenuScene] Loaded highest level: %s", scene.currentLevel)
+		scene.hasStartedGame = saveManager.GetHasStartedGame()
+		log.Printf("[MainMenuScene] Loaded highest level: %s, hasStartedGame: %v", scene.currentLevel, scene.hasStartedGame)
 	} else {
-		scene.currentLevel = "1-1" // Default for new players
-		log.Printf("[MainMenuScene] No save file, defaulting to level 1-1")
+		scene.currentLevel = "1-1"   // Default for new players
+		scene.hasStartedGame = false // New players haven't started the game
+		log.Printf("[MainMenuScene] No save file, defaulting to level 1-1, hasStartedGame: false")
 	}
 
 	// Story 12.1: Update button visibility based on unlock status
@@ -577,6 +583,122 @@ func (m *MainMenuScene) Draw(screen *ebiten.Image) {
 		// 使用 cameraX = 0（主菜单没有摄像机偏移）
 		m.renderSystem.DrawEntity(screen, m.selectorScreenEntity, 0)
 
+		// Story 12.1 Task 6: 渲染关卡进度数字（在冒险模式按钮上，随动画一起移动）
+		// 只在已开始游戏的用户显示关卡数字（新用户显示 StartAdventure 按钮，不需要数字）
+		if m.hasStartedGame && m.currentLevel != "" {
+			log.Printf("[MainMenuScene] 🔢 准备渲染关卡数字: %s", m.currentLevel)
+
+			// 获取 ReanimComponent 以访问按钮的实时变换
+			reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
+			if ok {
+				// 获取冒险按钮轨道的当前帧数据
+				buttonTrackName := "SelectorScreen_Adventure_button"
+				frames, trackExists := reanimComp.MergedTracks[buttonTrackName]
+
+				if trackExists && len(frames) > 0 {
+					// 获取当前动画的帧索引
+					currentFrameIdx := reanimComp.CurrentFrame
+					if currentFrameIdx < 0 {
+						currentFrameIdx = 0
+					}
+					if currentFrameIdx >= len(frames) {
+						currentFrameIdx = len(frames) - 1
+					}
+
+					if !m.levelNumbersDebugLogged {
+						log.Printf("[MainMenuScene] 🔍 按钮轨道信息: 轨道=%s, 总帧数=%d, 当前帧=%d", buttonTrackName, len(frames), currentFrameIdx)
+					}
+
+					// 获取按钮当前帧的变换数据
+					buttonFrame := frames[currentFrameIdx]
+
+					// 打印帧数据（仅一次）
+					frameX := 0.0
+					frameY := 0.0
+					if buttonFrame.X != nil {
+						frameX = *buttonFrame.X
+					}
+					if buttonFrame.Y != nil {
+						frameY = *buttonFrame.Y
+					}
+					if !m.levelNumbersDebugLogged {
+						log.Printf("[MainMenuScene] 🔍 按钮帧数据: X=%.1f, Y=%.1f", frameX, frameY)
+					}
+
+					// 获取 PositionComponent 的基础位置
+					posComp, hasPosComp := ecs.GetComponent[*components.PositionComponent](m.entityManager, m.selectorScreenEntity)
+					baseX := 0.0
+					baseY := 0.0
+					if hasPosComp {
+						baseX = posComp.X
+						baseY = posComp.Y
+					}
+
+					if !m.levelNumbersDebugLogged {
+						log.Printf("[MainMenuScene] 🔍 基础位置: baseX=%.1f, baseY=%.1f, CenterOffsetX=%.1f, CenterOffsetY=%.1f",
+							baseX, baseY, reanimComp.CenterOffsetX, reanimComp.CenterOffsetY)
+					}
+
+					// 计算数字渲染位置（按钮中心下方）
+					// 按钮尺寸：宽 330, 高 120
+					const buttonWidth = 330.0
+					const buttonHeight = 120.0
+					const numberOffsetX = 0.0
+					const numberOffsetY = 38.0
+
+					// 安全获取按钮位置（检查指针）
+					buttonX := 0.0
+					buttonY := 0.0
+					if buttonFrame.X != nil {
+						buttonX = *buttonFrame.X
+					}
+					if buttonFrame.Y != nil {
+						buttonY = *buttonFrame.Y
+					}
+
+					// 按钮中心位置 = 基础位置 + 帧位置（左边缘） + 宽度的一半 - 偏移
+					// buttonFrame.X 是按钮左边缘，需要加上宽度的一半得到中心
+					buttonCenterX := baseX + buttonX + buttonWidth/2 - reanimComp.CenterOffsetX + numberOffsetX
+					buttonCenterY := baseY + buttonY - reanimComp.CenterOffsetY + buttonHeight/2 + numberOffsetY
+
+					// 获取按钮的倾斜角度（转换为弧度）
+					// Reanim 的 SkewY 单位是度，需要转换为弧度
+					// SkewY 是 Y 轴倾斜，影响左右高度（负值表示左高右低）
+					angleRadians := 0.0
+					if buttonFrame.SkewY != nil && *buttonFrame.SkewY != 0 {
+						angleRadians = *buttonFrame.SkewY * 3.14159265359 / 180.0
+						if !m.levelNumbersDebugLogged {
+							log.Printf("[MainMenuScene] 🔍 使用 SkewY=%.3f度, angleRadians=%.3f弧度", *buttonFrame.SkewY, angleRadians)
+						}
+					} else if buttonFrame.SkewX != nil && *buttonFrame.SkewX != 0 {
+						// 如果 SkewY 为 0，尝试使用 SkewX
+						angleRadians = *buttonFrame.SkewX * 3.14159265359 / 180.0
+						if !m.levelNumbersDebugLogged {
+							log.Printf("[MainMenuScene] 🔍 使用 SkewX=%.3f度, angleRadians=%.3f弧度", *buttonFrame.SkewX, angleRadians)
+						}
+					} else {
+						// Reanim 中无倾斜角度，使用固定倾斜（左高右低，约 5 度）
+						angleRadians = 5.0 * 3.14159265359 / 180.0
+						if !m.levelNumbersDebugLogged {
+							log.Printf("[MainMenuScene] 🔍 Reanim 无倾斜，使用固定角度 -3 度, angleRadians=%.3f弧度", angleRadians)
+						}
+					}
+					if !m.levelNumbersDebugLogged {
+						m.levelNumbersDebugLogged = true
+					}
+
+					// 渲染关卡进度数字（应用倾斜角度）
+					renderLevelNumbers(screen, m.resourceManager, m.currentLevel, buttonCenterX, buttonCenterY, angleRadians)
+				} else {
+					log.Printf("[MainMenuScene] ⚠️ 未找到按钮轨道或帧数据: %s", buttonTrackName)
+				}
+			} else {
+				log.Println("[MainMenuScene] ⚠️ 未找到 ReanimComponent")
+			}
+		} else {
+			log.Println("[MainMenuScene] ⚠️ currentLevel 为空，不渲染数字")
+		}
+
 		// Note: Old m.buttons drawing removed - SelectorScreen Reanim handles all button rendering
 	} else {
 		// Fallback: Draw background image if SelectorScreen failed to load
@@ -713,10 +835,21 @@ func (m *MainMenuScene) initButtons() {
 func (m *MainMenuScene) onStartAdventureClicked() {
 	log.Println("Start Adventure button clicked")
 
-	// Story 8.6: Load level from save file or default to 1-1
-	levelToLoad := "1-1" // Default to first level
+	// Story 12.1 Task 6: 首次点击"开始冒险吧"时，标记用户已开始游戏
 	gameState := game.GetGameState()
 	saveManager := gameState.GetSaveManager()
+	if err := saveManager.Load(); err == nil {
+		if !saveManager.GetHasStartedGame() {
+			log.Println("[MainMenuScene] 首次开始游戏，设置 hasStartedGame = true")
+			saveManager.SetHasStartedGame()
+			if err := saveManager.Save(); err != nil {
+				log.Printf("[MainMenuScene] ⚠️ 保存 hasStartedGame 失败: %v", err)
+			}
+		}
+	}
+
+	// Story 8.6: Load level from save file or default to 1-1
+	levelToLoad := "1-1" // Default to first level
 	if err := saveManager.Load(); err == nil {
 		// Save file exists, get highest level
 		highestLevel := saveManager.GetHighestLevel()
@@ -789,15 +922,17 @@ func (m *MainMenuScene) updateButtonVisibility() {
 
 	// Step 2: Merge with code logic (dynamic control based on progress)
 
-	// 2.1 Hide adventure mode button based on progress
-	// New user (1-1): Hide "Adventure" button, show "Start Adventure" button
-	// Has progress: Hide "Start Adventure" button, show "Adventure" button
+	// 2.1 Hide adventure mode button based on whether user has started game
+	// New user (!hasStartedGame): Hide "Adventure" button, show "Start Adventure" button
+	// Has started game (hasStartedGame): Hide "Start Adventure" button, show "Adventure" button
 	// Adventure mode is always unlocked, so both buttons hide their shadows
-	if m.currentLevel == "1-1" {
+	if !m.hasStartedGame {
+		// 新用户：显示 StartAdventure 按钮
 		hiddenTracks["SelectorScreen_Adventure_button"] = true
 		hiddenTracks["SelectorScreen_Adventure_shadow"] = true
 		hiddenTracks["SelectorScreen_StartAdventure_shadow"] = true // ✅ Adventure 总是解锁，隐藏 StartAdventure 阴影
 	} else {
+		// 已开始游戏：显示 Adventure 按钮
 		hiddenTracks["SelectorScreen_StartAdventure_button"] = true
 		hiddenTracks["SelectorScreen_StartAdventure_shadow"] = true
 		hiddenTracks["SelectorScreen_Adventure_shadow"] = true // ✅ Adventure 总是解锁，隐藏 Adventure 阴影
