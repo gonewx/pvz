@@ -54,6 +54,11 @@ type MainMenuScene struct {
 
 	// Story 12.1 Task 6: Debug logging
 	levelNumbersDebugLogged bool // Track whether debug info has been logged (only log once)
+
+	// Story 12.3: Dialog system
+	dialogRenderSystem *systems.DialogRenderSystem // Dialog render system
+	dialogInputSystem  *systems.DialogInputSystem  // Dialog input system
+	currentDialog      ecs.EntityID                // Current open dialog entity (0 = none)
 }
 
 // NewMainMenuScene creates and returns a new MainMenuScene instance.
@@ -220,6 +225,31 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	// Initialize buttons
 	// scene.initButtons()
 
+	// Story 12.3: Initialize dialog systems
+	// 加载不同大小的字体用于对话框渲染
+	// 标题字体（大）
+	titleFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 22)
+	if err != nil {
+		log.Printf("[MainMenuScene] Warning: Failed to load dialog title font: %v", err)
+	}
+
+	// 消息字体（中）
+	messageFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 18)
+	if err != nil {
+		log.Printf("[MainMenuScene] Warning: Failed to load dialog message font: %v", err)
+	}
+
+	// 按钮字体（与奖励面板按钮字体一致）
+	buttonFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 20)
+	if err != nil {
+		log.Printf("[MainMenuScene] Warning: Failed to load dialog button font: %v", err)
+	}
+
+	scene.dialogRenderSystem = systems.NewDialogRenderSystem(scene.entityManager, WindowWidth, WindowHeight, titleFont, messageFont, buttonFont)
+	scene.dialogInputSystem = systems.NewDialogInputSystem(scene.entityManager)
+	scene.currentDialog = 0 // No dialog initially
+	log.Printf("[MainMenuScene] Initialized dialog systems")
+
 	return scene
 }
 
@@ -287,6 +317,33 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 				log.Printf("[MainMenuScene] ✅ 开场动画完成，已切换到循环模式（保留 anim_open 背景 + anim_idle + 云朵）")
 			}
 		}
+	}
+
+	// Story 12.3: If a dialog is open, handle dialog input and block background interaction
+	if m.currentDialog != 0 {
+		m.dialogInputSystem.Update(deltaTime)
+
+		// Clean up marked entities (必须在检查之前调用，否则实体还在)
+		m.entityManager.RemoveMarkedEntities()
+
+		// Check if dialog was closed
+		dialogStillExists := false
+		dialogEntities := ecs.GetEntitiesWith1[*components.DialogComponent](m.entityManager)
+		for _, entityID := range dialogEntities {
+			if entityID == m.currentDialog {
+				dialogStillExists = true
+				break
+			}
+		}
+
+		if !dialogStillExists {
+			// Dialog was closed, clear reference
+			m.currentDialog = 0
+		}
+
+		// Block all background interaction when dialog is open
+		m.wasMousePressed = ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
+		return
 	}
 
 	// Get mouse position
@@ -358,6 +415,9 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 
 	// Story 12.1 Task 5: Update mouse cursor based on hover state
 	m.updateMouseCursor()
+
+	// Clean up marked entities (e.g., closed dialogs)
+	m.entityManager.RemoveMarkedEntities()
 }
 
 // loadButtonImages loads normal and highlight images for all menu buttons.
@@ -756,6 +816,11 @@ func (m *MainMenuScene) Draw(screen *ebiten.Image) {
 			screen.DrawImage(img, op)
 		}
 	}
+
+	// Story 12.3: Draw dialogs (last, on top of everything)
+	if m.dialogRenderSystem != nil {
+		m.dialogRenderSystem.Draw(screen)
+	}
 }
 
 // initButtons initializes the menu buttons with their positions, images, and click handlers.
@@ -996,8 +1061,9 @@ func (m *MainMenuScene) onMenuButtonClicked(buttonType config.MenuButtonType) {
 			player.Play()
 		}
 
-		// Show unlock dialog (Story 12.3 - temporarily use log)
-		log.Printf("[MainMenuScene] TODO Story 12.3: Show unlock dialog for mode %v", buttonType)
+		// Story 12.3: Show unlock dialog
+		message := getUnlockMessage(buttonType)
+		m.showUnlockDialog("未解锁！", message)
 		return
 	}
 
@@ -1032,5 +1098,49 @@ func (m *MainMenuScene) onMenuButtonClicked(buttonType config.MenuButtonType) {
 
 	default:
 		log.Printf("[MainMenuScene] Warning: Unknown button type: %v", buttonType)
+	}
+}
+
+// showUnlockDialog displays a dialog with a title and message
+// Story 12.3: Dialog System Implementation
+func (m *MainMenuScene) showUnlockDialog(title, message string) {
+	// Close existing dialog (if any)
+	if m.currentDialog != 0 {
+		m.entityManager.DestroyEntity(m.currentDialog)
+		m.currentDialog = 0
+	}
+
+	// Create new dialog
+	dialogEntity, err := entities.NewDialogEntity(
+		m.entityManager,
+		m.resourceManager,
+		title,
+		message,
+		[]string{"确定"},
+		WindowWidth,
+		WindowHeight,
+	)
+
+	if err != nil {
+		log.Printf("[MainMenuScene] Warning: Failed to create dialog: %v", err)
+		return
+	}
+
+	m.currentDialog = dialogEntity
+	log.Printf("[MainMenuScene] Dialog created: %s - %s", title, message)
+}
+
+// getUnlockMessage returns the unlock message for a button type
+// Story 12.3: Dialog System Implementation
+func getUnlockMessage(buttonType config.MenuButtonType) string {
+	switch buttonType {
+	case config.MenuButtonChallenges:
+		return "进行更多新冒险来解锁玩玩小游戏。"
+	case config.MenuButtonVasebreaker:
+		return "进行更多新冒险来解锁解谜模式。"
+	case config.MenuButtonSurvival:
+		return "进行更多新冒险来解锁生存模式。"
+	default:
+		return "此功能尚未解锁。"
 	}
 }

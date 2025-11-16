@@ -1,0 +1,295 @@
+package systems
+
+import (
+	"image/color"
+	"log"
+
+	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/utils"
+	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
+)
+
+// DialogRenderSystem 对话框渲染系统
+// 负责渲染所有对话框实体
+//
+// 职责：
+//   - 渲染半透明遮罩（覆盖整个屏幕）
+//   - 渲染对话框背景（九宫格拉伸）
+//   - 渲染对话框装饰（骷髅头）
+//   - 渲染对话框标题和消息
+//   - 渲染对话框按钮
+type DialogRenderSystem struct {
+	entityManager *ecs.EntityManager
+	windowWidth   int
+	windowHeight  int
+	titleFont     *text.GoTextFace // 标题字体
+	messageFont   *text.GoTextFace // 消息字体
+	buttonFont    *text.GoTextFace // 按钮字体
+}
+
+// NewDialogRenderSystem 创建对话框渲染系统
+func NewDialogRenderSystem(em *ecs.EntityManager, windowWidth, windowHeight int, titleFont, messageFont, buttonFont *text.GoTextFace) *DialogRenderSystem {
+	return &DialogRenderSystem{
+		entityManager: em,
+		windowWidth:   windowWidth,
+		windowHeight:  windowHeight,
+		titleFont:     titleFont,
+		messageFont:   messageFont,
+		buttonFont:    buttonFont,
+	}
+}
+
+// Draw 渲染所有对话框
+// 查询所有拥有 DialogComponent 和 PositionComponent 的实体并渲染
+func (s *DialogRenderSystem) Draw(screen *ebiten.Image) {
+	// 查询所有对话框实体
+	dialogEntities := ecs.GetEntitiesWith2[*components.DialogComponent, *components.PositionComponent](s.entityManager)
+
+	if len(dialogEntities) == 0 {
+		return
+	}
+
+	log.Printf("[DialogRenderSystem] 正在渲染 %d 个对话框", len(dialogEntities))
+
+	// 绘制半透明遮罩（只需要绘制一次）
+	s.drawOverlay(screen)
+
+	// 渲染每个对话框
+	for _, entityID := range dialogEntities {
+		dialogComp, ok := ecs.GetComponent[*components.DialogComponent](s.entityManager, entityID)
+		if !ok {
+			continue
+		}
+
+		posComp, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+		if !ok {
+			continue
+		}
+
+		if !dialogComp.IsVisible {
+			log.Printf("[DialogRenderSystem] 对话框 %d 不可见，跳过渲染", entityID)
+			continue
+		}
+
+		log.Printf("[DialogRenderSystem] 渲染对话框: 位置=(%.0f, %.0f), 大小=(%.0f, %.0f), 标题=%s, 消息=%s",
+			posComp.X, posComp.Y, dialogComp.Width, dialogComp.Height, dialogComp.Title, dialogComp.Message)
+
+		// 1. 绘制对话框背景（九宫格）
+		utils.RenderNinePatch(screen, dialogComp.Parts, posComp.X, posComp.Y, dialogComp.Width, dialogComp.Height)
+
+		// 2. 绘制骷髅头装饰（顶部中央）
+		s.drawHeader(screen, dialogComp, posComp.X, posComp.Y)
+
+		// 3. 绘制标题文字
+		s.drawTitle(screen, dialogComp, posComp.X, posComp.Y)
+
+		// 4. 绘制消息文字
+		s.drawMessage(screen, dialogComp, posComp.X, posComp.Y)
+
+		// 5. 绘制按钮
+		s.drawButtons(screen, dialogComp, posComp.X, posComp.Y)
+
+		log.Printf("[DialogRenderSystem] 对话框渲染完成")
+	}
+}
+
+// drawOverlay 绘制半透明遮罩
+func (s *DialogRenderSystem) drawOverlay(screen *ebiten.Image) {
+	// 创建半透明黑色遮罩
+	overlay := ebiten.NewImage(s.windowWidth, s.windowHeight)
+	overlay.Fill(color.RGBA{0, 0, 0, 128}) // 50% 透明度
+	screen.DrawImage(overlay, &ebiten.DrawImageOptions{})
+}
+
+// drawHeader 绘制骷髅头装饰
+func (s *DialogRenderSystem) drawHeader(screen *ebiten.Image, dialog *components.DialogComponent, dialogX, dialogY float64) {
+	if dialog.Parts == nil || dialog.Parts.Header == nil {
+		return
+	}
+
+	// 骷髅头装饰居中显示在对话框顶部
+	headerBounds := dialog.Parts.Header.Bounds()
+	headerWidth := float64(headerBounds.Dx())
+	headerHeight := float64(headerBounds.Dy())
+
+	// 居中位置
+	headerX := dialogX + dialog.Width/2 - headerWidth/2
+	headerY := dialogY - headerHeight/2 // 一半在对话框上方，一半在对话框内
+
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Translate(headerX, headerY)
+	screen.DrawImage(dialog.Parts.Header, op)
+}
+
+// drawTitle 绘制标题文字
+func (s *DialogRenderSystem) drawTitle(screen *ebiten.Image, dialog *components.DialogComponent, dialogX, dialogY float64) {
+	if dialog.Title == "" || s.titleFont == nil {
+		return
+	}
+
+	// 标题居中显示在对话框顶部
+	centerX := dialogX + dialog.Width/2
+	centerY := dialogY + 60
+
+	log.Printf("[DialogRenderSystem] 绘制标题: '%s' at (%.0f, %.0f)", dialog.Title, centerX, centerY)
+
+	// 1. 先绘制阴影（黑色，稍微偏移）
+	shadowOp := &text.DrawOptions{}
+	shadowOp.LayoutOptions.PrimaryAlign = text.AlignCenter
+	shadowOp.LayoutOptions.SecondaryAlign = text.AlignCenter
+	shadowOp.GeoM.Translate(centerX+2, centerY+2)                // 阴影偏移2像素
+	shadowOp.ColorScale.ScaleWithColor(color.RGBA{0, 0, 0, 128}) // 半透明黑色
+	text.Draw(screen, dialog.Title, s.titleFont, shadowOp)
+
+	// 2. 再绘制主文字（橙黄色 - 和奖励面板标题一样）
+	op := &text.DrawOptions{}
+	op.LayoutOptions.PrimaryAlign = text.AlignCenter
+	op.LayoutOptions.SecondaryAlign = text.AlignCenter
+	op.GeoM.Translate(centerX, centerY)
+	op.ColorScale.ScaleWithColor(color.RGBA{255, 200, 0, 255}) // 橙黄色
+	text.Draw(screen, dialog.Title, s.titleFont, op)
+}
+
+// drawMessage 绘制消息文字
+func (s *DialogRenderSystem) drawMessage(screen *ebiten.Image, dialog *components.DialogComponent, dialogX, dialogY float64) {
+	if dialog.Message == "" || s.messageFont == nil {
+		return
+	}
+
+	// 消息显示在对话框中部
+	centerX := dialogX + dialog.Width/2
+	centerY := dialogY + dialog.Height/2 - 10
+
+	log.Printf("[DialogRenderSystem] 绘制消息: '%s' at (%.0f, %.0f)", dialog.Message, centerX, centerY)
+
+	// 1. 先绘制阴影（黑色，稍微偏移）
+	shadowOp := &text.DrawOptions{}
+	shadowOp.LayoutOptions.PrimaryAlign = text.AlignCenter
+	shadowOp.LayoutOptions.SecondaryAlign = text.AlignCenter
+	shadowOp.GeoM.Translate(centerX+2, centerY+2)                // 阴影偏移2像素
+	shadowOp.ColorScale.ScaleWithColor(color.RGBA{0, 0, 0, 128}) // 半透明黑色
+	text.Draw(screen, dialog.Message, s.messageFont, shadowOp)
+
+	// 2. 再绘制主文字（橙黄色 - 和奖励面板标题一样）
+	op := &text.DrawOptions{}
+	op.LayoutOptions.PrimaryAlign = text.AlignCenter
+	op.LayoutOptions.SecondaryAlign = text.AlignCenter
+	op.GeoM.Translate(centerX, centerY)
+	op.ColorScale.ScaleWithColor(color.RGBA{255, 200, 0, 255}) // 橙黄色
+	text.Draw(screen, dialog.Message, s.messageFont, op)
+}
+
+// drawButtons 绘制按钮
+func (s *DialogRenderSystem) drawButtons(screen *ebiten.Image, dialog *components.DialogComponent, dialogX, dialogY float64) {
+	for _, btn := range dialog.Buttons {
+		// 按钮绝对位置
+		btnX := dialogX + btn.X
+		btnY := dialogY + btn.Y
+
+		log.Printf("[DialogRenderSystem] 绘制按钮: '%s' at (%.0f, %.0f), 大小=(%.0f, %.0f)",
+			btn.Label, btnX, btnY, btn.Width, btn.Height)
+
+		// 如果有三段式按钮图片，使用三段式渲染
+		if btn.LeftImage != nil && btn.MiddleImage != nil && btn.RightImage != nil {
+			s.drawNineSliceButton(screen, &btn, btnX, btnY)
+		} else {
+			// 降级：使用纯色矩形
+			s.drawFallbackButton(screen, &btn, btnX, btnY)
+		}
+
+		// 绘制按钮文字（居中，使用游戏内菜单面板的按钮样式）
+		if s.buttonFont != nil {
+			centerX := btnX + btn.Width/2
+			centerY := btnY + btn.Height/2
+
+			log.Printf("[DialogRenderSystem] 按钮文字位置: (%.0f, %.0f)", centerX, centerY)
+
+			// 阴影偏移量
+			shadowOffsetX := 2.0
+			shadowOffsetY := 2.0
+
+			// 为了让"文字+阴影"整体看起来垂直居中，将主文字向上偏移阴影的一半
+			visualCenterOffsetY := -shadowOffsetY / 2.0
+
+			// 1. 先绘制阴影（半透明黑色，偏移位置）
+			shadowOp := &text.DrawOptions{}
+			shadowOp.LayoutOptions.PrimaryAlign = text.AlignCenter
+			shadowOp.LayoutOptions.SecondaryAlign = text.AlignCenter
+			shadowOp.GeoM.Translate(centerX+shadowOffsetX, centerY+shadowOffsetY+visualCenterOffsetY)
+			shadowOp.ColorScale.ScaleWithColor(color.RGBA{0, 0, 0, 180}) // 半透明黑色阴影（游戏内菜单样式）
+			text.Draw(screen, btn.Label, s.buttonFont, shadowOp)
+
+			// 2. 再绘制主文字（绿色 - 游戏内菜单按钮样式）
+			op := &text.DrawOptions{}
+			op.LayoutOptions.PrimaryAlign = text.AlignCenter
+			op.LayoutOptions.SecondaryAlign = text.AlignCenter
+			op.GeoM.Translate(centerX, centerY+visualCenterOffsetY)
+			op.ColorScale.ScaleWithColor(color.RGBA{0, 200, 0, 255}) // 绿色文字（游戏内菜单按钮样式）
+			text.Draw(screen, btn.Label, s.buttonFont, op)
+		}
+	}
+}
+
+// drawNineSliceButton 绘制三段式按钮（左、中、右）
+func (s *DialogRenderSystem) drawNineSliceButton(screen *ebiten.Image, btn *components.DialogButton, x, y float64) {
+	leftWidth := float64(btn.LeftImage.Bounds().Dx())
+	middleWidth := btn.MiddleWidth
+
+	// 绘制左边缘
+	leftOp := &ebiten.DrawImageOptions{}
+	leftOp.GeoM.Translate(x, y)
+	screen.DrawImage(btn.LeftImage, leftOp)
+
+	// 绘制中间（拉伸）
+	middleOp := &ebiten.DrawImageOptions{}
+	middleOp.GeoM.Scale(middleWidth/float64(btn.MiddleImage.Bounds().Dx()), 1.0)
+	middleOp.GeoM.Translate(x+leftWidth, y)
+	screen.DrawImage(btn.MiddleImage, middleOp)
+
+	// 绘制右边缘
+	rightOp := &ebiten.DrawImageOptions{}
+	rightOp.GeoM.Translate(x+leftWidth+middleWidth, y)
+	screen.DrawImage(btn.RightImage, rightOp)
+}
+
+// drawFallbackButton 绘制降级按钮（纯色矩形）
+func (s *DialogRenderSystem) drawFallbackButton(screen *ebiten.Image, btn *components.DialogButton, x, y float64) {
+	// 绘制按钮背景（灰色矩形）
+	btnImage := ebiten.NewImage(int(btn.Width), int(btn.Height))
+	btnImage.Fill(color.RGBA{80, 80, 80, 255}) // 深灰色背景
+
+	btnOp := &ebiten.DrawImageOptions{}
+	btnOp.GeoM.Translate(x, y)
+	screen.DrawImage(btnImage, btnOp)
+
+	// 绘制按钮边框（增强可见性）
+	// 上边框
+	topBorder := ebiten.NewImage(int(btn.Width), 2)
+	topBorder.Fill(color.RGBA{200, 200, 200, 255})
+	topOp := &ebiten.DrawImageOptions{}
+	topOp.GeoM.Translate(x, y)
+	screen.DrawImage(topBorder, topOp)
+
+	// 下边框
+	bottomBorder := ebiten.NewImage(int(btn.Width), 2)
+	bottomBorder.Fill(color.RGBA{200, 200, 200, 255})
+	bottomOp := &ebiten.DrawImageOptions{}
+	bottomOp.GeoM.Translate(x, y+btn.Height-2)
+	screen.DrawImage(bottomBorder, bottomOp)
+
+	// 左边框
+	leftBorder := ebiten.NewImage(2, int(btn.Height))
+	leftBorder.Fill(color.RGBA{200, 200, 200, 255})
+	leftOp := &ebiten.DrawImageOptions{}
+	leftOp.GeoM.Translate(x, y)
+	screen.DrawImage(leftBorder, leftOp)
+
+	// 右边框
+	rightBorder := ebiten.NewImage(2, int(btn.Height))
+	rightBorder.Fill(color.RGBA{200, 200, 200, 255})
+	rightOp := &ebiten.DrawImageOptions{}
+	rightOp.GeoM.Translate(x+btn.Width-2, y)
+	screen.DrawImage(rightBorder, rightOp)
+}
