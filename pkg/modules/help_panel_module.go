@@ -305,10 +305,17 @@ func (m *HelpPanelModule) applyAlphaMasks() {
 		log.Printf("[HelpPanelModule] Using original background (no mask)")
 	}
 
-	// 2. 处理帮助文本：用亮度作为 Alpha + 反转颜色
-	// 原图：黑底白字 → 目标：透明底黑字
-	m.helpTextImage = m.convertWhiteTextToBlack(m.textPNG)
-	log.Printf("[HelpPanelModule] Converted help text (white on black → black on transparent)")
+	// 2. 处理帮助文本：使用蒙板（像草皮渲染一样）
+	// 原图：黑底白字
+	// 策略：用原图自身作为蒙板（白色文字→不透明，黑色背景→透明）
+	// 然后反转颜色（白色文字→黑色文字）
+
+	// 2.1 先应用蒙板（用原图自身作为蒙板，像草皮渲染一样）
+	maskedText := utils.ApplyAlphaMask(m.textPNG, m.textPNG)
+
+	// 2.2 反转颜色（白色→黑色）
+	m.helpTextImage = m.invertColors(maskedText)
+	log.Printf("[HelpPanelModule] Applied alpha mask (self as mask) and inverted colors")
 
 	// 3. 更新 HelpPanelComponent 的图片引用
 	helpPanel, ok := ecs.GetComponent[*components.HelpPanelComponent](m.entityManager, m.helpPanelEntity)
@@ -322,20 +329,18 @@ func (m *HelpPanelModule) applyAlphaMasks() {
 	log.Printf("[HelpPanelModule] Image composition completed")
 }
 
-// convertWhiteTextToBlack 将黑底白字转换为透明底黑字
+// invertColors 反转图片的 RGB 颜色（保持 Alpha 不变）
 //
-// 处理流程：
-//   1. 计算每个像素的亮度（作为 Alpha）
-//   2. 应用阈值：暗色区域（亮度 < 阈值）→ 完全透明
-//   3. 反转 RGB（白色 → 黑色）
-//   4. 背景（黑色，低亮度）变透明，文字（白色，高亮度）变不透明
+// 用途：
+//   - 将透明底白字转换为透明底黑字
+//   - 只反转不透明区域的颜色，透明区域保持黑色
 //
 // 参数：
-//   - src: 原图（黑底白字）
+//   - src: 原图（透明底白字）
 //
 // 返回：
-//   - 处理后的图片（透明底黑字）
-func (m *HelpPanelModule) convertWhiteTextToBlack(src *ebiten.Image) *ebiten.Image {
+//   - 颜色反转后的图片（透明底黑字）
+func (m *HelpPanelModule) invertColors(src *ebiten.Image) *ebiten.Image {
 	bounds := src.Bounds()
 	width := bounds.Dx()
 	height := bounds.Dy()
@@ -344,38 +349,30 @@ func (m *HelpPanelModule) convertWhiteTextToBlack(src *ebiten.Image) *ebiten.Ima
 	result := ebiten.NewImage(width, height)
 
 	// 读取源图像素
-	srcPixels := make([]byte, width*height*4)
-	src.ReadPixels(srcPixels)
+	pixels := make([]byte, width*height*4)
+	src.ReadPixels(pixels)
 
-	// 处理每个像素
-	resultPixels := make([]byte, width*height*4)
-	const brightnessThreshold = 30 // 亮度阈值：低于此值的像素被视为背景（完全透明）
+	// 反转 RGB，保持 Alpha
+	for i := 0; i < len(pixels); i += 4 {
+		alpha := pixels[i+3]
 
-	for i := 0; i < len(srcPixels); i += 4 {
-		r := srcPixels[i+0]
-		g := srcPixels[i+1]
-		b := srcPixels[i+2]
-
-		// 计算亮度（灰度值）
-		brightness := (uint16(r) + uint16(g) + uint16(b)) / 3
-
-		// 应用阈值：暗色区域（背景）设为完全透明
-		var alpha byte
-		if brightness < brightnessThreshold {
-			alpha = 0 // 完全透明（背景）
+		// 只对不透明区域反转颜色（文字）
+		// 透明区域（背景）保持黑色 (0, 0, 0, 0)
+		if alpha > 0 {
+			pixels[i+0] = 255 - pixels[i+0] // 反转 R
+			pixels[i+1] = 255 - pixels[i+1] // 反转 G
+			pixels[i+2] = 255 - pixels[i+2] // 反转 B
 		} else {
-			alpha = byte(brightness) // 使用亮度作为 Alpha（文字）
+			// 透明像素保持黑色
+			pixels[i+0] = 0
+			pixels[i+1] = 0
+			pixels[i+2] = 0
 		}
-
-		// 反转 RGB（白色文字变成黑色）
-		resultPixels[i+0] = 255 - r // R
-		resultPixels[i+1] = 255 - g // G
-		resultPixels[i+2] = 255 - b // B
-		resultPixels[i+3] = alpha   // A（亮度，应用阈值）
+		// pixels[i+3] 保持不变（Alpha）
 	}
 
 	// 写入结果
-	result.WritePixels(resultPixels)
+	result.WritePixels(pixels)
 	return result
 }
 
