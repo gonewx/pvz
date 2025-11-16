@@ -147,25 +147,22 @@ func NewOptionsPanelModule(
 	return module, nil
 }
 
-// createConfirmButton 创建"确定"按钮
+// createConfirmButton 创建"确定"按钮（使用与帮助面板/奖励面板一致的样式）
 func (m *OptionsPanelModule) createConfirmButton(rm *game.ResourceManager) error {
 	// 按钮初始位置：屏幕外（隐藏）
 	hiddenX := -1000.0
 	hiddenY := -1000.0
 
-	// 加载"返回游戏"按钮图片（原版资源）
-	backToGameNormal := rm.GetImageByID("IMAGE_OPTIONS_BACKTOGAMEBUTTON0")
-	backToGameHover := rm.GetImageByID("IMAGE_OPTIONS_BACKTOGAMEBUTTON2")
-
-	if backToGameNormal == nil {
-		return fmt.Errorf("failed to load back to game button images")
+	// 加载按钮图片（直接使用图片路径，与帮助面板/奖励面板一致）
+	buttonImage, err := rm.LoadImage("assets/images/SeedChooser_Button.png")
+	if err != nil {
+		return fmt.Errorf("failed to load SeedChooser_Button.png: %w", err)
 	}
 
-	log.Printf("[OptionsPanelModule] Loaded confirm button images: Normal=%v, Hover=%v",
-		backToGameNormal != nil, backToGameHover != nil)
+	log.Printf("[OptionsPanelModule] Loaded confirm button image")
 
-	// 加载按钮文字字体（中文，使用配置的字号）
-	buttonFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.PauseMenuBackToGameButtonFontSize)
+	// 加载按钮文字字体（中文，使用奖励面板的字号）
+	buttonFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.RewardPanelButtonTextFontSize)
 	if err != nil {
 		log.Printf("[OptionsPanelModule] Warning: Failed to load button font: %v", err)
 		buttonFont = nil
@@ -183,12 +180,12 @@ func (m *OptionsPanelModule) createConfirmButton(rm *game.ResourceManager) error
 	// 添加按钮组件（简单图片按钮）
 	ecs.AddComponent(m.entityManager, m.confirmButtonEntity, &components.ButtonComponent{
 		Type:         components.ButtonTypeSimple,
-		NormalImage:  backToGameNormal,
-		HoverImage:   backToGameHover,
-		PressedImage: backToGameHover,
-		Text:         "确定",                    // 修改文本为"确定"
-		Font:         buttonFont,               // 中文字体
-		TextColor:    [4]uint8{0, 200, 0, 255}, // 绿色文字（与其他按钮一致）
+		NormalImage:  buttonImage,
+		HoverImage:   buttonImage, // 使用同一张图片
+		PressedImage: buttonImage,
+		Text:         "确定",                        // 文字为"确定"
+		Font:         buttonFont,                  // 中文字体
+		TextColor:    [4]uint8{255, 200, 0, 255},  // 橙黄色文字（与帮助面板/奖励面板一致）
 		State:        components.UINormal,
 		Enabled:      true,
 		OnClick: func() {
