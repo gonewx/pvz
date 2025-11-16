@@ -148,13 +148,19 @@ func TestPauseMenuModule_Update_StateSync(t *testing.T) {
 		IsActive: false,
 	})
 
+	// 创建 SettingsPanelModule（模拟）
+	settingsPanelModule := &SettingsPanelModule{
+		entityManager:       em,
+		settingsPanelEntity: pauseMenuEntity,
+	}
+
 	// 创建模块
 	module := &PauseMenuModule{
-		entityManager:   em,
-		gameState:       gs,
-		pauseMenuEntity: pauseMenuEntity,
-		buttonEntities:  []ecs.EntityID{},
-		wasActive:       false,
+		entityManager:       em,
+		gameState:           gs,
+		settingsPanelModule: settingsPanelModule,
+		buttonEntities:      []ecs.EntityID{},
+		wasActive:           false,
 	}
 
 	// 场景1：外部状态变化（如 ESC 键）- 未激活 -> 激活
@@ -194,13 +200,19 @@ func TestPauseMenuModule_Update_NoStateChange(t *testing.T) {
 		IsActive: true,
 	})
 
+	// 创建 SettingsPanelModule（模拟）
+	settingsPanelModule := &SettingsPanelModule{
+		entityManager:       em,
+		settingsPanelEntity: pauseMenuEntity,
+	}
+
 	// 创建模块
 	module := &PauseMenuModule{
-		entityManager:   em,
-		gameState:       gs,
-		pauseMenuEntity: pauseMenuEntity,
-		buttonEntities:  []ecs.EntityID{},
-		wasActive:       true, // 已经同步
+		entityManager:       em,
+		gameState:           gs,
+		settingsPanelModule: settingsPanelModule,
+		buttonEntities:      []ecs.EntityID{},
+		wasActive:           true, // 已经同步
 	}
 
 	// 多次调用 Update，状态不变
@@ -233,13 +245,19 @@ func TestPauseMenuModule_ShowAndUpdate(t *testing.T) {
 		IsActive: false,
 	})
 
+	// 创建 SettingsPanelModule（模拟）
+	settingsPanelModule := &SettingsPanelModule{
+		entityManager:       em,
+		settingsPanelEntity: pauseMenuEntity,
+	}
+
 	// 创建模块
 	module := &PauseMenuModule{
-		entityManager:   em,
-		gameState:       gs,
-		pauseMenuEntity: pauseMenuEntity,
-		buttonEntities:  []ecs.EntityID{},
-		wasActive:       false,
+		entityManager:       em,
+		gameState:           gs,
+		settingsPanelModule: settingsPanelModule,
+		buttonEntities:      []ecs.EntityID{},
+		wasActive:           false,
 	}
 
 	// 调用 Show
@@ -274,13 +292,19 @@ func TestPauseMenuModule_HideAndUpdate(t *testing.T) {
 		IsActive: true,
 	})
 
+	// 创建 SettingsPanelModule（模拟）
+	settingsPanelModule := &SettingsPanelModule{
+		entityManager:       em,
+		settingsPanelEntity: pauseMenuEntity,
+	}
+
 	// 创建模块
 	module := &PauseMenuModule{
-		entityManager:   em,
-		gameState:       gs,
-		pauseMenuEntity: pauseMenuEntity,
-		buttonEntities:  []ecs.EntityID{},
-		wasActive:       true,
+		entityManager:       em,
+		gameState:           gs,
+		settingsPanelModule: settingsPanelModule,
+		buttonEntities:      []ecs.EntityID{},
+		wasActive:           true,
 	}
 
 	// 调用 Hide
