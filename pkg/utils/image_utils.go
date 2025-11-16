@@ -43,58 +43,93 @@ func CompositeImages(baseImage, overlayImage *ebiten.Image) *ebiten.Image {
 	return composited
 }
 
-// ApplyAlphaMask applies an alpha mask to a base image.
+// ApplyAlphaMask applies an alpha mask to a base image using pixel-level compositing.
 // This is used in PVZ to remove black backgrounds from JPG images using PNG masks.
 //
 // Parameters:
-//   - baseImage: The source image (e.g., JPG with black background)
+//   - baseImage: The source image (e.g., JPG with black background or PNG with RGB data)
 //   - maskImage: The alpha mask image (8-bit or RGBA PNG)
 //   - White pixels in mask = fully opaque
 //   - Black pixels in mask = fully transparent
 //   - Gray pixels = partial transparency
 //
 // Returns:
-//   - A new image with the mask applied
+//   - A new image with the mask applied (RGBA format)
+//   - Returns nil if baseImage is nil
+//   - Returns baseImage unchanged if maskImage is nil (graceful degradation)
 //
-// Usage Example:
+// Algorithm:
+//   - Reads pixels from both images
+//   - Combines RGB from baseImage with Alpha from maskImage's luminance
+//   - Creates a new RGBA image with proper transparency
 //
-//	jpg := rm.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_BG_CENTER")      // JPG with black bg
-//	mask := rm.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_BG_CENTER_OVERLAY") // PNG mask
-//	result := utils.ApplyAlphaMask(jpg, mask)  // JPG with transparent background
+// Usage Examples:
 //
-// Note: This function uses Ebitengine's ColorScale to apply the mask at draw time,
-// avoiding the need to read pixels before the game starts.
+//	// Example 1: Help panel background (Story 12.3)
+//	bgJPG := rm.LoadImage("assets/images/ZombieNote.jpg")
+//	bgMask := rm.LoadImage("assets/images/ZombieNote_.png")
+//	maskedBG := utils.ApplyAlphaMask(bgJPG, bgMask)  // Transparent edges
+//
+//	// Example 2: Help panel text overlay
+//	textPNG := rm.LoadImage("assets/images/ZombieNoteHelp.png")
+//	textMask := rm.LoadImage("assets/images/ZombieNoteHelpBlack.png")
+//	maskedText := utils.ApplyAlphaMask(textPNG, textMask)  // Transparent text
+//
+// Performance:
+//   - Pixel-level operation, should be called during initialization, not per-frame
+//   - Cache the result in a component or module for repeated use
+//
+// Story 12.3: 对话框系统基础 - 帮助面板蒙板叠加
 func ApplyAlphaMask(baseImage, maskImage *ebiten.Image) *ebiten.Image {
 	if baseImage == nil {
 		return nil
 	}
 	if maskImage == nil {
+		// Graceful degradation: return original image if mask is missing
 		return baseImage
 	}
 
-	bounds := baseImage.Bounds()
-	width := bounds.Dx()
-	height := bounds.Dy()
+	// Get image dimensions
+	baseBounds := baseImage.Bounds()
+	maskBounds := maskImage.Bounds()
 
-	// Create a temporary image to render the masked result
+	width := baseBounds.Dx()
+	height := baseBounds.Dy()
+
+	// Check dimension mismatch (graceful degradation)
+	if width != maskBounds.Dx() || height != maskBounds.Dy() {
+		// Return original image if dimensions don't match
+		return baseImage
+	}
+
+	// Create output image (RGBA format)
 	result := ebiten.NewImage(width, height)
 
-	// First, draw the base image
-	result.DrawImage(baseImage, &ebiten.DrawImageOptions{})
+	// Read pixel data from both images
+	basePixels := make([]byte, width*height*4)
+	baseImage.ReadPixels(basePixels)
 
-	// Then draw the mask using multiply blend mode
-	// The mask's brightness will control the alpha
-	// (This is a simplified approach; for perfect results we'd use a custom shader)
-	op := &ebiten.DrawImageOptions{}
-	op.Blend = ebiten.BlendCopy
-	op.ColorScale.ScaleAlpha(0) // We'll use the mask as the alpha source
+	maskPixels := make([]byte, width*height*4)
+	maskImage.ReadPixels(maskPixels)
 
-	// WORKAROUND: Since we can't easily apply a mask in Ebitengine without shaders,
-	// we'll simply draw the mask multiplied by the base
-	// For now, just return the base image - proper masking will be implemented later
-	// TODO: Implement proper alpha masking using Kage shaders
+	// Composite RGBA data
+	outputPixels := make([]byte, width*height*4)
+	for i := 0; i < width*height; i++ {
+		// RGB from base image (color data)
+		outputPixels[i*4+0] = basePixels[i*4+0] // R
+		outputPixels[i*4+1] = basePixels[i*4+1] // G
+		outputPixels[i*4+2] = basePixels[i*4+2] // B
 
-	return baseImage
+		// Alpha from mask's luminance (brightness value)
+		// Mask is typically grayscale, so R=G=B, use R channel
+		// Higher luminance = more opaque
+		outputPixels[i*4+3] = maskPixels[i*4+0] // A = mask's R channel
+	}
+
+	// Write composed pixels to result image
+	result.WritePixels(outputPixels)
+
+	return result
 }
 
 // CompositeImagesAt creates a composited image with overlay at a specific position.

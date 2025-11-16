@@ -10,6 +10,7 @@ import (
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/decker502/pvz/pkg/modules"
 	"github.com/decker502/pvz/pkg/systems"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
@@ -59,6 +60,12 @@ type MainMenuScene struct {
 	dialogRenderSystem *systems.DialogRenderSystem // Dialog render system
 	dialogInputSystem  *systems.DialogInputSystem  // Dialog input system
 	currentDialog      ecs.EntityID                // Current open dialog entity (0 = none)
+
+	// Story 12.3: Help and Options panels
+	buttonSystem       *systems.ButtonSystem       // Button interaction system
+	buttonRenderSystem *systems.ButtonRenderSystem // Button render system
+	helpPanelModule    *modules.HelpPanelModule    // Help panel module
+	optionsPanelModule *modules.OptionsPanelModule // Options panel module
 }
 
 // NewMainMenuScene creates and returns a new MainMenuScene instance.
@@ -250,6 +257,44 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	scene.currentDialog = 0 // No dialog initially
 	log.Printf("[MainMenuScene] Initialized dialog systems")
 
+	// Story 12.3: Initialize button systems (shared by help and options panels)
+	scene.buttonSystem = systems.NewButtonSystem(scene.entityManager)
+	scene.buttonRenderSystem = systems.NewButtonRenderSystem(scene.entityManager)
+
+	// Story 12.3: Initialize help panel module
+	helpPanel, err := modules.NewHelpPanelModule(
+		scene.entityManager,
+		rm,
+		scene.buttonSystem,
+		scene.buttonRenderSystem,
+		WindowWidth,
+		WindowHeight,
+		nil, // onClose callback (no special action needed)
+	)
+	if err != nil {
+		log.Printf("[MainMenuScene] Warning: Failed to initialize help panel: %v", err)
+	} else {
+		scene.helpPanelModule = helpPanel
+		log.Printf("[MainMenuScene] Help panel module initialized")
+	}
+
+	// Story 12.3: Initialize options panel module
+	optionsPanel, err := modules.NewOptionsPanelModule(
+		scene.entityManager,
+		rm,
+		scene.buttonSystem,
+		scene.buttonRenderSystem,
+		WindowWidth,
+		WindowHeight,
+		nil, // onClose callback (no special action needed)
+	)
+	if err != nil {
+		log.Printf("[MainMenuScene] Warning: Failed to initialize options panel: %v", err)
+	} else {
+		scene.optionsPanelModule = optionsPanel
+		log.Printf("[MainMenuScene] Options panel module initialized")
+	}
+
 	return scene
 }
 
@@ -319,43 +364,62 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 		}
 	}
 
-	// Story 12.2: 键盘快捷键触发对话框（临时验证方案）
-	// F1 - 显示帮助对话框
-	if ebiten.IsKeyPressed(ebiten.KeyF1) && m.currentDialog == 0 {
+	// Story 12.3: Update help and options panels
+	if m.helpPanelModule != nil {
+		m.helpPanelModule.Update(deltaTime)
+	}
+	if m.optionsPanelModule != nil {
+		m.optionsPanelModule.Update(deltaTime)
+	}
+
+	// Story 12.3: Update button system (for panel buttons)
+	if m.buttonSystem != nil {
+		m.buttonSystem.Update(deltaTime)
+	}
+
+	// Story 12.2: 键盘快捷键触发面板（临时验证方案）
+	// 检查是否有面板或对话框打开
+	panelOpen := (m.helpPanelModule != nil && m.helpPanelModule.IsActive()) ||
+		(m.optionsPanelModule != nil && m.optionsPanelModule.IsActive()) ||
+		m.currentDialog != 0
+
+	// F1 - 显示帮助面板
+	if ebiten.IsKeyPressed(ebiten.KeyF1) && !panelOpen {
 		m.showHelpDialog()
 		return
 	}
 
-	// O 键 - 显示选项对话框
-	if ebiten.IsKeyPressed(ebiten.KeyO) && m.currentDialog == 0 {
+	// O 键 - 显示选项面板
+	if ebiten.IsKeyPressed(ebiten.KeyO) && !panelOpen {
 		m.showOptionsDialog()
 		return
 	}
 
-	// Story 12.3: If a dialog is open, handle dialog input and block background interaction
-	if m.currentDialog != 0 {
-		m.dialogInputSystem.Update(deltaTime)
+	// Story 12.3: If a panel or dialog is open, block background interaction
+	if panelOpen {
+		// 阻止背景交互
+		m.wasMousePressed = ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
 
-		// Clean up marked entities (必须在检查之前调用，否则实体还在)
-		m.entityManager.RemoveMarkedEntities()
+		// 对话框输入系统处理（如果有对话框）
+		if m.currentDialog != 0 {
+			m.dialogInputSystem.Update(deltaTime)
+			m.entityManager.RemoveMarkedEntities()
 
-		// Check if dialog was closed
-		dialogStillExists := false
-		dialogEntities := ecs.GetEntitiesWith1[*components.DialogComponent](m.entityManager)
-		for _, entityID := range dialogEntities {
-			if entityID == m.currentDialog {
-				dialogStillExists = true
-				break
+			// Check if dialog was closed
+			dialogStillExists := false
+			dialogEntities := ecs.GetEntitiesWith1[*components.DialogComponent](m.entityManager)
+			for _, entityID := range dialogEntities {
+				if entityID == m.currentDialog {
+					dialogStillExists = true
+					break
+				}
+			}
+
+			if !dialogStillExists {
+				m.currentDialog = 0
 			}
 		}
 
-		if !dialogStillExists {
-			// Dialog was closed, clear reference
-			m.currentDialog = 0
-		}
-
-		// Block all background interaction when dialog is open
-		m.wasMousePressed = ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
 		return
 	}
 
@@ -834,6 +898,14 @@ func (m *MainMenuScene) Draw(screen *ebiten.Image) {
 	if m.dialogRenderSystem != nil {
 		m.dialogRenderSystem.Draw(screen)
 	}
+
+	// Story 12.3: Draw help and options panels (above dialogs)
+	if m.helpPanelModule != nil {
+		m.helpPanelModule.Draw(screen)
+	}
+	if m.optionsPanelModule != nil {
+		m.optionsPanelModule.Draw(screen)
+	}
 }
 
 // initButtons initializes the menu buttons with their positions, images, and click handlers.
@@ -1158,31 +1230,20 @@ func getUnlockMessage(buttonType config.MenuButtonType) string {
 	}
 }
 
-// showHelpDialog 显示帮助对话框
-// Story 12.2: Bottom Function Bar
+// showHelpDialog 显示帮助面板
+// Story 12.3: 使用帮助面板模块（便笺背景 + 帮助文本）
 func (m *MainMenuScene) showHelpDialog() {
-	helpMessage := `游戏操作说明：
-
-鼠标点击：选择植物和种植
-ESC 键：暂停游戏
-F1 键：显示帮助（当前对话框）
-O 键：显示选项设置
-
-更多帮助信息请访问游戏菜单。`
-
-	m.showUnlockDialog("游戏帮助", helpMessage)
+	if m.helpPanelModule != nil {
+		m.helpPanelModule.Show()
+		log.Printf("[MainMenuScene] Help panel shown")
+	}
 }
 
-// showOptionsDialog 显示选项对话框
-// Story 12.2: Bottom Function Bar
+// showOptionsDialog 显示选项面板
+// Story 12.3: 使用选项面板模块（复用游戏场景的暂停菜单样式）
 func (m *MainMenuScene) showOptionsDialog() {
-	optionsMessage := `游戏设置：
-
-音乐音量：已启用
-音效音量：已启用
-全屏模式：窗口模式
-
-（完整的设置功能开发中）`
-
-	m.showUnlockDialog("游戏选项", optionsMessage)
+	if m.optionsPanelModule != nil {
+		m.optionsPanelModule.Show()
+		log.Printf("[MainMenuScene] Options panel shown")
+	}
 }
