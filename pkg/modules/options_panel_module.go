@@ -382,9 +382,17 @@ func (m *OptionsPanelModule) hideUIElements() {
 func (m *OptionsPanelModule) Draw(screen *ebiten.Image) {
 	// 获取选项面板组件
 	optionsPanel, ok := ecs.GetComponent[*components.PauseMenuComponent](m.entityManager, m.optionsPanelEntity)
-	if !ok || !optionsPanel.IsActive {
+	if !ok {
+		log.Printf("[OptionsPanelModule] Draw: Failed to get PauseMenuComponent")
 		return
 	}
+
+	if !optionsPanel.IsActive {
+		// log.Printf("[OptionsPanelModule] Draw: Panel is not active")
+		return
+	}
+
+	log.Printf("[OptionsPanelModule] Draw: Rendering panel (IsActive=%v)", optionsPanel.IsActive)
 
 	// 1. 渲染遮罩和墓碑背景
 	m.pauseMenuRenderSystem.Draw(screen)
@@ -526,10 +534,13 @@ func (m *OptionsPanelModule) drawCheckbox(screen *ebiten.Image, checkbox *compon
 //   - 设置 PauseMenuComponent.IsActive = true
 //   - UI 元素移动到正确位置
 func (m *OptionsPanelModule) Show() {
+	log.Printf("[OptionsPanelModule] Show() called")
 	if optionsPanel, ok := ecs.GetComponent[*components.PauseMenuComponent](m.entityManager, m.optionsPanelEntity); ok {
 		optionsPanel.IsActive = true
 		m.showUIElements()
-		log.Printf("[OptionsPanelModule] Options panel shown")
+		log.Printf("[OptionsPanelModule] Options panel shown, IsActive = %v", optionsPanel.IsActive)
+	} else {
+		log.Printf("[OptionsPanelModule] ERROR: Failed to get PauseMenuComponent for entity %d", m.optionsPanelEntity)
 	}
 }
 

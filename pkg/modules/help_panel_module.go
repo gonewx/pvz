@@ -51,9 +51,16 @@ type HelpPanelModule struct {
 	// 按钮实体
 	confirmButtonEntity ecs.EntityID // "确定"按钮
 
-	// 预处理的图片（初始化时合成，避免每帧重复计算）
+	// 原始图片（未合成，延迟处理避免 ReadPixels 错误）
+	bgJPG    *ebiten.Image // 便笺背景 JPG
+	bgMask   *ebiten.Image // 便笺背景 Alpha 蒙板
+	textPNG  *ebiten.Image // 帮助文本 PNG
+	textMask *ebiten.Image // 帮助文本 Alpha 蒙板
+
+	// 合成后的图片（首次 Draw 时生成）
 	backgroundImage *ebiten.Image // 便笺背景（RGB + Alpha 蒙板合成）
 	helpTextImage   *ebiten.Image // 帮助文本（RGB + Alpha 蒙板合成）
+	composited      bool          // 是否已经合成（避免重复处理）
 
 	// 回调函数
 	onClose func() // 关闭面板回调
@@ -101,39 +108,36 @@ func NewHelpPanelModule(
 		windowHeight:       windowHeight,
 	}
 
-	// 1. 加载便笺背景（RGB + Alpha 蒙板）
+	var err error
+
+	// 1. 加载便笺背景和 Alpha 蒙板（延迟处理，避免 ReadPixels 在游戏开始前调用）
 	log.Printf("[HelpPanelModule] Loading background images...")
-	bgJPG, err := rm.LoadImage("assets/images/ZombieNote.jpg")
+	module.bgJPG, err = rm.LoadImage("assets/images/ZombieNote.jpg")
 	if err != nil {
 		return nil, fmt.Errorf("failed to load ZombieNote.jpg: %w", err)
 	}
 
-	bgMask, err := rm.LoadImage("assets/images/ZombieNote_.png")
+	module.bgMask, err = rm.LoadImage("assets/images/ZombieNote_.png")
 	if err != nil {
-		log.Printf("[HelpPanelModule] Warning: Failed to load ZombieNote_.png, using original image: %v", err)
-		module.backgroundImage = bgJPG
-	} else {
-		// 应用 Alpha 蒙板
-		module.backgroundImage = utils.ApplyAlphaMask(bgJPG, bgMask)
-		log.Printf("[HelpPanelModule] Applied alpha mask to background")
+		log.Printf("[HelpPanelModule] Warning: Failed to load ZombieNote_.png: %v", err)
+		module.bgMask = nil // 没有蒙板就直接使用原图
 	}
 
-	// 2. 加载帮助文本（RGB + Alpha 蒙板）
-	log.Printf("[HelpPanelModule] Loading help text images...")
-	textPNG, err := rm.LoadImage("assets/images/ZombieNoteHelp.png")
+	// 2. 加载帮助文本（不需要蒙板，使用原图亮度作为 Alpha）
+	// ZombieNoteHelp.png：黑底白字
+	// ZombieNoteHelpBlack.png：全黑（无效的占位符）
+	// 处理目标：白字→黑字，黑底→透明
+	log.Printf("[HelpPanelModule] Loading help text image...")
+	module.textPNG, err = rm.LoadImage("assets/images/ZombieNoteHelp.png")
 	if err != nil {
 		return nil, fmt.Errorf("failed to load ZombieNoteHelp.png: %w", err)
 	}
 
-	textMask, err := rm.LoadImage("assets/images/ZombieNoteHelpBlack.png")
-	if err != nil {
-		log.Printf("[HelpPanelModule] Warning: Failed to load ZombieNoteHelpBlack.png, using original image: %v", err)
-		module.helpTextImage = textPNG
-	} else {
-		// 应用 Alpha 蒙板
-		module.helpTextImage = utils.ApplyAlphaMask(textPNG, textMask)
-		log.Printf("[HelpPanelModule] Applied alpha mask to help text")
-	}
+	// 不需要加载蒙板（使用原图亮度作为 Alpha）
+	module.textMask = nil
+
+	// Alpha Mask 合成将在首次 Draw() 时执行（此时游戏已经开始）
+	module.composited = false
 
 	// 3. 创建"确定"按钮
 	if err := module.createConfirmButton(rm); err != nil {
@@ -144,14 +148,14 @@ func NewHelpPanelModule(
 	module.helpPanelEntity = em.CreateEntity()
 
 	// 获取背景图片尺寸（用于居中）
-	bgBounds := module.backgroundImage.Bounds()
+	bgBounds := module.bgJPG.Bounds()
 	width := float64(bgBounds.Dx())
 	height := float64(bgBounds.Dy())
 
-	// 添加 HelpPanelComponent
+	// 添加 HelpPanelComponent（此时图片还未合成，将在 Draw 时处理）
 	ecs.AddComponent(em, module.helpPanelEntity, &components.HelpPanelComponent{
-		BackgroundImage:     module.backgroundImage,
-		HelpTextImage:       module.helpTextImage,
+		BackgroundImage:     nil, // 延迟合成
+		HelpTextImage:       nil, // 延迟合成
 		ConfirmButtonEntity: uint64(module.confirmButtonEntity),
 		IsActive:            false, // 初始状态：未激活
 		Width:               width,
@@ -276,6 +280,105 @@ func (m *HelpPanelModule) hideButton() {
 	}
 }
 
+// applyAlphaMasks 应用 Alpha 蒙板合成图片
+//
+// 职责：
+//   - 在首次 Draw 时调用（此时游戏已经开始，可以使用 ReadPixels）
+//   - 合成便笺背景
+//   - 处理帮助文本：用亮度作为 Alpha，反转颜色（黑底白字 → 透明底黑字）
+//   - 更新 HelpPanelComponent 的图片引用
+//
+// 注意：
+//   - 必须在游戏主循环开始后调用（否则 ReadPixels 会 panic）
+//   - 只执行一次（通过 composited 标记）
+func (m *HelpPanelModule) applyAlphaMasks() {
+	if m.composited {
+		return // 已经合成过了
+	}
+
+	// 1. 合成便笺背景
+	if m.bgMask != nil {
+		m.backgroundImage = utils.ApplyAlphaMask(m.bgJPG, m.bgMask)
+		log.Printf("[HelpPanelModule] Applied alpha mask to background")
+	} else {
+		m.backgroundImage = m.bgJPG
+		log.Printf("[HelpPanelModule] Using original background (no mask)")
+	}
+
+	// 2. 处理帮助文本：用亮度作为 Alpha + 反转颜色
+	// 原图：黑底白字 → 目标：透明底黑字
+	m.helpTextImage = m.convertWhiteTextToBlack(m.textPNG)
+	log.Printf("[HelpPanelModule] Converted help text (white on black → black on transparent)")
+
+	// 3. 更新 HelpPanelComponent 的图片引用
+	helpPanel, ok := ecs.GetComponent[*components.HelpPanelComponent](m.entityManager, m.helpPanelEntity)
+	if ok {
+		helpPanel.BackgroundImage = m.backgroundImage
+		helpPanel.HelpTextImage = m.helpTextImage
+	}
+
+	// 4. 标记为已合成
+	m.composited = true
+	log.Printf("[HelpPanelModule] Image composition completed")
+}
+
+// convertWhiteTextToBlack 将黑底白字转换为透明底黑字
+//
+// 处理流程：
+//   1. 计算每个像素的亮度（作为 Alpha）
+//   2. 应用阈值：暗色区域（亮度 < 阈值）→ 完全透明
+//   3. 反转 RGB（白色 → 黑色）
+//   4. 背景（黑色，低亮度）变透明，文字（白色，高亮度）变不透明
+//
+// 参数：
+//   - src: 原图（黑底白字）
+//
+// 返回：
+//   - 处理后的图片（透明底黑字）
+func (m *HelpPanelModule) convertWhiteTextToBlack(src *ebiten.Image) *ebiten.Image {
+	bounds := src.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+
+	// 创建新图片
+	result := ebiten.NewImage(width, height)
+
+	// 读取源图像素
+	srcPixels := make([]byte, width*height*4)
+	src.ReadPixels(srcPixels)
+
+	// 处理每个像素
+	resultPixels := make([]byte, width*height*4)
+	const brightnessThreshold = 30 // 亮度阈值：低于此值的像素被视为背景（完全透明）
+
+	for i := 0; i < len(srcPixels); i += 4 {
+		r := srcPixels[i+0]
+		g := srcPixels[i+1]
+		b := srcPixels[i+2]
+
+		// 计算亮度（灰度值）
+		brightness := (uint16(r) + uint16(g) + uint16(b)) / 3
+
+		// 应用阈值：暗色区域（背景）设为完全透明
+		var alpha byte
+		if brightness < brightnessThreshold {
+			alpha = 0 // 完全透明（背景）
+		} else {
+			alpha = byte(brightness) // 使用亮度作为 Alpha（文字）
+		}
+
+		// 反转 RGB（白色文字变成黑色）
+		resultPixels[i+0] = 255 - r // R
+		resultPixels[i+1] = 255 - g // G
+		resultPixels[i+2] = 255 - b // B
+		resultPixels[i+3] = alpha   // A（亮度，应用阈值）
+	}
+
+	// 写入结果
+	result.WritePixels(resultPixels)
+	return result
+}
+
 // Draw 渲染帮助面板到屏幕
 //
 // 参数:
@@ -291,6 +394,12 @@ func (m *HelpPanelModule) Draw(screen *ebiten.Image) {
 	helpPanel, ok := ecs.GetComponent[*components.HelpPanelComponent](m.entityManager, m.helpPanelEntity)
 	if !ok || !helpPanel.IsActive {
 		return
+	}
+
+	// 延迟合成 Alpha Mask（首次 Draw 时执行）
+	// 必须在游戏主循环开始后才能调用 ReadPixels
+	if !m.composited {
+		m.applyAlphaMasks()
 	}
 
 	// 1. 绘制半透明遮罩

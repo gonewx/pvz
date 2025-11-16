@@ -385,12 +385,14 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 
 	// F1 - 显示帮助面板
 	if ebiten.IsKeyPressed(ebiten.KeyF1) && !panelOpen {
+		log.Printf("[MainMenuScene] F1 key pressed, showing help panel")
 		m.showHelpDialog()
 		return
 	}
 
 	// O 键 - 显示选项面板
 	if ebiten.IsKeyPressed(ebiten.KeyO) && !panelOpen {
+		log.Printf("[MainMenuScene] O key pressed, showing options panel")
 		m.showOptionsDialog()
 		return
 	}
