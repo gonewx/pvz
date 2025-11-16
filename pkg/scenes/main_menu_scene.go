@@ -66,6 +66,10 @@ type MainMenuScene struct {
 	buttonRenderSystem *systems.ButtonRenderSystem // Button render system
 	helpPanelModule    *modules.HelpPanelModule    // Help panel module
 	optionsPanelModule *modules.OptionsPanelModule // Options panel module
+
+	// Keyboard state tracking for edge detection
+	wasF1Pressed bool // Track F1 key state from previous frame
+	wasOPressed  bool // Track O key state from previous frame
 }
 
 // NewMainMenuScene creates and returns a new MainMenuScene instance.
@@ -383,19 +387,27 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 		(m.optionsPanelModule != nil && m.optionsPanelModule.IsActive()) ||
 		m.currentDialog != 0
 
-	// F1 - 显示帮助面板
-	if ebiten.IsKeyPressed(ebiten.KeyF1) && !panelOpen {
+	// 检测按键状态（用于边缘检测）
+	isF1Pressed := ebiten.IsKeyPressed(ebiten.KeyF1)
+	isOPressed := ebiten.IsKeyPressed(ebiten.KeyO)
+
+	// F1 - 显示帮助面板（边缘触发）
+	isF1Clicked := isF1Pressed && !m.wasF1Pressed
+	if isF1Clicked && !panelOpen {
 		log.Printf("[MainMenuScene] F1 key pressed, showing help panel")
 		m.showHelpDialog()
-		return
 	}
 
-	// O 键 - 显示选项面板
-	if ebiten.IsKeyPressed(ebiten.KeyO) && !panelOpen {
+	// O 键 - 显示选项面板（边缘触发）
+	isOClicked := isOPressed && !m.wasOPressed
+	if isOClicked && !panelOpen {
 		log.Printf("[MainMenuScene] O key pressed, showing options panel")
 		m.showOptionsDialog()
-		return
 	}
+
+	// 更新按键状态（用于下一帧的边缘检测）
+	m.wasF1Pressed = isF1Pressed
+	m.wasOPressed = isOPressed
 
 	// Story 12.3: If a panel or dialog is open, block background interaction
 	if panelOpen {

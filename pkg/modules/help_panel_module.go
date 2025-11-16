@@ -8,7 +8,6 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/systems"
 	"github.com/decker502/pvz/pkg/utils"
@@ -167,40 +166,55 @@ func NewHelpPanelModule(
 	return module, nil
 }
 
-// createConfirmButton 创建"确定"按钮
+// createConfirmButton 创建"主菜单"按钮（使用与奖励面板"下一关"按钮相同的样式）
 func (m *HelpPanelModule) createConfirmButton(rm *game.ResourceManager) error {
 	// 按钮初始位置：屏幕外（隐藏）
 	hiddenX := -1000.0
 	hiddenY := -1000.0
 
-	// 按钮文本
-	buttonText := "确定"
+	// 加载按钮图片（直接使用图片路径，与奖励面板一致）
+	buttonImage, err := rm.LoadImage("assets/images/SeedChooser_Button.png")
+	if err != nil {
+		return fmt.Errorf("failed to load SeedChooser_Button.png: %w", err)
+	}
 
-	// 使用三段式按钮（复用 entities.NewMenuButton）
-	entity, err := entities.NewMenuButton(
-		m.entityManager,
-		rm,
-		hiddenX,
-		hiddenY,
-		buttonText,
-		config.PauseMenuInnerButtonFontSize,      // 使用与暂停菜单一致的字体大小
-		[4]uint8{0, 200, 0, 255},                 // 绿色文字
-		config.PauseMenuInnerButtonWidth-40,      // 减去左右边框宽度
-		func() {                                  // 点击回调
-			log.Printf("[HelpPanelModule] Confirm button clicked!")
+	// 加载按钮文字字体（中文，使用奖励面板的字号）
+	buttonFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.RewardPanelButtonTextFontSize)
+	if err != nil {
+		log.Printf("[HelpPanelModule] Warning: Failed to load button font: %v", err)
+		buttonFont = nil
+	}
+
+	// 创建"主菜单"按钮实体
+	m.confirmButtonEntity = m.entityManager.CreateEntity()
+
+	// 添加位置组件
+	ecs.AddComponent(m.entityManager, m.confirmButtonEntity, &components.PositionComponent{
+		X: hiddenX,
+		Y: hiddenY,
+	})
+
+	// 添加按钮组件（简单图片按钮，与奖励面板样式一致）
+	ecs.AddComponent(m.entityManager, m.confirmButtonEntity, &components.ButtonComponent{
+		Type:         components.ButtonTypeSimple,
+		NormalImage:  buttonImage,
+		HoverImage:   buttonImage, // 使用同一张图片
+		PressedImage: buttonImage,
+		Text:         "主菜单",                      // 文字改为"主菜单"
+		Font:         buttonFont,                  // 中文字体
+		TextColor:    [4]uint8{255, 200, 0, 255},  // 橙黄色文字（与奖励面板一致）
+		State:        components.UINormal,
+		Enabled:      true,
+		OnClick: func() {
+			log.Printf("[HelpPanelModule] Main menu button clicked!")
 			m.Hide()
 			if m.onClose != nil {
 				m.onClose()
 			}
 		},
-	)
+	})
 
-	if err != nil {
-		return err
-	}
-
-	m.confirmButtonEntity = entity
-	log.Printf("[HelpPanelModule] Confirm button created")
+	log.Printf("[HelpPanelModule] Main menu button created")
 
 	return nil
 }
@@ -228,7 +242,7 @@ func (m *HelpPanelModule) Update(deltaTime float64) {
 	}
 }
 
-// showButton 显示"确定"按钮（移动到正确位置）
+// showButton 显示"主菜单"按钮（移动到正确位置）
 func (m *HelpPanelModule) showButton() {
 	// 获取帮助面板组件（用于计算按钮位置）
 	helpPanel, ok := ecs.GetComponent[*components.HelpPanelComponent](m.entityManager, m.helpPanelEntity)
@@ -246,15 +260,8 @@ func (m *HelpPanelModule) showButton() {
 	screenCenterX := float64(m.windowWidth) / 2.0
 	screenCenterY := float64(m.windowHeight) / 2.0
 
-	// 计算按钮宽度（三段式按钮）
-	var buttonWidth float64
-	if button.Type == components.ButtonTypeNineSlice {
-		leftWidth := float64(button.LeftImage.Bounds().Dx())
-		rightWidth := float64(button.RightImage.Bounds().Dx())
-		buttonWidth = leftWidth + button.MiddleWidth + rightWidth
-	} else {
-		buttonWidth = config.PauseMenuInnerButtonWidth
-	}
+	// 计算按钮宽度（简单图片按钮）
+	buttonWidth := float64(button.NormalImage.Bounds().Dx())
 
 	// 按钮位置：在便笺下方居中
 	// 便笺底部 Y 坐标 = 屏幕中心 Y + 便笺高度/2
@@ -308,14 +315,14 @@ func (m *HelpPanelModule) applyAlphaMasks() {
 	// 2. 处理帮助文本：使用蒙板（像草皮渲染一样）
 	// 原图：黑底白字
 	// 策略：用原图自身作为蒙板（白色文字→不透明，黑色背景→透明）
-	// 然后反转颜色（白色文字→黑色文字）
+	// 然后将所有非透明像素设为黑色（不反转，直接设黑）
 
 	// 2.1 先应用蒙板（用原图自身作为蒙板，像草皮渲染一样）
 	maskedText := utils.ApplyAlphaMask(m.textPNG, m.textPNG)
 
-	// 2.2 反转颜色（白色→黑色）
-	m.helpTextImage = m.invertColors(maskedText)
-	log.Printf("[HelpPanelModule] Applied alpha mask (self as mask) and inverted colors")
+	// 2.2 将白色文字转为黑色（不反转，直接设为黑色）
+	m.helpTextImage = m.convertToBlack(maskedText)
+	log.Printf("[HelpPanelModule] Applied alpha mask (self as mask) and converted to black")
 
 	// 3. 更新 HelpPanelComponent 的图片引用
 	helpPanel, ok := ecs.GetComponent[*components.HelpPanelComponent](m.entityManager, m.helpPanelEntity)
@@ -329,18 +336,24 @@ func (m *HelpPanelModule) applyAlphaMasks() {
 	log.Printf("[HelpPanelModule] Image composition completed")
 }
 
-// invertColors 反转图片的 RGB 颜色（保持 Alpha 不变）
+// convertToBlack 将透明底白字转换为透明底黑字（使用预乘 Alpha）
 //
-// 用途：
-//   - 将透明底白字转换为透明底黑字
-//   - 只反转不透明区域的颜色，透明区域保持黑色
+// 处理方法：
+//   - 将所有像素的 RGB 设置为黑色，并应用预乘 Alpha
+//   - 预乘 Alpha：finalRGB = targetRGB * (alpha / 255)
+//   - 这可消除边缘的白色残留（参考 LoadCompositedImage 实现）
+//
+// 为什么使用预乘 Alpha：
+//   - ApplyAlphaMask 输出的是非预乘 Alpha
+//   - 半透明边缘（如 R=200, A=200）在非预乘模式下会显示为浅灰色
+//   - 预乘后（R=200*200/255=157, A=200）渲染时边缘更暗，消除白边
 //
 // 参数：
-//   - src: 原图（透明底白字）
+//   - src: 原图（透明底白字，非预乘 Alpha）
 //
 // 返回：
-//   - 颜色反转后的图片（透明底黑字）
-func (m *HelpPanelModule) invertColors(src *ebiten.Image) *ebiten.Image {
+//   - 处理后的图片（透明底黑字，预乘 Alpha）
+func (m *HelpPanelModule) convertToBlack(src *ebiten.Image) *ebiten.Image {
 	bounds := src.Bounds()
 	width := bounds.Dx()
 	height := bounds.Dy()
@@ -352,23 +365,18 @@ func (m *HelpPanelModule) invertColors(src *ebiten.Image) *ebiten.Image {
 	pixels := make([]byte, width*height*4)
 	src.ReadPixels(pixels)
 
-	// 反转 RGB，保持 Alpha
+	// 将所有像素设为黑色（使用预乘 Alpha）
 	for i := 0; i < len(pixels); i += 4 {
 		alpha := pixels[i+3]
 
-		// 只对不透明区域反转颜色（文字）
-		// 透明区域（背景）保持黑色 (0, 0, 0, 0)
-		if alpha > 0 {
-			pixels[i+0] = 255 - pixels[i+0] // 反转 R
-			pixels[i+1] = 255 - pixels[i+1] // 反转 G
-			pixels[i+2] = 255 - pixels[i+2] // 反转 B
-		} else {
-			// 透明像素保持黑色
-			pixels[i+0] = 0
-			pixels[i+1] = 0
-			pixels[i+2] = 0
-		}
-		// pixels[i+3] 保持不变（Alpha）
+		// 目标颜色：黑色 (0, 0, 0)
+		// 预乘 Alpha：finalRGB = targetRGB * (alpha / 255)
+		// 对于黑色：0 * (alpha / 255) = 0
+		// 所以预乘 Alpha 后 RGB 仍然是 0
+		pixels[i+0] = 0 // R = 0
+		pixels[i+1] = 0 // G = 0
+		pixels[i+2] = 0 // B = 0
+		pixels[i+3] = alpha // A 保持不变
 	}
 
 	// 写入结果
@@ -406,6 +414,7 @@ func (m *HelpPanelModule) Draw(screen *ebiten.Image) {
 	screenCenterX := float64(m.windowWidth) / 2.0
 	screenCenterY := float64(m.windowHeight) / 2.0
 
+	// 便笺背景居中
 	panelX := screenCenterX - helpPanel.Width/2.0
 	panelY := screenCenterY - helpPanel.Height/2.0
 
@@ -414,9 +423,16 @@ func (m *HelpPanelModule) Draw(screen *ebiten.Image) {
 	bgOp.GeoM.Translate(panelX, panelY)
 	screen.DrawImage(helpPanel.BackgroundImage, bgOp)
 
-	// 4. 绘制帮助文本（叠加在便笺上）
+	// 4. 绘制帮助文本（在便笺背景中央）
+	// 便笺背景：654x427，帮助文本：529x323
+	// 需要相对于便笺背景居中
+	textWidth := float64(helpPanel.HelpTextImage.Bounds().Dx())
+	textHeight := float64(helpPanel.HelpTextImage.Bounds().Dy())
+	textOffsetX := (helpPanel.Width - textWidth) / 2.0
+	textOffsetY := (helpPanel.Height - textHeight) / 2.0
+
 	textOp := &ebiten.DrawImageOptions{}
-	textOp.GeoM.Translate(panelX, panelY)
+	textOp.GeoM.Translate(panelX+textOffsetX, panelY+textOffsetY)
 	screen.DrawImage(helpPanel.HelpTextImage, textOp)
 
 	// 5. 绘制"确定"按钮

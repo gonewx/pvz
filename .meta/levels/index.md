@@ -123,13 +123,39 @@
 点击后，居中显示这些图片. 每个图需要叠加对应的蒙板。
 图片下方显示 `确定` 按钮，点击后，关闭帮助面板
 
+**资源文件：**
 - 便笺背景图
-assets/images/ZombieNote.jpg
-assets/images/ZombieNote_.png (Alpha 蒙板)
+  - `assets/images/ZombieNote.jpg` (RGB 图层)
+  - `assets/images/ZombieNote_.png` (Alpha 蒙板)
 
 - 帮助文本图
-assets/images/ZombieNoteHelp.png
-assets/images/ZombieNoteHelpBlack.png (Alpha 蒙板)
+  - `assets/images/ZombieNoteHelp.png` (黑底白字)
+  - `assets/images/ZombieNoteHelpBlack.png` (无效蒙板，全黑占位符)
+
+**实现方法（Story 12.3 已完成）：**
+
+1. **便笺背景处理**：
+   - 使用 `utils.ApplyAlphaMask(bgJPG, bgMask)` 合成 RGB 和 Alpha 通道
+   - 实现边缘透明效果
+
+2. **帮助文本处理**（黑底白字 → 透明底黑字）：
+   - **自蒙板技术**：使用 `utils.ApplyAlphaMask(textPNG, textPNG)`
+     - 白色文字（高亮度）→ 不透明
+     - 黑色背景（低亮度）→ 完全透明
+   - **颜色转换**：将所有像素 RGB 设为纯黑 (0, 0, 0)，保持 Alpha 通道
+   - **关键技术**：应用预乘 Alpha 概念消除白边残留
+     - 预乘公式：`finalRGB = targetRGB * (alpha / 255)`
+     - 黑色特性：`0 * (alpha / 255) = 0`，天然适配
+     - 参考实现：`resource_manager.go` 的 `LoadCompositedImage()`
+
+3. **延迟处理机制**：
+   - Alpha 蒙板合成在首次 `Draw()` 时执行（避免游戏启动前调用 `ReadPixels` 导致 panic）
+   - 使用 `composited` 标记确保只处理一次
+
+4. **模块化设计**：
+   - 实现位置：`pkg/modules/help_panel_module.go`
+   - 核心方法：`applyAlphaMasks()`, `convertToBlack()`
+   - 可在多个场景复用（主菜单、游戏场景等）
 
 *   **退出 (Quit)**
 
