@@ -319,6 +319,19 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 		}
 	}
 
+	// Story 12.2: 键盘快捷键触发对话框（临时验证方案）
+	// F1 - 显示帮助对话框
+	if ebiten.IsKeyPressed(ebiten.KeyF1) && m.currentDialog == 0 {
+		m.showHelpDialog()
+		return
+	}
+
+	// O 键 - 显示选项对话框
+	if ebiten.IsKeyPressed(ebiten.KeyO) && m.currentDialog == 0 {
+		m.showOptionsDialog()
+		return
+	}
+
 	// Story 12.3: If a dialog is open, handle dialog input and block background interaction
 	if m.currentDialog != 0 {
 		m.dialogInputSystem.Update(deltaTime)
@@ -1143,4 +1156,33 @@ func getUnlockMessage(buttonType config.MenuButtonType) string {
 	default:
 		return "此功能尚未解锁。"
 	}
+}
+
+// showHelpDialog 显示帮助对话框
+// Story 12.2: Bottom Function Bar
+func (m *MainMenuScene) showHelpDialog() {
+	helpMessage := `游戏操作说明：
+
+鼠标点击：选择植物和种植
+ESC 键：暂停游戏
+F1 键：显示帮助（当前对话框）
+O 键：显示选项设置
+
+更多帮助信息请访问游戏菜单。`
+
+	m.showUnlockDialog("游戏帮助", helpMessage)
+}
+
+// showOptionsDialog 显示选项对话框
+// Story 12.2: Bottom Function Bar
+func (m *MainMenuScene) showOptionsDialog() {
+	optionsMessage := `游戏设置：
+
+音乐音量：已启用
+音效音量：已启用
+全屏模式：窗口模式
+
+（完整的设置功能开发中）`
+
+	m.showUnlockDialog("游戏选项", optionsMessage)
 }
