@@ -163,12 +163,25 @@ func TestMenuButtonHitboxes(t *testing.T) {
 	for _, hitbox := range MenuButtonHitboxes {
 		buttonTypes[hitbox.ButtonType] = true
 
-		// Verify dimensions are positive
-		if hitbox.Width <= 0 {
-			t.Errorf("Button %s has invalid width: %f", hitbox.TrackName, hitbox.Width)
+		// Verify quadrilateral corners are defined
+		// 检查左上角
+		if hitbox.TopLeft.X == 0 && hitbox.TopLeft.Y == 0 {
+			t.Errorf("Button %s has undefined TopLeft corner", hitbox.TrackName)
 		}
-		if hitbox.Height <= 0 {
-			t.Errorf("Button %s has invalid height: %f", hitbox.TrackName, hitbox.Height)
+		// 检查右上角（X 应该大于左上角）
+		if hitbox.TopRight.X <= hitbox.TopLeft.X {
+			t.Errorf("Button %s has invalid TopRight corner (X: %.1f <= TopLeft.X: %.1f)",
+				hitbox.TrackName, hitbox.TopRight.X, hitbox.TopLeft.X)
+		}
+		// 检查右下角（X 应该大于左下角，Y 应该大于右上角）
+		if hitbox.BottomRight.Y <= hitbox.TopRight.Y {
+			t.Errorf("Button %s has invalid BottomRight corner (Y: %.1f <= TopRight.Y: %.1f)",
+				hitbox.TrackName, hitbox.BottomRight.Y, hitbox.TopRight.Y)
+		}
+		// 检查左下角（Y 应该大于左上角）
+		if hitbox.BottomLeft.Y <= hitbox.TopLeft.Y {
+			t.Errorf("Button %s has invalid BottomLeft corner (Y: %.1f <= TopLeft.Y: %.1f)",
+				hitbox.TrackName, hitbox.BottomLeft.Y, hitbox.TopLeft.Y)
 		}
 
 		// Verify track name is not empty
@@ -188,5 +201,43 @@ func TestMenuButtonHitboxes(t *testing.T) {
 		if !buttonTypes[expectedType] {
 			t.Errorf("Missing button type: %v", expectedType)
 		}
+	}
+}
+
+// TestIsPointInQuadrilateral tests the quadrilateral point detection function.
+func TestIsPointInQuadrilateral(t *testing.T) {
+	// 测试标准矩形（无旋转）
+	rect := &MenuButtonHitbox{
+		TrackName:   "test_rect",
+		TopLeft:     Point{X: 100, Y: 100},
+		TopRight:    Point{X: 200, Y: 100},
+		BottomRight: Point{X: 200, Y: 200},
+		BottomLeft:  Point{X: 100, Y: 200},
+	}
+
+	tests := []struct {
+		name     string
+		x, y     float64
+		expected bool
+	}{
+		{"中心点", 150, 150, true},
+		{"左上角内侧", 101, 101, true},
+		{"右下角内侧", 199, 199, true},
+		{"左边缘外", 99, 150, false},
+		{"右边缘外", 201, 150, false},
+		{"上边缘外", 150, 99, false},
+		{"下边缘外", 150, 201, false},
+		{"左上角外", 99, 99, false},
+		{"右下角外", 201, 201, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsPointInQuadrilateral(tt.x, tt.y, rect)
+			if result != tt.expected {
+				t.Errorf("IsPointInQuadrilateral(%.1f, %.1f) = %v, expected %v",
+					tt.x, tt.y, result, tt.expected)
+			}
+		})
 	}
 }

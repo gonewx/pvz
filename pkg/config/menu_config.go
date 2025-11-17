@@ -22,7 +22,16 @@ const (
 	MenuButtonSurvival
 )
 
-// MenuButtonHitbox defines the clickable region for a menu button.
+// Point represents a 2D coordinate point.
+type Point struct {
+	X float64
+	Y float64
+}
+
+// MenuButtonHitbox defines the clickable region for a menu button using a rotated rectangle (quadrilateral).
+//
+// The hitbox is defined by four corner points, allowing precise matching of tilted/rotated buttons.
+// Points are specified in clockwise order: TopLeft → TopRight → BottomRight → BottomLeft.
 //
 // IMPORTANT: The track names in SelectorScreen.reanim do NOT match the actual game modes!
 // See docs/stories/12.1.story-reanim-design.md Section 2.1.5 for the correct mapping:
@@ -37,64 +46,124 @@ type MenuButtonHitbox struct {
 	TrackName string
 	// ButtonType is the actual game mode this button represents
 	ButtonType MenuButtonType
-	// X, Y are the top-left corner coordinates of the clickable region
-	X, Y float64
-	// Width, Height are the dimensions of the clickable region
-	Width, Height float64
+	// Four corner points defining the quadrilateral hitbox (clockwise order)
+	TopLeft     Point
+	TopRight    Point
+	BottomRight Point
+	BottomLeft  Point
+}
+
+// IsPointInQuadrilateral checks if a point is inside a quadrilateral defined by four corners.
+//
+// Uses the cross product method: a point is inside if it's on the same side of all four edges.
+// The corners must be in order (clockwise or counter-clockwise).
+//
+// Parameters:
+//   - x, y: The point to test
+//   - quad: The quadrilateral hitbox
+//
+// Returns:
+//   - true if the point is inside the quadrilateral, false otherwise
+func IsPointInQuadrilateral(x, y float64, quad *MenuButtonHitbox) bool {
+	// 使用叉积法判断点是否在四边形内
+	// 如果点在所有边的同一侧，则点在四边形内
+
+	// 定义四条边（顺时针）
+	edges := []struct{ p1, p2 Point }{
+		{quad.TopLeft, quad.TopRight},       // 上边
+		{quad.TopRight, quad.BottomRight},   // 右边
+		{quad.BottomRight, quad.BottomLeft}, // 下边
+		{quad.BottomLeft, quad.TopLeft},     // 左边
+	}
+
+	// 检查点是否在所有边的同一侧
+	var sign int // 第一条边的符号（正或负）
+	for i, edge := range edges {
+		// 计算叉积：(p2 - p1) × (point - p1)
+		cross := crossProduct(edge.p1, edge.p2, Point{x, y})
+
+		if i == 0 {
+			// 记录第一条边的符号
+			if cross > 0 {
+				sign = 1
+			} else if cross < 0 {
+				sign = -1
+			} else {
+				sign = 0
+			}
+		} else {
+			// 检查后续边的符号是否一致
+			if cross > 0 && sign < 0 {
+				return false
+			}
+			if cross < 0 && sign > 0 {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+// crossProduct calculates the 2D cross product of vectors (p2-p1) and (p3-p1).
+//
+// Returns:
+//   - > 0: p3 is on the left side of the line p1->p2
+//   - < 0: p3 is on the right side of the line p1->p2
+//   - = 0: p3 is on the line p1->p2
+func crossProduct(p1, p2, p3 Point) float64 {
+	return (p2.X-p1.X)*(p3.Y-p1.Y) - (p2.Y-p1.Y)*(p3.X-p1.X)
 }
 
 // MenuButtonHitboxes defines the click regions for all four main menu buttons.
 //
-// Coordinates extracted from SelectorScreen.reanim (final frame positions).
-// Dimensions match the actual button image sizes (measured from PNG files).
+// Coordinates are automatically calculated from SelectorScreen.reanim using cmd/calculate_hitbox tool.
+// Each button is defined as a quadrilateral with four corner points to support rotated/skewed buttons.
 //
-// Image sizes:
-//   - SelectorScreen_Adventure_button: 330 x 120
-//   - SelectorScreen_Survival_button: 313 x 133
-//   - SelectorScreen_Challenges_button: 286 x 122
-//   - SelectorScreen_Vasebreaker_button: 266 x 123
+// To regenerate this configuration:
+//   go run cmd/calculate_hitbox/main.go
 //
 // Story 12.1: Main Menu Tombstone System Enhancement
 var MenuButtonHitboxes = []MenuButtonHitbox{
 	{
-		TrackName:  "SelectorScreen_Adventure_button",
-		ButtonType: MenuButtonAdventure,
-		X:          405,
-		Y:          79.7,
-		Width:      330, // Actual image width
-		Height:     120, // Actual image height
+		TrackName:   "SelectorScreen_Adventure_button",
+		ButtonType:  MenuButtonAdventure,
+		TopLeft:     Point{X: 405.0, Y: 79.7},
+		TopRight:    Point{X: 735.0, Y: 79.7},
+		BottomRight: Point{X: 735.0, Y: 199.7},
+		BottomLeft:  Point{X: 405.0, Y: 199.7},
 	},
 	{
-		TrackName:  "SelectorScreen_StartAdventure_button", // 新用户版本的冒险按钮
-		ButtonType: MenuButtonAdventure,
-		X:          405,
-		Y:          79.7,
-		Width:      330, // Actual image width
-		Height:     120, // Actual image height
+		TrackName:   "SelectorScreen_StartAdventure_button",
+		ButtonType:  MenuButtonAdventure, // 新用户版本的冒险按钮
+		TopLeft:     Point{X: 405.0, Y: 65.0},
+		TopRight:    Point{X: 735.0, Y: 65.0},
+		BottomRight: Point{X: 735.0, Y: 185.0},
+		BottomLeft:  Point{X: 405.0, Y: 185.0},
 	},
 	{
-		TrackName:  "SelectorScreen_Survival_button",
-		ButtonType: MenuButtonChallenges, // 注意：轨道名称是 Survival，但实际对应玩玩小游戏
-		X:          406,
-		Y:          173.1,
-		Width:      313, // Actual image width
-		Height:     133, // Actual image height
+		TrackName:   "SelectorScreen_Survival_button",
+		ButtonType:  MenuButtonChallenges, // 注意：轨道名称是 Survival，但实际对应玩玩小游戏
+		TopLeft:     Point{X: 406.0, Y: 173.1},
+		TopRight:    Point{X: 719.0, Y: 173.1},
+		BottomRight: Point{X: 719.0, Y: 306.1},
+		BottomLeft:  Point{X: 406.0, Y: 306.1},
 	},
 	{
-		TrackName:  "SelectorScreen_Challenges_button",
-		ButtonType: MenuButtonVasebreaker, // 注意：轨道名称是 Challenges，但实际对应解谜模式
-		X:          410,
-		Y:          257.5,
-		Width:      286, // Actual image width
-		Height:     122, // Actual image height
+		TrackName:   "SelectorScreen_Challenges_button",
+		ButtonType:  MenuButtonVasebreaker, // 注意：轨道名称是 Challenges，但实际对应解谜模式
+		TopLeft:     Point{X: 410.0, Y: 257.5},
+		TopRight:    Point{X: 696.0, Y: 257.5},
+		BottomRight: Point{X: 696.0, Y: 379.5},
+		BottomLeft:  Point{X: 410.0, Y: 379.5},
 	},
 	{
-		TrackName:  "SelectorScreen_ZenGarden_button",
-		ButtonType: MenuButtonSurvival, // 注意：轨道名称是 ZenGarden，但实际对应生存模式
-		X:          413,
-		Y:          328.0,
-		Width:      266, // Actual image width
-		Height:     123, // Actual image height
+		TrackName:   "SelectorScreen_ZenGarden_button",
+		ButtonType:  MenuButtonSurvival, // 注意：轨道名称是 ZenGarden，但实际对应生存模式
+		TopLeft:     Point{X: 413.0, Y: 328.0},
+		TopRight:    Point{X: 679.0, Y: 328.0},
+		BottomRight: Point{X: 679.0, Y: 451.0},
+		BottomLeft:  Point{X: 413.0, Y: 451.0},
 	},
 }
 

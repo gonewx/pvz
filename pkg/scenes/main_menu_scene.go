@@ -201,8 +201,11 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	// 调试日志：显示所有按钮的 hitbox 配置
 	log.Printf("[MainMenuScene] 加载了 %d 个按钮 hitbox 配置:", len(scene.buttonHitboxes))
 	for i, hitbox := range scene.buttonHitboxes {
-		log.Printf("[MainMenuScene]   [%d] %s: 位置=(%.1f, %.1f), 尺寸=%.1fx%.1f, 类型=%v",
-			i, hitbox.TrackName, hitbox.X, hitbox.Y, hitbox.Width, hitbox.Height, hitbox.ButtonType)
+		// 计算四边形的宽度和高度（用于日志显示）
+		width := hitbox.TopRight.X - hitbox.TopLeft.X
+		height := hitbox.BottomLeft.Y - hitbox.TopLeft.Y
+		log.Printf("[MainMenuScene]   [%d] %s: 左上角=(%.1f, %.1f), 尺寸=%.1fx%.1f, 类型=%v",
+			i, hitbox.TrackName, hitbox.TopLeft.X, hitbox.TopLeft.Y, width, height, hitbox.ButtonType)
 	}
 
 	// Story 12.1 Task 5: Load button highlight images
@@ -482,11 +485,18 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 			continue
 		}
 
+		// 使用四边形点击检测（支持旋转/倾斜按钮）
+		inHitbox := config.IsPointInQuadrilateral(float64(mouseX), float64(mouseY), &hitbox)
+
 		// 调试日志：显示每个按钮的 hitbox 信息和鼠标位置
-		inHitbox := isPointInRect(float64(mouseX), float64(mouseY), hitbox.X, hitbox.Y, hitbox.Width, hitbox.Height)
 		if hitbox.TrackName == "SelectorScreen_Challenges_button" && (inHitbox || isMouseClicked) {
-			log.Printf("[MainMenuScene] 解谜按钮检测: 鼠标=(%.1f, %.1f), Hitbox=(X:%.1f, Y:%.1f, W:%.1f, H:%.1f), 命中=%v",
-				float64(mouseX), float64(mouseY), hitbox.X, hitbox.Y, hitbox.Width, hitbox.Height, inHitbox)
+			log.Printf("[MainMenuScene] 解谜按钮检测: 鼠标=(%.1f, %.1f), 四边形=[(%.1f,%.1f)-(%.1f,%.1f)-(%.1f,%.1f)-(%.1f,%.1f)], 命中=%v",
+				float64(mouseX), float64(mouseY),
+				hitbox.TopLeft.X, hitbox.TopLeft.Y,
+				hitbox.TopRight.X, hitbox.TopRight.Y,
+				hitbox.BottomRight.X, hitbox.BottomRight.Y,
+				hitbox.BottomLeft.X, hitbox.BottomLeft.Y,
+				inHitbox)
 		}
 
 		// Check if mouse is in hitbox
