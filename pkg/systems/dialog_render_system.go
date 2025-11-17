@@ -3,6 +3,7 @@ package systems
 import (
 	"image/color"
 	"log"
+	"sort"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
@@ -20,25 +21,34 @@ import (
 //   - 渲染对话框装饰（骷髅头）
 //   - 渲染对话框标题和消息
 //   - 渲染对话框按钮
+//   - 渲染对话框的子实体（如输入框） - Story 12.4
 type DialogRenderSystem struct {
-	entityManager *ecs.EntityManager
-	windowWidth   int
-	windowHeight  int
-	titleFont     *text.GoTextFace // 标题字体
-	messageFont   *text.GoTextFace // 消息字体
-	buttonFont    *text.GoTextFace // 按钮字体
+	entityManager         *ecs.EntityManager
+	windowWidth           int
+	windowHeight          int
+	titleFont             *text.GoTextFace // 标题字体
+	messageFont           *text.GoTextFace // 消息字体
+	buttonFont            *text.GoTextFace // 按钮字体
+	textInputRenderSystem *TextInputRenderSystem // 文本输入框渲染系统（用于渲染子实体）
 }
 
 // NewDialogRenderSystem 创建对话框渲染系统
 func NewDialogRenderSystem(em *ecs.EntityManager, windowWidth, windowHeight int, titleFont, messageFont, buttonFont *text.GoTextFace) *DialogRenderSystem {
 	return &DialogRenderSystem{
-		entityManager: em,
-		windowWidth:   windowWidth,
-		windowHeight:  windowHeight,
-		titleFont:     titleFont,
-		messageFont:   messageFont,
-		buttonFont:    buttonFont,
+		entityManager:         em,
+		windowWidth:           windowWidth,
+		windowHeight:          windowHeight,
+		titleFont:             titleFont,
+		messageFont:           messageFont,
+		buttonFont:            buttonFont,
+		textInputRenderSystem: nil, // 稍后通过 SetTextInputRenderSystem 设置
 	}
+}
+
+// SetTextInputRenderSystem 设置文本输入框渲染系统
+// Story 12.4: 用于渲染对话框的子实体（输入框）
+func (s *DialogRenderSystem) SetTextInputRenderSystem(tirs *TextInputRenderSystem) {
+	s.textInputRenderSystem = tirs
 }
 
 // Draw 渲染所有对话框
@@ -55,6 +65,12 @@ func (s *DialogRenderSystem) Draw(screen *ebiten.Image) {
 
 	// 绘制半透明遮罩（只需要绘制一次）
 	s.drawOverlay(screen)
+
+	// ✅ Story 12.4: 按实体 ID 排序，确保渲染顺序固定（防止闪烁）
+	// ID 小的先渲染（在底层），ID 大的后渲染（在上层）
+	sort.Slice(dialogEntities, func(i, j int) bool {
+		return dialogEntities[i] < dialogEntities[j]
+	})
 
 	// 渲染每个对话框
 	for _, entityID := range dialogEntities {
@@ -91,8 +107,51 @@ func (s *DialogRenderSystem) Draw(screen *ebiten.Image) {
 		// 5. 绘制按钮
 		s.drawButtons(screen, dialogComp, posComp.X, posComp.Y)
 
+		// 6. ✅ Story 12.4: 绘制对话框的子实体（如输入框）
+		// 在对话框之后立即渲染其子实体，确保层级正确
+		if len(dialogComp.ChildEntities) > 0 {
+			log.Printf("[DialogRenderSystem] 对话框有 %d 个子实体，开始渲染", len(dialogComp.ChildEntities))
+			s.drawChildEntities(screen, dialogComp)
+		} else {
+			log.Printf("[DialogRenderSystem] 对话框没有子实体")
+		}
+
 		log.Printf("[DialogRenderSystem] 对话框渲染完成")
 	}
+}
+
+// drawChildEntities 绘制对话框的子实体（如输入框）
+// Story 12.4: 确保子实体跟随父对话框的z-order
+func (s *DialogRenderSystem) drawChildEntities(screen *ebiten.Image, dialogComp *components.DialogComponent) {
+	if s.textInputRenderSystem == nil {
+		log.Printf("[DialogRenderSystem] ⚠️ textInputRenderSystem is nil, cannot render child entities")
+		return
+	}
+
+	log.Printf("[DialogRenderSystem] 开始渲染 %d 个子实体", len(dialogComp.ChildEntities))
+
+	// 遍历所有子实体
+	for _, childID := range dialogComp.ChildEntities {
+		// 检查是否是文本输入框
+		input, ok := ecs.GetComponent[*components.TextInputComponent](s.entityManager, childID)
+		if !ok {
+			log.Printf("[DialogRenderSystem] 子实体 %d 不是文本输入框", childID)
+			continue
+		}
+
+		pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, childID)
+		if !ok {
+			log.Printf("[DialogRenderSystem] 子实体 %d 没有 PositionComponent", childID)
+			continue
+		}
+
+		log.Printf("[DialogRenderSystem] 渲染输入框子实体 %d at (%.0f, %.0f)", childID, pos.X, pos.Y)
+
+		// 直接调用 TextInputRenderSystem 的绘制方法
+		s.textInputRenderSystem.DrawInputBox(screen, input, pos)
+	}
+
+	log.Printf("[DialogRenderSystem] 子实体渲染完成")
 }
 
 // drawOverlay 绘制半透明遮罩
@@ -152,33 +211,89 @@ func (s *DialogRenderSystem) drawTitle(screen *ebiten.Image, dialog *components.
 	text.Draw(screen, dialog.Title, s.titleFont, op)
 }
 
-// drawMessage 绘制消息文字
+// drawMessage 绘制消息文字（支持多行）
 func (s *DialogRenderSystem) drawMessage(screen *ebiten.Image, dialog *components.DialogComponent, dialogX, dialogY float64) {
 	if dialog.Message == "" || s.messageFont == nil {
 		return
 	}
 
-	// 消息显示在对话框中部
-	centerX := dialogX + dialog.Width/2
-	centerY := dialogY + dialog.Height/2 - 10
+	// ✅ Story 12.4: 支持多行文本显示
+	// 将长文本按宽度限制自动换行
+	const maxLineWidth = 380.0 // 对话框宽度 - 左右边距
+	const lineHeight = 25.0     // 行高
 
-	log.Printf("[DialogRenderSystem] 绘制消息: '%s' at (%.0f, %.0f)", dialog.Message, centerX, centerY)
+	// 将消息文本按 maxLineWidth 分割成多行
+	lines := s.wrapText(dialog.Message, maxLineWidth)
 
-	// 1. 先绘制阴影（黑色，稍微偏移）
-	shadowOp := &text.DrawOptions{}
-	shadowOp.LayoutOptions.PrimaryAlign = text.AlignCenter
-	shadowOp.LayoutOptions.SecondaryAlign = text.AlignCenter
-	shadowOp.GeoM.Translate(centerX+2, centerY+2)                // 阴影偏移2像素
-	shadowOp.ColorScale.ScaleWithColor(color.RGBA{0, 0, 0, 128}) // 半透明黑色
-	text.Draw(screen, dialog.Message, s.messageFont, shadowOp)
+	// 计算总高度（用于垂直居中）
+	totalHeight := float64(len(lines)) * lineHeight
 
-	// 2. 再绘制主文字（橙黄色 - 和奖励面板标题一样）
-	op := &text.DrawOptions{}
-	op.LayoutOptions.PrimaryAlign = text.AlignCenter
-	op.LayoutOptions.SecondaryAlign = text.AlignCenter
-	op.GeoM.Translate(centerX, centerY)
-	op.ColorScale.ScaleWithColor(color.RGBA{255, 200, 0, 255}) // 橙黄色
-	text.Draw(screen, dialog.Message, s.messageFont, op)
+	// 起始Y坐标（垂直居中）
+	startY := dialogY + (dialog.Height-totalHeight)/2 + 10 // 稍微往上移
+
+	log.Printf("[DialogRenderSystem] 绘制消息 (%d 行): '%s' at (%.0f, %.0f)", len(lines), dialog.Message, dialogX+dialog.Width/2, startY)
+
+	// 逐行绘制
+	for i, line := range lines {
+		if line == "" {
+			continue
+		}
+
+		centerX := dialogX + dialog.Width/2
+		lineY := startY + float64(i)*lineHeight
+
+		// 1. 先绘制阴影（黑色，稍微偏移）
+		shadowOp := &text.DrawOptions{}
+		shadowOp.LayoutOptions.PrimaryAlign = text.AlignCenter
+		shadowOp.LayoutOptions.SecondaryAlign = text.AlignStart
+		shadowOp.GeoM.Translate(centerX+2, lineY+2)                  // 阴影偏移2像素
+		shadowOp.ColorScale.ScaleWithColor(color.RGBA{0, 0, 0, 128}) // 半透明黑色
+		text.Draw(screen, line, s.messageFont, shadowOp)
+
+		// 2. 再���制主文字（橙黄色）
+		op := &text.DrawOptions{}
+		op.LayoutOptions.PrimaryAlign = text.AlignCenter
+		op.LayoutOptions.SecondaryAlign = text.AlignStart
+		op.GeoM.Translate(centerX, lineY)
+		op.ColorScale.ScaleWithColor(color.RGBA{255, 200, 0, 255}) // 橙黄色
+		text.Draw(screen, line, s.messageFont, op)
+	}
+}
+
+// wrapText 将文本按指定宽度分割成多行
+// Story 12.4: 自动换行支持
+func (s *DialogRenderSystem) wrapText(textStr string, maxWidth float64) []string {
+	if s.messageFont == nil {
+		return []string{textStr}
+	}
+
+	words := []rune(textStr)
+	var lines []string
+	var currentLine []rune
+
+	for _, ch := range words {
+		// 尝试添加字符到当前行
+		testLine := append(currentLine, ch)
+		testLineStr := string(testLine)
+
+		// 测量宽度
+		width, _ := text.Measure(testLineStr, s.messageFont, 0)
+
+		if width > maxWidth && len(currentLine) > 0 {
+			// 当前行已满，保存并开始新行
+			lines = append(lines, string(currentLine))
+			currentLine = []rune{ch}
+		} else {
+			currentLine = testLine
+		}
+	}
+
+	// 添加最后一行
+	if len(currentLine) > 0 {
+		lines = append(lines, string(currentLine))
+	}
+
+	return lines
 }
 
 // drawButtons 绘制按钮

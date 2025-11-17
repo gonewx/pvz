@@ -109,6 +109,7 @@ func NewDialogEntity(
 		IsVisible: true,
 		Width:     dialogWidth,
 		Height:    dialogHeight,
+		AutoClose: true, // 错误对话框点击后自动关闭
 	})
 
 	// 添加 UI 组件标记
@@ -192,7 +193,7 @@ func calculateDialogSize(message string) (width, height float64) {
 	const (
 		MinWidth        = 400.0 // 最小宽度
 		MaxWidth        = 600.0 // 最大宽度
-		MinHeight       = 150.0 // 最小高度
+		MinHeight       = 250.0 // 最小高度
 		PaddingX        = 40.0  // 水平内边距（左右各20）
 		PaddingY        = 40.0  // 垂直内边距（上下各20）
 		TitleHeight     = 60.0  // 标题区域高度（包含骷髅头装饰空间）

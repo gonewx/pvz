@@ -14,6 +14,7 @@ import (
 	"github.com/decker502/pvz/pkg/systems"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
 const (
@@ -77,6 +78,17 @@ type MainMenuScene struct {
 	// Keyboard state tracking for edge detection
 	wasF1Pressed bool // Track F1 key state from previous frame
 	wasOPressed  bool // Track O key state from previous frame
+
+	// Story 12.4: User management UI
+	isFirstLaunch         bool                           // Whether this is first launch (no users)
+	newUserDialogShown    bool                           // Whether new user dialog has been shown for first launch
+	currentUserDialogID   ecs.EntityID                   // Current user dialog entity (0 = none)
+	currentInputBoxID     ecs.EntityID                   // Current text input box entity (0 = none)
+	currentErrorDialogID  ecs.EntityID                   // Current error dialog entity (0 = none) - Story 12.4: 防止错误对话框叠加
+	textInputSystem       *systems.TextInputSystem       // Text input system
+	textInputRenderSystem *systems.TextInputRenderSystem // Text input render system
+	userSignEntity        ecs.EntityID                   // User sign entity (wood sign showing username)
+	saveManager           *game.SaveManager              // Save manager reference for user management
 }
 
 // NewMainMenuScene creates and returns a new MainMenuScene instance.
@@ -112,6 +124,34 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	scene.renderSystem.SetReanimSystem(scene.reanimSystem)
 	log.Printf("[MainMenuScene] Initialized ECS systems")
 
+	// Story 12.4: Check if this is first launch (BEFORE creating SelectorScreen)
+	gameState := game.GetGameState()
+	saveManager := gameState.GetSaveManager()
+	scene.saveManager = saveManager // Save reference for user management
+	users, err := saveManager.LoadUserList()
+	if err != nil || len(users) == 0 {
+		// First launch: no users exist
+		scene.isFirstLaunch = true
+		scene.currentLevel = "1-1"
+		scene.hasStartedGame = false
+		log.Printf("[MainMenuScene] First launch detected: no users found")
+	} else {
+		// Not first launch: load current user's save
+		scene.isFirstLaunch = false
+		if err := saveManager.Load(); err == nil {
+			scene.currentLevel = saveManager.GetHighestLevel()
+			if scene.currentLevel == "" {
+				scene.currentLevel = "1-1"
+			}
+			scene.hasStartedGame = saveManager.GetHasStartedGame()
+			log.Printf("[MainMenuScene] Loaded highest level: %s, hasStartedGame: %v", scene.currentLevel, scene.hasStartedGame)
+		} else {
+			scene.currentLevel = "1-1"
+			scene.hasStartedGame = false
+			log.Printf("[MainMenuScene] No save file, defaulting to level 1-1")
+		}
+	}
+
 	// Story 12.1: Create SelectorScreen Reanim entity
 	selectorEntity, err := entities.NewSelectorScreenEntity(scene.entityManager, rm)
 	if err != nil {
@@ -124,12 +164,43 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 		// ✅ Epic 14: 移除 AnalyzeTrackTypes 调用（已私有化，由 ReanimSystem 内部处理）
 		// PlayAnimation/AddAnimation 会自动调用 analyzeTrackTypes
 
-		// ✅ Epic 14: 使用 AnimationCommand 触发开场组合动画（anim_open + anim_sign）
-		ecs.AddComponent(scene.entityManager, selectorEntity, &components.AnimationCommandComponent{
-			UnitID:    "selectorscreen",
-			ComboName: "opening", // 使用配置的组合动画（包含 anim_open 和 anim_sign）
-			Processed: false,
-		})
+		// Story 12.4 AC8: **关键修复**：在播放动画之前先设置 HiddenTracks
+		// 这样首次渲染就不会显示木牌和草叶子
+		reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](scene.entityManager, selectorEntity)
+		if ok && scene.isFirstLaunch {
+			reanimComp.HiddenTracks = make(map[string]bool)
+			// 隐��木牌轨道
+			reanimComp.HiddenTracks["woodsign1"] = true
+			reanimComp.HiddenTracks["woodsign2"] = true
+			reanimComp.HiddenTracks["woodsign3"] = true
+			// 隐藏草叶子轨道
+			reanimComp.HiddenTracks["leaf1"] = true
+			reanimComp.HiddenTracks["leaf2"] = true
+			reanimComp.HiddenTracks["leaf3"] = true
+			reanimComp.HiddenTracks["leaf4"] = true
+			reanimComp.HiddenTracks["leaf5"] = true
+			reanimComp.HiddenTracks["leaf22"] = true
+			reanimComp.HiddenTracks["leaf_SelectorScreen_Leaves"] = true
+			log.Printf("[MainMenuScene] First launch: hidden woodsign and leaf tracks (**BEFORE** playing animation)")
+		}
+
+		// ✅ Story 12.4 AC8: 根据首次启动状态播放不同的动画
+		if scene.isFirstLaunch {
+			// 首次启动：仅播放 anim_open（背景展开），不播放木牌和草动画
+			ecs.AddComponent(scene.entityManager, selectorEntity, &components.AnimationCommandComponent{
+				AnimationName: "anim_open", // 单动画模式
+				Processed:     false,
+			})
+			log.Printf("[MainMenuScene] First launch: playing anim_open only")
+		} else {
+			// 非首次启动：播放完整开场组合（anim_open + anim_sign）
+			ecs.AddComponent(scene.entityManager, selectorEntity, &components.AnimationCommandComponent{
+				UnitID:    "selectorscreen",
+				ComboName: "opening", // 使用配置的组合动画（包含 anim_open 和 anim_sign）
+				Processed: false,
+			})
+			log.Printf("[MainMenuScene] Normal launch: playing opening combo (anim_open + anim_sign)")
+		}
 
 		// 处理 AnimationCommand（立即初始化动画）
 		scene.reanimSystem.Update(0)
@@ -139,10 +210,10 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 		// 4. ✅ Epic 14: 移除 FinalizeAnimations 调用（已私有化，由 PlayAnimation/AddAnimation 内部处理）
 
 		// 5. 获取 ReanimComponent 并设置循环状态
-		reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](scene.entityManager, selectorEntity)
+		reanimComp, ok = ecs.GetComponent[*components.ReanimComponent](scene.entityManager, selectorEntity)
 		if ok {
 			// 🔍 调试：输出 AnimationFPS 的值
-			log.Printf("[MainMenuScene] 🔍 DEBUG: AnimationFPS = %.1f (全局 FPS)", reanimComp.AnimationFPS)
+			log.Printf("[MainMenuScene] ���� DEBUG: AnimationFPS = %.1f (全局 FPS)", reanimComp.AnimationFPS)
 
 			// 初始化 AnimationLoopStates、AnimationPausedStates 和 AnimationFPSOverrides
 			reanimComp.AnimationLoopStates = make(map[string]bool)
@@ -213,24 +284,13 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	scene.buttonHighlightImages = make(map[string]*ebiten.Image)
 	scene.loadButtonImages(rm)
 
-	// Story 12.1: Load current level from save
-	gameState := game.GetGameState()
-	saveManager := gameState.GetSaveManager()
-	if err := saveManager.Load(); err == nil {
-		scene.currentLevel = saveManager.GetHighestLevel()
-		if scene.currentLevel == "" {
-			scene.currentLevel = "1-1" // Default for new players
-		}
-		scene.hasStartedGame = saveManager.GetHasStartedGame()
-		log.Printf("[MainMenuScene] Loaded highest level: %s, hasStartedGame: %v", scene.currentLevel, scene.hasStartedGame)
-	} else {
-		scene.currentLevel = "1-1"   // Default for new players
-		scene.hasStartedGame = false // New players haven't started the game
-		log.Printf("[MainMenuScene] No save file, defaulting to level 1-1, hasStartedGame: false")
-	}
-
 	// Story 12.1: Update button visibility based on unlock status
 	scene.updateButtonVisibility()
+
+	// Story 12.4: Initialize user sign (if not first launch)
+	if !scene.isFirstLaunch {
+		scene.initUserSign()
+	}
 
 	// Load background image (fallback if SelectorScreen fails)
 	// img, err := rm.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_BG")
@@ -321,12 +381,41 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	// Story 12.2: Load bottom function button images
 	scene.loadBottomButtonImages()
 
+	// Story 12.4: Initialize text input systems (for user management dialogs)
+	scene.textInputSystem = systems.NewTextInputSystem(scene.entityManager)
+	// 加载输入框字体（与消息字体一致）
+	inputFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 20)
+	if err != nil {
+		log.Printf("[MainMenuScene] Warning: Failed to load input font: %v", err)
+	}
+	scene.textInputRenderSystem = systems.NewTextInputRenderSystem(scene.entityManager, inputFont)
+	log.Printf("[MainMenuScene] Text input systems initialized")
+
+	// ✅ Story 12.4: 设置 DialogRenderSystem 的 TextInputRenderSystem 引用
+	// 这样 DialogRenderSystem 可以在渲染对话框后立即渲染其子实体（输入框）
+	scene.dialogRenderSystem.SetTextInputRenderSystem(scene.textInputRenderSystem)
+	log.Printf("[MainMenuScene] Set TextInputRenderSystem reference in DialogRenderSystem")
+
 	return scene
 }
 
 // Update updates the main menu scene logic.
 // deltaTime is the time elapsed since the last update in seconds.
 func (m *MainMenuScene) Update(deltaTime float64) {
+	// 清理上一帧标记删除的实体（确保本帧开始前已删除）
+	m.entityManager.RemoveMarkedEntities()
+
+	// Story 12.4: Check for first launch and show new user dialog
+	if m.isFirstLaunch && !m.newUserDialogShown {
+		m.showNewUserDialogForFirstLaunch()
+		m.newUserDialogShown = true
+	}
+
+	// Story 12.4: Update text input system (for user dialogs)
+	if m.textInputSystem != nil {
+		m.textInputSystem.Update(deltaTime)
+	}
+
 	// Ensure background music is playing
 	if m.bgmPlayer != nil && !m.bgmPlayer.IsPlaying() {
 		m.bgmPlayer.Play()
@@ -344,7 +433,8 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 				// 策略：
 				//   1. 保留 anim_open（停留在最后一帧，提供背景）
 				//   2. 添加 anim_idle（提供按钮动画）
-				//   3. 添加云朵和草动画（在上层）
+				//   3. 添加云朵动画（在上层）
+				//   4. Story 12.4 AC8: 仅在非首次启动时添加草动画
 				// 原因：anim_idle 从物理帧 41 开始，但背景轨道在帧 41 被隐藏了（f=-1）
 				//       anim_open（帧 0-12）提供背景，anim_idle（帧 41+）提供按钮动画
 
@@ -357,7 +447,7 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 				//   理论顺序（从底到顶）：
 				//   1. anim_open (背景)
 				//   2. 云朵动画 (中间层)
-				//   3. anim_grass (草)
+				//   3. anim_grass (草) - 仅非首次启动
 				//   4. anim_idle (按钮，最上层)
 
 				// 1. 先添加云朵动画
@@ -371,11 +461,17 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 					reanimComp.AnimationLoopStates[animName] = true
 				}
 
-				// 2. 添加 anim_grass
-				if err := m.reanimSystem.AddAnimation(m.selectorScreenEntity, "anim_grass"); err != nil {
-					log.Printf("[MainMenuScene] Warning: Failed to add anim_grass: %v", err)
+				// 2. Story 12.4 AC8: 仅在非首次启动时添加 anim_grass
+				// 首次启动时，草动画会在用户创建成功后手动添加
+				if !m.isFirstLaunch {
+					if err := m.reanimSystem.AddAnimation(m.selectorScreenEntity, "anim_grass"); err != nil {
+						log.Printf("[MainMenuScene] Warning: Failed to add anim_grass: %v", err)
+					}
+					reanimComp.AnimationLoopStates["anim_grass"] = true
+					log.Printf("[MainMenuScene] Added anim_grass (non-first launch)")
+				} else {
+					log.Printf("[MainMenuScene] Skipped anim_grass (first launch, will add after user creation)")
 				}
-				reanimComp.AnimationLoopStates["anim_grass"] = true
 
 				// 3. 最后添加 anim_idle（按钮应该在最上层）
 				if err := m.reanimSystem.AddAnimation(m.selectorScreenEntity, "anim_idle"); err != nil {
@@ -403,11 +499,29 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 		m.buttonSystem.Update(deltaTime)
 	}
 
+	// Get mouse position (needed for both dialog and background interaction)
+	mouseX, mouseY := ebiten.CursorPosition()
+
+	// Check if mouse button is currently pressed
+	isMousePressed := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
+
+	// Detect click edge (button was just pressed this frame)
+	isMouseClicked := isMousePressed && !m.wasMousePressed
+
 	// Story 12.2: 键盘快捷键触发面板（临时验证方案）
 	// 检查是否有面板或对话框打开
+	// ✅ Story 12.4: 同时检查 currentDialog, currentUserDialogID 和 currentErrorDialogID
 	panelOpen := (m.helpPanelModule != nil && m.helpPanelModule.IsActive()) ||
 		(m.optionsPanelModule != nil && m.optionsPanelModule.IsActive()) ||
-		m.currentDialog != 0
+		m.currentDialog != 0 ||
+		m.currentUserDialogID != 0 ||
+		m.currentErrorDialogID != 0
+
+	// ✅ Story 12.4: 调试日志 - 跟踪对话框状态
+	if m.currentUserDialogID != 0 || m.currentErrorDialogID != 0 {
+		log.Printf("[MainMenuScene] Dialog state: panelOpen=%v, currentDialog=%d, currentUserDialogID=%d, currentErrorDialogID=%d",
+			panelOpen, m.currentDialog, m.currentUserDialogID, m.currentErrorDialogID)
+	}
 
 	// 检测按键状态（用于边缘检测）
 	isF1Pressed := ebiten.IsKeyPressed(ebiten.KeyF1)
@@ -434,7 +548,7 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 	// Story 12.3: If a panel or dialog is open, block background interaction
 	if panelOpen {
 		// 阻止背景交互
-		m.wasMousePressed = ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
+		m.wasMousePressed = isMousePressed
 
 		// 对话框输入系统处理（如果有对话框）
 		if m.currentDialog != 0 {
@@ -453,20 +567,39 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 
 			if !dialogStillExists {
 				m.currentDialog = 0
+				// 如果是错误对话框被关闭，也清除 currentErrorDialogID
+				if m.currentErrorDialogID != 0 {
+					// 检查错误对话框是否还存在
+					errorDialogExists := false
+					for _, entityID := range dialogEntities {
+						if entityID == m.currentErrorDialogID {
+							errorDialogExists = true
+							break
+						}
+					}
+					if !errorDialogExists {
+						log.Printf("[MainMenuScene] Error dialog closed, clearing currentErrorDialogID")
+						m.currentErrorDialogID = 0
+					}
+				}
+
+				// ✅ Story 12.4: 如果还有其他对话框，将 currentDialog 设置为最上层对话框
+				if len(dialogEntities) > 0 {
+					// 找到 ID 最大的对话框（最上层）
+					var maxDialogID ecs.EntityID = 0
+					for _, entityID := range dialogEntities {
+						if entityID > maxDialogID {
+							maxDialogID = entityID
+						}
+					}
+					m.currentDialog = maxDialogID
+					log.Printf("[MainMenuScene] Updated currentDialog to topmost dialog (ID: %d)", maxDialogID)
+				}
 			}
 		}
 
 		return
 	}
-
-	// Get mouse position
-	mouseX, mouseY := ebiten.CursorPosition()
-
-	// Check if mouse button is currently pressed
-	isMousePressed := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
-
-	// Detect click edge (button was just pressed this frame)
-	isMouseClicked := isMousePressed && !m.wasMousePressed
 
 	// Story 12.1: Check SelectorScreen button hitboxes
 	m.hoveredButton = "" // Reset hovered button
@@ -543,6 +676,9 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 
 	// Story 12.1 Task 5: Update button highlight based on hover state
 	m.updateButtonHighlight()
+
+	// Story 12.4 Task 2.3: Update user sign hover state
+	m.updateUserSignHover(mouseX, mouseY, isMouseClicked)
 
 	// Story 12.1 Task 5: Update mouse cursor based on hover state
 	m.updateMouseCursor()
@@ -912,6 +1048,9 @@ func (m *MainMenuScene) Draw(screen *ebiten.Image) {
 			log.Println("[MainMenuScene] ⚠️ currentLevel 为空，不渲染数字")
 		}
 
+		// Story 12.4 Task 2.4: 渲染木牌上的用户名文本
+		m.renderUserSignText(screen)
+
 		// Note: Old m.buttons drawing removed - SelectorScreen Reanim handles all button rendering
 	} else {
 		// Fallback: Draw background image if SelectorScreen failed to load
@@ -974,6 +1113,8 @@ func (m *MainMenuScene) Draw(screen *ebiten.Image) {
 	m.drawBottomButtons(screen)
 
 	// Story 12.3: Draw dialogs (last, on top of everything)
+	// ✅ Story 12.4: DialogRenderSystem 现在也负责渲染对话框的子实体（输入框）
+	// 这样确保输入框跟随父对话框的z-order，不会总是显示在最上层
 	if m.dialogRenderSystem != nil {
 		m.dialogRenderSystem.Draw(screen)
 	}
@@ -1191,6 +1332,16 @@ func (m *MainMenuScene) updateButtonVisibility() {
 	// 未解锁时：不隐藏按钮和阴影（显示墓碑状态）
 
 	// Step 3: Apply merged HiddenTracks to ReanimComponent
+	// Story 12.4: 首次启动时需要保留 leaf 轨道的隐藏状态
+	if m.isFirstLaunch && reanimComp.HiddenTracks != nil {
+		// 保留首次启动时设置的 leaf 轨道隐藏
+		for trackName := range reanimComp.HiddenTracks {
+			if !hiddenTracks[trackName] {
+				log.Printf("[MainMenuScene] Preserving first-launch hidden track: %s", trackName)
+				hiddenTracks[trackName] = true
+			}
+		}
+	}
 	reanimComp.HiddenTracks = hiddenTracks
 
 	log.Printf("[MainMenuScene] Updated button visibility (level=%s, %d hidden tracks): Adventure=%v, Challenges=%v, Vasebreaker=%v, Survival=%v",
@@ -1574,4 +1725,701 @@ func (m *MainMenuScene) onBottomButtonClicked(btnType components.BottomButtonTyp
 		log.Printf("[MainMenuScene] Quit button clicked - exiting game")
 		os.Exit(0)
 	}
+}
+
+// showNewUserDialogForFirstLaunch 显示首次启动的新建用户对话框
+//
+// Story 12.4: 首次启动用户创建流程
+//
+// 当游戏首次启动（无任何用户）时，自动弹出新建用户对话框
+// 用户必须创建用户才能继续游戏（不可跳过）
+func (m *MainMenuScene) showNewUserDialogForFirstLaunch() {
+	log.Printf("[MainMenuScene] Showing new user dialog for first launch")
+
+	// 创建新建用户对话框
+	dialogID, inputBoxID, err := entities.NewNewUserDialogEntity(
+		m.entityManager,
+		m.resourceManager,
+		WindowWidth,
+		WindowHeight,
+		func(result entities.NewUserDialogResult) {
+			if result.Confirmed {
+				// 用户点击"好"按钮（无论用户名是否为空）
+				// onNewUserCreated 内部会验证用户名
+				// 验证失败时会显示错误对话框，但���关闭新用户对话框
+				m.onNewUserCreated(result.Username)
+			} else {
+				// 用户点击"取消"按钮
+				// 首次启动不允许取消，显示错误提示对话框
+				log.Printf("[MainMenuScene] First launch: cannot cancel user creation, showing error dialog")
+				m.showErrorDialog("输入你的名字", "请输入你的名字，以创建新的用户档案。档案用于保存游戏积分和进度。")
+			}
+		},
+	)
+
+	if err != nil {
+		log.Printf("[MainMenuScene] Error: Failed to create new user dialog: %v", err)
+		return
+	}
+
+	m.currentUserDialogID = dialogID
+	m.currentInputBoxID = inputBoxID
+	m.currentDialog = dialogID // 设置 currentDialog 以触发背景交互阻止
+	log.Printf("[MainMenuScene] New user dialog created (entity ID: %d)", dialogID)
+}
+
+// onNewUserCreated 处理新用户创建成功的回调
+func (m *MainMenuScene) onNewUserCreated(username string) {
+	log.Printf("[MainMenuScene] Creating new user: %s", username)
+
+	gameState := game.GetGameState()
+	saveManager := gameState.GetSaveManager()
+
+	// 验证用户名
+	if err := saveManager.ValidateUsername(username); err != nil {
+		log.Printf("[MainMenuScene] Invalid username: %v", err)
+		// 显示错误提示对话框
+		m.showErrorDialog("无效的用户名", err.Error())
+		return
+	}
+
+	// 创建用户
+	if err := saveManager.CreateUser(username); err != nil {
+		log.Printf("[MainMenuScene] Failed to create user: %v", err)
+		m.showErrorDialog("创建用户失败", err.Error())
+		return
+	}
+
+	log.Printf("[MainMenuScene] User created successfully: %s", username)
+
+	// 关闭对话框
+	m.closeCurrentDialog()
+
+	// 重新加载存档数据
+	if err := saveManager.Load(); err == nil {
+		m.currentLevel = saveManager.GetHighestLevel()
+		if m.currentLevel == "" {
+			m.currentLevel = "1-1"
+		}
+		m.hasStartedGame = saveManager.GetHasStartedGame()
+	}
+
+	// 更新按钮可见性
+	m.updateButtonVisibility()
+
+	// Story 12.4: 初始化木牌（显示用户名）
+	m.initUserSign()
+
+	// 更新标志（不再是首次启动）
+	wasFirstLaunch := m.isFirstLaunch
+	m.isFirstLaunch = false
+
+	// Story 12.4 AC8: 创建成功后，播放 anim_sign + anim_grass
+	if wasFirstLaunch && m.selectorScreenEntity != 0 {
+		// 首次启动时，取消隐藏木牌和草叶子轨道
+		reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
+		if ok && reanimComp.HiddenTracks != nil {
+			// 取消隐藏木牌轨道
+			delete(reanimComp.HiddenTracks, "woodsign1")
+			delete(reanimComp.HiddenTracks, "woodsign2")
+			delete(reanimComp.HiddenTracks, "woodsign3")
+			// 取消隐藏草叶子轨道
+			delete(reanimComp.HiddenTracks, "leaf1")
+			delete(reanimComp.HiddenTracks, "leaf2")
+			delete(reanimComp.HiddenTracks, "leaf3")
+			delete(reanimComp.HiddenTracks, "leaf4")
+			delete(reanimComp.HiddenTracks, "leaf5")
+			delete(reanimComp.HiddenTracks, "leaf22")
+			delete(reanimComp.HiddenTracks, "leaf_SelectorScreen_Leaves")
+			log.Printf("[MainMenuScene] First launch: unhidden woodsign and leaf tracks")
+		}
+
+		// 播放木牌和草动画（anim_sign + anim_grass）
+		ecs.AddComponent(m.entityManager, m.selectorScreenEntity, &components.AnimationCommandComponent{
+			AnimationName: "anim_sign", // 先添加木牌动画
+			Processed:     false,
+		})
+		ecs.AddComponent(m.entityManager, m.selectorScreenEntity, &components.AnimationCommandComponent{
+			AnimationName: "anim_grass", // 再添加草动画
+			Processed:     false,
+		})
+		m.reanimSystem.Update(0)
+		log.Printf("[MainMenuScene] First launch: playing anim_sign + anim_grass after user creation")
+	}
+
+	log.Printf("[MainMenuScene] First launch setup completed")
+}
+
+// closeCurrentDialog 关闭当前打开的对话框
+func (m *MainMenuScene) closeCurrentDialog() {
+	if m.currentUserDialogID != 0 {
+		m.entityManager.DestroyEntity(m.currentUserDialogID)
+		m.currentUserDialogID = 0
+	}
+	if m.currentInputBoxID != 0 {
+		m.entityManager.DestroyEntity(m.currentInputBoxID)
+		m.currentInputBoxID = 0
+	}
+	// 清除 currentDialog 以允许背景交互
+	m.currentDialog = 0
+}
+
+// showErrorDialog 显示错误提示对话框
+// 注意：错误对话框不会影响 currentDialog/currentUserDialogID 的跟踪
+// 这样错误对话框关闭后，新用户对话框仍然保持打开状态
+// Story 12.4: 防止错误对话框叠加 - 同一时间只能有一个错误对话框
+func (m *MainMenuScene) showErrorDialog(title, message string) {
+	// ✅ 如果已有错误对话框，先销毁旧的
+	if m.currentErrorDialogID != 0 {
+		log.Printf("[MainMenuScene] Destroying old error dialog (entity ID: %d)", m.currentErrorDialogID)
+		// 如果 currentDialog 指向错误对话框，也清除
+		if m.currentDialog == m.currentErrorDialogID {
+			m.currentDialog = 0
+		}
+		m.entityManager.DestroyEntity(m.currentErrorDialogID)
+		m.currentErrorDialogID = 0
+	}
+
+	dialogID, err := entities.NewDialogEntity(
+		m.entityManager,
+		m.resourceManager,
+		title,
+		message,
+		[]string{"确定"},
+		WindowWidth,
+		WindowHeight,
+	)
+
+	if err != nil {
+		log.Printf("[MainMenuScene] Error: Failed to create error dialog: %v", err)
+		return
+	}
+
+	// ✅ 记录错误对话框ID，用于下次创建时销毁
+	m.currentErrorDialogID = dialogID
+	m.currentDialog = dialogID // 设置为当前对话框，触发背景交互阻止
+	log.Printf("[MainMenuScene] Error dialog created (entity ID: %d)", dialogID)
+}
+
+// initUserSign 初始化木牌UI实体（显示用户名）
+// Story 12.4 Task 2.2
+func (m *MainMenuScene) initUserSign() {
+	// 获取当前用户名
+	currentUser := m.saveManager.GetCurrentUser()
+	if currentUser == "" {
+		log.Printf("[MainMenuScene] Warning: No current user, skipping user sign initialization")
+		return
+	}
+
+	// 加载木牌按下状态图片
+	signPressImage, err := m.resourceManager.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_WOODSIGN2_PRESS")
+	if err != nil {
+		log.Printf("[MainMenuScene] Warning: Failed to load sign press image: %v", err)
+		signPressImage = nil
+	}
+
+	// 创建木牌实体（复用 SelectorScreen 中的 anim_sign 轨道）
+	// 木牌通过 Reanim 动画渲染，所以这里只需要添加 UserSignComponent
+	// 记录当前用户名和悬停状态
+
+	// 由于木牌已经在 SelectorScreen Reanim 中渲染，我们不需要创建新的实体
+	// 只需要在 SelectorScreen 实体上添加 UserSignComponent 即可
+	if m.selectorScreenEntity != 0 {
+		ecs.AddComponent(m.entityManager, m.selectorScreenEntity, &components.UserSignComponent{
+			CurrentUsername: currentUser,
+			IsHovered:       false,
+			SignPressImage:  signPressImage,
+		})
+		m.userSignEntity = m.selectorScreenEntity
+		log.Printf("[MainMenuScene] User sign initialized for user: %s", currentUser)
+	} else {
+		log.Printf("[MainMenuScene] Warning: SelectorScreen entity not found, cannot initialize user sign")
+	}
+}
+
+// updateUserSignHover 更新木牌悬停状态和点击检测
+// Story 12.4 Task 2.3
+func (m *MainMenuScene) updateUserSignHover(mouseX, mouseY int, isMouseClicked bool) {
+	// 如果没有木牌实体，跳过
+	if m.userSignEntity == 0 {
+		return
+	}
+
+	// 获取 UserSignComponent
+	userSignComp, ok := ecs.GetComponent[*components.UserSignComponent](m.entityManager, m.userSignEntity)
+	if !ok {
+		return
+	}
+
+	// 获取 ReanimComponent 以获取木牌轨道的位置
+	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.userSignEntity)
+	if !ok {
+		return
+	}
+
+	// 木牌轨道名称（根据 Story 12.4 AC1，使用 anim_sign 轨道中的 WoodSign2）
+	signTrackName := "SelectorScreen_WoodSign2"
+
+	// 检查轨道是否被隐藏
+	if reanimComp.HiddenTracks != nil && reanimComp.HiddenTracks[signTrackName] {
+		userSignComp.IsHovered = false
+		return
+	}
+
+	// 获取轨道的当前帧数据
+	frames, trackExists := reanimComp.MergedTracks[signTrackName]
+	if !trackExists || len(frames) == 0 {
+		userSignComp.IsHovered = false
+		return
+	}
+
+	// 获取当前帧索引
+	currentFrameIdx := reanimComp.CurrentFrame
+	if currentFrameIdx < 0 {
+		currentFrameIdx = 0
+	}
+	if currentFrameIdx >= len(frames) {
+		currentFrameIdx = len(frames) - 1
+	}
+
+	// 获取当前帧的变换数据
+	frame := frames[currentFrameIdx]
+
+	// 获取 PositionComponent 的基础位置
+	posComp, hasPosComp := ecs.GetComponent[*components.PositionComponent](m.entityManager, m.userSignEntity)
+	baseX := 0.0
+	baseY := 0.0
+	if hasPosComp {
+		baseX = posComp.X
+		baseY = posComp.Y
+	}
+
+	// 计算木牌的屏幕位置（左上角）
+	frameX := 0.0
+	frameY := 0.0
+	if frame.X != nil {
+		frameX = *frame.X
+	}
+	if frame.Y != nil {
+		frameY = *frame.Y
+	}
+
+	signX := baseX + frameX - reanimComp.CenterOffsetX
+	signY := baseY + frameY - reanimComp.CenterOffsetY
+
+	// 从 PartImages 获取木牌图片以确定尺寸
+	signImage, hasImage := reanimComp.PartImages[frame.ImagePath]
+	if !hasImage || signImage == nil {
+		userSignComp.IsHovered = false
+		return
+	}
+
+	bounds := signImage.Bounds()
+	signWidth := float64(bounds.Dx())
+	signHeight := float64(bounds.Dy())
+
+	// 点击检测区域（木牌的用户名文本区域）
+	// 根据原游戏，用户名区域大约在木牌的下半部分
+	clickableTop := signY + signHeight*0.4
+	clickableBottom := signY + signHeight*0.9
+	clickableLeft := signX + signWidth*0.1
+	clickableRight := signX + signWidth*0.9
+
+	// 检查鼠标是否在可点击区域内
+	mouseInSign := float64(mouseX) >= clickableLeft &&
+		float64(mouseX) <= clickableRight &&
+		float64(mouseY) >= clickableTop &&
+		float64(mouseY) <= clickableBottom
+
+	// 更新悬停状态
+	userSignComp.IsHovered = mouseInSign
+
+	// 如果点击木牌，打开用户管理对话框
+	if mouseInSign && isMouseClicked {
+		log.Printf("[MainMenuScene] User sign clicked, showing user management dialog")
+		m.showUserManagementDialog()
+	}
+}
+
+// showUserManagementDialog 显示用户管理对话框
+// Story 12.4 AC3, AC4
+func (m *MainMenuScene) showUserManagementDialog() {
+	// 如果已有对话框打开，先关闭
+	if m.currentUserDialogID != 0 {
+		m.closeCurrentDialog()
+	}
+
+	// 获取用户列表
+	users, err := m.saveManager.LoadUserList()
+	if err != nil {
+		log.Printf("[MainMenuScene] Error: Failed to load user list: %v", err)
+		m.showErrorDialog("加载失败", "无法加载用户列表")
+		return
+	}
+
+	// 获取当前用户
+	currentUser := m.saveManager.GetCurrentUser()
+
+	// 创建用户管理对话框
+	dialogID, err := entities.NewUserManagementDialogEntity(
+		m.entityManager,
+		m.resourceManager,
+		users,
+		currentUser,
+		WindowWidth,
+		WindowHeight,
+		m.onUserManagementAction,
+	)
+
+	if err != nil {
+		log.Printf("[MainMenuScene] Error: Failed to create user management dialog: %v", err)
+		return
+	}
+
+	m.currentUserDialogID = dialogID
+	m.currentDialog = dialogID
+	log.Printf("[MainMenuScene] User management dialog opened")
+}
+
+// onUserManagementAction 用户管理对话框的操作回调
+// Story 12.4 AC4, AC9
+func (m *MainMenuScene) onUserManagementAction(result entities.UserManagementDialogResult) {
+	switch result.Action {
+	case entities.UserActionSwitch:
+		// 切换用户
+		if result.SelectedUser != "" {
+			if err := m.saveManager.SwitchUser(result.SelectedUser); err != nil {
+				log.Printf("[MainMenuScene] Error: Failed to switch user: %v", err)
+				m.showErrorDialog("切换失败", "无法切换到用户: "+result.SelectedUser)
+				return
+			}
+			log.Printf("[MainMenuScene] Switched to user: %s", result.SelectedUser)
+			// 重新加载主菜单数据
+			m.reloadMainMenuData()
+			// 关闭对话框
+			m.closeCurrentDialog()
+		}
+
+	case entities.UserActionCreateNew:
+		// 显示新建用户对话框
+		m.closeCurrentDialog()
+		m.showNewUserDialog(false) // force=false，可以关闭
+
+	case entities.UserActionRename:
+		// 显示重命名对话框
+		if result.SelectedUser != "" {
+			m.closeCurrentDialog()
+			m.showRenameUserDialog(result.SelectedUser)
+		}
+
+	case entities.UserActionDelete:
+		// 显示删除确认对话框
+		if result.SelectedUser != "" {
+			m.closeCurrentDialog()
+			m.showDeleteUserDialog(result.SelectedUser)
+		}
+
+	case entities.UserActionNone:
+		// 取消，关闭对话框
+		m.closeCurrentDialog()
+	}
+}
+
+// reloadMainMenuData 重新加载主菜单数据（用户切换后）
+// Story 12.4 Task 8.2
+func (m *MainMenuScene) reloadMainMenuData() {
+	// 重新加载存档数据
+	if err := m.saveManager.Load(); err != nil {
+		log.Printf("[MainMenuScene] Error: Failed to load save after user switch: %v", err)
+		m.currentLevel = "1-1"
+		m.hasStartedGame = false
+	} else {
+		m.currentLevel = m.saveManager.GetHighestLevel()
+		if m.currentLevel == "" {
+			m.currentLevel = "1-1"
+		}
+		m.hasStartedGame = m.saveManager.GetHasStartedGame()
+		log.Printf("[MainMenuScene] Reloaded save: level=%s, hasStartedGame=%v", m.currentLevel, m.hasStartedGame)
+	}
+
+	// 更新按钮可见性
+	m.updateButtonVisibility()
+
+	// 更新木牌显示的用户名
+	if m.userSignEntity != 0 {
+		if userSignComp, ok := ecs.GetComponent[*components.UserSignComponent](m.entityManager, m.userSignEntity); ok {
+			userSignComp.CurrentUsername = m.saveManager.GetCurrentUser()
+			log.Printf("[MainMenuScene] Updated user sign to: %s", userSignComp.CurrentUsername)
+		}
+	}
+}
+
+// showNewUserDialog 显示新建用户对话框
+// Story 12.4 AC5
+func (m *MainMenuScene) showNewUserDialog(force bool) {
+	// 关闭现有对话框
+	if m.currentUserDialogID != 0 {
+		m.closeCurrentDialog()
+	}
+
+	// 创建新建用户对话框的回调
+	callback := func(result entities.NewUserDialogResult) {
+		if result.Confirmed {
+			m.onNewUserCreated(result.Username)
+		} else if !force {
+			// 非强制模式可以取消
+			m.closeCurrentDialog()
+		}
+	}
+
+	// 创建新建用户对话框
+	dialogID, inputBoxID, err := entities.NewNewUserDialogEntity(
+		m.entityManager,
+		m.resourceManager,
+		WindowWidth,
+		WindowHeight,
+		callback,
+	)
+
+	if err != nil {
+		log.Printf("[MainMenuScene] Error: Failed to create new user dialog: %v", err)
+		return
+	}
+
+	m.currentUserDialogID = dialogID
+	m.currentInputBoxID = inputBoxID
+	m.currentDialog = dialogID
+	log.Printf("[MainMenuScene] New user dialog opened (force=%v)", force)
+}
+
+// showRenameUserDialog 显示重命名用户对话框
+// Story 12.4 AC6
+func (m *MainMenuScene) showRenameUserDialog(oldUsername string) {
+	// 关闭现有对话框
+	if m.currentUserDialogID != 0 {
+		m.closeCurrentDialog()
+	}
+
+	// 创建重命名对话框的回调
+	callback := func(result entities.RenameUserDialogResult) {
+		if result.Confirmed && result.NewName != "" {
+			// 执行重命名
+			if err := m.saveManager.RenameUser(oldUsername, result.NewName); err != nil {
+				log.Printf("[MainMenuScene] Error: Failed to rename user: %v", err)
+				m.showErrorDialog("重命名失败", err.Error())
+				return
+			}
+			log.Printf("[MainMenuScene] User renamed: %s -> %s", oldUsername, result.NewName)
+			m.closeCurrentDialog()
+			m.reloadMainMenuData()
+		} else {
+			// 取消
+			m.closeCurrentDialog()
+		}
+	}
+
+	// 创建重命名对话框
+	dialogID, inputBoxID, err := entities.NewRenameUserDialogEntity(
+		m.entityManager,
+		m.resourceManager,
+		oldUsername,
+		WindowWidth,
+		WindowHeight,
+		callback,
+	)
+
+	if err != nil {
+		log.Printf("[MainMenuScene] Error: Failed to create rename user dialog: %v", err)
+		return
+	}
+
+	m.currentUserDialogID = dialogID
+	m.currentInputBoxID = inputBoxID
+	m.currentDialog = dialogID
+	log.Printf("[MainMenuScene] Rename user dialog opened for: %s", oldUsername)
+}
+
+// showDeleteUserDialog 显示删除用户确认对话框
+// Story 12.4 AC7
+func (m *MainMenuScene) showDeleteUserDialog(username string) {
+	// 关闭现有对话框
+	if m.currentUserDialogID != 0 {
+		m.closeCurrentDialog()
+	}
+
+	// 创建删除确认对话框的回调
+	callback := func(result entities.DeleteUserDialogResult) {
+		if result.Confirmed {
+			// 执行删除
+			if err := m.saveManager.DeleteUser(username); err != nil {
+				log.Printf("[MainMenuScene] Error: Failed to delete user: %v", err)
+				m.showErrorDialog("删除失败", err.Error())
+				return
+			}
+			log.Printf("[MainMenuScene] User deleted: %s", username)
+			m.closeCurrentDialog()
+
+			// 检查是否还有用户
+			users, err := m.saveManager.LoadUserList()
+			if err != nil || len(users) == 0 {
+				// 没有用户了，回到首次启动状态
+				m.isFirstLaunch = true
+				m.userSignEntity = 0
+				m.showNewUserDialog(true) // 强制创建新用户
+				return
+			}
+
+			// 重新加载数据
+			m.reloadMainMenuData()
+		} else {
+			// 取消
+			m.closeCurrentDialog()
+		}
+	}
+
+	// 创建删除确认对话框
+	dialogID, err := entities.NewDeleteUserDialogEntity(
+		m.entityManager,
+		m.resourceManager,
+		username,
+		WindowWidth,
+		WindowHeight,
+		callback,
+	)
+
+	if err != nil {
+		log.Printf("[MainMenuScene] Error: Failed to create delete user dialog: %v", err)
+		return
+	}
+
+	m.currentUserDialogID = dialogID
+	m.currentDialog = dialogID
+	log.Printf("[MainMenuScene] Delete user dialog opened for: %s", username)
+}
+
+// renderUserSignText 渲染木牌上的用户名文本
+// Story 12.4 Task 2.4
+func (m *MainMenuScene) renderUserSignText(screen *ebiten.Image) {
+	// 如果没有木牌实体，跳过
+	if m.userSignEntity == 0 {
+		return
+	}
+
+	// 获取 UserSignComponent
+	userSignComp, ok := ecs.GetComponent[*components.UserSignComponent](m.entityManager, m.userSignEntity)
+	if !ok || userSignComp.CurrentUsername == "" {
+		return
+	}
+
+	// 获取 ReanimComponent 以获取木牌轨道的位置
+	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.userSignEntity)
+	if !ok {
+		return
+	}
+
+	// 木牌轨道名称
+	signTrackName := "SelectorScreen_WoodSign2"
+
+	// 检查轨道是否被隐藏
+	if reanimComp.HiddenTracks != nil && reanimComp.HiddenTracks[signTrackName] {
+		return
+	}
+
+	// 获取轨道的当前帧数据
+	frames, trackExists := reanimComp.MergedTracks[signTrackName]
+	if !trackExists || len(frames) == 0 {
+		return
+	}
+
+	// 获取当前帧索引
+	currentFrameIdx := reanimComp.CurrentFrame
+	if currentFrameIdx < 0 {
+		currentFrameIdx = 0
+	}
+	if currentFrameIdx >= len(frames) {
+		currentFrameIdx = len(frames) - 1
+	}
+
+	// 获取当前帧的变换数据
+	frame := frames[currentFrameIdx]
+
+	// 获取 PositionComponent 的基础位置
+	posComp, hasPosComp := ecs.GetComponent[*components.PositionComponent](m.entityManager, m.userSignEntity)
+	baseX := 0.0
+	baseY := 0.0
+	if hasPosComp {
+		baseX = posComp.X
+		baseY = posComp.Y
+	}
+
+	// 计算木牌的屏幕位置
+	frameX := 0.0
+	frameY := 0.0
+	if frame.X != nil {
+		frameX = *frame.X
+	}
+	if frame.Y != nil {
+		frameY = *frame.Y
+	}
+
+	signX := baseX + frameX - reanimComp.CenterOffsetX
+	signY := baseY + frameY - reanimComp.CenterOffsetY
+
+	// 从 PartImages 获取木牌图片以确定尺寸
+	signImage, hasImage := reanimComp.PartImages[frame.ImagePath]
+	if !hasImage || signImage == nil {
+		return
+	}
+
+	bounds := signImage.Bounds()
+	signWidth := float64(bounds.Dx())
+	signHeight := float64(bounds.Dy())
+
+	// 如果悬停，替换为按下状态的图片
+	if userSignComp.IsHovered && userSignComp.SignPressImage != nil {
+		op := &ebiten.DrawImageOptions{}
+		op.GeoM.Translate(signX, signY)
+		screen.DrawImage(userSignComp.SignPressImage, op)
+	}
+
+	// 渲染文本（标题 + 用户名）
+	// 标题："欢迎回来，我的朋友！"
+	titleFont, err := m.resourceManager.LoadFont("assets/fonts/SimHei.ttf", 16)
+	if err != nil {
+		log.Printf("[MainMenuScene] Warning: Failed to load title font: %v", err)
+		return
+	}
+
+	usernameFont, err := m.resourceManager.LoadFont("assets/fonts/SimHei.ttf", 18)
+	if err != nil {
+		log.Printf("[MainMenuScene] Warning: Failed to load username font: %v", err)
+		return
+	}
+
+	// 标题位置（木牌上半部分，居中）
+	titleText := "欢迎回来，我的朋友！"
+	titleX := signX + signWidth*0.5
+	titleY := signY + signHeight*0.3
+
+	drawCenteredText(screen, titleText, titleX, titleY, titleFont, color.RGBA{R: 139, G: 69, B: 19, A: 255})
+
+	// 用户名位置（木牌下半部分，居中）
+	usernameX := signX + signWidth*0.5
+	usernameY := signY + signHeight*0.6
+
+	drawCenteredText(screen, userSignComp.CurrentUsername, usernameX, usernameY, usernameFont, color.RGBA{R: 101, G: 67, B: 33, A: 255})
+}
+
+// drawCenteredText 在指定位置居中绘制文本
+func drawCenteredText(screen *ebiten.Image, textStr string, centerX, centerY float64, fontFace *text.GoTextFace, clr color.Color) {
+	// 使用 text.Measure 计算文本宽度
+	textWidth, _ := text.Measure(textStr, fontFace, 0)
+
+	x := centerX - textWidth/2
+	y := centerY
+
+	op := &text.DrawOptions{}
+	op.GeoM.Translate(x, y)
+	op.ColorScale.ScaleWithColor(clr)
+	text.Draw(screen, textStr, fontFace, op)
 }

@@ -79,3 +79,12 @@ animation_combos:
       display_name: "开场展开"
       animations: ["anim_sign", "anim_open"]
       description: "主菜单的完整开场动画，包括背景展开和木牌装饰"
+    - name: "opening-without-grass"
+      display_name: "没有草开场展开"
+      animations: ["anim_open"]
+      description: "主菜单的完整开场动画，包括背景展开和木牌装饰"
+      hidden_tracks:
+        - "leaf1"
+        - "leaf2"  
+        - "leaf3"
+        - "leaf4"

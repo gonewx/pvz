@@ -717,6 +717,71 @@ if mouseWorldX >= clickCenterX-halfWidth { // 正确！都是世界坐标
 
 ---
 
+## 多用户存档管理系统（Story 12.4）
+
+### 架构概述
+
+本项目支持多用户存档管理，允许多个玩家在同一台电脑上使用独立的游戏存档。
+
+### 存档文件结构
+
+```
+data/saves/
+├── users.yaml              # 用户列表元数据
+├── player1.yaml            # 用户1的存档
+├── player2.yaml            # 用户2的存档
+└── ...
+```
+
+**users.yaml 格式：**
+```yaml
+users:
+  - username: "player1"
+    createdAt: "2025-11-17T10:00:00Z"
+    lastLoginAt: "2025-11-17T12:00:00Z"
+  - username: "player2"
+    createdAt: "2025-11-16T15:00:00Z"
+    lastLoginAt: "2025-11-17T11:00:00Z"
+currentUser: "player1"  # 上次登录的用户
+```
+
+### SaveManager 多用户 API
+
+```go
+// 用户管理方法
+func (sm *SaveManager) LoadUserList() ([]UserMetadata, error)
+func (sm *SaveManager) GetCurrentUser() string
+func (sm *SaveManager) ValidateUsername(username string) error
+func (sm *SaveManager) CreateUser(username string) error
+func (sm *SaveManager) RenameUser(oldName, newName string) error
+func (sm *SaveManager) DeleteUser(username string) error
+func (sm *SaveManager) SwitchUser(username string) error
+```
+
+### 用户管理对话框
+
+所有对话框复用 `DialogComponent` 和 `loadDialogParts()` 基础设施：
+
+- **NewNewUserDialogEntity()** - 新建用户对话框（带文本输入框）
+- **NewRenameUserDialogEntity()** - 重命名用户对话框
+- **NewDeleteUserDialogEntity()** - 删除确认对话框
+- **NewUserManagementDialogEntity()** - 用户管理对话框（用户列表）
+
+### 首次启动流程
+
+1. MainMenuScene 检测 `SaveManager.LoadUserList()` 是否为空
+2. 如果为空，标记 `isFirstLaunch = true`
+3. Update() 中检测首次启动，弹出新建用户对话框
+4. 用户创建成功后，重新加载存档数据并更新界面
+
+### 关键设计原则
+
+- **复用原则**：所有对话框复用现有的九宫格 DialogComponent
+- **零耦合**：components 包不引用 game 包（使用 UserInfo 代替 UserMetadata）
+- **向后兼容**：旧测试需要适配新的多用户架构（先创建用户再保存）
+
+---
+
 ## 文档参考
 
 ### 用户文档

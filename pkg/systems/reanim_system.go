@@ -91,10 +91,23 @@ func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) err
 		comp.LastRenderFrame = -1
 	}
 
-	// 单个动画模式下，不使用 HiddenTracks, ParentTracks
-	// 这些都依赖 Reanim 文件本身的定义
-	comp.HiddenTracks = nil
+	// 单个动画模式下，ParentTracks 不使用（依赖 Reanim 文件本身的定义）
 	comp.ParentTracks = nil
+
+	// Story 12.4: 保留现有的 HiddenTracks（如果已设置）
+	// 首次启动时需要在整个流程中保持轨道隐藏状态
+	// 只在 HiddenTracks 未初始化时才清空
+	if comp.HiddenTracks == nil {
+		// 未设置 HiddenTracks，保持为 nil（默认行为）
+		log.Printf("[ReanimSystem] PlayAnimation: HiddenTracks is nil, keeping it nil")
+	} else {
+		// 保留现有的 HiddenTracks
+		log.Printf("[ReanimSystem] PlayAnimation: Preserving HiddenTracks (count=%d)", len(comp.HiddenTracks))
+		for trackName := range comp.HiddenTracks {
+			log.Printf("[ReanimSystem]   - Hidden track: %s", trackName)
+		}
+	}
+	// 否则保留现有的 HiddenTracks
 
 	// 设置当前动画列表
 	comp.CurrentAnimations = []string{animName}

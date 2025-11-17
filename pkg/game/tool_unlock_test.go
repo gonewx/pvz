@@ -17,6 +17,11 @@ func TestToolUnlock(t *testing.T) {
 		t.Fatalf("Failed to create SaveManager: %v", err)
 	}
 
+	// 创建测试用户（多用户架构要求）
+	if err := saveManager.CreateUser("testuser"); err != nil {
+		t.Fatalf("Failed to create user: %v", err)
+	}
+
 	// 初始状态：铲子未解锁
 	if saveManager.IsToolUnlocked("shovel") {
 		t.Error("Shovel should not be unlocked initially")
@@ -54,6 +59,11 @@ func TestCompleteLevelWithToolUnlock(t *testing.T) {
 		t.Fatalf("Failed to create SaveManager: %v", err)
 	}
 
+	// 创建测试用户（多用户架构要求）
+	if err := saveManager.CreateUser("testuser"); err != nil {
+		t.Fatalf("Failed to create user: %v", err)
+	}
+
 	// 创建 GameState（使用临时 SaveManager）
 	gs := &GameState{
 		saveManager:        saveManager,
@@ -84,8 +94,8 @@ func TestCompleteLevelWithToolUnlock(t *testing.T) {
 		t.Error("Shovel should be unlocked after completing 1-4")
 	}
 
-	// 验证存档文件已保存
-	saveFile := filepath.Join(tmpDir, "progress.yaml")
+	// 验证存档文件已保存（现在是 testuser.yaml 而不是 progress.yaml）
+	saveFile := filepath.Join(tmpDir, "testuser.yaml")
 	if _, err := os.Stat(saveFile); os.IsNotExist(err) {
 		t.Error("Save file should exist after CompleteLevel()")
 	}
