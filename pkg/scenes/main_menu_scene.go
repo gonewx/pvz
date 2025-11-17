@@ -888,6 +888,15 @@ func (m *MainMenuScene) updateMouseCursor() {
 		cursorShape = ebiten.CursorShapePointer
 	}
 
+	// Story 12.4 AC2: Check if hovering over user sign
+	if m.userSignEntity != 0 {
+		if userSignComp, ok := ecs.GetComponent[*components.UserSignComponent](m.entityManager, m.userSignEntity); ok {
+			if userSignComp.IsHovered {
+				cursorShape = ebiten.CursorShapePointer
+			}
+		}
+	}
+
 	// Check if hovering over any panel button (help/options panel)
 	panelButtons := ecs.GetEntitiesWith1[*components.ButtonComponent](m.entityManager)
 	for _, entityID := range panelButtons {
@@ -2051,8 +2060,8 @@ func (m *MainMenuScene) updateUserSignHover(mouseX, mouseY int, isMouseClicked b
 		return
 	}
 
-	// 木牌轨道名称（woodsign1 是用户名显示的主木牌）
-	signTrackName := "woodsign1"
+	// Story 12.4 AC2: woodsign2 是 "如果这不是你的存档，请点我" 的木板
+	signTrackName := "woodsign2"
 
 	// 检查轨道是否被隐藏
 	if reanimComp.HiddenTracks != nil && reanimComp.HiddenTracks[signTrackName] {
@@ -2112,12 +2121,12 @@ func (m *MainMenuScene) updateUserSignHover(mouseX, mouseY int, isMouseClicked b
 	signWidth := float64(bounds.Dx())
 	signHeight := float64(bounds.Dy())
 
-	// 点击检测区域（木牌的用户名文本区域）
-	// 根据原游戏，用户名区域大约在木牌的下半部分
-	clickableTop := signY + signHeight*0.4
-	clickableBottom := signY + signHeight*0.9
-	clickableLeft := signX + signWidth*0.1
-	clickableRight := signX + signWidth*0.9
+	// Story 12.4 AC2: woodsign2 木板的点击检测区域
+	// "如果这不是你的存档，请点我" 整个木板都可点击
+	clickableTop := signY + signHeight*0.1    // 木板顶部预留 10% 边距
+	clickableBottom := signY + signHeight*0.9 // 木板底部预留 10% 边距
+	clickableLeft := signX + signWidth*0.05   // 木板左侧预留 5% 边距
+	clickableRight := signX + signWidth*0.95  // 木板右侧预留 5% 边距
 
 	// 检查鼠标是否在可点击区域内
 	mouseInSign := float64(mouseX) >= clickableLeft &&
@@ -2125,8 +2134,24 @@ func (m *MainMenuScene) updateUserSignHover(mouseX, mouseY int, isMouseClicked b
 		float64(mouseY) >= clickableTop &&
 		float64(mouseY) <= clickableBottom
 
-	// 更新悬停状态
-	userSignComp.IsHovered = mouseInSign
+	// 更新悬停状态，并动态替换木牌图片
+	if userSignComp.IsHovered != mouseInSign {
+		userSignComp.IsHovered = mouseInSign
+
+		// Story 12.4 AC2: 悬停时切换 woodsign2 为 SignPressImage
+		if mouseInSign && userSignComp.SignPressImage != nil {
+			// 直接使用按下状态图片（不需要绘制用户名，woodsign2 是纯木板）
+			reanimComp.PartImages["IMAGE_REANIM_SELECTORSCREEN_WOODSIGN2"] = userSignComp.SignPressImage
+			log.Printf("[MainMenuScene] User sign (woodsign2) hovered, switched to press image")
+		} else {
+			// 恢复正常状态木牌图片
+			originalSignImage, err := m.resourceManager.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_WOODSIGN2")
+			if err == nil {
+				reanimComp.PartImages["IMAGE_REANIM_SELECTORSCREEN_WOODSIGN2"] = originalSignImage
+				log.Printf("[MainMenuScene] User sign (woodsign2) unhovered, switched to normal image")
+			}
+		}
+	}
 
 	// 如果点击木牌，打开用户管理对话框
 	if mouseInSign && isMouseClicked {
