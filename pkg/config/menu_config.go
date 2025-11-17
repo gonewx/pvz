@@ -79,7 +79,7 @@ var MenuButtonHitboxes = []MenuButtonHitbox{
 		ButtonType: MenuButtonVasebreaker, // 注意：轨道名称是 Challenges，但实际对应解谜模式
 		X:          410,
 		Y:          257.5,
-		Width:      330,
+		Width:      20,
 		Height:     120,
 	},
 	{

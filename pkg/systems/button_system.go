@@ -14,6 +14,8 @@ import (
 //   - 检测鼠标悬停（更新按钮状态为 UIHovered）
 //   - 检测鼠标点击（触发 OnClick 回调）
 //   - 根据 Enabled 状态决定是否响应交互
+//
+// 注意：光标形状由调用者（如 MainMenuScene）统一管理
 type ButtonSystem struct {
 	entityManager *ecs.EntityManager
 }
@@ -35,9 +37,6 @@ func (s *ButtonSystem) Update(deltaTime float64) {
 	// 查询所有按钮实体
 	entities := ecs.GetEntitiesWith2[*components.ButtonComponent, *components.PositionComponent](s.entityManager)
 
-	// 追踪是否有按钮被悬停（用于设置光标）
-	anyButtonHovered := false
-
 	for _, entityID := range entities {
 		button, _ := ecs.GetComponent[*components.ButtonComponent](s.entityManager, entityID)
 		pos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
@@ -52,8 +51,6 @@ func (s *ButtonSystem) Update(deltaTime float64) {
 		isHovered := s.isMouseInButton(float64(mouseX), float64(mouseY), pos.X, pos.Y, button.Width, button.Height)
 
 		if isHovered {
-			anyButtonHovered = true // 标记有按钮被悬停
-
 			// 鼠标在按钮内
 			if mouseClicked {
 				// 点击按钮
@@ -71,12 +68,7 @@ func (s *ButtonSystem) Update(deltaTime float64) {
 		}
 	}
 
-	// 根据是否有按钮被悬停，设置光标形状
-	if anyButtonHovered {
-		ebiten.SetCursorShape(ebiten.CursorShapePointer) // 手形光标
-	} else {
-		ebiten.SetCursorShape(ebiten.CursorShapeDefault) // 默认箭头光标
-	}
+	// 注意：光标形状由调用者（如 MainMenuScene）统一管理，此处不再设置
 }
 
 // isMouseInButton 检测鼠标是否在按钮范围内

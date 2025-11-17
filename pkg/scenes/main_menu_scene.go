@@ -67,6 +67,13 @@ type MainMenuScene struct {
 	helpPanelModule    *modules.HelpPanelModule    // Help panel module
 	optionsPanelModule *modules.OptionsPanelModule // Options panel module
 
+	// Story 12.2: Bottom function bar (Options/Help/Quit buttons)
+	bottomButtonImages  map[components.BottomButtonType][2]*ebiten.Image // [0]=Normal, [1]=Hover
+	hoveredBottomButton components.BottomButtonType                      // Current hovered bottom button (-1 = none)
+
+	// Cursor state tracking
+	lastCursorShape ebiten.CursorShapeType // Track last cursor shape to avoid unnecessary updates
+
 	// Keyboard state tracking for edge detection
 	wasF1Pressed bool // Track F1 key state from previous frame
 	wasOPressed  bool // Track O key state from previous frame
@@ -85,8 +92,10 @@ type MainMenuScene struct {
 // If the background image fails to load, the scene will fall back to a solid color background.
 func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenuScene {
 	scene := &MainMenuScene{
-		resourceManager: rm,
-		sceneManager:    sm,
+		resourceManager:     rm,
+		sceneManager:        sm,
+		lastCursorShape:     -1, // 初始化为无效值，确保第一次更新光标
+		hoveredBottomButton: components.BottomButtonNone,
 	}
 
 	// Story 12.1: Initialize ECS systems for SelectorScreen Reanim
@@ -299,6 +308,9 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 		log.Printf("[MainMenuScene] Options panel module initialized")
 	}
 
+	// Story 12.2: Load bottom function button images
+	scene.loadBottomButtonImages()
+
 	return scene
 }
 
@@ -501,6 +513,9 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 	// Remember mouse state for next frame
 	m.wasMousePressed = isMousePressed
 
+	// Story 12.2: Update bottom function buttons (Options/Help/Quit)
+	m.updateBottomButtons(mouseX, mouseY, isMouseClicked)
+
 	// Story 12.1 Task 5: Update button highlight based on hover state
 	m.updateButtonHighlight()
 
@@ -687,23 +702,45 @@ func (m *MainMenuScene) updateButtonHighlight() {
 
 // updateMouseCursor updates the mouse cursor shape based on hover state.
 //
-// When the mouse hovers over an unlocked button, the cursor changes to a pointer hand.
-// Otherwise, the cursor is set to the default arrow shape.
+// When the mouse hovers over an unlocked button, bottom function button, or panel button,
+// the cursor changes to a pointer hand. Otherwise, the cursor is set to the default arrow shape.
+//
+// Only updates the cursor when the shape actually changes to avoid unnecessary API calls.
 //
 // Story 12.1 Task 5: Button Highlight Effect
+// Story 12.2: 底部功能栏 - 手形光标
+// Story 12.3: 面板按钮光标管理
 func (m *MainMenuScene) updateMouseCursor() {
 	// Default cursor shape
 	cursorShape := ebiten.CursorShapeDefault
 
-	// Check if hovering over a button
+	// Check if hovering over a grave button
 	if m.hoveredButton != "" {
 		// ✅ 修复：所有可见的按钮（包括未解锁的）都显示手形鼠标
 		// 未解锁的按钮也可以点击，点击后会提示未解锁
 		cursorShape = ebiten.CursorShapePointer
 	}
 
-	// Apply cursor shape
-	ebiten.SetCursorShape(cursorShape)
+	// Check if hovering over a bottom function button
+	if m.hoveredBottomButton != components.BottomButtonNone {
+		cursorShape = ebiten.CursorShapePointer
+	}
+
+	// Check if hovering over any panel button (help/options panel)
+	panelButtons := ecs.GetEntitiesWith1[*components.ButtonComponent](m.entityManager)
+	for _, entityID := range panelButtons {
+		button, ok := ecs.GetComponent[*components.ButtonComponent](m.entityManager, entityID)
+		if ok && button.State == components.UIHovered {
+			cursorShape = ebiten.CursorShapePointer
+			break
+		}
+	}
+
+	// Only update cursor if shape changed (避免闪烁)
+	if cursorShape != m.lastCursorShape {
+		ebiten.SetCursorShape(cursorShape)
+		m.lastCursorShape = cursorShape
+	}
 }
 
 // playGraveButtonSound plays the stone grinding sound effect for button hover.
@@ -907,6 +944,9 @@ func (m *MainMenuScene) Draw(screen *ebiten.Image) {
 			screen.DrawImage(img, op)
 		}
 	}
+
+	// Story 12.2: Draw bottom function buttons (Options/Help/Quit)
+	m.drawBottomButtons(screen)
 
 	// Story 12.3: Draw dialogs (last, on top of everything)
 	if m.dialogRenderSystem != nil {
@@ -1259,5 +1299,254 @@ func (m *MainMenuScene) showOptionsDialog() {
 	if m.optionsPanelModule != nil {
 		m.optionsPanelModule.Show()
 		log.Printf("[MainMenuScene] Options panel shown")
+	}
+}
+
+// ========== Story 12.2: Bottom Function Bar Implementation ==========
+
+// loadBottomButtonImages loads the normal and hover images for bottom function buttons.
+//
+// This method loads images but does NOT create entities. Buttons are rendered dynamically
+// in the Draw method, following the SelectorScreen animation transform.
+//
+// Story 12.2: 底部功能栏重构（动画跟随版本）
+func (m *MainMenuScene) loadBottomButtonImages() {
+	m.bottomButtonImages = make(map[components.BottomButtonType][2]*ebiten.Image)
+	m.hoveredBottomButton = components.BottomButtonNone // No hover initially
+
+	// Resource ID mapping
+	buttonResources := map[components.BottomButtonType][2]string{
+		components.BottomButtonOptions: {"IMAGE_SELECTORSCREEN_OPTIONS1", "IMAGE_SELECTORSCREEN_OPTIONS2"},
+		components.BottomButtonHelp:    {"IMAGE_SELECTORSCREEN_HELP1", "IMAGE_SELECTORSCREEN_HELP2"},
+		components.BottomButtonQuit:    {"IMAGE_SELECTORSCREEN_QUIT1", "IMAGE_SELECTORSCREEN_QUIT2"},
+	}
+
+	// Load images for each button
+	for btnType, resIDs := range buttonResources {
+		normalImg, err := m.resourceManager.LoadImageByID(resIDs[0])
+		if err != nil {
+			log.Printf("[MainMenuScene] Warning: Failed to load normal image for button %d: %v", btnType, err)
+			continue
+		}
+
+		hoverImg, err := m.resourceManager.LoadImageByID(resIDs[1])
+		if err != nil {
+			log.Printf("[MainMenuScene] Warning: Failed to load hover image for button %d: %v", btnType, err)
+			continue
+		}
+
+		m.bottomButtonImages[btnType] = [2]*ebiten.Image{normalImg, hoverImg}
+	}
+
+	log.Printf("[MainMenuScene] Loaded bottom button images (count=%d)", len(m.bottomButtonImages))
+}
+
+// calculateBottomButtonScreenPos calculates the screen position of a bottom button,
+// following the SelectorScreen animation transform.
+//
+// This follows the same logic as level numbers, using the background right section to follow animation.
+//
+// Returns: (screenX, screenY, width, height, ok)
+//
+// Story 12.2: 底部功能栏重构（动画跟随版本）
+func (m *MainMenuScene) calculateBottomButtonScreenPos(buttonType components.BottomButtonType) (float64, float64, float64, float64, bool) {
+	// Get SelectorScreen ReanimComponent
+	if m.selectorScreenEntity == 0 {
+		return 0, 0, 0, 0, false
+	}
+
+	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
+	if !ok {
+		return 0, 0, 0, 0, false
+	}
+
+	posComp, ok := ecs.GetComponent[*components.PositionComponent](m.entityManager, m.selectorScreenEntity)
+	if !ok {
+		return 0, 0, 0, 0, false
+	}
+
+	// Get button images to calculate size
+	images, ok := m.bottomButtonImages[buttonType]
+	if !ok || images[0] == nil {
+		return 0, 0, 0, 0, false
+	}
+
+	btnWidth := float64(images[0].Bounds().Dx())
+	btnHeight := float64(images[0].Bounds().Dy())
+
+	// 底部按钮跟随背景右侧动画移动（与关卡数字类似）
+	// 使用 SelectorScreen_BG_Right 轨道的偏移量
+	referenceTrackName := "SelectorScreen_BG_Right"
+	frames, trackExists := reanimComp.MergedTracks[referenceTrackName]
+
+	// 背景右侧的最终位置（开场动画完成后）
+	const finalBgRightX = 71.0
+	const finalBgRightY = 41.0
+
+	// 计算按钮的基础位置
+	buttonIndex := int(buttonType)
+	baseX, baseY := config.CalculateBottomButtonPosition(buttonIndex)
+
+	// 默认使用最终位置（无动画或轨道不存在时）
+	screenX := posComp.X + baseX - reanimComp.CenterOffsetX
+	screenY := posComp.Y + baseY - reanimComp.CenterOffsetY
+
+	if trackExists && len(frames) > 0 {
+		// 获取当前帧索引
+		currentFrameIdx := reanimComp.CurrentFrame
+		if currentFrameIdx < 0 {
+			currentFrameIdx = 0
+		}
+		if currentFrameIdx >= len(frames) {
+			currentFrameIdx = len(frames) - 1
+		}
+
+		// 获取当前帧数据
+		frame := frames[currentFrameIdx]
+
+		// 获取背景当前的 X 和 Y 坐标
+		frameX := finalBgRightX // 默认值
+		if frame.X != nil {
+			frameX = *frame.X
+		}
+
+		frameY := 0.0
+		if frame.Y != nil {
+			frameY = *frame.Y
+		}
+
+		// 计算背景相对于最终位置的偏移
+		bgOffsetX := frameX - finalBgRightX
+		bgOffsetY := frameY - finalBgRightY
+
+		// 按钮跟随背景的偏移
+		screenX = posComp.X + baseX + bgOffsetX - reanimComp.CenterOffsetX
+		screenY = posComp.Y + baseY + bgOffsetY - reanimComp.CenterOffsetY
+	}
+
+	return screenX, screenY, btnWidth, btnHeight, true
+}
+
+// updateBottomButtons updates the hover and click states of bottom buttons
+// based on mouse position and input.
+//
+// Story 12.2: 底部功能栏重构（动画跟随版本）
+func (m *MainMenuScene) updateBottomButtons(mouseX, mouseY int, isMouseClicked bool) {
+	m.hoveredBottomButton = components.BottomButtonNone // Reset hover state
+
+	// Check each button in order (Options, Help, Quit)
+	buttonTypes := []components.BottomButtonType{
+		components.BottomButtonOptions,
+		components.BottomButtonHelp,
+		components.BottomButtonQuit,
+	}
+
+	for _, btnType := range buttonTypes {
+		// Calculate button's current screen position (dynamic, follows animation)
+		screenX, screenY, btnWidth, btnHeight, ok := m.calculateBottomButtonScreenPos(btnType)
+		if !ok {
+			continue
+		}
+
+		// Skip detection if button is off-screen (still animating in)
+		// 只检测屏幕内的按钮，避免动画过程中的不稳定检测
+		if screenY > 600 || screenY+btnHeight < 0 || screenX > 800 || screenX+btnWidth < 0 {
+			continue
+		}
+
+		// Expand clickable area with padding for easier clicking
+		padding := config.BottomButtonClickPadding
+		expandedX := screenX - padding
+		expandedY := screenY - padding
+		expandedWidth := btnWidth + padding*2
+		expandedHeight := btnHeight + padding*2
+
+		// Check if mouse is over this button (using expanded area)
+		if isPointInRect(float64(mouseX), float64(mouseY), expandedX, expandedY, expandedWidth, expandedHeight) {
+			// Mouse is over button
+			if isMouseClicked {
+				// Button clicked
+				m.onBottomButtonClicked(btnType)
+			} else {
+				// Button hovered
+				m.hoveredBottomButton = btnType
+			}
+			break // Only one button can be hovered at a time
+		}
+	}
+}
+
+// drawBottomButtons renders the 3 bottom function buttons to the screen.
+//
+// Buttons follow the SelectorScreen animation transform, similar to level numbers.
+//
+// Story 12.2: 底部功能栏重构（动画跟随版本）
+func (m *MainMenuScene) drawBottomButtons(screen *ebiten.Image) {
+	// Draw each button in order (Options, Help, Quit)
+	buttonTypes := []components.BottomButtonType{
+		components.BottomButtonOptions,
+		components.BottomButtonHelp,
+		components.BottomButtonQuit,
+	}
+
+	for _, btnType := range buttonTypes {
+		// Get button images
+		images, ok := m.bottomButtonImages[btnType]
+		if !ok {
+			continue
+		}
+
+		// Select image based on hover state
+		img := images[0] // Normal image
+		if m.hoveredBottomButton == btnType && images[1] != nil {
+			img = images[1] // Hover image
+		}
+
+		if img == nil {
+			continue
+		}
+
+		// Calculate button's current screen position (dynamic, follows animation)
+		screenX, screenY, _, _, ok := m.calculateBottomButtonScreenPos(btnType)
+		if !ok {
+			continue
+		}
+
+		// Draw button
+		op := &ebiten.DrawImageOptions{}
+		op.GeoM.Translate(screenX, screenY)
+		screen.DrawImage(img, op)
+	}
+}
+
+// onBottomButtonClicked handles bottom button click events
+//
+// Actions:
+//   - Options: Opens the options panel
+//   - Help: Opens the help panel
+//   - Quit: Exits the game
+//
+// Story 12.2: 底部功能栏重构
+func (m *MainMenuScene) onBottomButtonClicked(btnType components.BottomButtonType) {
+	// Play click sound effect
+	if player, err := m.resourceManager.LoadSoundEffect("assets/sounds/buttonclick.ogg"); err == nil {
+		player.Play()
+	}
+
+	switch btnType {
+	case components.BottomButtonOptions:
+		// Show options panel (Story 12.3)
+		log.Printf("[MainMenuScene] Options button clicked")
+		m.showOptionsDialog()
+
+	case components.BottomButtonHelp:
+		// Show help panel (Story 12.3)
+		log.Printf("[MainMenuScene] Help button clicked")
+		m.showHelpDialog()
+
+	case components.BottomButtonQuit:
+		// Exit game
+		log.Printf("[MainMenuScene] Quit button clicked - exiting game")
+		os.Exit(0)
 	}
 }
