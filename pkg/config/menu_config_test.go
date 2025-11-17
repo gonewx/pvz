@@ -153,9 +153,9 @@ func TestIsMenuModeUnlocked_Survival(t *testing.T) {
 
 // TestMenuButtonHitboxes verifies that the hitbox configuration is valid.
 func TestMenuButtonHitboxes(t *testing.T) {
-	// Check that we have exactly 4 button hitboxes
-	if len(MenuButtonHitboxes) != 4 {
-		t.Errorf("Expected 4 button hitboxes, got %d", len(MenuButtonHitboxes))
+	// Check that we have exactly 5 button hitboxes (including both Adventure and StartAdventure variants)
+	if len(MenuButtonHitboxes) != 5 {
+		t.Errorf("Expected 5 button hitboxes, got %d", len(MenuButtonHitboxes))
 	}
 
 	// Check that all button types are present

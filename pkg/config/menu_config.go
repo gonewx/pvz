@@ -46,7 +46,13 @@ type MenuButtonHitbox struct {
 // MenuButtonHitboxes defines the click regions for all four main menu buttons.
 //
 // Coordinates extracted from SelectorScreen.reanim (final frame positions).
-// Dimensions are based on button image sizes (330x120 approximate).
+// Dimensions match the actual button image sizes (measured from PNG files).
+//
+// Image sizes:
+//   - SelectorScreen_Adventure_button: 330 x 120
+//   - SelectorScreen_Survival_button: 313 x 133
+//   - SelectorScreen_Challenges_button: 286 x 122
+//   - SelectorScreen_Vasebreaker_button: 266 x 123
 //
 // Story 12.1: Main Menu Tombstone System Enhancement
 var MenuButtonHitboxes = []MenuButtonHitbox{
@@ -55,40 +61,40 @@ var MenuButtonHitboxes = []MenuButtonHitbox{
 		ButtonType: MenuButtonAdventure,
 		X:          405,
 		Y:          79.7,
-		Width:      330,
-		Height:     120,
+		Width:      330, // Actual image width
+		Height:     120, // Actual image height
 	},
 	{
 		TrackName:  "SelectorScreen_StartAdventure_button", // 新用户版本的冒险按钮
 		ButtonType: MenuButtonAdventure,
 		X:          405,
 		Y:          79.7,
-		Width:      330,
-		Height:     120,
+		Width:      330, // Actual image width
+		Height:     120, // Actual image height
 	},
 	{
 		TrackName:  "SelectorScreen_Survival_button",
 		ButtonType: MenuButtonChallenges, // 注意：轨道名称是 Survival，但实际对应玩玩小游戏
 		X:          406,
 		Y:          173.1,
-		Width:      330,
-		Height:     120,
+		Width:      313, // Actual image width
+		Height:     133, // Actual image height
 	},
 	{
 		TrackName:  "SelectorScreen_Challenges_button",
 		ButtonType: MenuButtonVasebreaker, // 注意：轨道名称是 Challenges，但实际对应解谜模式
 		X:          410,
 		Y:          257.5,
-		Width:      20,
-		Height:     120,
+		Width:      286, // Actual image width
+		Height:     122, // Actual image height
 	},
 	{
 		TrackName:  "SelectorScreen_ZenGarden_button",
 		ButtonType: MenuButtonSurvival, // 注意：轨道名称是 ZenGarden，但实际对应生存模式
 		X:          413,
 		Y:          328.0,
-		Width:      330,
-		Height:     120,
+		Width:      266, // Actual image width
+		Height:     123, // Actual image height
 	},
 }
 
