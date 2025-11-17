@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
@@ -1832,19 +1833,22 @@ func (m *MainMenuScene) onNewUserCreated(username string) {
 			delete(reanimComp.HiddenTracks, "leaf22")
 			delete(reanimComp.HiddenTracks, "leaf_SelectorScreen_Leaves")
 			log.Printf("[MainMenuScene] First launch: unhidden woodsign and leaf tracks")
+
+			// ✅ 设置动画循环状态
+			reanimComp.AnimationLoopStates["anim_sign"] = false // 木牌动画非循环
+			reanimComp.AnimationLoopStates["anim_grass"] = true // 草动画循环
 		}
 
-		// 播放木牌和草动画（anim_sign + anim_grass）
-		ecs.AddComponent(m.entityManager, m.selectorScreenEntity, &components.AnimationCommandComponent{
-			AnimationName: "anim_sign", // 先添加木牌动画
-			Processed:     false,
-		})
-		ecs.AddComponent(m.entityManager, m.selectorScreenEntity, &components.AnimationCommandComponent{
-			AnimationName: "anim_grass", // 再添加草动画
-			Processed:     false,
-		})
-		m.reanimSystem.Update(0)
-		log.Printf("[MainMenuScene] First launch: playing anim_sign + anim_grass after user creation")
+		// ✅ 修复：直接调用 AddAnimation() 添加到现有动画列表
+		// 此时应该已经有：anim_open（背景）、anim_idle（按钮）、云朵动画
+		// 现在添加：anim_sign（木牌）、anim_grass（草）
+		if err := m.reanimSystem.AddAnimation(m.selectorScreenEntity, "anim_sign"); err != nil {
+			log.Printf("[MainMenuScene] Warning: Failed to add anim_sign: %v", err)
+		}
+		if err := m.reanimSystem.AddAnimation(m.selectorScreenEntity, "anim_grass"); err != nil {
+			log.Printf("[MainMenuScene] Warning: Failed to add anim_grass: %v", err)
+		}
+		log.Printf("[MainMenuScene] First launch: added anim_sign + anim_grass to existing animations")
 	}
 
 	log.Printf("[MainMenuScene] First launch setup completed")
@@ -1918,13 +1922,28 @@ func (m *MainMenuScene) initUserSign() {
 		signPressImage = nil
 	}
 
-	// 创建木牌实体（复用 SelectorScreen 中的 anim_sign 轨道）
-	// 木牌通过 Reanim 动画渲染，所以这里只需要添加 UserSignComponent
-	// 记录当前用户名和悬停状态
-
-	// 由于木牌已经在 SelectorScreen Reanim 中渲染，我们不需要创建新的实体
-	// 只需要在 SelectorScreen 实体上添加 UserSignComponent 即可
+	// Story 12.4 新方案：将用户名预先绘制到木牌图片上
+	// 这样用户名会自然跟随木牌动画，不需要单独处理动画同步
 	if m.selectorScreenEntity != 0 {
+		reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
+		if ok {
+			// 加载原始木牌图片
+			originalSignImage, err := m.resourceManager.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_WOODSIGN1")
+			if err != nil {
+				log.Printf("[MainMenuScene] Warning: Failed to load woodsign1 image: %v", err)
+				return
+			}
+
+			// 创建新图片，将用户名绘制在木牌上
+			signWithText := m.createSignWithUsername(originalSignImage, currentUser)
+			if signWithText != nil {
+				// 替换 PartImages 中的木牌图片
+				reanimComp.PartImages["IMAGE_REANIM_SELECTORSCREEN_WOODSIGN1"] = signWithText
+				log.Printf("[MainMenuScene] Replaced woodsign1 image with username: %s", currentUser)
+			}
+		}
+
+		// 添加 UserSignComponent（用于悬停和点击检测）
 		ecs.AddComponent(m.entityManager, m.selectorScreenEntity, &components.UserSignComponent{
 			CurrentUsername: currentUser,
 			IsHovered:       false,
@@ -1934,6 +1953,81 @@ func (m *MainMenuScene) initUserSign() {
 		log.Printf("[MainMenuScene] User sign initialized for user: %s", currentUser)
 	} else {
 		log.Printf("[MainMenuScene] Warning: SelectorScreen entity not found, cannot initialize user sign")
+	}
+}
+
+// createSignWithUsername 创建带用户名的木牌图片
+// 在原始木牌图片上绘制用户名文本（白字黄边，40号字体）
+func (m *MainMenuScene) createSignWithUsername(originalImage *ebiten.Image, username string) *ebiten.Image {
+	if originalImage == nil {
+		return nil
+	}
+
+	// 获取原始图片尺寸
+	bounds := originalImage.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+
+	// 创建新图片
+	newImage := ebiten.NewImage(width, height)
+
+	// 先绘制原始木牌图片
+	newImage.DrawImage(originalImage, nil)
+
+	// 加载字体
+	usernameFont, err := m.resourceManager.LoadFont("assets/fonts/fzse_gbk.ttf", 26)
+	if err != nil {
+		log.Printf("[MainMenuScene] Warning: Failed to load username font: %v", err)
+		return originalImage
+	}
+
+	// 计算用户名位置（木牌中下部分，居中，70% 高度）
+	centerX := float64(width) * 0.5
+	centerY := float64(height) * 0.60
+
+	// 绘制黄色描边
+	yellowColor := color.RGBA{R: 255, G: 255, B: 0, A: 255}
+	drawTextOutlineOnImage(newImage, username, centerX, centerY, usernameFont, yellowColor, 1)
+
+	// 绘制白色文本
+	whiteColor := color.RGBA{R: 255, G: 255, B: 255, A: 255}
+	drawCenteredTextOnImage(newImage, username, centerX, centerY, usernameFont, whiteColor)
+
+	return newImage
+}
+
+// drawCenteredTextOnImage 在图片上居中绘制文本
+func drawCenteredTextOnImage(img *ebiten.Image, textStr string, centerX, centerY float64, fontFace *text.GoTextFace, clr color.Color) {
+	textWidth, _ := text.Measure(textStr, fontFace, 0)
+	x := centerX - textWidth/2
+	y := centerY
+
+	op := &text.DrawOptions{}
+	op.GeoM.Translate(x, y)
+	op.ColorScale.ScaleWithColor(clr)
+	text.Draw(img, textStr, fontFace, op)
+}
+
+// drawTextOutlineOnImage 在图片上绘制文本描边
+func drawTextOutlineOnImage(img *ebiten.Image, textStr string, centerX, centerY float64, fontFace *text.GoTextFace, outlineColor color.Color, thickness int) {
+	textWidth, _ := text.Measure(textStr, fontFace, 0)
+	baseX := centerX - textWidth/2
+	baseY := centerY
+
+	// 绘制描边：在 8 个方向偏移绘制
+	offsets := []struct{ dx, dy float64 }{
+		{-1, -1}, {0, -1}, {1, -1},
+		{-1, 0}, {1, 0},
+		{-1, 1}, {0, 1}, {1, 1},
+	}
+
+	for _, offset := range offsets {
+		for t := 1; t <= thickness; t++ {
+			op := &text.DrawOptions{}
+			op.GeoM.Translate(baseX+offset.dx*float64(t), baseY+offset.dy*float64(t))
+			op.ColorScale.ScaleWithColor(outlineColor)
+			text.Draw(img, textStr, fontFace, op)
+		}
 	}
 }
 
@@ -1957,8 +2051,8 @@ func (m *MainMenuScene) updateUserSignHover(mouseX, mouseY int, isMouseClicked b
 		return
 	}
 
-	// 木牌轨道名称（根据 Story 12.4 AC1，使用 anim_sign 轨道中的 WoodSign2）
-	signTrackName := "SelectorScreen_WoodSign2"
+	// 木牌轨道名称（woodsign1 是用户名显示的主木牌）
+	signTrackName := "woodsign1"
 
 	// 检查轨道是否被隐藏
 	if reanimComp.HiddenTracks != nil && reanimComp.HiddenTracks[signTrackName] {
@@ -2299,115 +2393,11 @@ func (m *MainMenuScene) showDeleteUserDialog(username string) {
 
 // renderUserSignText 渲染木牌上的用户名文本
 // Story 12.4 Task 2.4
+// 新方案：用户名已预先绘制到木牌图片上，这里不需要单独渲染
+// 保留此函数用于未来可能的悬停效果（如更换图片）
 func (m *MainMenuScene) renderUserSignText(screen *ebiten.Image) {
-	// 如果没有木牌实体，跳过
-	if m.userSignEntity == 0 {
-		return
-	}
-
-	// 获取 UserSignComponent
-	userSignComp, ok := ecs.GetComponent[*components.UserSignComponent](m.entityManager, m.userSignEntity)
-	if !ok || userSignComp.CurrentUsername == "" {
-		return
-	}
-
-	// 获取 ReanimComponent 以获取木牌轨道的位置
-	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.userSignEntity)
-	if !ok {
-		return
-	}
-
-	// 木牌轨道名称
-	signTrackName := "SelectorScreen_WoodSign2"
-
-	// 检查轨道是否被隐藏
-	if reanimComp.HiddenTracks != nil && reanimComp.HiddenTracks[signTrackName] {
-		return
-	}
-
-	// 获取轨道的当前帧数据
-	frames, trackExists := reanimComp.MergedTracks[signTrackName]
-	if !trackExists || len(frames) == 0 {
-		return
-	}
-
-	// 获取当前帧索引
-	currentFrameIdx := reanimComp.CurrentFrame
-	if currentFrameIdx < 0 {
-		currentFrameIdx = 0
-	}
-	if currentFrameIdx >= len(frames) {
-		currentFrameIdx = len(frames) - 1
-	}
-
-	// 获取当前帧的变换数据
-	frame := frames[currentFrameIdx]
-
-	// 获取 PositionComponent 的基础位置
-	posComp, hasPosComp := ecs.GetComponent[*components.PositionComponent](m.entityManager, m.userSignEntity)
-	baseX := 0.0
-	baseY := 0.0
-	if hasPosComp {
-		baseX = posComp.X
-		baseY = posComp.Y
-	}
-
-	// 计算木牌的屏幕位置
-	frameX := 0.0
-	frameY := 0.0
-	if frame.X != nil {
-		frameX = *frame.X
-	}
-	if frame.Y != nil {
-		frameY = *frame.Y
-	}
-
-	signX := baseX + frameX - reanimComp.CenterOffsetX
-	signY := baseY + frameY - reanimComp.CenterOffsetY
-
-	// 从 PartImages 获取木牌图片以确定尺寸
-	signImage, hasImage := reanimComp.PartImages[frame.ImagePath]
-	if !hasImage || signImage == nil {
-		return
-	}
-
-	bounds := signImage.Bounds()
-	signWidth := float64(bounds.Dx())
-	signHeight := float64(bounds.Dy())
-
-	// 如果悬停，替换为按下状态的图片
-	if userSignComp.IsHovered && userSignComp.SignPressImage != nil {
-		op := &ebiten.DrawImageOptions{}
-		op.GeoM.Translate(signX, signY)
-		screen.DrawImage(userSignComp.SignPressImage, op)
-	}
-
-	// 渲染文本（标题 + 用户名）
-	// 标题："欢迎回来，我的朋友！"
-	titleFont, err := m.resourceManager.LoadFont("assets/fonts/SimHei.ttf", 16)
-	if err != nil {
-		log.Printf("[MainMenuScene] Warning: Failed to load title font: %v", err)
-		return
-	}
-
-	usernameFont, err := m.resourceManager.LoadFont("assets/fonts/SimHei.ttf", 18)
-	if err != nil {
-		log.Printf("[MainMenuScene] Warning: Failed to load username font: %v", err)
-		return
-	}
-
-	// 标题位置（木牌上半部分，居中）
-	titleText := "欢迎回来，我的朋友！"
-	titleX := signX + signWidth*0.5
-	titleY := signY + signHeight*0.3
-
-	drawCenteredText(screen, titleText, titleX, titleY, titleFont, color.RGBA{R: 139, G: 69, B: 19, A: 255})
-
-	// 用户名位置（木牌下半部分，居中）
-	usernameX := signX + signWidth*0.5
-	usernameY := signY + signHeight*0.6
-
-	drawCenteredText(screen, userSignComp.CurrentUsername, usernameX, usernameY, usernameFont, color.RGBA{R: 101, G: 67, B: 33, A: 255})
+	// 用户名已预先绘制到木牌图片上，随 Reanim 动画自然移动
+	// 此函数暂时为空，保留用于未来扩展
 }
 
 // drawCenteredText 在指定位置居中绘制文本
@@ -2422,4 +2412,46 @@ func drawCenteredText(screen *ebiten.Image, textStr string, centerX, centerY flo
 	op.GeoM.Translate(x, y)
 	op.ColorScale.ScaleWithColor(clr)
 	text.Draw(screen, textStr, fontFace, op)
+}
+
+// drawTextOutline 绘制文本描边（用于白字黄边效果）
+func drawTextOutline(screen *ebiten.Image, textStr string, centerX, centerY float64, fontFace *text.GoTextFace, outlineColor color.Color, thickness int) {
+	// 使用 text.Measure 计算文本宽度
+	textWidth, _ := text.Measure(textStr, fontFace, 0)
+	baseX := centerX - textWidth/2
+	baseY := centerY
+
+	// 绘制描边：在 8 个方向偏移绘制
+	offsets := []struct{ dx, dy float64 }{
+		{-1, -1}, {0, -1}, {1, -1},
+		{-1, 0}, {1, 0},
+		{-1, 1}, {0, 1}, {1, 1},
+	}
+
+	for _, offset := range offsets {
+		for t := 1; t <= thickness; t++ {
+			op := &text.DrawOptions{}
+			op.GeoM.Translate(baseX+offset.dx*float64(t), baseY+offset.dy*float64(t))
+			op.ColorScale.ScaleWithColor(outlineColor)
+			text.Draw(screen, textStr, fontFace, op)
+		}
+	}
+}
+
+// getTrackNames 获取 MergedTracks 中的所有轨道名称（用于调试）
+func getTrackNames(tracks map[string][]reanim.Frame) []string {
+	names := make([]string, 0, len(tracks))
+	for name := range tracks {
+		names = append(names, name)
+	}
+	return names
+}
+
+// getPartImageKeys 获取 PartImages 中的所有键（用于调试）
+func getPartImageKeys(images map[string]*ebiten.Image) []string {
+	keys := make([]string, 0, len(images))
+	for key := range images {
+		keys = append(keys, key)
+	}
+	return keys
 }
