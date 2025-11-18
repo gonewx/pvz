@@ -38,9 +38,12 @@ func (s *DialogInputSystem) Update(deltaTime float64) {
 		return
 	}
 
+	// ✅ 首先更新所有对话框的悬停状态（每帧都更新）
+	s.updateDialogHoverStates(dialogEntities)
+
 	// 检测 ESC 键按下
 	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
-		// 关闭所有对话框
+		// 关闭���有对话框
 		for _, entityID := range dialogEntities {
 			s.destroyDialogAndChildren(entityID)
 		}
@@ -76,6 +79,40 @@ func (s *DialogInputSystem) Update(deltaTime float64) {
 			log.Printf("[DialogInputSystem] 对话框位置: (%.0f, %.0f), 大小: (%.0f, %.0f)",
 				posComp.X, posComp.Y, dialogComp.Width, dialogComp.Height)
 
+			// ✅ Story 12.4: 检查是否点击了用户列表项
+			clickedUserIndex := s.getClickedUserListItem(mouseX, mouseY, entityID, dialogComp, posComp.X, posComp.Y)
+			if clickedUserIndex >= 0 {
+				log.Printf("[DialogInputSystem] ✅ 点击了用户���表项: %d", clickedUserIndex)
+
+				// 获取 UserListComponent
+				userList, ok := ecs.GetComponent[*components.UserListComponent](s.entityManager, entityID)
+				if ok {
+					// 检查是否点击了"建立一位新用户"项
+					if clickedUserIndex == len(userList.Users) {
+						// 点击了"建立一位新用户"，触发新建用户操作
+						log.Printf("[DialogInputSystem] 点击了'建立一位新用户'，触发按钮回调")
+						// 查找"好"按钮并触发回调（UserActionSwitch 会处理新建用户）
+						for i := range dialogComp.Buttons {
+							btn := &dialogComp.Buttons[i]
+							if btn.Label == "好" {
+								// 先更新选中索引
+								userList.SelectedIndex = clickedUserIndex
+								// 然后触发按钮回调
+								if btn.OnClick != nil {
+									btn.OnClick()
+								}
+								return
+							}
+						}
+					} else {
+						// 普通用户项，只更新选中索引
+						userList.SelectedIndex = clickedUserIndex
+						log.Printf("[DialogInputSystem] 更新选中索引为: %d", clickedUserIndex)
+					}
+				}
+				return
+			}
+
 			// 检查是否点击了按钮
 			clickedButton := s.getClickedButton(mouseX, mouseY, dialogComp, posComp.X, posComp.Y)
 			if clickedButton != nil {
@@ -98,8 +135,24 @@ func (s *DialogInputSystem) Update(deltaTime float64) {
 
 			// 检查是否点击了对话框外部
 			if !s.isClickInDialog(mouseX, mouseY, dialogComp, posComp.X, posComp.Y) {
-				// 点击了对话框外部，关闭对话框
-				log.Printf("[DialogInputSystem] 点击了对话框外部，关闭对话框 %d", entityID)
+				log.Printf("[DialogInputSystem] 点击了对话框外部")
+
+				// 如果对话框设置了 AutoClose=false，查找"取消"按钮并触发回调
+				if !dialogComp.AutoClose {
+					for i := range dialogComp.Buttons {
+						btn := &dialogComp.Buttons[i]
+						if btn.Label == "取消" {
+							log.Printf("[DialogInputSystem] 触发'取消'按钮回调")
+							if btn.OnClick != nil {
+								btn.OnClick()
+							}
+							return
+						}
+					}
+				}
+
+				// 如果没有"取消"按钮或 AutoClose=true，直接销毁对话框
+				log.Printf("[DialogInputSystem] 直接关闭对话框 %d", entityID)
 				s.destroyDialogAndChildren(entityID)
 				return
 			}
@@ -165,4 +218,126 @@ func (s *DialogInputSystem) getClickedButton(mouseX, mouseY int, dialog *compone
 // isClickOnButton 判断点击是否在按钮上（已废弃，使用 getClickedButton 代替）
 func (s *DialogInputSystem) isClickOnButton(mouseX, mouseY int, dialog *components.DialogComponent, dialogX, dialogY float64) bool {
 	return s.getClickedButton(mouseX, mouseY, dialog, dialogX, dialogY) != nil
+}
+
+// getClickedUserListItem 获取被点击的用户列表项索引（Story 12.4）
+// 返回值：
+//   - -1: 没有点击列表项
+//   - 0 ~ len(users)-1: 点击了普通用户项
+//   - len(users): 点击了"建立一位新用户"项
+func (s *DialogInputSystem) getClickedUserListItem(mouseX, mouseY int, entityID ecs.EntityID, dialog *components.DialogComponent, dialogX, dialogY float64) int {
+	// 检查是否有 UserListComponent
+	userList, ok := ecs.GetComponent[*components.UserListComponent](s.entityManager, entityID)
+	if !ok {
+		return -1
+	}
+
+	mx := float64(mouseX)
+	my := float64(mouseY)
+
+	// 列表区域配置（使用统一常量）
+	listX := dialogX + components.UserListPadding
+	listWidth := dialog.Width - components.UserListPadding*2
+	itemHeight := userList.ItemHeight
+
+	// 检查每个用户列表项
+	for i := range userList.Users {
+		itemY := dialogY + components.UserListStartY + float64(i)*itemHeight
+
+		if mx >= listX &&
+			mx <= listX+listWidth &&
+			my >= itemY &&
+			my <= itemY+itemHeight {
+			log.Printf("[DialogInputSystem] ✅ 点击了用户列表项 %d", i)
+			return i
+		}
+	}
+
+	// 检查"建立一位新用户"项
+	newUserIndex := len(userList.Users)
+	newUserItemY := dialogY + components.UserListStartY + float64(newUserIndex)*itemHeight
+
+	if mx >= listX &&
+		mx <= listX+listWidth &&
+		my >= newUserItemY &&
+		my <= newUserItemY+itemHeight {
+		log.Printf("[DialogInputSystem] ✅ 点击了'建立一位新用户'")
+		return newUserIndex
+	}
+
+	return -1
+}
+
+// updateDialogHoverStates 更新所有对话框的悬停状态
+// 每帧调用,负责更新用户列表的 HoveredIndex 和对话框按钮的 HoveredButtonIdx
+func (s *DialogInputSystem) updateDialogHoverStates(dialogEntities []ecs.EntityID) {
+	mouseX, mouseY := ebiten.CursorPosition()
+	mx := float64(mouseX)
+	my := float64(mouseY)
+
+	// 遍历所有对话框
+	for _, entityID := range dialogEntities {
+		dialogComp, ok1 := ecs.GetComponent[*components.DialogComponent](s.entityManager, entityID)
+		posComp, ok2 := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+
+		if !ok1 || !ok2 || !dialogComp.IsVisible {
+			continue
+		}
+
+		dialogX := posComp.X
+		dialogY := posComp.Y
+
+		// 检查鼠标是否在对话框内
+		isInDialog := mx >= dialogX && mx <= dialogX+dialogComp.Width &&
+			my >= dialogY && my <= dialogY+dialogComp.Height
+
+		if isInDialog {
+			// ✅ 更新按钮悬停状态
+			hoveredBtnIdx := -1
+			for i := range dialogComp.Buttons {
+				btn := &dialogComp.Buttons[i]
+				btnX := dialogX + btn.X
+				btnY := dialogY + btn.Y
+
+				if mx >= btnX && mx <= btnX+btn.Width &&
+					my >= btnY && my <= btnY+btn.Height {
+					hoveredBtnIdx = i
+					break
+				}
+			}
+			dialogComp.HoveredButtonIdx = hoveredBtnIdx
+
+			// ✅ 更新用户列表悬停状态（如果有）
+			userList, ok := ecs.GetComponent[*components.UserListComponent](s.entityManager, entityID)
+			if ok {
+				// 鼠标在对话框内,检测悬停项
+				listX := dialogX + components.UserListPadding
+				listWidth := dialogComp.Width - components.UserListPadding*2
+				itemHeight := userList.ItemHeight
+
+				hoveredIndex := -1
+				totalItems := len(userList.Users) + 1 // +1 for "建立一位新用户"
+
+				for i := 0; i < totalItems; i++ {
+					itemY := dialogY + components.UserListStartY + float64(i)*itemHeight
+
+					if mx >= listX && mx <= listX+listWidth &&
+						my >= itemY && my <= itemY+itemHeight {
+						hoveredIndex = i
+						break
+					}
+				}
+
+				userList.HoveredIndex = hoveredIndex
+			}
+		} else {
+			// 鼠标不在对话框内,重置所有悬停状态
+			dialogComp.HoveredButtonIdx = -1
+
+			userList, ok := ecs.GetComponent[*components.UserListComponent](s.entityManager, entityID)
+			if ok {
+				userList.HoveredIndex = -1
+			}
+		}
+	}
 }

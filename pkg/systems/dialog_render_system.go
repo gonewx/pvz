@@ -26,9 +26,9 @@ type DialogRenderSystem struct {
 	entityManager         *ecs.EntityManager
 	windowWidth           int
 	windowHeight          int
-	titleFont             *text.GoTextFace // 标题字体
-	messageFont           *text.GoTextFace // 消息字体
-	buttonFont            *text.GoTextFace // 按钮字体
+	titleFont             *text.GoTextFace       // 标题字体
+	messageFont           *text.GoTextFace       // 消息字体
+	buttonFont            *text.GoTextFace       // 按钮字体
 	textInputRenderSystem *TextInputRenderSystem // 文本输入框渲染系统（用于渲染子实体）
 }
 
@@ -103,6 +103,9 @@ func (s *DialogRenderSystem) Draw(screen *ebiten.Image) {
 
 		// 4. 绘制消息文字
 		s.drawMessage(screen, dialogComp, posComp.X, posComp.Y)
+
+		// 4.5. ✅ Story 12.4: 绘制用户列表（如果有 UserListComponent）
+		s.drawUserList(screen, entityID, dialogComp, posComp.X, posComp.Y)
 
 		// 5. 绘制按钮
 		s.drawButtons(screen, dialogComp, posComp.X, posComp.Y)
@@ -220,7 +223,7 @@ func (s *DialogRenderSystem) drawMessage(screen *ebiten.Image, dialog *component
 	// ✅ Story 12.4: 支持多行文本显示
 	// 将长文本按宽度限制自动换行
 	const maxLineWidth = 380.0 // 对话框宽度 - 左右边距
-	const lineHeight = 25.0     // 行高
+	const lineHeight = 25.0    // 行高
 
 	// 将消息文本按 maxLineWidth 分割成多行
 	lines := s.wrapText(dialog.Message, maxLineWidth)
@@ -407,4 +410,117 @@ func (s *DialogRenderSystem) drawFallbackButton(screen *ebiten.Image, btn *compo
 	rightOp := &ebiten.DrawImageOptions{}
 	rightOp.GeoM.Translate(x+btn.Width-2, y)
 	screen.DrawImage(rightBorder, rightOp)
+}
+
+// drawUserList 绘制用户列表（Story 12.4）
+// 如果对话框有 UserListComponent，则绘制用户列表，否则跳过
+func (s *DialogRenderSystem) drawUserList(screen *ebiten.Image, entityID ecs.EntityID, dialog *components.DialogComponent, dialogX, dialogY float64) {
+	// 检查是否有 UserListComponent
+	userList, ok := ecs.GetComponent[*components.UserListComponent](s.entityManager, entityID)
+	if !ok {
+		// 没有用户列表组件，跳过
+		return
+	}
+
+	log.Printf("[DialogRenderSystem] 绘制用户列表: %d 个用户", len(userList.Users))
+
+	// 列表区域配置（使用统一常量）
+	const listBgPadding = 2.0  // 列表背景的内边距
+	const listBgHeight = 200.0 // 列表背景固定高度
+	listX := dialogX + components.UserListPadding
+	listWidth := dialog.Width - components.UserListPadding*2
+	itemHeight := userList.ItemHeight
+
+	// 绘制列表区域背景（使用黑色填充，固定高度）
+	bgWidth := listWidth + listBgPadding*2
+	bgHeight := listBgHeight
+	bgX := listX - listBgPadding
+	bgY := dialogY + components.UserListStartY - listBgPadding
+
+	// 创建黑色背景
+	bgCanvas := ebiten.NewImage(int(bgWidth), int(bgHeight))
+	bgCanvas.Fill(color.RGBA{0, 0, 0, 255}) // 黑色
+
+	// 绘制背景到屏幕
+	bgOp := &ebiten.DrawImageOptions{}
+	bgOp.GeoM.Translate(bgX, bgY)
+	screen.DrawImage(bgCanvas, bgOp)
+
+	log.Printf("[DialogRenderSystem] 绘制列表背景（黑色，固定高度）: (%.0f, %.0f), 大小=(%.0f, %.0f)", bgX, bgY, bgWidth, bgHeight)
+
+	// 绘制用户列表项
+	for i, user := range userList.Users {
+		itemY := dialogY + components.UserListStartY + float64(i)*itemHeight
+
+		// 判断是否是选中的用户（使用 SelectedIndex 而不是 CurrentUser）
+		isSelected := (i == userList.SelectedIndex)
+
+		// 判断是否是悬停的用户
+		isHovered := (i == userList.HoveredIndex)
+
+		// 只有选中的用户项绘制背景（绿色）
+		if isSelected {
+			bgImage := ebiten.NewImage(int(listWidth), int(itemHeight)-2)
+			bgImage.Fill(color.RGBA{0, 150, 0, 200}) // 绿色
+			bgOp := &ebiten.DrawImageOptions{}
+			bgOp.GeoM.Translate(listX, itemY)
+			screen.DrawImage(bgImage, bgOp)
+		}
+
+		// 绘制用户名文字（水平和垂直居中）
+		textX := listX + listWidth/2  // 水平居中
+		textY := itemY + itemHeight/2 // 垂直居中
+		textOp := &text.DrawOptions{}
+		textOp.GeoM.Translate(textX, textY)
+		textOp.LayoutOptions.PrimaryAlign = text.AlignCenter   // 水平居中
+		textOp.LayoutOptions.SecondaryAlign = text.AlignCenter // 垂直居中
+
+		// 根据悬停状态设置文字颜色：悬停时白色，正常时黄色
+		if isHovered {
+			textOp.ColorScale.ScaleWithColor(color.White) // 悬停时白色
+		} else {
+			textOp.ColorScale.ScaleWithColor(color.RGBA{255, 200, 0, 255}) // 正常时黄色
+		}
+
+		if s.messageFont != nil {
+			text.Draw(screen, user.Username, s.messageFont, textOp)
+		}
+	}
+
+	// 绘制"建立一位新用户"选项（列表末尾）
+	newUserIndex := len(userList.Users)
+	newUserItemY := dialogY + components.UserListStartY + float64(newUserIndex)*itemHeight
+
+	// 判断是否悬停
+	isNewUserHovered := (newUserIndex == userList.HoveredIndex)
+
+	// 如果选中了"建立一位新用户"项，绘制背景
+	if userList.SelectedIndex == newUserIndex {
+		bgImage := ebiten.NewImage(int(listWidth), int(itemHeight)-2)
+		bgImage.Fill(color.RGBA{0, 150, 0, 200}) // 绿色
+		bgOp := &ebiten.DrawImageOptions{}
+		bgOp.GeoM.Translate(listX, newUserItemY)
+		screen.DrawImage(bgImage, bgOp)
+	}
+
+	// 绘制文字"建立一位新用户"（水平和垂直居中）
+	newUserTextX := listX + listWidth/2         // 水平居中
+	newUserTextY := newUserItemY + itemHeight/2 // 垂直居中
+	newUserTextOp := &text.DrawOptions{}
+	newUserTextOp.GeoM.Translate(newUserTextX, newUserTextY)
+	newUserTextOp.LayoutOptions.PrimaryAlign = text.AlignCenter   // 水平居中
+	newUserTextOp.LayoutOptions.SecondaryAlign = text.AlignCenter // 垂直居中
+
+	// 根据悬停状态设置文字颜色：悬停时白色，正常时黄色
+	if isNewUserHovered {
+		newUserTextOp.ColorScale.ScaleWithColor(color.White) // 悬停时白色
+	} else {
+		newUserTextOp.ColorScale.ScaleWithColor(color.RGBA{255, 200, 0, 255}) // 正常时黄色
+	}
+
+	if s.messageFont != nil {
+		text.Draw(screen, "（建立一位新用户）", s.messageFont, newUserTextOp)
+	}
+
+	log.Printf("[DialogRenderSystem] 用户列表渲染完成")
 }

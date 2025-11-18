@@ -2,6 +2,14 @@ package components
 
 import "time"
 
+// UserListComponent 布局常量
+const (
+	// UserListStartY 列表区域起始 Y 位置（相对于对话框）
+	UserListStartY = 100.0
+	// UserListPadding 列表左右内边距
+	UserListPadding = 70.0
+)
+
 // UserInfo 用户信息（避免循环引用 game 包）
 //
 // Story 12.4: 用户管理 UI
@@ -24,6 +32,9 @@ type UserListComponent struct {
 
 	// 当前选中的用户索引（-1 表示选中"建立一位新用户"）
 	SelectedIndex int
+
+	// 当前悬停的用户索引（-1 表示没有悬停）
+	HoveredIndex int
 
 	// 当前登录的用户名（用于高亮显示）
 	CurrentUser string

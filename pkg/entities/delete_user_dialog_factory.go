@@ -133,14 +133,15 @@ func NewDeleteUserDialogEntity(
 
 	// 添加对话框组件
 	ecs.AddComponent(em, dialogEntity, &components.DialogComponent{
-		Title:     "你确定吗？",
-		Message:   message,
-		Buttons:   dialogButtons,
-		Parts:     parts,
-		IsVisible: true,
-		Width:     dialogWidth,
-		Height:    dialogHeight,
-		AutoClose: true, // 删除确认对话框点击后自动关闭
+		Title:            "你确定吗？",
+		Message:          message,
+		Buttons:          dialogButtons,
+		Parts:            parts,
+		IsVisible:        true,
+		Width:            dialogWidth,
+		Height:           dialogHeight,
+		AutoClose:        true, // 删除确认对话框点击后自动关���
+		HoveredButtonIdx: -1,   // 初始化为未悬停状态
 	})
 
 	// 添加 UI 组件标记

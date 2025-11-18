@@ -183,15 +183,16 @@ func NewRenameUserDialogEntity(
 
 	// 添加对话框组件
 	ecs.AddComponent(em, dialogEntity, &components.DialogComponent{
-		Title:         "重命名用户",
-		Message:       "请输入新的用户名：",
-		Buttons:       dialogButtons,
-		Parts:         parts,
-		IsVisible:     true,
-		Width:         dialogWidth,
-		Height:        dialogHeight,
-		ChildEntities: []ecs.EntityID{inputEntity}, // 输入框是对话框的子实体
-		AutoClose:     false,                       // 需要验证后才关闭，由回调逻辑控制
+		Title:            "重命名用户",
+		Message:          "请输入新的用户名：",
+		Buttons:          dialogButtons,
+		Parts:            parts,
+		IsVisible:        true,
+		Width:            dialogWidth,
+		Height:           dialogHeight,
+		ChildEntities:    []ecs.EntityID{inputEntity}, // 输入框是对话框的子实体
+		AutoClose:        false,                       // 需要验证后才关闭，由回调逻辑控制
+		HoveredButtonIdx: -1,                          // 初始化为未悬停状态
 	})
 
 	// 添加 UI 组件标记

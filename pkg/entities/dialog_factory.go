@@ -102,14 +102,15 @@ func NewDialogEntity(
 
 	// 添加对话框组件
 	ecs.AddComponent(em, entity, &components.DialogComponent{
-		Title:     title,
-		Message:   message,
-		Buttons:   dialogButtons,
-		Parts:     parts,
-		IsVisible: true,
-		Width:     dialogWidth,
-		Height:    dialogHeight,
-		AutoClose: true, // 错误对话框点击后自动关闭
+		Title:            title,
+		Message:          message,
+		Buttons:          dialogButtons,
+		Parts:            parts,
+		IsVisible:        true,
+		Width:            dialogWidth,
+		Height:           dialogHeight,
+		AutoClose:        true, // 错误对话框点击后自动关闭
+		HoveredButtonIdx: -1,   // 初始化为未悬停状态
 	})
 
 	// 添加 UI 组件标记

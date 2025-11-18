@@ -8,15 +8,16 @@ import (
 // DialogComponent 对话框组件
 // 用于显示模态对话框（如未解锁提示、确认对话框等）
 type DialogComponent struct {
-	Title         string           // 对话框标题（如"未解锁！"）
-	Message       string           // 对话框消息（如"进行更多新冒险..."）
-	Buttons       []DialogButton   // 按钮列表（如["确定"]）
-	Parts         *DialogParts     // 九宫格图片资源
-	IsVisible     bool             // 是否可见
-	Width         float64          // 对话框宽度
-	Height        float64          // 对话框高度
-	ChildEntities []ecs.EntityID   // 关联的子实体（如输入框），对话框销毁时一起销毁
-	AutoClose     bool             // 点击按钮后是否自动关闭对话框（默认 true，新用户对话框设为 false）
+	Title            string           // 对话框标题（如"未解锁！"）
+	Message          string           // 对话框消息（如"进行更多新冒险..."）
+	Buttons          []DialogButton   // 按钮列表（如["确定"]）
+	Parts            *DialogParts     // 九宫格图片资源
+	IsVisible        bool             // 是否可见
+	Width            float64          // 对话框宽度
+	Height           float64          // 对话框高度
+	ChildEntities    []ecs.EntityID   // 关联的子实体（如输入框），对话框销毁时一起销毁
+	AutoClose        bool             // 点击按钮后是否自动关闭对话框（默认 true，新用户对话框设为 false）
+	HoveredButtonIdx int              // 当前悬停的按钮索引（-1 表示没有悬停）- ECS 架构重构
 }
 
 // DialogButton 对话框按钮

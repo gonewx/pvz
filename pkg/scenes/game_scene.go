@@ -145,6 +145,12 @@ type GameScene struct {
 
 	// Story 11.3: Final Wave Warning System (最后一波提示系统)
 	finalWaveWarningSystem *systems.FinalWaveWarningSystem // 最后一波提示动画系统
+
+	// Dialog Systems (对话框系统 - ECS ���构)
+	dialogInputSystem *systems.DialogInputSystem // 对话框输入系统（处理对话框交互）
+
+	// Cursor state tracking (光标状态追踪)
+	lastCursorShape ebiten.CursorShapeType // 上一帧的光标形状（避免不必要的API调用）
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -404,6 +410,10 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	scene.buttonSystem = systems.NewButtonSystem(scene.entityManager)
 	scene.buttonRenderSystem = systems.NewButtonRenderSystem(scene.entityManager)
 	log.Printf("[GameScene] Initialized button systems")
+
+	// 对话框系统初始化（ECS 架构）
+	scene.dialogInputSystem = systems.NewDialogInputSystem(scene.entityManager)
+	log.Printf("[GameScene] Initialized dialog input system")
 
 	// 创建菜单按钮实体
 	scene.initMenuButton(rm)
@@ -1117,10 +1127,17 @@ func (s *GameScene) Update(deltaTime float64) {
 
 	// Story 10.1: Check if game is paused
 	if s.gameState.IsPaused {
-		// 暂停时只更新 UI 系统（按钮交互、暂停菜单）
+		// 暂停时只更新 UI 系统（按钮交互、暂停菜单、对话框）
 		if s.buttonSystem != nil {
 			s.buttonSystem.Update(deltaTime)
 		}
+		// ✅ ECS 架构修复: 更新对话框输入系统（暂停菜单可能包含对话框）
+		if s.dialogInputSystem != nil {
+			s.dialogInputSystem.Update(deltaTime)
+			s.entityManager.RemoveMarkedEntities()
+		}
+		// ✅ 暂停时也需要更新鼠标光标（按钮悬停效果）
+		s.updateMouseCursor()
 		return // 跳过所有游戏逻辑系统
 	}
 	// Story 8.2 QA改进：铺草皮动画系统更新（必须在开场动画之前）
@@ -1359,6 +1376,9 @@ func (s *GameScene) Update(deltaTime float64) {
 	}
 	s.lifetimeSystem.Update(deltaTime)     // 11. Check for expired entities
 	s.entityManager.RemoveMarkedEntities() // 12. Clean up deleted entities (always last)
+
+	// 13. Update mouse cursor based on component states
+	s.updateMouseCursor()
 }
 
 // updateIntroAnimation updates the intro camera animation that showcases the entire lawn.
@@ -2221,3 +2241,57 @@ func (s *GameScene) initLawnmowers() {
 
 	log.Printf("[GameScene] Initialized %d lawnmowers for enabled lanes: %v", len(enabledLanes), enabledLanes)
 }
+
+// updateMouseCursor 根据组件状态更新鼠标光标形状
+//
+// ECS 架构原则:
+//   - 只读取组件状态,不进行碰撞检测
+//   - DialogInputSystem 负责更新 DialogComponent.HoveredButtonIdx
+//   - ButtonSystem 负责更新 ButtonComponent.State
+//   - 这里只根据状态设置光标
+//
+// 检查优先级:
+//   1. 面板按钮 (ButtonComponent)
+//   2. 对话框按钮 (DialogComponent.HoveredButtonIdx)
+func (s *GameScene) updateMouseCursor() {
+	// Default cursor shape
+	cursorShape := ebiten.CursorShapeDefault
+
+	// 1. Check if hovering over any panel button (pause menu, settings panel)
+	panelButtons := ecs.GetEntitiesWith1[*components.ButtonComponent](s.entityManager)
+	for _, entityID := range panelButtons {
+		button, ok := ecs.GetComponent[*components.ButtonComponent](s.entityManager, entityID)
+		if ok && button.State == components.UIHovered {
+			cursorShape = ebiten.CursorShapePointer
+			break
+		}
+	}
+
+	// 2. Check if hovering over any dialog button (if there are any dialogs)
+	dialogEntities := ecs.GetEntitiesWith1[*components.DialogComponent](s.entityManager)
+	for _, entityID := range dialogEntities {
+		dialogComp, ok := ecs.GetComponent[*components.DialogComponent](s.entityManager, entityID)
+		if ok && dialogComp.IsVisible {
+			// 检查对话框按钮是否悬停（只读取状态）
+			if dialogComp.HoveredButtonIdx >= 0 {
+				cursorShape = ebiten.CursorShapePointer
+				break
+			}
+
+			// 检查用户列表是否有悬停项（只读取状态）
+			if userList, ok2 := ecs.GetComponent[*components.UserListComponent](s.entityManager, entityID); ok2 {
+				if userList.HoveredIndex >= 0 {
+					cursorShape = ebiten.CursorShapePointer
+					break
+				}
+			}
+		}
+	}
+
+	// Only update cursor if shape changed (避免闪烁)
+	if cursorShape != s.lastCursorShape {
+		ebiten.SetCursorShape(cursorShape)
+		s.lastCursorShape = cursorShape
+	}
+}
+

@@ -554,50 +554,70 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 		// 阻止背景交互
 		m.wasMousePressed = isMousePressed
 
-		// 对话框输入系统处理（如果有对话框）
-		if m.currentDialog != 0 {
+		// ✅ ECS 架构修复: 对所有对话框都调用 DialogInputSystem.Update()
+		// 无论是 currentDialog, currentUserDialogID 还是 currentErrorDialogID
+		if m.currentDialog != 0 || m.currentUserDialogID != 0 || m.currentErrorDialogID != 0 {
 			m.dialogInputSystem.Update(deltaTime)
 			m.entityManager.RemoveMarkedEntities()
 
 			// Check if dialog was closed
-			dialogStillExists := false
 			dialogEntities := ecs.GetEntitiesWith1[*components.DialogComponent](m.entityManager)
-			for _, entityID := range dialogEntities {
-				if entityID == m.currentDialog {
-					dialogStillExists = true
-					break
+
+			// 检查 currentDialog 是否还存在
+			if m.currentDialog != 0 {
+				dialogStillExists := false
+				for _, entityID := range dialogEntities {
+					if entityID == m.currentDialog {
+						dialogStillExists = true
+						break
+					}
+				}
+
+				if !dialogStillExists {
+					m.currentDialog = 0
+					// 如果是错误对话框被关闭，也清除 currentErrorDialogID
+					if m.currentErrorDialogID != 0 {
+						// 检查错误对话框是否还存在
+						errorDialogExists := false
+						for _, entityID := range dialogEntities {
+							if entityID == m.currentErrorDialogID {
+								errorDialogExists = true
+								break
+							}
+						}
+						if !errorDialogExists {
+							log.Printf("[MainMenuScene] Error dialog closed, clearing currentErrorDialogID")
+							m.currentErrorDialogID = 0
+						}
+					}
+
+					// ✅ Story 12.4: 如果还有其他对话框，将 currentDialog 设置为最上层对话框
+					if len(dialogEntities) > 0 {
+						// 找到 ID 最大的对话框（最上层）
+						var maxDialogID ecs.EntityID = 0
+						for _, entityID := range dialogEntities {
+							if entityID > maxDialogID {
+								maxDialogID = entityID
+							}
+						}
+						m.currentDialog = maxDialogID
+						log.Printf("[MainMenuScene] Updated currentDialog to topmost dialog (ID: %d)", maxDialogID)
+					}
 				}
 			}
 
-			if !dialogStillExists {
-				m.currentDialog = 0
-				// 如果是错误对话框被关闭，也清除 currentErrorDialogID
-				if m.currentErrorDialogID != 0 {
-					// 检查错误对话框是否还存在
-					errorDialogExists := false
-					for _, entityID := range dialogEntities {
-						if entityID == m.currentErrorDialogID {
-							errorDialogExists = true
-							break
-						}
-					}
-					if !errorDialogExists {
-						log.Printf("[MainMenuScene] Error dialog closed, clearing currentErrorDialogID")
-						m.currentErrorDialogID = 0
+			// 检查 currentUserDialogID 是否还存在
+			if m.currentUserDialogID != 0 {
+				userDialogExists := false
+				for _, entityID := range dialogEntities {
+					if entityID == m.currentUserDialogID {
+						userDialogExists = true
+						break
 					}
 				}
-
-				// ✅ Story 12.4: 如果还有其他对话框，将 currentDialog 设置为最上层对话框
-				if len(dialogEntities) > 0 {
-					// 找到 ID 最大的对话框（最上层）
-					var maxDialogID ecs.EntityID = 0
-					for _, entityID := range dialogEntities {
-						if entityID > maxDialogID {
-							maxDialogID = entityID
-						}
-					}
-					m.currentDialog = maxDialogID
-					log.Printf("[MainMenuScene] Updated currentDialog to topmost dialog (ID: %d)", maxDialogID)
+				if !userDialogExists {
+					log.Printf("[MainMenuScene] User dialog closed, clearing currentUserDialogID")
+					m.currentUserDialogID = 0
 				}
 			}
 		}
@@ -685,7 +705,18 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 	m.updateButtonHighlight()
 
 	// Story 12.4 Task 2.3: Update user sign hover state
-	m.updateUserSignHover(mouseX, mouseY, isMouseClicked)
+	// ✅ 修复：对话框打开时禁用木牌悬停检测（避免遮罩层下的木牌被误判为悬停）
+	hasOpenDialog := m.currentUserDialogID != 0 || m.currentDialog != 0 || m.currentErrorDialogID != 0
+	if !hasOpenDialog {
+		m.updateUserSignHover(mouseX, mouseY, isMouseClicked)
+	} else {
+		// 对话框打开时，强制重置木牌悬停状态
+		if m.userSignEntity != 0 {
+			if userSignComp, ok := ecs.GetComponent[*components.UserSignComponent](m.entityManager, m.userSignEntity); ok {
+				userSignComp.IsHovered = false
+			}
+		}
+	}
 
 	// Story 12.1 Task 5: Update mouse cursor based on hover state
 	m.updateMouseCursor()
@@ -882,79 +913,63 @@ func (m *MainMenuScene) updateMouseCursor() {
 	// Default cursor shape
 	cursorShape := ebiten.CursorShapeDefault
 
-	// Check if hovering over a grave button
-	if m.hoveredButton != "" {
-		// ✅ 修复：所有可见的按钮（包括未解锁的）都显示手形鼠标
-		// 未解锁的按钮也可以点击，点击后会提示未解锁
-		cursorShape = ebiten.CursorShapePointer
-	}
+	// ✅ 核心修复：对话框打开时，只检查对话框的悬停状态，忽略所有底层 UI
+	hasOpenDialog := m.currentUserDialogID != 0 || m.currentDialog != 0 || m.currentErrorDialogID != 0
 
-	// Check if hovering over a bottom function button
-	if m.hoveredBottomButton != components.BottomButtonNone {
-		cursorShape = ebiten.CursorShapePointer
-	}
+	if !hasOpenDialog {
+		// 只有在没有对话框时才检查底层 UI 元素
 
-	// Story 12.4 AC2: Check if hovering over user sign
-	if m.userSignEntity != 0 {
-		if userSignComp, ok := ecs.GetComponent[*components.UserSignComponent](m.entityManager, m.userSignEntity); ok {
-			if userSignComp.IsHovered {
+		// Check if hovering over a grave button
+		if m.hoveredButton != "" {
+			// ✅ 修复：所有可见的按钮（包括未解锁的）都显示手形鼠标
+			// 未解锁的按钮也可以点击，点击后会提示未解锁
+			cursorShape = ebiten.CursorShapePointer
+		}
+
+		// Check if hovering over a bottom function button
+		if m.hoveredBottomButton != components.BottomButtonNone {
+			cursorShape = ebiten.CursorShapePointer
+		}
+
+		// Story 12.4 AC2: Check if hovering over user sign
+		if m.userSignEntity != 0 {
+			if userSignComp, ok := ecs.GetComponent[*components.UserSignComponent](m.entityManager, m.userSignEntity); ok {
+				if userSignComp.IsHovered {
+					cursorShape = ebiten.CursorShapePointer
+				}
+			}
+		}
+
+		// Check if hovering over any panel button (help/options panel)
+		panelButtons := ecs.GetEntitiesWith1[*components.ButtonComponent](m.entityManager)
+		for _, entityID := range panelButtons {
+			button, ok := ecs.GetComponent[*components.ButtonComponent](m.entityManager, entityID)
+			if ok && button.State == components.UIHovered {
 				cursorShape = ebiten.CursorShapePointer
+				break
 			}
 		}
 	}
 
-	// Check if hovering over any panel button (help/options panel)
-	panelButtons := ecs.GetEntitiesWith1[*components.ButtonComponent](m.entityManager)
-	for _, entityID := range panelButtons {
-		button, ok := ecs.GetComponent[*components.ButtonComponent](m.entityManager, entityID)
-		if ok && button.State == components.UIHovered {
-			cursorShape = ebiten.CursorShapePointer
-			break
-		}
-	}
+	// ✅ ECS 架构重构: 只读取组件状态,不进行碰撞检测
+	// DialogInputSystem 负责更新 DialogComponent.HoveredButtonIdx 和 UserListComponent.HoveredIndex
+	// 这里只根据状态设置光标
 
-	// Story 12.4: Check if hovering over dialog buttons or user list items
-	if m.currentUserDialogID != 0 {
-		mouseX, mouseY := ebiten.CursorPosition()
-
-		// Check dialog buttons
-		dialogComp, ok1 := ecs.GetComponent[*components.DialogComponent](m.entityManager, m.currentUserDialogID)
-		posComp, ok2 := ecs.GetComponent[*components.PositionComponent](m.entityManager, m.currentUserDialogID)
-
-		if ok1 && ok2 {
-			mx := float64(mouseX)
-			my := float64(mouseY)
-			dialogX := posComp.X
-			dialogY := posComp.Y
-
-			// Check if hovering over any dialog button
-			for i := range dialogComp.Buttons {
-				btn := &dialogComp.Buttons[i]
-				btnX := dialogX + btn.X
-				btnY := dialogY + btn.Y
-
-				if mx >= btnX && mx <= btnX+btn.Width &&
-					my >= btnY && my <= btnY+btn.Height {
+	// 检查所有对话框（用户管理对话框、错误对话框、通用对话框）
+	dialogIDs := []ecs.EntityID{m.currentUserDialogID, m.currentDialog, m.currentErrorDialogID}
+	for _, dialogID := range dialogIDs {
+		if dialogID != 0 {
+			dialogComp, ok := ecs.GetComponent[*components.DialogComponent](m.entityManager, dialogID)
+			if ok && dialogComp.IsVisible {
+				// 检查对话框按钮是否悬停（只读取状态）
+				if dialogComp.HoveredButtonIdx >= 0 {
 					cursorShape = ebiten.CursorShapePointer
 					break
 				}
-			}
 
-			// Check if hovering over user list items
-			if userList, ok := ecs.GetComponent[*components.UserListComponent](m.entityManager, m.currentUserDialogID); ok {
-				const listStartY = 100.0
-				const listPadding = 70.0
-				listX := dialogX + listPadding
-				listWidth := dialogComp.Width - listPadding*2
-				itemHeight := userList.ItemHeight
-
-				// Check each user list item
-				totalItems := len(userList.Users) + 1 // +1 for "建立一位新用户"
-				for i := 0; i < totalItems; i++ {
-					itemY := dialogY + listStartY + float64(i)*itemHeight
-
-					if mx >= listX && mx <= listX+listWidth &&
-						my >= itemY && my <= itemY+itemHeight {
+				// 检查用户列表是否有悬停项（只读取状态）
+				if userList, ok := ecs.GetComponent[*components.UserListComponent](m.entityManager, dialogID); ok {
+					if userList.HoveredIndex >= 0 {
 						cursorShape = ebiten.CursorShapePointer
 						break
 					}

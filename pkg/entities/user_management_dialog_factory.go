@@ -2,6 +2,7 @@ package entities
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
@@ -58,6 +59,18 @@ func NewUserManagementDialogEntity(
 		return 0, fmt.Errorf("加载对话框资源失败: %w", err)
 	}
 
+	// 用户管理对话框需要更高的底部区域以容纳 2 排按钮
+	// 将 BigBottom 图片覆盖到 Bottom 字段，由应用层决定使用哪种 UI 表现
+	if parts.BigBottomLeft != nil {
+		parts.BottomLeft = parts.BigBottomLeft
+	}
+	if parts.BigBottomMiddle != nil {
+		parts.BottomMiddle = parts.BigBottomMiddle
+	}
+	if parts.BigBottomRight != nil {
+		parts.BottomRight = parts.BigBottomRight
+	}
+
 	// 加载按钮图片资源
 	btnLeftImg, err := rm.LoadImageByID("IMAGE_BUTTON_LEFT")
 	if err != nil {
@@ -75,8 +88,8 @@ func NewUserManagementDialogEntity(
 	}
 
 	// 对话框尺寸
-	const dialogWidth = 600.0
-	const dialogHeight = 450.0
+	const dialogWidth = 510.0
+	const dialogHeight = 400.0
 
 	// 计算居中位置
 	dialogX := float64(windowWidth)/2 - dialogWidth/2
@@ -91,38 +104,35 @@ func NewUserManagementDialogEntity(
 		Y: dialogY,
 	})
 
-	// 构建用户列表显示文本
-	userListText := "当前用户列表:\n\n"
-	for i, user := range users {
-		prefix := "  "
-		if user.Username == currentUser {
-			prefix = "► " // 当前用户标记
-		}
-		userListText += fmt.Sprintf("%s%d. %s\n", prefix, i+1, user.Username)
-	}
-	userListText += "\n[点击下方按钮进行操作]"
+	// 构建用户列表显示文本（已移除，由 UserListComponent 渲染）
+	// userListText := ""
 
-	// 创建对话框按钮
+	// 创建对话框按钮（4 个石板风格按钮）
 	btnLeftWidth := float64(btnLeftImg.Bounds().Dx())
 	btnRightWidth := float64(btnRightImg.Bounds().Dx())
-	btnMiddleWidth := 120.0
+	btnMiddleWidth := 150.0 // 缩小按钮宽度以适应4个按钮
 	btnTotalWidth := btnLeftWidth + btnMiddleWidth + btnRightWidth
 	btnHeight := float64(btnLeftImg.Bounds().Dy())
 
-	// 按钮布局（底部4个按钮：重命名、删除、确定、取消）
-	const btnSpacing = 15.0
-	btnY := dialogHeight - 65.0
+	// 按钮布局（底部4个按钮：重命名、删除、好、取消）
+	const btnSpacing = 5.0
+	const btnBottomMargin = -22.0 // 按钮区域距离底部的边距
 
-	// 简化版本：只实现"新建用户"和"取消"按钮
-	// 完整版本需要更复杂的UI布局
-	btn1X := dialogWidth/2 - btnTotalWidth - btnSpacing/2
-	btn2X := dialogWidth/2 + btnSpacing/2
+	// 按钮横向布局（2x2网格）
+	// 第一行（上排）：重命名（左上）、删除（右上）
+	// 第二行（下排）：好（左下）、取消（右下）
+	btnRow2Y := dialogHeight - btnBottomMargin - btnHeight // 下排按钮 Y 坐标
+	btnRow1Y := btnRow2Y - btnHeight - btnSpacing          // 上排按钮 Y 坐标（给2排按钮留足空间）
+
+	btnCol1X := dialogWidth/2 - btnTotalWidth - btnSpacing/2 // 左列按钮 X 坐标
+	btnCol2X := dialogWidth/2 + btnSpacing/2                 // 右列按钮 X 坐标
 
 	dialogButtons := []components.DialogButton{
+		// 左上：重命名
 		{
-			Label:       "建立一位新用户",
-			X:           btn1X,
-			Y:           btnY,
+			Label:       "重命名",
+			X:           btnCol1X,
+			Y:           btnRow1Y,
 			Width:       btnTotalWidth,
 			Height:      btnHeight,
 			LeftImage:   btnLeftImg,
@@ -132,16 +142,17 @@ func NewUserManagementDialogEntity(
 			OnClick: func() {
 				if callback != nil {
 					callback(UserManagementDialogResult{
-						Action:         UserActionCreateNew,
-						NewUserClicked: true,
+						Action:       UserActionRename,
+						SelectedUser: "", // 主菜单场景会从 UserListComponent 读取
 					})
 				}
 			},
 		},
+		// 右上：删除
 		{
-			Label:       "取消",
-			X:           btn2X,
-			Y:           btnY,
+			Label:       "删除",
+			X:           btnCol2X,
+			Y:           btnRow1Y,
 			Width:       btnTotalWidth,
 			Height:      btnHeight,
 			LeftImage:   btnLeftImg,
@@ -149,6 +160,47 @@ func NewUserManagementDialogEntity(
 			RightImage:  btnRightImg,
 			MiddleWidth: btnMiddleWidth,
 			OnClick: func() {
+				if callback != nil {
+					callback(UserManagementDialogResult{
+						Action:       UserActionDelete,
+						SelectedUser: "", // 主菜单场景会从 UserListComponent 读取
+					})
+				}
+			},
+		},
+		// 左下：好
+		{
+			Label:       "好",
+			X:           btnCol1X,
+			Y:           btnRow2Y,
+			Width:       btnTotalWidth,
+			Height:      btnHeight,
+			LeftImage:   btnLeftImg,
+			MiddleImage: btnMiddleImg,
+			RightImage:  btnRightImg,
+			MiddleWidth: btnMiddleWidth,
+			OnClick: func() {
+				if callback != nil {
+					callback(UserManagementDialogResult{
+						Action:       UserActionSwitch,
+						SelectedUser: "", // 主菜单场景会从 UserListComponent 读取
+					})
+				}
+			},
+		},
+		// 右下：取消
+		{
+			Label:       "取消",
+			X:           btnCol2X,
+			Y:           btnRow2Y,
+			Width:       btnTotalWidth,
+			Height:      btnHeight,
+			LeftImage:   btnLeftImg,
+			MiddleImage: btnMiddleImg,
+			RightImage:  btnRightImg,
+			MiddleWidth: btnMiddleWidth,
+			OnClick: func() {
+				log.Printf("[UserManagementDialog] 取消按钮被点击")
 				if callback != nil {
 					callback(UserManagementDialogResult{
 						Action: UserActionNone,
@@ -160,14 +212,15 @@ func NewUserManagementDialogEntity(
 
 	// 添加对话框组件
 	ecs.AddComponent(em, dialogEntity, &components.DialogComponent{
-		Title:     "你叫啥？",
-		Message:   userListText,
-		Buttons:   dialogButtons,
-		Parts:     parts,
-		IsVisible: true,
-		Width:     dialogWidth,
-		Height:    dialogHeight,
-		AutoClose: true, // 用户管理对话框点击后自动关闭
+		Title:            "你叫啥？",
+		Message:          "", // 用户列表由 UserListComponent 渲染，不需要 Message
+		Buttons:          dialogButtons,
+		Parts:            parts,
+		IsVisible:        true,
+		Width:            dialogWidth,
+		Height:           dialogHeight,
+		AutoClose:        false, // 用户管理对话框不自动关闭（需要显式关闭）
+		HoveredButtonIdx: -1,    // 初始化为未悬停状态
 	})
 
 	// 添加 UI 组件标记
@@ -175,19 +228,25 @@ func NewUserManagementDialogEntity(
 		State: components.UINormal,
 	})
 
-	// 添加用户列表组件（用于后续扩展）
+	// 添加用户列表组件
 	userInfoList := make([]components.UserInfo, len(users))
+	selectedIndex := 0 // 默认选中第一个用户
 	for i, user := range users {
 		userInfoList[i] = components.UserInfo{
 			Username:    user.Username,
 			CreatedAt:   user.CreatedAt,
 			LastLoginAt: user.LastLoginAt,
 		}
+		// 找到当前用户的索引
+		if user.Username == currentUser {
+			selectedIndex = i
+		}
 	}
 
 	ecs.AddComponent(em, dialogEntity, &components.UserListComponent{
 		Users:         userInfoList,
-		SelectedIndex: 0,
+		SelectedIndex: selectedIndex, // 初始化为当前用户
+		HoveredIndex:  -1,            // 初始化为未悬停
 		CurrentUser:   currentUser,
 		ItemHeight:    30.0,
 		VisibleItems:  5,

@@ -181,15 +181,16 @@ func NewNewUserDialogEntity(
 
 	// 添加对话框组件
 	ecs.AddComponent(em, dialogEntity, &components.DialogComponent{
-		Title:         "新用户",
-		Message:       "请输入你的名字：",
-		Buttons:       dialogButtons,
-		Parts:         parts,
-		IsVisible:     true,
-		Width:         dialogWidth,
-		Height:        dialogHeight,
-		ChildEntities: []ecs.EntityID{inputEntity}, // 输入框是对话框的子实体
-		AutoClose:     false,                       // 不自动关闭，由回调逻辑控制
+		Title:            "新用户",
+		Message:          "请输入你的名字：",
+		Buttons:          dialogButtons,
+		Parts:            parts,
+		IsVisible:        true,
+		Width:            dialogWidth,
+		Height:           dialogHeight,
+		ChildEntities:    []ecs.EntityID{inputEntity}, // 输入框是对话框的子实体
+		AutoClose:        false,                       // 不自动关闭，由回调逻辑控制
+		HoveredButtonIdx: -1,                          // 初始化为未悬停状态
 	})
 
 	// 添加 UI 组件标记
