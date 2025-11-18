@@ -161,7 +161,7 @@ func (m *PauseMenuModule) createPauseMenuButtons(rm *game.ResourceManager) error
 
 	// 加载"返回游戏"按钮图片（原版资源）
 	backToGameNormal := rm.GetImageByID("IMAGE_OPTIONS_BACKTOGAMEBUTTON0")
-	backToGameHover := rm.GetImageByID("IMAGE_OPTIONS_BACKTOGAMEBUTTON2")
+	backToGamePressed := rm.GetImageByID("IMAGE_OPTIONS_BACKTOGAMEBUTTON2")
 
 	if backToGameNormal == nil {
 		return fmt.Errorf("failed to load back to game button images")
@@ -183,8 +183,8 @@ func (m *PauseMenuModule) createPauseMenuButtons(rm *game.ResourceManager) error
 	ecs.AddComponent(m.entityManager, backToGameEntity, &components.ButtonComponent{
 		Type:         components.ButtonTypeSimple,
 		NormalImage:  backToGameNormal,
-		HoverImage:   backToGameHover,
-		PressedImage: backToGameHover,
+		HoverImage:   backToGameNormal,   // ✅ 悬停时不换图（backtogamebutton 系列没有悬停状态）
+		PressedImage: backToGamePressed,  // ✅ 按下时使用 button2（下陷效果）
 		Text:         "返回游戏",
 		Font:         buttonFont,
 		TextColor:    [4]uint8{0, 200, 0, 255},

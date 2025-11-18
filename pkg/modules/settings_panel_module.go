@@ -274,10 +274,10 @@ func (m *SettingsPanelModule) createBottomButton(rm *game.ResourceManager, butto
 		return fmt.Errorf("failed to load options_backtogamebutton0.png: %w", err)
 	}
 
-	backToGameHover, err := rm.LoadImage("assets/images/options_backtogamebutton2.png")
+	backToGamePressed, err := rm.LoadImage("assets/images/options_backtogamebutton2.png")
 	if err != nil {
-		log.Printf("[SettingsPanelModule] Warning: Failed to load hover button image: %v", err)
-		backToGameHover = backToGameNormal // 使用 Normal 图片作为后备
+		log.Printf("[SettingsPanelModule] Warning: Failed to load pressed button image: %v", err)
+		backToGamePressed = backToGameNormal // 使用 Normal 图片作为后备
 	}
 
 	// 加载按钮文字字体
@@ -300,8 +300,8 @@ func (m *SettingsPanelModule) createBottomButton(rm *game.ResourceManager, butto
 	ecs.AddComponent(m.entityManager, m.bottomButtonEntity, &components.ButtonComponent{
 		Type:         components.ButtonTypeSimple,
 		NormalImage:  backToGameNormal,
-		HoverImage:   backToGameHover,
-		PressedImage: backToGameHover,
+		HoverImage:   backToGameNormal,   // ✅ 悬停时不换图（backtogamebutton 系列没有悬停状态）
+		PressedImage: backToGamePressed,  // ✅ 按下时使用 button2（下陷效果）
 		Text:         buttonConfig.Text,                 // 使用配置的文字
 		Font:         buttonFont,                        // 中文字体
 		TextColor:    [4]uint8{0, 200, 0, 255},          // 绿色文字

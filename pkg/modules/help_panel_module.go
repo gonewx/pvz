@@ -178,6 +178,13 @@ func (m *HelpPanelModule) createConfirmButton(rm *game.ResourceManager) error {
 		return fmt.Errorf("failed to load SeedChooser_Button.png: %w", err)
 	}
 
+	// ✅ 加载按钮发光图片（悬停状态）
+	buttonGlowImage, err := rm.LoadImage("assets/images/SeedChooser_Button_Glow.png")
+	if err != nil {
+		log.Printf("[HelpPanelModule] Warning: Failed to load SeedChooser_Button_Glow.png: %v", err)
+		buttonGlowImage = buttonImage // 降级使用普通图片
+	}
+
 	// 加载按钮文字字体（中文，使用奖励面板的字号）
 	buttonFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.RewardPanelButtonTextFontSize)
 	if err != nil {
@@ -198,8 +205,8 @@ func (m *HelpPanelModule) createConfirmButton(rm *game.ResourceManager) error {
 	ecs.AddComponent(m.entityManager, m.confirmButtonEntity, &components.ButtonComponent{
 		Type:         components.ButtonTypeSimple,
 		NormalImage:  buttonImage,
-		HoverImage:   buttonImage, // 使用同一张图片
-		PressedImage: buttonImage,
+		HoverImage:   buttonGlowImage, // ✅ 悬停时显示发光图片
+		PressedImage: buttonImage,     // ✅ 按下时仍使用普通图片（只有位移效果）
 		Text:         "主菜单",                      // 文字改为"主菜单"
 		Font:         buttonFont,                  // 中文字体
 		TextColor:    [4]uint8{255, 200, 0, 255},  // 橙黄色文字（与奖励面板一致）

@@ -75,24 +75,30 @@ func (s *ButtonRenderSystem) drawNineSliceButton(screen *ebiten.Image, button *c
 		return
 	}
 
+	// ✅ 按下状态：按钮向下偏移 2px
+	pressOffsetY := 0.0
+	if button.State == components.UIClicked {
+		pressOffsetY = 2.0
+	}
+
 	leftWidth := float64(button.LeftImage.Bounds().Dx())
 	rightWidth := float64(button.RightImage.Bounds().Dx())
 	middleWidth := button.MiddleWidth
 
 	// 绘制左边缘
 	leftOp := &ebiten.DrawImageOptions{}
-	leftOp.GeoM.Translate(x, y)
+	leftOp.GeoM.Translate(x, y+pressOffsetY) // ✅ 应用按下偏移
 	screen.DrawImage(button.LeftImage, leftOp)
 
 	// 绘制中间（拉伸）
 	middleOp := &ebiten.DrawImageOptions{}
 	middleOp.GeoM.Scale(middleWidth/float64(button.MiddleImage.Bounds().Dx()), 1.0)
-	middleOp.GeoM.Translate(x+leftWidth, y)
+	middleOp.GeoM.Translate(x+leftWidth, y+pressOffsetY) // ✅ 应用按下偏移
 	screen.DrawImage(button.MiddleImage, middleOp)
 
 	// 绘制右边缘
 	rightOp := &ebiten.DrawImageOptions{}
-	rightOp.GeoM.Translate(x+leftWidth+middleWidth, y)
+	rightOp.GeoM.Translate(x+leftWidth+middleWidth, y+pressOffsetY) // ✅ 应用按下偏移
 	screen.DrawImage(button.RightImage, rightOp)
 
 	// 更新按钮尺寸（缓存）
@@ -102,18 +108,25 @@ func (s *ButtonRenderSystem) drawNineSliceButton(screen *ebiten.Image, button *c
 
 // drawSimpleButton 渲染简单图片按钮
 func (s *ButtonRenderSystem) drawSimpleButton(screen *ebiten.Image, button *components.ButtonComponent, x, y float64) {
-	// 根据状态选择图片
+	// ✅ 修复：根据状态选择图片
+	// - UINormal: 正常图片
+	// - UIHovered: 悬停图片（如果有，否则用正常图片）
+	// - UIClicked: 按下图片（如果有，否则用悬停或正常图片）
 	var img *ebiten.Image
 	switch button.State {
 	case components.UIHovered:
+		// 悬停状态：优先使用悬停图片，否则用正常图片
 		if button.HoverImage != nil {
 			img = button.HoverImage
 		} else {
 			img = button.NormalImage
 		}
 	case components.UIClicked:
+		// ✅ 按下状态：优先使用按下图片，否则降级到悬停或正常图片
 		if button.PressedImage != nil {
 			img = button.PressedImage
+		} else if button.HoverImage != nil {
+			img = button.HoverImage
 		} else {
 			img = button.NormalImage
 		}
@@ -125,9 +138,21 @@ func (s *ButtonRenderSystem) drawSimpleButton(screen *ebiten.Image, button *comp
 		return
 	}
 
+	// ✅ 按下状态偏移逻辑：
+	// 如果 PressedImage 与 NormalImage 相同，则应用代码偏移（SeedChooser_Button 系列）
+	// 如果 PressedImage 与 NormalImage 不同，则不偏移（backtogamebutton 系列，图片自带下陷效果）
+	pressOffsetY := 0.0
+	if button.State == components.UIClicked {
+		if button.PressedImage == button.NormalImage {
+			// 图片相同，应用代码偏移
+			pressOffsetY = 2.0
+		}
+		// 图片不同，不偏移（图片本身已有下陷效果）
+	}
+
 	// 绘制按钮图片
 	op := &ebiten.DrawImageOptions{}
-	op.GeoM.Translate(x, y)
+	op.GeoM.Translate(x, y+pressOffsetY) // 应用按下偏移（如果需要）
 	screen.DrawImage(img, op)
 
 	// 更新按钮尺寸（缓存）
@@ -141,9 +166,19 @@ func (s *ButtonRenderSystem) drawButtonText(screen *ebiten.Image, button *compon
 		return
 	}
 
+	// ✅ 按下状态偏移逻辑：文字始终跟随按钮视觉效果
+	// 两种情况都需要偏移：
+	// 1. SeedChooser_Button 系列：图片代码偏移 2px，文字也偏移 2px
+	// 2. backtogamebutton 系列：图片自带下陷效果（视觉上向下约 2px），文字也偏移 2px
+	// 结论：无论哪种按钮，文字都向下偏移 2px
+	pressOffsetY := 0.0
+	if button.State == components.UIClicked {
+		pressOffsetY = 2.0
+	}
+
 	// 计算按钮中心点
 	centerX := x + button.Width/2
-	centerY := y + button.Height/2
+	centerY := y + button.Height/2 + pressOffsetY // 应用按下偏移
 
 	// 阴影偏移量
 	shadowOffsetX := 2.0
