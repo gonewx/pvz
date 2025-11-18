@@ -268,12 +268,15 @@ func (s *DialogInputSystem) getClickedUserListItem(mouseX, mouseY int, entityID 
 	return -1
 }
 
-// updateDialogHoverStates 更新所有对话框的悬停状态
-// 每帧调用,负责更新用户列表的 HoveredIndex 和对话框按钮的 HoveredButtonIdx
+// updateDialogHoverStates 更新所有对话框的悬停状态和按下状态
+// 每帧调用,负责更新用户列表的 HoveredIndex 和对话框按钮的 HoveredButtonIdx 和 PressedButtonIdx
 func (s *DialogInputSystem) updateDialogHoverStates(dialogEntities []ecs.EntityID) {
 	mouseX, mouseY := ebiten.CursorPosition()
 	mx := float64(mouseX)
 	my := float64(mouseY)
+
+	// ✅ 检测鼠标左键是否按下
+	isMousePressed := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
 
 	// 遍历所有对话框
 	for _, entityID := range dialogEntities {
@@ -307,6 +310,13 @@ func (s *DialogInputSystem) updateDialogHoverStates(dialogEntities []ecs.EntityI
 			}
 			dialogComp.HoveredButtonIdx = hoveredBtnIdx
 
+			// ✅ 更新按钮按下状态（只有悬停+鼠标按下时才设置 PressedButtonIdx）
+			if isMousePressed && hoveredBtnIdx >= 0 {
+				dialogComp.PressedButtonIdx = hoveredBtnIdx
+			} else {
+				dialogComp.PressedButtonIdx = -1
+			}
+
 			// ✅ 更新用户列表悬停状态（如果有）
 			userList, ok := ecs.GetComponent[*components.UserListComponent](s.entityManager, entityID)
 			if ok {
@@ -331,8 +341,9 @@ func (s *DialogInputSystem) updateDialogHoverStates(dialogEntities []ecs.EntityI
 				userList.HoveredIndex = hoveredIndex
 			}
 		} else {
-			// 鼠标不在对话框内,重置所有悬停状态
+			// 鼠标不在对话框内,重置所有悬停和按下状态
 			dialogComp.HoveredButtonIdx = -1
+			dialogComp.PressedButtonIdx = -1
 
 			userList, ok := ecs.GetComponent[*components.UserListComponent](s.entityManager, entityID)
 			if ok {

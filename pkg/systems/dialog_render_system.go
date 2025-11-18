@@ -301,7 +301,7 @@ func (s *DialogRenderSystem) wrapText(textStr string, maxWidth float64) []string
 
 // drawButtons 绘制按钮
 func (s *DialogRenderSystem) drawButtons(screen *ebiten.Image, dialog *components.DialogComponent, dialogX, dialogY float64) {
-	for _, btn := range dialog.Buttons {
+	for i, btn := range dialog.Buttons {
 		// 按钮绝对位置
 		btnX := dialogX + btn.X
 		btnY := dialogY + btn.Y
@@ -309,18 +309,25 @@ func (s *DialogRenderSystem) drawButtons(screen *ebiten.Image, dialog *component
 		log.Printf("[DialogRenderSystem] 绘制按钮: '%s' at (%.0f, %.0f), 大小=(%.0f, %.0f)",
 			btn.Label, btnX, btnY, btn.Width, btn.Height)
 
+		// ✅ 检查是否是按下的按钮（下陷效果）
+		isPressed := dialog.PressedButtonIdx == i
+		pressOffsetY := 0.0
+		if isPressed {
+			pressOffsetY = 2.0 // 按钮按下时向下偏移 2 像素
+		}
+
 		// 如果有三段式按钮图片，使用三段式渲染
 		if btn.LeftImage != nil && btn.MiddleImage != nil && btn.RightImage != nil {
-			s.drawNineSliceButton(screen, &btn, btnX, btnY)
+			s.drawNineSliceButton(screen, &btn, btnX, btnY+pressOffsetY)
 		} else {
 			// 降级：使用纯色矩形
-			s.drawFallbackButton(screen, &btn, btnX, btnY)
+			s.drawFallbackButton(screen, &btn, btnX, btnY+pressOffsetY)
 		}
 
 		// 绘制按钮文字（居中，使用游戏内菜单面板的按钮样式）
 		if s.buttonFont != nil {
 			centerX := btnX + btn.Width/2
-			centerY := btnY + btn.Height/2
+			centerY := btnY + btn.Height/2 + pressOffsetY // ✅ 文字也跟随按钮下陷
 
 			log.Printf("[DialogRenderSystem] 按钮文字位置: (%.0f, %.0f)", centerX, centerY)
 

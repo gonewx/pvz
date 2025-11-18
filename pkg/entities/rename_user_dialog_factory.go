@@ -193,6 +193,7 @@ func NewRenameUserDialogEntity(
 		ChildEntities:    []ecs.EntityID{inputEntity}, // 输入框是对话框的子实体
 		AutoClose:        false,                       // 需要验证后才关闭，由回调逻辑控制
 		HoveredButtonIdx: -1,                          // 初始化为未悬停状态
+		PressedButtonIdx: -1,   // 初始化为未按下状态
 	})
 
 	// 添加 UI 组件标记

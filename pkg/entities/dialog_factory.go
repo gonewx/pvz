@@ -111,6 +111,7 @@ func NewDialogEntity(
 		Height:           dialogHeight,
 		AutoClose:        true, // 错误对话框点击后自动关闭
 		HoveredButtonIdx: -1,   // 初始化为未悬停状态
+		PressedButtonIdx: -1,   // 初始化为未按下状态
 	})
 
 	// 添加 UI 组件标记
