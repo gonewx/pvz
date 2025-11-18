@@ -50,10 +50,10 @@ func (s *DialogInputSystem) Update(deltaTime float64) {
 		return
 	}
 
-	// 检测鼠标左键点击
-	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+	// ✅ 修改为释放时执行：检测鼠标左键释放（而不是按下）
+	if inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft) {
 		mouseX, mouseY := ebiten.CursorPosition()
-		log.Printf("[DialogInputSystem] 检测到鼠标点击: (%d, %d)", mouseX, mouseY)
+		log.Printf("[DialogInputSystem] 检测到鼠标释放: (%d, %d)", mouseX, mouseY)
 
 		// ✅ Story 12.4: 按 ID 倒序排序，优先处理最上层（ID 最大）的对话框
 		sort.Slice(dialogEntities, func(i, j int) bool {

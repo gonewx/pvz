@@ -509,8 +509,8 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 	// Check if mouse button is currently pressed
 	isMousePressed := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
 
-	// Detect click edge (button was just pressed this frame)
-	isMouseClicked := isMousePressed && !m.wasMousePressed
+	// ✅ 修改为释放时执行：检测鼠标释放边缘（刚释放的瞬间）
+	isMouseReleased := !isMousePressed && m.wasMousePressed
 
 	// Story 12.2: 键盘快捷键触发面板（临时验证方案）
 	// 检查是否有面板或对话框打开
@@ -649,7 +649,7 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 		inHitbox := config.IsPointInQuadrilateral(float64(mouseX), float64(mouseY), &hitbox)
 
 		// 调试日志：显示每个按钮的 hitbox 信息和鼠标位置
-		if hitbox.TrackName == "SelectorScreen_Challenges_button" && (inHitbox || isMouseClicked) {
+		if hitbox.TrackName == "SelectorScreen_Challenges_button" && (inHitbox || isMouseReleased) {
 			log.Printf("[MainMenuScene] 解谜按钮检测: 鼠标=(%.1f, %.1f), 四边形=[(%.1f,%.1f)-(%.1f,%.1f)-(%.1f,%.1f)-(%.1f,%.1f)], 命中=%v",
 				float64(mouseX), float64(mouseY),
 				hitbox.TopLeft.X, hitbox.TopLeft.Y,
@@ -663,7 +663,7 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 		if inHitbox {
 			m.hoveredButton = hitbox.TrackName
 
-			if isMouseClicked {
+			if isMouseReleased {
 				// Button clicked
 				log.Printf("[MainMenuScene] 按钮点击: %s (类型=%v)", hitbox.TrackName, hitbox.ButtonType)
 				m.onMenuButtonClicked(hitbox.ButtonType)
@@ -679,7 +679,7 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 		// Check if mouse is hovering over this button
 		if isPointInRect(float64(mouseX), float64(mouseY), btn.X, btn.Y, btn.Width, btn.Height) {
 			// Mouse is over the button
-			if isMouseClicked {
+			if isMouseReleased {
 				// Button was clicked
 				btn.State = components.UIClicked
 				if btn.OnClick != nil {
@@ -699,7 +699,7 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 	m.wasMousePressed = isMousePressed
 
 	// Story 12.2: Update bottom function buttons (Options/Help/Quit)
-	m.updateBottomButtons(mouseX, mouseY, isMouseClicked)
+	m.updateBottomButtons(mouseX, mouseY, isMouseReleased)
 
 	// Story 12.1 Task 5: Update button highlight based on hover state
 	m.updateButtonHighlight()
@@ -708,7 +708,7 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 	// ✅ 修复：对话框打开时禁用木牌悬停检测（避免遮罩层下的木牌被误判为悬停）
 	hasOpenDialog := m.currentUserDialogID != 0 || m.currentDialog != 0 || m.currentErrorDialogID != 0
 	if !hasOpenDialog {
-		m.updateUserSignHover(mouseX, mouseY, isMouseClicked)
+		m.updateUserSignHover(mouseX, mouseY, isMouseReleased)
 	} else {
 		// 对话框打开时，强制重置木牌悬停状态
 		if m.userSignEntity != 0 {
@@ -1688,7 +1688,7 @@ func (m *MainMenuScene) calculateBottomButtonScreenPos(buttonType components.Bot
 // based on mouse position and input.
 //
 // Story 12.2: 底部功能栏重构（动画跟随版本）
-func (m *MainMenuScene) updateBottomButtons(mouseX, mouseY int, isMouseClicked bool) {
+func (m *MainMenuScene) updateBottomButtons(mouseX, mouseY int, isMouseReleased bool) {
 	m.hoveredBottomButton = components.BottomButtonNone // Reset hover state
 
 	// Check each button in order (Options, Help, Quit)
@@ -1721,7 +1721,7 @@ func (m *MainMenuScene) updateBottomButtons(mouseX, mouseY int, isMouseClicked b
 		// Check if mouse is over this button (using expanded area)
 		if isPointInRect(float64(mouseX), float64(mouseY), expandedX, expandedY, expandedWidth, expandedHeight) {
 			// Mouse is over button
-			if isMouseClicked {
+			if isMouseReleased {
 				// Button clicked
 				m.onBottomButtonClicked(btnType)
 			} else {
@@ -2115,7 +2115,7 @@ func drawTextOutlineOnImage(img *ebiten.Image, textStr string, centerX, centerY 
 
 // updateUserSignHover 更新木牌悬停状态和点击检测
 // Story 12.4 Task 2.3
-func (m *MainMenuScene) updateUserSignHover(mouseX, mouseY int, isMouseClicked bool) {
+func (m *MainMenuScene) updateUserSignHover(mouseX, mouseY int, isMouseReleased bool) {
 	// 如果没有木牌实体，跳过
 	if m.userSignEntity == 0 {
 		return
@@ -2268,7 +2268,7 @@ func (m *MainMenuScene) updateUserSignHover(mouseX, mouseY int, isMouseClicked b
 	}
 
 	// 如果点击木牌，打开用户管理对话框
-	if mouseInSign && isMouseClicked {
+	if mouseInSign && isMouseReleased {
 		log.Printf("[MainMenuScene] User sign clicked, showing user management dialog")
 		m.showUserManagementDialog()
 	}

@@ -28,11 +28,12 @@ func NewButtonSystem(em *ecs.EntityManager) *ButtonSystem {
 }
 
 // Update 更新按钮交互状态
-// 检测鼠标位置和点击，更新按钮状态并触发回调
+// 检测鼠标位置和释放，更新按钮状态并触发回调
 func (s *ButtonSystem) Update(deltaTime float64) {
 	// 获取鼠标位置
 	mouseX, mouseY := ebiten.CursorPosition()
-	mouseClicked := inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft)
+	mousePressed := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
+	mouseReleased := inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft)
 
 	// 查询所有按钮实体
 	entities := ecs.GetEntitiesWith2[*components.ButtonComponent, *components.PositionComponent](s.entityManager)
@@ -52,12 +53,16 @@ func (s *ButtonSystem) Update(deltaTime float64) {
 
 		if isHovered {
 			// 鼠标在按钮内
-			if mouseClicked {
-				// 点击按钮
+			if mousePressed {
+				// 按下状态（显示按下效果）
 				button.State = components.UIClicked
+			} else if mouseReleased {
+				// ✅ 释放时执行：释放瞬间触发回调
 				if button.OnClick != nil {
 					button.OnClick()
 				}
+				// 释放后恢复悬停状态
+				button.State = components.UIHovered
 			} else {
 				// 悬停状态
 				button.State = components.UIHovered
