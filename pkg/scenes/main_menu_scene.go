@@ -107,8 +107,11 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	scene := &MainMenuScene{
 		resourceManager:     rm,
 		sceneManager:        sm,
-		lastCursorShape:     -1, // 初始化为无效值，确保第一次更新光标
+		lastCursorShape:     -1,                                                         // 初始化为无效值，确保第一次更新光标
 		hoveredBottomButton: components.BottomButtonNone,
+		wasMousePressed:     ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft),        // ✅ 初始化鼠标状态，防止场景切换时误触发点击
+		wasF1Pressed:        ebiten.IsKeyPressed(ebiten.KeyF1),                         // ✅ 初始化键盘状态
+		wasOPressed:         ebiten.IsKeyPressed(ebiten.KeyO),                          // ✅ 初始化键盘状态
 	}
 
 	// Story 12.1: Initialize ECS systems for SelectorScreen Reanim
