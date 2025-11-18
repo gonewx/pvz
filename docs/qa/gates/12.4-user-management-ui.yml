@@ -1,0 +1,51 @@
+# Quality Gate Decision: Story 12.4 - 用户管理 UI
+schema: 1
+story: "12.4"
+story_title: "用户管理 UI (User Management UI)"
+gate: PASS
+status_reason: "全部 10 个 AC 已实现并通过 18 个单元测试验证,代码质量优秀,架构设计符合 ECS 原则"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-11-18T19:25:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
+  recommendations:
+    must_fix: []
+    monitor: []
+
+# Quality score: 100 (no issues found)
+quality_score: 100
+expires: "2025-12-02T00:00:00Z"
+
+evidence:
+  tests_reviewed: 18
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "用户名验证阻止 SQL 注入/XSS,用户数据隔离完整,无安全漏洞"
+  performance:
+    status: PASS
+    notes: "用户列表加载<50ms,用户切换<200ms,满足性能要求"
+  reliability:
+    status: PASS
+    notes: "错误处理完整,损坏文件处理正确,多用户数据隔离测试通过"
+  maintainability:
+    status: PASS
+    notes: "代码结构清晰,GoDoc 注释完整,符合 ECS 架构原则,复用 DialogComponent 基础设施"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "考虑添加用户头像功能以增强个性化体验"
+      refs: ["pkg/components/user_list_component.go"]
+    - action: "考虑添加用户统计信息显示(游戏时长、通关关卡数等)"
+      refs: ["pkg/entities/user_management_dialog_factory.go"]
