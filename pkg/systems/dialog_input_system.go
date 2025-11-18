@@ -290,33 +290,33 @@ func (s *DialogInputSystem) updateDialogHoverStates(dialogEntities []ecs.EntityI
 		dialogX := posComp.X
 		dialogY := posComp.Y
 
-		// 检查鼠标是否在对话框内
+		// ✅ 修复：先检查按钮悬停（支持按钮超出对话框边界的情况）
+		hoveredBtnIdx := -1
+		for i := range dialogComp.Buttons {
+			btn := &dialogComp.Buttons[i]
+			btnX := dialogX + btn.X
+			btnY := dialogY + btn.Y
+
+			if mx >= btnX && mx <= btnX+btn.Width &&
+				my >= btnY && my <= btnY+btn.Height {
+				hoveredBtnIdx = i
+				break
+			}
+		}
+		dialogComp.HoveredButtonIdx = hoveredBtnIdx
+
+		// ✅ 更新按钮按下状态（只有悬停+鼠标按下时才设置 PressedButtonIdx）
+		if isMousePressed && hoveredBtnIdx >= 0 {
+			dialogComp.PressedButtonIdx = hoveredBtnIdx
+		} else {
+			dialogComp.PressedButtonIdx = -1
+		}
+
+		// 检查鼠标是否在对话框内（用于用户列表检测）
 		isInDialog := mx >= dialogX && mx <= dialogX+dialogComp.Width &&
 			my >= dialogY && my <= dialogY+dialogComp.Height
 
 		if isInDialog {
-			// ✅ 更新按钮悬停状态
-			hoveredBtnIdx := -1
-			for i := range dialogComp.Buttons {
-				btn := &dialogComp.Buttons[i]
-				btnX := dialogX + btn.X
-				btnY := dialogY + btn.Y
-
-				if mx >= btnX && mx <= btnX+btn.Width &&
-					my >= btnY && my <= btnY+btn.Height {
-					hoveredBtnIdx = i
-					break
-				}
-			}
-			dialogComp.HoveredButtonIdx = hoveredBtnIdx
-
-			// ✅ 更新按钮按下状态（只有悬停+鼠标按下时才设置 PressedButtonIdx）
-			if isMousePressed && hoveredBtnIdx >= 0 {
-				dialogComp.PressedButtonIdx = hoveredBtnIdx
-			} else {
-				dialogComp.PressedButtonIdx = -1
-			}
-
 			// ✅ 更新用户列表悬停状态（如果有）
 			userList, ok := ecs.GetComponent[*components.UserListComponent](s.entityManager, entityID)
 			if ok {
@@ -341,10 +341,7 @@ func (s *DialogInputSystem) updateDialogHoverStates(dialogEntities []ecs.EntityI
 				userList.HoveredIndex = hoveredIndex
 			}
 		} else {
-			// 鼠标不在对话框内,重置所有悬停和按下状态
-			dialogComp.HoveredButtonIdx = -1
-			dialogComp.PressedButtonIdx = -1
-
+			// 鼠标不在对话框内,重置用户列表悬停状态
 			userList, ok := ecs.GetComponent[*components.UserListComponent](s.entityManager, entityID)
 			if ok {
 				userList.HoveredIndex = -1
