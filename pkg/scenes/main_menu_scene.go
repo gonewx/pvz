@@ -666,6 +666,14 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 	return
 	}
 
+	// Story 12.6 Task 2.6: Block all button interactions during zombie hand animation
+	if m.menuState == MainMenuStateZombieHandPlaying {
+		m.hoveredButton = ""
+		m.hoveredBottomButton = components.BottomButtonNone
+		m.wasMousePressed = isMousePressed
+		return
+	}
+
 	// Story 12.1: Check SelectorScreen button hitboxes
 	m.hoveredButton = "" // Reset hovered button
 
@@ -2924,14 +2932,16 @@ func getMapKeys(m map[string][]int) []string {
 }
 
 // disableAllButtons disables all menu buttons during zombie hand animation.
-// Story 12.6 Task 2.3
+// Story 12.6 Task 2.3 & 2.6
+//
+// Note: This function is called when zombie hand animation starts.
+// The actual button blocking logic is implemented in Update() by checking
+// menuState == MainMenuStateZombieHandPlaying and returning early.
 func (m *MainMenuScene) disableAllButtons() {
-	// Hide all button hitboxes by clearing the list
-	// This prevents hover and click detection
-	// Buttons will be re-enabled when scene switches
+	// Clear hover states
 	m.hoveredButton = ""
 	m.hoveredBottomButton = components.BottomButtonNone
-	log.Printf("[MainMenuScene] Disabled all buttons (zombie hand animation playing)")
+	log.Printf("[MainMenuScene] 🚫 Disabled all buttons (zombie hand animation playing)")
 }
 
 // checkZombieHandAnimationFinished checks if zombie hand animation has finished and switches scene.
