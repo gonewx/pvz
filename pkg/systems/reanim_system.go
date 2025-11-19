@@ -3,6 +3,7 @@ package systems
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/components"
@@ -484,7 +485,7 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 	// Debug: 检查是否有 sodroll 实体
 	for _, id := range entities {
 		comp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id)
-		if exists && comp.ReanimName == "sodroll" && comp.CurrentFrame < 3 {
+		if exists && comp.ReanimName == "sodroll" && comp.CurrentFrame >= 4 && comp.CurrentFrame <= 10 {
 			log.Printf("[ReanimSystem] 🟫 Update: sodroll entity %d, frame=%d, FPS=%.1f",
 				id, comp.CurrentFrame, comp.AnimationFPS)
 		}
@@ -787,18 +788,17 @@ func (s *ReanimSystem) cleanupProcessedCommands(deltaTime float64) {
 // 新逻辑：外层循环动画，内层循环轨道，后面的动画自然覆盖前面的动画
 func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 	// Debug: 无条件打印向日葵和 SodRoll 的缓存准备
-	if comp.ReanimName == "sunflower" && comp.CurrentFrame < 3 {
+	if comp.ReanimName == "sunflower" && comp.CurrentFrame >= 4 && comp.CurrentFrame <= 10 {
 		log.Printf("[ReanimSystem] 🌻 prepareRenderCache 被调用: frame=%d", comp.CurrentFrame)
 	}
-	if comp.ReanimName == "sodroll" && comp.CurrentFrame < 3 {
+	if comp.ReanimName == "sodroll" && comp.CurrentFrame >= 4 && comp.CurrentFrame <= 10 {
 		log.Printf("[ReanimSystem] 🟫 SodRoll prepareRenderCache 被调用: frame=%d, VisualTracks=%d",
 			comp.CurrentFrame, len(comp.VisualTracks))
 	}
-	if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 30 {
+	if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame >= 4 && comp.CurrentFrame <= 100 {
 		log.Printf("[ReanimSystem] 🎬 SelectorScreen prepareRenderCache 被调用: frame=%d, animations=%v",
 			comp.CurrentFrame, comp.CurrentAnimations)
 	}
-
 	// 重用切片避免分配
 	comp.CachedRenderData = comp.CachedRenderData[:0]
 
@@ -870,25 +870,42 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 			}
 
 			// 映射逻辑帧到物理帧
-			physicalFrame := mapLogicalToPhysical(int(logicalFrame), animVisibles)
+			// 特殊处理：对于单动画文件（使用合成动画名 "_root"），逻辑帧=物理帧
+			var physicalFrame int
+			isSyntheticAnim := animName == "_root" || strings.HasPrefix(animName, "_")
+			if isSyntheticAnim {
+				// 单动画文件：直接使用逻辑帧作为物理帧
+				physicalFrame = int(logicalFrame)
+			} else {
+				// 命名动画：使用 AnimVisibles 映射
+				physicalFrame = mapLogicalToPhysical(int(logicalFrame), animVisibles)
+			}
+
 			if physicalFrame < 0 || physicalFrame >= len(mergedFrames) {
 				continue
 			}
 
 			// 检查动画定义轨道是否可见（f != -1）
-			animDefTrack, ok := comp.MergedTracks[animName]
-			if !ok || physicalFrame >= len(animDefTrack) {
-				continue
-			}
+			// 对于单动画文件（使用合成动画名如 "_root"），跳过这个检查
+			// 因为 MergedTracks 只包含轨道名称，不包含合成的动画名称
+			// isSyntheticAnim 已在上面定义
+			if !isSyntheticAnim {
+				// 只对命名动画（named animations）进行动画定义轨道检查
+				animDefTrack, ok := comp.MergedTracks[animName]
+				if !ok || physicalFrame >= len(animDefTrack) {
+					continue
+				}
 
-			defFrame := animDefTrack[physicalFrame]
-			if defFrame.FrameNum != nil && *defFrame.FrameNum == -1 {
-				// 动画隐藏，跳过整个动画
-				continue
+				defFrame := animDefTrack[physicalFrame]
+				if defFrame.FrameNum != nil && *defFrame.FrameNum == -1 {
+					// 动画隐藏，跳过整个动画
+					continue
+				}
 			}
 
 			// 检查视觉轨道在该帧是否被隐藏（f=-1）
 			currentTrackFrame := mergedFrames[physicalFrame]
+
 			if currentTrackFrame.FrameNum != nil && *currentTrackFrame.FrameNum == -1 {
 				// 视觉轨道在该帧被隐藏，跳过
 				skippedHidden++
@@ -1042,7 +1059,7 @@ func (s *ReanimSystem) GetRenderData(entityID ecs.EntityID) []components.RenderP
 	}
 
 	// Debug: SelectorScreen 前30帧打印
-	if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 30 {
+	if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame >= 4 && comp.CurrentFrame <= 100 {
 		log.Printf("[ReanimSystem] 🎨 GetRenderData: frame=%d, lastRenderFrame=%d, needRebuild=%v",
 			comp.CurrentFrame, comp.LastRenderFrame, needRebuild)
 	}
@@ -1405,4 +1422,13 @@ func (s *ReanimSystem) RenderToTexture(entityID ecs.EntityID, target *ebiten.Ima
 	}
 
 	return nil
+}
+
+// getMapKeysStr returns string keys of a map[string][]int (helper for debugging)
+func getMapKeysStr(m map[string][]int) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }

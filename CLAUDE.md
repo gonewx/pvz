@@ -828,3 +828,5 @@ func (sm *SaveManager) SwitchUser(username string) error
 - 验证粒子系统的实现， 可以使用类似 `go run cmd/particles/main.go --verbose --effect="Planting"  > /tmp/p.log 2>&1` 的命令运行，并查看日志
 - 如果没有动画轨道,那可能是简单的动画组件,应该按配置的名称,直接播放就行
 - 将刚刚的经验记录起来
+- 单动画文件（如 Zombie_hand.reanim）创建 visiblesArray 时，应该填充全 0 数组 [0, 0, 0, ...]
+  表示所有帧可见，而不是序列索引 [0, 1, 2, ...]，因为 mapLogicalToPhysical 函数通 animVisibles[i] == 0 判断帧是否可见

@@ -1,7 +1,9 @@
 id: zombie_hand
 name: Zombie_hand
 reanim_file: data/reanim/Zombie_hand.reanim
-default_animation: anim_idle
+# Note: This reanim file has no named animations, just track data
+# The entire file is a single animation sequence (zombie hand rising from ground)
+# Use single animation mode (no default_animation, no available_animations)
 scale: 1
 images:
     IMAGE_REANIM_ZOMBIE_HAND_ARM: assets/reanim/Zombie_hand_arm.png
@@ -20,4 +22,3 @@ images:
     IMAGE_REANIM_ZOMBIE_HAND_ROCK4: assets/reanim/Zombie_hand_rock4.png
     IMAGE_REANIM_ZOMBIE_HAND_ROCK5: assets/reanim/Zombie_hand_rock5.png
     IMAGE_REANIM_ZOMBIE_HAND_ROCK6: assets/reanim/Zombie_hand_rock6.png
-available_animations: []

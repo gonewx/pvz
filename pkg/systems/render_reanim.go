@@ -205,6 +205,12 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		tx := partX + baseScreenX
 		ty := partY + baseScreenY
 
+		// Debug: 僵尸手掌渲染坐标
+		if reanimComp.ReanimName == "Zombie_hand" && i < 3 { // 只打印前3个部件
+			log.Printf("[RenderReanim] 🧟 Part %d: partX=%.1f, partY=%.1f, baseScreenX=%.1f, baseScreenY=%.1f → final tx=%.1f, ty=%.1f",
+				i, partX, partY, baseScreenX, baseScreenY, tx, ty)
+		}
+
 		// 应用变换矩阵到图片的四个角
 		x0 := tx
 		y0 := ty

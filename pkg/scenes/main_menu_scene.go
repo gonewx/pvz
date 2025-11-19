@@ -25,6 +25,14 @@ const (
 	WindowHeight = 600
 )
 
+// MainMenuState represents the state of the main menu scene
+type MainMenuState int
+
+const (
+	MainMenuStateNormal MainMenuState = iota  // Normal state
+	MainMenuStateZombieHandPlaying            // Zombie hand animation playing
+)
+
 // MainMenuScene represents the main menu screen of the game.
 // It displays when the game starts and allows the player to navigate to other scenes.
 type MainMenuScene struct {
@@ -90,6 +98,11 @@ type MainMenuScene struct {
 	textInputRenderSystem *systems.TextInputRenderSystem // Text input render system
 	userSignEntity        ecs.EntityID                   // User sign entity (wood sign showing username)
 	saveManager           *game.SaveManager              // Save manager reference for user management
+
+	// Story 12.6: Zombie hand transition animation
+	zombieHandEntity ecs.EntityID  // Zombie hand entity ID
+	menuState        MainMenuState // Main menu state
+	pendingScene     string        // Pending scene to switch to after animation
 }
 
 // NewMainMenuScene creates and returns a new MainMenuScene instance.
@@ -112,6 +125,7 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 		wasMousePressed:     ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft),        // ✅ 初始化鼠标状态，防止场景切换时误触发点击
 		wasF1Pressed:        ebiten.IsKeyPressed(ebiten.KeyF1),                         // ✅ 初始化键盘状态
 		wasOPressed:         ebiten.IsKeyPressed(ebiten.KeyO),                          // ✅ 初始化键盘状态
+		menuState:           MainMenuStateNormal,                                        // Story 12.6: 初始化为正常状态
 	}
 
 	// Story 12.1: Initialize ECS systems for SelectorScreen Reanim
@@ -400,6 +414,25 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	scene.dialogRenderSystem.SetTextInputRenderSystem(scene.textInputRenderSystem)
 	log.Printf("[MainMenuScene] Set TextInputRenderSystem reference in DialogRenderSystem")
 
+	// Story 12.6: Create zombie hand entity (initially paused, for transition animation)
+	// Position: (0, 0) - Zombie_hand.reanim 中的坐标已经是绝对屏幕坐标
+	// 例如 arm 轨道的坐标是 (381.6, 712.5)，这是相对于屏幕左上角的绝对位置
+	zombieHandEntity, err := entities.NewZombieHandEntity(
+		scene.entityManager,
+		rm,
+		0, // X = 0，使用 Reanim 文件中的绝对坐标
+		0, // Y = 0，使用 Reanim 文件中的绝对坐标
+	)
+	if err != nil {
+		log.Printf("[MainMenuScene] Warning: Failed to create zombie hand entity: %v", err)
+		scene.zombieHandEntity = 0
+	} else {
+		scene.zombieHandEntity = zombieHandEntity
+		// Mark as UI element (not affected by camera)
+		ecs.AddComponent(scene.entityManager, zombieHandEntity, &components.UIComponent{})
+		log.Printf("[MainMenuScene] Zombie hand entity created (ID=%d, initially paused)", zombieHandEntity)
+	}
+
 	return scene
 }
 
@@ -428,6 +461,11 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 	// Story 12.1: Update Reanim system (animate clouds, flowers, etc.)
 	if m.reanimSystem != nil {
 		m.reanimSystem.Update(deltaTime)
+
+		// Story 12.6: Check if zombie hand animation finished
+		if m.menuState == MainMenuStateZombieHandPlaying {
+			m.checkZombieHandAnimationFinished()
+		}
 
 		// ✅ 检测开场动画完成，切换到循环动画
 		if !m.cloudAnimsResumed && m.selectorScreenEntity != 0 {
@@ -1007,6 +1045,11 @@ func (m *MainMenuScene) playGraveButtonSound() {
 // If a background image is loaded, it draws the image.
 // Otherwise, it uses a dark blue fallback background.
 func (m *MainMenuScene) Draw(screen *ebiten.Image) {
+	// Story 12.6: Debug menu state
+	if m.zombieHandEntity != 0 {
+		log.Printf("[MainMenuScene] 🎨 Draw() called: menuState=%d", m.menuState)
+	}
+
 	// Story 12.1: Draw SelectorScreen Reanim (contains background, buttons, decorations)
 	if m.selectorScreenEntity != 0 {
 		// 主菜单使用 Reanim 渲染，直接调用 DrawEntity
@@ -1192,6 +1235,18 @@ func (m *MainMenuScene) Draw(screen *ebiten.Image) {
 
 	// Story 12.2: Draw bottom function buttons (Options/Help/Quit)
 	m.drawBottomButtons(screen)
+
+	// Story 12.6: Draw zombie hand animation (if playing)
+	if m.menuState == MainMenuStateZombieHandPlaying && m.zombieHandEntity != 0 {
+		log.Printf("[MainMenuScene] 🧟 Drawing zombie hand entity (ID=%d)", m.zombieHandEntity)
+		m.renderSystem.DrawEntity(screen, m.zombieHandEntity, 0)
+	} else {
+		// Debug: Log why zombie hand is not drawn
+		if m.zombieHandEntity != 0 {
+			log.Printf("[MainMenuScene] 🧟 NOT drawing zombie hand: menuState=%d (expected %d)",
+				m.menuState, MainMenuStateZombieHandPlaying)
+		}
+	}
 
 	// Story 12.3: Draw dialogs (last, on top of everything)
 	// ✅ Story 12.4: DialogRenderSystem 现在也负责渲染对话框的子实体（输入框）
@@ -1476,9 +1531,9 @@ func (m *MainMenuScene) onMenuButtonClicked(buttonType config.MenuButtonType) {
 	// Route to appropriate handler based on button type
 	switch buttonType {
 	case config.MenuButtonAdventure:
-		// Start adventure mode
-		log.Printf("[MainMenuScene] Starting Adventure mode")
-		m.onStartAdventureClicked()
+		// Story 12.6: Trigger zombie hand animation before starting adventure
+		log.Printf("[MainMenuScene] Adventure button clicked - triggering zombie hand animation")
+		m.triggerZombieHandAnimation()
 
 	case config.MenuButtonChallenges:
 		// TODO: Implement challenges/mini-games mode
@@ -2805,4 +2860,137 @@ func getPartImageKeys(images map[string]*ebiten.Image) []string {
 		keys = append(keys, key)
 	}
 	return keys
+}
+
+// triggerZombieHandAnimation triggers the zombie hand rising animation and blocks interaction.
+// Story 12.6 Task 2.3: Trigger zombie hand animation on Adventure button click
+func (m *MainMenuScene) triggerZombieHandAnimation() {
+	if m.zombieHandEntity == 0 {
+		// Zombie hand entity not created, fall back to直接跳转
+		log.Printf("[MainMenuScene] Warning: Zombie hand entity not found, skipping animation")
+		m.onStartAdventureClicked()
+		return
+	}
+
+	// Get ReanimComponent
+	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.zombieHandEntity)
+	if !ok {
+		log.Printf("[MainMenuScene] Warning: Zombie hand entity has no ReanimComponent, skipping animation")
+		m.onStartAdventureClicked()
+		return
+	}
+
+	// Debug: Print animation info
+	log.Printf("[MainMenuScene] 🧟 Zombie hand animation info:")
+	log.Printf("  - CurrentAnimations: %v", reanimComp.CurrentAnimations)
+	log.Printf("  - AnimVisiblesMap keys: %v", getMapKeys(reanimComp.AnimVisiblesMap))
+	if visibles, ok := reanimComp.AnimVisiblesMap["_root"]; ok {
+		log.Printf("  - _root visibles length: %d", len(visibles))
+		if len(visibles) > 0 {
+			log.Printf("  - _root visibles first 5: %v", visibles[:min(5, len(visibles))])
+		}
+	}
+	log.Printf("  - FPS: %.1f", reanimComp.AnimationFPS)
+	log.Printf("  - IsLooping: %v", reanimComp.IsLooping)
+	log.Printf("  - IsPaused: %v", reanimComp.IsPaused)
+	log.Printf("  - IsFinished: %v", reanimComp.IsFinished)
+
+	// Unpause the animation
+	reanimComp.IsPaused = false
+	reanimComp.CurrentFrame = 0        // Reset to first frame
+	reanimComp.FrameAccumulator = 0.0  // Reset accumulator
+	reanimComp.IsFinished = false      // Reset finished flag
+
+	// Set menu state to block interaction
+	log.Printf("[MainMenuScene] 🧟 Setting menuState from %d to %d", m.menuState, MainMenuStateZombieHandPlaying)
+	m.menuState = MainMenuStateZombieHandPlaying
+	m.pendingScene = "GameScene"
+	log.Printf("[MainMenuScene] 🧟 menuState is now: %d", m.menuState)
+
+	// Disable all buttons to prevent clicks during animation
+	m.disableAllButtons()
+
+	log.Printf("[MainMenuScene] Zombie hand animation started (FPS=%.1f, total frames≈25)",
+		reanimComp.AnimationFPS)
+}
+
+// getMapKeys returns the keys of a map (helper for debugging)
+func getMapKeys(m map[string][]int) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+// disableAllButtons disables all menu buttons during zombie hand animation.
+// Story 12.6 Task 2.3
+func (m *MainMenuScene) disableAllButtons() {
+	// Hide all button hitboxes by clearing the list
+	// This prevents hover and click detection
+	// Buttons will be re-enabled when scene switches
+	m.hoveredButton = ""
+	m.hoveredBottomButton = components.BottomButtonNone
+	log.Printf("[MainMenuScene] Disabled all buttons (zombie hand animation playing)")
+}
+
+// checkZombieHandAnimationFinished checks if zombie hand animation has finished and switches scene.
+// Story 12.6 Task 2.4 & 2.5: Detect animation completion and switch to game scene
+func (m *MainMenuScene) checkZombieHandAnimationFinished() {
+	if m.zombieHandEntity == 0 {
+		return
+	}
+
+	// Get ReanimComponent
+	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.zombieHandEntity)
+	if !ok {
+		log.Printf("[MainMenuScene] Warning: Zombie hand entity has no ReanimComponent")
+		return
+	}
+
+	// Debug: Print animation state every frame
+	log.Printf("[MainMenuScene] 🧟 Checking animation: CurrentFrame=%d, IsFinished=%v, IsPaused=%v",
+		reanimComp.CurrentFrame, reanimComp.IsFinished, reanimComp.IsPaused)
+	if reanimComp.AnimationFrameIndices != nil {
+		if frameIdx, ok := reanimComp.AnimationFrameIndices["_root"]; ok {
+			log.Printf("[MainMenuScene] 🧟   _root frame index: %.2f", frameIdx)
+		}
+	}
+
+	// Check if animation finished
+	if !reanimComp.IsFinished {
+		return
+	}
+
+	// Animation finished, switch to game scene
+	log.Printf("[MainMenuScene] Zombie hand animation finished, switching to game scene")
+
+	// Story 8.6: Load level from save file or default to 1-1
+	gameState := game.GetGameState()
+	saveManager := gameState.GetSaveManager()
+
+	// Story 12.1 Task 6: 首次点击"开始冒险吧"时，标记用户已开始游戏
+	if err := saveManager.Load(); err == nil {
+		if !saveManager.GetHasStartedGame() {
+			log.Println("[MainMenuScene] 首次开始游戏，设置 hasStartedGame = true")
+			saveManager.SetHasStartedGame()
+			if err := saveManager.Save(); err != nil {
+				log.Printf("[MainMenuScene] ⚠️ 保存 hasStartedGame 失败: %v", err)
+			}
+		}
+	}
+
+	levelToLoad := "1-1" // Default to first level
+	if err := saveManager.Load(); err == nil {
+		// Save file exists, get highest level
+		highestLevel := saveManager.GetHighestLevel()
+		if highestLevel != "" {
+			levelToLoad = highestLevel
+			log.Printf("[MainMenu] Loading from save: highest level = %s", highestLevel)
+		}
+	}
+
+	// Pass ResourceManager, SceneManager, and levelID to GameScene
+	gameScene := NewGameScene(m.resourceManager, m.sceneManager, levelToLoad)
+	m.sceneManager.SwitchTo(gameScene)
 }
