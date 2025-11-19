@@ -29,8 +29,8 @@ const (
 type MainMenuState int
 
 const (
-	MainMenuStateNormal MainMenuState = iota  // Normal state
-	MainMenuStateZombieHandPlaying            // Zombie hand animation playing
+	MainMenuStateNormal            MainMenuState = iota // Normal state
+	MainMenuStateZombieHandPlaying                      // Zombie hand animation playing
 )
 
 // MainMenuScene represents the main menu screen of the game.
@@ -120,12 +120,12 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	scene := &MainMenuScene{
 		resourceManager:     rm,
 		sceneManager:        sm,
-		lastCursorShape:     -1,                                                         // 初始化为无效值，确保第一次更新光标
+		lastCursorShape:     -1, // 初始化为无效值，确保第一次更新光标
 		hoveredBottomButton: components.BottomButtonNone,
-		wasMousePressed:     ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft),        // ✅ 初始化鼠标状态，防止场景切换时误触发点击
-		wasF1Pressed:        ebiten.IsKeyPressed(ebiten.KeyF1),                         // ✅ 初始化键盘状态
-		wasOPressed:         ebiten.IsKeyPressed(ebiten.KeyO),                          // ✅ 初始化键盘状态
-		menuState:           MainMenuStateNormal,                                        // Story 12.6: 初始化为正常状态
+		wasMousePressed:     ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft), // ✅ 初始化鼠标状态，防止场景切换时误触发点击
+		wasF1Pressed:        ebiten.IsKeyPressed(ebiten.KeyF1),                   // ✅ 初始化键盘状态
+		wasOPressed:         ebiten.IsKeyPressed(ebiten.KeyO),                    // ✅ 初始化键盘状态
+		menuState:           MainMenuStateNormal,                                 // Story 12.6: 初始化为正常状态
 	}
 
 	// Story 12.1: Initialize ECS systems for SelectorScreen Reanim
@@ -660,10 +660,9 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 			}
 		}
 
-
-	// Story 12.4: Update mouse cursor for dialog buttons and list items
-	m.updateMouseCursor()
-	return
+		// Story 12.4: Update mouse cursor for dialog buttons and list items
+		m.updateMouseCursor()
+		return
 	}
 
 	// Story 12.6 Task 2.6: Block all button interactions during zombie hand animation
@@ -2102,7 +2101,7 @@ func (m *MainMenuScene) initUserSign() {
 }
 
 // createSignWithUsername 创建带用户名的木牌图片
-// 在原始木牌图片上绘制用户名文本（白字黄边，40号字体）
+// 在原始木牌图片上绘制用户名文本（白色泛黄，无描边，26号字体）
 func (m *MainMenuScene) createSignWithUsername(originalImage *ebiten.Image, username string) *ebiten.Image {
 	if originalImage == nil {
 		return nil
@@ -2130,13 +2129,9 @@ func (m *MainMenuScene) createSignWithUsername(originalImage *ebiten.Image, user
 	centerX := float64(width) * 0.5
 	centerY := float64(height) * 0.60
 
-	// 绘制黄色描边
-	yellowColor := color.RGBA{R: 255, G: 255, B: 0, A: 255}
-	drawTextOutlineOnImage(newImage, username, centerX, centerY, usernameFont, yellowColor, 1)
-
-	// 绘制白色文本
-	whiteColor := color.RGBA{R: 255, G: 255, B: 255, A: 255}
-	drawCenteredTextOnImage(newImage, username, centerX, centerY, usernameFont, whiteColor)
+	// 绘制白色泛黄文本（无描边）
+	yellowishWhiteColor := color.RGBA{R: 255, G: 255, B: 200, A: 255}
+	drawCenteredTextOnImage(newImage, username, centerX, centerY, usernameFont, yellowishWhiteColor)
 
 	return newImage
 }
@@ -2905,9 +2900,9 @@ func (m *MainMenuScene) triggerZombieHandAnimation() {
 
 	// Unpause the animation
 	reanimComp.IsPaused = false
-	reanimComp.CurrentFrame = 0        // Reset to first frame
-	reanimComp.FrameAccumulator = 0.0  // Reset accumulator
-	reanimComp.IsFinished = false      // Reset finished flag
+	reanimComp.CurrentFrame = 0       // Reset to first frame
+	reanimComp.FrameAccumulator = 0.0 // Reset accumulator
+	reanimComp.IsFinished = false     // Reset finished flag
 
 	// Set menu state to block interaction
 	log.Printf("[MainMenuScene] 🧟 Setting menuState from %d to %d", m.menuState, MainMenuStateZombieHandPlaying)
