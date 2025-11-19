@@ -300,9 +300,6 @@ func (s *LoadingScene) spawnSproutAnimation(index int) {
 		// Other triggers: sprout with variations
 		resourceName = "LoadBar_sprout"
 		animationName = "anim_sprout" // From loadbar_sprout.yaml default_animation
-
-		// TODO: Apply scale variations (scaleX, scaleY) when ReanimComponent supports it
-		// For now, just use default animation
 	}
 
 	// Load Reanim data from ResourceManager
@@ -331,6 +328,35 @@ func (s *LoadingScene) spawnSproutAnimation(index int) {
 		UnitID:        getUnitIDFromResourceName(resourceName), // Convert ResourceName to unitID
 		AnimationName: animationName,
 		Processed:     false,
+	})
+
+	// Apply scale variations (Story 1.5 Task 4)
+	// - 0.2 (index 0): Normal (ScaleX=1.0, ScaleY=1.0)
+	// - 0.4 (index 1): Mirror (ScaleX=-1.0, ScaleY=1.0)
+	// - 0.6 (index 2): Enlarged (ScaleX=1.5, ScaleY=1.5)
+	// - 0.8 (index 3): Mirror (ScaleX=-1.0, ScaleY=1.0)
+	// - 1.0 (index 4): Zombie head (Normal)
+	var scaleX, scaleY float64
+	if index == len(config.LoadingSproutTriggers)-1 {
+		// Zombie head: Normal
+		scaleX, scaleY = 1.0, 1.0
+	} else {
+		switch index {
+		case 0: // 0.2: Normal
+			scaleX, scaleY = 1.0, 1.0
+		case 1: // 0.4: Mirror
+			scaleX, scaleY = -1.0, 1.0
+		case 2: // 0.6: Enlarged
+			scaleX, scaleY = 1.5, 1.5
+		case 3: // 0.8: Mirror
+			scaleX, scaleY = -1.0, 1.0
+		default:
+			scaleX, scaleY = 1.0, 1.0
+		}
+	}
+	ecs.AddComponent(s.entityManager, entity, &components.ScaleComponent{
+		ScaleX: scaleX,
+		ScaleY: scaleY,
 	})
 
 	// Store entity for cleanup
