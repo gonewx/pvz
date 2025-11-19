@@ -5,6 +5,7 @@ import (
 	"image/color"
 	"log"
 	"math"
+	"strings"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
@@ -47,14 +48,16 @@ type LoadingScene struct {
 	// zombiePlayer *audio.Player
 	// clickPlayer  *audio.Player
 
-	// ECS system for Reanim animations
+	// Sod roll cap (simple linear interpolation, no ECS)
+	sodRollCapImage *ebiten.Image // Sod roll cap image
+
+	// ECS system for Reanim animations (only for sprouts)
 	entityManager   *ecs.EntityManager
 	reanimSystem    *systems.ReanimSystem
 	renderSystem    *systems.RenderSystem
 	configManager   *config.ReanimConfigManager
 	cameraX         float64                        // Camera X position (0 for loading scene)
 	cameraY         float64                        // Camera Y position (0 for loading scene)
-	capEntity       ecs.EntityID                   // Sod roll cap entity
 	sproutEntities  []ecs.EntityID                 // Sprout animation entities
 	triggeredFlags  []bool                         // Track which sprout animations have been triggered
 	sproutPositions map[int]struct{ x, y float64 } // Position for each sprout animation
@@ -118,10 +121,16 @@ func NewLoadingScene(rm *game.ResourceManager, sm *game.SceneManager, configMana
 		log.Printf("Failed to load grass bar image: %v", err)
 	}
 
+	// Load sod roll cap image (single image, will apply transform)
+	scene.sodRollCapImage, err = rm.LoadImage("assets/reanim/SodRollCap.png")
+	if err != nil {
+		log.Printf("[LoadingScene] Failed to load sod roll cap image: %v", err)
+	}
+
 	// Load fonts
 	scene.loadFonts()
 
-	// Initialize ECS systems
+	// Initialize ECS systems (only for sprouts)
 	scene.initECS()
 
 	// Define sprout positions (spread across progress bar)
@@ -129,7 +138,7 @@ func NewLoadingScene(rm *game.ResourceManager, sm *game.SceneManager, configMana
 	for i := range config.LoadingSproutTriggers {
 		// Position sprouts above and slightly offset from progress bar
 		baseX := config.LoadingBarX + config.LoadingGrassOffsetX
-		offsetX := (barWidth / float64(len(config.LoadingSproutTriggers))) * float64(i)
+		offsetX := barWidth * float64(config.LoadingSproutTriggers[i])
 		scene.sproutPositions[i] = struct{ x, y float64 }{
 			x: baseX + offsetX,
 			y: config.LoadingBarY - 40, // Above progress bar
@@ -137,6 +146,13 @@ func NewLoadingScene(rm *game.ResourceManager, sm *game.SceneManager, configMana
 	}
 
 	return scene
+}
+
+// getUnitIDFromResourceName converts ResourceManager name (PascalCase) to config unitID (lowercase)
+// Examples: "LoadBar_sprout" -> "loadbar_sprout", "LoadBar_Zombiehead" -> "loadbar_zombiehead"
+func getUnitIDFromResourceName(resourceName string) string {
+	// Simple conversion: just lowercase the entire name
+	return strings.ToLower(resourceName)
 }
 
 // loadFonts loads the font resources for the loading scene.
@@ -149,40 +165,13 @@ func (s *LoadingScene) loadFonts() {
 	}
 }
 
-// initECS initializes the ECS systems for Reanim animations.
+// initECS initializes the ECS systems for Reanim animations (sprouts only).
 func (s *LoadingScene) initECS() {
 	s.entityManager = ecs.NewEntityManager()
 	s.reanimSystem = systems.NewReanimSystem(s.entityManager)
 	s.reanimSystem.SetConfigManager(s.configManager)
 	s.renderSystem = systems.NewRenderSystem(s.entityManager)
-
-	// Create sod roll cap entity
-	s.createSodRollCap()
-}
-
-// createSodRollCap creates the sod roll cap animation entity.
-func (s *LoadingScene) createSodRollCap() {
-	s.capEntity = s.entityManager.CreateEntity()
-
-	// Position at the left end of the progress bar initially
-	grassX := config.LoadingBarX + config.LoadingGrassOffsetX
-	grassY := config.LoadingBarY + config.LoadingGrassOffsetY
-
-	ecs.AddComponent(s.entityManager, s.capEntity, &components.PositionComponent{
-		X: grassX,
-		Y: grassY,
-	})
-
-	// Add ReanimComponent (required for animation playback)
-	// ReanimSystem will initialize this component when processing AnimationCommandComponent
-	ecs.AddComponent(s.entityManager, s.capEntity, &components.ReanimComponent{})
-
-	// Add animation command to play sod roll cap animation
-	ecs.AddComponent(s.entityManager, s.capEntity, &components.AnimationCommandComponent{
-		UnitID:    "sodroll",
-		ComboName: "default",
-		Processed: false,
-	})
+	s.renderSystem.SetReanimSystem(s.reanimSystem) // 设置 ReanimSystem 引用，用于 GetRenderData
 }
 
 // Update updates the loading scene logic.
@@ -195,13 +184,10 @@ func (s *LoadingScene) Update(deltaTime float64) {
 	// Update loading progress
 	s.updateProgress(deltaTime)
 
-	// Update sod roll cap position
-	s.updateCapPosition()
-
 	// Check and trigger sprout animations
 	s.checkSproutTriggers()
 
-	// Update ECS systems
+	// Update ECS systems (for sprouts)
 	s.reanimSystem.Update(deltaTime)
 
 	// Check for click to transition to main menu (only when complete and hovering over progress bar)
@@ -247,23 +233,6 @@ func (s *LoadingScene) updateProgress(deltaTime float64) {
 		s.loadingComplete = true
 		// TODO: Play flower sound (Task 6)
 	}
-}
-
-// updateCapPosition updates the sod roll cap position based on progress.
-func (s *LoadingScene) updateCapPosition() {
-	if s.capEntity == 0 {
-		return
-	}
-
-	pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, s.capEntity)
-	if !ok {
-		return
-	}
-
-	// Calculate cap position (follow progress bar right edge)
-	grassWidth := 314.0 // Grass bar width
-	grassX := config.LoadingBarX + config.LoadingGrassOffsetX
-	pos.X = grassX + (grassWidth * s.progress)
 }
 
 // updateMouseInteraction handles mouse hover and click interaction with progress bar.
@@ -316,32 +285,52 @@ func (s *LoadingScene) spawnSproutAnimation(index int) {
 
 	ecs.AddComponent(s.entityManager, entity, &components.PositionComponent{
 		X: pos.x,
-		Y: pos.y,
+		Y: pos.y + 10,
 	})
 
 	// Determine animation type based on index
-	var unitID string
+	var resourceName string  // ResourceManager uses PascalCase names
+	var animationName string // Direct animation name to play
 
 	if index == len(config.LoadingSproutTriggers)-1 {
 		// Last trigger: zombie head
-		unitID = "loadbar_zombiehead"
+		resourceName = "LoadBar_Zombiehead"
+		animationName = "anim_zombie" // From loadbar_zombiehead.yaml default_animation
 	} else {
 		// Other triggers: sprout with variations
-		unitID = "loadbar_sprout"
+		resourceName = "LoadBar_sprout"
+		animationName = "anim_sprout" // From loadbar_sprout.yaml default_animation
 
 		// TODO: Apply scale variations (scaleX, scaleY) when ReanimComponent supports it
 		// For now, just use default animation
 	}
 
-	// Add ReanimComponent (required for animation playback)
-	// ReanimSystem will initialize this component when processing AnimationCommandComponent
-	ecs.AddComponent(s.entityManager, entity, &components.ReanimComponent{})
+	// Load Reanim data from ResourceManager
+	reanimXML := s.resourceManager.GetReanimXML(resourceName)
+	if reanimXML == nil {
+		log.Printf("[LoadingScene] Failed to load %s reanim (not found in cache)", resourceName)
+		return
+	}
+
+	partImages := s.resourceManager.GetReanimPartImages(resourceName)
+	if partImages == nil {
+		log.Printf("[LoadingScene] Failed to load %s part images (not found in cache)", resourceName)
+		return
+	}
+
+	// Add ReanimComponent with full data
+	ecs.AddComponent(s.entityManager, entity, &components.ReanimComponent{
+		ReanimName: resourceName,
+		ReanimXML:  reanimXML,
+		PartImages: partImages,
+	})
 
 	// Add animation command
+	// Note: Need to set UnitID so ReanimSystem can read loop config from YAML
 	ecs.AddComponent(s.entityManager, entity, &components.AnimationCommandComponent{
-		UnitID:    unitID,
-		ComboName: "default",
-		Processed: false,
+		UnitID:        getUnitIDFromResourceName(resourceName), // Convert ResourceName to unitID
+		AnimationName: animationName,
+		Processed:     false,
 	})
 
 	// Store entity for cleanup
@@ -373,10 +362,10 @@ func (s *LoadingScene) Draw(screen *ebiten.Image) {
 	// Draw logo
 	s.drawLogo(screen)
 
-	// Draw progress bar
+	// Draw progress bar (includes sod roll cap)
 	s.drawProgressBar(screen)
 
-	// Draw Reanim animations (sod roll cap and sprouts)
+	// Draw Reanim animations (sprouts only)
 	s.renderSystem.DrawGameWorld(screen, s.cameraX)
 
 	// Draw text messages
@@ -441,6 +430,9 @@ func (s *LoadingScene) drawProgressBar(screen *ebiten.Image) {
 			screen.DrawImage(visibleGrass, op)
 		}
 	}
+
+	// Draw sod roll cap (on top of grass)
+	s.drawSodRollCap(screen)
 }
 
 // drawText draws the loading text messages.
@@ -482,4 +474,67 @@ func (s *LoadingScene) drawText(screen *ebiten.Image) {
 	mainOp.GeoM.Translate(textX, textY)
 	mainOp.ColorScale.ScaleWithColor(textColor)
 	text.Draw(screen, message, s.textFontFace, mainOp)
+}
+
+// drawSodRollCap draws the sod roll cap with linear interpolation between keyframes.
+func (s *LoadingScene) drawSodRollCap(screen *ebiten.Image) {
+	if s.sodRollCapImage == nil || s.progress <= 0 || s.progress >= 1.0 {
+		return
+	}
+
+	// Keyframe data from SodRoll.reanim
+	// 帧 0:  ScaleX=0.8,   ScaleY=0.8
+	// 帧 13: ScaleX=0.624, ScaleY=0.624
+	const (
+		frame0Scale  = 0.8
+		frame13Scale = 0.624
+	)
+
+	// Linear interpolation for scale based on progress (0.0 → 1.0)
+	currentScale := frame0Scale + (frame13Scale-frame0Scale)*s.progress
+
+	// Calculate position
+	grassWidth := 314.0 // Grass bar width
+	grassX := config.LoadingBarX + config.LoadingGrassOffsetX
+	grassY := config.LoadingBarY + config.LoadingGrassOffsetY
+
+	// X: follow grass bar right edge
+	// Cap should be centered at the grass bar right edge
+	imgBounds := s.sodRollCapImage.Bounds()
+	imgWidth := float64(imgBounds.Dx())
+	imgHeight := float64(imgBounds.Dy())
+	scaledWidth := imgWidth * currentScale
+
+	grassRightEdge := grassX + (grassWidth * s.progress)
+	capX := grassRightEdge - (scaledWidth / 2.0) // Center the cap at grass right edge
+
+	// Y: place cap on top of grass bar
+	// Cap image height is 71, we want the bottom of the scaled image to touch grassY
+	scaledHeight := imgHeight * currentScale
+
+	// Position so bottom edge is slightly below grassY for visual grounding
+	// Adjustable offset to fine-tune visual contact
+	const yOffset = 30.0 // Positive = move down
+	capY := grassY - scaledHeight + yOffset
+
+	// Calculate rotation for rolling effect
+	// As the cap moves from left to right, it should rotate
+	// Full progress (314 pixels) = multiple full rotations
+	// Assuming cap diameter ~73 pixels, circumference = π * 73 ≈ 229
+	// So 314 pixels ≈ 1.37 rotations ≈ 1.37 * 2π radians
+	const rotationsPerFullProgress = 1.5 // Adjust for visual effect
+	rotation := s.progress * rotationsPerFullProgress * 2 * math.Pi
+
+	// Draw with scale and rotation
+	op := &ebiten.DrawImageOptions{}
+	// 1. Move image center to origin (for rotation around center)
+	op.GeoM.Translate(-imgWidth/2.0, -imgHeight/2.0)
+	// 2. Apply rotation (rolling effect)
+	op.GeoM.Rotate(rotation)
+	// 3. Apply scale
+	op.GeoM.Scale(currentScale, currentScale)
+	// 4. Move to final position (adjust for the fact we rotated around center)
+	op.GeoM.Translate(capX+scaledWidth/2.0, capY+scaledHeight/2.0)
+
+	screen.DrawImage(s.sodRollCapImage, op)
 }

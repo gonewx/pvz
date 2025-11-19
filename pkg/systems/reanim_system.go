@@ -129,6 +129,91 @@ func (s *ReanimSystem) PlayAnimation(entityID ecs.EntityID, animName string) err
 	return nil
 }
 
+// PlayAnimationWithConfig 播放单个动画（带配置）
+// 与 PlayAnimation 类似，但从配置文件中读取 loop 设置
+//
+// 参数：
+//   - entityID: 实体 ID
+//   - unitID: 单位 ID（用于查找配置，如 "loadbar_sprout"）
+//   - animName: 动画名称（如 "anim_sprout"）
+//
+// 返回：
+//   - error: 如果实体不存在、没有 ReanimComponent、或配置读取失败，返回错误
+func (s *ReanimSystem) PlayAnimationWithConfig(entityID ecs.EntityID, unitID, animName string) error {
+	comp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !ok {
+		return fmt.Errorf("entity %d does not have ReanimComponent", entityID)
+	}
+
+	if comp.ReanimXML == nil {
+		return fmt.Errorf("entity %d has no ReanimXML data", entityID)
+	}
+
+	// 初始化 MergedTracks（如果需要）
+	if comp.MergedTracks == nil {
+		comp.MergedTracks = reanim.BuildMergedTracks(comp.ReanimXML)
+		comp.VisualTracks, comp.LogicalTracks = s.analyzeTrackTypes(comp.ReanimXML)
+		comp.AnimationFPS = float64(comp.ReanimXML.FPS)
+		comp.IsLooping = true // 默认值
+		comp.LastRenderFrame = -1
+	}
+
+	// 单个动画模式下，ParentTracks 不使用
+	comp.ParentTracks = nil
+
+	// 保留现有的 HiddenTracks
+	if comp.HiddenTracks == nil {
+		log.Printf("[ReanimSystem] PlayAnimationWithConfig: HiddenTracks is nil, keeping it nil")
+	} else {
+		log.Printf("[ReanimSystem] PlayAnimationWithConfig: Preserving HiddenTracks (count=%d)", len(comp.HiddenTracks))
+	}
+
+	// 设置当前动画列表
+	comp.CurrentAnimations = []string{animName}
+	comp.CurrentFrame = 0
+	comp.FrameAccumulator = 0
+	comp.IsFinished = false
+
+	// 从配置中读取 loop 设置
+	shouldLoop := true // 默认循环
+	if s.configManager != nil {
+		unitConfig, err := s.configManager.GetUnit(unitID)
+		if err == nil {
+			// 查找动画配置
+			for _, animInfo := range unitConfig.AvailableAnimations {
+				if animInfo.Name == animName {
+					// animInfo.Loop 是 *bool 类型
+					// nil = 使用默认值 true（循环）
+					// &false = 显式设置为不循环
+					// &true = 显式设置为循环
+					if animInfo.Loop != nil {
+						shouldLoop = *animInfo.Loop
+						if !shouldLoop {
+							log.Printf("[ReanimSystem] PlayAnimationWithConfig: 动画 %s (unit=%s) 配置为不循环", animName, unitID)
+						}
+					}
+					break
+				}
+			}
+		} else {
+			log.Printf("[ReanimSystem] PlayAnimationWithConfig: 无法获取单位配置 %s: %v，使用默认循环设置", unitID, err)
+		}
+	}
+
+	comp.IsLooping = shouldLoop
+
+	// 重建动画数据
+	s.rebuildAnimationData(comp)
+
+	// 计算并缓存 CenterOffset
+	s.calculateCenterOffset(comp)
+
+	// 标记缓存失效
+	comp.LastRenderFrame = -1
+
+	return nil
+}
+
 // AddAnimation 添加一个动画到当前播放列表（累加模式）
 // 用于同时播放多个独立动画（如背景 + 云朵 + 草）
 //
@@ -430,8 +515,12 @@ func (s *ReanimSystem) processAnimationCommands() {
 
 		// 执行命令
 		var err error
-		if cmd.AnimationName != "" {
-			// 模式 1: 单动画模式
+		if cmd.UnitID != "" && cmd.AnimationName != "" && cmd.ComboName == "" {
+			// 模式 3: 单动画模式（带配置）- 从 unitID 配置中读取 loop 设置
+			log.Printf("[ReanimSystem] 执行单动画命令（带配置）: entity=%d, unit=%s, anim=%s", id, cmd.UnitID, cmd.AnimationName)
+			err = s.PlayAnimationWithConfig(id, cmd.UnitID, cmd.AnimationName)
+		} else if cmd.AnimationName != "" {
+			// 模式 1: 单动画模式（无配置）- 默认循环
 			log.Printf("[ReanimSystem] 执行单动画命令: entity=%d, anim=%s", id, cmd.AnimationName)
 			err = s.PlayAnimation(id, cmd.AnimationName)
 		} else if cmd.UnitID != "" {
@@ -576,8 +665,8 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 
 			animSpeed := 1.0 // 默认正常速度
 			if comp.AnimationSpeedOverrides != nil {
-				if speed, hasOverride := comp.AnimationSpeedOverrides[animName]; hasOverride && speed > 0 {
-					animSpeed = speed
+				if speed, hasOverride := comp.AnimationSpeedOverrides[animName]; hasOverride {
+					animSpeed = speed  // 允许 speed = 0 来完全禁用自动推进
 				}
 			}
 
@@ -881,6 +970,12 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 				physicalFrame = mapLogicalToPhysical(int(logicalFrame), animVisibles)
 			}
 
+			// Debug: SodRoll 帧映射（前 15 帧）
+			if comp.ReanimName == "sodroll" && comp.CurrentFrame < 15 {
+				log.Printf("[ReanimSystem] 🟫 SodRoll Frame %d: trackName=%s, animName=%s, logicalFrame=%.2f, physicalFrame=%d, isSynthetic=%v",
+					comp.CurrentFrame, trackName, animName, logicalFrame, physicalFrame, isSyntheticAnim)
+			}
+
 			if physicalFrame < 0 || physicalFrame >= len(mergedFrames) {
 				continue
 			}
@@ -1045,6 +1140,12 @@ func (s *ReanimSystem) GetRenderData(entityID ecs.EntityID) []components.RenderP
 			currentFrameSum += frameIdx
 		}
 
+		// Debug: SodRoll 缓存更新检查（前 15 帧）
+		if comp.ReanimName == "sodroll" && comp.CurrentFrame < 15 {
+			log.Printf("[ReanimSystem] 🟫 SodRoll GetRenderData Frame %d: currentFrameSum=%.3f, LastRenderFrame=%d, needRebuild=%v",
+				comp.CurrentFrame, currentFrameSum, comp.LastRenderFrame, comp.LastRenderFrame == -1 || float64(comp.LastRenderFrame) != currentFrameSum)
+		}
+
 		// 如果帧索引和发生变化，或者是首次渲染
 		if comp.LastRenderFrame == -1 || float64(comp.LastRenderFrame) != currentFrameSum {
 			needRebuild = true
@@ -1052,6 +1153,11 @@ func (s *ReanimSystem) GetRenderData(entityID ecs.EntityID) []components.RenderP
 		}
 	} else {
 		// 后备逻辑：使用整数 CurrentFrame（兼容旧代码）
+		// Debug: SodRoll 后备逻辑（前 15 帧）
+		if comp.ReanimName == "sodroll" && comp.CurrentFrame < 15 {
+			log.Printf("[ReanimSystem] 🟫 SodRoll GetRenderData（后备逻辑） Frame %d: LastRenderFrame=%d, CurrentFrame=%d, needRebuild=%v",
+				comp.CurrentFrame, comp.LastRenderFrame, comp.CurrentFrame, comp.LastRenderFrame != comp.CurrentFrame)
+		}
 		if comp.LastRenderFrame != comp.CurrentFrame {
 			needRebuild = true
 			comp.LastRenderFrame = comp.CurrentFrame
@@ -1066,6 +1172,10 @@ func (s *ReanimSystem) GetRenderData(entityID ecs.EntityID) []components.RenderP
 
 	// 重建缓存
 	if needRebuild {
+		// Debug: SodRoll 缓存重建（前 15 帧）
+		if comp.ReanimName == "sodroll" && comp.CurrentFrame < 15 {
+			log.Printf("[ReanimSystem] 🟫 SodRoll 重建缓存: Frame %d, needRebuild=true", comp.CurrentFrame)
+		}
 		s.prepareRenderCache(comp)
 	}
 

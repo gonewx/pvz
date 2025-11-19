@@ -11,3 +11,4 @@ images:
 available_animations:
     - name: anim_sprout
       display_name: sprout
+      loop: false

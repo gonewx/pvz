@@ -12,3 +12,4 @@ images:
 available_animations:
     - name: anim_zombie
       display_name: zombie
+      loop: false
