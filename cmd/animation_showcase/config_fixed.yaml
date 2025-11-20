@@ -3906,6 +3906,39 @@ animations:
       IMAGE_REANIM_ZOMBIE_HAND_FINGER4_2: "assets/reanim/Zombie_hand_finger4_2.png"  # TODO: 修正路径
       IMAGE_REANIM_ZOMBIE_HAND_ROCK5: "assets/reanim/Zombie_hand_rock5.png"  # TODO: 修正路径
       IMAGE_REANIM_ZOMBIE_HAND_ROCK6: "assets/reanim/Zombie_hand_rock6.png"  # TODO: 修正路径
+    
+    available_animations: []
+
+    animation_combos:
+      - name: "all"
+        display_name: "整体"
+        animations:
+          - arm
+          - hand
+          - finger1-2
+          - finger1-1
+          - finger2-2
+          - finger2-1
+          - finger3-2
+          - finger3-1
+          - finger4-2
+          - finger4-1
+          - rock2
+          - rock5
+          - rock2.2
+          - rock1
+          - rock3
+          - rock6
+          - rock5.2
+          - rock4
+          - rock6.2
+          - rock4.2
+          - rock5.3
+          - rock5.4
+          - rock6.2
+          - rock5.5
+        # 轨道绑定策略：auto（自动分析）或 manual（手动配置）
+        binding_strategy: "auto"
 
   # Zombie_imp
   - id: "zombie_imp"
