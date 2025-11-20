@@ -130,11 +130,11 @@ func NewAnimationCell(config *AnimationUnitConfig, globalFPS int, targetTPS int)
 		partImages[ref] = img
 	}
 
-	// 构建合并轨道
-	mergedTracks := reanim.BuildMergedTracks(reanimXML)
+	// 构建合并轨道（带顺序，处理同名轨道）
+	mergedTracks, trackOrder := reanim.BuildMergedTracksWithOrder(reanimXML)
 
-	// 分析轨道类型
-	visualTracks, logicalTracks := analyzeTrackTypes(reanimXML)
+	// 分析轨道类型（使用带唯一后缀的轨道顺序）
+	visualTracks, logicalTracks := analyzeTrackTypesWithOrder(mergedTracks, trackOrder)
 
 	cell := &AnimationCell{
 		config:       config,
@@ -896,7 +896,54 @@ func calculateCenterOffset(
 	return centerOffsetX, centerOffsetY
 }
 
+// analyzeTrackTypesWithOrder 分析轨道类型（使用带唯一后缀的轨道顺序）
+// 这个函数处理同名轨道问题，确保 visualTracks 中使用的是唯一键名（如 "rock", "rock#1", "rock#2"）
+func analyzeTrackTypesWithOrder(mergedTracks map[string][]reanim.Frame, trackOrder []string) (visualTracks []string, logicalTracks []string) {
+	animationDefinitionTracks := map[string]bool{
+		"anim_idle":      true,
+		"anim_shooting":  true,
+		"anim_head_idle": true,
+		"anim_full_idle": true,
+	}
+
+	for _, trackKey := range trackOrder {
+		// 获取原始轨道名称（去掉 #N 后缀）用于跳过动画定义轨道
+		originalName := trackKey
+		if idx := strings.Index(trackKey, "#"); idx > 0 {
+			originalName = trackKey[:idx]
+		}
+
+		// 跳过动画定义轨道
+		if animationDefinitionTracks[originalName] || strings.HasPrefix(originalName, "anim_") {
+			continue
+		}
+
+		// 获取轨道帧数据
+		frames, ok := mergedTracks[trackKey]
+		if !ok {
+			continue
+		}
+
+		hasImage := false
+		for _, frame := range frames {
+			if frame.ImagePath != "" {
+				hasImage = true
+				break
+			}
+		}
+
+		if hasImage {
+			visualTracks = append(visualTracks, trackKey)
+		} else {
+			logicalTracks = append(logicalTracks, trackKey)
+		}
+	}
+
+	return
+}
+
 // analyzeTrackTypes 分析轨道类型（视觉轨道和逻辑轨道）
+// 注意：此函数不处理同名轨道，已被 analyzeTrackTypesWithOrder 替代
 func analyzeTrackTypes(reanimXML *reanim.ReanimXML) (visualTracks []string, logicalTracks []string) {
 	animationDefinitionTracks := map[string]bool{
 		"anim_idle":      true,
