@@ -1,6 +1,7 @@
 package systems
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/decker502/pvz/internal/reanim"
@@ -84,6 +85,9 @@ func (s *ReanimSystem) getParentOffsetForAnimation(comp *components.ReanimCompon
 }
 
 // analyzeTrackTypes 分析 Reanim 文件中的轨道类型，区分视觉轨道和逻辑轨道
+//
+// 同名轨道处理：当多个轨道具有相同名称时，会自动为它们添加唯一后缀
+// （如 "rock", "rock#1", "rock#2"），以匹配 BuildMergedTracks 的行为
 func (s *ReanimSystem) analyzeTrackTypes(reanimXML *reanim.ReanimXML) (visualTracks []string, logicalTracks []string) {
 	// 原因：向日葵的 anim_idle 轨道包含头部图像，不应该被跳过
 	// animation_showcase 的逻辑可能不适用于所有植物
@@ -94,7 +98,18 @@ func (s *ReanimSystem) analyzeTrackTypes(reanimXML *reanim.ReanimXML) (visualTra
 		"anim_full_idle": true,
 	}
 
+	// 用于追踪同名轨道的出现次数（与 BuildMergedTracks 保持一致）
+	trackNameCount := make(map[string]int)
+
 	for _, track := range reanimXML.Tracks {
+		// 生成唯一的轨道键名（与 BuildMergedTracks 保持一致）
+		trackKey := track.Name
+		if count, exists := trackNameCount[track.Name]; exists {
+			// 同名轨道，添加序号后缀
+			trackKey = fmt.Sprintf("%s#%d", track.Name, count)
+		}
+		trackNameCount[track.Name]++
+
 		// 先检查轨道是否包含图片
 		hasImage := false
 		for _, frame := range track.Frames {
@@ -106,13 +121,13 @@ func (s *ReanimSystem) analyzeTrackTypes(reanimXML *reanim.ReanimXML) (visualTra
 
 		// 也应该作为视觉轨道处理（例如向日葵的 anim_idle 轨道）
 		if hasImage {
-			visualTracks = append(visualTracks, track.Name)
+			visualTracks = append(visualTracks, trackKey)
 		} else if animationDefinitionTracks[track.Name] {
 			// 只有在没有图片的情况下，才跳过动画定义轨道
-			logicalTracks = append(logicalTracks, track.Name)
+			logicalTracks = append(logicalTracks, trackKey)
 		} else {
 			// 其他无图片轨道也作为逻辑轨道
-			logicalTracks = append(logicalTracks, track.Name)
+			logicalTracks = append(logicalTracks, trackKey)
 		}
 	}
 

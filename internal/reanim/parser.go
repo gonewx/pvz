@@ -112,6 +112,9 @@ func BuildAnimVisiblesMap(reanimXML *ReanimXML) map[string][]int {
 // 许多帧是空的（nil 值），依赖前一帧的值。
 // 此函数累积所有物理帧的帧值，确保每帧都有完整数据。
 //
+// 同名轨道处理：当多个轨道具有相同名称时（如 LoadBar_sprout.reanim 中的多个 "rock" 轨道），
+// 会自动为它们添加唯一后缀（如 "rock", "rock#1", "rock#2"）。
+//
 // 参数：
 //   - reanimXML: Reanim 动画数据
 //
@@ -135,6 +138,8 @@ func BuildMergedTracks(reanimXML *ReanimXML) map[string][]Frame {
 	}
 
 	mergedTracks := make(map[string][]Frame)
+	// 用于追踪同名轨道的出现次数
+	trackNameCount := make(map[string]int)
 
 	// 处理所有轨道（包括动画定义轨道）
 	for _, track := range reanimXML.Tracks {
@@ -206,8 +211,134 @@ func BuildMergedTracks(reanimXML *ReanimXML) map[string][]Frame {
 			mergedFrames[i] = mergedFrame
 		}
 
-		mergedTracks[track.Name] = mergedFrames
+		// 生成唯一的轨道键名
+		trackKey := track.Name
+		if count, exists := trackNameCount[track.Name]; exists {
+			// 同名轨道，添加序号后缀
+			trackKey = fmt.Sprintf("%s#%d", track.Name, count)
+		}
+		trackNameCount[track.Name]++
+
+		mergedTracks[trackKey] = mergedFrames
 	}
 
 	return mergedTracks
+}
+
+// BuildMergedTracksWithOrder 构建带帧继承的轨道数据，同时返回轨道顺序
+//
+// 与 BuildMergedTracks 功能相同，但额外返回轨道的处理顺序列表。
+// 这对于需要按原始顺序渲染轨道的场景很重要（如多个同名轨道的 Z-order）。
+//
+// 参数：
+//   - reanimXML: Reanim 动画数据
+//
+// 返回：
+//   - map[string][]Frame: 轨道名称 -> 合并后的帧数组
+//   - []string: 轨道顺序列表（包含带后缀的唯一键名）
+func BuildMergedTracksWithOrder(reanimXML *ReanimXML) (map[string][]Frame, []string) {
+	if reanimXML == nil {
+		return map[string][]Frame{}, []string{}
+	}
+
+	// 确定标准帧数（所有轨道中的最大帧数）
+	standardFrameCount := 0
+	for _, track := range reanimXML.Tracks {
+		if len(track.Frames) > standardFrameCount {
+			standardFrameCount = len(track.Frames)
+		}
+	}
+
+	if standardFrameCount == 0 {
+		return map[string][]Frame{}, []string{}
+	}
+
+	mergedTracks := make(map[string][]Frame)
+	trackOrder := make([]string, 0, len(reanimXML.Tracks))
+	// 用于追踪同名轨道的出现次数
+	trackNameCount := make(map[string]int)
+
+	// 处理所有轨道（包括动画定义轨道）
+	for _, track := range reanimXML.Tracks {
+		// 初始化累积状态
+		accX := 0.0
+		accY := 0.0
+		accSX := 1.0
+		accSY := 1.0
+		accKX := 0.0
+		accKY := 0.0
+		accF := 0 // 默认第一帧 f=0（与参考代码一致）
+		accImg := ""
+
+		// 为此轨道构建合并帧数组
+		mergedFrames := make([]Frame, standardFrameCount)
+
+		for i := 0; i < standardFrameCount; i++ {
+			// 如果原始轨道在此索引有帧，更新累积状态
+			if i < len(track.Frames) {
+				frame := track.Frames[i]
+
+				// 仅当字段非 nil 时更新累积值
+				if frame.X != nil {
+					accX = *frame.X
+				}
+				if frame.Y != nil {
+					accY = *frame.Y
+				}
+				if frame.ScaleX != nil {
+					accSX = *frame.ScaleX
+				}
+				if frame.ScaleY != nil {
+					accSY = *frame.ScaleY
+				}
+				if frame.SkewX != nil {
+					accKX = *frame.SkewX
+				}
+				if frame.SkewY != nil {
+					accKY = *frame.SkewY
+				}
+				if frame.FrameNum != nil {
+					accF = *frame.FrameNum
+				}
+				if frame.ImagePath != "" {
+					accImg = frame.ImagePath
+				}
+			}
+
+			// 创建具有独立指针的新帧（避免指针共享）
+			x := accX
+			y := accY
+			sx := accSX
+			sy := accSY
+			kx := accKX
+			ky := accKY
+			f := accF
+
+			mergedFrame := Frame{
+				X:         &x,
+				Y:         &y,
+				ScaleX:    &sx,
+				ScaleY:    &sy,
+				SkewX:     &kx,
+				SkewY:     &ky,
+				FrameNum:  &f, // 所有轨道的所有帧都设置 FrameNum
+				ImagePath: accImg,
+			}
+
+			mergedFrames[i] = mergedFrame
+		}
+
+		// 生成唯一的轨道键名
+		trackKey := track.Name
+		if count, exists := trackNameCount[track.Name]; exists {
+			// 同名轨道，添加序号后缀
+			trackKey = fmt.Sprintf("%s#%d", track.Name, count)
+		}
+		trackNameCount[track.Name]++
+
+		mergedTracks[trackKey] = mergedFrames
+		trackOrder = append(trackOrder, trackKey)
+	}
+
+	return mergedTracks, trackOrder
 }

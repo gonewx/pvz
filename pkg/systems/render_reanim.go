@@ -62,6 +62,11 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		return
 	}
 
+	// Debug: SodRoll 渲染入口（前 15 帧）
+	if reanimComp.ReanimName == "sodroll" && reanimComp.CurrentFrame < 15 {
+		log.Printf("[RenderReanim] 🟫 renderReanimEntity 被调用: entity=%d, frame=%d", id, reanimComp.CurrentFrame)
+	}
+
 	// DEBUG: 追踪子弹渲染
 	if reanimComp.ReanimName == "simple_pea" {
 		log.Printf("[RenderSystem] 🎯 开始渲染子弹 %d: pos=(%.1f, %.1f), cameraX=%.1f",
@@ -130,14 +135,13 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		partX := getFloat(frame.X) + partData.OffsetX
 		partY := getFloat(frame.Y) + partData.OffsetY
 
-		// 应用实体级别的缩放（ScaleComponent）到部件位置
-		// 这样整个实体的所有部件会统一缩放，不会分散
+		// 获取实体级别的缩放（ScaleComponent）
 		entityScaleX := 1.0
 		entityScaleY := 1.0
 		if scaleComp, hasScaleComp := ecs.GetComponent[*components.ScaleComponent](s.entityManager, id); hasScaleComp {
 			entityScaleX = scaleComp.ScaleX
 			entityScaleY = scaleComp.ScaleY
-			// 缩放部件的相对位置
+			// 缩放部件的相对位置（用于整体缩放/镜像）
 			partX *= entityScaleX
 			partY *= entityScaleY
 		}
@@ -173,6 +177,12 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		skewX := getFloat(frame.SkewX)
 		skewY := getFloat(frame.SkewY)
 
+		// Debug: SodRoll 变换数据（前 15 帧）
+		if reanimComp.ReanimName == "sodroll" && reanimComp.CurrentFrame < 15 {
+			log.Printf("[RenderReanim] 🟫 SodRoll Frame %d Part[%d]: scaleX=%.3f, scaleY=%.3f, skewX=%.1f°, skewY=%.1f°",
+				reanimComp.CurrentFrame, i, scaleX, scaleY, skewX, skewY)
+		}
+
 		// 构建变换矩阵
 		// a, b 控制 X 方向的变换
 		// c, d 控制 Y 方向的变换
@@ -192,18 +202,70 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 			skewXRad := skewX * math.Pi / 180.0
 			skewYRad := skewY * math.Pi / 180.0
 
-			// 标准 skew 矩阵：
-			// [a  c]   [cos(kx)*sx   -sin(ky)*sy]
-			// [b  d] = [sin(kx)*sx    cos(ky)*sy]
-			a = math.Cos(skewXRad) * scaleX
-			b = math.Sin(skewXRad) * scaleX
-			c = -math.Sin(skewYRad) * scaleY // 注意负号
-			d = math.Cos(skewYRad) * scaleY
+			// 标准 skew 矩阵（考虑镜像）：
+			// 当 entityScaleX < 0 时，我们需要镜像图片但保持旋转角度的视觉效果
+			//
+			// 镜像变换的关键：
+			// - 水平镜像会反转 X 坐标
+			// - 但 skew 角度应该保持视觉上的一致性
+			//
+			// 使用帧缩放的绝对值来计算 skew，然后单独应用镜像
+			frameScaleXAbs := math.Abs(getFloat(frame.ScaleX))
+			if frameScaleXAbs == 0 {
+				frameScaleXAbs = 1.0
+			}
+			frameScaleYAbs := math.Abs(getFloat(frame.ScaleY))
+			if frameScaleYAbs == 0 {
+				frameScaleYAbs = 1.0
+			}
+
+			// 先计算基于帧缩放的 skew 矩阵
+			cosKx := math.Cos(skewXRad)
+			sinKx := math.Sin(skewXRad)
+			cosKy := math.Cos(skewYRad)
+			sinKy := math.Sin(skewYRad)
+
+			// 应用帧缩放
+			a = cosKx * frameScaleXAbs
+			b = sinKx * frameScaleXAbs
+			c = -sinKy * frameScaleYAbs
+			d = cosKy * frameScaleYAbs
+
+			// 然后应用实体缩放（镜像）
+			// 镜像只影响水平方向：a 和 c 需要乘以 entityScaleX
+			a *= entityScaleX
+			c *= entityScaleX
+			// b 和 d 保持原样（控制 Y 方向）
+			// 但如果 entityScaleY 也是负的，则需要镜像 Y 方向
+			b *= entityScaleY
+			d *= entityScaleY
 		}
 
 		// 计算最终位置（部件位置 + 父子偏移 + 实体屏幕位置）
 		tx := partX + baseScreenX
 		ty := partY + baseScreenY
+
+		// 注意：镜像时不需要额外补偿
+		// partX *= entityScaleX 已经正确地镜像了部件中心位置
+		// scaleX *= entityScaleX 让图片翻转
+		// 负缩放时，图片从 tx 向左绘制到 tx - |a|*w
+		// 镜像后的部件中心 = tx - |a|*w/2 = -partX_原 + base - |a|*w/2
+		// 这正好是原中心 (partX_原 + base + |a|*w/2) 的镜像
+
+		// Debug: LoadBar_sprout 镜像渲染（前 3 帧）
+		if reanimComp.ReanimName == "LoadBar_sprout" && reanimComp.CurrentFrame < 3 {
+			frameScaleX := getFloat(frame.ScaleX)
+			if frameScaleX == 0 {
+				frameScaleX = 1.0
+			}
+			if entityScaleX < 0 {
+				log.Printf("[RenderReanim] 🪞 Mirror Part[%d]: entityScaleX=%.1f, frameScaleX=%.3f, scaleX=%.3f, w=%.1f, partX=%.1f, partY=%.1f, tx=%.1f, baseScreenX=%.1f",
+					i, entityScaleX, frameScaleX, scaleX, w, partX, partY, tx, baseScreenX)
+			} else {
+				log.Printf("[RenderReanim] 🌱 Normal Part[%d]: entityScaleX=%.1f, frameScaleX=%.3f, scaleX=%.3f, w=%.1f, partX=%.1f, partY=%.1f, tx=%.1f, baseScreenX=%.1f",
+					i, entityScaleX, frameScaleX, scaleX, w, partX, partY, tx, baseScreenX)
+			}
+		}
 
 		// Debug: 僵尸手掌渲染坐标
 		if reanimComp.ReanimName == "Zombie_hand" && i < 3 { // 只打印前3个部件

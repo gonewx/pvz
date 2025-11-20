@@ -318,3 +318,153 @@ func TestCompareWithReference(t *testing.T) {
 		break // Only check one track for this test
 	}
 }
+
+// TestBuildMergedTracks_DuplicateTrackNames tests handling of duplicate track names
+// LoadBar_sprout.reanim contains multiple tracks with the same name (e.g., 6 "rock" tracks)
+func TestBuildMergedTracks_DuplicateTrackNames(t *testing.T) {
+	path := "../../data/reanim/LoadBar_sprout.reanim"
+
+	reanimXML, err := ParseReanimFile(path)
+	if err != nil {
+		t.Fatalf("Failed to parse LoadBar_sprout.reanim: %v", err)
+	}
+
+	// Count duplicate track names in the original file
+	trackNameCounts := make(map[string]int)
+	for _, track := range reanimXML.Tracks {
+		trackNameCounts[track.Name]++
+	}
+
+	// Verify there are duplicate track names
+	rockCount := trackNameCounts["rock"]
+	sproutPetalCount := trackNameCounts["sprout_petal"]
+
+	if rockCount < 2 {
+		t.Errorf("Expected multiple 'rock' tracks, got %d", rockCount)
+	}
+	if sproutPetalCount < 2 {
+		t.Errorf("Expected multiple 'sprout_petal' tracks, got %d", sproutPetalCount)
+	}
+
+	t.Logf("Original file has %d 'rock' tracks and %d 'sprout_petal' tracks", rockCount, sproutPetalCount)
+
+	// Build merged tracks
+	mergedTracks := BuildMergedTracks(reanimXML)
+
+	// Verify all tracks are present with unique keys
+	expectedKeyCount := len(reanimXML.Tracks)
+	actualKeyCount := len(mergedTracks)
+	if actualKeyCount != expectedKeyCount {
+		t.Errorf("Expected %d unique track keys, got %d", expectedKeyCount, actualKeyCount)
+	}
+
+	// Verify the naming convention for duplicate tracks
+	// First occurrence: "rock"
+	// Second occurrence: "rock#1"
+	// Third occurrence: "rock#2", etc.
+	if _, exists := mergedTracks["rock"]; !exists {
+		t.Error("Expected 'rock' key to exist")
+	}
+	if _, exists := mergedTracks["rock#1"]; rockCount > 1 && !exists {
+		t.Error("Expected 'rock#1' key to exist for duplicate track")
+	}
+	if _, exists := mergedTracks["rock#2"]; rockCount > 2 && !exists {
+		t.Error("Expected 'rock#2' key to exist for duplicate track")
+	}
+
+	t.Logf("✓ BuildMergedTracks generated %d unique keys for %d original tracks",
+		actualKeyCount, len(reanimXML.Tracks))
+
+	// Verify each track has data
+	for key, frames := range mergedTracks {
+		if len(frames) == 0 {
+			t.Errorf("Track '%s' has no frames", key)
+		}
+	}
+}
+
+// TestBuildMergedTracksWithOrder_DuplicateTrackNames tests the order-preserving variant
+func TestBuildMergedTracksWithOrder_DuplicateTrackNames(t *testing.T) {
+	path := "../../data/reanim/LoadBar_sprout.reanim"
+
+	reanimXML, err := ParseReanimFile(path)
+	if err != nil {
+		t.Fatalf("Failed to parse LoadBar_sprout.reanim: %v", err)
+	}
+
+	// Build merged tracks with order
+	mergedTracks, trackOrder := BuildMergedTracksWithOrder(reanimXML)
+
+	// Verify order length matches original track count
+	if len(trackOrder) != len(reanimXML.Tracks) {
+		t.Errorf("Track order length mismatch: expected %d, got %d",
+			len(reanimXML.Tracks), len(trackOrder))
+	}
+
+	// Verify order matches map keys
+	if len(trackOrder) != len(mergedTracks) {
+		t.Errorf("Track order length (%d) doesn't match map size (%d)",
+			len(trackOrder), len(mergedTracks))
+	}
+
+	// Verify all keys in order exist in map
+	for _, key := range trackOrder {
+		if _, exists := mergedTracks[key]; !exists {
+			t.Errorf("Track key '%s' in order but not in map", key)
+		}
+	}
+
+	// Verify the order preserves the original sequence
+	// The first 'rock' should come before 'rock#1'
+	firstRockIdx := -1
+	rockOneIdx := -1
+	for i, key := range trackOrder {
+		if key == "rock" && firstRockIdx == -1 {
+			firstRockIdx = i
+		}
+		if key == "rock#1" && rockOneIdx == -1 {
+			rockOneIdx = i
+		}
+	}
+
+	if firstRockIdx != -1 && rockOneIdx != -1 && firstRockIdx >= rockOneIdx {
+		t.Errorf("Track order not preserved: 'rock' at %d, 'rock#1' at %d",
+			firstRockIdx, rockOneIdx)
+	}
+
+	t.Logf("✓ BuildMergedTracksWithOrder preserved order: %d tracks", len(trackOrder))
+
+	// Print first 10 track names for verification
+	printCount := 10
+	if len(trackOrder) < printCount {
+		printCount = len(trackOrder)
+	}
+	t.Logf("First %d track keys: %v", printCount, trackOrder[:printCount])
+}
+
+// TestBuildMergedTracks_NoDuplicates tests normal case without duplicate names
+func TestBuildMergedTracks_NoDuplicates(t *testing.T) {
+	path := "../../data/reanim/PeaShooterSingle.reanim"
+
+	reanimXML, err := ParseReanimFile(path)
+	if err != nil {
+		t.Fatalf("Failed to parse PeaShooterSingle.reanim: %v", err)
+	}
+
+	// Build merged tracks
+	mergedTracks := BuildMergedTracks(reanimXML)
+
+	// Verify key count matches original track count
+	if len(mergedTracks) != len(reanimXML.Tracks) {
+		t.Errorf("Expected %d track keys, got %d", len(reanimXML.Tracks), len(mergedTracks))
+	}
+
+	// Verify no keys have "#" suffix (since there are no duplicates)
+	for key := range mergedTracks {
+		if strings.Contains(key, "#") {
+			t.Errorf("Unexpected duplicate suffix in key '%s' for file without duplicates", key)
+		}
+	}
+
+	t.Logf("✓ BuildMergedTracks generated %d keys (no duplicates)", len(mergedTracks))
+}

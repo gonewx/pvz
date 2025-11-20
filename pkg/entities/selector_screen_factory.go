@@ -136,17 +136,32 @@ func NewSelectorScreenPartialEntity(
 // extractVisualTracks 从 ReanimXML 中提取视觉轨道列表
 // 如果提供了 visibleTracks，则只包含指定的轨道
 // 否则只包含有图片引用的轨道（过滤掉纯逻辑轨道）
+//
+// 同名轨道处理：当多个轨道具有相同名称时，会自动为它们添加唯一后缀
+// （如 "rock", "rock#1", "rock#2"），以匹配 BuildMergedTracks 的行为
 func extractVisualTracks(reanimXML *reanim.ReanimXML, visibleTracks map[string]bool) []string {
 	if reanimXML == nil {
 		return []string{}
 	}
 
 	tracks := []string{}
+	// 用于追踪同名轨道的出现次数（与 BuildMergedTracks 保持一致）
+	trackNameCount := make(map[string]int)
+
 	for _, track := range reanimXML.Tracks {
+		// 生成唯一的轨道键名（与 BuildMergedTracks 保持一致）
+		trackKey := track.Name
+		if count, exists := trackNameCount[track.Name]; exists {
+			// 同名轨道，添加序号后缀
+			trackKey = fmt.Sprintf("%s#%d", track.Name, count)
+		}
+		trackNameCount[track.Name]++
+
 		// 如果指定了 visibleTracks，则只包含在列表中的轨道
 		if visibleTracks != nil {
+			// 注意：visibleTracks 使用原始名称（不带后缀）
 			if visibleTracks[track.Name] {
-				tracks = append(tracks, track.Name)
+				tracks = append(tracks, trackKey)
 			}
 		} else {
 			// 否则只包含有图片引用的视觉轨道（过滤掉纯逻辑轨道）
@@ -159,7 +174,7 @@ func extractVisualTracks(reanimXML *reanim.ReanimXML, visibleTracks map[string]b
 				}
 			}
 			if hasImage {
-				tracks = append(tracks, track.Name)
+				tracks = append(tracks, trackKey)
 			}
 		}
 	}
@@ -198,16 +213,29 @@ func extractVisualTracks(reanimXML *reanim.ReanimXML, visibleTracks map[string]b
 
 // buildHiddenTracks 根据 visibleTracks 构建隐藏轨道映射
 // 如果提供了 visibleTracks，则未包含的轨道会被隐藏
+//
+// 同名轨道处理：与 extractVisualTracks 保持一致，使用带后缀的唯一键名
 func buildHiddenTracks(reanimXML *reanim.ReanimXML, visibleTracks map[string]bool) map[string]bool {
 	if visibleTracks == nil || reanimXML == nil {
 		return nil // 不隐藏任何轨道
 	}
 
 	hiddenTracks := make(map[string]bool)
+	// 用于追踪同名轨道的出现次数（与 BuildMergedTracks 保持一致）
+	trackNameCount := make(map[string]int)
+
 	for _, track := range reanimXML.Tracks {
+		// 生成唯一的轨道键名
+		trackKey := track.Name
+		if count, exists := trackNameCount[track.Name]; exists {
+			trackKey = fmt.Sprintf("%s#%d", track.Name, count)
+		}
+		trackNameCount[track.Name]++
+
 		// 如果轨道不在 visibleTracks 中，则隐藏它
+		// 注意：visibleTracks 使用原始名称（不带后缀）
 		if !visibleTracks[track.Name] {
-			hiddenTracks[track.Name] = true
+			hiddenTracks[trackKey] = true
 		}
 	}
 	return hiddenTracks
