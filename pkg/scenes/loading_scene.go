@@ -139,9 +139,16 @@ func NewLoadingScene(rm *game.ResourceManager, sm *game.SceneManager, configMana
 		// Position sprouts above and slightly offset from progress bar
 		baseX := config.LoadingBarX + config.LoadingGrassOffsetX
 		offsetX := barWidth * float64(config.LoadingSproutTriggers[i])
+
+		// Get Y offset for this specific sprout (or use default if not configured)
+		offsetY := -40.0 // Default offset
+		if i < len(config.LoadingSproutOffsetsY) {
+			offsetY = config.LoadingSproutOffsetsY[i]
+		}
+
 		scene.sproutPositions[i] = struct{ x, y float64 }{
 			x: baseX + offsetX,
-			y: config.LoadingBarY - 40, // Above progress bar
+			y: config.LoadingBarY + offsetY,
 		}
 	}
 

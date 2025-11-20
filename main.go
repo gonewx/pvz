@@ -145,16 +145,16 @@ func main() {
 
 	// 根据 --level 参数决定启动场景
 	if *levelFlag != "" {
-		// 如果指定了 --level 参数，直接启动游戏场景（跳过主菜单）
+		// 如果指定了 --level 参数，直接启动游戏场景（跳过加载界面和主菜单）
 		if *verboseFlag {
-			log.Printf("[main] --level flag detected, skipping main menu")
+			log.Printf("[main] --level flag detected, skipping loading scene and main menu")
 		}
 		gameScene := scenes.NewGameScene(resourceManager, sceneManager, levelToLoad)
 		sceneManager.SwitchTo(gameScene)
 	} else {
-		// 否则启动主菜单场景
-		mainMenuScene := scenes.NewMainMenuScene(resourceManager, sceneManager)
-		sceneManager.SwitchTo(mainMenuScene)
+		// 否则启动加载界面场景 (Story 1.5)
+		loadingScene := scenes.NewLoadingScene(resourceManager, sceneManager, reanimConfigManager)
+		sceneManager.SwitchTo(loadingScene)
 	}
 
 	// Create a new game instance with the scene manager

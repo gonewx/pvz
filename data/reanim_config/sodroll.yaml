@@ -10,7 +10,7 @@ available_animations:
     - name: SodRoll
       display_name: "草皮滚动"
     - name: SodRollCap
-      display_name: t
+      display_name: "草皮卷盖滚动"
 animation_combos:
     - name: roll
       display_name: "草皮铺设动画"
@@ -18,3 +18,11 @@ animation_combos:
           - SodRoll
           - SodRollCap
       binding_strategy: auto
+    - name: cap_only
+      display_name: "仅草皮卷盖（加载界面用）"
+      animations:
+          - SodRollCap
+      binding_strategy: auto
+      loop: false  # 不循环，完全由 LoadingScene 手动控制帧
+      hidden_tracks:
+          - SodRoll  # Hide the roll body, only show cap

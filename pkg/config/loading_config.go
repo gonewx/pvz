@@ -35,4 +35,8 @@ const (
 )
 
 // LoadingSproutTriggers 小动画触发进度阈值
-var LoadingSproutTriggers = []float64{0.2, 0.4, 0.6, 0.8, 1.0}
+var LoadingSproutTriggers = []float64{0.08, 0.28, 0.48, 0.68, 0.8}
+
+// LoadingSproutOffsetsY 每个小动画相对进度条的 Y 轴偏移（负值表示在进度条上方）
+// 索引对应 LoadingSproutTriggers 中的触发顺序
+var LoadingSproutOffsetsY = []float64{-34, -34, -45, -37, -35}
