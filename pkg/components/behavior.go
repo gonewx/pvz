@@ -19,6 +19,9 @@ const (
 	BehaviorZombieEating
 	// BehaviorZombieDying 僵尸死亡中：播放死亡动画，动画完成后删除实体
 	BehaviorZombieDying
+	// BehaviorZombieSquashing 僵尸被压扁中：播放除草车碾压动画（位移、旋转、缩放）
+	// 动画完成后切换为 BehaviorZombieDying，触发粒子效果并删除实体
+	BehaviorZombieSquashing
 	// BehaviorWallnut 坚果墙行为：无攻击能力的纯防御植物，根据生命值百分比切换外观状态
 	// 坚果墙拥有极高的生命值(4000)，用于阻挡僵尸前进
 	// 外观状态：完好(>66%) → 轻伤(33-66%) → 重伤(<33%)

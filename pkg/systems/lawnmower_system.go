@@ -4,6 +4,7 @@ import (
 	"log"
 	"math"
 
+	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
@@ -58,10 +59,14 @@ func (s *LawnmowerSystem) Update(deltaTime float64) {
 	// 2. 更新移动中的除草车位置
 	s.updateLawnmowerPositions(deltaTime)
 
-	// 3. 检���并消灭僵尸
+
+	// 3. 更新压扁动画
+	s.updateSquashAnimations(deltaTime)
+
+		// 4. 检测并消灭僵尸
 	s.checkZombieCollisions()
 
-	// 4. 检测除草车离开屏幕
+	// 5. 检测除草车离开屏幕
 	s.checkLawnmowerCompletion()
 }
 
@@ -312,9 +317,85 @@ func (s *LawnmowerSystem) HasActiveLawnmowers() bool {
 	return false
 }
 
-// triggerZombieDeath 触发僵尸死亡动画和粒子效果
-// 除草车碾压僵尸时调用此方法，不再直接删除
+// triggerZombieDeath 触发僵尸压扁动画
+// 除草车碾压僵尸时调用此方法，不再直接切换为死亡状态
+// 而是先播放压扁动画，动画结束后再触发死亡
 func (s *LawnmowerSystem) triggerZombieDeath(zombieID ecs.EntityID) {
+	// 1. 获取僵尸当前位置和行为组件
+	position, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
+	if !ok {
+		log.Printf("[LawnmowerSystem] 僵尸 %d 缺少 PositionComponent，无法触发压扁动画", zombieID)
+		return
+	}
+
+	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
+	if !ok {
+		log.Printf("[LawnmowerSystem] 僵尸 %d 缺少 BehaviorComponent，无法触发压扁动画", zombieID)
+		return
+	}
+
+	// 2. 获取对应的除草车实体ID（用于跟随移动）
+	lawnmowers := ecs.GetEntitiesWith1[*components.LawnmowerComponent](s.entityManager)
+	var lawnmowerID ecs.EntityID = 0
+	zombieLane := s.getEntityLane(position.Y)
+
+	for _, lwID := range lawnmowers {
+		lawnmower, _ := ecs.GetComponent[*components.LawnmowerComponent](s.entityManager, lwID)
+		if lawnmower.Lane == zombieLane && lawnmower.IsMoving {
+			lawnmowerID = lwID
+			break
+		}
+	}
+
+	// 3. 加载 locator 轨道数据
+	locatorFrames, err := s.loadLocatorFrames()
+	if err != nil || len(locatorFrames) == 0 {
+		log.Printf("[LawnmowerSystem] 加载 locator 轨道失败，回退到普通死亡动画")
+		// 回退到旧逻辑：直接切换为 BehaviorZombieDying
+		s.triggerZombieDeathFallback(zombieID)
+		return
+	}
+
+	// 4. 添加 SquashAnimationComponent（开始压扁动画）
+	duration := float64(len(locatorFrames)) / 12.0 // 8 帧 / 12 FPS ≈ 0.667 秒
+
+	ecs.AddComponent(s.entityManager, zombieID, &components.SquashAnimationComponent{
+		ElapsedTime:       0.0,
+		Duration:          duration,
+		LocatorFrames:     locatorFrames,
+		CurrentFrameIndex: 0,
+		OriginalPosX:      position.X,
+		OriginalPosY:      position.Y,
+		LawnmowerEntityID: lawnmowerID,
+		IsCompleted:       false,
+	})
+
+	log.Printf("[LawnmowerSystem] 僵尸 %d 开始压扁动画（时长 %.2f 秒，%d 帧）",
+		zombieID, duration, len(locatorFrames))
+
+	// 5. 移除速度组件（僵尸停止自主移动）
+	if ecs.HasComponent[*components.VelocityComponent](s.entityManager, zombieID) {
+		ecs.RemoveComponent[*components.VelocityComponent](s.entityManager, zombieID)
+		log.Printf("[LawnmowerSystem] 僵尸 %d 移除 VelocityComponent（停止移动）", zombieID)
+	}
+
+	// 6. 暂停僵尸当前动画（定格为当前帧）
+	if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, zombieID); ok {
+		reanim.IsPaused = true
+		log.Printf("[LawnmowerSystem] 僵尸 %d 暂停动画（定格当前帧）", zombieID)
+	}
+
+	// 7. 切换行为类型为 BehaviorZombieSquashing（新状态）
+	// 注意：不立即切换为 BehaviorZombieDying，避免 BehaviorSystem 干扰
+	behavior.Type = components.BehaviorZombieSquashing
+
+	// 注意：不在这里触发粒子效果和死亡动画
+	// 这些会在压扁动画结束后由 triggerDeathAfterSquash() 触发
+}
+
+// triggerZombieDeathFallback 回退到旧逻辑：直接触发死亡动画和粒子效果
+// 当 locator 轨道加载失败时使用
+func (s *LawnmowerSystem) triggerZombieDeathFallback(zombieID ecs.EntityID) {
 	// 1. 切换行为类型为 BehaviorZombieDying
 	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
 	if !ok {
@@ -322,7 +403,7 @@ func (s *LawnmowerSystem) triggerZombieDeath(zombieID ecs.EntityID) {
 		return
 	}
 	behavior.Type = components.BehaviorZombieDying
-	log.Printf("[LawnmowerSystem] 僵尸 %d 行为切换为 BehaviorZombieDying", zombieID)
+	log.Printf("[LawnmowerSystem] 僵尸 %d 行为切换为 BehaviorZombieDying（回退模式）", zombieID)
 
 	// 2. 移除速度组件（僵尸停止移动）
 	if ecs.HasComponent[*components.VelocityComponent](s.entityManager, zombieID) {
@@ -341,7 +422,7 @@ func (s *LawnmowerSystem) triggerZombieDeath(zombieID ecs.EntityID) {
 	if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, zombieID); ok {
 		reanim.IsLooping = false
 	}
-	log.Printf("[LawnmowerSystem] 僵尸 %d 开始播放死亡动画", zombieID)
+	log.Printf("[LawnmowerSystem] 僵尸 %d 开始播放死亡动画（回退模式）", zombieID)
 
 	// 4. 触发粒子效果（手臂和头部掉落）
 	// 这与 BehaviorSystem 的逻辑一致
@@ -381,4 +462,223 @@ func (s *LawnmowerSystem) triggerZombieDeath(zombieID ecs.EntityID) {
 	} else {
 		log.Printf("[LawnmowerSystem] 僵尸 %d 触发头部掉落粒子效果", zombieID)
 	}
+}
+
+// loadLocatorFrames 从 LawnMoweredZombie.reanim 加载 locator 轨道的帧数据
+// 参数:
+//   - 无（直接从 ResourceManager 读取）
+//
+// 返回:
+//   - []components.LocatorFrame: locator 轨道的帧数据数组
+//   - error: 如果加载失败返回错误
+func (s *LawnmowerSystem) loadLocatorFrames() ([]components.LocatorFrame, error) {
+	// 从 ResourceManager 获取 LawnMoweredZombie 的 ReanimXML
+	reanimXML := s.resourceManager.GetReanimXML("LawnMoweredZombie")
+	if reanimXML == nil {
+		log.Printf("[LawnmowerSystem] 错误：未找到 LawnMoweredZombie.reanim 数据")
+		return nil, nil
+	}
+
+	// 查找 locator 轨道
+	var locatorTrack *reanim.Track
+	for i := range reanimXML.Tracks {
+		if reanimXML.Tracks[i].Name == "locator" {
+			locatorTrack = &reanimXML.Tracks[i]
+			break
+		}
+	}
+
+	if locatorTrack == nil {
+		log.Printf("[LawnmowerSystem] 错误：LawnMoweredZombie.reanim 中未找到 locator 轨道")
+		return nil, nil
+	}
+
+	// 转换为 LocatorFrame 数组
+	frames := make([]components.LocatorFrame, len(locatorTrack.Frames))
+	for i, frame := range locatorTrack.Frames {
+		frames[i] = components.LocatorFrame{
+			X:      getFloatValue(frame.X),
+			Y:      getFloatValue(frame.Y),
+			SkewX:  getFloatValue(frame.SkewX),
+			SkewY:  getFloatValue(frame.SkewY),
+			ScaleX: getFloatValue(frame.ScaleX),
+			ScaleY: getFloatValue(frame.ScaleY),
+		}
+
+		// 设置默认值
+		if frames[i].ScaleX == 0 {
+			frames[i].ScaleX = 1.0
+		}
+		if frames[i].ScaleY == 0 {
+			frames[i].ScaleY = 1.0
+		}
+	}
+
+	log.Printf("[LawnmowerSystem] 成功加载 locator 轨道：%d 帧", len(frames))
+	return frames, nil
+}
+
+// getFloatValue 获取浮点指针的值，如果为 nil 则返回 0.0
+func getFloatValue(ptr *float64) float64 {
+	if ptr == nil {
+		return 0.0
+	}
+	return *ptr
+}
+
+// updateSquashAnimations 更新所有正在播放的压扁动画
+// 参数:
+//   - deltaTime: 自上次更新以来的时间（秒）
+func (s *LawnmowerSystem) updateSquashAnimations(deltaTime float64) {
+	// 查询所有拥有 SquashAnimationComponent 的实体（僵尸）
+	squashEntities := ecs.GetEntitiesWith3[
+		*components.SquashAnimationComponent,
+		*components.PositionComponent,
+		*components.ReanimComponent,
+	](s.entityManager)
+
+	for _, zombieID := range squashEntities {
+		squashAnim, _ := ecs.GetComponent[*components.SquashAnimationComponent](s.entityManager, zombieID)
+		position, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
+		reanim, _ := ecs.GetComponent[*components.ReanimComponent](s.entityManager, zombieID)
+
+		// 累积已播放时间
+		squashAnim.ElapsedTime += deltaTime
+
+		// 检查动画是否已完成
+		if squashAnim.IsComplete() {
+			// 动画结束，触发死亡
+			s.triggerDeathAfterSquash(zombieID)
+			continue
+		}
+
+		// 计算当前帧索引
+		frameIndex := squashAnim.GetCurrentFrameIndex()
+		if frameIndex >= len(squashAnim.LocatorFrames) {
+			frameIndex = len(squashAnim.LocatorFrames) - 1
+		}
+
+		frame := squashAnim.LocatorFrames[frameIndex]
+
+		// 应用 locator 变换到僵尸
+
+		// 1. 位置：跟随除草车移动 + locator 偏移
+		//    如果有关联的除草车，跟随除草车的 X 坐标
+		if squashAnim.LawnmowerEntityID != 0 {
+			if lawnmowerPos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, squashAnim.LawnmowerEntityID); ok {
+				position.X = lawnmowerPos.X + frame.X
+			} else {
+				// 除草车已删除，使用原始位置 + 偏移
+				position.X = squashAnim.OriginalPosX + frame.X
+			}
+		} else {
+			position.X = squashAnim.OriginalPosX + frame.X
+		}
+		position.Y = squashAnim.OriginalPosY + frame.Y
+
+		// 2. 应用变换到 Reanim 动画的所有可见轨道
+		// 关键：我们需要修改僵尸 Reanim 的每个部件帧，应用 locator 的缩放和倾斜
+		if len(reanim.CachedRenderData) > 0 {
+			// 应用 locator 变换到每个渲染部件
+			for i := range reanim.CachedRenderData {
+				// 应用缩放
+				reanim.CachedRenderData[i].Frame.ScaleX = &frame.ScaleX
+				reanim.CachedRenderData[i].Frame.ScaleY = &frame.ScaleY
+
+				// 应用旋转（skew）
+				reanim.CachedRenderData[i].Frame.SkewX = &frame.SkewX
+				reanim.CachedRenderData[i].Frame.SkewY = &frame.SkewY
+			}
+
+			// 标记缓存失效，强制重新渲染
+			reanim.LastRenderFrame = -1
+		}
+
+		// 更新组件状态
+		squashAnim.CurrentFrameIndex = frameIndex
+
+		// Debug 日志（前 3 帧）
+		if frameIndex < 3 {
+			log.Printf("[LawnmowerSystem] 僵尸 %d 压扁动画: 帧=%d/%d, 进度=%.1f%%, scaleX=%.3f, skewX=%.1f°",
+				zombieID, frameIndex, len(squashAnim.LocatorFrames),
+				squashAnim.GetProgress()*100,
+				frame.ScaleX, frame.SkewX)
+		}
+	}
+}
+
+// triggerDeathAfterSquash 压扁动画结束后触发僵尸死亡
+// 参数:
+//   - zombieID: 僵尸实体ID
+func (s *LawnmowerSystem) triggerDeathAfterSquash(zombieID ecs.EntityID) {
+	// 1. 移除 SquashAnimationComponent
+	ecs.RemoveComponent[*components.SquashAnimationComponent](s.entityManager, zombieID)
+	log.Printf("[LawnmowerSystem] 僵尸 %d 压扁动画完成，移除 SquashAnimationComponent", zombieID)
+
+	// 2. 切换行为类型为 BehaviorZombieDying
+	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
+	if !ok {
+		log.Printf("[LawnmowerSystem] 警告：僵尸 %d 缺少 BehaviorComponent", zombieID)
+		return
+	}
+	behavior.Type = components.BehaviorZombieDying
+	log.Printf("[LawnmowerSystem] 僵尸 %d 切换为 BehaviorZombieDying", zombieID)
+
+	// 3. 播放死亡动画（单次播放，不循环）
+	ecs.AddComponent(s.entityManager, zombieID, &components.AnimationCommandComponent{
+		UnitID:    "zombie",
+		ComboName: "death",
+		Processed: false,
+	})
+	if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, zombieID); ok {
+		reanim.IsLooping = false
+		reanim.IsPaused = false // 恢复播放（之前暂停了）
+
+		// 重置变换（移除压扁效果）
+		if len(reanim.CachedRenderData) > 0 {
+			for i := range reanim.CachedRenderData {
+				reanim.CachedRenderData[i].Frame.ScaleX = nil
+				reanim.CachedRenderData[i].Frame.ScaleY = nil
+				reanim.CachedRenderData[i].Frame.SkewX = nil
+				reanim.CachedRenderData[i].Frame.SkewY = nil
+			}
+			reanim.LastRenderFrame = -1
+		}
+	}
+	log.Printf("[LawnmowerSystem] 僵尸 %d 开始播放死亡动画（压扁后）", zombieID)
+
+	// 4. 触发粒子效果（手臂和头部掉落）
+	position, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
+	if !ok {
+		log.Printf("[LawnmowerSystem] 警告：僵尸 %d 缺少 PositionComponent，无法触发粒子效果", zombieID)
+		return
+	}
+
+	angleOffset := 180.0 // 粒子向左飞出
+
+	// 触发手臂掉落粒子
+	_, err := entities.CreateParticleEffect(
+		s.entityManager,
+		s.resourceManager,
+		"MoweredZombieArm",
+		position.X, position.Y,
+		angleOffset,
+	)
+	if err != nil {
+		log.Printf("[LawnmowerSystem] 警告：创建手臂粒子失败: %v", err)
+	}
+
+	// 触发头部掉落粒子
+	_, err = entities.CreateParticleEffect(
+		s.entityManager,
+		s.resourceManager,
+		"MoweredZombieHead",
+		position.X, position.Y,
+		angleOffset,
+	)
+	if err != nil {
+		log.Printf("[LawnmowerSystem] 警告：创建头部粒子失败: %v", err)
+	}
+
+	log.Printf("[LawnmowerSystem] 僵尸 %d 触发死亡粒子效果", zombieID)
 }
