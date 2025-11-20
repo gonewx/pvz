@@ -202,7 +202,7 @@ func (s *WaveSpawnSystem) ActivateWave(waveIndex int) int {
 				// 如果僵尸还在行转换中（VY != 0），保持Y轴速度不变
 				// 只设置X轴速度
 				if vel.VX == 0 {
-					vel.VX = -23.0 // 僵尸标准移动速度
+					vel.VX = -150.0 // 僵尸标准移动速度
 					log.Printf("[WaveSpawnSystem] Activated zombie %d (wave %d, index %d), VX=%.1f",
 						entityID, waveIndex, waveState.IndexInWave, vel.VX)
 				}
