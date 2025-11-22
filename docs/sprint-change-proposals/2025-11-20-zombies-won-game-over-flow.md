@@ -104,7 +104,7 @@ if pos.X < DefeatBoundaryX {
 **影响分析**:
 - ✅ **可以继续**: 当前 Epic 8 不会被阻塞，已完成的 Stories (8.1-8.5) 无需修改
 - ⚠️ **体验不完整**: Story 8.6-8.10 的关卡测试会暴露"失败流程不完整"的问题
-- 📝 **建议**: 将"僵尸获胜流程"作为 **Story 8.11** 添加到 Epic 8，确保第一章的完整体验
+- 📝 **建议**: 将"僵尸获胜流程"作为 **Story 8.8** 添加到 Epic 8，确保第一章的完整体验
 
 **具体影响点**:
 - **Story 8.6 (1-2 至 1-4 关卡)**: 玩家可能失败，需要完整的失败流程
@@ -131,8 +131,8 @@ if pos.X < DefeatBoundaryX {
 
 **选项 A**: 将"僵尸获胜流程"添加到 Epic 8（推荐）
 - **理由**: Epic 8 聚焦"关卡实现"，失败流程是关卡的核心组成部分
-- **Story 编号**: 8.11
-- **位置**: 插入 Story 8.10 之前（集成测试前）
+- **Story 编号**: 8.8（顺序创建，当前最高为 8.7）
+- **位置**: 作为下一个 Story 顺序实现
 
 **选项 B**: 将"僵尸获胜流程"添加到 Epic 10
 - **理由**: Epic 10 聚焦"游戏体验"，失败体验是体验的一部分
@@ -185,7 +185,7 @@ FR13.2: **失败** - 任意一个僵尸到达屏幕最左侧的房子。
 **文件**: `docs/prd/epic-8-level-chapter1-implementation.md`
 
 **建议修改**:
-1. 在 Story 列表中添加 **Story 8.11: 僵尸获胜流程与游戏结束对话框**
+1. 在 Story 列表中添加 **Story 8.8: 僵尸获胜流程与游戏结束对话框**
 2. 更新 "Definition of Done" 部分，添加"失败流程完整实现"标准
 
 **文件**: `docs/prd/epic-10-game-experience-polish.md`
@@ -207,7 +207,7 @@ FR13.2: **失败** - 任意一个僵尸到达屏幕最左侧的房子。
 | 文档 | 冲突级别 | 需要更新 | 优先级 |
 |------|---------|---------|-------|
 | `docs/prd/requirements.md` | ⚠️ 中等 | 添加 FR13.2 子需求 | 高 |
-| `docs/prd/epic-8-level-chapter1-implementation.md` | ⚠️ 中等 | 添加 Story 8.11 | 高 |
+| `docs/prd/epic-8-level-chapter1-implementation.md` | ⚠️ 中等 | 添加 Story 8.8 | 高 |
 | `docs/architecture/core-systems.md` | ℹ️ 轻微 | 更新 LevelSystem 职责 | 中 |
 | `.meta/levels/zombiewon.md` | ✅ 无冲突 | 无 | N/A |
 
@@ -220,7 +220,7 @@ FR13.2: **失败** - 任意一个僵尸到达屏幕最左侧的房子。
 **描述**: 在现有 `LevelSystem` 基础上扩展，添加僵尸获胜过场系统
 
 **实施步骤**:
-1. 创建 **Story 8.11: 僵尸获胜流程与游戏结束对话框**
+1. 创建 **Story 8.8: 僵尸获胜流程与游戏结束对话框**
 2. 扩展 `checkDefeatCondition()` 函数，添加游戏冻结逻辑
 3. 创建 `GameFreezeComponent` 标记游戏冻结状态
 4. 实现 `ZombiesWonPhaseSystem` 管理三阶段流程
@@ -276,9 +276,9 @@ FR13.2: **失败** - 任意一个僵尸到达屏幕最左侧的房子。
 
 ## 📝 5. 具体变更建议 (Section 5: Proposed Changes)
 
-### 5.1 新增 Story: 8.11 僵尸获胜流程与游戏结束对话框
+### 5.1 新增 Story: 8.8 僵尸获胜流程与游戏结束对话框
 
-**Story 标题**: Story 8.11: 僵尸获胜流程与游戏结束对话框 (Zombies Won Game Over Flow)
+**Story 标题**: Story 8.8: 僵尸获胜流程与游戏结束对话框 (Zombies Won Game Over Flow)
 
 **Story 目标**:
 实现完整的僵尸获胜过场效果，包括游戏冻结、僵尸入侵动画、惨叫音效、"吃脑子"动画和游戏结束对话框，完全还原原版 PVZ 的失败体验。
@@ -581,7 +581,7 @@ FR13.2: **失败** - 任意一个僵尸到达屏幕最左侧的房子。
 ```markdown
 ---
 
-### Story 8.11: 僵尸获胜流程与游戏结束对话框 (Zombies Won Game Over Flow)
+### Story 8.8: 僵尸获胜流程与游戏结束对话框 (Zombies Won Game Over Flow)
 **目标**: 实现完整的僵尸获胜过场效果
 
 **范围**:
@@ -616,7 +616,7 @@ FR13.2: **失败** - 任意一个僵尸到达屏幕最左侧的房子。
 
 **修改后**:
 ```markdown
-- [ ] **Story 8.11**: 僵尸获胜流程与游戏结束对话框 - 📝 待创建
+- [ ] **Story 8.8**: 僵尸获胜流程与游戏结束对话框 - 📝 待创建
 - [ ] **Story 8.10**: 第一章集成测试与调优 - 📝 待创建
 ```
 
@@ -652,7 +652,7 @@ FR13.2: **失败** - 任意一个僵尸到达屏幕最左侧的房子。
     - 检测胜利/失败条件
     - 触发最后一波提示
     - 触发关卡完成奖励动画
-    - **触发僵尸获胜流程** (Story 8.11)
+    - **触发僵尸获胜流程** (Story 8.8)
 *   **Key Interfaces:** `Update(deltaTime float64)`, `CheckVictory()`, `CheckDefeat()`, `triggerZombiesWonFlow(zombieID)`
 *   **Dependencies:** `EntityManager`, `WaveSpawnSystem`, `RewardAnimationSystem`, `LawnmowerSystem`, `ZombiesWonPhaseSystem`
 ```
@@ -663,7 +663,7 @@ FR13.2: **失败** - 任意一个僵尸到达屏幕最左侧的房子。
 
 **新增内容**:
 ```markdown
-## 僵尸获胜流程系统 (Story 8.11)
+## 僵尸获胜流程系统 (Story 8.8)
 
 ### 流程概述
 
@@ -727,7 +727,7 @@ type ZombiesWonPhaseComponent struct {
 ### 参考文档
 
 - **需求文档**: `.meta/levels/zombiewon.md`
-- **Epic 文档**: `docs/prd/epic-8-level-chapter1-implementation.md` (Story 8.11)
+- **Epic 文档**: `docs/prd/epic-8-level-chapter1-implementation.md` (Story 8.8)
 ```
 
 ---
@@ -738,19 +738,19 @@ type ZombiesWonPhaseComponent struct {
 
 | 变更类型 | 变更内容 | 优先级 |
 |---------|---------|-------|
-| **新增 Story** | Story 8.11: 僵尸获胜流程与游戏结束对话框 | 🔴 高 |
+| **新增 Story** | Story 8.8: 僵尸获胜流程与游戏结束对话框 | 🔴 高 |
 | **新增组件** | `GameFreezeComponent`, `ZombiesWonPhaseComponent` | 🔴 高 |
 | **新增系统** | `ZombiesWonPhaseSystem` | 🔴 高 |
 | **修改代码** | `LevelSystem.checkDefeatCondition()`, `BehaviorSystem.Update()` | 🔴 高 |
-| **文档更新** | PRD (FR13.2), Epic 8 (Story 8.11), Architecture, CLAUDE.md | 🟡 中 |
+| **文档更新** | PRD (FR13.2), Epic 8 (Story 8.8), Architecture, CLAUDE.md | 🟡 中 |
 | **资源配置** | `data/reanim_config/zombieswon.yaml` | 🟡 中 |
 
 ### 6.2 实施顺序
 
 **推荐实施顺序**:
 1. ✅ **批准 Sprint Change Proposal**（当前文档）
-2. 📝 **更新 PRD 和 Epic 文档**（FR13.2, Story 8.11）
-3. 🔧 **创建 Story 8.11 详细 Story 文档**（使用 SM Agent 的 `*draft` 命令）
+2. 📝 **更新 PRD 和 Epic 文档**（FR13.2, Story 8.8）
+3. 🔧 **创建 Story 8.8 详细 Story 文档**（使用 SM Agent 的 `*draft` 命令）
 4. 💻 **开发实现**（按 Phase 1-4 顺序开发）
 5. 🧪 **单元测试 + 集成测试**（每个 Phase 独立测试）
 6. 🎮 **用户验收测试**（完整流程测试）
@@ -792,7 +792,7 @@ type ZombiesWonPhaseComponent struct {
 
 **文档完整性**:
 - ✅ PRD 更新完成（FR13.2 子需求）
-- ✅ Epic 8 更新完成（Story 8.11 添加）
+- ✅ Epic 8 更新完成（Story 8.8 添加）
 - ✅ Architecture 文档更新（LevelSystem 职责）
 - ✅ CLAUDE.md 更新（开发指南章节）
 
@@ -800,7 +800,7 @@ type ZombiesWonPhaseComponent struct {
 
 | 任务 | 工时 | 负责人 |
 |------|------|--------|
-| Story 8.11 详细设计 | 2h | Bob (Scrum Master) |
+| Story 8.8 详细设计 | 2h | Bob (Scrum Master) |
 | 组件和系统开发 | 8-12h | Dev Agent |
 | 单元测试编写 | 3-4h | Dev Agent |
 | 集成测试 | 2-3h | Dev Agent |
@@ -815,15 +815,15 @@ type ZombiesWonPhaseComponent struct {
 
 **立即行动** (用户审批后):
 1. **用户审批 Sprint Change Proposal** - 用户确认变更方案
-2. **Bob (Scrum Master)** - 创建 Story 8.11 详细文档（使用 `*draft` 命令）
+2. **Bob (Scrum Master)** - 创建 Story 8.8 详细文档（使用 `*draft` 命令）
 3. **Bob (Scrum Master)** - 更新 PRD 和 Epic 8 文档
-4. **Dev Agent** - 实现 Story 8.11（Phase 1-4）
+4. **Dev Agent** - 实现 Story 8.8（Phase 1-4）
 
 ### 7.2 需要的代理人
 
 | 代理人 | 职责 | 任务 |
 |-------|------|------|
-| **Bob (Scrum Master)** ⭐ 当前 | 变更管理、Story 创建、文档更新 | 1. 创建 Story 8.11 文档<br>2. 更新 PRD/Epic 文档<br>3. 跟踪实施进度 |
+| **Bob (Scrum Master)** ⭐ 当前 | 变更管理、Story 创建、文档更新 | 1. 创建 Story 8.8 文档<br>2. 更新 PRD/Epic 文档<br>3. 跟踪实施进度 |
 | **Dev Agent** | 代码实现、测试编写 | 1. 实现组件和系统<br>2. 编写单元测试<br>3. 集成测试 |
 | **PM (Product Owner)** | 最终审批 | 审批 Sprint Change Proposal |
 
@@ -831,7 +831,7 @@ type ZombiesWonPhaseComponent struct {
 
 **交接给 Dev Agent 前**:
 - [ ] Sprint Change Proposal 已获用户批准
-- [ ] Story 8.11 详细文档已创建（`docs/stories/8.11.story.md`）
+- [ ] Story 8.8 详细文档已创建（`docs/stories/8.8.story.md`）
 - [ ] PRD 和 Epic 8 文档已更新
 - [ ] 技术实现路径已明确（组件、系统、集成点）
 
@@ -879,7 +879,7 @@ type ZombiesWonPhaseComponent struct {
 - [ ] **用户（项目所有者）** - 批准变更方案和实施计划
 - [ ] **PM (Product Owner)** - 确认 Story 优先级和资源分配
 
-**批准后下一步**: Bob (Scrum Master) 使用 `*draft` 命令创建 Story 8.11 详细文档
+**批准后下一步**: Bob (Scrum Master) 使用 `*draft` 命令创建 Story 8.8 详细文档
 
 ---
 

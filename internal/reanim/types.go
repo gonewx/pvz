@@ -59,6 +59,10 @@ type Frame struct {
 	// When rendering, apply: c = -sin(ky * π / 180) * scaleY to compensate.
 	SkewY *float64 `xml:"ky,omitempty"`
 
+	// Alpha is the transparency/opacity value (0.0 = fully transparent, 1.0 = fully opaque)
+	// Used for fade-in/fade-out effects and layered transparency
+	Alpha *float64 `xml:"a,omitempty"`
+
 	// ImagePath is the sprite part image reference, e.g., "IMAGE_REANIM_PEASHOOTER_HEAD"
 	ImagePath string `xml:"i,omitempty"`
 }

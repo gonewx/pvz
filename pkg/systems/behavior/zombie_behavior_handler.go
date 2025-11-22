@@ -735,5 +735,32 @@ func (s *BehaviorSystem) handleBucketheadZombieBehavior(entityID ecs.EntityID, d
 	s.handleZombieBasicBehavior(entityID, deltaTime)
 }
 
+// updateTriggerZombieMovement 更新触发僵尸的移动（游戏冻结期间）
+// Story 8.8: 简化的移动逻辑，只更新位置，不检测碰撞和啃食
+// 用于 Phase 2 期间让触发僵尸继续走出屏幕
+func (s *BehaviorSystem) updateTriggerZombieMovement(entityID ecs.EntityID, deltaTime float64) {
+	// 获取位置组件
+	position, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+	if !ok {
+		return
+	}
+
+	// 获取速度组件
+	velocity, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID)
+	if !ok {
+		log.Printf("[BehaviorSystem] ⚠️ 触发僵尸 %d 缺少 VelocityComponent", entityID)
+		return
+	}
+
+	// 更新位置：根据速度和时间增量移动僵尸
+	position.X += velocity.VX * deltaTime
+	position.Y += velocity.VY * deltaTime
+
+	// DEBUG: 记录僵尸移动
+	log.Printf("[BehaviorSystem] Trigger zombie %d moving: X=%.1f, VX=%.2f", entityID, position.X, velocity.VX)
+
+	// 注意：不检测边界删除，由 ZombiesWonPhaseSystem 处理
+}
+
 // handleCherryBombBehavior 处理樱桃炸弹的行为逻辑
 // 樱桃炸弹种植后开始引信倒计时（1.5秒），倒计时结束后触发爆炸

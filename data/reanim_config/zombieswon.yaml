@@ -5,6 +5,7 @@ default_animation: anim_screen
 scale: 1
 images:
     IMAGE_REANIM_ZOMBIESWON: assets/reanim/ZombiesWon.jpg
+    IMAGE_REANIM_ZOMBIESWON_OVERLAY: assets/reanim/ZombiesWon_.png
     IMAGE_REANIM_ZOMBIESWON_SCREEN: assets/reanim/ZombiesWonScreen.png
 available_animations:
     - name: anim_screen

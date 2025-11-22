@@ -82,5 +82,9 @@ func NewMenuButton(
 		State: components.UINormal,
 	})
 
+	// 添加菜单按钮标记（Story 8.8 - Task 6）
+	// 用于在游戏冻结期间隐藏菜单按钮
+	ecs.AddComponent(em, entity, &components.MenuButtonComponent{})
+
 	return entity, nil
 }

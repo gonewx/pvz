@@ -67,6 +67,13 @@ type ResourceManager struct {
 	// Story 13.6: Reanim 配置管理器
 	reanimConfigManager *config.ReanimConfigManager // Reanim 配置管理器（用于配置驱动的动画播放）
 
+	// Story 8.8: 背景音乐管理（用于淡出功能）
+	currentBGMPlayer *audio.Player // 当前播放的背景音乐播放器
+	bgmFadeOut       bool          // 是否正在淡出
+	bgmFadeDuration  float64       // 淡出总时长（秒）
+	bgmFadeElapsed   float64       // 淡出已经过时间（秒）
+	bgmInitialVolume float64       // 淡出开始时的音量
+
 	// YAML resource configuration
 	config      *ResourceConfig   // Parsed YAML configuration
 	resourceMap map[string]string // Resource ID -> file path mapping for quick lookup
@@ -753,6 +760,7 @@ func (rm *ResourceManager) loadReanimPartImages(unitName string, reanimXML *rean
 		"IMAGE_REANIM_SELECTORSCREEN_BG_CENTER": "IMAGE_REANIM_SELECTORSCREEN_BG_CENTER_OVERLAY",
 		"IMAGE_REANIM_SELECTORSCREEN_BG_LEFT":   "IMAGE_REANIM_SELECTORSCREEN_BG_LEFT_OVERLAY",
 		"IMAGE_REANIM_SELECTORSCREEN_BG_RIGHT":  "IMAGE_REANIM_SELECTORSCREEN_BG_RIGHT_OVERLAY",
+		"IMAGE_REANIM_ZOMBIESWON":               "IMAGE_REANIM_ZOMBIESWON_OVERLAY",
 	}
 
 	// 加载每个图片
@@ -1372,4 +1380,92 @@ func (rm *ResourceManager) SetReanimConfigManager(manager *config.ReanimConfigMa
 //	}
 func (rm *ResourceManager) GetReanimConfigManager() *config.ReanimConfigManager {
 	return rm.reanimConfigManager
+}
+
+// ===== Story 8.8: 背景音乐淡出功能 =====
+
+// SetCurrentBGM 设置当前播放的背景音乐播放器
+// 用于在淡出时能够找到并控制背景音乐
+//
+// Parameters:
+//   - player: 当前播放的背景音乐播放器
+//
+// Example usage:
+//
+//	player, err := rm.LoadAudio("assets/audio/Music/mainmenu.ogg")
+//	if err == nil {
+//	    rm.SetCurrentBGM(player)
+//	    player.Play()
+//	}
+func (rm *ResourceManager) SetCurrentBGM(player *audio.Player) {
+	rm.currentBGMPlayer = player
+}
+
+// FadeOutMusic 开始淡出当前背景音乐
+// 在指定的时间内将音量从当前值降至 0，然后停止播放
+//
+// 注意：
+//   - 需要在每帧调用 UpdateBGMFade(deltaTime) 来更新淡出进度
+//   - 如果没有设置当前背景音乐播放器，此方法不执行任何操作
+//
+// Parameters:
+//   - duration: 淡出时长（秒），例如 0.2 表示 200 毫秒
+//
+// Example usage:
+//
+//	// 在游戏冻结时淡出背景音乐
+//	rm.FadeOutMusic(0.2)
+func (rm *ResourceManager) FadeOutMusic(duration float64) {
+	if rm.currentBGMPlayer == nil {
+		return // 没有背景音乐播放器，跳过
+	}
+
+	// 记录当前音量作为初始音量
+	rm.bgmInitialVolume = rm.currentBGMPlayer.Volume()
+	rm.bgmFadeDuration = duration
+	rm.bgmFadeElapsed = 0.0
+	rm.bgmFadeOut = true
+
+	log.Printf("[ResourceManager] 开始淡出背景音乐，时长: %.2f 秒，初始音量: %.2f", duration, rm.bgmInitialVolume)
+}
+
+// UpdateBGMFade 更新背景音乐淡出进度
+// 应在每帧调用（通常在 GameScene.Update() 中）
+//
+// Parameters:
+//   - deltaTime: 自上次更新以来的时间（秒）
+//
+// Example usage:
+//
+//	// 在 GameScene.Update() 中
+//	rm.UpdateBGMFade(deltaTime)
+func (rm *ResourceManager) UpdateBGMFade(deltaTime float64) {
+	if !rm.bgmFadeOut || rm.currentBGMPlayer == nil {
+		return // 没有正在进行的淡出
+	}
+
+	// 更新淡出进度
+	rm.bgmFadeElapsed += deltaTime
+
+	// 计算当前音量（线性插值）
+	progress := rm.bgmFadeElapsed / rm.bgmFadeDuration
+	if progress >= 1.0 {
+		// 淡出完成
+		rm.currentBGMPlayer.SetVolume(0.0)
+		rm.currentBGMPlayer.Pause() // 停止播放
+		rm.bgmFadeOut = false
+		log.Printf("[ResourceManager] 背景音乐淡出完成")
+	} else {
+		// 线性淡出：从初始音量降到 0
+		currentVolume := rm.bgmInitialVolume * (1.0 - progress)
+		rm.currentBGMPlayer.SetVolume(currentVolume)
+	}
+}
+
+// IsBGMFadingOut 检查背景音乐是否正在淡出
+//
+// Returns:
+//   - bool: 如果正在淡出返回 true，否则返回 false
+func (rm *ResourceManager) IsBGMFadingOut() bool {
+	return rm.bgmFadeOut
 }

@@ -12,9 +12,6 @@ import (
 
 // 关卡流程常量
 const (
-	// DefeatBoundaryX 失败边界X坐标（僵尸到达此位置视为游戏失败）
-	DefeatBoundaryX = 100.0
-
 	// LastWaveWarningTime 最后一波提示提前时间（秒）
 	LastWaveWarningTime = 5.0
 )
@@ -299,8 +296,8 @@ func (s *LevelSystem) checkDefeatWithLawnmower() {
 				s.gameState.SetGameResult("lose")
 				log.Printf("[LevelSystem] Defeat! Zombie (ID:%d) reached the left boundary on lane %d (lawnmower used)", entityID, lane)
 
-				// 触发僵尸胜利动画
-				s.triggerZombiesWon()
+				// 触发完整的僵尸获胜流程（Story 8.8）
+				s.triggerZombiesWonFlow(entityID)
 				return
 			} else {
 				// 除草车未使用，不触发失败（让除草车触发）
@@ -338,8 +335,8 @@ func (s *LevelSystem) checkDefeatWithoutLawnmower() {
 			s.gameState.SetGameResult("lose")
 			log.Printf("[LevelSystem] Defeat! Zombie (ID:%d) reached the left boundary at X=%.0f", entityID, pos.X)
 
-			// 触发僵尸胜利动画
-			s.triggerZombiesWon()
+			// 触发完整的僵尸获胜流程（Story 8.8）
+			s.triggerZombiesWonFlow(entityID)
 			return
 		}
 	}
@@ -737,7 +734,9 @@ func (s *LevelSystem) ShowProgressBar() {
 // 僵尸胜利动画
 // ========================================
 
-// triggerZombiesWon 触发僵尸胜利动画
+// triggerZombiesWon 触发僵尸胜利动画（旧版本）
+//
+// @deprecated 请使用 triggerZombiesWonFlow() 来触发完整的四阶段僵尸获胜流程
 //
 // 当僵尸到达左边界且所有除草车已用完时调用。
 // 显示 ZombiesWon.reanim 动画，覆盖整个屏幕。
@@ -749,6 +748,7 @@ func (s *LevelSystem) ShowProgressBar() {
 // 注意：
 //   - 动画会一直显示直到玩家退出游戏
 //   - 使用单动画模式播放 "anim_screen"
+//   - 新代码请使用 triggerZombiesWonFlow() 实现完整流程（Story 8.8）
 func (s *LevelSystem) triggerZombiesWon() {
 	log.Printf("[LevelSystem] Triggering zombies won animation!")
 
@@ -776,4 +776,57 @@ func (s *LevelSystem) triggerZombiesWon() {
 	})
 
 	log.Printf("[LevelSystem] Created ZombiesWon entity (ID: %d), playing anim_screen animation", zombiesWonEntity)
+}
+
+// triggerZombiesWonFlow 触发完整的四阶段僵尸获胜流程（Story 8.8）
+//
+// 相比旧版 triggerZombiesWon()，新流程包含：
+// - Phase 1: 游戏冻结（1.5秒）- 植物停止攻击、子弹消失、UI隐藏、音乐淡出
+// - Phase 2: 僵尸入侵动画 - 触发僵尸继续行走至屏幕外
+// - Phase 3: 惨叫与"吃脑子"动画（3-4秒）- 惨叫音效、咀嚼音效、屏幕抖动
+// - Phase 4: 游戏结束对话框 - 显示"再次尝试"/"返回主菜单"按钮
+//
+// 参数：
+//   - triggerZombieID: 触发失败的僵尸实体ID（在 Phase 2 继续移动）
+//
+// 执行步骤：
+//  1. 创建流程控制实体
+//  2. 添加 ZombiesWonPhaseComponent（阶段状态机）
+//  3. 添加 GameFreezeComponent（冻结标记）
+//  4. 交由 ZombiesWonPhaseSystem 管理流程推进
+//
+// 注意：
+//   - 流程由 ZombiesWonPhaseSystem 自动推进，无需手动管理
+//   - 遵循 ECS 零耦合原则，通过组件通信
+func (s *LevelSystem) triggerZombiesWonFlow(triggerZombieID ecs.EntityID) {
+	log.Printf("[LevelSystem] Triggering zombies won flow (4-phase), zombie ID:%d", triggerZombieID)
+
+	// 创建流程控制实体
+	flowEntityID := s.entityManager.CreateEntity()
+
+	// 添加阶段控制组件
+	phaseComp := &components.ZombiesWonPhaseComponent{
+		CurrentPhase:         1,     // Phase 1: 游戏冻结
+		PhaseTimer:           0.0,
+		TriggerZombieID:      triggerZombieID,
+		CameraMovedToTarget:  false, // Phase 2: 摄像机是否已到达目标位置
+		InitialCameraX:       0.0,   // Phase 2: 初始摄像机X位置
+		ZombieStartedWalking: false, // Phase 2: 僵尸是否已开始行走
+		ZombieReachedTarget:  false, // Phase 2: 僵尸是否已到达目标位置
+		ScreamPlayed:         false,
+		ChompPlayed:          false,
+		AnimationReady:       false,
+		ScreenShakeTime:      0.0,
+		DialogShown:          false,
+		WaitTimer:            0.0,
+	}
+	ecs.AddComponent(s.entityManager, flowEntityID, phaseComp)
+
+	// 添加游戏冻结标记
+	freezeComp := &components.GameFreezeComponent{
+		IsFrozen: true,
+	}
+	ecs.AddComponent(s.entityManager, flowEntityID, freezeComp)
+
+	log.Printf("[LevelSystem] Flow entity created (ID:%d), zombie ID:%d", flowEntityID, triggerZombieID)
 }

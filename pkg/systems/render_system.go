@@ -1,6 +1,7 @@
 package systems
 
 import (
+	"image"
 	"image/color"
 	"log"
 	"math"
@@ -43,6 +44,7 @@ import (
 type RenderSystem struct {
 	entityManager     *ecs.EntityManager
 	reanimSystem      *ReanimSystem         // ✅ 修复：添加 ReanimSystem 引用以调用 GetRenderData()
+	resourceManager   interface{ GetImageByID(string) *ebiten.Image } // 资源管理器（用于加载房门图片等）
 	debugPrinted      map[ecs.EntityID]bool // 记录已打印调试信息的实体
 	particleVertices  []ebiten.Vertex       // 粒子顶点数组（复用，避免每帧分配）
 	particleIndices   []uint16              // 粒子索引数组（复用，避免每帧分配）
@@ -63,6 +65,11 @@ func NewRenderSystem(em *ecs.EntityManager) *RenderSystem {
 // SetReanimSystem 设置 ReanimSystem 引用（用于调用 GetRenderData）
 func (s *RenderSystem) SetReanimSystem(rs *ReanimSystem) {
 	s.reanimSystem = rs
+}
+
+// SetResourceManager 设置 ResourceManager 引用（用于加载房门图片等）
+func (s *RenderSystem) SetResourceManager(rm interface{ GetImageByID(string) *ebiten.Image }) {
+	s.resourceManager = rm
 }
 
 // DrawEntity 绘制单个实体（公开方法，用于特殊场景如主菜单）
@@ -91,6 +98,20 @@ func (s *RenderSystem) Draw(screen *ebiten.Image, cameraX float64) {
 //   - screen: 绘制目标屏幕
 //   - cameraX: 摄像机的世界坐标X位置
 func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
+	// 检查游戏是否冻结（僵尸获胜流程期间）
+	// Story 8.8 - Task 6: 冻结时隐藏除草车
+	freezeEntities := ecs.GetEntitiesWith1[*components.GameFreezeComponent](s.entityManager)
+	isFrozen := len(freezeEntities) > 0
+
+	// Story 8.8 - Task 6: 检测僵尸获胜阶段（用于房门渲染）
+	phaseEntities := ecs.GetEntitiesWith1[*components.ZombiesWonPhaseComponent](s.entityManager)
+	var currentPhase int = 0
+	if len(phaseEntities) > 0 {
+		if phaseComp, ok := ecs.GetComponent[*components.ZombiesWonPhaseComponent](s.entityManager, phaseEntities[0]); ok {
+			currentPhase = phaseComp.CurrentPhase
+		}
+	}
+
 	// 所有实体都使用 ReanimComponent 渲染
 	// 查询拥有 PositionComponent 和 ReanimComponent 的实体
 	entities := ecs.GetEntitiesWith2[
@@ -108,6 +129,13 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 		// 跳过植物预览实体（它们由 PlantPreviewRenderSystem 专门渲染）
 		if _, hasPlantPreview := ecs.GetComponent[*components.PlantPreviewComponent](s.entityManager, id); hasPlantPreview {
 			continue
+		}
+
+		// 冻结时隐藏除草车（Story 8.8）
+		if isFrozen {
+			if ecs.HasComponent[*components.LawnmowerComponent](s.entityManager, id) {
+				continue
+			}
 		}
 
 		// 只渲染植物
@@ -132,6 +160,13 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 		// 跳过植物预览实体
 		if _, hasPlantPreview := ecs.GetComponent[*components.PlantPreviewComponent](s.entityManager, id); hasPlantPreview {
 			continue
+		}
+
+		// 冻结时隐藏除草车（Story 8.8）
+		if isFrozen {
+			if ecs.HasComponent[*components.LawnmowerComponent](s.entityManager, id) {
+				continue
+			}
 		}
 
 		// 跳过植物
@@ -175,9 +210,26 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 		return posI.X > posJ.X
 	})
 
-	// 按排序后的顺序渲染
+	// Story 8.8 - Task 6: Phase 2+ 时渲染房门图片
+	// 渲染顺序：阴影层（underlay）→ 门板层（mask）→ 僵尸 → ZombiesWon动画（UI层）
+	// 这样确保：门板遮挡僵尸，但 ZombiesWon 动画显示在门板之上
+	if currentPhase >= 2 && s.resourceManager != nil {
+		s.drawGameOverDoorUnderlay(screen, cameraX) // 阴影层（在僵尸下方）
+		s.drawGameOverDoorOverlay(screen, cameraX)  // 门板层（在僵尸下方，但会通过剪裁实现遮挡效果）
+	}
+
+	// 按排序后的顺序渲染僵尸和子弹
+	// Story 8.8 - Task 6: 如果在 Phase 2+，需要剪裁僵尸超出门板左边界的部分
 	for _, id := range zombiesAndProjectiles {
-		s.drawEntity(screen, id, cameraX)
+		if currentPhase >= 2 {
+			// 计算门板左边界的世界坐标
+			doorLeftBoundary := config.GameOverDoorMaskX
+
+			// 渲染僵尸时应用剪裁
+			s.drawEntityWithClipping(screen, id, cameraX, doorLeftBoundary)
+		} else {
+			s.drawEntity(screen, id, cameraX)
+		}
 	}
 }
 
@@ -238,6 +290,95 @@ func (s *RenderSystem) drawEntity(screen *ebiten.Image, id ecs.EntityID, cameraX
 
 	// 如果既没有 ReanimComponent 也没有 SpriteComponent，记录警告
 	log.Printf("[RenderSystem] 警告: 实体 %d 没有可渲染组件（ReanimComponent 或 SpriteComponent）", id)
+}
+
+// drawEntityWithClipping 绘制单个实体并应用剪裁
+// Story 8.8 - Task 6: 用于僵尸走入房子时，剪裁超出门板左边界的部分
+//
+// 参数:
+//   - screen: 绘制目标屏幕
+//   - id: 实体ID
+//   - cameraX: 摄像机的世界坐标X位置
+//   - clipLeftWorldX: 剪裁左边界的世界坐标（僵尸超过此X坐标的部分将被隐藏）
+func (s *RenderSystem) drawEntityWithClipping(screen *ebiten.Image, id ecs.EntityID, cameraX float64, clipLeftWorldX float64) {
+	// 获取实体位置
+	pos, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, id)
+	if !hasPos {
+		return
+	}
+
+	// 只对僵尸应用剪裁（检查是否有 BehaviorComponent 且是僵尸类型）
+	behaviorComp, hasBehavior := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, id)
+	isZombie := hasBehavior && (behaviorComp.Type == components.BehaviorZombieBasic ||
+		behaviorComp.Type == components.BehaviorZombieEating ||
+		behaviorComp.Type == components.BehaviorZombieDying ||
+		behaviorComp.Type == components.BehaviorZombieSquashing ||
+		behaviorComp.Type == components.BehaviorZombieConehead ||
+		behaviorComp.Type == components.BehaviorZombieBuckethead)
+
+	if !isZombie {
+		// 非僵尸实体正常渲染
+		s.drawEntity(screen, id, cameraX)
+		return
+	}
+
+	// 获取僵尸的 ReanimComponent 来估算宽度
+	reanimComp, hasReanim := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id)
+	if !hasReanim {
+		s.drawEntity(screen, id, cameraX)
+		return
+	}
+
+	// 估算僵尸的渲染宽度（使用默认值，因为没有 BoundingBox 字段）
+	zombieWidth := 150.0 // 默认僵尸宽度
+
+	// 计算僵尸左边缘的世界坐标
+	zombieLeftWorldX := pos.X - reanimComp.CenterOffsetX
+
+	// 如果僵尸完全在门板右侧，正常渲染
+	if zombieLeftWorldX >= clipLeftWorldX {
+		s.drawEntity(screen, id, cameraX)
+		return
+	}
+
+	// 如果僵尸完全在门板左侧（完全被遮挡），不渲染
+	zombieRightWorldX := zombieLeftWorldX + zombieWidth
+	if zombieRightWorldX <= clipLeftWorldX {
+		return // 完全被遮挡，不渲染
+	}
+
+	// 僵尸部分超出门板左边界，需要剪裁
+	// 创建临时图像来渲染僵尸
+	tempImg := ebiten.NewImage(int(zombieWidth)+10, 300) // 给足够的空间
+	defer tempImg.Dispose()
+
+	// 将僵尸渲染到临时图像（使用临时摄像机坐标）
+	tempCameraX := zombieLeftWorldX
+	s.renderReanimEntity(tempImg, id, tempCameraX)
+
+	// 计算剪裁区域
+	// 只保留门板右侧的部分
+	clipStartX := int(clipLeftWorldX - zombieLeftWorldX)
+	if clipStartX < 0 {
+		clipStartX = 0
+	}
+
+	// 获取剪裁后的子图像
+	tempBounds := tempImg.Bounds()
+	if clipStartX < tempBounds.Dx() {
+		clippedImg := tempImg.SubImage(image.Rect(
+			clipStartX, 0,
+			tempBounds.Dx(), tempBounds.Dy(),
+		)).(*ebiten.Image)
+
+		// 绘制剪裁后的图像到屏幕
+		op := &ebiten.DrawImageOptions{}
+		screenX := (zombieLeftWorldX + float64(clipStartX)) - cameraX
+		screenY := pos.Y - reanimComp.CenterOffsetY
+		op.GeoM.Translate(screenX, screenY)
+
+		screen.DrawImage(clippedImg, op)
+	}
 }
 
 // renderSpriteEntity 渲染简单的 SpriteComponent 实体
@@ -880,3 +1021,86 @@ func (s *RenderSystem) drawCenteredTextTTF(screen *ebiten.Image, textStr string,
 // Returns -1 if the track has no visible frames or is not found.
 //
 // This is used for PlayOnce tracks to determine where to lock the track.
+// DrawUIElements 绘制所有 UI 元素（公开方法，供验证程序使用）
+// 渲染所有标记为 UIComponent 的实体
+//
+// 参数:
+//   - screen: 绘制目标屏幕
+func (s *RenderSystem) DrawUIElements(screen *ebiten.Image) {
+	// 查询所有有 UIComponent 和 PositionComponent 的实体
+	uiEntities := ecs.GetEntitiesWith2[
+		*components.PositionComponent,
+		*components.UIComponent,
+	](s.entityManager)
+
+	// 渲染所有 UI 实体（UI 元素不受摄像机影响，cameraX = 0）
+	for _, entityID := range uiEntities {
+		s.drawEntity(screen, entityID, 0)
+	}
+}
+
+// drawGameOverDoorUnderlay 渲染房门下层图片（阴影/右半部分）
+// Story 8.8 - Task 6: 僵尸获胜流程期间显示房门打开效果
+// 此图片在僵尸之前绘制，作为阴影层
+//
+// 参数:
+//   - screen: 绘制目标屏幕
+//   - cameraX: 摄像机X坐标
+func (s *RenderSystem) drawGameOverDoorUnderlay(screen *ebiten.Image, cameraX float64) {
+	if s.resourceManager == nil {
+		return
+	}
+
+	// 加载房门下层图片（阴影）
+	underlayImg := s.resourceManager.GetImageByID("IMAGE_BACKGROUND1_GAMEOVER_INTERIOR_OVERLAY")
+	if underlayImg == nil {
+		log.Printf("[RenderSystem] 警告：无法加载房门下层图片 IMAGE_BACKGROUND1_GAMEOVER_INTERIOR_OVERLAY")
+		return
+	}
+
+	// 绘制房门下层图片
+	// 坐标使用配置常量（可在 pkg/config/gameover_door_config.go 中调整）
+	op := &ebiten.DrawImageOptions{}
+
+	// 图片位置：世界坐标转换为屏幕坐标
+	worldX := config.GameOverDoorInteriorOverlayX
+	worldY := config.GameOverDoorInteriorOverlayY
+	screenX := worldX - cameraX
+	screenY := worldY
+	op.GeoM.Translate(screenX, screenY)
+
+	screen.DrawImage(underlayImg, op)
+}
+
+// drawGameOverDoorOverlay 渲染房门上层图片（门板/左半部分）
+// Story 8.8 - Task 6: 僵尸获胜流程期间显示房门打开效果
+// 此图片在僵尸之后绘制，遮挡僵尸以模拟进屋效果
+//
+// 参数:
+//   - screen: 绘制目标屏幕
+//   - cameraX: 摄像机X坐标
+func (s *RenderSystem) drawGameOverDoorOverlay(screen *ebiten.Image, cameraX float64) {
+	if s.resourceManager == nil {
+		return
+	}
+
+	// 加载房门上层图片（门板）
+	overlayImg := s.resourceManager.GetImageByID("IMAGE_BACKGROUND1_GAMEOVER_MASK")
+	if overlayImg == nil {
+		log.Printf("[RenderSystem] 警告：无法加载房门上层图片 IMAGE_BACKGROUND1_GAMEOVER_MASK")
+		return
+	}
+
+	// 绘制房门上层图片
+	// 坐标使用配置常量（可在 pkg/config/gameover_door_config.go 中调整）
+	op := &ebiten.DrawImageOptions{}
+
+	// 图片位置：世界坐标转换为屏幕坐标
+	worldX := config.GameOverDoorMaskX
+	worldY := config.GameOverDoorMaskY
+	screenX := worldX - cameraX
+	screenY := worldY
+	op.GeoM.Translate(screenX, screenY)
+
+	screen.DrawImage(overlayImg, op)
+}

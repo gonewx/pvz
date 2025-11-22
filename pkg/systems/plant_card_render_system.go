@@ -40,6 +40,13 @@ func NewPlantCardRenderSystem(em *ecs.EntityManager, sunFont *text.GoTextFace) *
 // 自动过滤奖励卡片（有 RewardCardComponent 标记的卡片）
 // 奖励卡片由各自的系统（如 RewardAnimationSystem）自行渲染
 func (s *PlantCardRenderSystem) Draw(screen *ebiten.Image) {
+	// 检查游戏是否冻结（僵尸获胜流程期间）
+	// 冻结时隐藏植物选择栏
+	freezeEntities := ecs.GetEntitiesWith1[*components.GameFreezeComponent](s.entityManager)
+	if len(freezeEntities) > 0 {
+		return // 游戏冻结，不渲染植物卡片
+	}
+
 	// 查询所有拥有 PlantCardComponent, PositionComponent 的实体
 	cardEntities := ecs.GetEntitiesWith2[
 		*components.PlantCardComponent,

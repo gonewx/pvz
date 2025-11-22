@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
@@ -152,10 +153,87 @@ func createReanimComponent(rm *game.ResourceManager, unitName string) (*componen
 		return nil, fmt.Errorf("reanim images not found for %s", unitName)
 	}
 
+	// 构建 MergedTracks（合并所有轨道数据）
+	mergedTracks := reanim.BuildMergedTracks(reanimXML)
+
+	// 提取视觉轨道列表（从 XML 中的 <track> 标签）
+	visualTracks := make([]string, 0, len(reanimXML.Tracks))
+	for _, track := range reanimXML.Tracks {
+		visualTracks = append(visualTracks, track.Name)
+	}
+
+	// 检查是否为单动画文件（无命名动画）
+	// 单动画文件的特征：没有以 "anim_" 开头的控制轨道（除了可能的 anim_screen）
+	isSingleAnimFile := true
+	for _, track := range reanimXML.Tracks {
+		if track.Name != "anim_screen" && len(track.Name) >= 5 && track.Name[:5] == "anim_" {
+			isSingleAnimFile = false
+			break
+		}
+	}
+
+	// 为单动画文件构建 visiblesArray
+	// 所有物理帧都标记为可见（值为 0），让轨道自己的 FrameNum 控制显隐
+	var currentAnimations []string
+	var animVisiblesMap map[string][]int
+
+	if isSingleAnimFile {
+		// 单动画文件模式：使用 "_root" 合成动画名
+		maxFrames := 0
+		for _, frames := range mergedTracks {
+			if len(frames) > maxFrames {
+				maxFrames = len(frames)
+			}
+		}
+
+		visiblesArray := make([]int, maxFrames)
+		for i := 0; i < maxFrames; i++ {
+			visiblesArray[i] = 0 // All frames are visible
+		}
+
+		currentAnimations = []string{"_root"}
+		animVisiblesMap = map[string][]int{
+			"_root": visiblesArray,
+		}
+
+		log.Printf("[UI Factory] Single-anim file '%s': maxFrames=%d, using _root animation", unitName, maxFrames)
+	} else {
+		// 命名动画文件：使用默认动画或留空（等待 AnimationCommandComponent）
+		currentAnimations = []string{}
+		animVisiblesMap = make(map[string][]int)
+	}
+
 	// 创建组件
 	return &components.ReanimComponent{
-		ReanimXML:  reanimXML,
-		PartImages: partImages,
+		// 基础数据
+		ReanimName:   unitName, // Story 8.8: 设置 ReanimName 用于调试和识别
+		ReanimXML:    reanimXML,
+		PartImages:   partImages,
+		MergedTracks: mergedTracks,
+
+		// 轨道分类
+		VisualTracks:  visualTracks,
+		LogicalTracks: []string{},
+
+		// 播放状态
+		CurrentFrame:      0,
+		FrameAccumulator:  0.0,
+		AnimationFPS:      float64(reanimXML.FPS),
+		CurrentAnimations: currentAnimations,
+
+		// 动画数据
+		AnimVisiblesMap: animVisiblesMap,
+
+		// 循环与暂停状态
+		AnimationLoopStates:   make(map[string]bool),
+		AnimationPausedStates: make(map[string]bool),
+		AnimationFrameIndices: make(map[string]float64),
+		IsLooping:             true, // 单动画文件默认循环
+		IsPaused:              false,
+
+		// 配置字段
+		ParentTracks: nil,
+		HiddenTracks: nil,
 	}, nil
 }
 
@@ -187,16 +265,26 @@ func NewZombiesWonEntity(
 		return 0, fmt.Errorf("failed to load ZombiesWon.reanim: %w", err)
 	}
 
+	// ZombiesWon 是全屏动画，位置从(0, 0)开始，不需要居中偏移
+	reanimComp.CenterOffsetX = 0
+	reanimComp.CenterOffsetY = 0
+
+	// 设置为不循环，并使用 AnimationLoopStates 控制
+	reanimComp.IsLooping = false
+	reanimComp.AnimationLoopStates = map[string]bool{
+		"_root": false, // _root 动画不循环
+	}
+
 	// 创建实体
 	entityID := em.CreateEntity()
 
-	// 设置位置（屏幕中央）
+	// 设置位置（全屏动画从左上角开始）
 	posComp := &components.PositionComponent{
-		X: centerX,
-		Y: centerY,
+		X: 0,
+		Y: 0,
 	}
 
-	// 添加 UI 组件（标记为 UI 元素，最上层渲染）
+	// 添加 UI 组件（标记为 UI 元素，不受摄像机影响）
 	uiComp := &components.UIComponent{
 		State: components.UINormal,
 	}

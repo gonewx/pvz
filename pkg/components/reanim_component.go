@@ -150,6 +150,12 @@ type ReanimComponent struct {
 	// 关键修复：animation_showcase 使用黑名单，而非白名单
 	HiddenTracks map[string]bool
 
+	// TrackOffsets 轨道偏移量（用于抖动效果）
+	// Key: 轨道名
+	// Value: [X, Y] 偏移量
+	// 渲染时会在轨道的原始位置上叠加此偏移
+	TrackOffsets map[string][2]float64
+
 	// CenterOffsetX/Y 是 bounding box 中心的坐标（相对于 Reanim 原点）
 	// 用于渲染时居中对齐：screenPos = worldPos - CenterOffset
 	// 在动画初始化时计算一次并缓存，避免每帧重新计算导致位置抖动

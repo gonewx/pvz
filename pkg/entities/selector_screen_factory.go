@@ -123,6 +123,9 @@ func NewSelectorScreenPartialEntity(
 
 	em.AddComponent(entityID, reanimComp)
 
+	// Add UIComponent to ensure it updates even when game is frozen
+	em.AddComponent(entityID, &components.UIComponent{})
+
 	// 6. Add PositionComponent
 	em.AddComponent(entityID, &components.PositionComponent{
 		X: x,

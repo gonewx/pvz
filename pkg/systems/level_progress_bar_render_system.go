@@ -29,6 +29,13 @@ func NewLevelProgressBarRenderSystem(em *ecs.EntityManager, font *text.GoTextFac
 
 // Draw 渲染所有进度条实体
 func (s *LevelProgressBarRenderSystem) Draw(screen *ebiten.Image) {
+	// 检查游戏是否冻结（僵尸获胜流程期间）
+	// 冻结时隐藏进度条
+	freezeEntities := ecs.GetEntitiesWith1[*components.GameFreezeComponent](s.entityManager)
+	if len(freezeEntities) > 0 {
+		return // 游戏冻结，不渲染进度条
+	}
+
 	// 查询所有拥有 LevelProgressBarComponent 的实体
 	entities := ecs.GetEntitiesWith1[*components.LevelProgressBarComponent](s.entityManager)
 

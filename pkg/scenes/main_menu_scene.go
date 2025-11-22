@@ -439,6 +439,12 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 // Update updates the main menu scene logic.
 // deltaTime is the time elapsed since the last update in seconds.
 func (m *MainMenuScene) Update(deltaTime float64) {
+	// Debug: Check for GameFreezeComponent
+	freezeEntities := ecs.GetEntitiesWith1[*components.GameFreezeComponent](m.entityManager)
+	if len(freezeEntities) > 0 {
+		log.Printf("[MainMenuScene] ⚠️  WARNING: Found %d GameFreezeComponent entities! This should not happen in MainMenu.", len(freezeEntities))
+	}
+
 	// 清理上一帧标记删除的实体（确保本帧开始前已删除）
 	m.entityManager.RemoveMarkedEntities()
 
@@ -2903,6 +2909,13 @@ func (m *MainMenuScene) triggerZombieHandAnimation() {
 	reanimComp.CurrentFrame = 0       // Reset to first frame
 	reanimComp.FrameAccumulator = 0.0 // Reset accumulator
 	reanimComp.IsFinished = false     // Reset finished flag
+
+	// ✅ 修复：重置所有动画的帧索引，确保动画能从头播放
+	if reanimComp.AnimationFrameIndices != nil {
+		for k := range reanimComp.AnimationFrameIndices {
+			reanimComp.AnimationFrameIndices[k] = 0.0
+		}
+	}
 
 	// Set menu state to block interaction
 	log.Printf("[MainMenuScene] 🧟 Setting menuState from %d to %d", m.menuState, MainMenuStateZombieHandPlaying)

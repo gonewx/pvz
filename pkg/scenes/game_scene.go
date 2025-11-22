@@ -146,6 +146,9 @@ type GameScene struct {
 	// Story 11.3: Final Wave Warning System (最后一波提示系统)
 	finalWaveWarningSystem *systems.FinalWaveWarningSystem // 最后一波提示动画系统
 
+	// Story 8.8: Zombies Won Flow System (僵尸获胜流程系统)
+	zombiesWonPhaseSystem *systems.ZombiesWonPhaseSystem // 僵尸获胜四阶段流程系统
+
 	// Dialog Systems (对话框系统 - ECS ���构)
 	dialogInputSystem *systems.DialogInputSystem // 对话框输入系统（处理对话框交互）
 
@@ -178,6 +181,11 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 		isIntroAnimPlaying: false,              // 禁用开场动画
 		introAnimTimer:     0,
 	}
+
+	// Reset game state flags for new session
+	scene.gameState.SetPaused(false)
+	scene.gameState.IsGameOver = false
+	scene.gameState.GameResult = ""
 
 	// Load all UI resources
 	scene.loadResources()
@@ -253,6 +261,9 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 
 	// ✅ 修复：设置 ReanimSystem 引用，以便 RenderSystem 调用 GetRenderData()
 	scene.renderSystem.SetReanimSystem(scene.reanimSystem)
+
+	// Story 8.8 - Task 6: 设置 ResourceManager 引用，以便 RenderSystem 加载房门图片
+	scene.renderSystem.SetResourceManager(rm)
 
 	// Initialize input system with sun counter target position and lawn grid system (Story 2.4 + Story 3.3)
 	// Story 6.3: Pass reanimSystem to InputSystem for plant animation initialization
@@ -371,6 +382,20 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	// Story 11.3: Create FinalWaveWarningSystem (最后一波提示系统)
 	scene.finalWaveWarningSystem = systems.NewFinalWaveWarningSystem(scene.entityManager)
 	log.Printf("[GameScene] Initialized final wave warning system")
+
+	// Story 8.8: Create ZombiesWonPhaseSystem (僵尸获胜流程系统)
+	scene.zombiesWonPhaseSystem = systems.NewZombiesWonPhaseSystem(
+		scene.entityManager,
+		scene.resourceManager,
+		scene.gameState,
+		WindowWidth,
+		WindowHeight,
+	)
+	log.Printf("[GameScene] Initialized zombies won phase system")
+	// Story 8.8: 设置"再次尝试"回调
+	scene.zombiesWonPhaseSystem.SetRetryCallback(func() {
+		scene.retryLevel()
+	})
 
 	// 3. Create ZombieLaneTransitionSystem (僵尸行转换系统)
 	scene.zombieLaneTransitionSystem = systems.NewZombieLaneTransitionSystem(scene.entityManager)
@@ -1120,6 +1145,12 @@ func (s *GameScene) loadSoddingResources() {
 //   - System execution order ensures correct game logic flow
 //   - Story 10.1: Pause menu (只更新 UI 系统，跳过游戏逻辑)
 func (s *GameScene) Update(deltaTime float64) {
+	// DEBUG: Check for GameFreezeComponent on every frame to debug freeze issue
+	freezeEntities := ecs.GetEntitiesWith1[*components.GameFreezeComponent](s.entityManager)
+	if len(freezeEntities) > 0 && s.zombiesWonPhaseSystem == nil {
+		log.Printf("[GameScene] ⚠️ WARNING: GameFreezeComponent found but ZombiesWonPhaseSystem is nil! Count: %d", len(freezeEntities))
+	}
+
 	// Story 10.1: 更新暂停菜单模块
 	if s.pauseMenuModule != nil {
 		s.pauseMenuModule.Update(deltaTime)
@@ -1319,7 +1350,15 @@ func (s *GameScene) Update(deltaTime float64) {
 	}
 
 	// 同步摄像机位置到全局状态（供所有系统使用）
-	s.gameState.CameraX = s.cameraX
+	// Story 8.8: 如果游戏结束且 ZombiesWonPhaseSystem 激活，则反向同步（让系统控制摄像机）
+	if s.gameState.IsGameOver {
+		// 游戏结束时，ZombiesWonPhaseSystem 控制摄像机移动
+		// 所以需要反向同步：从 GameState.CameraX 更新到 s.cameraX
+		s.cameraX = s.gameState.CameraX
+	} else {
+		// 正常游戏时，GameScene 控制摄像机
+		s.gameState.CameraX = s.cameraX
+	}
 
 	// Story 5.5: Check if game is over (win or lose)
 	// If game is over, stop updating game systems but allow reward animation to play
@@ -1329,13 +1368,24 @@ func (s *GameScene) Update(deltaTime float64) {
 		s.rewardSystem.Update(deltaTime)   // 奖励动画系统（卡片包动画）
 		s.reanimSystem.Update(deltaTime)   // Reanim 系统（植物卡片动画）
 		s.particleSystem.Update(deltaTime) // 粒子系统（光晕效果）
-		return                             // 停止其他游戏系统（僵尸移动、植物攻击等）
+
+		// Story 8.8: 僵尸获胜流程需要继续更新
+		if s.zombiesWonPhaseSystem != nil {
+			s.zombiesWonPhaseSystem.Update(deltaTime)
+		}
+		// Story 8.8: 触发僵尸需要继续移动（BehaviorSystem 会检测冻结状态）
+		s.behaviorSystem.Update(deltaTime)
+
+		return // 停止其他游戏系统（僵尸移动、植物攻击等）
 	}
 
 	// Update all ECS systems in order (order matters for correct game logic)
-	s.levelSystem.Update(deltaTime)                // 0. Update level system (Story 5.5: wave spawning, victory/defeat)
-	s.rewardSystem.Update(deltaTime)               // 0.1. Update reward animation system (Story 8.3: 卡片包动画)
-	s.finalWaveWarningSystem.Update(deltaTime)     // 0.2. Update final wave warning (Story 11.3: 自动清理提示动画)
+	s.levelSystem.Update(deltaTime)            // 0. Update level system (Story 5.5: wave spawning, victory/defeat)
+	s.rewardSystem.Update(deltaTime)           // 0.1. Update reward animation system (Story 8.3: 卡片包动画)
+	s.finalWaveWarningSystem.Update(deltaTime) // 0.2. Update final wave warning (Story 11.3: 自动清理提示动画)
+	if s.zombiesWonPhaseSystem != nil {
+		s.zombiesWonPhaseSystem.Update(deltaTime) // 0.3. Update zombies won flow (Story 8.8: 僵尸获胜四阶段流程)
+	}
 	s.zombieLaneTransitionSystem.Update(deltaTime) // 0.5. Update zombie lane transitions (move to target lane before attacking)
 
 	// Story 3.1 架构优化：使用模块化方式更新植物选择栏
@@ -1732,6 +1782,12 @@ func (s *GameScene) createMergedBackground() *ebiten.Image {
 // drawSeedBank renders the plant selection bar at the top left of the screen.
 // If the seed bank image is not loaded, it draws a simple rectangle as fallback.
 func (s *GameScene) drawSeedBank(screen *ebiten.Image) {
+	// Story 8.8: 游戏冻结时隐藏植物选择栏
+	freezeEntities := ecs.GetEntitiesWith1[*components.GameFreezeComponent](s.entityManager)
+	if len(freezeEntities) > 0 {
+		return
+	}
+
 	if s.seedBank != nil {
 		// Draw the seed bank image at the top left corner
 		op := &ebiten.DrawImageOptions{}
@@ -1751,6 +1807,12 @@ func (s *GameScene) drawSeedBank(screen *ebiten.Image) {
 // so we don't need to draw them separately. This method displays the sun count number.
 // The text is horizontally centered to accommodate dynamic value lengths (e.g., 50, 150, 9990).
 func (s *GameScene) drawSunCounter(screen *ebiten.Image) {
+	// Story 8.8: 游戏冻结时隐藏阳光计数器
+	freezeEntities := ecs.GetEntitiesWith1[*components.GameFreezeComponent](s.entityManager)
+	if len(freezeEntities) > 0 {
+		return
+	}
+
 	// Get current sun value from game state
 	sunValue := s.gameState.GetSun()
 	sunText := fmt.Sprintf("%d", sunValue)
@@ -2251,8 +2313,8 @@ func (s *GameScene) initLawnmowers() {
 //   - 这里只根据状态设置光标
 //
 // 检查优先级:
-//   1. 面板按钮 (ButtonComponent)
-//   2. 对话框按钮 (DialogComponent.HoveredButtonIdx)
+//  1. 面板按钮 (ButtonComponent)
+//  2. 对话框按钮 (DialogComponent.HoveredButtonIdx)
 func (s *GameScene) updateMouseCursor() {
 	// Default cursor shape
 	cursorShape := ebiten.CursorShapeDefault
@@ -2295,3 +2357,17 @@ func (s *GameScene) updateMouseCursor() {
 	}
 }
 
+// retryLevel 重新尝试当前关卡
+// Story 8.8: 重新加载关卡，重置所有状态
+func (s *GameScene) retryLevel() {
+	log.Printf("[GameScene] 重新尝试关卡")
+
+	// 获取当前关卡ID
+	currentLevelID := "1-1" // 默认值
+	if s.gameState.CurrentLevel != nil {
+		currentLevelID = s.gameState.CurrentLevel.ID
+	}
+
+	// 重新加载场景
+	s.sceneManager.SwitchTo(NewGameScene(s.resourceManager, s.sceneManager, currentLevelID))
+}

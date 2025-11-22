@@ -342,6 +342,10 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 		return fmt.Errorf("failed to get config for unit %s: %w", unitID, err)
 	}
 
+	if unitConfig == nil {
+		return fmt.Errorf("unit config is nil for %s", unitID)
+	}
+
 	// 查找 combo 配置
 	var combo *config.AnimationComboConfig
 	if comboName == "" {
@@ -450,7 +454,7 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 
 	// 计算并缓存 CenterOffset（基于第一帧）
 	// 检查配置中是否手动指定了 CenterOffset
-	if unitConfig != nil && len(unitConfig.CenterOffset) == 2 {
+	if len(unitConfig.CenterOffset) == 2 {
 		// 使用配置指定的 CenterOffset
 		comp.CenterOffsetX = unitConfig.CenterOffset[0]
 		comp.CenterOffsetY = unitConfig.CenterOffset[1]
@@ -679,7 +683,7 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 			animSpeed := 1.0 // 默认正常速度
 			if comp.AnimationSpeedOverrides != nil {
 				if speed, hasOverride := comp.AnimationSpeedOverrides[animName]; hasOverride {
-					animSpeed = speed  // 允许 speed = 0 来完全禁用自动推进
+					animSpeed = speed // 允许 speed = 0 来完全禁用自动推进
 				}
 			}
 
@@ -703,14 +707,10 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 					}
 				}
 			} else {
-				// 非循环动画：停留在最后一帧，不超出范围
-				if animVisibles, exists := comp.AnimVisiblesMap[animName]; exists {
-					visibleCount := countVisibleFrames(animVisibles)
-					if visibleCount > 0 && comp.AnimationFrameIndices[animName] >= float64(visibleCount) {
-						// 限制在最后一帧（visibleCount-1）
-						comp.AnimationFrameIndices[animName] = float64(visibleCount - 1)
-					}
-				}
+				// 非循环动画：不需要强制限制在最后一帧
+				// 前面的逻辑（visibleCount > 0 && int(currentFrame) >= visibleCount）会负责停止更新
+				// 让 indices 自然保持在 >= visibleCount 的状态，以便 IsFinished 可以被触发
+				// 如果强制拉回 visibleCount-1，会导致 CurrentFrame 永远小于 visibleCount，IsFinished 永远为 false
 			}
 		}
 

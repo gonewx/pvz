@@ -42,6 +42,28 @@ func NewBehaviorSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game
 
 // Update 更新所有拥有行为组件的实体
 func (s *BehaviorSystem) Update(deltaTime float64) {
+	// 检查游戏是否冻结（僵尸获胜流程期间）
+	// Story 8.8: 游戏冻结时，所有植物停止攻击，但触发僵尸继续移动
+	freezeEntities := ecs.GetEntitiesWith1[*components.GameFreezeComponent](s.entityManager)
+	if len(freezeEntities) > 0 {
+		// 游戏冻结期间，只允许触发僵尸继续移动
+		// 查询 ZombiesWonPhaseComponent 获取触发僵尸ID
+		phaseEntities := ecs.GetEntitiesWith1[*components.ZombiesWonPhaseComponent](s.entityManager)
+		for _, phaseEntityID := range phaseEntities {
+			phaseComp, ok := ecs.GetComponent[*components.ZombiesWonPhaseComponent](s.entityManager, phaseEntityID)
+			if !ok {
+				continue
+			}
+			// 只更新触发僵尸的移动（Phase 2 期间僵尸需要继续走出屏幕）
+			triggerZombieID := phaseComp.TriggerZombieID
+			if triggerZombieID != 0 {
+				// 简化的移动逻辑：只更新位置，不检测碰撞
+				s.updateTriggerZombieMovement(triggerZombieID, deltaTime)
+			}
+		}
+		return
+	}
+
 	// 查询所有植物实体
 	plantEntityList := s.queryPlants()
 

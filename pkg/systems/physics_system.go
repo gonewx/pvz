@@ -73,6 +73,21 @@ func (ps *PhysicsSystem) checkAABBCollision(
 // 参数:
 //   - deltaTime: 自上一帧以来经过的时间（秒），本系统暂不使用
 func (ps *PhysicsSystem) Update(deltaTime float64) {
+	// 检查游戏是否冻结（僵尸获胜流程期间）
+	// Story 8.8: 游戏冻结时，删除所有子弹实体
+	freezeEntities := ecs.GetEntitiesWith1[*components.GameFreezeComponent](ps.em)
+	if len(freezeEntities) > 0 {
+		// 删除所有子弹实体
+		bulletEntities := ecs.GetEntitiesWith1[*components.VelocityComponent](ps.em)
+		for _, bulletID := range bulletEntities {
+			behaviorComp, ok := ecs.GetComponent[*components.BehaviorComponent](ps.em, bulletID)
+			if ok && behaviorComp.Type == components.BehaviorPeaProjectile {
+				ps.em.DestroyEntity(bulletID)
+			}
+		}
+		return
+	}
+
 	// 查询所有拥有必要组件的实体（子弹和僵尸都需要这些组件）
 	allEntities := ecs.GetEntitiesWith3[
 		*components.BehaviorComponent,

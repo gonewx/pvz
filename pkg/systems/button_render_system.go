@@ -30,10 +30,21 @@ func NewButtonRenderSystem(em *ecs.EntityManager) *ButtonRenderSystem {
 // Draw 渲染所有按钮
 // 查询所有拥有 ButtonComponent 和 PositionComponent 的实体并渲染
 func (s *ButtonRenderSystem) Draw(screen *ebiten.Image) {
+	// 检查游戏是否冻结（僵尸获胜流程期间）
+	freezeEntities := ecs.GetEntitiesWith1[*components.GameFreezeComponent](s.entityManager)
+	isFrozen := len(freezeEntities) > 0
+
 	// 查询所有按钮实体
 	entities := ecs.GetEntitiesWith2[*components.ButtonComponent, *components.PositionComponent](s.entityManager)
 
 	for _, entityID := range entities {
+		// 冻结时，隐藏菜单按钮（通过 MenuButtonComponent 标记识别）
+		if isFrozen {
+			if ecs.HasComponent[*components.MenuButtonComponent](s.entityManager, entityID) {
+				continue // 跳过菜单按钮
+			}
+		}
+
 		s.DrawButton(screen, entityID)
 	}
 }

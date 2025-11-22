@@ -40,7 +40,8 @@ type AnimationCell struct {
 	mergedTracks map[string][]reanim.Frame
 
 	// 图片资源
-	partImages map[string]*ebiten.Image
+	partImages      map[string]*ebiten.Image
+	backgroundImage *ebiten.Image // 背景图片（可选）
 
 	// 可切换的动画项（包含普通动画和组合动画）
 	switchableAnimations  []SwitchableAnimation
@@ -130,6 +131,20 @@ func NewAnimationCell(config *AnimationUnitConfig, globalFPS int, targetTPS int)
 		partImages[ref] = img
 	}
 
+	// 加载背景图片（如果配置了）
+	var backgroundImg *ebiten.Image
+	if config.BackgroundImage != "" {
+		img, err := loadImageWithMask(config.BackgroundImage)
+		if err != nil {
+			log.Printf("  警告: 无法加载背景图片 %s: %v", config.BackgroundImage, err)
+		} else {
+			backgroundImg = img
+			if *verbose {
+				log.Printf("  ✓ 加载背景图片: %s", config.BackgroundImage)
+			}
+		}
+	}
+
 	// 构建合并轨道（带顺序，处理同名轨道）
 	mergedTracks, trackOrder := reanim.BuildMergedTracksWithOrder(reanimXML)
 
@@ -137,10 +152,11 @@ func NewAnimationCell(config *AnimationUnitConfig, globalFPS int, targetTPS int)
 	visualTracks, logicalTracks := analyzeTrackTypesWithOrder(mergedTracks, trackOrder)
 
 	cell := &AnimationCell{
-		config:       config,
-		reanimXML:    reanimXML,
-		mergedTracks: mergedTracks,
-		partImages:   partImages,
+		config:            config,
+		reanimXML:         reanimXML,
+		mergedTracks:      mergedTracks,
+		partImages:        partImages,
+		backgroundImage:   backgroundImg,
 
 		currentFrame:          0,
 		currentAnimationIndex: 0,
@@ -399,6 +415,17 @@ func (c *AnimationCell) Update() {
 func (c *AnimationCell) Render(canvas *ebiten.Image, centerX, centerY float64) {
 	c.centerX = centerX
 	c.centerY = centerY
+
+	// 绘制背景图片（如果有）
+	if c.backgroundImage != nil {
+		bgOpts := &ebiten.DrawImageOptions{}
+		// 背景图片使用左上角对齐，centerX 和 centerY 表示虚拟显示区域的中心
+		// 需要将背景图片放置在左上角
+		bgWidth := float64(c.backgroundImage.Bounds().Dx())
+		bgHeight := float64(c.backgroundImage.Bounds().Dy())
+		bgOpts.GeoM.Translate(centerX-bgWidth/2, centerY-bgHeight/2)
+		canvas.DrawImage(c.backgroundImage, bgOpts)
+	}
 
 	// 使用缓存：如果帧没有变化，使用缓存的渲染数据
 	if c.currentFrame != c.lastRenderFrame {

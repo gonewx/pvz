@@ -25,6 +25,25 @@ global:
 
 # 动画单元配置列表
 animations:
+  # 僵尸获胜动画（带背景以观察半透明效果）
+  - id: "zombieswon"
+    name: "僵尸获胜"
+    reanim_file: "data/reanim/ZombiesWon.reanim"
+    default_animation: "anim_screen"
+    scale: 1.0
+    alignment: "top-left"
+    background_image: "assets/images/background1.jpg"  # 添加背景图片以观察半透明轨道效果
+
+    # 图片资源映射
+    images:
+      IMAGE_REANIM_ZOMBIESWON_SCREEN: "assets/reanim/ZombiesWonScreen.png"
+      IMAGE_REANIM_ZOMBIESWON: "assets/reanim/ZombiesWon.jpg"
+
+    # 可用的动画列表
+    available_animations:
+      - name: "anim_screen"
+        display_name: "全屏动画"
+
   # 豌豆射手
   - id: "peashooter"
     name: "豌豆射手"
