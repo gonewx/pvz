@@ -560,30 +560,43 @@ func (s *ReanimSystem) processAnimationCommands() {
 func (s *ReanimSystem) Update(deltaTime float64) {
 	s.processAnimationCommands()
 
+	// Story 8.8: 检查游戏是否冻结（僵尸获胜流程期间）
+	// 冻结时只更新触发僵尸的动画，其他实体的动画暂停
+	freezeEntities := ecs.GetEntitiesWith1[*components.GameFreezeComponent](s.entityManager)
+	isFrozen := len(freezeEntities) > 0
+	var triggerZombieID ecs.EntityID = 0
+
+	if isFrozen {
+		// 获取触发僵尸的ID
+		phaseEntities := ecs.GetEntitiesWith1[*components.ZombiesWonPhaseComponent](s.entityManager)
+		for _, phaseEntityID := range phaseEntities {
+			phaseComp, ok := ecs.GetComponent[*components.ZombiesWonPhaseComponent](s.entityManager, phaseEntityID)
+			if ok {
+				triggerZombieID = phaseComp.TriggerZombieID
+				break
+			}
+		}
+	}
+
 	entities := ecs.GetEntitiesWith1[*components.ReanimComponent](s.entityManager)
-
-	// Debug: 输出 SelectorScreen 的更新信息（前 5 次）
-	for _, id := range entities {
-		comp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id)
-		if exists && comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 5 {
-			log.Printf("[ReanimSystem] 🔍 Update: SelectorScreen entity %d, frame=%d, animations=%v",
-				id, comp.CurrentFrame, comp.CurrentAnimations)
-		}
-	}
-
-	// Debug: 检查是否有 sodroll 实体
-	for _, id := range entities {
-		comp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id)
-		if exists && comp.ReanimName == "sodroll" && comp.CurrentFrame >= 4 && comp.CurrentFrame <= 10 {
-			log.Printf("[ReanimSystem] 🟫 Update: sodroll entity %d, frame=%d, FPS=%.1f",
-				id, comp.CurrentFrame, comp.AnimationFPS)
-		}
-	}
 
 	for _, id := range entities {
 		comp, exists := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id)
 		if !exists {
 			continue
+		}
+
+		// Story 8.8: 游戏冻结时，只更新触发僵尸的动画，其他僵尸实体动画暂停
+		// 但是 UI 元素（如 ZombiesWon 动画）应该继续更新
+		if isFrozen && triggerZombieID != 0 && id != triggerZombieID {
+			// 检查是否是 UI 元素
+			_, isUI := ecs.GetComponent[*components.UIComponent](s.entityManager, id)
+
+			if !isUI {
+				// 非 UI 元素（僵尸、植物等）的动画暂停
+				continue
+			}
+			// UI 元素继续更新（不跳过）
 		}
 
 		// 跳过没有数据的组件
@@ -674,14 +687,7 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 			// frameIncrement = (FPS / targetTPS) * speedMultiplier
 			// 例如：FPS=12, TPS=60, speed=0.2 → increment = (12/60) * 0.2 = 0.04 帧/tick
 			frameIncrement := (animFPS / s.targetTPS) * animSpeed
-			oldFrameIndex := comp.AnimationFrameIndices[animName]
 			comp.AnimationFrameIndices[animName] += frameIncrement
-
-			// Debug: 豌豆射手的帧推进（前10帧）
-			if (comp.ReanimName == "peashooter" || comp.ReanimName == "peashootersingle") && int(oldFrameIndex) < 10 {
-				log.Printf("[ReanimSystem] 帧推进: anim=%s, %.2f -> %.2f (increment=%.4f, FPS=%.1f, speed=%.2f)",
-					animName, oldFrameIndex, comp.AnimationFrameIndices[animName], frameIncrement, animFPS, animSpeed)
-			}
 
 			if isLooping {
 				if animVisibles, exists := comp.AnimVisiblesMap[animName]; exists {
@@ -696,12 +702,22 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 						}
 					}
 				}
+			} else {
+				// 非循环动画：停留在最后一帧，不超出范围
+				if animVisibles, exists := comp.AnimVisiblesMap[animName]; exists {
+					visibleCount := countVisibleFrames(animVisibles)
+					if visibleCount > 0 && comp.AnimationFrameIndices[animName] >= float64(visibleCount) {
+						// 限制在最后一帧（visibleCount-1）
+						comp.AnimationFrameIndices[animName] = float64(visibleCount - 1)
+					}
+				}
 			}
 		}
 
 		// 同步更新 CurrentFrame（用于后备和非循环动画检测）
 		// 使用第一个**活跃的**（正在播放的）动画的帧索引
 		foundActiveAnim := false
+
 		for _, animName := range comp.CurrentAnimations {
 			// 跳过暂停的动画
 			if comp.AnimationPausedStates != nil {
@@ -739,14 +755,6 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 			// 使用这个活跃动画的帧索引更新 CurrentFrame
 			comp.CurrentFrame = int(comp.AnimationFrameIndices[animName])
 			foundActiveAnim = true
-			// Debug: 豌豆射手的帧更新（前10帧）
-			if (comp.ReanimName == "peashooter" || comp.ReanimName == "peashootersingle") && comp.CurrentFrame < 10 {
-				log.Printf("[ReanimSystem] CurrentFrame更新: anim=%s, frameIndex=%.2f, CurrentFrame=%d",
-					animName, comp.AnimationFrameIndices[animName], comp.CurrentFrame)
-			}
-			if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 5 {
-				log.Printf("[ReanimSystem] 使用动画 %s 更新 CurrentFrame = %d", animName, comp.CurrentFrame)
-			}
 			break
 		}
 
@@ -928,13 +936,8 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 
 		// 内层循环：遍历所有动画，找到最后一个有效的数据
 		for _, animName := range comp.CurrentAnimations {
-			// 检查动画是否暂停
-			if comp.AnimationPausedStates != nil {
-				if isPaused, exists := comp.AnimationPausedStates[animName]; exists && isPaused {
-					skippedPaused++
-					continue
-				}
-			}
+			// 注意：暂停的动画仍然需要渲染当前帧，只是不推进帧索引
+			// 所以这里不跳过暂停的动画（与 Update 函数不同）
 
 			// 获取该动画的当前逻辑帧（支持独立帧索引）
 			var logicalFrame float64
@@ -977,6 +980,10 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 			}
 
 			if physicalFrame < 0 || physicalFrame >= len(mergedFrames) {
+				if comp.ReanimName == "ZombiesWon" {
+					log.Printf("[ReanimSystem] 🧟 ZombiesWon: ❌ physicalFrame 越界 (physicalFrame=%d, mergedFrames=%d)",
+						physicalFrame, len(mergedFrames))
+				}
 				continue
 			}
 
@@ -1089,6 +1096,14 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 
 		// 如果该轨道有有效选中数据，添加到缓存
 		if hasValidSelection {
+			// 应用轨道偏移（用于抖动效果）
+			if comp.TrackOffsets != nil {
+				if offset, ok := comp.TrackOffsets[trackName]; ok {
+					selectedOffsetX += offset[0]
+					selectedOffsetY += offset[1]
+				}
+			}
+
 			comp.CachedRenderData = append(comp.CachedRenderData, components.RenderPartData{
 				Img:     selectedImg,
 				Frame:   selectedFrame,
@@ -1305,6 +1320,14 @@ func (s *ReanimSystem) getInterpolatedFrame(
 		result.SkewY = &interpolatedSkewY
 	} else if f1.SkewY != nil {
 		result.SkewY = f1.SkewY
+	}
+
+	// 插值透明度 (Alpha)
+	if f1.Alpha != nil && f2.Alpha != nil {
+		interpolatedAlpha := *f1.Alpha + (*f2.Alpha-*f1.Alpha)*t
+		result.Alpha = &interpolatedAlpha
+	} else if f1.Alpha != nil {
+		result.Alpha = f1.Alpha
 	}
 
 	// FrameNum 不插值（可见性标志），使用第一帧的

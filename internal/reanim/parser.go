@@ -150,7 +150,8 @@ func BuildMergedTracks(reanimXML *ReanimXML) map[string][]Frame {
 		accSY := 1.0
 		accKX := 0.0
 		accKY := 0.0
-		accF := 0 // 默认第一帧 f=0（与参考代码一致）
+		accAlpha := 1.0 // 默认 Alpha = 1.0
+		accF := 0       // 默认第一帧 f=0（与参考代码一致）
 		accImg := ""
 
 		// 为此轨道构建合并帧数组
@@ -180,6 +181,9 @@ func BuildMergedTracks(reanimXML *ReanimXML) map[string][]Frame {
 				if frame.SkewY != nil {
 					accKY = *frame.SkewY
 				}
+				if frame.Alpha != nil {
+					accAlpha = *frame.Alpha
+				}
 				if frame.FrameNum != nil {
 					accF = *frame.FrameNum
 				}
@@ -195,6 +199,7 @@ func BuildMergedTracks(reanimXML *ReanimXML) map[string][]Frame {
 			sy := accSY
 			kx := accKX
 			ky := accKY
+			a := accAlpha
 			f := accF
 
 			mergedFrame := Frame{
@@ -204,6 +209,7 @@ func BuildMergedTracks(reanimXML *ReanimXML) map[string][]Frame {
 				ScaleY:    &sy,
 				SkewX:     &kx,
 				SkewY:     &ky,
+				Alpha:     &a,
 				FrameNum:  &f, // 所有轨道的所有帧都设置 FrameNum
 				ImagePath: accImg,
 			}
@@ -267,7 +273,8 @@ func BuildMergedTracksWithOrder(reanimXML *ReanimXML) (map[string][]Frame, []str
 		accSY := 1.0
 		accKX := 0.0
 		accKY := 0.0
-		accF := 0 // 默认第一帧 f=0（与参考代码一致）
+		accAlpha := 1.0 // 默认 Alpha = 1.0
+		accF := 0       // 默认第一帧 f=0（与参考代码一致）
 		accImg := ""
 
 		// 为此轨道构建合并帧数组
@@ -297,6 +304,9 @@ func BuildMergedTracksWithOrder(reanimXML *ReanimXML) (map[string][]Frame, []str
 				if frame.SkewY != nil {
 					accKY = *frame.SkewY
 				}
+				if frame.Alpha != nil {
+					accAlpha = *frame.Alpha
+				}
 				if frame.FrameNum != nil {
 					accF = *frame.FrameNum
 				}
@@ -312,6 +322,7 @@ func BuildMergedTracksWithOrder(reanimXML *ReanimXML) (map[string][]Frame, []str
 			sy := accSY
 			kx := accKX
 			ky := accKY
+			a := accAlpha
 			f := accF
 
 			mergedFrame := Frame{
@@ -321,6 +332,7 @@ func BuildMergedTracksWithOrder(reanimXML *ReanimXML) (map[string][]Frame, []str
 				ScaleY:    &sy,
 				SkewX:     &kx,
 				SkewY:     &ky,
+				Alpha:     &a,
 				FrameNum:  &f, // 所有轨道的所有帧都设置 FrameNum
 				ImagePath: accImg,
 			}
