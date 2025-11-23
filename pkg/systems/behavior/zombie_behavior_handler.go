@@ -757,7 +757,7 @@ func (s *BehaviorSystem) updateTriggerZombieMovement(entityID ecs.EntityID, delt
 	position.Y += velocity.VY * deltaTime
 
 	// DEBUG: 记录僵尸移动
-	log.Printf("[BehaviorSystem] Trigger zombie %d moving: X=%.1f, VX=%.2f", entityID, position.X, velocity.VX)
+	log.Printf("[BehaviorSystem] Trigger zombie %d moving: X=%.1f, Y=%.1f, VX=%.2f, VY=%.2f", entityID, position.X, position.Y, velocity.VX, velocity.VY)
 
 	// 注意：不检测边界删除，由 ZombiesWonPhaseSystem 处理
 }

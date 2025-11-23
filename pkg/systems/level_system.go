@@ -801,32 +801,9 @@ func (s *LevelSystem) triggerZombiesWon() {
 func (s *LevelSystem) triggerZombiesWonFlow(triggerZombieID ecs.EntityID) {
 	log.Printf("[LevelSystem] Triggering zombies won flow (4-phase), zombie ID:%d", triggerZombieID)
 
-	// 创建流程控制实体
-	flowEntityID := s.entityManager.CreateEntity()
-
-	// 添加阶段控制组件
-	phaseComp := &components.ZombiesWonPhaseComponent{
-		CurrentPhase:         1,     // Phase 1: 游戏冻结
-		PhaseTimer:           0.0,
-		TriggerZombieID:      triggerZombieID,
-		CameraMovedToTarget:  false, // Phase 2: 摄像机是否已到达目标位置
-		InitialCameraX:       0.0,   // Phase 2: 初始摄像机X位置
-		ZombieStartedWalking: false, // Phase 2: 僵尸是否已开始行走
-		ZombieReachedTarget:  false, // Phase 2: 僵尸是否已到达目标位置
-		ScreamPlayed:         false,
-		ChompPlayed:          false,
-		AnimationReady:       false,
-		ScreenShakeTime:      0.0,
-		DialogShown:          false,
-		WaitTimer:            0.0,
-	}
-	ecs.AddComponent(s.entityManager, flowEntityID, phaseComp)
-
-	// 添加游戏冻结标记
-	freezeComp := &components.GameFreezeComponent{
-		IsFrozen: true,
-	}
-	ecs.AddComponent(s.entityManager, flowEntityID, freezeComp)
+	// 使用 ZombiesWonPhaseSystem 提供的标准接口启动流程
+	// 遵循 DRY 原则，复用业务逻辑
+	flowEntityID := StartZombiesWonFlow(s.entityManager, triggerZombieID)
 
 	log.Printf("[LevelSystem] Flow entity created (ID:%d), zombie ID:%d", flowEntityID, triggerZombieID)
 }

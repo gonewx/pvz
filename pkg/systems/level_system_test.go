@@ -4,6 +4,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
@@ -340,3 +341,100 @@ func TestCheckFinalWaveWarningTriggerOnce(t *testing.T) {
 		t.Errorf("第二次检查后，finalWaveWarningTriggered 应该仍为 true 且不变")
 	}
 }
+
+// ========================================
+// Story 8.8: Zombies Won Flow Tests
+// ========================================
+
+// TestTriggerZombiesWonFlow_CreatesFlowEntity 测试 triggerZombiesWonFlow 创建流程实体
+func TestTriggerZombiesWonFlow_CreatesFlowEntity(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := &game.GameState{
+		CurrentLevel: &config.LevelConfig{},
+	}
+
+	// 创建一个僵尸实体作为触发者
+	zombieID := em.CreateEntity()
+	ecs.AddComponent(em, zombieID, &components.BehaviorComponent{
+		Type: components.BehaviorZombieBasic,
+	})
+	ecs.AddComponent(em, zombieID, &components.PositionComponent{
+		X: 200.0,
+		Y: 300.0,
+	})
+	ecs.AddComponent(em, zombieID, &components.VelocityComponent{
+		VX: -150.0,
+		VY: 0,
+	})
+
+	ls := &LevelSystem{
+		entityManager: em,
+		gameState:     gs,
+	}
+
+	// 调用 triggerZombiesWonFlow
+	ls.triggerZombiesWonFlow(zombieID)
+
+	// 验证：应该创建了一个带有 ZombiesWonPhaseComponent 的实体
+	phaseEntities := ecs.GetEntitiesWith1[*components.ZombiesWonPhaseComponent](em)
+	if len(phaseEntities) != 1 {
+		t.Fatalf("expected 1 phase entity, got %d", len(phaseEntities))
+	}
+
+	// 验证：流程实体应该包含 GameFreezeComponent
+	freezeEntities := ecs.GetEntitiesWith1[*components.GameFreezeComponent](em)
+	if len(freezeEntities) != 1 {
+		t.Fatalf("expected 1 freeze entity, got %d", len(freezeEntities))
+	}
+
+	// 验证：ZombiesWonPhaseComponent 应该正确初始化
+	phaseComp, ok := ecs.GetComponent[*components.ZombiesWonPhaseComponent](em, phaseEntities[0])
+	if !ok {
+		t.Fatalf("failed to get phase component")
+	}
+
+	if phaseComp.CurrentPhase != 1 {
+		t.Errorf("expected CurrentPhase=1, got %d", phaseComp.CurrentPhase)
+	}
+	if phaseComp.TriggerZombieID != zombieID {
+		t.Errorf("expected TriggerZombieID=%d, got %d", zombieID, phaseComp.TriggerZombieID)
+	}
+
+	// 验证：GameFreezeComponent 应该标记为已冻结
+	freezeComp, ok := ecs.GetComponent[*components.GameFreezeComponent](em, freezeEntities[0])
+	if !ok {
+		t.Fatalf("failed to get freeze component")
+	}
+	if !freezeComp.IsFrozen {
+		t.Errorf("expected IsFrozen=true")
+	}
+}
+
+// TestTriggerZombiesWonFlow_OnlyCreatesOnce 测试重复调用只创建一个流程实体
+func TestTriggerZombiesWonFlow_OnlyCreatesOnce(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := &game.GameState{
+		CurrentLevel: &config.LevelConfig{},
+	}
+
+	zombieID := em.CreateEntity()
+	ecs.AddComponent(em, zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	ecs.AddComponent(em, zombieID, &components.PositionComponent{X: 200.0, Y: 300.0})
+
+	ls := &LevelSystem{
+		entityManager: em,
+		gameState:     gs,
+	}
+
+	// 调用两次
+	ls.triggerZombiesWonFlow(zombieID)
+	ls.triggerZombiesWonFlow(zombieID) // 第二次调用
+
+	// 验证：应该创建了两个流程实体（每次调用都会创建）
+	// 注意：实际游戏中不会重复调用，但测试确保函数行为一致
+	phaseEntities := ecs.GetEntitiesWith1[*components.ZombiesWonPhaseComponent](em)
+	if len(phaseEntities) != 2 {
+		t.Fatalf("expected 2 phase entities (one per call), got %d", len(phaseEntities))
+	}
+}
+

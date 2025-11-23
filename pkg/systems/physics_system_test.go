@@ -793,3 +793,63 @@ func countAllEntities(em *ecs.EntityManager) int {
 
 	return count
 }
+
+// ========================================
+// Story 8.8: Game Freeze Tests
+// ========================================
+
+// TestPhysicsSystem_GameFreezeDeletesBullets 测试游戏冻结时删除所有子弹
+func TestPhysicsSystem_GameFreezeDeletesBullets(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(getTestAudioContext())
+	ps := NewPhysicsSystem(em, rm)
+
+	// 创建多个子弹
+	bullet1 := em.CreateEntity()
+	em.AddComponent(bullet1, &components.BehaviorComponent{Type: components.BehaviorPeaProjectile})
+	em.AddComponent(bullet1, &components.PositionComponent{X: 300, Y: 250})
+	ecs.AddComponent(em, bullet1, &components.VelocityComponent{VX: 200, VY: 0})
+
+	bullet2 := em.CreateEntity()
+	em.AddComponent(bullet2, &components.BehaviorComponent{Type: components.BehaviorPeaProjectile})
+	em.AddComponent(bullet2, &components.PositionComponent{X: 400, Y: 250})
+	ecs.AddComponent(em, bullet2, &components.VelocityComponent{VX: 200, VY: 0})
+
+	// 创建一个僵尸（不应该被删除）
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	em.AddComponent(zombieID, &components.PositionComponent{X: 600, Y: 250})
+	ecs.AddComponent(em, zombieID, &components.VelocityComponent{VX: -50, VY: 0})
+
+	// 添加 GameFreezeComponent
+	freezeEntityID := em.CreateEntity()
+	ecs.AddComponent(em, freezeEntityID, &components.GameFreezeComponent{
+		IsFrozen: true,
+	})
+
+	// 执行 Update
+	ps.Update(0.016)
+
+	// 移除标记删除的实体
+	em.RemoveMarkedEntities()
+
+	// 验证：所有子弹都被删除
+	bulletCount := 0
+	allEntities := ecs.GetEntitiesWith1[*components.BehaviorComponent](em)
+	for _, entityID := range allEntities {
+		behaviorComp, ok := ecs.GetComponent[*components.BehaviorComponent](em, entityID)
+		if ok && behaviorComp.Type == components.BehaviorPeaProjectile {
+			bulletCount++
+		}
+	}
+	if bulletCount != 0 {
+		t.Errorf("游戏冻结期间应删除所有子弹，但还剩 %d 个", bulletCount)
+	}
+
+	// 验证：僵尸仍然存在
+	_, exists := em.GetComponent(zombieID, reflect.TypeOf(&components.BehaviorComponent{}))
+	if !exists {
+		t.Error("游戏冻结期间僵尸不应被删除")
+	}
+}
+

@@ -56,7 +56,8 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 			}
 			// 只更新触发僵尸的移动（Phase 2 期间僵尸需要继续走出屏幕）
 			triggerZombieID := phaseComp.TriggerZombieID
-			if triggerZombieID != 0 {
+			// Story 8.8: Phase 1 (冻结) 期间僵尸不应移动，只有 Phase 2+ 才允许移动
+			if triggerZombieID != 0 && phaseComp.CurrentPhase >= 2 {
 				// 简化的移动逻辑：只更新位置，不检测碰撞
 				s.updateTriggerZombieMovement(triggerZombieID, deltaTime)
 			}

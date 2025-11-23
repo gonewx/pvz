@@ -419,3 +419,121 @@ func countAllEntities(em *ecs.EntityManager) int {
 
 	return count
 }
+
+// ========================================
+// Story 8.8: Game Freeze Tests
+// ========================================
+
+// TestBehaviorSystem_GameFreezeStopsPlantAttacks 测试游戏冻结时植物停止攻击
+func TestBehaviorSystem_GameFreezeStopsPlantAttacks(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(getTestAudioContext())
+	gs := game.GetGameState()
+
+	bs := createTestBehaviorSystem(em, rm, gs)
+
+	// 创建一个豌豆射手
+	peashooterID := em.CreateEntity()
+	ecs.AddComponent(em, peashooterID, &components.BehaviorComponent{
+		Type: components.BehaviorPeashooter,
+	})
+	ecs.AddComponent(em, peashooterID, &components.PositionComponent{
+		X: 300.0,
+		Y: 300.0,
+	})
+	ecs.AddComponent(em, peashooterID, &components.PlantComponent{
+		GridCol: 2,
+		GridRow: 2,
+	})
+	ecs.AddComponent(em, peashooterID, &components.TimerComponent{
+		Name:        "attack",
+		TargetTime:  1.5,
+		CurrentTime: 1.5, // 已满，立即可以攻击
+		IsReady:     true,
+	})
+
+	// 创建一个僵尸（使豌豆射手有攻击目标）
+	zombieID := em.CreateEntity()
+	ecs.AddComponent(em, zombieID, &components.BehaviorComponent{
+		Type: components.BehaviorZombieBasic,
+	})
+	ecs.AddComponent(em, zombieID, &components.PositionComponent{
+		X: 500.0,
+		Y: 300.0, // 同一行
+	})
+	ecs.AddComponent(em, zombieID, &components.VelocityComponent{
+		VX: -50.0,
+	})
+
+	// 添加 GameFreezeComponent（模拟游戏冻结）
+	freezeEntityID := em.CreateEntity()
+	ecs.AddComponent(em, freezeEntityID, &components.GameFreezeComponent{
+		IsFrozen: true,
+	})
+	// 添加 ZombiesWonPhaseComponent（Phase 1 = 冻结阶段）
+	ecs.AddComponent(em, freezeEntityID, &components.ZombiesWonPhaseComponent{
+		CurrentPhase:    1, // Phase 1: 冻结
+		TriggerZombieID: zombieID,
+	})
+
+	// 记录更新前的子弹数量
+	initialBulletCount := len(ecs.GetEntitiesWith1[*components.BehaviorComponent](em))
+
+	// 执行 Update（游戏冻结状态下）
+	bs.Update(0.1)
+
+	// 验证：没有新的子弹产生（植物停止攻击）
+	currentBulletCount := len(ecs.GetEntitiesWith1[*components.BehaviorComponent](em))
+	if currentBulletCount != initialBulletCount {
+		t.Errorf("游戏冻结期间不应创建新子弹。初始: %d, 当前: %d", initialBulletCount, currentBulletCount)
+	}
+}
+
+// TestBehaviorSystem_TriggerZombieCanMoveInPhase2 测试触发僵尸在 Phase 2 可以移动
+func TestBehaviorSystem_TriggerZombieCanMoveInPhase2(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(getTestAudioContext())
+	gs := game.GetGameState()
+
+	bs := createTestBehaviorSystem(em, rm, gs)
+
+	// 创建触发僵尸
+	zombieID := em.CreateEntity()
+	ecs.AddComponent(em, zombieID, &components.BehaviorComponent{
+		Type: components.BehaviorZombieBasic,
+	})
+	ecs.AddComponent(em, zombieID, &components.PositionComponent{
+		X: 300.0,
+		Y: 300.0,
+	})
+	ecs.AddComponent(em, zombieID, &components.VelocityComponent{
+		VX: -150.0,
+		VY: 0,
+	})
+
+	// 添加 GameFreezeComponent 和 ZombiesWonPhaseComponent（Phase 2）
+	freezeEntityID := em.CreateEntity()
+	ecs.AddComponent(em, freezeEntityID, &components.GameFreezeComponent{
+		IsFrozen: true,
+	})
+	ecs.AddComponent(em, freezeEntityID, &components.ZombiesWonPhaseComponent{
+		CurrentPhase:    2, // Phase 2: 僵尸入侵
+		TriggerZombieID: zombieID,
+	})
+
+	initialX := 300.0
+
+	// 执行 Update
+	bs.Update(0.1)
+
+	// 验证：触发僵尸应该继续移动（位置变化）
+	posComp, ok := ecs.GetComponent[*components.PositionComponent](em, zombieID)
+	if !ok {
+		t.Fatalf("failed to get position component")
+	}
+
+	if posComp.X >= initialX {
+		t.Errorf("触发僵尸在 Phase 2 应该继续移动（向左）。初始X: %f, 当前X: %f", initialX, posComp.X)
+	}
+}
+
