@@ -8,18 +8,19 @@ import (
 
 func TestZombiesWonPhaseComponent_InitialState(t *testing.T) {
 	comp := &ZombiesWonPhaseComponent{
-		CurrentPhase:        1,
-		PhaseTimer:          0.0,
-		TriggerZombieID:     42,
-		ZombieExited:        false,
-		CameraMovedToTarget: false,
-		InitialCameraX:      0.0,
-		ScreamPlayed:        false,
-		ChompPlayed:         false,
-		AnimationReady:      false,
-		ScreenShakeTime:     0.0,
-		DialogShown:         false,
-		WaitTimer:           0.0,
+		CurrentPhase:         1,
+		PhaseTimer:           0.0,
+		TriggerZombieID:      42,
+		ZombieReachedTarget:  false,
+		CameraMovedToTarget:  false,
+		InitialCameraX:       0.0,
+		ZombieStartedWalking: false,
+		ScreamPlayed:         false,
+		ChompPlayed:          false,
+		AnimationReady:       false,
+		ScreenShakeTime:      0.0,
+		DialogShown:          false,
+		WaitTimer:            0.0,
 	}
 
 	if comp.CurrentPhase != 1 {
@@ -28,11 +29,14 @@ func TestZombiesWonPhaseComponent_InitialState(t *testing.T) {
 	if comp.TriggerZombieID != 42 {
 		t.Errorf("Expected TriggerZombieID=42, got=%d", comp.TriggerZombieID)
 	}
-	if comp.ZombieExited {
-		t.Error("Expected ZombieExited=false")
+	if comp.ZombieReachedTarget {
+		t.Error("Expected ZombieReachedTarget=false")
 	}
 	if comp.CameraMovedToTarget {
 		t.Error("Expected CameraMovedToTarget=false")
+	}
+	if comp.ZombieStartedWalking {
+		t.Error("Expected ZombieStartedWalking=false")
 	}
 	if comp.ScreamPlayed {
 		t.Error("Expected ScreamPlayed=false")
@@ -79,11 +83,12 @@ func TestZombiesWonPhaseComponent_Phase2Fields(t *testing.T) {
 	var zombieID ecs.EntityID = 100
 
 	comp := &ZombiesWonPhaseComponent{
-		CurrentPhase:        2,
-		TriggerZombieID:     zombieID,
-		ZombieExited:        false,
-		CameraMovedToTarget: false,
-		InitialCameraX:      400.0,
+		CurrentPhase:         2,
+		TriggerZombieID:      zombieID,
+		ZombieReachedTarget:  false,
+		CameraMovedToTarget:  false,
+		InitialCameraX:       400.0,
+		ZombieStartedWalking: false,
 	}
 
 	if comp.TriggerZombieID != zombieID {
@@ -94,21 +99,26 @@ func TestZombiesWonPhaseComponent_Phase2Fields(t *testing.T) {
 		t.Errorf("Expected InitialCameraX=400.0, got=%f", comp.InitialCameraX)
 	}
 
+	// 模拟僵尸开始行走
+	comp.ZombieStartedWalking = true
+	if !comp.ZombieStartedWalking {
+		t.Error("Expected ZombieStartedWalking=true after zombie starts walking")
+	}
+
 	// 模拟摄像机移动到目标位置
 	comp.CameraMovedToTarget = true
 	if !comp.CameraMovedToTarget {
 		t.Error("Expected CameraMovedToTarget=true after camera reaches target")
 	}
 
-	// 模拟僵尸走出屏幕
-	comp.ZombieExited = true
-
-	if !comp.ZombieExited {
-		t.Error("Expected ZombieExited=true after zombie exits")
+	// 模拟僵尸到达目标位置
+	comp.ZombieReachedTarget = true
+	if !comp.ZombieReachedTarget {
+		t.Error("Expected ZombieReachedTarget=true after zombie reaches target")
 	}
 
 	// 验证两个条件都满足时可以进入 Phase 3
-	if comp.CameraMovedToTarget && comp.ZombieExited {
+	if comp.CameraMovedToTarget && comp.ZombieReachedTarget {
 		// 这是进入 Phase 3 的条件
 		if comp.CurrentPhase != 2 {
 			t.Error("Expected to remain in Phase 2 until system transitions")

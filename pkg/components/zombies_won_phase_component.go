@@ -34,11 +34,12 @@ type ZombiesWonPhaseComponent struct {
 	PhaseTimer   float64 // 阶段计时器（秒）
 
 	// Phase 2 专用字段
-	TriggerZombieID     ecs.EntityID // 触发失败的僵尸ID
-	CameraMovedToTarget bool          // 摄像机是否已移动到目标位置（世界坐标 0）
-	InitialCameraX      float64       // 初始摄像机X位置（用于计算平滑移动）
+	TriggerZombieID      ecs.EntityID // 触发失败的僵尸ID
+	CameraMovedToTarget  bool         // 摄像机是否已移动到目标位置（世界坐标 0）
+	InitialCameraX       float64      // 初始摄像机X位置（用于计算平滑移动）
 	ZombieStartedWalking bool         // 僵尸是否已开始行走（摄像机到位后）
-	ZombieReachedTarget  bool         // 僵尸是否已到达目标位置（X <= 100, Y >= 300）
+	ZombieReachedTarget1 bool         // 僵尸是否已到达第1个目标位置（房门口）
+	ZombieReachedTarget  bool         // 僵尸是否已到达第2个目标位置（即将进入房子，触发 Phase 3）
 
 	// Phase 3 专用字段
 	ScreamPlayed    bool    // 是否已播放惨叫音效
