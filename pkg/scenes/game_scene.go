@@ -150,7 +150,8 @@ type GameScene struct {
 	zombiesWonPhaseSystem *systems.ZombiesWonPhaseSystem // 僵尸获胜四阶段流程系统
 
 	// Dialog Systems (对话框系统 - ECS ���构)
-	dialogInputSystem *systems.DialogInputSystem // 对话框输入系统（处理对话框交互）
+	dialogInputSystem  *systems.DialogInputSystem  // 对话框输入系统（处理对话框交互）
+	dialogRenderSystem *systems.DialogRenderSystem // 对话框渲染系统（渲染对话框和按钮）
 
 	// Cursor state tracking (光标状态追踪)
 	lastCursorShape ebiten.CursorShapeType // 上一帧的光标形状（避免不必要的API调用）
@@ -437,8 +438,25 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	log.Printf("[GameScene] Initialized button systems")
 
 	// 对话框系统初始化（ECS 架构）
+	// Story 8.8: Load dialog fonts for DialogRenderSystem
+	titleFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 24)
+	if err != nil {
+		log.Printf("Warning: Failed to load title font: %v", err)
+	}
+
+	messageFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 18)
+	if err != nil {
+		log.Printf("Warning: Failed to load message font: %v", err)
+	}
+
+	buttonFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 20)
+	if err != nil {
+		log.Printf("Warning: Failed to load button font: %v", err)
+	}
+
 	scene.dialogInputSystem = systems.NewDialogInputSystem(scene.entityManager)
-	log.Printf("[GameScene] Initialized dialog input system")
+	scene.dialogRenderSystem = systems.NewDialogRenderSystem(scene.entityManager, WindowWidth, WindowHeight, titleFont, messageFont, buttonFont)
+	log.Printf("[GameScene] Initialized dialog systems (input + render)")
 
 	// 创建菜单按钮实体
 	scene.initMenuButton(rm)
@@ -1376,6 +1394,14 @@ func (s *GameScene) Update(deltaTime float64) {
 		// Story 8.8: 触发僵尸需要继续移动（BehaviorSystem 会检测冻结状态）
 		s.behaviorSystem.Update(deltaTime)
 
+		// Story 8.8: 游戏结束时也需要更新对话框输入系统（处理按钮点击）
+		if s.dialogInputSystem != nil {
+			s.dialogInputSystem.Update(deltaTime)
+			s.entityManager.RemoveMarkedEntities()
+		}
+		// 更新鼠标光标（按钮悬停效果）
+		s.updateMouseCursor()
+
 		return // 停止其他游戏系统（僵尸移动、植物攻击等）
 	}
 
@@ -1563,6 +1589,16 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 
 	// DEBUG: Draw grid boundaries and SodRoll debug lines (Story 3.3 debugging)
 	s.drawGridDebug(screen)
+
+	// Story 8.8: Draw UI elements (ZombiesWon animation, dialogs, etc.)
+	// 渲染所有标记为 UIComponent 的实体（在暂停菜单之前）
+	s.renderSystem.DrawUIElements(screen)
+
+	// Story 8.8: Draw dialog boxes (game over dialog, etc.)
+	// 对话框在 UI 元素之后渲染，确保显示在最上层
+	if s.dialogRenderSystem != nil {
+		s.dialogRenderSystem.Draw(screen)
+	}
 
 	// Story 10.1: Draw pause menu (最顶层 - 在所有其他元素之上)
 	if s.pauseMenuModule != nil {
