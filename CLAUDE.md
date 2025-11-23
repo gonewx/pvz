@@ -9,793 +9,6 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 高层架构
-
-### ECS 架构模式
-
-本项目采用实体-组件-系统(Entity-Component-System)架构:
-
-- **实体(Entity)**: 游戏对象的唯一标识符(如植物、僵尸、子弹)
-- **组件(Component)**: 纯数据结构,描述实体的属性(如位置、生命值、精灵图)
-- **系统(System)**: 处理逻辑的函数,对拥有特定组件的实体进行操作
-
-**关键原则**:
-- 组件只包含数据,不包含方法
-- 系统之间通过 EntityManager 或 EventBus 通信,不直接调用
-- 数据与行为完全分离
-
-### 核心系统层级
-
-```
-main.go (游戏入口)
-    ↓
-SceneManager (场景管理器)
-    ↓
-├── MainMenuScene (主菜单场景)
-└── GameScene (游戏场景)
-        ↓
-    EntityManager (实体管理器)
-        ↓
-    ├── InputSystem (输入系统)
-    ├── BehaviorSystem (行为系统)
-    ├── PhysicsSystem (物理系统)
-    ├── ReanimSystem (Reanim动画系统 - Story 6.5)
-    ├── ParticleSystem (粒子系统 - Story 7.2)
-    ├── UISystem (UI系统)
-    └── RenderSystem (渲染系统)
-        ├── DrawGameWorld() - 植物、僵尸、子弹
-        ├── DrawParticles() - 粒子效果 (Story 7.3)
-        └── DrawSuns() - 阳光
-```
-
-### 目录结构规范
-
-```plaintext
-pvz/
-├── main.go                 # 游戏主入口
-├── assets/                 # 游戏资源
-│   ├── images/             # 图片资源(spritesheets)
-│   ├── audio/              # 音频资源
-│   └── fonts/              # 字体文件
-├── data/                   # 外部化游戏数据
-│   ├── levels/             # 关卡配置(YAML)
-│   └── units/              # 单位属性文件
-├── pkg/                    # 核心代码库
-│   ├── components/         # 所有组件定义
-│   ├── entities/           # 实体工厂函数
-│   ├── systems/            # 所有系统实现
-│   ├── scenes/             # 游戏场景
-│   ├── ecs/                # ECS框架核心
-│   ├── game/               # 游戏核心管理器
-│   ├── utils/              # 通用工具函数
-│   └── config/             # 配置加载与管理
-├── go.mod
-└── go.sum
-```
-
-## 泛型 ECS API 使用指南
-
-本项目的 ECS 框架已升级为基于 Go 泛型的类型安全 API（Epic 9 - Story 9.1/9.2/9.3）。
-
-### 泛型 API 优势
-
-- ✅ **编译时类型检查**：消除运行时 panic 风险，约 150+ 处潜在错误被编译器捕获
-- ✅ **无需类型断言**：代码更简洁，消除了 60+ 处手动类型断言
-- ✅ **性能提升**：减少反射开销，综合性能提升约 10%
-- ✅ **更好的 IDE 支持**：代码补全、类型推导、重构工具全面支持
-- ✅ **代码可读性**：代码行数减少 40-60%，更易维护
-
-### 基本用法
-
-#### 1. 获取组件（GetComponent）
-
-```go
-// ❌ 旧方式（反射 API，已废弃）
-comp, ok := em.GetComponent(entity, reflect.TypeOf(&components.PlantComponent{}))
-if ok {
-    plantComp := comp.(*components.PlantComponent) // 手动类型断言，可能 panic
-    plantComp.Health -= 10
-}
-
-// ✅ 新方式（泛型 API，推荐）
-plantComp, ok := ecs.GetComponent[*components.PlantComponent](em, entity)
-if ok {
-    plantComp.Health -= 10 // 无需类型断言，类型安全
-}
-```
-
-#### 2. 添加组件（AddComponent）
-
-```go
-// ❌ 旧方式
-em.AddComponent(entity, &components.PlantComponent{
-    PlantType: "Peashooter",
-    Health:    300,
-})
-
-// ✅ 新方式（类型自动推导）
-ecs.AddComponent(em, entity, &components.PlantComponent{
-    PlantType: "Peashooter",
-    Health:    300,
-})
-```
-
-#### 3. 检查组件存在性（HasComponent）
-
-```go
-// ❌ 旧方式
-if em.HasComponent(entity, reflect.TypeOf(&components.PlantComponent{})) {
-    // 处理植物逻辑
-}
-
-// ✅ 新方式
-if ecs.HasComponent[*components.PlantComponent](em, entity) {
-    // 处理植物逻辑
-}
-```
-
-#### 4. 查询实体（GetEntitiesWith）
-
-```go
-// ❌ 旧方式（冗长且运行时检查）
-entities := em.GetEntitiesWith(
-    reflect.TypeOf(&components.BehaviorComponent{}),
-    reflect.TypeOf(&components.PlantComponent{}),
-    reflect.TypeOf(&components.PositionComponent{}),
-)
-
-// ✅ 新方式（编译时类型检查）
-entities := ecs.GetEntitiesWith3[
-    *components.BehaviorComponent,
-    *components.PlantComponent,
-    *components.PositionComponent,
-](em)
-```
-
-**函数选择规则**：
-- 查询 1 个组件 → 使用 `GetEntitiesWith1[T1]`
-- 查询 2 个组件 → 使用 `GetEntitiesWith2[T1, T2]`
-- 查询 3 个组件 → 使用 `GetEntitiesWith3[T1, T2, T3]`
-- 查询 4 个组件 → 使用 `GetEntitiesWith4[T1, T2, T3, T4]`
-- 查询 5 个组件 → 使用 `GetEntitiesWith5[T1, T2, T3, T4, T5]`
-- 查询 5+ 组件 → 使用反射 API 或分步查询
-
-**特点**：
-- 无需手动使用 `reflect.TypeOf`
-- 代码更简洁
-- 与其他泛型 API 风格一致
-
-**解决方案 C** （推荐）：重新设计组件
-- 如果需要查询超过 5 个组件，可能说明组件设计过于碎片化
-- 考虑合并相关组件或使用组合组件
-
----
-
-## 核心组件说明
-
-### 必要组件(所有实体必备)
-- `PositionComponent`: 存储 X,Y 坐标
-- `SpriteComponent`: 存储要绘制的图像引用
-
-### 功能组件
-- `AnimationComponent`: 管理基于spritesheet的帧动画
-- `HealthComponent`: 生命值管理(CurrentHealth, MaxHealth)
-- `BehaviorComponent`: 定义实体行为类型(向日葵、豌豆射手等)
-- `TimerComponent`: 通用计时器(用于攻击冷却、生产周期等)
-- `UIComponent`: 标记UI元素及其状态
-- `VelocityComponent`: 移动速度(用于子弹、僵尸移动)
-- `CollisionComponent`: 碰撞检测的边界框
-- `ParticleComponent`: 粒子效果数据(位置、速度、颜色、生命周期等) - Story 7.2
-- `EmitterComponent`: 粒子发射器配置(生成规则、限制、力场等) - Story 7.2
-- `ReanimComponent`: Reanim 动画组件，支持复杂的多轨道动画系统 - Epic 13
-
-### 动画控制组件
-- `AnimationCommandComponent`: 动画播放命令(用于系统间通信，替代直接调用 ReanimSystem) - Epic 14
-  - UnitID: 单位 ID(如 "zombie")
-  - ComboName: 组合名称(如 "death")
-  - AnimationName: 单动画名称(可选)
-  - Processed: 是否已处理
-
-## 如何正确触发动画
-
-**核心原则**: 系统之间通过组件通信,不直接调用。动画触发遵循 **ECS 零耦合原则**。
-
-### ✅ 推荐方式: 使用 AnimationCommand 组件 (Epic 14)
-
-#### 场景 A: 播放配置化的动画组合
-
-```go
-// 示例：僵尸死亡动画
-ecs.AddComponent(s.entityManager, zombieID, &components.AnimationCommandComponent{
-    UnitID:    "zombie",        // 单位 ID（对应 data/reanim_config/zombie.yaml）
-    ComboName: "death",         // 组合名称（在配置文件中定义）
-    Processed: false,           // 标记为未处理
-})
-```
-
-**工作流程**:
-1. 业务系统（如 BehaviorSystem）添加 AnimationCommandComponent 组件
-2. ReanimSystem 在 Update() 开头读取未处理的命令
-3. ReanimSystem 根据配置播放动画,然后标记 Processed = true
-
-#### 场景 B: 播放单个动画
-
-```go
-// 示例：最终波次警告动画
-ecs.AddComponent(s.entityManager, warningID, &components.AnimationCommandComponent{
-    AnimationName: "FinalWave",  // 单动画名称
-    Processed:     false,
-})
-```
-
-**注意**: 单动画模式不需要 UnitID 和 ComboName。
-
-### ❌ 错误方式: 直接调用 ReanimSystem (已废弃)
-
-```go
-// ❌ 违反 ECS 零耦合原则
-s.reanimSystem.PlayCombo(entityID, "zombie", "death")
-
-// ❌ 需要在系统间传递 ReanimSystem 引用
-type BehaviorSystem struct {
-    reanimSystem *ReanimSystem  // 耦合!
-}
-```
-
-**为什么错误**:
-- 系统间直接调用导致紧耦合
-- 违反"数据-行为分离"原则
-- 难以测试和维护
-- 无法并行处理（依赖调用顺序）
-
-### 设计原则
-
-**零耦合**: System 之间通过 EntityManager（组件）通信，不直接调用
-
-**数据驱动**: 动画请求表达为组件数据，由 ReanimSystem 统一处理
-
-**职责分离**:
-- 逻辑系统（BehaviorSystem 等）: 决策"何时播放动画"
-- ReanimSystem: 执行"如何播放动画"
-
-### Epic 14 重构成果
-
-**改造前** (15 处违规):
-```
-BehaviorSystem  ──直接调用──> ReanimSystem.PlayCombo()
-WaveSpawnSystem ──直接调用──> ReanimSystem.PlayCombo()
-LevelSystem     ──直接调用──> ReanimSystem.PlayAnimation()
-...（共 9 个系统）
-```
-
-**改造后** (零违规):
-```
-BehaviorSystem  ──添加组件──> AnimationCommandComponent
-WaveSpawnSystem ──添加组件──> AnimationCommandComponent  ──ReanimSystem读取──> 执行动画
-LevelSystem     ──添加组件──> AnimationCommandComponent
-```
-
-**架构改进**:
-- ✅ 系统间耦合度降低 90%
-- ✅ 完全符合 ECS 架构原则
-- ✅ 代码更易测试和维护
-
-**详见**: `docs/prd/epic-14-ecs-decoupling-refactor.md`
-
-## Reanim 动画配置系统（Epic 13）
-
-本项目使用**配置驱动**的 Reanim 动画系统，所有动画配置统一在 YAML 文件中管理，无需修改代码即可调整动画组合。
-
-### 配置文件位置
-
-**配置目录**：`data/reanim_config/` (Story 13.9 - 多文件架构)
-
-这是一个分片配置目录，每个动画单元对应一个独立的 YAML 文件，便于定位、编辑和维护。
-
-**全局配置文件**：`data/reanim_config.yaml`（仅包含全局设置）
-
-**示例结构**：
-```
-data/
-├── reanim_config.yaml          # 全局配置
-└── reanim_config/              # 动画单元配置目录
-    ├── peashooter.yaml         # 豌豆射手配置
-    ├── sunflower.yaml          # 向日葵配置
-    ├── zombie.yaml             # 僵尸配置
-    ├── zombie_conehead.yaml    # 路障僵尸配置
-    └── ... (共 142 个文件)
-```
-
-### 配置文件格式
-
-**全局配置文件** (`data/reanim_config.yaml`):
-```yaml
-global:
-  playback:
-    tps: 60      # 游戏目标 TPS
-    fps: 12      # 默认动画 FPS
-```
-
-**单个动画单元配置** (`data/reanim_config/peashooter.yaml`):
-```yaml
-id: "peashooter"                    # 动画单元 ID
-name: "PeaShooter"                  # 显示名称
-reanim_file: "data/reanim/PeaShooterSingle.reanim"
-default_animation: "anim_idle"     # 默认动画
-
-images:                             # 图片映射
-  IMAGE_REANIM_PEASHOOTER_HEAD: "assets/reanim/PeaShooter_Head.png"
-  # ... 其他图片
-
-available_animations:               # 可用动画列表
-  - name: "anim_idle"
-    display_name: "待机"
-  - name: "anim_shooting"
-    display_name: "攻击"
-
-animation_combos:                   # 动画组合配置
-  - name: "attack"                  # 组合名称
-    display_name: "攻击+摇晃"
-    animations: ["anim_shooting", "anim_head_idle"]  # 多动画组合
-    parent_tracks:                  # 父子关系定义
-      anim_face: "anim_stem"       # 头部跟随茎干
-```
-
-### 渲染架构（Story 13.10 - 正向渲染逻辑）
-
-**核心设计理念**：动画是主体，轨道是数据源
-
-从 Story 13.10 开始，Reanim 系统采用**正向渲染逻辑**（动画→轨道），完全删除了轨道绑定机制（TrackAnimationBinding）。
-
-**旧逻辑（已废弃）**：
-```go
-// ❌ 反向逻辑：从轨道查找控制动画
-for _, trackName := range visualTracks {
-    controllingAnim := findControllingAnimation(trackName)  // 需要复杂的绑定分析
-    frame := getFrame(controllingAnim, trackName)
-    render(frame)
-}
-```
-
-**新逻辑（当前实现）**：
-```go
-// ✅ 正向逻辑：从动画遍历轨道
-for _, animName := range currentAnimations {
-    physicalFrame := getPhysicalFrame(animName)
-    if isAnimationVisible(animName, physicalFrame) {
-        for _, trackName := range visualTracks {
-            frame := tracks[trackName][physicalFrame]
-            if frame.ImagePath != "" {
-                render(frame)  // 后面的动画自然覆盖前面的
-            }
-        }
-    }
-}
-```
-
-**优势**：
-- ✅ **无需轨道绑定**：删除了 analyzeTrackBinding、findControllingAnimation 等复杂机制（净减少约 241 行代码）
-- ✅ **自然的图层覆盖**：后播放的动画自动覆盖前面的动画，符合 Reanim 格式的原始设计
-- ✅ **多阶段动画**：轨道可以在不同动画阶段显示不同内容（如草叶子：开场滑入，循环摇摆）
-- ✅ **代码更简洁**：渲染逻辑从 ~150 行减少到 ~80 行
-
-**示例：SelectorScreen 多动画渲染**
-```
-CurrentAnimations = ["anim_open", "anim_grass"]
-
-渲染结果：
-├─ 背景（SelectorScreen_BG）：来自 anim_open（anim_grass 未覆盖）
-└─ 叶子（leaf_SelectorScreen_Leaves）：来自 anim_grass（覆盖了 anim_open）
-```
-
-### 配置驱动的动画播放 API
-
-**推荐方式**：使用配置驱动的 API（Epic 13 - Story 13.6）
-
-```go
-// ✅ 推荐：使用 PlayCombo 播放配置的动画组合
-rs.PlayCombo(entityID, "peashooter", "attack")
-// 自动处理：
-// - 播放 anim_shooting + anim_head_idle
-// - 应用父子关系（头部跟随身体）
-// - 使用正向渲染逻辑（动画→轨道）
-
-// ✅ 推荐：使用 PlayDefaultAnimation 播放默认动画
-rs.PlayDefaultAnimation(entityID, "peashooter")
-// 自动播放 default_animation 配置的动画
-
-// ❌ 不推荐：硬编码动画名称（已废弃）
-rs.PlayAnimations(entityID, []string{"anim_shooting", "anim_head_idle"})
-```
-
-### 配置管理器
-
-游戏启动时会自动加载配置：
-
-```go
-// 配置目录在 main.go 中预加载 (Story 13.9)
-configManager, err := config.NewReanimConfigManager("data/reanim_config")
-if err != nil {
-    log.Fatalf("加载 Reanim 配置失败: %v", err)
-}
-
-// 配置管理器传递给 ReanimSystem
-reanimSystem.SetConfigManager(configManager)
-```
-
-### 添加新实体的动画配置
-
-1. 在 `data/reanim_config/` 目录中创建新的配置文件：
-   ```yaml
-   # data/reanim_config/new_plant.yaml
-   id: "new_plant"                  # 新实体 ID
-   name: "NewPlant"
-   reanim_file: "data/reanim/NewPlant.reanim"
-   default_animation: "anim_idle"
-   # ... 配置其他字段
-   ```
-
-2. 在代码中使用配置驱动的 API：
-   ```go
-   // 实体初始化时播放默认动画
-   rs.PlayDefaultAnimation(entityID, "new_plant")
-
-   // 需要时播放特定组合
-   rs.PlayCombo(entityID, "new_plant", "attack")
-   ```
-
-### 关键设计原则
-
-- ✅ **配置优于硬编码**：动画组合在配置文件中定义
-- ✅ **集中管理**：所有配置在单个文件中，便于维护
-- ✅ **自动绑定**：系统自动处理轨道绑定和父子关系
-- ✅ **热修改**：修改配置文件无需重新编译代码
-
-### 详细文档参考
-
-- **配置指南**：[docs/reanim/reanim-config-guide.md](docs/reanim/reanim-config-guide.md)
-- **Epic 13 PRD**：[docs/prd/epic-13-reanim-modernization.md](docs/prd/epic-13-reanim-modernization.md)
-
-
-## 坐标系统使用指南
-
-### 世界坐标 vs 屏幕坐标
-
-本项目使用**世界坐标系统**：
-- **世界坐标**：相对于背景图片左上角（固定）
-- **屏幕坐标**：相对于游戏窗口左上角（随摄像机移动）
-- **转换公式**：`worldX = screenX + cameraX`
-
-### 何时使用哪种坐标？
-
-| 场景 | 使用坐标类型 | 示例 |
-|------|------------|------|
-| 组件存储位置 | 世界坐标 | `PositionComponent.X/Y` |
-| 网格定义 | 世界坐标 | `config.GridWorldStartX` |
-| 鼠标输入 | 屏幕坐标 | `ebiten.CursorPosition()` |
-| 渲染绘制 | 屏幕坐标 | `screen.DrawImage()` |
-
-### Reanim 坐标系统和锚点 (Epic 13 重要经验)
-
-**关键发现：渲染系统把 Reanim 文件中的坐标当作图片左上角使用**
-
-#### 渲染公式
-
-```go
-// RenderSystem 的实际渲染位置计算
-baseScreenX = pos.X - cameraX - CenterOffsetX
-partX = frame.X  // 来自 Reanim 文件的 X 坐标
-finalScreenX = baseScreenX + partX
-
-// 转换为世界坐标
-worldX = finalScreenX + cameraX = pos.X - CenterOffsetX + partX
-```
-
-**关键点：**
-- `frame.X`（Reanim 文件中的 X）被当作**图片左上角**的相对坐标
-- 图片使用左上角锚点渲染（`x0 = tx, y0 = ty`）
-- 不需要手动转换中心到左上角
-
-**问题：**草皮叠加层应该铺到哪里？
-
-**关键设计决策：**
-- 草皮卷是一个圆柱体（SodRoll），滚动时逐渐展开草皮
-- 草皮应该铺到**草皮卷的中心位置**（圆柱体的中心线），而不是左边缘或右边缘
-- 物理上合理：草皮从卷的中心展开，铺设在地面上
-
-**错误理解：**
-```go
-// ❌ 错误：草皮铺到草皮卷的左边缘
-grassRightEdge := pos.X - CenterOffsetX + SodRoll.X
-// 结果：草皮铺设不足，未覆盖应该覆盖的区域
-```
-
-**正确实现：**
-```go
-// ✅ 正确：草皮铺到草皮卷的中心（sodding_system.go:calculateCurrentCenterX）
-sodRollCenterX := SodRoll.X + scaledHalfWidth  // 图片中心
-worldRightEdgeX := pos.X - CenterOffsetX + sodRollCenterX
-// GetSodRollCenterX() 返回此值，用于裁剪草皮叠加层的可见宽度
-```
-
----
-
-### 坐标转换工具库 (Epic 16 - Story 16.1)
-
-**工具库位置**: `pkg/utils/coordinates.go`
-
-为了消除坐标计算的重复代码、降低认知负担、减少错误，项目提供了统一的坐标转换工具库。
-
-#### 核心函数及其用途
-
-| 函数 | 用途 | 返回值 |
-|------|------|--------|
-| `GetRenderScreenOrigin` | **渲染系统**使用，计算屏幕坐标 | (screenX, screenY, error) |
-| `GetClickableCenter` | **点击检测**使用，计算点击中心（世界坐标） | (centerX, centerY, error) |
-| `GetRenderOrigin` | **草皮系统**等需要世界坐标的场景 | (originX, originY, error) |
-| `ReanimLocalToWorld` | 将 Reanim 局部坐标转换为世界坐标 | (worldX, worldY, error) |
-| `WorldToScreen` | 通用世界坐标到屏幕坐标转换 | (screenX, screenY) |
-
-#### 使用场景说明
-
-**何时使用哪个函数？**
-
-```go
-// 场景 1: 渲染系统 - 绘制 Reanim 动画
-// 使用 GetRenderScreenOrigin
-baseScreenX, baseScreenY, err := coordinates.GetRenderScreenOrigin(em, entityID, pos, cameraX)
-if err != nil {
-    return err
-}
-// 叠加部件相对坐标
-partX := frame.X + partData.OffsetX
-finalX := baseScreenX + partX
-
-// 场景 2: 点击检测 - 判断鼠标是否点击了实体
-// 使用 GetClickableCenter
-clickCenterX, clickCenterY, err := coordinates.GetClickableCenter(em, entityID, pos)
-if err != nil {
-    continue // 跳过没有动画组件的实体
-}
-halfWidth := clickable.Width / 2.0
-if mouseWorldX >= clickCenterX-halfWidth &&
-   mouseWorldX <= clickCenterX+halfWidth {
-    // 点击命中
-}
-
-// 场景 3: 草皮系统 - 计算草皮铺设范围（世界坐标）
-// 使用 ReanimLocalToWorld
-sodRollCenterX := frame.X + scaledHalfWidth  // Reanim 局部坐标
-worldCenterX, worldCenterY, err := coordinates.ReanimLocalToWorld(em, entityID, pos, sodRollCenterX, 0)
-if err != nil {
-    return err
-}
-
-// 场景 4: 通用坐标转换
-// 使用 WorldToScreen
-screenX, screenY := coordinates.WorldToScreen(worldX, worldY, cameraX, isUI)
-```
-
-#### 迁移指南（旧 API → 新 API）
-
-**Before (手工计算)** vs **After (工具库)**
-
-##### 示例 1: 渲染系统
-
-```go
-// ❌ Before: 手工计算（7-8 行）
-reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](em, entityID)
-if !ok {
-    return
-}
-_, isUI := ecs.GetComponent[*components.UIComponent](em, entityID)
-effectiveCameraX := cameraX
-if isUI {
-    effectiveCameraX = 0
-}
-baseScreenX := pos.X - effectiveCameraX - reanimComp.CenterOffsetX
-baseScreenY := pos.Y - reanimComp.CenterOffsetY
-
-// ✅ After: 使用工具库（3 行）
-baseScreenX, baseScreenY, err := coordinates.GetRenderScreenOrigin(em, entityID, pos, cameraX)
-if err != nil {
-    return err
-}
-```
-
-**代码简化**: 56-57% 行数减少
-
-##### 示例 2: 点击检测系统
-
-```go
-// ❌ Before: 手工计算
-reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](em, entityID)
-if !ok {
-    continue
-}
-clickCenterX := pos.X - reanimComp.CenterOffsetX
-clickCenterY := pos.Y - reanimComp.CenterOffsetY
-
-// ✅ After: 使用工具库
-clickCenterX, clickCenterY, err := coordinates.GetClickableCenter(em, entityID, pos)
-if err != nil {
-    continue
-}
-```
-
-##### 示例 3: 草皮系统
-
-```go
-// ❌ Before: 手工计算（重复多次）
-worldLeftEdge := posComp.X - reanimComp.CenterOffsetX + leftEdge
-worldCenterX := posComp.X - reanimComp.CenterOffsetX + centerX
-worldRightEdge := posComp.X - reanimComp.CenterOffsetX + rightEdge
-
-// ✅ After: 使用工具库
-worldLeftEdgeX, _, err := coordinates.ReanimLocalToWorld(em, entityID, pos, leftEdge, 0)
-worldCenterX, _, err := coordinates.ReanimLocalToWorld(em, entityID, pos, centerX, 0)
-worldRightEdgeX, _, err := coordinates.ReanimLocalToWorld(em, entityID, pos, rightEdge, 0)
-```
-
-#### 常见陷阱
-
-##### 陷阱 1: UI 元素的摄像机偏移处理
-
-**问题**: 忘记 UI 元素不受摄像机影响
-
-```go
-// ❌ 错误：UI 元素也应用了摄像机偏移
-screenX := pos.X - cameraX - reanimComp.CenterOffsetX  // 错误！
-
-// ✅ 正确：使用工具库自动处理
-screenX, screenY, err := coordinates.GetRenderScreenOrigin(em, entityID, pos, cameraX)
-// 工具库内部会检查 UIComponent，自动将 UI 的 effectiveCameraX 设为 0
-```
-
-##### 陷阱 2: 错误处理
-
-**问题**: 实体可能没有 ReanimComponent
-
-```go
-// ❌ 错误：未检查错误
-screenX, screenY, _ := coordinates.GetRenderScreenOrigin(em, entityID, pos, cameraX)
-// 如果实体没有 ReanimComponent，返回 (0, 0, ErrNoReanimComponent)
-
-// ✅ 正确：检查错误
-screenX, screenY, err := coordinates.GetRenderScreenOrigin(em, entityID, pos, cameraX)
-if err != nil {
-    if errors.Is(err, coordinates.ErrNoReanimComponent) {
-        // 处理无动画组件的情况
-        return
-    }
-    log.Printf("获取渲染坐标失败: %v", err)
-    return
-}
-```
-
-##### 陷阱 3: 世界坐标 vs 屏幕坐标的混淆
-
-**问题**: 误用坐标类型
-
-```go
-// ❌ 错误：点击检测应该使用世界坐标，而非屏幕坐标
-screenX, screenY, _ := coordinates.GetRenderScreenOrigin(em, entityID, pos, cameraX)
-if mouseWorldX >= screenX-halfWidth { // 错误！比较世界坐标与屏幕坐标
-    // ...
-}
-
-// ✅ 正确：点击检测使用世界坐标
-clickCenterX, clickCenterY, err := coordinates.GetClickableCenter(em, entityID, pos)
-if mouseWorldX >= clickCenterX-halfWidth { // 正确！都是世界坐标
-    // ...
-}
-```
-
-#### 性能保证
-
-**基准测试结果**（Intel i9-14900KF）：
-
-| 函数 | 性能 (ns/op) | 内存分配 |
-|------|-------------|----------|
-| GetRenderScreenOrigin | 20.07 | 0 allocs/op |
-| GetClickableCenter | 11.27 | 0 allocs/op |
-| GetRenderOrigin | 10.82 | 0 allocs/op |
-| ReanimLocalToWorld | 11.78 | 0 allocs/op |
-| WorldToScreen | 0.13 | 0 allocs/op |
-| 手工计算（对比） | 20.47 | 0 allocs/op |
-
-**结论**:
-- ✅ **零性能开销** - 工具函数 (20.07ns) 甚至比手工计算 (20.47ns) 稍快
-- ✅ **零内存分配** - 编译器成功内联
-- ✅ **100% 测试覆盖率** - 27 个表驱动测试用例
-
-#### 完整文档
-
-- **ADR-001**: `docs/architecture/adr/001-coordinate-transformation-library.md`
-- **源代码**: `pkg/utils/coordinates.go` (完整 GoDoc 注释)
-- **单元测试**: `pkg/utils/coordinates_test.go`
-
----
-
-## 多用户存档管理系统（Story 12.4）
-
-### 架构概述
-
-本项目支持多用户存档管理，允许多个玩家在同一台电脑上使用独立的游戏存档。
-
-### 存档文件结构
-
-```
-data/saves/
-├── users.yaml              # 用户列表元数据
-├── player1.yaml            # 用户1的存档
-├── player2.yaml            # 用户2的存档
-└── ...
-```
-
-**users.yaml 格式：**
-```yaml
-users:
-  - username: "player1"
-    createdAt: "2025-11-17T10:00:00Z"
-    lastLoginAt: "2025-11-17T12:00:00Z"
-  - username: "player2"
-    createdAt: "2025-11-16T15:00:00Z"
-    lastLoginAt: "2025-11-17T11:00:00Z"
-currentUser: "player1"  # 上次登录的用户
-```
-
-### SaveManager 多用户 API
-
-```go
-// 用户管理方法
-func (sm *SaveManager) LoadUserList() ([]UserMetadata, error)
-func (sm *SaveManager) GetCurrentUser() string
-func (sm *SaveManager) ValidateUsername(username string) error
-func (sm *SaveManager) CreateUser(username string) error
-func (sm *SaveManager) RenameUser(oldName, newName string) error
-func (sm *SaveManager) DeleteUser(username string) error
-func (sm *SaveManager) SwitchUser(username string) error
-```
-
-### 用户管理对话框
-
-所有对话框复用 `DialogComponent` 和 `loadDialogParts()` 基础设施：
-
-- **NewNewUserDialogEntity()** - 新建用户对话框（带文本输入框）
-- **NewRenameUserDialogEntity()** - 重命名用户对话框
-- **NewDeleteUserDialogEntity()** - 删除确认对话框
-- **NewUserManagementDialogEntity()** - 用户管理对话框（用户列表）
-
-### 首次启动流程
-
-1. MainMenuScene 检测 `SaveManager.LoadUserList()` 是否为空
-2. 如果为空，标记 `isFirstLaunch = true`
-3. Update() 中检测首次启动，弹出新建用户对话框
-4. 用户创建成功后，重新加载存档数据并更新界面
-
-### 关键设计原则
-
-- **复用原则**：所有对话框复用现有的九宫格 DialogComponent
-- **零耦合**：components 包不引用 game 包（使用 UserInfo 代替 UserMetadata）
-- **向后兼容**：旧测试需要适配新的多用户架构（先创建用户再保存）
-
----
-
-## 文档参考
-
-### 用户文档
-- **[README.md](README.md)** - 项目概览、功能特性
-- **[快速开始](docs/quickstart.md)** - 环境设置、构建运行
-- **[用户手册](docs/user-guide.md)** - 游戏操作、植物僵尸详解
-- **[开发指南](docs/development.md)** - 代码贡献、开发流程
-
-### 技术文档
-- **[PRD](docs/prd.md)** - 产品需求文档
-- **[Architecture](docs/architecture.md)** - 详细架构设计文档
-- **[Brief](docs/brief.md)** - 项目简介
-- **[Frontend Spec](docs/front-end-spec.md)** - 前端规范
-
 ---
 
 ## 用户手工维护区域
@@ -817,7 +30,6 @@ func (sm *SaveManager) SwitchUser(username string) error
 
 - 确认功能正常后，再提交git
 - 代码中尽量不要添加历史追溯性注释。代码注释应该解释"为什么"，而不是"什么时候修改的"
----
 
 - reanim 定义中豌豆射手的名称是 `peashootersingle` , 双发豌豆射手是 `peashooter`, 我们游戏定义中使用的是 `peashooter` 和 `repeater` , 注意区别。
 - 原版《植物大战僵尸》使用固定时间步长 **0.01秒（1厘秒）** 作为物理更新基准（相当于100FPS）。粒子配置文件中的某些值基于这个时间步长定义，而非真实的"每秒"单位。
@@ -830,3 +42,201 @@ func (sm *SaveManager) SwitchUser(username string) error
 - 将刚刚的经验记录起来
 - 单动画文件（如 Zombie_hand.reanim）创建 visiblesArray 时，应该填充全 0 数组 [0, 0, 0, ...]
   表示所有帧可见，而不是序列索引 [0, 1, 2, ...]，因为 mapLogicalToPhysical 函数通 animVisibles[i] == 0 判断帧是否可见
+
+---
+
+## 核心架构
+
+### ECS (Entity-Component-System) 架构
+
+本项目使用基于 Go 泛型的 ECS 架构模式。**重要原则**：
+- **组件 (Components)**: 仅存储数据，不包含任何方法
+- **系统 (Systems)**: 仅包含逻辑，通过查询组件处理实体
+- **系统隔离**: 系统之间严禁直接调用，必须通过 EntityManager 或 EventBus 通信
+
+### 泛型 API（推荐使用）
+
+**优先使用泛型 API**，已废弃反射 API：
+
+```go
+// ✅ 推荐：泛型 API（类型安全，无需断言）
+plantComp, ok := ecs.GetComponent[*components.PlantComponent](em, entity)
+if ok {
+    plantComp.Health -= 10
+}
+
+// 查询实体
+entities := ecs.GetEntitiesWith2[
+    *components.PlantComponent,
+    *components.PositionComponent,
+](em)
+
+// ❌ 不推荐：反射 API（已废弃）
+comp, ok := em.GetComponent(entity, reflect.TypeOf(&components.PlantComponent{}))
+```
+
+### Reanim 动画系统
+
+**Reanim** 是原版 PvZ 的骨骼动画系统，项目完整复刻：
+
+- **动画定义**: `data/reanim/` 目录下的 `.reanim` 文件（XML格式）
+- **动画配置**: `data/reanim_config.yaml` 定义动画组合和轨道绑定
+- **组件**: `ReanimComponent` 存储动画状态
+- **系统**: `ReanimSystem` 处理动画更新和渲染
+
+**动画组合**：多个动画可以组合播放（如身体+头部+手臂分别播放不同动画）
+**轨道绑定**：子动画自动绑定到父动画的特定轨道（track）
+
+### 粒子系统
+
+基于 XML 配置的粒子效果系统：
+- **配置文件**: `assets/effect/particles/` 下的 XML 文件（不可修改）
+- **组件**: `ParticleComponent` 存储粒子状态
+- **系统**: `ParticleSystem` 处理生成、更新和渲染
+- **批量渲染**: 使用 DrawTriangles 实现高性能批量渲染
+
+## 常用开发命令
+
+### 构建与运行
+
+```bash
+# 运行游戏（从项目根目录）
+go run .
+
+# 运行游戏并启用详细日志
+go run . --verbose
+
+# 构建可执行文件
+go build -o pvz-go .
+
+# 构建优化版本
+go build -ldflags="-s -w" -o pvz-go .
+```
+
+### 测试
+
+```bash
+# 运行所有测试（必须在项目根目录）
+go test ./...
+
+# 运行带覆盖率的测试
+go test -cover ./...
+
+# 运行特定包的测试
+go test ./pkg/systems
+
+# 运行特定测试函数
+go test ./pkg/systems -run TestBehaviorSystem
+
+# 生成覆盖率报告
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+```
+
+### 调试工具
+
+```bash
+# 验证粒子系统实现
+go run cmd/particles/main.go --verbose --effect="Planting" > /tmp/p.log 2>&1
+
+# 动画查看器
+go run cmd/animation_showcase/main.go --reanim=PeaShooter --verbose
+
+# 验证僵尸胜利动画
+go run cmd/verify_zombies_won/main.go
+
+# 其他验证工具
+go run cmd/verify_opening/main.go          # 开场动画
+go run cmd/verify_pause_menu/main.go       # 暂停菜单
+go run cmd/verify_reward_panel/main.go     # 奖励面板
+```
+
+## 项目结构
+
+```
+pvz3/
+├── main.go                      # 游戏入口
+├── pkg/                         # 核心代码库
+│   ├── ecs/                     # ECS 框架（泛型实现）
+│   ├── components/              # 组件定义（纯数据）
+│   ├── systems/                 # 系统实现（纯逻辑）
+│   ├── entities/                # 实体工厂函数
+│   ├── scenes/                  # 游戏场景
+│   ├── game/                    # 核心管理器
+│   ├── config/                  # 配置加载
+│   └── utils/                   # 工具函数
+├── assets/                      # 游戏资源（images/audio/fonts/effect）
+├── data/                        # 外部化数据（YAML配置）
+│   ├── levels/                  # 关卡配置
+│   ├── reanim/                  # Reanim 动画定义
+│   └── reanim_config.yaml       # 动画配置
+├── cmd/                         # 调试和验证工具
+└── docs/                        # 文档
+```
+
+## 编码规范
+
+### Go 代码风格
+
+- 使用 `gofmt` 格式化所有代码
+- 遵循 Go 命名约定：
+  - 包名: `snake_case`
+  - 结构体/接口: `PascalCase`
+  - 函数/方法: `PascalCase` (public), `camelCase` (private)
+  - 变量: `camelCase`
+  - 常量: `PascalCase`
+
+### ECS 特定规范
+
+- **组件**: 仅包含字段，不包含方法
+- **系统**: 不相互调用，通过 EntityManager 通信
+- **工厂函数**: 使用 `NewXxxEntity()` 创建实体
+- **错误处理**: 严禁忽略错误，使用 `fmt.Errorf` 或 `%w` 包装错误
+- **依赖注入**: 通过构造函数注入，避免全局变量
+
+### 测试要求
+
+- 核心逻辑包（systems, components）目标覆盖率 ≥ 80%
+- 关键系统（BehaviorSystem, PhysicsSystem）目标覆盖率 ≥ 90%
+- 测试文件与源文件同包，以 `_test.go` 结尾
+
+## 关卡配置
+
+关卡配置位于 `data/levels/` 目录，使用 YAML 格式：
+
+```yaml
+# data/levels/level-1-1.yaml
+id: "1-1"
+chapter: 1
+name: "第一关"
+flags: 1
+enabledLanes: [3]  # 仅中间一行草地
+availablePlants:
+  - peashooter
+  - sunflower
+zombieWaves:
+  - wave: 1
+    time: 10.0
+    zombies:
+      - type: normal
+        lane: 3
+```
+
+## 技术参考
+
+- **游戏引擎**: [Ebitengine v2](https://ebiten.org/)
+- **Go 版本**: 1.21+
+- **配置格式**: YAML (gopkg.in/yaml.v3)
+- **架构模式**: Entity-Component-System (ECS)
+- **动画系统**: Reanim（原版 PvZ 骨骼动画系统）
+- **粒子系统**: XML 配置驱动
+
+## 参考文档
+
+- [README.md](README.md) - 项目概览
+- [docs/architecture.md](docs/architecture.md) - 详细架构设计
+- [docs/development.md](docs/development.md) - 开发指南
+- [docs/prd.md](docs/prd.md) - 产品需求文档
+- [docs/quickstart.md](docs/quickstart.md) - 快速开始指南
+
+---
