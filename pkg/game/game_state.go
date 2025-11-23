@@ -206,9 +206,20 @@ func (gs *GameState) GetCurrentWave() int {
 			gs.CurrentWaveIndex, zombiesOnField, gs.IsWaitingForNextWave)
 	}
 
-	// 第一波：立即触发（游戏开始时）
+	// 第一波：检查 delay 参数
 	if gs.CurrentWaveIndex == 0 && !gs.SpawnedWaves[0] {
-		log.Printf("[GetCurrentWave] ✅ 第一波立即触发")
+		waveConfig := gs.CurrentLevel.Waves[0]
+		// 如果配置了 delay，等待指定时间后触发
+		if waveConfig.Delay > 0 {
+			if gs.LevelTime >= waveConfig.Delay {
+				log.Printf("[GetCurrentWave] ✅ 第一波触发 (delay=%.1fs, levelTime=%.1fs)", waveConfig.Delay, gs.LevelTime)
+				return 0
+			}
+			// 还未到延迟时间，继续等待
+			return -1
+		}
+		// 无 delay 配置，立即触发
+		log.Printf("[GetCurrentWave] ✅ 第一波立即触发 (无delay配置)")
 		return 0
 	}
 
