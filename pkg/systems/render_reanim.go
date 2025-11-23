@@ -289,16 +289,11 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		colorB := float32(1.0 + flashIntensity)
 		colorA := float32(1.0)
 
-		// Story 8.8: 应用透明度（Alpha）值
-		// ZombiesWon 动画的 fullscreen 和 fullscreen2 轨道使用 alpha 渐变创建淡入效果
+		// 应用透明度（Alpha）值
+		// Ebiten 默认使用 ColorScaleModeStraightAlpha，会自动将 RGB 乘以 Alpha
+		// 我们只需要设置 ColorA，不需要手动预乘 RGB
 		if frame.Alpha != nil {
 			colorA = float32(*frame.Alpha)
-
-			// Ebiten DrawTriangles 使用预乘 Alpha (Premultiplied Alpha)
-			// 必须将颜色分量乘以 Alpha 值，否则在非黑色纹理上会出现发光/加色混合效果
-			colorR *= colorA
-			colorG *= colorA
-			colorB *= colorA
 		}
 
 		vs := []ebiten.Vertex{
