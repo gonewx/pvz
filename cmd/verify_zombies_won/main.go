@@ -13,6 +13,7 @@ import (
 	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/systems"
+	"github.com/decker502/pvz/pkg/systems/behavior"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -36,13 +37,14 @@ var (
 // VerifyZombiesWonGame 僵尸获胜流程验证游戏
 // 包含四个阶段：游戏冻结、僵尸入侵、惨叫动画、游戏结束对话框
 type VerifyZombiesWonGame struct {
-	entityManager    *ecs.EntityManager
-	gameState        *game.GameState
-	resourceManager  *game.ResourceManager
-	reanimSystem     *systems.ReanimSystem
-	renderSystem     *systems.RenderSystem
-	zombiesWonSystem *systems.ZombiesWonPhaseSystem
-	dialogSystem     *systems.DialogRenderSystem  // 对话框渲染系统
+	entityManager     *ecs.EntityManager
+	gameState         *game.GameState
+	resourceManager   *game.ResourceManager
+	reanimSystem      *systems.ReanimSystem
+	renderSystem      *systems.RenderSystem
+	behaviorSystem    *behavior.BehaviorSystem // 行为系统（处理僵尸移动）
+	zombiesWonSystem  *systems.ZombiesWonPhaseSystem
+	dialogSystem      *systems.DialogRenderSystem // 对话框渲染系统
 	dialogInputSystem *systems.DialogInputSystem  // 对话框输入系统
 
 	debugFont *text.GoTextFace // 中文调试字体
@@ -104,6 +106,11 @@ func NewVerifyZombiesWonGame() (*VerifyZombiesWonGame, error) {
 	renderSystem := systems.NewRenderSystem(em)
 	renderSystem.SetReanimSystem(reanimSystem) // 设置 ReanimSystem 引用以支持 Reanim 动画渲染
 	renderSystem.SetResourceManager(rm)        // 设置 ResourceManager 引用以支持房门渲染 (Story 8.8 - Task 6)
+
+	// 创建行为系统（用于处理僵尸移动）
+	// 注意：验证程序不需要 LawnmowerSystem 和 LawnGridSystem，传入 nil 即可
+	// 因为在 Freeze 状态下，BehaviorSystem 只处理触发僵尸的移动，不会访问这些依赖
+	behaviorSystem := behavior.NewBehaviorSystem(em, rm, gs, nil, 0)
 
 	// 加载中文调试字体
 	debugFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 16)
@@ -170,6 +177,7 @@ func NewVerifyZombiesWonGame() (*VerifyZombiesWonGame, error) {
 		resourceManager:   rm,
 		reanimSystem:      reanimSystem,
 		renderSystem:      renderSystem,
+		behaviorSystem:    behaviorSystem,
 		dialogSystem:      dialogSystem,
 		dialogInputSystem: dialogInputSystem,
 		debugFont:         debugFont,
@@ -191,9 +199,9 @@ func NewVerifyZombiesWonGame() (*VerifyZombiesWonGame, error) {
 
 // setupTestScene 创建测试场景
 func (vg *VerifyZombiesWonGame) setupTestScene() {
-	// 创建测试用僵尸（位于 X=600 的位置，从屏幕右侧开始）
+	// 创建测试用僵尸（从屏幕右侧开始）
 	var err error
-	vg.zombieID, err = entities.NewZombieEntity(vg.entityManager, vg.resourceManager, 2, 600.0)
+	vg.zombieID, err = entities.NewZombieEntity(vg.entityManager, vg.resourceManager, 0, 300.0)
 	if err != nil {
 		log.Printf("Warning: Failed to create zombie entity: %v", err)
 		// 创建简化版僵尸
@@ -207,7 +215,7 @@ func (vg *VerifyZombiesWonGame) setupTestScene() {
 	// 设置僵尸向左移动（激活状态）
 	vel, ok := ecs.GetComponent[*components.VelocityComponent](vg.entityManager, vg.zombieID)
 	if ok {
-		vel.VX = -150.0 // 标准僵尸移动速度
+		vel.VX = -30.0 // 标准僵尸移动速度
 	}
 
 	// 播放行走动画
@@ -256,46 +264,6 @@ func (vg *VerifyZombiesWonGame) triggerFlow() {
 
 	log.Println("[VerifyZombiesWon] 🚀 触发僵尸获胜流程")
 
-	// 创建流程控制实体
-	vg.flowID = vg.entityManager.CreateEntity()
-
-	// 确定初始阶段（根据跳过参数）
-	initialPhase := 1
-	if *skipPhase1 && *skipPhase2 && *skipPhase3 {
-		initialPhase = 4 // 跳到最后
-		log.Println("[VerifyZombiesWon] ⏭️  跳过所有阶段，直接进入 Phase 4")
-	} else if *skipPhase1 && *skipPhase2 {
-		initialPhase = 3 // 从 Phase 3 开始
-		log.Println("[VerifyZombiesWon] ⏭️  跳过 Phase 1和2，从 Phase 3 开始")
-	} else if *skipPhase1 {
-		initialPhase = 2 // 从 Phase 2 开始
-		log.Println("[VerifyZombiesWon] ⏭️  跳过 Phase 1，从 Phase 2 开始")
-	}
-
-	// 添加阶段控制组件
-	phaseComp := &components.ZombiesWonPhaseComponent{
-		CurrentPhase:         initialPhase,
-		PhaseTimer:           0.0,
-		TriggerZombieID:      vg.zombieID,
-		CameraMovedToTarget:  false,
-		InitialCameraX:       vg.gameState.CameraX,
-		ZombieStartedWalking: false,
-		ZombieReachedTarget:  false,
-		ScreamPlayed:         false,
-		ChompPlayed:          false,
-		AnimationReady:       false,
-		ScreenShakeTime:      0.0,
-		DialogShown:          false,
-		WaitTimer:            0.0,
-	}
-	ecs.AddComponent(vg.entityManager, vg.flowID, phaseComp)
-
-	// 添加游戏冻结标记
-	freezeComp := &components.GameFreezeComponent{
-		IsFrozen: true,
-	}
-	ecs.AddComponent(vg.entityManager, vg.flowID, freezeComp)
-
 	// 创建 ZombiesWonPhaseSystem（如果尚未创建）
 	if vg.zombiesWonSystem == nil {
 		vg.zombiesWonSystem = systems.NewZombiesWonPhaseSystem(
@@ -311,8 +279,33 @@ func (vg *VerifyZombiesWonGame) triggerFlow() {
 		})
 	}
 
+	// 使用业务逻辑接口启动流程
+	vg.flowID = systems.StartZombiesWonFlow(vg.entityManager, vg.zombieID)
+
+	// 确定初始阶段（根据跳过参数）
+	initialPhase := 1
+	if *skipPhase1 && *skipPhase2 && *skipPhase3 {
+		initialPhase = 4
+		log.Println("[VerifyZombiesWon] ⏭️  跳过所有阶段，直接进入 Phase 4")
+	} else if *skipPhase1 && *skipPhase2 {
+		initialPhase = 3
+		log.Println("[VerifyZombiesWon] ⏭️  跳过 Phase 1和2，从 Phase 3 开始")
+	} else if *skipPhase1 {
+		initialPhase = 2
+		log.Println("[VerifyZombiesWon] ⏭️  跳过 Phase 1，从 Phase 2 开始")
+	}
+
+	// 如果需要跳过阶段，修改组件状态
+	if initialPhase > 1 {
+		if phaseComp, ok := ecs.GetComponent[*components.ZombiesWonPhaseComponent](vg.entityManager, vg.flowID); ok {
+			phaseComp.CurrentPhase = initialPhase
+			// 补充设置 InitialCameraX，防止直接跳转导致数据缺失
+			phaseComp.InitialCameraX = vg.gameState.CameraX
+		}
+	}
+
 	vg.triggered = true
-	log.Printf("[VerifyZombiesWon] 流程实体创建 (ID: %d)，初始阶段: Phase %d", vg.flowID, initialPhase)
+	log.Printf("[VerifyZombiesWon] 流程已启动，当前阶段: Phase %d", initialPhase)
 }
 
 // onRetryClicked "再次尝试"按钮点击回调
@@ -392,11 +385,11 @@ func (vg *VerifyZombiesWonGame) Update() error {
 		dt *= 3.0
 	}
 
-	// 【新增】自动检测僵尸到达失败边界 (X < 250)
+	// 【新增】自动检测僵尸到达失败边界
 	if !vg.triggered {
 		pos, ok := ecs.GetComponent[*components.PositionComponent](vg.entityManager, vg.zombieID)
-		if ok && pos.X < 250.0 {
-			log.Printf("[VerifyZombiesWon] ⚠️  僵尸到达失败边界 (X=%.2f < 250.0)，自动触发僵尸获胜流程", pos.X)
+		if ok && pos.X < systems.DefeatBoundaryX {
+			log.Printf("[VerifyZombiesWon] ⚠️  僵尸到达失败边界 (X=%.2f < %.2f)，自动触发僵尸获胜流程", pos.X, systems.DefeatBoundaryX)
 			vg.triggerFlow()
 		}
 	}
@@ -419,8 +412,10 @@ func (vg *VerifyZombiesWonGame) Update() error {
 	// 更新资源管理器（处理背景音乐淡出）
 	vg.resourceManager.UpdateBGMFade(dt)
 
-	// 更新僵尸位置（在 Phase 2 期间移动）
-	vg.updateZombieMovement(dt)
+	// 更新行为系统（处理僵尸移动）
+	// 替代原有的模拟逻辑 updateZombieMovement
+	// 在 Freeze 状态下，BehaviorSystem 会专门处理触发僵尸的移动
+	vg.behaviorSystem.Update(dt)
 
 	// 更新僵尸获胜流程系统
 	if vg.zombiesWonSystem != nil {
@@ -436,26 +431,6 @@ func (vg *VerifyZombiesWonGame) Update() error {
 	vg.updateCursorShape()
 
 	return nil
-}
-
-// updateZombieMovement 更新僵尸移动
-func (vg *VerifyZombiesWonGame) updateZombieMovement(dt float64) {
-	pos, ok := ecs.GetComponent[*components.PositionComponent](vg.entityManager, vg.zombieID)
-	if !ok {
-		return
-	}
-
-	vel, ok := ecs.GetComponent[*components.VelocityComponent](vg.entityManager, vg.zombieID)
-	if !ok {
-		return
-	}
-
-	// 只有在 Phase 2 期间僵尸才继续移动
-	phaseComp, ok := ecs.GetComponent[*components.ZombiesWonPhaseComponent](vg.entityManager, vg.flowID)
-	if ok && phaseComp.CurrentPhase == 2 {
-		pos.X += vel.VX * dt
-		pos.Y += vel.VY * dt
-	}
 }
 
 // updateCursorShape 更新光标形状（鼠标悬停在对话框按钮上时显示手形）
@@ -481,7 +456,6 @@ func (vg *VerifyZombiesWonGame) updateCursorShape() {
 	// 设置光标形状
 	ebiten.SetCursorShape(cursorShape)
 }
-
 
 // isPhase1Complete 检查 Phase 1 是否完成
 func (vg *VerifyZombiesWonGame) isPhase1Complete() bool {
