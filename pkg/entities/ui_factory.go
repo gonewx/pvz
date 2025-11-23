@@ -224,12 +224,8 @@ func createReanimComponent(rm *game.ResourceManager, unitName string) (*componen
 		// 动画数据
 		AnimVisiblesMap: animVisiblesMap,
 
-		// 循环与暂停状态
-		AnimationLoopStates:   make(map[string]bool),
-		AnimationPausedStates: make(map[string]bool),
-		AnimationFrameIndices: make(map[string]float64),
-		IsLooping:             true, // 单动画文件默认循环
-		IsPaused:              false,
+		// 循环与暂停状态 (由 ReanimSystem.PlayCombo() 初始化)
+		IsLooping: true, // 默认循环,会被 PlayCombo 覆盖
 
 		// 配置字段
 		ParentTracks: nil,
@@ -269,11 +265,9 @@ func NewZombiesWonEntity(
 	reanimComp.CenterOffsetX = 0
 	reanimComp.CenterOffsetY = 0
 
-	// 设置为不循环，并使用 AnimationLoopStates 控制
-	reanimComp.IsLooping = false
-	reanimComp.AnimationLoopStates = map[string]bool{
-		"_root": false, // _root 动画不循环
-	}
+	// ✅ 循环状态和速度由配置文件控制 (data/reanim_config/zombieswon.yaml)
+	// 调用者需要添加 AnimationCommandComponent 来播放动画:
+	//   UnitID: "zombieswon", ComboName: "appear"
 
 	// 创建实体
 	entityID := em.CreateEntity()

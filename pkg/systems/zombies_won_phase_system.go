@@ -9,14 +9,13 @@ import (
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
-	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
 // 僵尸获胜流程常量
 const (
 	// Phase 1: 游戏冻结阶段持续时间（秒）
-	Phase1FreezeDuration = 1.5
+	// Story 8.8: 游戏冻结1.5秒，期间所有物体静止
+	Phase1FreezeDuration = 1.0
 
 	// Phase 2: 摄像机移动目标位置（世界坐标）
 	Phase2CameraTargetX = 0.0
@@ -25,27 +24,68 @@ const (
 	// 假设从标准游戏位置（~400）移动到 0，约 2-3 秒完成
 	Phase2CameraMoveSpeed = 200.0
 
-	// Phase 2: 僵尸目标位置（房子门口）
-	Phase2ZombieTargetX = 100.0
-	Phase2ZombieTargetY = 350.0
+	// Phase 2: 第1个目标位置偏移量（房门口，相对于 config.GameOverDoorMaskX/Y）
+	// 实际目标位置 = GameOverDoorMaskX + OffsetX, GameOverDoorMaskY + OffsetY
+	Phase2ZombieTarget1OffsetX = 50.0  // 让僵尸站在门口偏右
+	Phase2ZombieTarget1OffsetY = 150.0 // 门口 Y 位置（手工调整）
+
+	// Phase 2: 第2个目标位置 X 偏移量（即将进入房子，相对于第1个目标位置的 X）
+	// 僵尸到达第1个目标后继续向左走，到达此位置时触发 Phase 3
+	Phase2ZombieTarget2OffsetX = -120.0 // 从第1个目标位置向左偏移
+
+	// Phase 2: 僵尸行走速度（满足 Story 8.8 视觉要求）
+	Phase2ZombieHorizontalSpeed = 50.0
+	Phase2ZombieVerticalSpeed   = 50.0
+
+	// Phase 2: 判定到达目标的容差（±像素）
+	Phase2ZombieReachThreshold = 5.0
 
 	// Phase 3: 咀嚼音效延迟时间（相对于惨叫音效）
 	Phase3ChompDelay = 0.5
 
-	// Phase 3: 惨叫动画总持续时间（秒）
-	Phase3AnimationDuration = 3.5
-
 	// Phase 3: 屏幕抖动参数
-	ScreenShakeAmplitude = 5.0  // 振幅（像素）
-	ScreenShakeFrequency = 50.0 // 频率（Hz）
-	ScreenShakeDuration  = 2.5  // 抖动持续时间（秒）
-
-	// Phase 4: 等待玩家点击的超时时间（秒）
-	Phase4WaitTimeout = 5.0
+	ScreenShakeAmplitude = 3.0   // 振幅（像素）
+	ScreenShakeFrequency = 500.0 // 频率（Hz）
+	ScreenShakeDuration  = 2.5   // 抖动持续时间（秒）
 
 	// 僵尸触发失败的边界X坐标（进入 Phase 1）
-	DefeatBoundaryX = 250.0
+	DefeatBoundaryX = 220.0
 )
+
+// StartZombiesWonFlow 启动僵尸获胜流程
+// 创建流程控制实体并添加必要的组件（状态机、冻结标记）
+// 返回流程实体 ID
+func StartZombiesWonFlow(em *ecs.EntityManager, triggerZombieID ecs.EntityID) ecs.EntityID {
+	// 创建流程控制实体
+	flowEntityID := em.CreateEntity()
+
+	// 添加阶段控制组件
+	phaseComp := &components.ZombiesWonPhaseComponent{
+		CurrentPhase:         1, // 默认为 Phase 1
+		PhaseTimer:           0.0,
+		TriggerZombieID:      triggerZombieID,
+		CameraMovedToTarget:  false,
+		InitialCameraX:       0.0, // 将在 System Update 中初始化
+		ZombieStartedWalking: false,
+		ZombieReachedTarget:  false,
+		ScreamPlayed:         false,
+		ChompPlayed:          false,
+		AnimationReady:       false,
+		ScreenShakeTime:      0.0,
+		DialogShown:          false,
+		WaitTimer:            0.0,
+	}
+	ecs.AddComponent(em, flowEntityID, phaseComp)
+
+	// 添加游戏冻结标记
+	freezeComp := &components.GameFreezeComponent{
+		IsFrozen: true,
+	}
+	ecs.AddComponent(em, flowEntityID, freezeComp)
+
+	log.Printf("[ZombiesWonPhaseSystem] Started flow (EntityID: %d, TriggerZombieID: %d)", flowEntityID, triggerZombieID)
+	return flowEntityID
+}
 
 // ZombiesWonPhaseSystem 僵尸获胜流程系统
 //
@@ -69,8 +109,8 @@ type ZombiesWonPhaseSystem struct {
 	windowHeight int
 
 	// 用于 Phase 4 的回调（由 GameScene 提供）
-	onRetryCallback     func() // "再次尝试"回调
-	onMainMenuCallback  func() // "返回主菜单"回调（可选，验证程序不需要）
+	onRetryCallback    func() // "再次尝试"回调
+	onMainMenuCallback func() // "返回主菜单"回调（可选，验证程序不需要）
 
 	// 保存原始摄像机位置（用于屏幕抖动后恢复）
 	originalCameraX float64
@@ -157,9 +197,11 @@ func (s *ZombiesWonPhaseSystem) updatePhase1Freeze(
 
 	// 淡出背景音乐（仅第一次执行）
 	if phaseComp.PhaseTimer == deltaTime { // 刚进入 Phase 1
-		// TODO: Task 7 - 实现背景音乐淡出
-		// s.resourceManager.FadeOutMusic(0.2)
-		log.Printf("[ZombiesWonPhaseSystem] Phase 1: Game frozen, music fade out (TODO)")
+		// AC 1: 背景音乐在 ~0.2 秒内淡出
+		if s.resourceManager != nil {
+			s.resourceManager.FadeOutMusic(0.2)
+			log.Printf("[ZombiesWonPhaseSystem] Phase 1: Music fade out started (0.2s)")
+		}
 	}
 
 	// 延迟 1.5 秒后进入 Phase 2
@@ -173,162 +215,142 @@ func (s *ZombiesWonPhaseSystem) updatePhase1Freeze(
 	}
 }
 
-// updatePhase2ZombieEntry Phase 2: 僵尸入侵动画（两步执行）
-// 第一步：摄像机移动到目标位置
-// 第二步：僵尸行走到目标位置
+// updatePhase2ZombieEntry Phase 2: 僵尸入侵动画（同时执行）
+// 摄像机和僵尸同时移动（并行执行）
+// 进入 Phase 3 条件：摄像机到位（CameraX ≤ 0）且 僵尸到达房门位置
 func (s *ZombiesWonPhaseSystem) updatePhase2ZombieEntry(
 	entityID ecs.EntityID,
 	phaseComp *components.ZombiesWonPhaseComponent,
 	deltaTime float64,
 ) {
-	// 第一次进入 Phase 2：保存初始摄像机位置，冻结僵尸移动
+	// 第一次进入 Phase 2：初始化状态
 	if phaseComp.PhaseTimer == deltaTime { // 刚进入 Phase 2
 		phaseComp.InitialCameraX = s.gameState.CameraX
-		log.Printf("[ZombiesWonPhaseSystem] Phase 2 started: Initial camera X=%.2f", phaseComp.InitialCameraX)
+		phaseComp.ZombieStartedWalking = true // 立即开始行走（与摄像机同时）
+		log.Printf("[ZombiesWonPhaseSystem] Phase 2 started: Initial camera X=%.2f, zombie starts walking simultaneously",
+			phaseComp.InitialCameraX)
 
-		// 冻结触发僵尸的移动（保存速度，然后设为 0）
-		if velComp, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, phaseComp.TriggerZombieID); ok {
-			// 注意：不需要保存速度，因为僵尸的标准移动速度是常量 -150.0
-			velComp.VX = 0
-			velComp.VY = 0
-			log.Printf("[ZombiesWonPhaseSystem] Phase 2: Frozen zombie movement (zombie ID=%d)", phaseComp.TriggerZombieID)
+		// Story 8.8: 懒加载房门图片（DelayLoad_Background1 资源组）
+		// 确保门板图片在渲染前已加载到缓存
+		// 注意：单元测试环境中 resourceManager 可能未初始化配置，需要容错处理
+		if s.resourceManager != nil {
+			if err := s.resourceManager.LoadResourceGroup("DelayLoad_Background1"); err != nil {
+				log.Printf("[ZombiesWonPhaseSystem] 警告：房门图片加载失败: %v", err)
+			} else {
+				log.Printf("[ZombiesWonPhaseSystem] Phase 2: 成功加载房门图片资源")
+			}
 		}
 	}
 
-	// 第一步：摄像机平滑移动到目标位置（世界坐标 0）
+	// ========================================
+	// Step 1: 摄像机平滑移动到目标位置（与僵尸同时）
+	// ========================================
 	if !phaseComp.CameraMovedToTarget {
 		currentCameraX := s.gameState.CameraX
 
-		log.Printf("[ZombiesWonPhaseSystem] Phase 2 Step 1: Camera X=%.2f, Target=%.2f",
-			currentCameraX, Phase2CameraTargetX)
-
-		// 计算移动方向（向左移动，即减小 CameraX）
 		if currentCameraX > Phase2CameraTargetX {
-			// 计算本帧移动距离
 			moveDistance := Phase2CameraMoveSpeed * deltaTime
-
-			// 计算新位置
 			newCameraX := currentCameraX - moveDistance
 
-			log.Printf("[ZombiesWonPhaseSystem] Phase 2: Moving camera from %.2f to %.2f (distance=%.2f)",
-				currentCameraX, newCameraX, moveDistance)
-
-			// 防止超调：如果移动后小于目标位置，则直接设为目标位置
+			// 防止超调
 			if newCameraX <= Phase2CameraTargetX {
 				newCameraX = Phase2CameraTargetX
 				phaseComp.CameraMovedToTarget = true
-				log.Printf("[ZombiesWonPhaseSystem] Camera reached target position X=%.2f", newCameraX)
+				log.Printf("[ZombiesWonPhaseSystem] Phase 2: Camera reached target X=%.2f", newCameraX)
 			}
 
-			// 更新摄像机位置
 			s.gameState.CameraX = newCameraX
 		} else {
-			// 已经在目标位置或更左侧
 			phaseComp.CameraMovedToTarget = true
-			log.Printf("[ZombiesWonPhaseSystem] Camera already at or past target")
-		}
-		return // 继续等待摄像机到位
-	}
-
-	// 第二步：摄像机到位后，僵尸开始行走到目标位置
-	if !phaseComp.ZombieStartedWalking {
-		phaseComp.ZombieStartedWalking = true
-		log.Printf("[ZombiesWonPhaseSystem] Phase 2 Step 2: Zombie starts walking to target position (%.2f, %.2f)",
-			Phase2ZombieTargetX, Phase2ZombieTargetY)
-
-		// 获取僵尸当前位置
-		posComp, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, phaseComp.TriggerZombieID)
-		if !ok {
-			return
-		}
-
-		// 恢复触发僵尸的移动速度（X 和 Y 同时移动）
-		if velComp, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, phaseComp.TriggerZombieID); ok {
-			velComp.VX = -150.0 // 僵尸标准移动速度（向左）
-
-			// 根据当前 Y 和目标 Y 决定 Y 方向速度
-			deltaY := Phase2ZombieTargetY - posComp.Y
-			if deltaY > 0 {
-				velComp.VY = 50.0 // 向下移动（加速到 50.0，原来是 5.0）
-				log.Printf("[ZombiesWonPhaseSystem] Phase 2: Zombie moving (VX=-150.0, VY=50.0 downward)")
-			} else if deltaY < 0 {
-				velComp.VY = -50.0 // 向上移动（加速到 -50.0）
-				log.Printf("[ZombiesWonPhaseSystem] Phase 2: Zombie moving (VX=-150.0, VY=-50.0 upward)")
-			} else {
-				velComp.VY = 0 // 已经在目标 Y
-				log.Printf("[ZombiesWonPhaseSystem] Phase 2: Zombie moving (VX=-150.0, VY=0)")
-			}
+			log.Printf("[ZombiesWonPhaseSystem] Phase 2: Camera already at target")
 		}
 	}
 
-	// 检查僵尸是否到达目标位置
+	// ========================================
+	// Step 2: 僵尸行走到房门目标位置（与摄像机同时）
+	// ========================================
 	posComp, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, phaseComp.TriggerZombieID)
 	if !ok {
-		// 僵尸实体已被删除（不应该发生）
 		log.Printf("[ZombiesWonPhaseSystem] Warning: Trigger zombie entity %d not found", phaseComp.TriggerZombieID)
-		// 强制进入 Phase 3
 		phaseComp.CurrentPhase = 3
 		phaseComp.PhaseTimer = 0.0
 		phaseComp.ZombieReachedTarget = true
 		return
 	}
 
-	log.Printf("[ZombiesWonPhaseSystem] Phase 2: Zombie position (%.2f, %.2f), Target (%.2f, %.2f)",
-		posComp.X, posComp.Y, Phase2ZombieTargetX, Phase2ZombieTargetY)
+	// 获取第1个目标位置（房门口，基于 gameover_door_config.go + 偏移常量）
+	target1X := config.GameOverDoorMaskX + Phase2ZombieTarget1OffsetX
+	target1Y := config.GameOverDoorMaskY + Phase2ZombieTarget1OffsetY
 
-	// 判断是否到达目标位置（使用容差）
-	const xTolerance = 5.0
-	const yTolerance = 5.0
+	// 获取第2个目标位置（即将进入房子，相对于第1个目标位置的 X 偏移）
+	target2X := target1X + Phase2ZombieTarget2OffsetX
 
-	// 检查每个方向是否到达，并停止已到达方向的移动
-	velComp, hasVel := ecs.GetComponent[*components.VelocityComponent](s.entityManager, phaseComp.TriggerZombieID)
+	// 计算当前位置与第1个目标的距离
+	currentX := posComp.X
+	currentY := posComp.Y
+	dx := target1X - currentX
+	dy := target1Y - currentY
+	distance := math.Sqrt(dx*dx + dy*dy)
 
-	xReached := posComp.X <= Phase2ZombieTargetX+xTolerance && posComp.X >= Phase2ZombieTargetX-xTolerance
-	yReached := posComp.Y <= Phase2ZombieTargetY+yTolerance && posComp.Y >= Phase2ZombieTargetY-yTolerance
-
-	// X 方向到达，停止 X 移动
-	if xReached && hasVel && velComp.VX != 0 {
-		velComp.VX = 0
-		log.Printf("[ZombiesWonPhaseSystem] Phase 2: X reached target (%.2f), stopped X movement", posComp.X)
+	// DEBUG: 每秒输出一次僵尸位置和目标位置（避免日志过多）
+	if int(phaseComp.PhaseTimer*10)%10 == 0 {
+		log.Printf("[ZombiesWonPhaseSystem] DEBUG Phase 2: Zombie pos=(%.2f, %.2f), target1=(%.2f, %.2f), target2X=%.2f, distance=%.2f, reached1=%v, reached2=%v, cameraReached=%v",
+			currentX, currentY, target1X, target1Y, target2X, distance, phaseComp.ZombieReachedTarget1, phaseComp.ZombieReachedTarget, phaseComp.CameraMovedToTarget)
 	}
 
-	// Y 方向到达，停止 Y 移动
-	if yReached && hasVel && velComp.VY != 0 {
-		velComp.VY = 0
-		log.Printf("[ZombiesWonPhaseSystem] Phase 2: Y reached target (%.2f), stopped Y movement", posComp.Y)
-	}
-
-	// 两个方向都到达目标，进入 Phase 3
-	if xReached && yReached {
-		if !phaseComp.ZombieReachedTarget {
-			log.Printf("[ZombiesWonPhaseSystem] Phase 2: Zombie reached target position (%.2f, %.2f)",
-				posComp.X, posComp.Y)
-
-			// 冻结僵尸移动
-			if velComp, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, phaseComp.TriggerZombieID); ok {
-				velComp.VX = 0
+	// 僵尸移动逻辑
+	if phaseComp.ZombieStartedWalking && !phaseComp.ZombieReachedTarget {
+		if velComp, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, phaseComp.TriggerZombieID); ok {
+			// 阶段1：僵尸还未到达第1个目标位置（房门口）
+			if !phaseComp.ZombieReachedTarget1 {
+				// 判断是否到达第1个目标位置（距离小于阈值）
+				if distance <= Phase2ZombieReachThreshold {
+					// 僵尸到达第1个目标位置
+					// 注意：不强制 snap Y 坐标，因为僵尸可能从不同行走来
+					// 只 snap X 坐标，保持当前 Y 位置（避免突然跳变）
+					posComp.X = target1X
+					// 切换为只向左移动（进入房门）
+					velComp.VX = -Phase2ZombieHorizontalSpeed
+					velComp.VY = 0
+					phaseComp.ZombieReachedTarget1 = true
+					log.Printf("[ZombiesWonPhaseSystem] Phase 2: Zombie reached target 1 (door position X=%.2f), keeping Y=%.2f, now walking into door", posComp.X, posComp.Y)
+				} else {
+					// 计算单位方向向量，沿直线走向第1个目标
+					dirX := dx / distance
+					dirY := dy / distance
+					// 按固定速度移动
+					velComp.VX = dirX * Phase2ZombieHorizontalSpeed
+					velComp.VY = dirY * Phase2ZombieHorizontalSpeed // 使用相同速度保持匀速
+				}
+			} else {
+				// 阶段2：僵尸已到达第1个目标，继续向左走到第2个目标位置
+				// 判断是否到达第2个目标位置
+				if currentX <= target2X {
+					phaseComp.ZombieReachedTarget = true
+					log.Printf("[ZombiesWonPhaseSystem] Phase 2: Zombie reached target 2 (entering house) X=%.2f (target2X=%.2f)", currentX, target2X)
+				}
+				// 继续向左移动
+				velComp.VX = -Phase2ZombieHorizontalSpeed
 				velComp.VY = 0
-				log.Printf("[ZombiesWonPhaseSystem] Phase 2: Frozen zombie movement")
-			}
-
-			// 冻结僵尸动画（暂停 Reanim 动画）
-			if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, phaseComp.TriggerZombieID); ok {
-				if reanimComp.AnimationPausedStates == nil {
-					reanimComp.AnimationPausedStates = make(map[string]bool)
-				}
-				// 暂停所有当前播放的动画
-				for _, animName := range reanimComp.CurrentAnimations {
-					reanimComp.AnimationPausedStates[animName] = true
-				}
-				log.Printf("[ZombiesWonPhaseSystem] Phase 2: Frozen zombie animation (paused %d animations)", len(reanimComp.CurrentAnimations))
 			}
 		}
-		phaseComp.ZombieReachedTarget = true
+	}
 
-		// 僵尸到达目标位置，进入 Phase 3
-		log.Printf("[ZombiesWonPhaseSystem] Phase 2 complete, Phase 2 -> Phase 3")
+	// ========================================
+	// 进入 Phase 3 条件：摄像机到位 且 僵尸到达第2个目标位置
+	// ========================================
+	if phaseComp.CameraMovedToTarget && phaseComp.ZombieReachedTarget {
+		log.Printf("[ZombiesWonPhaseSystem] Phase 2 complete -> Phase 3 (camera at target AND zombie at target 2)")
 		phaseComp.CurrentPhase = 3
 		phaseComp.PhaseTimer = 0.0
+
+		// Story 8.8 AC: 僵尸到达第2个目标位置后继续在 X 轴前进（VY=0），模拟走进房门效果
+		// 不冻结僵尸移动，让它继续向左走进门
+		if velComp, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, phaseComp.TriggerZombieID); ok {
+			velComp.VX = -Phase2ZombieHorizontalSpeed // 继续向左
+			velComp.VY = 0
+		}
+		// 不冻结动画，让僵尸继续播放行走动画
 	}
 }
 
@@ -338,6 +360,21 @@ func (s *ZombiesWonPhaseSystem) updatePhase3ScreamAnimation(
 	phaseComp *components.ZombiesWonPhaseComponent,
 	deltaTime float64,
 ) {
+	// Story 8.8 AC Phase 2: 僵尸到达房门口后继续在 X 轴前进，模拟走进房门效果
+	// Phase 3 开始时僵尸继续向左移动（已在 Phase 2 结束时设置 VX=-150）
+	// 当僵尸完全走出画面（X < -100）后停止移动
+
+	// 检查僵尸是否完全走出画面
+	if posComp, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, phaseComp.TriggerZombieID); ok {
+		if posComp.X < -100 {
+			// 僵尸已走出画面，冻结移动
+			if velComp, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, phaseComp.TriggerZombieID); ok {
+				velComp.VX = 0
+				velComp.VY = 0
+			}
+		}
+	}
+
 	// 播放惨叫音效（只播放一次）
 	if !phaseComp.ScreamPlayed {
 		s.playScreamSound()
@@ -372,15 +409,19 @@ func (s *ZombiesWonPhaseSystem) updatePhase3ScreamAnimation(
 		}
 	}
 
-	// 延迟 3-4 秒后进入 Phase 4
-	if phaseComp.PhaseTimer >= Phase3AnimationDuration {
-		log.Printf("[ZombiesWonPhaseSystem] Phase 3 -> Phase 4 (dialog)")
-		phaseComp.CurrentPhase = 4
-		phaseComp.PhaseTimer = 0.0
+	// 检查动画是否播放完成
+	// 动画播放完成后停留在最后一帧（保持遮罩效果），然后进入 Phase 4
+	if phaseComp.AnimationReady && s.zombiesWonEntityID != 0 {
+		reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, s.zombiesWonEntityID)
+		if ok && reanimComp.IsFinished {
+			log.Printf("[ZombiesWonPhaseSystem] Phase 3 -> Phase 4 (animation finished, staying on last frame)")
+			phaseComp.CurrentPhase = 4
+			phaseComp.PhaseTimer = 0.0
 
-		// Story 8.8: 摄像机应该停留在目标位置（世界坐标 0），不要恢复到原始位置
-		// 原版 PVZ 在失败流程中摄像机会停留在显示房子的位置
-		s.gameState.CameraX = Phase2CameraTargetX // 停留在 0
+			// Story 8.8: 摄像机应该停留在目标位置（世界坐标 0），不要恢复到原始位置
+			// 原版 PVZ 在失败流程中摄像机会停留在显示房子的位置
+			s.gameState.CameraX = Phase2CameraTargetX // 停留在 0
+		}
 	}
 }
 
@@ -390,14 +431,15 @@ func (s *ZombiesWonPhaseSystem) updatePhase4Dialog(
 	phaseComp *components.ZombiesWonPhaseComponent,
 	deltaTime float64,
 ) {
-	// 检测鼠标点击或超时
-	clicked := inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft)
-	timeout := phaseComp.WaitTimer >= Phase4WaitTimeout
+	// 确保僵尸已停止移动（此时僵尸应该已经走出画面 X < -100）
+	if velComp, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, phaseComp.TriggerZombieID); ok {
+		velComp.VX = 0
+		velComp.VY = 0
+	}
 
-	phaseComp.WaitTimer += deltaTime
-
-	if (clicked || timeout) && !phaseComp.DialogShown {
-		log.Printf("[ZombiesWonPhaseSystem] Phase 4: Showing game over dialog (clicked=%v, timeout=%v)", clicked, timeout)
+	// 动画播放完成后立即显示对话框
+	if !phaseComp.DialogShown {
+		log.Printf("[ZombiesWonPhaseSystem] Phase 4: Showing game over dialog immediately")
 
 		// 直接创建游戏结束对话框（只有"再次尝试"按钮）
 		_, err := entities.NewGameOverDialogEntity(
@@ -405,8 +447,8 @@ func (s *ZombiesWonPhaseSystem) updatePhase4Dialog(
 			s.resourceManager,
 			s.windowWidth,
 			s.windowHeight,
-			s.onRetryCallback,    // "再次尝试"回调
-			nil,                   // 不需要"返回主菜单"按钮
+			s.onRetryCallback, // "再次尝试"回调
+			nil,               // 不需要"返回主菜单"按钮
 		)
 		if err != nil {
 			log.Printf("[ZombiesWonPhaseSystem] Error creating game over dialog: %v", err)
@@ -416,9 +458,10 @@ func (s *ZombiesWonPhaseSystem) updatePhase4Dialog(
 
 		phaseComp.DialogShown = true
 
-		// 删除流程控制实体（流程结束）
-		s.entityManager.DestroyEntity(entityID)
-		log.Printf("[ZombiesWonPhaseSystem] Flow completed, entity destroyed")
+		// Story 8.8: 保持流程实体存在，以维持游戏冻结状态（GameFreezeComponent）
+		// 直到玩家点击按钮重置场景
+		// s.entityManager.DestroyEntity(entityID)
+		log.Printf("[ZombiesWonPhaseSystem] Phase 4: Dialog shown, keeping game frozen")
 	}
 }
 
@@ -467,13 +510,13 @@ func (s *ZombiesWonPhaseSystem) createZombiesWonAnimation() {
 	// 保存实体 ID 用于抖动效果
 	s.zombiesWonEntityID = zombiesWonEntity
 
-	// Story 8.8: ZombiesWon.reanim 是单动画文件（无命名动画）
-	// 不需要通过 AnimationCommandComponent 播放动画
-	// NewZombiesWonEntity 会自动设置 CurrentAnimations = ["_root"]
-	// 注意：绝对不要播放 "anim_screen"（那是控制轨道），会导致：
-	//   - anim_screen 只有 frame 24 可见
-	//   - 而 ZombiesWon 轨道在 frame 24 是隐藏的（f=-1）
-	//   - 结果：文字图片永远不显示
+	// ✅ 使用配置文件播放动画 (data/reanim_config/zombieswon.yaml)
+	// combo "appear" 配置: loop=false, speed=1.0
+	ecs.AddComponent(s.entityManager, zombiesWonEntity, &components.AnimationCommandComponent{
+		UnitID:    "zombieswon",
+		ComboName: "appear",
+		Processed: false,
+	})
 
 	log.Printf("[ZombiesWonPhaseSystem] ZombiesWon animation entity created (ID: %d) at (%.2f, %.2f)", zombiesWonEntity, centerX, centerY)
 }

@@ -565,18 +565,21 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 	s.processAnimationCommands()
 
 	// Story 8.8: 检查游戏是否冻结（僵尸获胜流程期间）
-	// 冻结时只更新触发僵尸的动画，其他实体的动画暂停
+	// Phase 1: 所有实体动画暂停（包括触发僵尸）
+	// Phase 2+: 只有触发僵尸的动画继续，其他实体暂停
 	freezeEntities := ecs.GetEntitiesWith1[*components.GameFreezeComponent](s.entityManager)
 	isFrozen := len(freezeEntities) > 0
 	var triggerZombieID ecs.EntityID = 0
+	var currentPhase int = 0
 
 	if isFrozen {
-		// 获取触发僵尸的ID
+		// 获取触发僵尸的ID和当前阶段
 		phaseEntities := ecs.GetEntitiesWith1[*components.ZombiesWonPhaseComponent](s.entityManager)
 		for _, phaseEntityID := range phaseEntities {
 			phaseComp, ok := ecs.GetComponent[*components.ZombiesWonPhaseComponent](s.entityManager, phaseEntityID)
 			if ok {
 				triggerZombieID = phaseComp.TriggerZombieID
+				currentPhase = phaseComp.CurrentPhase
 				break
 			}
 		}
@@ -590,15 +593,23 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 			continue
 		}
 
-		// Story 8.8: 游戏冻结时，只更新触发僵尸的动画，其他僵尸实体动画暂停
-		// 但是 UI 元素（如 ZombiesWon 动画）应该继续更新
-		if isFrozen && triggerZombieID != 0 && id != triggerZombieID {
+		// Story 8.8: 游戏冻结时的动画暂停逻辑
+		// Phase 1: 所有非UI实体动画暂停（包括触发僵尸）
+		// Phase 2+: 只有触发僵尸的动画继续，其他非UI实体暂停
+		if isFrozen {
 			// 检查是否是 UI 元素
 			_, isUI := ecs.GetComponent[*components.UIComponent](s.entityManager, id)
 
 			if !isUI {
-				// 非 UI 元素（僵尸、植物等）的动画暂停
-				continue
+				// Phase 1: 所有非UI实体动画暂停
+				if currentPhase == 1 {
+					continue
+				}
+
+				// Phase 2+: 只有触发僵尸的动画继续
+				if triggerZombieID != 0 && id != triggerZombieID {
+					continue
+				}
 			}
 			// UI 元素继续更新（不跳过）
 		}
@@ -968,9 +979,14 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 			if isSyntheticAnim {
 				// 单动画文件：直接使用逻辑帧作为物理帧
 				physicalFrame = int(logicalFrame)
+				// Story 8.8: 修复 ZombiesWon 动画越界问题
+				// 如果是非循环动画且已播放到最后，钳制到最后一帧
+				if !comp.IsLooping && physicalFrame >= len(mergedFrames) {
+					physicalFrame = len(mergedFrames) - 1
+				}
 			} else {
 				// 命名动画：使用 AnimVisibles 映射
-				physicalFrame = mapLogicalToPhysical(int(logicalFrame), animVisibles)
+				physicalFrame = MapLogicalToPhysical(int(logicalFrame), animVisibles)
 			}
 
 			// Debug: SodRoll 帧映射（前 15 帧）
@@ -1256,8 +1272,8 @@ func (s *ReanimSystem) getInterpolatedFrame(
 	t := logicalFrame - float64(frame1Index) // 插值因子 (0.0 - 1.0)
 
 	// 2. 映射逻辑帧到物理帧
-	physicalFrame1 := mapLogicalToPhysical(frame1Index, animVisibles)
-	physicalFrame2 := mapLogicalToPhysical(frame2Index, animVisibles)
+	physicalFrame1 := MapLogicalToPhysical(frame1Index, animVisibles)
+	physicalFrame2 := MapLogicalToPhysical(frame2Index, animVisibles)
 
 	// 3. 边界检查
 	if physicalFrame1 < 0 || physicalFrame1 >= len(mergedFrames) {

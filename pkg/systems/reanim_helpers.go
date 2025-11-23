@@ -48,7 +48,7 @@ func (s *ReanimSystem) getParentOffsetForAnimation(comp *components.ReanimCompon
 
 	// 获取第一个可见帧的物理索引
 	// 不需要遍历查找，直接使用逻辑帧号 0 映射到物理帧
-	firstPhysicalFrame := mapLogicalToPhysical(0, parentAnimVisibles)
+	firstPhysicalFrame := MapLogicalToPhysical(0, parentAnimVisibles)
 	if firstPhysicalFrame < 0 || firstPhysicalFrame >= len(parentFrames) {
 		return 0, 0
 	}
@@ -287,8 +287,9 @@ func countVisibleFrames(animVisibles []int) int {
 	return count
 }
 
-// mapLogicalToPhysical 将逻辑帧号映射到物理帧号
-func mapLogicalToPhysical(logicalFrameNum int, animVisibles []int) int {
+// MapLogicalToPhysical 将逻辑帧号映射到物理帧号
+// 公共 API,供需要手动处理帧映射的业务代码使用
+func MapLogicalToPhysical(logicalFrameNum int, animVisibles []int) int {
 	if len(animVisibles) == 0 {
 		return logicalFrameNum
 	}

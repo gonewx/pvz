@@ -227,56 +227,18 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 
 		// 4. ✅ Epic 14: 移除 FinalizeAnimations 调用（已私有化，由 PlayAnimation/AddAnimation 内部处理）
 
-		// 5. 获取 ReanimComponent 并设置循环状态
-		reanimComp, ok = ecs.GetComponent[*components.ReanimComponent](scene.entityManager, selectorEntity)
-		if ok {
-			// 🔍 调试：输出 AnimationFPS 的值
-			log.Printf("[MainMenuScene] ���� DEBUG: AnimationFPS = %.1f (全局 FPS)", reanimComp.AnimationFPS)
+		// 处理 AnimationCommand（立即初始化动画）
+		scene.reanimSystem.Update(0)
 
-			// 初始化 AnimationLoopStates、AnimationPausedStates 和 AnimationFPSOverrides
-			reanimComp.AnimationLoopStates = make(map[string]bool)
-			reanimComp.AnimationPausedStates = make(map[string]bool)
-			reanimComp.AnimationFPSOverrides = make(map[string]float64)
-			reanimComp.AnimationSpeedOverrides = make(map[string]float64)
-
-			// ✅ 从配置中加载每个动画的独立 FPS 和速度倍率
-			if configManager := rm.GetReanimConfigManager(); configManager != nil {
-				unitConfig, err := configManager.GetUnit("selectorscreen")
-				if err == nil {
-					for _, animInfo := range unitConfig.AvailableAnimations {
-						if animInfo.FPS > 0 {
-							reanimComp.AnimationFPSOverrides[animInfo.Name] = animInfo.FPS
-							log.Printf("[MainMenuScene] 动画 %s 使用独立 FPS = %.1f", animInfo.Name, animInfo.FPS)
-						}
-						if animInfo.Speed > 0 {
-							reanimComp.AnimationSpeedOverrides[animInfo.Name] = animInfo.Speed
-							log.Printf("[MainMenuScene] 动画 %s 使用速度倍率 = %.2f", animInfo.Name, animInfo.Speed)
-						}
-					}
-				} else {
-					log.Printf("[MainMenuScene] Warning: 无法加载 selectorscreen 配置: %v", err)
-				}
-			}
-
-			// 开场动画设置为非循环（opening 组合包含 anim_open 和 anim_sign）
-			reanimComp.AnimationLoopStates["anim_open"] = false
-			reanimComp.AnimationLoopStates["anim_sign"] = false
-			reanimComp.AnimationLoopStates["anim_idle"] = false
-
-			// ✅ Story 13.10: 云朵动画在开场完成后才添加，这里不需要初始化
-			// 云朵动画会在 Update() 中检测到 IsFinished 后动态添加
-
-			// 全局设置为循环模式（但具体每个动画由 AnimationLoopStates 控制）
-			reanimComp.IsLooping = true
-
-			// ✅ Story 13.10: 不再需要手动绑定轨道
-			// 新的渲染逻辑直接从动画遍历到轨道，自然覆盖
-
-			log.Printf("[MainMenuScene] ✅ SelectorScreen 动画初始化完成（开场动画非循环）")
-		}
+		// ✅ ReanimSystem.PlayCombo() 已自动从配置文件加载并设置:
+		//   - AnimationFPSOverrides (available_animations.fps)
+		//   - AnimationSpeedOverrides (available_animations.speed)
+		//   - AnimationLoopStates (animation_combos.animation_loop_states)
+		//   - IsLooping (animation_combos.loop)
 
 		// 修复：SelectorScreen 是全屏 UI，应该使用左上角对齐（Reanim 原始坐标）
 		// 而不是中心对齐。禁用 CenterOffset 功能。
+		reanimComp, ok = ecs.GetComponent[*components.ReanimComponent](scene.entityManager, selectorEntity)
 		if ok {
 			reanimComp.CenterOffsetX = 0
 			reanimComp.CenterOffsetY = 0
@@ -2236,7 +2198,7 @@ func (m *MainMenuScene) updateUserSignHover(mouseX, mouseY int, isMouseReleased 
 		}
 
 		// 映射逻辑帧到物理帧
-		physicalFrame := mapLogicalToPhysical(int(logicalFrame), animVisibles)
+		physicalFrame := systems.MapLogicalToPhysical(int(logicalFrame), animVisibles)
 		if physicalFrame < 0 || physicalFrame >= len(frames) {
 			continue
 		}
@@ -2831,35 +2793,6 @@ func getTrackNames(tracks map[string][]reanim.Frame) []string {
 		names = append(names, name)
 	}
 	return names
-}
-
-// mapLogicalToPhysical 映射逻辑帧索引到物理帧索引
-// 辅助函数，用于处理隐藏帧（与 reanim_system.go 中的函数相同）
-func mapLogicalToPhysical(logicalFrameNum int, animVisibles []int) int {
-	if len(animVisibles) == 0 {
-		return logicalFrameNum
-	}
-
-	logicalIndex := 0
-	lastVisiblePhysicalFrame := -1
-	for i := 0; i < len(animVisibles); i++ {
-		if animVisibles[i] == 0 {
-			lastVisiblePhysicalFrame = i // 记录最后一个可见帧的物理索引
-			if logicalIndex == logicalFrameNum {
-				return i
-			}
-			logicalIndex++
-		}
-	}
-
-	// 如果逻辑帧超出范围，返回最后一个可见帧
-	// 这样非循环动画在完成后会停留在最后一帧
-	if lastVisiblePhysicalFrame >= 0 {
-		return lastVisiblePhysicalFrame
-	}
-
-	// 回退：没有可见帧，返回原始值
-	return logicalFrameNum
 }
 
 // getPartImageKeys 获取 PartImages 中的所有键（用于调试）

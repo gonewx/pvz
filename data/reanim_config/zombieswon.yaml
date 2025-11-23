@@ -1,12 +1,26 @@
 id: zombieswon
 name: ZombiesWon
 reanim_file: data/reanim/ZombiesWon.reanim
-default_animation: anim_screen
+default_animation: _root
 scale: 1
+center_offset: [0, 0]
 images:
     IMAGE_REANIM_ZOMBIESWON: assets/reanim/ZombiesWon.jpg
     IMAGE_REANIM_ZOMBIESWON_OVERLAY: assets/reanim/ZombiesWon_.png
     IMAGE_REANIM_ZOMBIESWON_SCREEN: assets/reanim/ZombiesWonScreen.png
 available_animations:
-    - name: anim_screen
-      display_name: screen
+    - name: fullscreen
+      display_name: fullscreen
+      speed: 0.2
+    - name: fullscreen2
+      display_name: fullscreen2
+      speed: 0.2      
+    - name: ZombiesWon
+      display_name: ZombiesWon
+      speed: 0.2
+
+animation_combos:
+    - name: "appear"
+      display_name: "僵尸胜利"
+      animations: ["fullscreen", "fullscreen2", "ZombiesWon"]
+      loop: false
