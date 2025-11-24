@@ -51,6 +51,9 @@ type GameScene struct {
 	sodWidth    int     // 草皮图片宽度（缓存）
 	sodHeight   int     // 草皮图片高度（缓存）
 
+	// Story 8.2.1: 草皮闪烁调试标志
+	lawnFlashLogged bool // 是否已记录草皮闪烁信息（避免重复日志）
+
 	// Font Resources
 	sunCounterFont *text.GoTextFace // Font for sun counter display
 	plantCardFont  *text.GoTextFace // Font for plant card sun cost display
@@ -572,21 +575,25 @@ func (s *GameScene) Update(deltaTime float64) {
 
 				// Story 11.5 修复：动画完成后处理草皮叠加层
 				// 原理：动画期间使用叠加层裁剪显示，完成后将草皮合并到底层背景
+				// Story 8.2.1 修复：保留 sodRowImage 用于草坪闪烁效果
 				if s.soddedBackground != nil {
 					// Level 1-4: 有完整的已铺草皮背景，直接替换
 					log.Printf("[GameScene] 替换底层背景: IMAGE_BACKGROUND1UNSODDED → IMAGE_BACKGROUND1")
 					s.background = s.soddedBackground
 					s.soddedBackground = nil
 					s.preSoddedImage = nil
+					// Story 8.2.1: 保留 sodRowImage 用于草坪闪烁
+					log.Printf("[GameScene] 保留 sodRowImage 用于草坪闪烁效果")
 				} else if s.preSoddedImage != nil || s.sodRowImage != nil {
 					// Level 1-1, 1-2: 需要将草皮叠加层合并到底层背景
 					log.Printf("[GameScene] 合并草皮叠加层到底层背景")
 					mergedBg := s.createMergedBackground()
 					if mergedBg != nil {
-						// 原子操作：先替换背景，再清空叠加层，确保渲染不中断
+						// 原子操作：先替换背景，再清空preSoddedImage
 						s.background = mergedBg
 						s.preSoddedImage = nil
-						s.sodRowImage = nil
+						// Story 8.2.1: 保留 sodRowImage 用于草坪闪烁，不清空
+						log.Printf("[GameScene] 背景合并完成，保留 sodRowImage 用于草坪闪烁")
 					} else {
 						// 合并失败，保持叠加层不清空，避免草皮消失
 						log.Printf("[GameScene] 警告：合并背景失败，保持叠加层")
@@ -652,21 +659,25 @@ func (s *GameScene) Update(deltaTime float64) {
 
 					// Story 11.5 修复：动画完成后处理草皮叠加层
 					// 原理：动画期间使用叠加层裁剪显示，完成后将草皮合并到底层背景
+					// Story 8.2.1 修复：保留 sodRowImage 用于草坪闪烁效果
 					if s.soddedBackground != nil {
 						// Level 1-4: 有完整的已铺草皮背景，直接替换
 						log.Printf("[GameScene] 替换底层背景: IMAGE_BACKGROUND1UNSODDED → IMAGE_BACKGROUND1")
 						s.background = s.soddedBackground
 						s.soddedBackground = nil
 						s.preSoddedImage = nil
+						// Story 8.2.1: 保留 sodRowImage 用于草坪闪烁
+						log.Printf("[GameScene] 保留 sodRowImage 用于草坪闪烁效果")
 					} else if s.preSoddedImage != nil || s.sodRowImage != nil {
 						// Level 1-1, 1-2: 需要将草皮叠加层合并到底层背景
 						log.Printf("[GameScene] 合并草皮叠加层到底层背景")
 						mergedBg := s.createMergedBackground()
 						if mergedBg != nil {
-							// 原子操作：先替换背景，再清空叠加层，确保渲染不中断
+							// 原子操作：先替换背景，再清空preSoddedImage
 							s.background = mergedBg
 							s.preSoddedImage = nil
-							s.sodRowImage = nil
+							// Story 8.2.1: 保留 sodRowImage 用于草坪闪烁，不清空
+							log.Printf("[GameScene] 背景合并完成，保留 sodRowImage 用于草坪闪烁")
 						} else {
 							// 合并失败，保持叠加层不清空，避免草皮消失
 							log.Printf("[GameScene] 警告：合并背景失败，保持叠加层")
@@ -863,6 +874,10 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	// Layer 4.5: Draw lawn flash effect (Story 8.2 教学)
 	// 草坪闪烁效果，用于教学提示玩家可以种植
 	s.drawLawnFlash(screen)
+
+	// Story 8.2.1: Draw card flash effect (教学)
+	// 卡片闪烁效果，用于提示玩家点击卡片
+	s.drawCardFlash(screen)
 
 	// Layer 5: Draw UI overlays (sun counter text)
 	// 文字始终在最上层以确保可读性

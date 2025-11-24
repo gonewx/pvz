@@ -2,6 +2,7 @@ package systems
 
 import (
 	"fmt"
+	"log"
 	"math"
 
 	"github.com/decker502/pvz/pkg/components"
@@ -151,10 +152,12 @@ func (s *LawnGridSystem) IsLaneEnabled(lane int) bool {
 func (s *LawnGridSystem) EnableFlash() {
 	s.flashEnabled = true
 	s.flashTime = 0
+	log.Printf("[LawnGridSystem] Flash ENABLED, flashEnabled=%v", s.flashEnabled)
 }
 
 // DisableFlash 禁用草坪闪烁效果
 func (s *LawnGridSystem) DisableFlash() {
+	log.Printf("[LawnGridSystem] Flash DISABLED")
 	s.flashEnabled = false
 	s.flashTime = 0
 }

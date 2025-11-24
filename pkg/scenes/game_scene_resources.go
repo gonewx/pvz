@@ -281,14 +281,19 @@ func (s *GameScene) loadTwoStageSoddingImages(enabledLanes []int) {
 	s.sodWidth = sodBounds.Dx()
 	s.sodHeight = sodBounds.Dy()
 
-	// 计算草皮叠加层Y坐标（对齐到第一行的顶部）
-	firstLane := enabledLanes[0]
-	sodOverlayY := config.GridWorldStartY + float64(firstLane-1)*config.CellHeight
+	// 计算草皮叠加层Y坐标（需要与预渲染时的位置一致）
+	// 两阶段渲染：使用中间行的中心位置
+	// Story 8.2.1 修复：sodOverlayY应该使用实际的草皮位置（居中+偏移）
+	middleLane := enabledLanes[len(enabledLanes)/2]
+	rowCenterY := config.GridWorldStartY + float64(middleLane-1)*config.CellHeight + config.CellHeight/2.0
+	sodHeight := float64(s.sodHeight)
+	sodOverlayY := rowCenterY - sodHeight/2.0 + config.SodOverlayOffsetY
 
-	// X坐标从0开始
-	s.sodOverlayX = 0
+	// Story 8.2.1 修复：sodOverlayX应该使用实际的草皮位置（GridWorldStartX + SodOverlayOffsetX）
+	// 因为草皮在预渲染时被放置在这个位置，闪烁效果需要对齐
+	s.sodOverlayX = config.GridWorldStartX + config.SodOverlayOffsetX
 	s.sodOverlayY = sodOverlayY
-	log.Printf("[GameScene] 草皮叠加层: 位置(0, %.1f) 尺寸(%dx%d)", sodOverlayY, s.sodWidth, s.sodHeight)
+	log.Printf("[GameScene] 草皮叠加层: 位置(%.1f, %.1f) 尺寸(%dx%d)", s.sodOverlayX, sodOverlayY, s.sodWidth, s.sodHeight)
 }
 
 // loadConsecutive3RowsSodding loads consecutive 3 rows sodding image (IMAGE_SOD3ROW).
@@ -310,14 +315,19 @@ func (s *GameScene) loadConsecutive3RowsSodding(enabledLanes []int) {
 	s.sodWidth = sodBounds.Dx()
 	s.sodHeight = sodBounds.Dy()
 
-	// 计算草皮叠加层Y坐标（对齐到第一行的顶部）
-	firstLane := enabledLanes[0]
-	sodOverlayY := config.GridWorldStartY + float64(firstLane-1)*config.CellHeight
+	// 计算草皮叠加层Y坐标（需要与预渲染时的位置一致）
+	// 连续3行：使用中间行的中心位置
+	// Story 8.2.1 修复：sodOverlayY应该使用实际的草皮位置（居中+偏移）
+	middleLane := enabledLanes[len(enabledLanes)/2]
+	rowCenterY := config.GridWorldStartY + float64(middleLane-1)*config.CellHeight + config.CellHeight/2.0
+	sodHeight := float64(s.sodHeight)
+	sodOverlayY := rowCenterY - sodHeight/2.0 + config.SodOverlayOffsetY
 
-	// X坐标从0开始
-	s.sodOverlayX = 0
+	// Story 8.2.1 修复：sodOverlayX应该使用实际的草皮位置（GridWorldStartX + SodOverlayOffsetX）
+	// 因为草皮在预渲染时被放置在这个位置，闪烁效果需要对齐
+	s.sodOverlayX = config.GridWorldStartX + config.SodOverlayOffsetX
 	s.sodOverlayY = sodOverlayY
-	log.Printf("[GameScene] 草皮叠加层: 位置(0, %.1f) 尺寸(%dx%d)", sodOverlayY, s.sodWidth, s.sodHeight)
+	log.Printf("[GameScene] 草皮叠加层: 位置(%.1f, %.1f) 尺寸(%dx%d)", s.sodOverlayX, sodOverlayY, s.sodWidth, s.sodHeight)
 }
 
 // loadSingleRowSodding loads single row sodding image (IMAGE_SOD1ROW).
@@ -339,15 +349,19 @@ func (s *GameScene) loadSingleRowSodding(animLanes []int) {
 	s.sodWidth = sodBounds.Dx()
 	s.sodHeight = sodBounds.Dy()
 
-	// 计算草皮叠加层Y坐标（对齐到动画行的顶部）
+	// 计算草皮叠加层Y坐标（需要与预渲染时的位置一致）
 	// 单行模式下，使用第一个动画行的位置
+	// Story 8.2.1 修复：sodOverlayY应该使用实际的草皮位置（居中+偏移）
 	firstAnimLane := animLanes[0]
-	sodOverlayY := config.GridWorldStartY + float64(firstAnimLane-1)*config.CellHeight
+	rowCenterY := config.GridWorldStartY + float64(firstAnimLane-1)*config.CellHeight + config.CellHeight/2.0
+	sodHeight := float64(s.sodHeight)
+	sodOverlayY := rowCenterY - sodHeight/2.0 + config.SodOverlayOffsetY
 
-	// X坐标从0开始
-	s.sodOverlayX = 0
+	// Story 8.2.1 修复：sodOverlayX应该使用实际的草皮位置（GridWorldStartX + SodOverlayOffsetX）
+	// 因为草皮在预渲染时被放置在这个位置，闪烁效果需要对齐
+	s.sodOverlayX = config.GridWorldStartX + config.SodOverlayOffsetX
 	s.sodOverlayY = sodOverlayY
-	log.Printf("[GameScene] 草皮叠加层: 位置(0, %.1f) 尺寸(%dx%d)", sodOverlayY, s.sodWidth, s.sodHeight)
+	log.Printf("[GameScene] 草皮叠加层: 位置(%.1f, %.1f) 尺寸(%dx%d)", s.sodOverlayX, sodOverlayY, s.sodWidth, s.sodHeight)
 }
 
 // preRenderSoddedBackground pre-renders sodded background for overlay rendering.

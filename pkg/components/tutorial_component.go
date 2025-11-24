@@ -1,6 +1,9 @@
 package components
 
-import "github.com/decker502/pvz/pkg/config"
+import (
+	"github.com/decker502/pvz/pkg/config"
+	"github.com/decker502/pvz/pkg/ecs"
+)
 
 // TutorialComponent 教学系统组件
 // 存储教学引导的运行时状态，跟踪当前步骤和完成进度
@@ -20,4 +23,9 @@ type TutorialComponent struct {
 	// TutorialSteps 教学步骤配置（从 LevelConfig 复制）
 	// 包含触发条件、文本键和动作定义
 	TutorialSteps []config.TutorialStep
+
+	// Story 8.2.1: 卡片闪烁效果支持（遮罩式闪烁）
+	HighlightedCardEntity ecs.EntityID // 被高亮的卡片实体ID（0表示无）
+	FlashTimer            float64      // 闪烁计时器（秒）
+	FlashCycleDuration    float64      // 闪烁周期（秒）
 }

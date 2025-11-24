@@ -64,11 +64,13 @@ func (s *GameScene) easeOutQuad(t float64) float64 {
 //   - 只读取组件状态,不进行碰撞检测
 //   - DialogInputSystem 负责更新 DialogComponent.HoveredButtonIdx
 //   - ButtonSystem 负责更新 ButtonComponent.State
+//   - InputSystem 负责更新 PlantCardComponent.UIComponent.State
 //   - 这里只根据状态设置光标
 //
 // 检查优先级:
 //  1. 面板按钮 (ButtonComponent)
 //  2. 对话框按钮 (DialogComponent.HoveredButtonIdx)
+//  3. 植物卡片 (PlantCardComponent + UIComponent)
 func (s *GameScene) updateMouseCursor() {
 	// Default cursor shape
 	cursorShape := ebiten.CursorShapeDefault
@@ -84,22 +86,44 @@ func (s *GameScene) updateMouseCursor() {
 	}
 
 	// 2. Check if hovering over any dialog button (if there are any dialogs)
-	dialogEntities := ecs.GetEntitiesWith1[*components.DialogComponent](s.entityManager)
-	for _, entityID := range dialogEntities {
-		dialogComp, ok := ecs.GetComponent[*components.DialogComponent](s.entityManager, entityID)
-		if ok && dialogComp.IsVisible {
-			// 检查对话框按钮是否悬停（只读取状态）
-			if dialogComp.HoveredButtonIdx >= 0 {
-				cursorShape = ebiten.CursorShapePointer
-				break
-			}
-
-			// 检查用户列表是否有悬停项（只读取状态）
-			if userList, ok2 := ecs.GetComponent[*components.UserListComponent](s.entityManager, entityID); ok2 {
-				if userList.HoveredIndex >= 0 {
+	if cursorShape == ebiten.CursorShapeDefault {
+		dialogEntities := ecs.GetEntitiesWith1[*components.DialogComponent](s.entityManager)
+		for _, entityID := range dialogEntities {
+			dialogComp, ok := ecs.GetComponent[*components.DialogComponent](s.entityManager, entityID)
+			if ok && dialogComp.IsVisible {
+				// 检查对话框按钮是否悬停（只读取状态）
+				if dialogComp.HoveredButtonIdx >= 0 {
 					cursorShape = ebiten.CursorShapePointer
 					break
 				}
+
+				// 检查用户列表是否有悬停项（只读取状态）
+				if userList, ok2 := ecs.GetComponent[*components.UserListComponent](s.entityManager, entityID); ok2 {
+					if userList.HoveredIndex >= 0 {
+						cursorShape = ebiten.CursorShapePointer
+						break
+					}
+				}
+			}
+		}
+	}
+
+	// 3. Story 8.2.1: Check if hovering over any plant card
+	if cursorShape == ebiten.CursorShapeDefault {
+		plantCards := ecs.GetEntitiesWith2[
+			*components.PlantCardComponent,
+			*components.UIComponent,
+		](s.entityManager)
+		for _, entityID := range plantCards {
+			// 跳过奖励卡片
+			if _, isRewardCard := ecs.GetComponent[*components.RewardCardComponent](s.entityManager, entityID); isRewardCard {
+				continue
+			}
+
+			ui, ok := ecs.GetComponent[*components.UIComponent](s.entityManager, entityID)
+			if ok && ui.State == components.UIHovered {
+				cursorShape = ebiten.CursorShapePointer
+				break
 			}
 		}
 	}

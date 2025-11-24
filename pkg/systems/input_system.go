@@ -86,6 +86,9 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 
 	// 注意：植物预览位置现在由 PlantPreviewSystem 统一管理，无需在这里更新
 
+	// Story 8.2.1: 更新植物卡片悬停状态（每帧检测）
+	s.updatePlantCardHover()
+
 	// DEBUG: 按 P 键在鼠标位置生成 PeaSplat 粒子效果（测试用）
 	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
 		mouseScreenX, mouseScreenY := ebiten.CursorPosition()
@@ -628,6 +631,55 @@ func (s *InputSystem) resetPlantCardSelection(plantType components.PlantType) {
 			ui.State = components.UINormal
 			log.Printf("[InputSystem] 重置植物卡片选择状态: PlantType=%v", plantType)
 			break // 只重置第一个匹配的卡片
+		}
+	}
+}
+
+// updatePlantCardHover 更新植物卡片的悬停状态
+// Story 8.2.1: 每帧检测鼠标是否悬停在植物卡片上，设置 UIComponent.State 为 UIHovered
+func (s *InputSystem) updatePlantCardHover() {
+	mouseX, mouseY := ebiten.CursorPosition()
+
+	// 查询所有植物卡片实体
+	entities := ecs.GetEntitiesWith4[
+		*components.PlantCardComponent,
+		*components.ClickableComponent,
+		*components.PositionComponent,
+		*components.UIComponent,
+	](s.entityManager)
+
+	// 遍历所有卡片，检测悬停
+	for _, entityID := range entities {
+		// 跳过奖励卡片
+		if _, isRewardCard := ecs.GetComponent[*components.RewardCardComponent](s.entityManager, entityID); isRewardCard {
+			continue
+		}
+
+		// 获取组件
+		card, _ := ecs.GetComponent[*components.PlantCardComponent](s.entityManager, entityID)
+		clickable, _ := ecs.GetComponent[*components.ClickableComponent](s.entityManager, entityID)
+		pos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+		ui, _ := ecs.GetComponent[*components.UIComponent](s.entityManager, entityID)
+
+		// AABB 碰撞检测
+		isHovering := float64(mouseX) >= pos.X && float64(mouseX) <= pos.X+clickable.Width &&
+			float64(mouseY) >= pos.Y && float64(mouseY) <= pos.Y+clickable.Height
+
+		// 只有可用的卡片才显示悬停效果
+		if isHovering && card.IsAvailable && clickable.IsEnabled {
+			// 只有当前状态不是 Clicked 时才设置为 Hovered（避免覆盖点击状态）
+			if ui.State != components.UIClicked {
+				ui.State = components.UIHovered
+			}
+		} else {
+			// 如果不再悬停且当前是 Hovered 状态，恢复为 Normal
+			if ui.State == components.UIHovered {
+				if card.IsAvailable {
+					ui.State = components.UINormal
+				} else {
+					ui.State = components.UIDisabled
+				}
+			}
 		}
 	}
 }

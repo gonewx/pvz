@@ -61,10 +61,13 @@ func NewTutorialSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.Resou
 	// 创建教学实体
 	tutorialEntity := em.CreateEntity()
 	ecs.AddComponent(em, tutorialEntity, &components.TutorialComponent{
-		CurrentStepIndex: 0,
-		CompletedSteps:   make(map[string]bool),
-		IsActive:         true,
-		TutorialSteps:    levelConfig.TutorialSteps, // 复制配置
+		CurrentStepIndex:      0,
+		CompletedSteps:        make(map[string]bool),
+		IsActive:              true,
+		TutorialSteps:         levelConfig.TutorialSteps, // 复制配置
+		HighlightedCardEntity: 0,                         // Story 8.2.1: 初始无高亮卡片
+		FlashTimer:            0,
+		FlashCycleDuration:    0.8, // Story 8.2.1: 闪烁周期0.8秒
 	})
 
 	log.Printf("[TutorialSystem] Initialized with %d tutorial steps", len(levelConfig.TutorialSteps))
@@ -89,7 +92,7 @@ func NewTutorialSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.Resou
 		lastSunCount:         0,     // 初始化阳光实体计数
 		lastTextDisplayTime:  0,     // 初始化文本显示时间
 		arrowRepeatTimer:     0,     // 定时器初始化
-		arrowRepeatInterval:  1.2,   // 箭头每1.2秒重复一次（粒子播放1秒，间隔0.2秒）
+		arrowRepeatInterval:  1.0,   // Story 8.2.1: 箭头每1.0秒重复一次（粒子播放1秒），无缝衔接避免闪烁
 		waveDelayTimer:       0,     // 波次延迟计时器初始化
 		lastWaveKilled:       false, // 初始化为false
 	}
@@ -157,8 +160,8 @@ func (s *TutorialSystem) Update(dt float64) {
 			log.Printf("[TutorialSystem] gameStart: findPeashooterCard returned ID=%d", cardID)
 			if cardID != 0 {
 				s.showArrowIndicator(cardID)
-				// 注释掉卡片闪光，只保留箭头
-				// s.highlightPlantCard(cardID)
+				// Story 8.2.1: 启用卡片闪光效果
+				s.highlightPlantCard(cardID)
 			} else {
 				log.Println("[TutorialSystem] WARNING: Cannot find peashooter card!")
 			}
@@ -187,7 +190,7 @@ func (s *TutorialSystem) Update(dt float64) {
 		case "seedClicked":
 			// 步骤2：点击卡片后，隐藏箭头，启用草坪闪烁
 			s.hideArrowIndicator()
-			// s.unhighlightPlantCard()
+			s.unhighlightPlantCard() // Story 8.2.1: 隐藏卡片闪光
 			s.lawnGridSystem.EnableFlash() // 启用草坪闪烁效果（由明变暗）
 			log.Printf("[TutorialSystem] Lawn flash enabled (seedClicked)")
 
@@ -195,21 +198,22 @@ func (s *TutorialSystem) Update(dt float64) {
 			// 步骤6（旧版）：卡片冷却完成，再次显示箭头
 			if cardID := s.findPeashooterCard(); cardID != 0 {
 				s.showArrowIndicator(cardID)
-				// 注释掉卡片闪光，只保留箭头
-				// s.highlightPlantCard(cardID)
+				// Story 8.2.1: 启用卡片闪光效果
+				s.highlightPlantCard(cardID)
 			}
 
 		case "enoughSunAndCooldown":
 			// 步骤6（新版）：阳光足够且卡片冷却完成，显示箭头指向豌豆射手卡片
 			if cardID := s.findPeashooterCard(); cardID != 0 {
 				s.showArrowIndicator(cardID)
+				s.highlightPlantCard(cardID) // Story 8.2.1: 启用卡片闪光效果
 				log.Printf("[TutorialSystem] enoughSunAndCooldown: showing arrow to peashooter card")
 			}
 
 		case "secondSeedClicked":
 			// 步骤8：第二次点击卡片，隐藏箭头，启用草坪闪烁
 			s.hideArrowIndicator()
-			// s.unhighlightPlantCard()
+			s.unhighlightPlantCard() // Story 8.2.1: 隐藏卡片闪光
 			s.lawnGridSystem.EnableFlash() // 启用草坪闪烁效果（由明变暗）
 			log.Printf("[TutorialSystem] Lawn flash enabled (secondSeedClicked)")
 		}
@@ -220,6 +224,11 @@ func (s *TutorialSystem) Update(dt float64) {
 
 	// 更新教学文本显示时间
 	s.updateTextDisplayTime(dt)
+
+	// Story 8.2.1: 更新卡片闪烁计时器
+	if tutorial.HighlightedCardEntity != 0 {
+		tutorial.FlashTimer += dt
+	}
 
 	// 重复显示箭头和闪光效果（因为粒子效果只播放1秒）
 	s.updateArrowRepeat(dt, currentStep)
@@ -541,51 +550,35 @@ func (s *TutorialSystem) findPeashooterCard() ecs.EntityID {
 	return 0
 }
 
-// highlightPlantCard 显示卡片闪烁效果（使用粒子效果）
+// highlightPlantCard 显示卡片闪烁效果（Story 8.2.1: 使用遮罩式闪烁）
 // 参数：
 //   - targetEntity: 目标卡片实体ID
 func (s *TutorialSystem) highlightPlantCard(targetEntity ecs.EntityID) {
-	// 隐藏已存在的闪烁效果
-	s.unhighlightPlantCard()
-
-	// 获取目标卡片位置
-	pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, targetEntity)
+	// 获取教学组件
+	tutorial, ok := ecs.GetComponent[*components.TutorialComponent](s.entityManager, s.tutorialEntity)
 	if !ok {
-		log.Printf("[TutorialSystem] Target card has no PositionComponent, cannot highlight")
+		log.Printf("[TutorialSystem] Cannot get TutorialComponent for highlighting card")
 		return
 	}
 
-	// 创建卡片闪烁粒子效果（使用 SeedPacketFlash.xml）
-	highlightEntity, err := entities.CreateParticleEffect(
-		s.entityManager,
-		s.resourceManager,
-		"SeedPacketFlash", // 粒子效果名称
-		pos.X, pos.Y,      // 在卡片位置
-	)
-
-	if err != nil {
-		log.Printf("[TutorialSystem] Failed to create card highlight: %v", err)
-		return
-	}
-
-	// 标记为UI粒子（不受摄像机影响）
-	// 添加 UIComponent 到发射器，这样生成的粒子会自动继承 UI 标记
-	ecs.AddComponent(s.entityManager, highlightEntity, &components.UIComponent{
-		State: components.UINormal,
-	})
-
-	// 保存闪烁实体ID，用于后续移除
-	s.cardHighlightEntity = highlightEntity
-	log.Printf("[TutorialSystem] Card highlight shown at (%.1f, %.1f)", pos.X, pos.Y)
+	// 设置高亮卡片
+	tutorial.HighlightedCardEntity = targetEntity
+	tutorial.FlashTimer = 0 // 重置闪烁计时器
+	log.Printf("[TutorialSystem] Card highlight enabled for entity %d", targetEntity)
 }
 
 // unhighlightPlantCard 隐藏卡片闪烁效果
 func (s *TutorialSystem) unhighlightPlantCard() {
-	if s.cardHighlightEntity != 0 {
-		s.entityManager.DestroyEntity(s.cardHighlightEntity)
-		s.cardHighlightEntity = 0
-		log.Printf("[TutorialSystem] Card highlight hidden")
+	// 获取教学组件
+	tutorial, ok := ecs.GetComponent[*components.TutorialComponent](s.entityManager, s.tutorialEntity)
+	if !ok {
+		return
 	}
+
+	// 清除高亮卡片
+	tutorial.HighlightedCardEntity = 0
+	tutorial.FlashTimer = 0
+	log.Printf("[TutorialSystem] Card highlight disabled")
 }
 
 // updateArrowRepeat 更新箭头重复显示逻辑
@@ -605,13 +598,9 @@ func (s *TutorialSystem) updateArrowRepeat(dt float64, currentStep config.Tutori
 		return
 	}
 
-	// Bug修复：阳光不足时，隐藏箭头并停止重复
-	if s.gameState.GetSun() < 100 {
-		s.hideArrowIndicator()
-		s.arrowRepeatTimer = 0
-		log.Printf("[TutorialSystem] 阳光不足（%d < 100），隐藏箭头", s.gameState.GetSun())
-		return
-	}
+	// Story 8.2.1 修复：移除阳光检查逻辑，箭头应该持续显示直到玩家点击卡片
+	// 原有的 L609-614 逻辑会导致箭头在阳光<100时被错误隐藏
+	// 教学流程中，箭头在 gameStart 时显示（阳光=0），应该持续到 seedClicked
 
 	// 更新定时器
 	s.arrowRepeatTimer += dt
