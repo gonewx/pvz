@@ -208,9 +208,38 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 		posI, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombiesAndProjectiles[i])
 		posJ, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombiesAndProjectiles[j])
 
+		// Story 10.6: 修正 Y 坐标排序逻辑
+		// 如果实体正在被压扁，应该使用其 OriginalPosY 参与排序
+		// 否则动画过程中的 Y 位移（被铲起）会导致排序错误
+		yI := posI.Y
+		yJ := posJ.Y
+
+		_, isSquashedI := ecs.GetComponent[*components.SquashAnimationComponent](s.entityManager, zombiesAndProjectiles[i])
+		if isSquashedI {
+			if squashI, ok := ecs.GetComponent[*components.SquashAnimationComponent](s.entityManager, zombiesAndProjectiles[i]); ok {
+				yI = squashI.OriginalPosY
+			}
+		}
+
+		_, isSquashedJ := ecs.GetComponent[*components.SquashAnimationComponent](s.entityManager, zombiesAndProjectiles[j])
+		if isSquashedJ {
+			if squashJ, ok := ecs.GetComponent[*components.SquashAnimationComponent](s.entityManager, zombiesAndProjectiles[j]); ok {
+				yJ = squashJ.OriginalPosY
+			}
+		}
+
 		// 主排序：按Y坐标（从小到大）
-		if posI.Y != posJ.Y {
-			return posI.Y < posJ.Y
+		// 使用 epsilon 处理浮点数误差，确保同一行的实体（即使有微小差异）进入二级排序
+		if math.Abs(yI-yJ) > 1.0 {
+			return yI < yJ
+		}
+
+		// Story 10.6: 压扁僵尸优先渲染（在底层），除草车后渲染（在上层）
+		if isSquashedI != isSquashedJ {
+			// 如果 i 被压扁 (true) 而 j 没有 (false)，i 应该先渲染 (return true)
+			// 这样 i 就在 j 的下面（被 j 遮挡）
+			// 此时 i 是僵尸，j 是除草车，符合"车碾过僵尸"的视觉效果
+			return isSquashedI
 		}
 
 		// 二级排序：当Y坐标相同时，按X坐标（从大到小，右侧先渲染）

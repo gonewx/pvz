@@ -732,6 +732,11 @@ func (s *GameScene) Update(deltaTime float64) {
 		s.reanimSystem.Update(deltaTime)   // Reanim 系统（植物卡片动画）
 		s.particleSystem.Update(deltaTime) // 粒子系统（光晕效果）
 
+		// Story 10.6: 除草车系统（压扁动画需要继续播放）
+		if s.lawnmowerSystem != nil {
+			s.lawnmowerSystem.Update(deltaTime)
+		}
+
 		// Story 8.8: 僵尸获胜流程需要继续更新
 		if s.zombiesWonPhaseSystem != nil {
 			s.zombiesWonPhaseSystem.Update(deltaTime)
@@ -781,6 +786,7 @@ func (s *GameScene) Update(deltaTime float64) {
 	s.physicsSystem.Update(deltaTime) // 7. Check collisions (Story 4.3)
 	// Story 6.3: Reanim 动画系统（替代旧的 AnimationSystem）
 	s.reanimSystem.Update(deltaTime)   // 8. Update Reanim animation frames
+
 	s.particleSystem.Update(deltaTime) // 9. Update particle effects (Story 7.2)
 	// 方案A+：闪烁效果系统
 	s.flashEffectSystem.Update(deltaTime) // 9.3. Update flash effects (hit feedback)

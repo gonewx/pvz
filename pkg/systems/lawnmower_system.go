@@ -59,11 +59,10 @@ func (s *LawnmowerSystem) Update(deltaTime float64) {
 	// 2. 更新移动中的除草车位置
 	s.updateLawnmowerPositions(deltaTime)
 
-
 	// 3. 更新压扁动画
 	s.updateSquashAnimations(deltaTime)
 
-		// 4. 检测并消灭僵尸
+	// 4. 检测并消灭僵尸
 	s.checkZombieCollisions()
 
 	// 5. 检测除草车离开屏幕
@@ -425,6 +424,12 @@ func (s *LawnmowerSystem) triggerZombieDeathFallback(zombieID ecs.EntityID) {
 	log.Printf("[LawnmowerSystem] 僵尸 %d 开始播放死亡动画（回退模式）", zombieID)
 
 	// 4. 触发粒子效果（手臂和头部掉落）
+	// Story 10.6: 添加安全检查，避免测试环境中的 ResourceManager 为空或未初始化
+	if s.resourceManager == nil {
+		log.Printf("[LawnmowerSystem] ResourceManager 未初始化，跳过粒子效果")
+		return
+	}
+
 	// 这与 BehaviorSystem 的逻辑一致
 	position, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
 	if !ok {
@@ -472,6 +477,12 @@ func (s *LawnmowerSystem) triggerZombieDeathFallback(zombieID ecs.EntityID) {
 //   - []components.LocatorFrame: locator 轨道的帧数据数组
 //   - error: 如果加载失败返回错误
 func (s *LawnmowerSystem) loadLocatorFrames() ([]components.LocatorFrame, error) {
+	// 检查 ResourceManager 是否存在
+	if s.resourceManager == nil {
+		log.Printf("[LawnmowerSystem] 警告：ResourceManager 未初始化，无法加载 locator 轨道")
+		return nil, nil
+	}
+
 	// 从 ResourceManager 获取 LawnMoweredZombie 的 ReanimXML
 	reanimXML := s.resourceManager.GetReanimXML("LawnMoweredZombie")
 	if reanimXML == nil {
@@ -493,37 +504,55 @@ func (s *LawnmowerSystem) loadLocatorFrames() ([]components.LocatorFrame, error)
 		return nil, nil
 	}
 
-	// 转换为 LocatorFrame 数组
+	// 转换为 LocatorFrame 数组（支持属性继承）
+	// Reanim 格式中，如果帧未定义某个属性，则继承上一帧的值（Sparse Frames）
+	// 如果不处理继承，会导致后续帧的 Rotation 突然归零（出现"垂直压扁" bug）
 	frames := make([]components.LocatorFrame, len(locatorTrack.Frames))
+
+	// 初始状态
+	var curX, curY, curSkewX, curSkewY float64 = 0, 0, 0, 0
+	var curScaleX, curScaleY float64 = 1, 1
+
 	for i, frame := range locatorTrack.Frames {
-		frames[i] = components.LocatorFrame{
-			X:      getFloatValue(frame.X),
-			Y:      getFloatValue(frame.Y),
-			SkewX:  getFloatValue(frame.SkewX),
-			SkewY:  getFloatValue(frame.SkewY),
-			ScaleX: getFloatValue(frame.ScaleX),
-			ScaleY: getFloatValue(frame.ScaleY),
+		// 更新当前值（如果有定义）
+		if frame.X != nil {
+			curX = *frame.X
+		}
+		if frame.Y != nil {
+			curY = *frame.Y
+		}
+		if frame.SkewX != nil {
+			curSkewX = *frame.SkewX
+		}
+		if frame.SkewY != nil {
+			curSkewY = *frame.SkewY
+		}
+		if frame.ScaleX != nil {
+			curScaleX = *frame.ScaleX
+		}
+		if frame.ScaleY != nil {
+			curScaleY = *frame.ScaleY
 		}
 
-		// 设置默认值
-		if frames[i].ScaleX == 0 {
-			frames[i].ScaleX = 1.0
-		}
-		if frames[i].ScaleY == 0 {
-			frames[i].ScaleY = 1.0
+		frames[i] = components.LocatorFrame{
+			X:      curX,
+			Y:      curY,
+			SkewX:  curSkewX,
+			SkewY:  curSkewY,
+			ScaleX: curScaleX,
+			ScaleY: curScaleY,
 		}
 	}
 
 	log.Printf("[LawnmowerSystem] 成功加载 locator 轨道：%d 帧", len(frames))
-	return frames, nil
-}
 
-// getFloatValue 获取浮点指针的值，如果为 nil 则返回 0.0
-func getFloatValue(ptr *float64) float64 {
-	if ptr == nil {
-		return 0.0
+	// Debug: 打印前 4 帧的数据（包含旋转信息）
+	for i := 0; i < 4 && i < len(frames); i++ {
+		log.Printf("[LawnmowerSystem]   帧 %d: X=%.1f, Y=%.1f, SkewX=%.1f°, SkewY=%.1f°, ScaleX=%.3f, ScaleY=%.3f",
+			i, frames[i].X, frames[i].Y, frames[i].SkewX, frames[i].SkewY, frames[i].ScaleX, frames[i].ScaleY)
 	}
-	return *ptr
+
+	return frames, nil
 }
 
 // updateSquashAnimations 更新所有正在播放的压扁动画
@@ -531,22 +560,26 @@ func getFloatValue(ptr *float64) float64 {
 //   - deltaTime: 自上次更新以来的时间（秒）
 func (s *LawnmowerSystem) updateSquashAnimations(deltaTime float64) {
 	// 查询所有拥有 SquashAnimationComponent 的实体（僵尸）
-	squashEntities := ecs.GetEntitiesWith3[
+	squashEntities := ecs.GetEntitiesWith2[
 		*components.SquashAnimationComponent,
 		*components.PositionComponent,
-		*components.ReanimComponent,
 	](s.entityManager)
 
 	for _, zombieID := range squashEntities {
 		squashAnim, _ := ecs.GetComponent[*components.SquashAnimationComponent](s.entityManager, zombieID)
 		position, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
-		reanim, _ := ecs.GetComponent[*components.ReanimComponent](s.entityManager, zombieID)
+
+		// 获取 ReanimComponent (用于设置旋转和缩放)
+		reanimComp, hasReanim := ecs.GetComponent[*components.ReanimComponent](s.entityManager, zombieID)
 
 		// 累积已播放时间
 		squashAnim.ElapsedTime += deltaTime
 
 		// 检查动画是否已完成
 		if squashAnim.IsComplete() {
+			// Debug: 打印完成时的详细信息
+			log.Printf("[LawnmowerSystem] 僵尸 %d 压扁动画判定完成: ElapsedTime=%.3f, Duration=%.3f, Progress=%.1f%%, IsCompleted=%v",
+				zombieID, squashAnim.ElapsedTime, squashAnim.Duration, squashAnim.GetProgress()*100, squashAnim.IsCompleted)
 			// 动画结束，触发死亡
 			s.triggerDeathAfterSquash(zombieID)
 			continue
@@ -557,41 +590,38 @@ func (s *LawnmowerSystem) updateSquashAnimations(deltaTime float64) {
 		if frameIndex >= len(squashAnim.LocatorFrames) {
 			frameIndex = len(squashAnim.LocatorFrames) - 1
 		}
+		if frameIndex < 0 || len(squashAnim.LocatorFrames) == 0 {
+			// 边界保护：没有帧数据，跳过此僵尸
+			continue
+		}
 
 		frame := squashAnim.LocatorFrames[frameIndex]
 
 		// 应用 locator 变换到僵尸
 
-		// 1. 位置：跟随除草车移动 + locator 偏移
-		//    如果有关联的除草车，跟随除草车的 X 坐标
-		if squashAnim.LawnmowerEntityID != 0 {
-			if lawnmowerPos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, squashAnim.LawnmowerEntityID); ok {
-				position.X = lawnmowerPos.X + frame.X
-			} else {
-				// 除草车已删除，使用原始位置 + 偏移
-				position.X = squashAnim.OriginalPosX + frame.X
-			}
-		} else {
-			position.X = squashAnim.OriginalPosX + frame.X
-		}
+		// 1. 位置：使用原始位置 + locator 偏移
+		// Story 10.6: 修复"车顶着僵尸"的问题
+		// LawnMoweredZombie.reanim 的 locator 轨道 X 值已经包含了位移（先快后慢）
+		// 如果叠加除草车的位置（+lawnmowerPos.X），僵尸会移动得比车还快（飞到车前面）
+		// 正确逻辑是：僵尸相对于地面（OriginalPosX）移动
+		// - Phase 1: 僵尸被铲起向前抛（速度 > 车速），飞到车前
+		// - Phase 2: 僵尸落地被压扁（速度 < 车速），车追上并碾过僵尸
+		position.X = squashAnim.OriginalPosX + frame.X
 		position.Y = squashAnim.OriginalPosY + frame.Y
 
-		// 2. 应用变换到 Reanim 动画的所有可见轨道
-		// 关键：我们需要修改僵尸 Reanim 的每个部件帧，应用 locator 的缩放和倾斜
-		if len(reanim.CachedRenderData) > 0 {
-			// 应用 locator 变换到每个渲染部件
-			for i := range reanim.CachedRenderData {
-				// 应用缩放
-				reanim.CachedRenderData[i].Frame.ScaleX = &frame.ScaleX
-				reanim.CachedRenderData[i].Frame.ScaleY = &frame.ScaleY
+		// 2. 旋转和缩放：设置 ReanimComponent 的整体变换属性
+		// Story 10.6: 修复压扁动画垂直问题
+		// 使用 ReanimComponent.Rotation/Scale 实现整体旋转和缩放，而非手动修改 CachedRenderData
+		if hasReanim {
+			reanimComp.Rotation = frame.SkewX
+			reanimComp.ScaleX = frame.ScaleX
+			reanimComp.ScaleY = frame.ScaleY
+		}
 
-				// 应用旋转（skew）
-				reanim.CachedRenderData[i].Frame.SkewX = &frame.SkewX
-				reanim.CachedRenderData[i].Frame.SkewY = &frame.SkewY
-			}
-
-			// 标记缓存失效，强制重新渲染
-			reanim.LastRenderFrame = -1
+		// Story 10.6 优化：在压扁开始时（frame 4，scaleX开始变小）触发粒子效果和隐藏肢体
+		// 避免除草车已经开过头了才出现粒子效果
+		if !squashAnim.ParticlesTriggered && frameIndex >= 4 {
+			s.triggerSquashParticles(zombieID, squashAnim)
 		}
 
 		// 更新组件状态
@@ -607,61 +637,64 @@ func (s *LawnmowerSystem) updateSquashAnimations(deltaTime float64) {
 	}
 }
 
-// triggerDeathAfterSquash 压扁动画结束后触发僵尸死亡
-// 参数:
-//   - zombieID: 僵尸实体ID
-func (s *LawnmowerSystem) triggerDeathAfterSquash(zombieID ecs.EntityID) {
-	// 1. 移除 SquashAnimationComponent
-	ecs.RemoveComponent[*components.SquashAnimationComponent](s.entityManager, zombieID)
-	log.Printf("[LawnmowerSystem] 僵尸 %d 压扁动画完成，移除 SquashAnimationComponent", zombieID)
-
-	// 2. 切换行为类型为 BehaviorZombieDying
-	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
-	if !ok {
-		log.Printf("[LawnmowerSystem] 警告：僵尸 %d 缺少 BehaviorComponent", zombieID)
+// triggerSquashParticles 触发压扁粒子效果并隐藏僵尸肢体
+func (s *LawnmowerSystem) triggerSquashParticles(zombieID ecs.EntityID, squashAnim *components.SquashAnimationComponent) {
+	if squashAnim.ParticlesTriggered {
 		return
 	}
-	behavior.Type = components.BehaviorZombieDying
-	log.Printf("[LawnmowerSystem] 僵尸 %d 切换为 BehaviorZombieDying", zombieID)
+	squashAnim.ParticlesTriggered = true
 
-	// 3. 播放死亡动画（单次播放，不循环）
-	ecs.AddComponent(s.entityManager, zombieID, &components.AnimationCommandComponent{
-		UnitID:    "zombie",
-		ComboName: "death",
-		Processed: false,
-	})
-	if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, zombieID); ok {
-		reanim.IsLooping = false
-		reanim.IsPaused = false // 恢复播放（之前暂停了）
-
-		// 重置变换（移除压扁效果）
-		if len(reanim.CachedRenderData) > 0 {
-			for i := range reanim.CachedRenderData {
-				reanim.CachedRenderData[i].Frame.ScaleX = nil
-				reanim.CachedRenderData[i].Frame.ScaleY = nil
-				reanim.CachedRenderData[i].Frame.SkewX = nil
-				reanim.CachedRenderData[i].Frame.SkewY = nil
-			}
-			reanim.LastRenderFrame = -1
+	// 1. 隐藏僵尸头部和手臂
+	if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, zombieID); ok {
+		if reanimComp.HiddenTracks == nil {
+			reanimComp.HiddenTracks = make(map[string]bool)
 		}
-	}
-	log.Printf("[LawnmowerSystem] 僵尸 %d 开始播放死亡动画（压扁后）", zombieID)
+		// 隐藏头部
+		reanimComp.HiddenTracks["anim_head1"] = true
+		reanimComp.HiddenTracks["anim_head2"] = true
 
-	// 4. 触发粒子效果（手臂和头部掉落）
+		// 隐藏外侧手臂
+		reanimComp.HiddenTracks["Zombie_outerarm_upper"] = true
+		reanimComp.HiddenTracks["Zombie_outerarm_lower"] = true
+		reanimComp.HiddenTracks["Zombie_outerarm_hand"] = true
+
+		log.Printf("[LawnmowerSystem] 僵尸 %d 隐藏头部和手臂，触发粒子效果", zombieID)
+	}
+
+	if s.resourceManager == nil {
+		return
+	}
+
+	// 2. 触发粒子效果
 	position, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
 	if !ok {
-		log.Printf("[LawnmowerSystem] 警告：僵尸 %d 缺少 PositionComponent，无法触发粒子效果", zombieID)
 		return
 	}
 
-	angleOffset := 180.0 // 粒子向左飞出
+	// 粒子生成位置修正
+	spawnX := position.X
+	spawnY := squashAnim.OriginalPosY
+
+	// 尝试获取除草车位置，使粒子生成与除草车绑定
+	if squashAnim.LawnmowerEntityID != 0 {
+		if lmPos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, squashAnim.LawnmowerEntityID); ok {
+			// 使用除草车位置生成粒子（车轮下方）
+			// 除草车宽度约 80px，中心锚点。车头在 X + 40，车尾在 X - 40
+			// 碾压发生在车底，我们取稍微靠后的位置，模拟"被压扁后爆出"
+			spawnX = lmPos.X - 10.0
+			log.Printf("[LawnmowerSystem] 使用除草车位置生成粒子: %.1f (僵尸位置: %.1f)", spawnX, position.X)
+		}
+	}
+
+	// 粒子方向修正
+	angleOffset := -90.0
 
 	// 触发手臂掉落粒子
 	_, err := entities.CreateParticleEffect(
 		s.entityManager,
 		s.resourceManager,
 		"MoweredZombieArm",
-		position.X, position.Y,
+		spawnX, spawnY,
 		angleOffset,
 	)
 	if err != nil {
@@ -673,12 +706,50 @@ func (s *LawnmowerSystem) triggerDeathAfterSquash(zombieID ecs.EntityID) {
 		s.entityManager,
 		s.resourceManager,
 		"MoweredZombieHead",
-		position.X, position.Y,
+		spawnX, spawnY,
 		angleOffset,
 	)
 	if err != nil {
 		log.Printf("[LawnmowerSystem] 警告：创建头部粒子失败: %v", err)
 	}
+}
 
-	log.Printf("[LawnmowerSystem] 僵尸 %d 触发死亡粒子效果", zombieID)
+// triggerDeathAfterSquash 压扁动画结束后触发僵尸死亡
+// Story 10.6: 压扁动画本身就是完整的死亡过程
+// 动画结束后应该直接删除僵尸（而不是再播放 BehaviorZombieDying 动画）
+//
+// 参数:
+//   - zombieID: 僵尸实体ID
+func (s *LawnmowerSystem) triggerDeathAfterSquash(zombieID ecs.EntityID) {
+	// 0. 获取组件信息（在移除组件前）
+	squashAnim, ok := ecs.GetComponent[*components.SquashAnimationComponent](s.entityManager, zombieID)
+	if !ok {
+		// 容错处理：如果没有组件，直接删除僵尸
+		s.entityManager.DestroyEntity(zombieID)
+		return
+	}
+
+	// 1. 确保粒子效果已触发（如果动画非常快或者被跳过，可能没触发）
+	if !squashAnim.ParticlesTriggered {
+		s.triggerSquashParticles(zombieID, squashAnim)
+	}
+
+	// 2. 移除 SquashAnimationComponent
+	ecs.RemoveComponent[*components.SquashAnimationComponent](s.entityManager, zombieID)
+	log.Printf("[LawnmowerSystem] 僵尸 %d 压扁动画完成，移除 SquashAnimationComponent", zombieID)
+
+	// Story 10.6 修复：压扁动画结束后直接删除僵尸
+	// 原因：压扁动画本身就是完整的死亡过程（铲起→旋转→压扁）
+	//       不需要再播放 BehaviorZombieDying 动画（头部掉落）
+
+	// 3. 增加僵尸消灭计数（必须在删除实体之前）
+	// 注意：这里手动计数，因为僵尸不会经过 BehaviorSystem 的死亡流程
+	if s.gameState != nil {
+		s.gameState.IncrementZombiesKilled()
+		log.Printf("[LawnmowerSystem] 僵尸 %d 被除草车消灭，计数+1", zombieID)
+	}
+
+	// 4. 直接删除僵尸实体
+	s.entityManager.DestroyEntity(zombieID)
+	log.Printf("[LawnmowerSystem] 僵尸 %d 压扁完成，已删除", zombieID)
 }

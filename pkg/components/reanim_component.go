@@ -193,4 +193,20 @@ type ReanimComponent struct {
 	// 只有非循环动画到达最后一帧时才会设置为 true
 	// 循环动画始终为 false
 	IsFinished bool
+
+	// ==========================================================================
+	// 变换控制 (Transform Control)
+	// ==========================================================================
+
+	// Rotation 整体旋转角度（度）
+	// 用于实现压扁动画等整体旋转效果
+	Rotation float64
+
+	// ScaleX 整体 X 轴缩放
+	// 默认为 1.0。与 ScaleComponent 叠加（乘法）
+	ScaleX float64
+
+	// ScaleY 整体 Y 轴缩放
+	// 默认为 1.0。与 ScaleComponent 叠加（乘法）
+	ScaleY float64
 }

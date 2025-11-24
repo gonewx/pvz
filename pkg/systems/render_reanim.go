@@ -141,9 +141,33 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		if scaleComp, hasScaleComp := ecs.GetComponent[*components.ScaleComponent](s.entityManager, id); hasScaleComp {
 			entityScaleX = scaleComp.ScaleX
 			entityScaleY = scaleComp.ScaleY
-			// 缩放部件的相对位置（用于整体缩放/镜像）
-			partX *= entityScaleX
-			partY *= entityScaleY
+		}
+
+		// 叠加 ReanimComponent 的整体缩放
+		if reanimComp.ScaleX != 0 {
+			entityScaleX *= reanimComp.ScaleX
+		}
+		if reanimComp.ScaleY != 0 {
+			entityScaleY *= reanimComp.ScaleY
+		}
+
+		// 应用整体缩放（影响部件位置）
+		partX *= entityScaleX
+		partY *= entityScaleY
+
+		// 应用整体旋转（ReanimComponent.Rotation，影响部件位置）
+		if reanimComp.Rotation != 0 {
+			rad := reanimComp.Rotation * math.Pi / 180.0
+			cosR := math.Cos(rad)
+			sinR := math.Sin(rad)
+
+			// 旋转部件位置（相对于实体原点）
+			// x' = x*cos - y*sin
+			// y' = x*sin + y*cos
+			newX := partX*cosR - partY*sinR
+			newY := partX*sinR + partY*cosR
+			partX = newX
+			partY = newY
 		}
 
 		// 获取图片尺寸
@@ -239,6 +263,27 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 			// 但如果 entityScaleY 也是负的，则需要镜像 Y 方向
 			b *= entityScaleY
 			d *= entityScaleY
+		}
+
+		// 应用整体旋转（ReanimComponent.Rotation）到变换矩阵
+		if reanimComp.Rotation != 0 {
+			rad := reanimComp.Rotation * math.Pi / 180.0
+			cosR := math.Cos(rad)
+			sinR := math.Sin(rad)
+
+			// M_final = M_rotation * M_current
+			// [cos -sin] * [a c] = [cos*a - sin*b,  cos*c - sin*d]
+			// [sin  cos]   [b d]   [sin*a + cos*b,  sin*c + cos*d]
+
+			newA := cosR*a - sinR*b
+			newB := sinR*a + cosR*b
+			newC := cosR*c - sinR*d
+			newD := sinR*c + cosR*d
+
+			a = newA
+			b = newB
+			c = newC
+			d = newD
 		}
 
 		// 计算最终位置（部件位置 + 父子偏移 + 实体屏幕位置）

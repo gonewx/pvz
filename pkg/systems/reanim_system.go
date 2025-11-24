@@ -1152,6 +1152,8 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 
 // GetRenderData 获取渲染数据（供 RenderSystem 使用）
 // 如果缓存失效，会自动重建缓存
+// Story 10.6: 如果实体有 SquashAnimationComponent，跳过缓存重建
+// 因为压扁动画的变换是在 LawnmowerSystem.ApplySquashTransforms() 中手动应用的
 func (s *ReanimSystem) GetRenderData(entityID ecs.EntityID) []components.RenderPartData {
 	comp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 	if !ok {

@@ -9,7 +9,7 @@ availablePlants:              # 可用植物
   - "peashooter"
   - "sunflower"
   - "cherrybomb"
-skipOpening: false            # 不跳过开场
+skipOpening: true            # 不跳过开场
 initialSun: 50                # 初始阳光50
 
 # Story 8.7: 僵尸行转换模式
@@ -36,11 +36,11 @@ sodRollParticles: false                       # 禁用土粒飞溅特效
 # 波次配置：1面旗帜（2个小波次 + 1个旗帜波）
 waves:
   # 第1波：游戏开始后20秒，3个普通僵尸
-  - delay: 20
+  - delay: 1
     zombies:
       - type: "basic"
         lanes: [2, 3, 4]  # 随机从3行中选择
-        count: 3
+        count: 1
         spawnInterval: 2.0
 
   # # 第2波：第1波消灭后15秒，4个普通僵尸

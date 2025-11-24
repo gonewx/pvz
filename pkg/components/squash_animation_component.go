@@ -43,6 +43,10 @@ type SquashAnimationComponent struct {
 	// 用于跟随除草车移动（僵尸的 X 坐标会同步除草车的移动）
 	LawnmowerEntityID ecs.EntityID
 
+	// ParticlesTriggered 是否已触发粒子效果
+	// 用于在动画播放中途（压扁开始时）触发头部/手臂掉落粒子，并隐藏对应身体部件
+	ParticlesTriggered bool
+
 	// IsCompleted 动画是否已完成
 	// 当动画播放到最后一帧时设置为 true
 	IsCompleted bool
@@ -100,6 +104,15 @@ func (s *SquashAnimationComponent) IsComplete() bool {
 // GetCurrentFrameIndex 根据当前已播放时间计算应该播放的帧索引
 // 返回:
 //   - int: 帧索引（0 到 len(LocatorFrames)-1），如果动画结束返回最后一帧
+//
+// Story 10.6 帧索引映射说明：
+// - 8帧动画（索引 0-7），每帧占据动画时长的 1/8
+// - 帧0: progress ∈ [0.000, 0.125)
+// - 帧1: progress ∈ [0.125, 0.250)
+// - ...
+// - 帧7: progress ∈ [0.875, 1.000]（注意：最后一帧包含1.0）
+// - 公式：frameIndex = min(int(progress * frameCount), frameCount - 1)
+//   确保 progress=1.0 时不会越界
 func (s *SquashAnimationComponent) GetCurrentFrameIndex() int {
 	progress := s.GetProgress()
 	frameCount := len(s.LocatorFrames)
@@ -107,15 +120,12 @@ func (s *SquashAnimationComponent) GetCurrentFrameIndex() int {
 		return 0
 	}
 
-	// 计算帧索引（progress * frameCount）
+	// 帧索引计算：progress × frameCount，然后限制到最后一帧
 	frameIndex := int(progress * float64(frameCount))
 
-	// 限制在有效范围内
+	// 确保不越界：当 progress=1.0 时，frameIndex=frameCount，需要钳制到 frameCount-1
 	if frameIndex >= frameCount {
 		frameIndex = frameCount - 1
-	}
-	if frameIndex < 0 {
-		frameIndex = 0
 	}
 
 	return frameIndex

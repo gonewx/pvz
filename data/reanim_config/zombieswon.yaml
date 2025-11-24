@@ -11,13 +11,13 @@ images:
 available_animations:
     - name: fullscreen
       display_name: fullscreen
-      speed: 0.2
+      speed: 0.5
     - name: fullscreen2
       display_name: fullscreen2
-      speed: 0.2      
+      speed: 0.5      
     - name: ZombiesWon
       display_name: ZombiesWon
-      speed: 0.2
+      speed: 0.5
 
 animation_combos:
     - name: "appear"
