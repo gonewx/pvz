@@ -7,6 +7,7 @@ import (
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/entities"
+	"github.com/decker502/pvz/pkg/utils"
 )
 
 func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaTime float64) {
@@ -62,13 +63,41 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 		return
 	}
 
-	// DEBUG: 记录僵尸速度
-	log.Printf("[BehaviorSystem] Zombie %d moving: X=%.1f, VX=%.2f, VY=%.2f",
-		entityID, position.X, velocity.VX, velocity.VY)
+	// 尝试使用根运动法计算位移
+	// 根运动法：从 Reanim 动画的 _ground 轨道读取帧间位移增量，实现脚步与地面同步
+	reanim, hasReanim := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	useRootMotion := false
 
-	// 更新位置：根据速度和时间增量移动僵尸
-	position.X += velocity.VX * deltaTime
-	position.Y += velocity.VY * deltaTime
+	if hasReanim {
+		// 尝试使用根运动法
+		deltaX, deltaY, err := utils.CalculateRootMotionDelta(reanim, "_ground")
+
+		if err == nil {
+			// 成功：应用根运动位移
+			position.X += deltaX
+			position.Y += deltaY
+			useRootMotion = true
+
+			// DEBUG 日志（通过 verbose 标志控制）
+			log.Printf("[BehaviorSystem] Zombie %d root motion: X=%.1f, deltaX=%.2f, deltaY=%.2f",
+				entityID, position.X, deltaX, deltaY)
+		} else {
+			// 失败：记录警告并回退到固定速度法
+			log.Printf("[BehaviorSystem] ⚠️ Root motion failed for zombie %d: %v, falling back to fixed velocity",
+				entityID, err)
+		}
+	}
+
+	// 后备方案：如果根运动失败或没有 ReanimComponent，使用固定速度法
+	if !useRootMotion {
+		// DEBUG: 记录僵尸速度
+		log.Printf("[BehaviorSystem] Zombie %d moving: X=%.1f, VX=%.2f, VY=%.2f",
+			entityID, position.X, velocity.VX, velocity.VY)
+
+		// 更新位置：根据速度和时间增量移动僵尸
+		position.X += velocity.VX * deltaTime
+		position.Y += velocity.VY * deltaTime
+	}
 
 	// 边界检查：如果僵尸移出屏幕左侧，标记删除
 	// 使用 config.ZombieDeletionBoundary 提供容错空间，避免僵尸刚移出就被删除

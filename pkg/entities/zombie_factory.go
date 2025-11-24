@@ -57,10 +57,17 @@ func NewZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spawnX f
 	}
 
 	// 添加基础 ReanimComponent
+	// LastGroundX/Y 初始化为 0.0，用于根运动计算
+	// LastAnimFrame 初始化为 -1，表示尚未开始动画
 	em.AddComponent(entityID, &components.ReanimComponent{
-		ReanimName: "Zombie",
-		ReanimXML:  reanimXML,
-		PartImages: partImages,
+		ReanimName:        "Zombie",
+		ReanimXML:         reanimXML,
+		PartImages:        partImages,
+		LastGroundX:       0.0,
+		LastGroundY:       0.0,
+		LastAnimFrame:     -1,
+		AccumulatedDeltaX: 0.0,
+		AccumulatedDeltaY: 0.0,
 	})
 
 	// ✅ Epic 14: 使用 AnimationCommand 触发动画（替代直接调用 ReanimSystem）
@@ -113,6 +120,7 @@ func NewZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spawnX f
 // 返回:
 //   - ecs.EntityID: 创建的路障僵尸实体ID，如果失败返回 0
 //   - error: 如果创建失败返回错误信息
+//
 // Story 14.3: Epic 14 - 移除 ReanimSystem 依赖，动画通过 AnimationCommand 组件初始化
 func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spawnX float64) (ecs.EntityID, error) {
 	if em == nil {
@@ -148,10 +156,17 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, 
 
 	// 添加 ReanimComponent（路障僵尸：基础部件 + 路障）
 	// Story 13.7: 使用配置驱动，不再硬编码 VisibleTracks
+	// LastGroundX/Y 初始化为 0.0，用于根运动计算
+	// LastAnimFrame 初始化为 -1，表示尚未开始动画
 	em.AddComponent(entityID, &components.ReanimComponent{
-		ReanimName: "Zombie",
-		ReanimXML:  reanimXML,
-		PartImages: partImages,
+		ReanimName:        "Zombie",
+		ReanimXML:         reanimXML,
+		PartImages:        partImages,
+		LastGroundX:       0.0,
+		LastGroundY:       0.0,
+		LastAnimFrame:     -1,
+		AccumulatedDeltaX: 0.0,
+		AccumulatedDeltaY: 0.0,
 	})
 
 	// ✅ Epic 14: 使用 AnimationCommand 触发动画（替代直接调用 ReanimSystem）
@@ -210,6 +225,7 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, 
 // 返回:
 //   - ecs.EntityID: 创建的铁桶僵尸实体ID，如果失败返回 0
 //   - error: 如果创建失败返回错误信息
+//
 // Story 14.3: Epic 14 - 移除 ReanimSystem 依赖，动画通过 AnimationCommand 组件初始化
 func NewBucketheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spawnX float64) (ecs.EntityID, error) {
 	if em == nil {
@@ -245,10 +261,17 @@ func NewBucketheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int
 
 	// 添加 ReanimComponent（铁桶僵尸：基础部件 + 铁桶）
 	// Story 13.7: 使用配置驱动，不再硬编码 VisibleTracks
+	// LastGroundX/Y 初始化为 0.0，用于根运动计算
+	// LastAnimFrame 初始化为 -1，表示尚未开始动画
 	em.AddComponent(entityID, &components.ReanimComponent{
-		ReanimName: "Zombie",
-		ReanimXML:  reanimXML,
-		PartImages: partImages,
+		ReanimName:        "Zombie",
+		ReanimXML:         reanimXML,
+		PartImages:        partImages,
+		LastGroundX:       0.0,
+		LastGroundY:       0.0,
+		LastAnimFrame:     -1,
+		AccumulatedDeltaX: 0.0,
+		AccumulatedDeltaY: 0.0,
 	})
 
 	// ✅ Epic 14: 使用 AnimationCommand 触发动画（替代直接调用 ReanimSystem）

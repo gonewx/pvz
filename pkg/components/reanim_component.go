@@ -209,4 +209,31 @@ type ReanimComponent struct {
 	// ScaleY 整体 Y 轴缩放
 	// 默认为 1.0。与 ScaleComponent 叠加（乘法）
 	ScaleY float64
+
+	// ==========================================================================
+	// 根运动（Root Motion）相关字段
+	// ==========================================================================
+
+	// LastGroundX 存储上一帧 _ground 轨道的 X 坐标
+	// 用于计算帧间位移增量，实现僵尸脚步与地面的同步
+	// 初始化时必须设置为 0.0
+	LastGroundX float64
+
+	// LastGroundY 存储上一帧 _ground 轨道的 Y 坐标
+	// 用于计算帧间位移增量
+	// 初始化时必须设置为 0.0
+	LastGroundY float64
+
+	// LastAnimFrame 存储上一次动画帧索引
+	// 用于检测动画帧是否变化，实现位移插值
+	// 初始化时必须设置为 -1
+	LastAnimFrame int
+
+	// AccumulatedDeltaX 存储每游戏帧固定的 X 位移（用于线性插值）
+	// 当动画帧变化时，计算总位移除以插值帧数（5帧），得到每帧固定值
+	// 后续游戏帧直接返回此固定值，实现线性均匀分配（避免指数衰减）
+	AccumulatedDeltaX float64
+
+	// AccumulatedDeltaY 存储每游戏帧固定的 Y 位移
+	AccumulatedDeltaY float64
 }
