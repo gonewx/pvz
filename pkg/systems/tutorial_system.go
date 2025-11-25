@@ -159,6 +159,11 @@ func (s *TutorialSystem) Update(dt float64) {
 			log.Printf("[TutorialSystem] Skipping sunflowerReminder text display (sunflowerCount=%d >= 3)", s.sunflowerCount)
 		}
 
+		// 如果 textKey 为空，也跳过文本显示（如 hideSunflowerHint 步骤）
+		if currentStep.TextKey == "" {
+			skipTextDisplay = true
+		}
+
 		// 从 LawnStrings 获取文本
 		text := ""
 		if !skipTextDisplay {
