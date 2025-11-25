@@ -104,6 +104,15 @@ func NewZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spawnX f
 		Height: config.ZombieCollisionHeight,
 	})
 
+	// Story 10.7: 为僵尸添加阴影组件
+	shadowSize := config.GetShadowSize("zombie")
+	em.AddComponent(entityID, &components.ShadowComponent{
+		Width:   shadowSize.Width,
+		Height:  shadowSize.Height,
+		Alpha:   config.DefaultShadowAlpha,
+		OffsetY: 0,
+	})
+
 	return entityID, nil
 }
 
@@ -209,6 +218,15 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, 
 		Height: config.ZombieCollisionHeight,
 	})
 
+	// Story 10.7: 为路障僵尸添加阴影组件
+	shadowSize := config.GetShadowSize("zombie_cone")
+	em.AddComponent(entityID, &components.ShadowComponent{
+		Width:   shadowSize.Width,
+		Height:  shadowSize.Height,
+		Alpha:   config.DefaultShadowAlpha,
+		OffsetY: 0,
+	})
+
 	return entityID, nil
 }
 
@@ -312,6 +330,15 @@ func NewBucketheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int
 	em.AddComponent(entityID, &components.CollisionComponent{
 		Width:  config.ZombieCollisionWidth,
 		Height: config.ZombieCollisionHeight,
+	})
+
+	// Story 10.7: 为铁桶僵尸添加阴影组件
+	shadowSize := config.GetShadowSize("zombie_bucket")
+	em.AddComponent(entityID, &components.ShadowComponent{
+		Width:   shadowSize.Width,
+		Height:  shadowSize.Height,
+		Alpha:   config.DefaultShadowAlpha,
+		OffsetY: 0,
 	})
 
 	return entityID, nil

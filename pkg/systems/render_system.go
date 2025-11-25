@@ -42,9 +42,12 @@ import (
 //   - CLAUDE.md#组件使用策略
 //   - docs/stories/6.3.story.md
 type RenderSystem struct {
-	entityManager     *ecs.EntityManager
-	reanimSystem      *ReanimSystem         // ✅ 修复：添加 ReanimSystem 引用以调用 GetRenderData()
-	resourceManager   interface{ GetImageByID(string) *ebiten.Image } // 资源管理器（用于加载房门图片等）
+	entityManager   *ecs.EntityManager
+	reanimSystem    *ReanimSystem // ✅ 修复：添加 ReanimSystem 引用以调用 GetRenderData()
+	resourceManager interface {
+		GetImageByID(string) *ebiten.Image
+		GetShadowImage() *ebiten.Image // Story 10.7: 添加获取阴影贴图的方法
+	} // 资源管理器（用于加载房门图片、阴影贴图等）
 	debugPrinted      map[ecs.EntityID]bool // 记录已打印调试信息的实体
 	particleVertices  []ebiten.Vertex       // 粒子顶点数组（复用，避免每帧分配）
 	particleIndices   []uint16              // 粒子索引数组（复用，避免每帧分配）
@@ -67,8 +70,12 @@ func (s *RenderSystem) SetReanimSystem(rs *ReanimSystem) {
 	s.reanimSystem = rs
 }
 
-// SetResourceManager 设置 ResourceManager 引用（用于加载房门图片等）
-func (s *RenderSystem) SetResourceManager(rm interface{ GetImageByID(string) *ebiten.Image }) {
+// SetResourceManager 设置 ResourceManager 引用（用于加载房门图片、阴影贴图等）
+// Story 10.7: 扩展接口以支持 GetShadowImage()
+func (s *RenderSystem) SetResourceManager(rm interface {
+	GetImageByID(string) *ebiten.Image
+	GetShadowImage() *ebiten.Image
+}) {
 	s.resourceManager = rm
 }
 
@@ -118,6 +125,9 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 		*components.PositionComponent,
 		*components.ReanimComponent,
 	](s.entityManager)
+
+	// Story 10.7: 第一遍A：渲染植物阴影（底层-阴影层）
+	s.drawPlantShadows(screen, entities, cameraX)
 
 	// 第一遍：渲染植物（底层）
 	for _, id := range entities {
@@ -245,6 +255,9 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 		// 二级排序：当Y坐标相同时，按X坐标（从大到小，右侧先渲染）
 		return posI.X > posJ.X
 	})
+
+	// Story 10.7: 第二遍A：渲染僵尸阴影（中间层-阴影层）
+	s.drawZombieShadows(screen, zombiesAndProjectiles, cameraX)
 
 	// Story 8.8 - Task 6: Phase 2+ 时渲染房门图片
 	// 渲染顺序：阴影层（underlay）→ 僵尸 → 门板层（mask）→ ZombiesWon动画（UI层）
@@ -1198,3 +1211,138 @@ func (s *RenderSystem) drawGameOverDoorOverlay(screen *ebiten.Image, cameraX flo
 
 	screen.DrawImage(overlayImg, op)
 }
+
+// drawPlantShadows 渲染植物阴影
+// Story 10.7: 为植物添加阴影效果以增加场景深度感
+//
+// 阴影定位策略：
+//   - 植物的 pos 是格子中心，阴影应该在格子底部中心（脚底位置）
+//   - 格子底部 Y = pos.Y + CellHeight/2
+//   - 阴影稍微上移一点，让它看起来在脚下而不是脚后面
+//
+// 参数:
+//   - screen: 绘制目标屏幕
+//   - entities: 所有实体的ID列表
+//   - cameraX: 摄像机X坐标
+func (s *RenderSystem) drawPlantShadows(screen *ebiten.Image, entities []ecs.EntityID, cameraX float64) {
+	if s.resourceManager == nil {
+		return
+	}
+
+	// 加载阴影贴图
+	shadowImg := s.resourceManager.GetShadowImage()
+	if shadowImg == nil {
+		return // 阴影贴图加载失败，不渲染阴影
+	}
+
+	// 获取阴影贴图的原始尺寸
+	shadowImgBounds := shadowImg.Bounds()
+	shadowImgWidth := float64(shadowImgBounds.Dx())
+	shadowImgHeight := float64(shadowImgBounds.Dy())
+
+	// 遍历所有植物实体，渲染阴影
+	for _, id := range entities {
+		// 跳过非植物实体
+		_, isPlant := ecs.GetComponent[*components.PlantComponent](s.entityManager, id)
+		if !isPlant {
+			continue
+		}
+
+		// 获取位置组件
+		pos, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, id)
+		if !hasPos {
+			continue
+		}
+
+		// 计算阴影位置：格子底部中心，稍微上移让阴影在脚下
+		// 格子底部 Y = pos.Y + CellHeight/2
+		// 阴影上移偏移量，让阴影看起来在植物脚下而不是脚后面
+		shadowOffsetY := config.PlantShadowOffsetY // 可配置的偏移量
+		footY := pos.Y + config.CellHeight/2 + shadowOffsetY
+		screenX := pos.X - shadowImgWidth/2 - cameraX
+		screenY := footY - shadowImgHeight/2
+
+		// 应用变换和透明度
+		op := &ebiten.DrawImageOptions{}
+		op.GeoM.Translate(screenX, screenY)
+		op.ColorScale.ScaleAlpha(config.DefaultShadowAlpha) // 使用配置的透明度
+
+		// 绘制阴影
+		screen.DrawImage(shadowImg, op)
+	}
+}
+
+// drawZombieShadows 渲染僵尸阴影
+// Story 10.7: 为僵尸添加阴影效果以增加场景深度感
+//
+// 阴影定位策略：
+//   - 僵尸的 pos.Y 是格子中心 + ZombieVerticalOffset
+//   - 僵尸脚底位置约在格子底部
+//   - 阴影绘制在格子底部中心
+//
+// 参数:
+//   - screen: 绘制目标屏幕
+//   - zombieEntities: 僵尸实体的ID列表（已按Y坐标排序）
+//   - cameraX: 摄像机X坐标
+func (s *RenderSystem) drawZombieShadows(screen *ebiten.Image, zombieEntities []ecs.EntityID, cameraX float64) {
+	if s.resourceManager == nil {
+		return
+	}
+
+	// 加载阴影贴图
+	shadowImg := s.resourceManager.GetShadowImage()
+	if shadowImg == nil {
+		return // 阴影贴图加载失败，不渲染阴影
+	}
+
+	// 获取阴影贴图的原始尺寸
+	shadowImgBounds := shadowImg.Bounds()
+	shadowImgWidth := float64(shadowImgBounds.Dx())
+	shadowImgHeight := float64(shadowImgBounds.Dy())
+
+	// 遍历所有僵尸实体，渲染阴影
+	for _, id := range zombieEntities {
+		// 只渲染有 BehaviorComponent 且是僵尸类型的实体
+		behaviorComp, hasBehavior := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, id)
+		if !hasBehavior {
+			continue
+		}
+
+		// 检查是否是僵尸类型
+		isZombie := behaviorComp.Type == components.BehaviorZombieBasic ||
+			behaviorComp.Type == components.BehaviorZombieEating ||
+			behaviorComp.Type == components.BehaviorZombieDying ||
+			behaviorComp.Type == components.BehaviorZombieSquashing ||
+			behaviorComp.Type == components.BehaviorZombieConehead ||
+			behaviorComp.Type == components.BehaviorZombieBuckethead
+
+		if !isZombie {
+			continue
+		}
+
+		// 获取位置组件
+		pos, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, id)
+		if !hasPos {
+			continue
+		}
+
+		// 计算阴影位置：僵尸脚底中心
+		// 僵尸 pos.Y = 格子中心 + ZombieVerticalOffset
+		// 脚底位置 = pos.Y - ZombieVerticalOffset + CellHeight/2 + shadowOffsetY
+		// 简化为：格子底部 + shadowOffsetY
+		shadowOffsetX := config.ZombieShadowOffsetX // 可配置的 X 偏移量
+		shadowOffsetY := config.ZombieShadowOffsetY // 可配置的 Y 偏移量
+		footY := pos.Y - config.ZombieVerticalOffset + config.CellHeight/2 + shadowOffsetY
+		screenX := pos.X - shadowImgWidth/2 - cameraX + shadowOffsetX
+		screenY := footY - shadowImgHeight/2
+
+		// 应用变换和透明度
+		op := &ebiten.DrawImageOptions{}
+		op.GeoM.Translate(screenX, screenY)
+		op.ColorScale.ScaleAlpha(config.DefaultShadowAlpha) // 使用配置的透明度
+
+		// 绘制阴影
+		screen.DrawImage(shadowImg, op)
+	}
+}
+

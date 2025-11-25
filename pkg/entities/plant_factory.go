@@ -171,6 +171,30 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 		log.Printf("[PlantFactory] 豌豆射手 %d: 成功使用集中配置文件创建动画", entityID)
 	}
 
+	// Story 10.7: 为植物添加阴影组件
+	// 根据植物类型从配置获取阴影尺寸
+	var shadowEntityType string
+	switch plantType {
+	case components.PlantSunflower:
+		shadowEntityType = "sunflower"
+	case components.PlantPeashooter:
+		shadowEntityType = "peashooter"
+	case components.PlantWallnut:
+		shadowEntityType = "wallnut"
+	case components.PlantCherryBomb:
+		shadowEntityType = "cherrybomb"
+	default:
+		shadowEntityType = "" // 使用默认尺寸,暂不支持 repeater 和 snowpea
+	}
+
+	shadowSize := config.GetShadowSize(shadowEntityType)
+	em.AddComponent(entityID, &components.ShadowComponent{
+		Width:   shadowSize.Width,
+		Height:  shadowSize.Height,
+		Alpha:   config.DefaultShadowAlpha,
+		OffsetY: 0,
+	})
+
 	return entityID, nil
 }
 
@@ -248,6 +272,15 @@ func NewWallnutEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameSta
 	em.AddComponent(entityID, &components.CollisionComponent{
 		Width:  config.CellWidth * 0.8,  // 碰撞盒宽度略小于格子宽度
 		Height: config.CellHeight * 0.8, // 碰撞盒高度略小于格子高度
+	})
+
+	// Story 10.7: 为坚果墙添加阴影组件
+	shadowSize := config.GetShadowSize("wallnut")
+	em.AddComponent(entityID, &components.ShadowComponent{
+		Width:   shadowSize.Width,
+		Height:  shadowSize.Height,
+		Alpha:   config.DefaultShadowAlpha,
+		OffsetY: 0,
 	})
 
 	return entityID, nil
@@ -332,6 +365,15 @@ func NewCherryBombEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.Game
 	em.AddComponent(entityID, &components.CollisionComponent{
 		Width:  config.CellWidth,
 		Height: config.CellHeight,
+	})
+
+	// Story 10.7: 为樱桃炸弹添加阴影组件
+	shadowSize := config.GetShadowSize("cherrybomb")
+	em.AddComponent(entityID, &components.ShadowComponent{
+		Width:   shadowSize.Width,
+		Height:  shadowSize.Height,
+		Alpha:   config.DefaultShadowAlpha,
+		OffsetY: 0,
 	})
 
 	return entityID, nil

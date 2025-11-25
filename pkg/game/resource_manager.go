@@ -968,6 +968,37 @@ func (rm *ResourceManager) GetImageByID(resourceID string) *ebiten.Image {
 	return rm.imageCache[filePath]
 }
 
+// GetShadowImage 获取阴影贴图
+// 如果尚未加载,则自动加载 plantshadow.png
+// 此方法确保阴影贴图只加载一次并被缓存
+//
+// 返回值:
+//   - 阴影贴图的 ebiten.Image 指针
+//   - 如果加载失败则返回 nil
+//
+// 用法:
+//   shadowImg := rm.GetShadowImage()
+//   if shadowImg != nil {
+//       screen.DrawImage(shadowImg, op)
+//   }
+func (rm *ResourceManager) GetShadowImage() *ebiten.Image {
+	shadowPath := "assets/images/plantshadow.png"
+
+	// 检查缓存
+	if cachedImg, exists := rm.imageCache[shadowPath]; exists {
+		return cachedImg
+	}
+
+	// 加载阴影贴图
+	img, err := rm.LoadImage(shadowPath)
+	if err != nil {
+		log.Printf("警告: 无法加载阴影贴图 %s: %v", shadowPath, err)
+		return nil
+	}
+
+	return img
+}
+
 // LoadCompositedImage loads a base image and its alpha mask, then applies the mask to remove background.
 // This is used for PVZ assets where a JPG base image (with black background) needs to be
 // combined with a PNG mask to create transparency.
