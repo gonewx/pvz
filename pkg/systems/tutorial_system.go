@@ -140,6 +140,9 @@ func (s *TutorialSystem) Update(dt float64) {
 	// 获取当前步骤
 	currentStep := tutorial.TutorialSteps[tutorial.CurrentStepIndex]
 
+	// 更新状态跟踪变量（在检查触发条件之前更新，确保使用最新状态）
+	s.updateTrackingState()
+
 	// 更新步骤计时器（用于超时触发器）
 	s.stepTimeElapsed += dt
 
@@ -149,22 +152,31 @@ func (s *TutorialSystem) Update(dt float64) {
 		tutorial.CompletedSteps[currentStep.Trigger] = true
 		log.Printf("[TutorialSystem] Step %d triggered: %s", tutorial.CurrentStepIndex, currentStep.Trigger)
 
-		// 从 LawnStrings 获取文本
-		text := ""
-		if s.gameState.LawnStrings != nil {
-			text = s.gameState.LawnStrings.GetString(currentStep.TextKey)
-		} else {
-			// 如果 LawnStrings 未加载，显示键名（调试用）
-			text = "[" + currentStep.TextKey + "]"
+		// 特殊处理：sunflowerReminder 触发时，如果已有≥3颗向日葵，跳过文本显示
+		// 这是为了让玩家快速种植3颗向日葵时可以跳过提醒步骤
+		skipTextDisplay := currentStep.Trigger == "sunflowerReminder" && s.sunflowerCount >= 3
+		if skipTextDisplay {
+			log.Printf("[TutorialSystem] Skipping sunflowerReminder text display (sunflowerCount=%d >= 3)", s.sunflowerCount)
 		}
 
-		// 显示教学文本（根据 action 类型选择样式）
-		if currentStep.Action == "sunflowerHint" {
-			s.showTutorialTextAdvisory(text) // 提示性教学：更靠下，自动消失
-		} else {
-			s.showTutorialText(text) // 强制性教学：标准位置
+		// 从 LawnStrings 获取文本
+		text := ""
+		if !skipTextDisplay {
+			if s.gameState.LawnStrings != nil {
+				text = s.gameState.LawnStrings.GetString(currentStep.TextKey)
+			} else {
+				// 如果 LawnStrings 未加载，显示键名（调试用）
+				text = "[" + currentStep.TextKey + "]"
+			}
+
+			// 显示教学文本（根据 action 类型选择样式）
+			if currentStep.Action == "sunflowerHint" {
+				s.showTutorialTextAdvisory(text) // 提示性教学：更靠下，自动消失
+			} else {
+				s.showTutorialText(text) // 强制性教学：标准位置
+			}
+			s.lastTextDisplayTime = 0.01 // 重置计时器（从0.01开始，避免0值判断）
 		}
-		s.lastTextDisplayTime = 0.01 // 重置计时器（从0.01开始，避免0值判断）
 
 		// 方案A+：根据步骤触发器显示/隐藏箭头指示符和卡片闪烁
 		// 注意：如果 action 是 sunflowerHint，则跳过 trigger 中的箭头处理（由 action switch 处理）
@@ -238,14 +250,17 @@ func (s *TutorialSystem) Update(dt float64) {
 		// 根据 action 处理向日葵教学（Level 1-2）
 		switch currentStep.Action {
 		case "sunflowerHint":
-			// 显示箭头指向向日葵卡片，卡片闪烁
-			cardID := s.findSunflowerCard()
-			if cardID != 0 {
-				s.showArrowIndicator(cardID)
-				s.highlightPlantCard(cardID)
-				log.Printf("[TutorialSystem] sunflowerHint: showing arrow to sunflower card (ID=%d)", cardID)
-			} else {
-				log.Println("[TutorialSystem] WARNING: Cannot find sunflower card for sunflowerHint!")
+			// 如果是跳过文本显示的情况（已有≥3颗向日葵），不显示箭头
+			if !skipTextDisplay {
+				// 显示箭头指向向日葵卡片，卡片闪烁
+				cardID := s.findSunflowerCard()
+				if cardID != 0 {
+					s.showArrowIndicator(cardID)
+					s.highlightPlantCard(cardID)
+					log.Printf("[TutorialSystem] sunflowerHint: showing arrow to sunflower card (ID=%d)", cardID)
+				} else {
+					log.Println("[TutorialSystem] WARNING: Cannot find sunflower card for sunflowerHint!")
+				}
 			}
 			// 重置步骤计时器
 			s.stepTimeElapsed = 0
@@ -257,6 +272,15 @@ func (s *TutorialSystem) Update(dt float64) {
 			s.hideTutorialText()
 			tutorial.IsActive = false // 立即标记教学完成
 			log.Printf("[TutorialSystem] Sunflower tutorial completed (sunflowerCount=%d)", s.sunflowerCount)
+			return // 教学完成，直接返回，不再更新箭头
+
+		case "hideSunflowerHint":
+			// 隐藏箭头和卡片高亮，但保留教学文字让其自然超时消失
+			s.hideArrowIndicator()
+			s.unhighlightPlantCard()
+			tutorial.IsActive = false // 标记教学完成，不再处理后续步骤
+			log.Printf("[TutorialSystem] Sunflower hint hidden, text will auto-dismiss (sunflowerCount=%d)", s.sunflowerCount)
+			return // 直接返回
 		}
 
 		// 移动到下一步
@@ -273,9 +297,6 @@ func (s *TutorialSystem) Update(dt float64) {
 
 	// 重复显示箭头和闪光效果（因为粒子效果只播放1秒）
 	s.updateArrowRepeat(dt, currentStep)
-
-	// 更新状态跟踪变量（用于下一帧检测变化）
-	s.updateTrackingState()
 }
 
 // checkTriggerCondition 检查触发条件是否满足
@@ -399,8 +420,8 @@ func (s *TutorialSystem) checkTriggerCondition(trigger string) bool {
 		return s.sunflowerCount >= 2 || s.stepTimeElapsed >= 10.0
 
 	case "sunflowerReminder":
-		// 20秒后仍不足3颗向日葵
-		return s.stepTimeElapsed >= 20.0 && s.sunflowerCount < 3
+		// 20秒后仍不足3颗向日葵，或已经种植≥3颗（跳过提醒直接完成）
+		return (s.stepTimeElapsed >= 20.0 && s.sunflowerCount < 3) || s.sunflowerCount >= 3
 
 	case "sunflowerCount3":
 		// 种植≥3颗向日葵

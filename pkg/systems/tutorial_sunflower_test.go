@@ -95,11 +95,11 @@ func TestSunflowerTriggerConditions(t *testing.T) {
 			expected:       true,
 		},
 		{
-			name:           "sunflowerReminder - 20秒后已有3颗不触发",
+			name:           "sunflowerReminder - 20秒后已有3颗也触发（用于跳过步骤）",
 			trigger:        "sunflowerReminder",
 			sunflowerCount: 3,
 			timeElapsed:    20.0,
-			expected:       false,
+			expected:       true, // 新行为：也触发，但跳过文本显示
 		},
 		{
 			name:           "sunflowerReminder - 15秒不足3颗不触发",
@@ -107,6 +107,13 @@ func TestSunflowerTriggerConditions(t *testing.T) {
 			sunflowerCount: 2,
 			timeElapsed:    15.0,
 			expected:       false,
+		},
+		{
+			name:           "sunflowerReminder - 5秒已有3颗也触发（快速种植跳过）",
+			trigger:        "sunflowerReminder",
+			sunflowerCount: 3,
+			timeElapsed:    5.0,
+			expected:       true, // 新行为：时间未到但已有3颗，也触发以跳过步骤
 		},
 		{
 			name:           "sunflowerCount3 - 3颗向日葵触发",
@@ -314,8 +321,10 @@ func TestSunflowerTutorialProgression(t *testing.T) {
 	ts.updateTrackingState()
 	ts.Update(0.016)
 
-	if tutorial.CurrentStepIndex != 3 {
-		t.Errorf("After 3 sunflowers, CurrentStepIndex = %d, expected 3", tutorial.CurrentStepIndex)
+	// 注意：completeTutorial action 会提前 return，不会执行 CurrentStepIndex++
+	// 所以步骤索引仍然是 2，但教学已标记为完成
+	if tutorial.CurrentStepIndex != 2 {
+		t.Errorf("After 3 sunflowers, CurrentStepIndex = %d, expected 2 (completeTutorial returns early)", tutorial.CurrentStepIndex)
 	}
 
 	// 教学应该已完成

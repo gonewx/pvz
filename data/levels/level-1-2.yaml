@@ -54,10 +54,10 @@ tutorialSteps:
     textKey: "ADVICE_PLANT_SUNFLOWER3"
     action: "sunflowerHint"
 
-  # 步骤5：种植≥3颗向日葵，教学完成
+  # 步骤5：种植≥3颗向日葵，隐藏箭头（文字自然超时消失）
   - trigger: "sunflowerCount3"
     textKey: ""
-    action: "completeTutorial"
+    action: "hideSunflowerHint"
 
 # 波次配置：1面旗帜（2个小波次 + 1个旗帜波）
 waves:
