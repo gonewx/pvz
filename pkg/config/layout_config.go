@@ -85,6 +85,17 @@ const (
 	// 背景条顶部Y坐标 = screenHeight - TutorialTextBackgroundOffsetFromBottom
 	TutorialTextBackgroundOffsetFromBottom = 180.0
 
+	// ========== 提示性教学文本UI配置参数（Level 1-2 等非强制教学关卡） ==========
+
+	// AdvisoryTutorialTextOffsetFromBottom 提示性教学文本距离屏幕底部的偏移（像素）
+	AdvisoryTutorialTextOffsetFromBottom = 85.0
+
+	// AdvisoryTutorialTextBackgroundOffsetFromBottom 提示性教学背景条距离屏幕底部的偏移（像素）
+	AdvisoryTutorialTextBackgroundOffsetFromBottom = 125.0
+
+	// AdvisoryTutorialTextDisplayDuration 提示性教学文字显示时长（秒）
+	AdvisoryTutorialTextDisplayDuration = 5.0
+
 	// TutorialTextBackgroundAlpha 教学文本背景条的透明度（0-255）
 	TutorialTextBackgroundAlpha = 128
 

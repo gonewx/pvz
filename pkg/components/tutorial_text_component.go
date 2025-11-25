@@ -17,4 +17,9 @@ type TutorialTextComponent struct {
 	// BackgroundAlpha 背景透明度（0.0-1.0）
 	// 当前版本不使用背景框，保留用于后续优化
 	BackgroundAlpha float64
+
+	// IsAdvisory 是否为提示性教学（非强制）
+	// true: 使用更靠下的位置，自动定时消失（Level 1-2 向日葵教学）
+	// false: 使用标准位置，需要手动隐藏（Level 1-1 强制教学）
+	IsAdvisory bool
 }

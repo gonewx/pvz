@@ -1057,17 +1057,27 @@ func (s *RenderSystem) DrawTutorialText(screen *ebiten.Image, tutorialFont inter
 		// 获取屏幕尺寸
 		screenWidth, screenHeight := screen.Bounds().Dx(), screen.Bounds().Dy()
 
+		// 根据教学类型选择位置配置
+		var bgOffsetFromBottom, textOffsetFromBottom float64
+		if textComp.IsAdvisory {
+			// 提示性教学（Level 1-2）：更靠下
+			bgOffsetFromBottom = config.AdvisoryTutorialTextBackgroundOffsetFromBottom
+			textOffsetFromBottom = config.AdvisoryTutorialTextOffsetFromBottom
+		} else {
+			// 强制性教学（Level 1-1）：标准位置
+			bgOffsetFromBottom = config.TutorialTextBackgroundOffsetFromBottom
+			textOffsetFromBottom = config.TutorialTextOffsetFromBottom
+		}
+
 		// 绘制半透明黑色背景条（横贯整个屏幕）
-		// 使用配置常量，方便后续手工调整
-		bgY := float64(screenHeight) - config.TutorialTextBackgroundOffsetFromBottom
+		bgY := float64(screenHeight) - bgOffsetFromBottom
 		bgHeight := config.TutorialTextBackgroundHeight
 		ebitenutil.DrawRect(screen, 0, bgY, float64(screenWidth), bgHeight,
 			color.RGBA{0, 0, 0, uint8(config.TutorialTextBackgroundAlpha)})
 
 		// 计算文本位置（底部中央）
-		// 使用配置常量，方便后续手工调整
 		textX := float64(screenWidth) / 2
-		textY := float64(screenHeight) - config.TutorialTextOffsetFromBottom
+		textY := float64(screenHeight) - textOffsetFromBottom
 
 		// 检查是否为 TrueType 字体
 		if ttFont, ok := tutorialFont.(*text.GoTextFace); ok && ttFont != nil {

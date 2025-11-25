@@ -413,12 +413,16 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	log.Printf("[GameScene] Initialized flash effect system for hit feedback")
 
 	// Story 8.2: Initialize tutorial system (if this is a tutorial level)
-	if scene.gameState.CurrentLevel != nil && scene.gameState.CurrentLevel.OpeningType == "tutorial" && len(scene.gameState.CurrentLevel.TutorialSteps) > 0 {
+	if scene.gameState.CurrentLevel != nil && len(scene.gameState.CurrentLevel.TutorialSteps) > 0 {
 		scene.tutorialSystem = systems.NewTutorialSystem(scene.entityManager, scene.gameState, scene.resourceManager, scene.lawnGridSystem, scene.sunSpawnSystem, scene.waveSpawnSystem, scene.gameState.CurrentLevel)
 		log.Printf("[GameScene] Tutorial system activated for level %s", scene.gameState.CurrentLevel.ID)
 
-		// 禁用自动阳光生成（第一次收集阳光后由 TutorialSystem 启用）
-		scene.sunSpawnSystem.Disable()
+		// 仅强制性教学关卡禁用自动阳光生成
+		if scene.gameState.CurrentLevel.OpeningType == "tutorial" {
+			// 禁用自动阳光生成（第一次收集阳光后由 TutorialSystem 启用）
+			scene.sunSpawnSystem.Disable()
+			log.Printf("[GameScene] Tutorial level: suns will be spawned by tutorial system")
+		}
 
 		// Load tutorial font (使用简体中文黑体字体 SimHei.ttf)
 		ttFont, err := scene.resourceManager.LoadFont("assets/fonts/SimHei.ttf", 28)
@@ -428,10 +432,6 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 			scene.tutorialFont = ttFont
 			log.Printf("[GameScene] Loaded tutorial font: SimHei.ttf (28px)")
 		}
-
-		// Story 8.2: 教学关卡不预生成阳光
-		// 阳光由教学系统在特定步骤触发生成（种植第一个豌豆射手后、收集第一颗阳光后）
-		log.Printf("[GameScene] Tutorial level: suns will be spawned by tutorial system")
 	}
 
 	// Story 8.2 QA改进：初始化铺草皮动画系统

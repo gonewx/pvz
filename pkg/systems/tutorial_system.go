@@ -44,6 +44,10 @@ type TutorialSystem struct {
 	// 僵尸波次管理（教学关卡专用）
 	waveDelayTimer float64 // 波次延迟计时器（秒）
 	lastWaveKilled bool    // 上一波是否已全部击杀
+
+	// 向日葵教学相关（Level 1-2）
+	sunflowerCount  int     // 向日葵种植计数
+	stepTimeElapsed float64 // 当前步骤经过时间（用于超时触发）
 }
 
 // NewTutorialSystem 创建教学系统实例
@@ -96,6 +100,8 @@ func NewTutorialSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.Resou
 		arrowRepeatInterval:  1.0,   // Story 8.2.1: 箭头每1.0秒重复一次（粒子播放1秒），无缝衔接避免闪烁
 		waveDelayTimer:       0,     // 波次延迟计时器初始化
 		lastWaveKilled:       false, // 初始化为false
+		sunflowerCount:       0,     // 向日葵计数初始化
+		stepTimeElapsed:      0,     // 步骤计时器初始化
 	}
 }
 
@@ -134,6 +140,9 @@ func (s *TutorialSystem) Update(dt float64) {
 	// 获取当前步骤
 	currentStep := tutorial.TutorialSteps[tutorial.CurrentStepIndex]
 
+	// 更新步骤计时器（用于超时触发器）
+	s.stepTimeElapsed += dt
+
 	// 检查触发条件
 	if s.checkTriggerCondition(currentStep.Trigger) {
 		// 标记步骤已完成
@@ -149,25 +158,31 @@ func (s *TutorialSystem) Update(dt float64) {
 			text = "[" + currentStep.TextKey + "]"
 		}
 
-		// 显示教学文本
-		s.showTutorialText(text)
+		// 显示教学文本（根据 action 类型选择样式）
+		if currentStep.Action == "sunflowerHint" {
+			s.showTutorialTextAdvisory(text) // 提示性教学：更靠下，自动消失
+		} else {
+			s.showTutorialText(text) // 强制性教学：标准位置
+		}
 		s.lastTextDisplayTime = 0.01 // 重置计时器（从0.01开始，避免0值判断）
 
 		// 方案A+：根据步骤触发器显示/隐藏箭头指示符和卡片闪烁
-		switch currentStep.Trigger {
-		case "gameStart":
-			// 步骤1：游戏开始，显示箭头指向豌豆射手卡片（原版设计）
-			cardID := s.findPeashooterCard()
-			log.Printf("[TutorialSystem] gameStart: findPeashooterCard returned ID=%d", cardID)
-			if cardID != 0 {
-				s.showArrowIndicator(cardID)
-				// Story 8.2.1: 启用卡片闪光效果
-				s.highlightPlantCard(cardID)
-			} else {
-				log.Println("[TutorialSystem] WARNING: Cannot find peashooter card!")
-			}
+		// 注意：如果 action 是 sunflowerHint，则跳过 trigger 中的箭头处理（由 action switch 处理）
+		if currentStep.Action != "sunflowerHint" {
+			switch currentStep.Trigger {
+			case "gameStart":
+				// 步骤1：游戏开始，显示箭头指向豌豆射手卡片（原版设计）
+				cardID := s.findPeashooterCard()
+				log.Printf("[TutorialSystem] gameStart: findPeashooterCard returned ID=%d", cardID)
+				if cardID != 0 {
+					s.showArrowIndicator(cardID)
+					// Story 8.2.1: 启用卡片闪光效果
+					s.highlightPlantCard(cardID)
+				} else {
+					log.Println("[TutorialSystem] WARNING: Cannot find peashooter card!")
+				}
 
-		case "plantPlaced":
+			case "plantPlaced":
 			// 步骤3：种植第一个豌豆射手后，禁用草坪闪烁，启用阳光自动生成，生成一颗阳光
 			s.lawnGridSystem.DisableFlash() // 禁用草坪闪烁
 			log.Printf("[TutorialSystem] Lawn flash disabled (plantPlaced)")
@@ -217,6 +232,31 @@ func (s *TutorialSystem) Update(dt float64) {
 			s.unhighlightPlantCard()       // Story 8.2.1: 隐藏卡片闪光
 			s.lawnGridSystem.EnableFlash() // 启用草坪闪烁效果（由明变暗）
 			log.Printf("[TutorialSystem] Lawn flash enabled (secondSeedClicked)")
+			}
+		}
+
+		// 根据 action 处理向日葵教学（Level 1-2）
+		switch currentStep.Action {
+		case "sunflowerHint":
+			// 显示箭头指向向日葵卡片，卡片闪烁
+			cardID := s.findSunflowerCard()
+			if cardID != 0 {
+				s.showArrowIndicator(cardID)
+				s.highlightPlantCard(cardID)
+				log.Printf("[TutorialSystem] sunflowerHint: showing arrow to sunflower card (ID=%d)", cardID)
+			} else {
+				log.Println("[TutorialSystem] WARNING: Cannot find sunflower card for sunflowerHint!")
+			}
+			// 重置步骤计时器
+			s.stepTimeElapsed = 0
+
+		case "completeTutorial":
+			// 向日葵教学完成，隐藏所有提示
+			s.hideArrowIndicator()
+			s.unhighlightPlantCard()
+			s.hideTutorialText()
+			tutorial.IsActive = false // 立即标记教学完成
+			log.Printf("[TutorialSystem] Sunflower tutorial completed (sunflowerCount=%d)", s.sunflowerCount)
 		}
 
 		// 移动到下一步
@@ -349,6 +389,23 @@ func (s *TutorialSystem) checkTriggerCondition(trigger string) bool {
 		plantEntities := ecs.GetEntitiesWith1[*components.PlantComponent](s.entityManager)
 		return len(plantEntities) >= 2
 
+	// 向日葵教学触发器（Level 1-2）
+	case "sunflowerCount1OrTimeout":
+		// 种植1颗向日葵或10秒超时
+		return s.sunflowerCount >= 1 || s.stepTimeElapsed >= 10.0
+
+	case "sunflowerCount2OrTimeout":
+		// 种植2颗向日葵或10秒超时
+		return s.sunflowerCount >= 2 || s.stepTimeElapsed >= 10.0
+
+	case "sunflowerReminder":
+		// 20秒后仍不足3颗向日葵
+		return s.stepTimeElapsed >= 20.0 && s.sunflowerCount < 3
+
+	case "sunflowerCount3":
+		// 种植≥3颗向日葵
+		return s.sunflowerCount >= 3
+
 	default:
 		return false
 	}
@@ -358,14 +415,41 @@ func (s *TutorialSystem) checkTriggerCondition(trigger string) bool {
 // 参数：
 //   - text: 教学文本内容
 func (s *TutorialSystem) showTutorialText(text string) {
+	s.showTutorialTextWithStyle(text, false)
+}
+
+// showTutorialTextAdvisory 显示提示性教学文本（更靠下，自动消失）
+// 参数：
+//   - text: 教学文本内容
+func (s *TutorialSystem) showTutorialTextAdvisory(text string) {
+	s.showTutorialTextWithStyle(text, true)
+}
+
+// showTutorialTextWithStyle 显示教学文本（内部方法）
+// 参数：
+//   - text: 教学文本内容
+//   - isAdvisory: 是否为提示性教学（更靠下，自动消失）
+func (s *TutorialSystem) showTutorialTextWithStyle(text string, isAdvisory bool) {
 	// 如果教学文本实体已存在，更新文本
 	if s.textEntity != 0 {
 		if textComp, ok := ecs.GetComponent[*components.TutorialTextComponent](s.entityManager, s.textEntity); ok {
 			textComp.Text = text
 			textComp.DisplayTime = 0
-			log.Printf("[TutorialSystem] Updated tutorial text: %s", text)
+			textComp.IsAdvisory = isAdvisory
+			if isAdvisory {
+				textComp.MaxDisplayTime = config.AdvisoryTutorialTextDisplayDuration
+			} else {
+				textComp.MaxDisplayTime = 0 // 无限显示
+			}
+			log.Printf("[TutorialSystem] Updated tutorial text: %s (advisory=%v)", text, isAdvisory)
 			return
 		}
+	}
+
+	// 计算最大显示时间
+	maxDisplayTime := 0.0
+	if isAdvisory {
+		maxDisplayTime = config.AdvisoryTutorialTextDisplayDuration
 	}
 
 	// 创建新的教学文本实体
@@ -373,8 +457,9 @@ func (s *TutorialSystem) showTutorialText(text string) {
 	ecs.AddComponent(s.entityManager, s.textEntity, &components.TutorialTextComponent{
 		Text:            text,
 		DisplayTime:     0,
-		MaxDisplayTime:  0, // 无限显示，直到步骤完成
+		MaxDisplayTime:  maxDisplayTime,
 		BackgroundAlpha: 0.7,
+		IsAdvisory:      isAdvisory,
 	})
 	ecs.AddComponent(s.entityManager, s.textEntity, &components.UIComponent{
 		State: components.UINormal,
@@ -428,6 +513,15 @@ func (s *TutorialSystem) updateTrackingState() {
 	}
 
 	s.lastPlantCount = currentPlantCount
+
+	// 统计向日葵数量（Level 1-2 教学用）
+	s.sunflowerCount = 0
+	for _, plantID := range plantEntities {
+		plant, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, plantID)
+		if ok && plant.PlantType == components.PlantSunflower {
+			s.sunflowerCount++
+		}
+	}
 
 	// 更新阳光实体计数（用于检测新阳光生成）
 	sunEntities := ecs.GetEntitiesWith1[*components.SunComponent](s.entityManager)
@@ -551,6 +645,20 @@ func (s *TutorialSystem) findPeashooterCard() ecs.EntityID {
 	return 0
 }
 
+// findSunflowerCard 查找向日葵卡片实体
+// 返回：
+//   - ecs.EntityID: 卡片实体ID（0表示未找到）
+func (s *TutorialSystem) findSunflowerCard() ecs.EntityID {
+	cardEntities := ecs.GetEntitiesWith1[*components.PlantCardComponent](s.entityManager)
+	for _, cardID := range cardEntities {
+		card, ok := ecs.GetComponent[*components.PlantCardComponent](s.entityManager, cardID)
+		if ok && card.PlantType == components.PlantSunflower {
+			return cardID
+		}
+	}
+	return 0
+}
+
 // highlightPlantCard 显示卡片闪烁效果（Story 8.2.1: 使用遮罩式闪烁）
 // 参数：
 //   - targetEntity: 目标卡片实体ID
@@ -585,7 +693,7 @@ func (s *TutorialSystem) unhighlightPlantCard() {
 // updateArrowRepeat 更新箭头重复显示逻辑
 // 参数：
 //   - dt: 时间增量（秒）
-//   - currentStep: 当前教学步骤（未使用，保留用于扩展）
+//   - currentStep: 当前教学步骤
 //
 // 功能：
 //   - 因为粒子效果只播放1秒（SystemLoops=1, SystemDuration=100厘秒）
@@ -610,8 +718,14 @@ func (s *TutorialSystem) updateArrowRepeat(dt float64, currentStep config.Tutori
 	if s.arrowRepeatTimer >= s.arrowRepeatInterval {
 		s.arrowRepeatTimer = 0 // 重置定时器
 
-		// 找到豌豆射手卡片并重新显示箭头
-		cardID := s.findPeashooterCard()
+		// 根据当前步骤的 action 决定指向哪个卡片
+		var cardID ecs.EntityID
+		if currentStep.Action == "sunflowerHint" {
+			cardID = s.findSunflowerCard()
+		} else {
+			cardID = s.findPeashooterCard()
+		}
+
 		if cardID != 0 {
 			// 先隐藏旧的箭头（避免重复创建）
 			s.hideArrowIndicator()

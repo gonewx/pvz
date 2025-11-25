@@ -32,6 +32,33 @@ sodRollAnimation: true                        # 启用铺草皮动画
 sodRollParticles: true                        # 启用土粒飞溅特效
 soddingAnimLanes: [2, 4]                      # 只在第2/4行播放动画（第3行跳过）
 
+# 向日葵教学步骤配置（提示性教学）
+tutorialSteps:
+  # 步骤1：游戏开始，提示向日葵重要性
+  - trigger: "gameStart"
+    textKey: "ADVICE_PLANT_SUNFLOWER1"
+    action: "sunflowerHint"
+
+  # 步骤2：种植1颗向日葵或10秒后
+  - trigger: "sunflowerCount1OrTimeout"
+    textKey: "ADVICE_PLANT_SUNFLOWER2"
+    action: "sunflowerHint"
+
+  # 步骤3：种植2颗向日葵或10秒后
+  - trigger: "sunflowerCount2OrTimeout"
+    textKey: "ADVICE_MORE_SUNFLOWERS"
+    action: "sunflowerHint"
+
+  # 步骤4：20秒后仍不足3颗，再次提醒
+  - trigger: "sunflowerReminder"
+    textKey: "ADVICE_PLANT_SUNFLOWER3"
+    action: "sunflowerHint"
+
+  # 步骤5：种植≥3颗向日葵，教学完成
+  - trigger: "sunflowerCount3"
+    textKey: ""
+    action: "completeTutorial"
+
 # 波次配置：1面旗帜（2个小波次 + 1个旗帜波）
 waves:
   # 第1波：游戏开始后20秒，2个普通僵尸
