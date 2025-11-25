@@ -591,22 +591,60 @@ func (rprs *RewardPanelRenderSystem) drawHint(screen *ebiten.Image, alpha float6
 	text.Draw(screen, hintText, rprs.plantInfoFont, op)
 }
 
+// isHoveringNextButton 检查鼠标是否悬停在"下一关"按钮上
+func (rprs *RewardPanelRenderSystem) isHoveringNextButton() bool {
+	// 获取鼠标位置
+	mouseX, mouseY := ebiten.CursorPosition()
+
+	// 计算按钮位置（与 drawNextLevelButton 逻辑一致）
+	bgWidth := config.RewardPanelBackgroundWidth
+	bgHeight := config.RewardPanelBackgroundHeight
+	offsetX := (rprs.screenWidth - bgWidth) / 2
+	offsetY := (rprs.screenHeight - bgHeight) / 2
+
+	// 按钮中心位置
+	buttonX := offsetX + bgWidth/2
+	buttonY := offsetY + bgHeight*config.RewardPanelButtonY
+
+	// 按钮尺寸（根据 IMAGE_SEEDCHOOSER_BUTTON 的尺寸，约 155x38）
+	buttonWidth := 155.0
+	buttonHeight := 50.0 // 增大高度以提高可点击性
+
+	// AABB 碰撞检测
+	halfWidth := buttonWidth / 2
+	halfHeight := buttonHeight / 2
+
+	return float64(mouseX) >= buttonX-halfWidth && float64(mouseX) <= buttonX+halfWidth &&
+		float64(mouseY) >= buttonY-halfHeight && float64(mouseY) <= buttonY+halfHeight
+}
+
 // drawNextLevelButton 绘制"下一关"按钮（在面板底部）。
+// 当鼠标悬停时，使用高亮版本的按钮图片
 func (rprs *RewardPanelRenderSystem) drawNextLevelButton(screen *ebiten.Image, alpha float64) {
 	if alpha < 0.5 {
 		return
 	}
 
-	// 加载按钮图片（使用 SeedChooser_Button.png）
-	buttonImage := rprs.resourceManager.GetImageByID("IMAGE_SEEDCHOOSER_BUTTON")
+	// 检查是否悬停
+	isHovered := rprs.isHoveringNextButton()
+
+	// 根据悬停状态选择按钮图片
+	var buttonImage *ebiten.Image
+	if isHovered {
+		// 悬停时使用高亮图片
+		buttonImage = rprs.resourceManager.GetImageByID("IMAGE_SEEDCHOOSER_BUTTON_GLOW")
+	}
+	if buttonImage == nil {
+		// 使用普通按钮图片
+		buttonImage = rprs.resourceManager.GetImageByID("IMAGE_SEEDCHOOSER_BUTTON")
+	}
+
 	if buttonImage == nil {
 		log.Printf("[RewardPanelRenderSystem] WARNING: IMAGE_SEEDCHOOSER_BUTTON not loaded! Drawing fallback button")
 		// 如果资源未加载，绘制简单的矩形按钮作为后备
 		rprs.drawFallbackButton(screen, alpha)
 		return
 	}
-
-	log.Printf("[RewardPanelRenderSystem] Drawing next level button with alpha=%.2f", alpha)
 
 	// 奖励背景是 800x600
 	bgWidth := config.RewardPanelBackgroundWidth

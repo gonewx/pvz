@@ -153,32 +153,49 @@ func (ras *RewardAnimationSystem) TriggerReward(rewardType string, rewardID stri
 	startX := 500.0 + rand.Float64()*200.0 // 屏幕坐标 500-700
 	startY := config.GridWorldStartY + float64(randomLane)*config.CellHeight + config.CellHeight/2.0
 
-	// 计算 Phase 3 目标位置（屏幕坐标中央上方）
-	//
-	// 设计说明：
-	//   - 用户期望：卡片在屏幕的水平中央上方
-	//   - 屏幕宽度：800
-	//   - 屏幕中央X：800 / 2 = 400
-	//
-	// 计算流程：
-	//   1. 计算屏幕中央坐标
-	//   2. 减去半个卡片宽度，得到卡片左上角X坐标
-	//   3. Y坐标：草坪顶部上方约50像素（屏幕坐标）
-	screenCenterX := ras.screenWidth / 2.0 // 400
-	lawnTopY := config.GridWorldStartY     // 76 (世界坐标和屏幕坐标Y相同)
+	// 根据奖励类型计算不同的目标位置和初始缩放
+	var targetX, targetY float64
+	var startScale, endScale float64
 
-	// 注意：PositionComponent 是卡片左上角坐标，需要减去半个卡片宽度使卡片中心对齐
-	// 卡片原始尺寸 100x140，在 expanding 结束时，CardScale = 1.0，所以卡片宽度 = 100
-	cardWidthAtEnd := 100.0                       // RewardExpandScaleEnd = 1.0 时的卡片宽度
-	targetX := screenCenterX - cardWidthAtEnd/2.0 // 卡片左上角X = 屏幕中心X - 半宽 = 400 - 50 = 350
-	targetY := lawnTopY + 50.0                    // 草坪顶部下方50像素
+	if rewardType == "tool" {
+		// 工具奖励：目标位置应与奖励面板中铲子的显示位置一致
+		// 奖励面板使用卡片显示区域（RewardPanelCardBox）的中心
+		bgWidth := config.RewardPanelBackgroundWidth
+		bgHeight := config.RewardPanelBackgroundHeight
+		offsetX := (ras.screenWidth - bgWidth) / 2
+		offsetY := (ras.screenHeight - bgHeight) / 2
+
+		// 卡片显示区域中心（与 drawToolIcon 中的计算一致）
+		boxCenterX := offsetX + config.RewardPanelCardBoxLeft + config.RewardPanelCardBoxWidth/2
+		boxCenterY := offsetY + config.RewardPanelCardBoxTop + config.RewardPanelCardBoxHeight/2
+
+		// 工具图标使用中心锚点绘制，所以目标位置就是中心坐标
+		targetX = boxCenterX
+		targetY = boxCenterY
+
+		// 工具奖励使用专用的缩放配置
+		startScale = config.ShovelRewardStartScale // 约 0.56，与植物卡包视觉大小一致
+		endScale = config.ShovelRewardEndScale     // 1.0，与奖励面板中的显示一致
+	} else {
+		// 植物奖励：目标位置是屏幕中央上方
+		screenCenterX := ras.screenWidth / 2.0
+		lawnTopY := config.GridWorldStartY
+
+		// 卡片原始尺寸 100x140，目标缩放 1.0
+		cardWidthAtEnd := 100.0
+		targetX = screenCenterX - cardWidthAtEnd/2.0
+		targetY = lawnTopY + 50.0
+
+		// 植物奖励使用标准卡片缩放
+		startScale = config.PlantCardScale   // 0.50
+		endScale = RewardExpandScaleEnd      // 1.0
+	}
 
 	log.Printf("[RewardAnimationSystem] ===== 位置计算调试信息 =====")
-	log.Printf("[RewardAnimationSystem] 屏幕宽度: %.1f, 屏幕中心X: %.1f", ras.screenWidth, screenCenterX)
+	log.Printf("[RewardAnimationSystem] 屏幕宽度: %.1f", ras.screenWidth)
 	log.Printf("[RewardAnimationSystem] 起始屏幕坐标: (%.1f, %.1f)", startX, startY)
-	log.Printf("[RewardAnimationSystem] 卡片宽度(scale=1.0): %.1f", cardWidthAtEnd)
-	log.Printf("[RewardAnimationSystem] 目标X计算: %.1f - %.1f/2 = %.1f", screenCenterX, cardWidthAtEnd, targetX)
-	log.Printf("[RewardAnimationSystem] 卡片包起始位置: (%.1f, %.1f), 目标位置: (%.1f, %.1f)", startX, startY, targetX, targetY)
+	log.Printf("[RewardAnimationSystem] 目标位置: (%.1f, %.1f)", targetX, targetY)
+	log.Printf("[RewardAnimationSystem] 起始缩放: %.2f, 目标缩放: %.2f", startScale, endScale)
 	log.Printf("[RewardAnimationSystem] 随机行: %d", randomLane)
 
 	// 添加 RewardAnimationComponent
@@ -189,11 +206,11 @@ func (ras *RewardAnimationSystem) TriggerReward(rewardType string, rewardID stri
 		StartY:         startY,
 		TargetX:        targetX,
 		TargetY:        targetY,
-		Scale:          config.PlantCardScale, // 使用标准卡片缩放（0.50）
-		RewardType:     rewardType,            // 新增：奖励类型
-		PlantID:        rewardID,              // 兼容性：植物ID或工具ID都存这里
-		ToolID:         rewardID,              // 新增：工具ID（如果是工具奖励）
-		ParticleEffect: particleEffect,        // 新增：粒子效果名称
+		Scale:          startScale,     // 使用计算的初始缩放
+		RewardType:     rewardType,
+		PlantID:        rewardID,
+		ToolID:         rewardID,
+		ParticleEffect: particleEffect,
 	})
 
 	// 添加 PositionComponent
@@ -225,7 +242,7 @@ func (ras *RewardAnimationSystem) TriggerReward(rewardType string, rewardID stri
 			plantType,
 			startX,
 			startY,
-			config.PlantCardScale, // 使用标准卡片缩放（0.50）
+			startScale, // 使用计算的初始缩放
 		)
 		if err != nil {
 			log.Printf("[RewardAnimationSystem] Failed to create card pack entity: %v", err)
@@ -252,11 +269,11 @@ func (ras *RewardAnimationSystem) TriggerReward(rewardType string, rewardID stri
 			StartY:         startY,
 			TargetX:        targetX,
 			TargetY:        targetY,
-			Scale:          config.PlantCardScale, // 使用标准卡片缩放（0.50）
-			RewardType:     rewardType,            // 新增：奖励类型
-			PlantID:        rewardID,              // 兼容性：植物ID或工具ID都存这里
-			ToolID:         rewardID,              // 新增：工具ID
-			ParticleEffect: particleEffect,        // 新增：粒子效果名称
+			Scale:          startScale,
+			RewardType:     rewardType,
+			PlantID:        rewardID,
+			ToolID:         rewardID,
+			ParticleEffect: particleEffect,
 		})
 
 		log.Printf("[RewardAnimationSystem] 植物卡片包已创建（使用 Story 8.4 统一工厂方法）")
@@ -524,8 +541,8 @@ func (ras *RewardAnimationSystem) updateWaitingPhase(dt float64, rewardComp *com
 
 // updateExpandingPhase 处理卡片展开阶段（2秒）。
 // - Award.xml 粒子特效播放（12个光芒发射器跟随卡片移动）
-// - 卡片放大：config.PlantCardScale (0.50) → 1.0
-// - 移动到屏幕中央上方
+// - 卡片/工具放大到目标缩放
+// - 移动到目标位置
 func (ras *RewardAnimationSystem) updateExpandingPhase(dt float64, rewardComp *components.RewardAnimationComponent) {
 	// 获取位置组件
 	posComp, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.rewardEntity)
@@ -542,8 +559,18 @@ func (ras *RewardAnimationSystem) updateExpandingPhase(dt float64, rewardComp *c
 	// 应用缓动函数（easeOutQuad）
 	easedProgress := easeOutQuad(progress)
 
-	// 更新缩放（从标准卡片大小 0.50 放大到原始大小 1.0）
-	rewardComp.Scale = config.PlantCardScale + (RewardExpandScaleEnd-config.PlantCardScale)*easedProgress
+	// 根据奖励类型确定缩放的起始值和目标值
+	var startScale, endScale float64
+	if rewardComp.RewardType == "tool" {
+		startScale = config.ShovelRewardStartScale // 约 0.56
+		endScale = config.ShovelRewardEndScale     // 1.0
+	} else {
+		startScale = config.PlantCardScale // 0.50
+		endScale = RewardExpandScaleEnd    // 1.0
+	}
+
+	// 更新缩放（从起始缩放放大到目标缩放）
+	rewardComp.Scale = startScale + (endScale-startScale)*easedProgress
 
 	// 同步缩放到 PlantCardComponent（Story 8.4）
 	if cardComp, ok := ecs.GetComponent[*components.PlantCardComponent](ras.entityManager, ras.rewardEntity); ok {
@@ -838,6 +865,90 @@ func (ras *RewardAnimationSystem) IsActive() bool {
 // IsCompleted 返回系统是否已完成。
 func (ras *RewardAnimationSystem) IsCompleted() bool {
 	return !ras.isActive && ras.rewardEntity == 0
+}
+
+// IsHoveringReward 检查鼠标是否悬停在奖励图标上（用于光标显示）
+// 在 waiting 阶段悬停在卡片/工具图标上时返回 true
+func (ras *RewardAnimationSystem) IsHoveringReward() bool {
+	if !ras.isActive || ras.rewardEntity == 0 {
+		return false
+	}
+
+	// 只在 waiting 阶段检测悬停
+	rewardComp, ok := ecs.GetComponent[*components.RewardAnimationComponent](ras.entityManager, ras.rewardEntity)
+	if !ok || rewardComp.Phase != "waiting" {
+		return false
+	}
+
+	// 获取鼠标位置
+	mouseX, mouseY := ebiten.CursorPosition()
+
+	// 获取位置组件
+	posComp, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.rewardEntity)
+	if !ok {
+		return false
+	}
+
+	// 根据奖励类型计算边界框
+	var width, height float64
+	if rewardComp.RewardType == "tool" {
+		// 工具图标：使用铲子图片尺寸 (116 x 125) * scale
+		// 图标以中心点为锚点绘制
+		width = 116.0 * rewardComp.Scale
+		height = 125.0 * rewardComp.Scale
+		// 计算边界框（以中心点为锚点）
+		left := posComp.X - width/2
+		top := posComp.Y - height/2
+		right := posComp.X + width/2
+		bottom := posComp.Y + height/2
+		return float64(mouseX) >= left && float64(mouseX) <= right &&
+			float64(mouseY) >= top && float64(mouseY) <= bottom
+	} else {
+		// 植物卡片：使用卡片尺寸 (100 x 140) * scale
+		// 卡片以左上角为锚点绘制
+		width = 100.0 * rewardComp.Scale
+		height = 140.0 * rewardComp.Scale
+		left := posComp.X
+		top := posComp.Y
+		right := posComp.X + width
+		bottom := posComp.Y + height
+		return float64(mouseX) >= left && float64(mouseX) <= right &&
+			float64(mouseY) >= top && float64(mouseY) <= bottom
+	}
+}
+
+// IsHoveringNextButton 检查鼠标是否悬停在"下一关"按钮上
+// 在 showing 阶段悬停在按钮上时返回 true
+func (ras *RewardAnimationSystem) IsHoveringNextButton() bool {
+	if !ras.isActive || ras.currentPhase != "showing" {
+		return false
+	}
+
+	// 获取鼠标位置
+	mouseX, mouseY := ebiten.CursorPosition()
+
+	// 使用与 isNextLevelButtonClicked 相同的按钮位置计算
+	return ras.isNextLevelButtonClicked(float64(mouseX), float64(mouseY))
+}
+
+// GetCursorShape 返回当前应显示的光标形状
+// 调用者应在 Update 循环中调用此方法并设置光标
+func (ras *RewardAnimationSystem) GetCursorShape() ebiten.CursorShapeType {
+	if !ras.isActive {
+		return ebiten.CursorShapeDefault
+	}
+
+	// waiting 阶段：悬停在卡片/图标上时显示手形
+	if ras.IsHoveringReward() {
+		return ebiten.CursorShapePointer
+	}
+
+	// showing 阶段：悬停在"下一关"按钮上时显示手形
+	if ras.IsHoveringNextButton() {
+		return ebiten.CursorShapePointer
+	}
+
+	return ebiten.CursorShapeDefault
 }
 
 // GetEntity 返回当前奖励动画实体ID（用于调试和验证）。

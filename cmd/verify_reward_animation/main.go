@@ -26,8 +26,11 @@ const (
 
 var (
 	// 命令行参数
-	plantID = flag.String("plant", "sunflower", "植物ID (sunflower, peashooter, cherrybomb, wallnut)")
-	verbose = flag.Bool("verbose", false, "显示详细调试信息")
+	plantID    = flag.String("plant", "", "植物ID (sunflower, peashooter, cherrybomb, wallnut)")
+	toolID     = flag.String("tool", "", "工具ID (shovel)")
+	verbose    = flag.Bool("verbose", false, "显示详细调试信息")
+	rewardType string // 奖励类型: "plant" 或 "tool"
+	rewardID   string // 奖励ID
 )
 
 // VerifyRewardAnimationGame 完整奖励动画流程验证游戏
@@ -82,12 +85,21 @@ func NewVerifyRewardAnimationGame() (*VerifyRewardAnimationGame, error) {
 		log.Fatal("Failed to load Reanim resources:", err)
 	}
 
+	// 加载 Reanim 配置管理器
+	log.Println("Loading Reanim config...")
+	reanimConfigManager, err := config.NewReanimConfigManager("data/reanim_config")
+	if err != nil {
+		return nil, fmt.Errorf("failed to load reanim config: %w", err)
+	}
+
 	// 获取游戏状态单例
 	gs := game.GetGameState()
 	gs.CameraX = config.GameCameraX // 设置摄像机位置
 
 	// 创建系统
 	reanimSystem := systems.NewReanimSystem(em)
+	// 设置配置管理器（必须在 PlayCombo 之前设置）
+	reanimSystem.SetConfigManager(reanimConfigManager)
 	particleSystem := systems.NewParticleSystem(em, rm) // 粒子系统用于光晕效果
 	renderSystem := systems.NewRenderSystem(em)
 
@@ -117,18 +129,18 @@ func NewVerifyRewardAnimationGame() (*VerifyRewardAnimationGame, error) {
 	log.Println("╔════════════════════════════════════════════════════════╗")
 	log.Println("║      完整奖励动画流程验证程序 (Story 8.3 + 8.4)         ║")
 	log.Println("╚════════════════════════════════════════════════════════╝")
-	log.Printf("[VerifyRewardAnimation] 测试植物: %s", *plantID)
+	log.Printf("[VerifyRewardAnimation] 测试类型: %s, ID: %s", rewardType, rewardID)
 	log.Println()
 	log.Println("【验证流程】")
-	log.Println("  Phase 1: appearing     - 卡片包弹出动画 (0.3s)")
+	log.Println("  Phase 1: appearing     - 卡片包/工具弹出动画 (0.6s)")
 	log.Println("  Phase 2: waiting       - 等待用户点击 (手动触发)")
-	log.Println("  Phase 3: expanding     - 卡片包移动+展开动画 (2s)")
-	log.Println("  Phase 3.5: pausing     - 短暂停顿+Award粒子 (0.5s)")
-	log.Println("  Phase 3.6: disappearing - 卡片包渐渐消失 (0.3s)")
+	log.Println("  Phase 3: expanding     - 移动+展开动画 (2s)")
+	log.Println("  Phase 3.5: pausing     - 短暂停顿+Award粒子 (2.5s)")
+	log.Println("  Phase 3.6: disappearing - 渐渐消失 (1.0s)")
 	log.Println("  Phase 4: showing       - 显示奖励面板 (持续)")
 	log.Println()
 	log.Println("【快捷键】")
-	log.Println("  Space/Click - 展开卡片包 (Phase 2)")
+	log.Println("  Space/Click - 展开卡片包/工具 (Phase 2)")
 	log.Println("  R - 重启验证")
 	log.Println("  Q - 退出程序")
 	log.Println("════════════════════════════════════════════════════════")
@@ -148,8 +160,8 @@ func NewVerifyRewardAnimationGame() (*VerifyRewardAnimationGame, error) {
 	}
 
 	// 自动触发奖励动画（无需手动按T键）
-	log.Println("[VerifyRewardAnimation] 自动触发奖励动画")
-	rewardSystem.TriggerReward("plant", *plantID)
+	log.Printf("[VerifyRewardAnimation] 自动触发奖励动画 (类型: %s, ID: %s)", rewardType, rewardID)
+	rewardSystem.TriggerReward(rewardType, rewardID)
 	game.triggered = true
 
 	return game, nil
@@ -159,8 +171,8 @@ func NewVerifyRewardAnimationGame() (*VerifyRewardAnimationGame, error) {
 func (vg *VerifyRewardAnimationGame) Update() error {
 	// 快捷键：T 键手动触发奖励（如果未触发）
 	if inpututil.IsKeyJustPressed(ebiten.KeyT) && !vg.triggered {
-		log.Println("[VerifyRewardAnimation] 手动触发奖励动画")
-		vg.rewardSystem.TriggerReward("plant", *plantID)
+		log.Printf("[VerifyRewardAnimation] 手动触发奖励动画 (类型: %s, ID: %s)", rewardType, rewardID)
+		vg.rewardSystem.TriggerReward(rewardType, rewardID)
 		vg.triggered = true
 	}
 
@@ -184,6 +196,10 @@ func (vg *VerifyRewardAnimationGame) Update() error {
 
 	// 更新奖励系统（包含完整的 4 个阶段）
 	vg.rewardSystem.Update(dt)
+
+	// 更新鼠标光标（奖励图标和按钮悬停时显示手形）
+	cursorShape := vg.rewardSystem.GetCursorShape()
+	ebiten.SetCursorShape(cursorShape)
 
 	// 检查是否完成所有阶段
 	if vg.triggered && !vg.completed {
@@ -270,8 +286,8 @@ func (vg *VerifyRewardAnimationGame) reset() {
 	vg.completed = false
 
 	// 自动触发
-	log.Println("[VerifyRewardAnimation] 重新触发奖励动画")
-	vg.rewardSystem.TriggerReward("plant", *plantID)
+	log.Printf("[VerifyRewardAnimation] 重新触发奖励动画 (类型: %s, ID: %s)", rewardType, rewardID)
+	vg.rewardSystem.TriggerReward(rewardType, rewardID)
 	vg.triggered = true
 }
 
@@ -307,7 +323,7 @@ func main() {
 		log.SetOutput(os.Stdout)
 	}
 
-	// 验证植物ID
+	// 验证参数：必须指定 --plant 或 --tool 其中之一
 	validPlants := map[string]bool{
 		"sunflower":  true,
 		"peashooter": true,
@@ -315,10 +331,35 @@ func main() {
 		"wallnut":    true,
 	}
 
-	if !validPlants[*plantID] {
-		fmt.Fprintf(os.Stderr, "错误: 无效的植物ID '%s'\n", *plantID)
-		fmt.Fprintln(os.Stderr, "有效的植物ID: sunflower, peashooter, cherrybomb, wallnut")
+	validTools := map[string]bool{
+		"shovel": true,
+	}
+
+	if *plantID != "" && *toolID != "" {
+		fmt.Fprintln(os.Stderr, "错误: 不能同时指定 --plant 和 --tool")
 		os.Exit(1)
+	}
+
+	if *plantID != "" {
+		if !validPlants[*plantID] {
+			fmt.Fprintf(os.Stderr, "错误: 无效的植物ID '%s'\n", *plantID)
+			fmt.Fprintln(os.Stderr, "有效的植物ID: sunflower, peashooter, cherrybomb, wallnut")
+			os.Exit(1)
+		}
+		rewardType = "plant"
+		rewardID = *plantID
+	} else if *toolID != "" {
+		if !validTools[*toolID] {
+			fmt.Fprintf(os.Stderr, "错误: 无效的工具ID '%s'\n", *toolID)
+			fmt.Fprintln(os.Stderr, "有效的工具ID: shovel")
+			os.Exit(1)
+		}
+		rewardType = "tool"
+		rewardID = *toolID
+	} else {
+		// 默认测试向日葵
+		rewardType = "plant"
+		rewardID = "sunflower"
 	}
 
 	// 创建游戏实例
@@ -328,7 +369,13 @@ func main() {
 	}
 
 	// 设置窗口标题
-	ebiten.SetWindowTitle(fmt.Sprintf("完整奖励动画流程验证 - %s - Story 8.3 + 8.4", *plantID))
+	var title string
+	if rewardType == "tool" {
+		title = fmt.Sprintf("完整奖励动画流程验证 - 工具:%s", rewardID)
+	} else {
+		title = fmt.Sprintf("完整奖励动画流程验证 - 植物:%s", rewardID)
+	}
+	ebiten.SetWindowTitle(title)
 	ebiten.SetWindowSize(screenWidth, screenHeight)
 
 	// 运行游戏

@@ -33,20 +33,15 @@ var (
 // VerifyGame 奖励卡片包动画验证游戏
 // 包含完整的游戏背景场景（草坪、植物等）
 type VerifyGame struct {
-	entityManager         *ecs.EntityManager
-	gameState             *game.GameState
-	resourceManager       *game.ResourceManager
-	reanimSystem          *systems.ReanimSystem
-	particleSystem        *systems.ParticleSystem // 粒子系统（用于光晕效果）
-	rewardSystem          *systems.RewardAnimationSystem
-	renderSystem          *systems.RenderSystem
-	plantCardRenderSystem *systems.PlantCardRenderSystem   // 植物卡片渲染系统（Story 8.4）
-	panelRenderSystem     *systems.RewardPanelRenderSystem // 奖励面板渲染系统（Story 8.4）
+	entityManager   *ecs.EntityManager
+	gameState       *game.GameState
+	resourceManager *game.ResourceManager
+	reanimSystem    *systems.ReanimSystem
+	particleSystem  *systems.ParticleSystem           // 粒子系统（用于光晕效果）
+	rewardSystem    *systems.RewardAnimationSystem    // 奖励动画系统（封装所有渲染逻辑）
+	renderSystem    *systems.RenderSystem             // Reanim 渲染系统
 
 	debugFont *text.GoTextFace // 中文调试字体
-
-	backgroundEntity ecs.EntityID   // 背景实体
-	plantEntities    []ecs.EntityID // 测试用植物实体（使用 Reanim）
 
 	triggered bool // 是否已触发奖励
 	completed bool // 是否已完成验证（Phase 3 结束）
@@ -80,27 +75,23 @@ func NewVerifyGame() (*VerifyGame, error) {
 		log.Fatal("Failed to load Reanim resources:", err)
 	}
 
+	// 加载 Reanim 配置管理器
+	log.Println("Loading Reanim config...")
+	reanimConfigManager, err := config.NewReanimConfigManager("data/reanim_config")
+	if err != nil {
+		return nil, fmt.Errorf("failed to load reanim config: %w", err)
+	}
+
 	// 获取游戏状态单例
 	gs := game.GetGameState()
 	gs.CameraX = config.GameCameraX // 设置摄像机位置
 
 	// 创建系统
 	reanimSystem := systems.NewReanimSystem(em)
+	reanimSystem.SetConfigManager(reanimConfigManager)
 	particleSystem := systems.NewParticleSystem(em, rm) // 粒子系统用于光晕效果
 	renderSystem := systems.NewRenderSystem(em)
 	rewardSystem := systems.NewRewardAnimationSystem(em, gs, rm, nil, reanimSystem, particleSystem, renderSystem)
-
-	// 创建植物卡片渲染系统（Story 8.4: 使用统一的植物卡片渲染）
-	// 加载阳光字体用于卡片渲染
-	sunFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.PlantCardSunCostFontSize)
-	if err != nil {
-		log.Printf("Warning: Failed to load sun cost font: %v", err)
-		sunFont = nil
-	}
-	plantCardRenderSystem := systems.NewPlantCardRenderSystem(em, sunFont) // 此工具只有奖励卡片，会正常渲染
-
-	// 创建奖励面板渲染系统（Story 8.4: 使用新的卡片工厂方法）
-	panelRenderSystem := systems.NewRewardPanelRenderSystem(em, gs, rm, reanimSystem)
 
 	// 加载中文调试字体
 	debugFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 14)
@@ -114,18 +105,16 @@ func NewVerifyGame() (*VerifyGame, error) {
 	log.Println("[VerifyGame] 快捷键: Space/Click=展开卡片, R=重启, Q=退出")
 
 	game := &VerifyGame{
-		entityManager:         em,
-		gameState:             gs,
-		resourceManager:       rm,
-		reanimSystem:          reanimSystem,
-		particleSystem:        particleSystem,
-		rewardSystem:          rewardSystem,
-		renderSystem:          renderSystem,
-		plantCardRenderSystem: plantCardRenderSystem,
-		panelRenderSystem:     panelRenderSystem,
-		debugFont:             debugFont,
-		triggered:             false,
-		completed:             false,
+		entityManager:   em,
+		gameState:       gs,
+		resourceManager: rm,
+		reanimSystem:    reanimSystem,
+		particleSystem:  particleSystem,
+		rewardSystem:    rewardSystem,
+		renderSystem:    renderSystem,
+		debugFont:       debugFont,
+		triggered:       false,
+		completed:       false,
 	}
 
 	// 自动触发奖励动画（无需手动按T键）
@@ -168,6 +157,10 @@ func (vg *VerifyGame) Update() error {
 		vg.rewardSystem.Update(dt)
 	}
 
+	// 更新鼠标光标（奖励图标和按钮悬停时显示手形）
+	cursorShape := vg.rewardSystem.GetCursorShape()
+	ebiten.SetCursorShape(cursorShape)
+
 	// 检查是否完成（到 Phase 4 showing 时停止，不显示面板）
 	if vg.triggered && !vg.completed {
 		rewardComp, ok := ecs.GetComponent[*components.RewardAnimationComponent](
@@ -199,21 +192,11 @@ func (vg *VerifyGame) Draw(screen *ebiten.Image) {
 		screen.DrawImage(backgroundImg, opts)
 	}
 
-	// 绘制卡片包（通过 RenderSystem）
-	cameraOffsetX := vg.gameState.CameraX
-	vg.renderSystem.Draw(screen, cameraOffsetX)
-
-	// 绘制粒子效果（光晕）
-	vg.renderSystem.DrawParticles(screen, cameraOffsetX)
-
-	// 验证程序不显示奖励面板，所以不调用 panelRenderSystem.Draw()
-	// 这样可以避免创建重复的卡片实体
-	// vg.panelRenderSystem.Draw(screen)
-
-	// 绘制植物卡片实体（Story 8.4: 使用统一的植物卡片渲染系统）
-	// 注意：当前验证程序主要验证卡片包动画，不创建植物卡片实体，
-	// 但保留此调用以保持代码结构一致性，为未来扩展做准备
-	vg.plantCardRenderSystem.Draw(screen)
+	// 绘制奖励动画（包括植物卡片包和粒子效果）
+	// RewardAnimationSystem.Draw() 完全封装了所有渲染逻辑：
+	// - Phase 1-3: 卡片包（PlantCardComponent）+ 粒子效果
+	// - Phase 4: 奖励面板
+	vg.rewardSystem.Draw(screen)
 
 	// 绘制调试信息
 	vg.drawDebugInfo(screen)

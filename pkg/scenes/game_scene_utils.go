@@ -69,6 +69,7 @@ func (s *GameScene) easeOutQuad(t float64) float64 {
 //   - 这里只根据状态设置光标
 //
 // 检查优先级:
+//  0. 奖励动画 (RewardAnimationSystem - 最高优先级，遮盖其他元素)
 //  1. 面板按钮 (ButtonComponent)
 //  2. 对话框按钮 (DialogComponent.HoveredButtonIdx)
 //  3. 植物卡片 (PlantCardComponent + UIComponent)
@@ -77,13 +78,23 @@ func (s *GameScene) updateMouseCursor() {
 	// Default cursor shape
 	cursorShape := ebiten.CursorShapeDefault
 
+	// 0. 奖励动画系统悬停检测（最高优先级，因为奖励面板会遮盖其他元素）
+	if s.rewardSystem != nil && s.rewardSystem.IsActive() {
+		rewardCursor := s.rewardSystem.GetCursorShape()
+		if rewardCursor != ebiten.CursorShapeDefault {
+			cursorShape = rewardCursor
+		}
+	}
+
 	// 1. Check if hovering over any panel button (pause menu, settings panel, menu button)
-	panelButtons := ecs.GetEntitiesWith1[*components.ButtonComponent](s.entityManager)
-	for _, entityID := range panelButtons {
-		button, ok := ecs.GetComponent[*components.ButtonComponent](s.entityManager, entityID)
-		if ok && button.State == components.UIHovered {
-			cursorShape = ebiten.CursorShapePointer
-			break
+	if cursorShape == ebiten.CursorShapeDefault {
+		panelButtons := ecs.GetEntitiesWith1[*components.ButtonComponent](s.entityManager)
+		for _, entityID := range panelButtons {
+			button, ok := ecs.GetComponent[*components.ButtonComponent](s.entityManager, entityID)
+			if ok && button.State == components.UIHovered {
+				cursorShape = ebiten.CursorShapePointer
+				break
+			}
 		}
 	}
 

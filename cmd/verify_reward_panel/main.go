@@ -73,12 +73,20 @@ func NewVerifyPanelGame() (*VerifyPanelGame, error) {
 		log.Fatal("Failed to load Reanim resources:", err)
 	}
 
+	// 加载 Reanim 配置管理器
+	log.Println("Loading Reanim config...")
+	reanimConfigManager, err := config.NewReanimConfigManager("data/reanim_config")
+	if err != nil {
+		return nil, fmt.Errorf("failed to load reanim config: %w", err)
+	}
+
 	// 获取游戏状态单例
 	gs := game.GetGameState()
 	gs.CameraX = config.GameCameraX // 设置摄像机位置
 
 	// 创建 Reanim 系统（用于渲染植物）
 	reanimSystem := systems.NewReanimSystem(em)
+	reanimSystem.SetConfigManager(reanimConfigManager)
 
 	// 创建面板渲染系统（需要 ReanimSystem 来渲染植物）
 	panelRenderSystem := systems.NewRewardPanelRenderSystem(em, gs, rm, reanimSystem)

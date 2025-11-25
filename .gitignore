@@ -32,3 +32,6 @@ data/saves/
 systems.test
 pvz3
 scenes.test
+verify_reward_animation
+verify_reward_card
+verify_reward_panel

@@ -108,6 +108,22 @@ const (
 
 	// RewardPanelDescriptionLineSpacing 描述文本行间距（像素）
 	RewardPanelDescriptionLineSpacing = 28.0 // 字体大小 22 + 行间距 6
+
+	// ========== 铲子奖励动画配置 ==========
+	// 铲子图片原始尺寸：116 x 125 像素
+	// 植物卡片缩放后尺寸：100 x 140 * 0.5 = 50 x 70 像素
+	// 为了让铲子开始时看起来和植物卡包大小一致，需要特殊的缩放因子
+
+	// ShovelRewardStartScale 铲子奖励动画开始时的缩放因子
+	// 计算方式：植物卡片显示宽度 50 / 铲子原始宽度 116 ≈ 0.43
+	// 使用宽度匹配确保铲子不超出植物卡片的视觉边界
+	// 调整此值可以改变铲子在草坪弹出时的大小
+	ShovelRewardStartScale = 0.43
+
+	// ShovelRewardEndScale 铲子奖励动画目标位置的缩放因子
+	// 应该与奖励面板中铲子显示的缩放一致
+	// 奖励面板中铲子缩放 = panel.CardScale * RewardPanelCardScale = 1.0
+	ShovelRewardEndScale = 1.0
 )
 
 // 文本颜色配置（根据原版截图）
