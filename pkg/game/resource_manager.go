@@ -977,10 +977,11 @@ func (rm *ResourceManager) GetImageByID(resourceID string) *ebiten.Image {
 //   - 如果加载失败则返回 nil
 //
 // 用法:
-//   shadowImg := rm.GetShadowImage()
-//   if shadowImg != nil {
-//       screen.DrawImage(shadowImg, op)
-//   }
+//
+//	shadowImg := rm.GetShadowImage()
+//	if shadowImg != nil {
+//	    screen.DrawImage(shadowImg, op)
+//	}
 func (rm *ResourceManager) GetShadowImage() *ebiten.Image {
 	shadowPath := "assets/images/plantshadow.png"
 

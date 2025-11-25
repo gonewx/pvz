@@ -141,6 +141,7 @@ func NewFallingPartEffect(em *ecs.EntityManager, partImage *ebiten.Image, x, y, 
 // 返回:
 //   - ecs.EntityID: 创建的动画实体ID，如果失败返回 0
 //   - error: 如果创建失败返回错误信息
+//
 // Story 14.3: Epic 14 - 移除 ReanimSystem 依赖，动画通过 AnimationCommand 组件初始化
 func CreateFinalWaveEntity(em *ecs.EntityManager, rm ResourceLoader, x, y float64) (ecs.EntityID, error) {
 	if em == nil {

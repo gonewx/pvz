@@ -29,8 +29,8 @@ func TestFinalWaveAnimation_NonLooping(t *testing.T) {
 
 	// 创建模拟的 Reanim 数据
 	reanimComp := &components.ReanimComponent{
-		ReanimXML: nil, // PlayCombo 会处理初始化
-		PartImages: make(map[string]*ebiten.Image),
+		ReanimXML:         nil, // PlayCombo 会处理初始化
+		PartImages:        make(map[string]*ebiten.Image),
 		CurrentAnimations: []string{},
 	}
 	ecs.AddComponent(em, entityID, reanimComp)

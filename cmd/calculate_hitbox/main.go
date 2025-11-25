@@ -270,10 +270,10 @@ func calculateQuadCorners(frame *reanim.Frame, width, height float64) QuadCorner
 	// Reanim 坐标是图片左上角
 	// 四个本地角坐标（相对于图片左上角）
 	corners := []Point{
-		{0, 0},                  // 左上
-		{width, 0},              // 右上
-		{width, height},         // 右下
-		{0, height},             // 左下
+		{0, 0},          // 左上
+		{width, 0},      // 右上
+		{width, height}, // 右下
+		{0, height},     // 左下
 	}
 
 	// 应用变换矩阵

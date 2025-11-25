@@ -566,29 +566,29 @@ func TestLawnmowerSystem_EarlyParticleTrigger(t *testing.T) {
 
 	// 创建帧数据（ScaleX 递减）
 	frames := []components.LocatorFrame{
-		{ScaleX: 1.0},  // 0
-		{ScaleX: 1.0},  // 1
-		{ScaleX: 1.0},  // 2
-		{ScaleX: 0.9},  // 3
-		{ScaleX: 0.8},  // 4 (Should trigger here)
-		{ScaleX: 0.5},  // 5
+		{ScaleX: 1.0}, // 0
+		{ScaleX: 1.0}, // 1
+		{ScaleX: 1.0}, // 2
+		{ScaleX: 0.9}, // 3
+		{ScaleX: 0.8}, // 4 (Should trigger here)
+		{ScaleX: 0.5}, // 5
 	}
 
 	// 添加压扁动画组件
 	ecs.AddComponent(em, zombieID, &components.SquashAnimationComponent{
-		ElapsedTime:       0.0,
-		Duration:          0.6,
-		LocatorFrames:     frames,
-		CurrentFrameIndex: 0,
-		OriginalPosX:      100.0,
-		OriginalPosY:      200.0,
-		IsCompleted:       false,
+		ElapsedTime:        0.0,
+		Duration:           0.6,
+		LocatorFrames:      frames,
+		CurrentFrameIndex:  0,
+		OriginalPosX:       100.0,
+		OriginalPosY:       200.0,
+		IsCompleted:        false,
 		ParticlesTriggered: false,
 	})
 
 	// 1. 更新到第 2 帧 (progress < 0.66, frameIndex < 4)
 	system.Update(0.2) // 0.2/0.6 = 0.33 -> Frame 2 (6*0.33 = 2)
-	
+
 	squashAnim, _ := ecs.GetComponent[*components.SquashAnimationComponent](em, zombieID)
 	if squashAnim.ParticlesTriggered {
 		t.Error("Particles should NOT be triggered at frame 2")
@@ -596,7 +596,7 @@ func TestLawnmowerSystem_EarlyParticleTrigger(t *testing.T) {
 
 	// 2. 更新到第 4 帧 (progress > 0.66, frameIndex >= 4)
 	system.Update(0.25) // Total 0.45/0.6 = 0.75 -> Frame 4.5 -> 4
-	
+
 	if !squashAnim.ParticlesTriggered {
 		t.Error("Particles SHOULD be triggered at frame 4")
 	}

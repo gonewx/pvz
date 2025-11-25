@@ -69,15 +69,15 @@ func NewLawnmowerEntity(
 	em.AddComponent(entityID, &components.ReanimComponent{
 		ReanimXML:  reanimXML,
 		PartImages: partImages,
-		IsLooping:  true,    // 除草车动画循环播放
-		IsPaused:   true,    // ✅ 默认暂停，触发后恢复
+		IsLooping:  true, // 除草车动画循环播放
+		IsPaused:   true, // ✅ 默认暂停，触发后恢复
 	})
 
 	// ✅ Epic 14: 使用 AnimationCommand 触发动画（替代直接调用 ReanimSystem）
 	// 添加动画命令组件，让 ReanimSystem 在 Update 中处理
 	ecs.AddComponent(em, entityID, &components.AnimationCommandComponent{
-		AnimationName: "anim_normal",  // LawnMower.reanim 使用 anim_normal 动画
-		Processed:     false,          // 标记为未处理，等待 ReanimSystem 处理
+		AnimationName: "anim_normal", // LawnMower.reanim 使用 anim_normal 动画
+		Processed:     false,         // 标记为未处理，等待 ReanimSystem 处理
 	})
 
 	// 添加除草车组件

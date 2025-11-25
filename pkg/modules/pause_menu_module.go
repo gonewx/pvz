@@ -183,8 +183,8 @@ func (m *PauseMenuModule) createPauseMenuButtons(rm *game.ResourceManager) error
 	ecs.AddComponent(m.entityManager, backToGameEntity, &components.ButtonComponent{
 		Type:         components.ButtonTypeSimple,
 		NormalImage:  backToGameNormal,
-		HoverImage:   backToGameNormal,   // ✅ 悬停时不换图（backtogamebutton 系列没有悬停状态）
-		PressedImage: backToGamePressed,  // ✅ 按下时使用 button2（下陷效果）
+		HoverImage:   backToGameNormal,  // ✅ 悬停时不换图（backtogamebutton 系列没有悬停状态）
+		PressedImage: backToGamePressed, // ✅ 按下时使用 button2（下陷效果）
 		Text:         "返回游戏",
 		Font:         buttonFont,
 		TextColor:    [4]uint8{0, 200, 0, 255},

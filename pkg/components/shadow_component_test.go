@@ -6,11 +6,11 @@ import (
 
 func TestShadowComponent_BasicFields(t *testing.T) {
 	tests := []struct {
-		name    string
-		shadow  ShadowComponent
-		wantW   float64
-		wantH   float64
-		wantA   float32
+		name     string
+		shadow   ShadowComponent
+		wantW    float64
+		wantH    float64
+		wantA    float32
 		wantOffY float64
 	}{
 		{
@@ -84,7 +84,7 @@ func TestShadowComponent_BoundaryValues(t *testing.T) {
 		{"Alpha最小值", 0.0},
 		{"Alpha最大值", 1.0},
 		{"Alpha超出范围(负数)", -0.1}, // 虽然无效,但组件应能存储
-		{"Alpha超出范围(>1)", 1.5},    // 虽然无效,但组件应能存储
+		{"Alpha超出范围(>1)", 1.5},  // 虽然无效,但组件应能存储
 	}
 
 	for _, tt := range tests {

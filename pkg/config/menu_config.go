@@ -121,7 +121,8 @@ func crossProduct(p1, p2, p3 Point) float64 {
 // Each button is defined as a quadrilateral with four corner points to support rotated/skewed buttons.
 //
 // To regenerate this configuration:
-//   go run cmd/calculate_hitbox/main.go
+//
+//	go run cmd/calculate_hitbox/main.go
 //
 // Story 12.1: Main Menu Tombstone System Enhancement
 var MenuButtonHitboxes = []MenuButtonHitbox{

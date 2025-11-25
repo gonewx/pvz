@@ -1345,4 +1345,3 @@ func (s *RenderSystem) drawZombieShadows(screen *ebiten.Image, zombieEntities []
 		screen.DrawImage(shadowImg, op)
 	}
 }
-

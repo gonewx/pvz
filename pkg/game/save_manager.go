@@ -229,7 +229,7 @@ func (sm *SaveManager) SetHighestLevel(levelID string) {
 //
 // 返回：
 //   - bool: true 表示用户已开始过游戏（显示 Adventure 按钮和关卡数字）
-//           false 表示新用户（显示 StartAdventure 按钮，不显示关卡数字）
+//     false 表示新用户（显示 StartAdventure 按钮，不显示关卡数字）
 func (sm *SaveManager) GetHasStartedGame() bool {
 	return sm.data.HasStartedGame
 }

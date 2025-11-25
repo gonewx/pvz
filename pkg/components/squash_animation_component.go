@@ -106,13 +106,13 @@ func (s *SquashAnimationComponent) IsComplete() bool {
 //   - int: 帧索引（0 到 len(LocatorFrames)-1），如果动画结束返回最后一帧
 //
 // Story 10.6 帧索引映射说明：
-// - 8帧动画（索引 0-7），每帧占据动画时长的 1/8
-// - 帧0: progress ∈ [0.000, 0.125)
-// - 帧1: progress ∈ [0.125, 0.250)
-// - ...
-// - 帧7: progress ∈ [0.875, 1.000]（注意：最后一帧包含1.0）
-// - 公式：frameIndex = min(int(progress * frameCount), frameCount - 1)
-//   确保 progress=1.0 时不会越界
+//   - 8帧动画（索引 0-7），每帧占据动画时长的 1/8
+//   - 帧0: progress ∈ [0.000, 0.125)
+//   - 帧1: progress ∈ [0.125, 0.250)
+//   - ...
+//   - 帧7: progress ∈ [0.875, 1.000]（注意：最后一帧包含1.0）
+//   - 公式：frameIndex = min(int(progress * frameCount), frameCount - 1)
+//     确保 progress=1.0 时不会越界
 func (s *SquashAnimationComponent) GetCurrentFrameIndex() int {
 	progress := s.GetProgress()
 	frameCount := len(s.LocatorFrames)

@@ -117,7 +117,7 @@ func NewZombieHandEntity(em *ecs.EntityManager, rm *game.ResourceManager, x, y f
 		LastRenderFrame:  -1,
 
 		// 控制标志
-		IsPaused:   true, // Start paused (will be played on button click)
+		IsPaused:   true,  // Start paused (will be played on button click)
 		IsLooping:  false, // Single playthrough (transition animation)
 		IsFinished: false,
 

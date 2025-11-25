@@ -44,7 +44,7 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 	// Reanim 坐标系统：部件坐标从原点开始绘制
 	// 中心偏移会由 ReanimSystem 自动计算并在渲染时应用
 	worldCenterX := config.GridWorldStartX + float64(col)*config.CellWidth + config.CellWidth/2
-	worldCenterY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+	worldCenterY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2 + config.PlantOffsetY
 
 	// Story 6.3: Reanim 迁移完成
 	// 注意：旧版代码使用 SpriteComponent 和 GetPlantImagePath()
@@ -300,6 +300,7 @@ func NewWallnutEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameSta
 // 返回:
 //   - ecs.EntityID: 创建的樱桃炸弹实体ID，如果失败返回 0
 //   - error: 如果创建失败返回错误信息
+//
 // Story 14.3: Epic 14 - 移除 ReanimSystem 依赖，动画通过 AnimationCommand 组件初始化
 func NewCherryBombEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState, col, row int) (ecs.EntityID, error) {
 	// 计算格子中心坐标（使用世界坐标系统）

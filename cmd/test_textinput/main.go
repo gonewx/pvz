@@ -2,7 +2,8 @@
 // 用于验证 TextInputComponent 和相关系统的功能
 //
 // 用法:
-//   go run cmd/test_textinput/main.go
+//
+//	go run cmd/test_textinput/main.go
 //
 // 功能:
 //   - 显示"新用户"对话框

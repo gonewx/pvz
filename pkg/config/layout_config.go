@@ -92,7 +92,7 @@ const (
 
 	// ZombieSpawnMinX 僵尸生成的最小X坐标（世界坐标）
 	// 用于开场预览和正常游戏，僵尸在此范围内随机分布
-	ZombieSpawnMinX = 1050.0
+	ZombieSpawnMinX = 1150.0
 
 	// ZombieSpawnMaxX 僵尸生成的最大X坐标（世界坐标）
 	// 不能超过背景宽度，留出边距避免僵尸贴边
@@ -102,7 +102,7 @@ const (
 	// ZombieSpawnMaxX_Row1 第1行僵尸生成的最大X坐标（世界坐标）
 	// 建议值范围：1000.0 - 1350.0
 	// 调整此值可以控制第1行僵尸的生成范围
-	ZombieSpawnMaxX_Row1 = 1150.0
+	ZombieSpawnMaxX_Row1 = 1200.0
 
 	// ZombieSpawnMaxX_Row2 第2行僵尸生成的最大X坐标（世界坐标）
 	// 建议值范围：1000.0 - 1350.0

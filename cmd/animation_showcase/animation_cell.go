@@ -152,11 +152,11 @@ func NewAnimationCell(config *AnimationUnitConfig, globalFPS int, targetTPS int)
 	visualTracks, logicalTracks := analyzeTrackTypesWithOrder(mergedTracks, trackOrder)
 
 	cell := &AnimationCell{
-		config:            config,
-		reanimXML:         reanimXML,
-		mergedTracks:      mergedTracks,
-		partImages:        partImages,
-		backgroundImage:   backgroundImg,
+		config:          config,
+		reanimXML:       reanimXML,
+		mergedTracks:    mergedTracks,
+		partImages:      partImages,
+		backgroundImage: backgroundImg,
 
 		currentFrame:          0,
 		currentAnimationIndex: 0,

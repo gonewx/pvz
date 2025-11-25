@@ -84,10 +84,10 @@ type HelpPanelModule struct {
 //   - error: 如果初始化失败
 //
 // 初始化流程：
-//   1. 加载便笺背景和 Alpha 蒙板，合成
-//   2. 加载帮助文本和 Alpha 蒙板，合成
-//   3. 创建"确定"按钮实体
-//   4. 创建帮助面板实体，添加 HelpPanelComponent
+//  1. 加载便笺背景和 Alpha 蒙板，合成
+//  2. 加载帮助文本和 Alpha 蒙板，合成
+//  3. 创建"确定"按钮实体
+//  4. 创建帮助面板实体，添加 HelpPanelComponent
 //
 // Story 12.3: 对话框系统基础
 func NewHelpPanelModule(
@@ -205,11 +205,11 @@ func (m *HelpPanelModule) createConfirmButton(rm *game.ResourceManager) error {
 	ecs.AddComponent(m.entityManager, m.confirmButtonEntity, &components.ButtonComponent{
 		Type:         components.ButtonTypeSimple,
 		NormalImage:  buttonImage,
-		HoverImage:   buttonGlowImage, // ✅ 悬停时显示发光图片
-		PressedImage: buttonImage,     // ✅ 按下时仍使用普通图片（只有位移效果）
+		HoverImage:   buttonGlowImage,            // ✅ 悬停时显示发光图片
+		PressedImage: buttonImage,                // ✅ 按下时仍使用普通图片（只有位移效果）
 		Text:         "主菜单",                      // 文字改为"主菜单"
-		Font:         buttonFont,                  // 中文字体
-		TextColor:    [4]uint8{255, 200, 0, 255},  // 橙黄色文字（与奖励面板一致）
+		Font:         buttonFont,                 // 中文字体
+		TextColor:    [4]uint8{255, 200, 0, 255}, // 橙黄色文字（与奖励面板一致）
 		State:        components.UINormal,
 		Enabled:      true,
 		OnClick: func() {
@@ -380,9 +380,9 @@ func (m *HelpPanelModule) convertToBlack(src *ebiten.Image) *ebiten.Image {
 		// 预乘 Alpha：finalRGB = targetRGB * (alpha / 255)
 		// 对于黑色：0 * (alpha / 255) = 0
 		// 所以预乘 Alpha 后 RGB 仍然是 0
-		pixels[i+0] = 0 // R = 0
-		pixels[i+1] = 0 // G = 0
-		pixels[i+2] = 0 // B = 0
+		pixels[i+0] = 0     // R = 0
+		pixels[i+1] = 0     // G = 0
+		pixels[i+2] = 0     // B = 0
 		pixels[i+3] = alpha // A 保持不变
 	}
 

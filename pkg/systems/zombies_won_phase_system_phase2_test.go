@@ -188,13 +188,13 @@ func TestZombiesWonPhaseSystem_Phase2TransitionsToPhase3(t *testing.T) {
 
 	phaseID := em.CreateEntity()
 	phaseComp := &components.ZombiesWonPhaseComponent{
-		CurrentPhase:          2,
-		PhaseTimer:            0.5,
-		TriggerZombieID:       zombieID,
-		CameraMovedToTarget:   true, // 摄像机已到位
-		ZombieStartedWalking:  true,
-		ZombieReachedTarget1:  true, // 已到达第1个目标
-		ZombieReachedTarget:   false,
+		CurrentPhase:         2,
+		PhaseTimer:           0.5,
+		TriggerZombieID:      zombieID,
+		CameraMovedToTarget:  true, // 摄像机已到位
+		ZombieStartedWalking: true,
+		ZombieReachedTarget1: true, // 已到达第1个目标
+		ZombieReachedTarget:  false,
 	}
 	ecs.AddComponent(em, phaseID, phaseComp)
 

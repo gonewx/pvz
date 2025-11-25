@@ -536,4 +536,3 @@ func TestBehaviorSystem_TriggerZombieCanMoveInPhase2(t *testing.T) {
 		t.Errorf("触发僵尸在 Phase 2 应该继续移动（向左）。初始X: %f, 当前X: %f", initialX, posComp.X)
 	}
 }
-

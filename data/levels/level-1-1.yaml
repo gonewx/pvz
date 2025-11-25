@@ -8,7 +8,7 @@ enabledLanes: [3]             # 只启用第3行（中间行）
 availablePlants:              # 只有豌豆射手
   - "peashooter"
 rewardPlant: "sunflower"      # Story 8.3: 完成本关奖励向日葵
-skipOpening: true            # 启用完整开场动画(铺草皮 + 僵尸预告)
+skipOpening: false            # 启用完整开场动画(铺草皮 + 僵尸预告)
 initialSun: 150               # 初始阳光150（原版1-1关卡配置，足够种植1个豌豆射手）
 
 # Story 8.2 QA改进：背景和草皮配置

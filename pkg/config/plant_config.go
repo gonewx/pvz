@@ -35,6 +35,8 @@ const (
 	// SnowPeaShootingFireFrame    = 5  // 寒冰射手（与豌豆射手动画相同）
 	// RepeaterShootingFireFrame1  = 5  // 双发射手（第一发）
 	// RepeaterShootingFireFrame2  = 8  // 双发射手（第二发，延迟约 0.25秒）
+
+	PlantOffsetY = -10.0
 )
 
 // 向日葵阳光生产位置配置

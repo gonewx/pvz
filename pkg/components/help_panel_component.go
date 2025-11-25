@@ -16,10 +16,10 @@ import (
 //   - 帮助文本：ZombieNoteHelp.png + Alpha 蒙板 ZombieNoteHelpBlack.png
 //
 // 渲染顺序：
-//   1. 半透明遮罩（覆盖整个屏幕）
-//   2. 便笺背景（带 Alpha 蒙板）
-//   3. 帮助文本（带 Alpha 蒙板，叠加在便笺上）
-//   4. 确定按钮（在便笺下方）
+//  1. 半透明遮罩（覆盖整个屏幕）
+//  2. 便笺背景（带 Alpha 蒙板）
+//  3. 帮助文本（带 Alpha 蒙板，叠加在便笺上）
+//  4. 确定按钮（在便笺下方）
 //
 // Story 12.3: 对话框系统基础
 type HelpPanelComponent struct {

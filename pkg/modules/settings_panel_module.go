@@ -48,7 +48,7 @@ type SettingsPanelModule struct {
 
 	// 底部按钮（可选）
 	bottomButtonEntity ecs.EntityID // 底部按钮实体（如 "返回游戏"、"确定"）
-	hasBottomButton    bool          // 是否有底部按钮
+	hasBottomButton    bool         // 是否有底部按钮
 
 	// UI 文字字体
 	labelFont *text.GoTextFace // 标签文字字体
@@ -77,8 +77,8 @@ type SettingsPanelCallbacks struct {
 
 // BottomButtonConfig 底部按钮配置
 type BottomButtonConfig struct {
-	Text    string   // 按钮文字（如 "返回游戏"、"确定"）
-	OnClick func()   // 点击回调
+	Text    string // 按钮文字（如 "返回游戏"、"确定"）
+	OnClick func() // 点击回调
 }
 
 // NewSettingsPanelModule 创建通用设置面板模块
@@ -300,14 +300,14 @@ func (m *SettingsPanelModule) createBottomButton(rm *game.ResourceManager, butto
 	ecs.AddComponent(m.entityManager, m.bottomButtonEntity, &components.ButtonComponent{
 		Type:         components.ButtonTypeSimple,
 		NormalImage:  backToGameNormal,
-		HoverImage:   backToGameNormal,   // ✅ 悬停时不换图（backtogamebutton 系列没有悬停状态）
-		PressedImage: backToGamePressed,  // ✅ 按下时使用 button2（下陷效果）
-		Text:         buttonConfig.Text,                 // 使用配置的文字
-		Font:         buttonFont,                        // 中文字体
-		TextColor:    [4]uint8{0, 200, 0, 255},          // 绿色文字
+		HoverImage:   backToGameNormal,         // ✅ 悬停时不换图（backtogamebutton 系列没有悬停状态）
+		PressedImage: backToGamePressed,        // ✅ 按下时使用 button2（下陷效果）
+		Text:         buttonConfig.Text,        // 使用配置的文字
+		Font:         buttonFont,               // 中文字体
+		TextColor:    [4]uint8{0, 200, 0, 255}, // 绿色文字
 		State:        components.UINormal,
 		Enabled:      true,
-		OnClick:      buttonConfig.OnClick,              // 使用配置的回调
+		OnClick:      buttonConfig.OnClick, // 使用配置的回调
 	})
 
 	log.Printf("[SettingsPanelModule] Bottom button created with text: %s", buttonConfig.Text)

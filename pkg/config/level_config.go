@@ -57,6 +57,14 @@ type LevelConfig struct {
 	//   - "instant": 标准关卡（推荐）
 	//   - "gradual": 需要视觉过渡效果的特殊关卡
 	LaneTransitionMode string `yaml:"laneTransitionMode"`
+
+	// Story 8.3.1 新增字段：预览僵尸数量配置
+	// 开场动画中展示的预览僵尸数量，可选配置
+	// 如果为 0（未配置），则根据关卡难度自动计算：
+	//   - 简单关卡（≤2波）：3 只预览僵尸
+	//   - 中等关卡（3-5波）：5 只预览僵尸
+	//   - 困难关卡（>5波）：8 只预览僵尸
+	PreviewZombieCount int `yaml:"previewZombieCount"`
 }
 
 // TutorialStep 教学步骤配置（Story 8.2）

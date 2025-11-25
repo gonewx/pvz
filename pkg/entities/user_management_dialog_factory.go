@@ -221,7 +221,7 @@ func NewUserManagementDialogEntity(
 		Height:           dialogHeight,
 		AutoClose:        false, // 用户管理对话框不自动关闭（需要显式关闭）
 		HoveredButtonIdx: -1,    // 初始化为未悬停状态
-		PressedButtonIdx: -1,   // 初始化为未按下状态
+		PressedButtonIdx: -1,    // 初始化为未按下状态
 	})
 
 	// 添加 UI 组件标记

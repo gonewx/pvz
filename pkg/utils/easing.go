@@ -32,8 +32,9 @@ func EaseInCubic(t float64) float64 {
 // EaseInOutCubic 三次方缓入缓出
 // 特点：开始慢，中间快，结束慢
 // 公式：
-//   t < 0.5: f(t) = 4t³
-//   t >= 0.5: f(t) = 1 - (-2t + 2)³ / 2
+//
+//	t < 0.5: f(t) = 4t³
+//	t >= 0.5: f(t) = 1 - (-2t + 2)³ / 2
 func EaseInOutCubic(t float64) float64 {
 	if t < 0.5 {
 		return 4 * t * t * t

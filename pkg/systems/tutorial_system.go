@@ -2,6 +2,7 @@ package systems
 
 import (
 	"log"
+	"math/rand"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
@@ -167,18 +168,18 @@ func (s *TutorialSystem) Update(dt float64) {
 			}
 
 		case "plantPlaced":
-			// 步骤3：种植第一个豌豆射手后，禁用草坪闪烁，生成一颗阳光
+			// 步骤3：种植第一个豌豆射手后，禁用草坪闪烁，启用阳光自动生成，生成一颗阳光
 			s.lawnGridSystem.DisableFlash() // 禁用草坪闪烁
 			log.Printf("[TutorialSystem] Lawn flash disabled (plantPlaced)")
+			s.sunSpawnSystem.Enable() // 启用阳光自动生成（原版机制：种植后开始掉落阳光）
 			s.spawnSkyFallingSun()
 			s.sunSpawned = true // 标记阳光已生成（触发下一步骤）
-			log.Println("[TutorialSystem] Spawned first sun after planting peashooter, sunSpawned=true")
+			log.Println("[TutorialSystem] Spawned first sun after planting peashooter, sunSpawned=true, auto spawn ENABLED")
 
 		case "sunClicked":
-			// 步骤5：收集第一颗阳光后，启用阳光自动生成，并生成第二颗阳光
-			s.sunSpawnSystem.Enable() // 启用阳光自动生成
+			// 步骤5：收集第一颗阳光后，生成第二颗阳光（阳光自动生成已在 plantPlaced 启用）
 			s.spawnSkyFallingSun()
-			log.Println("[TutorialSystem] Spawned second sun after clicking first sun, auto spawn ENABLED")
+			log.Println("[TutorialSystem] Spawned second sun after clicking first sun")
 
 		case "secondPlantPlaced":
 			// 步骤9：种植第二个豌豆射手后，禁用草坪闪烁，开始生成僵尸
@@ -190,7 +191,7 @@ func (s *TutorialSystem) Update(dt float64) {
 		case "seedClicked":
 			// 步骤2：点击卡片后，隐藏箭头，启用草坪闪烁
 			s.hideArrowIndicator()
-			s.unhighlightPlantCard() // Story 8.2.1: 隐藏卡片闪光
+			s.unhighlightPlantCard()       // Story 8.2.1: 隐藏卡片闪光
 			s.lawnGridSystem.EnableFlash() // 启用草坪闪烁效果（由明变暗）
 			log.Printf("[TutorialSystem] Lawn flash enabled (seedClicked)")
 
@@ -213,7 +214,7 @@ func (s *TutorialSystem) Update(dt float64) {
 		case "secondSeedClicked":
 			// 步骤8：第二次点击卡片，隐藏箭头，启用草坪闪烁
 			s.hideArrowIndicator()
-			s.unhighlightPlantCard() // Story 8.2.1: 隐藏卡片闪光
+			s.unhighlightPlantCard()       // Story 8.2.1: 隐藏卡片闪光
 			s.lawnGridSystem.EnableFlash() // 启用草坪闪烁效果（由明变暗）
 			log.Printf("[TutorialSystem] Lawn flash enabled (secondSeedClicked)")
 		}
@@ -628,12 +629,27 @@ func (s *TutorialSystem) spawnSkyFallingSun() {
 	// 生成随机X坐标（草坪范围内）
 	minX := 100.0
 	maxX := 700.0
-	startX := minX + (maxX-minX)*0.5 // 暂时固定在中间位置
+	startX := minX + rand.Float64()*(maxX-minX) // 随机位置
 
 	// 生成随机Y坐标（落地位置）
-	minY := 80.0
-	maxY := 500.0
-	targetY := minY + (maxY-minY)*0.5 // 暂时固定在中间位置
+	minY := 150.0
+	maxY := 450.0
+	targetY := minY + rand.Float64()*(maxY-minY) // 随机位置
+
+	// 边界检查：确保阳光完整显示在屏幕内
+	sunRadius := 40.0 // 阳光半径
+	if startX < sunRadius {
+		startX = sunRadius
+	}
+	if startX > 800-sunRadius {
+		startX = 800 - sunRadius
+	}
+	if targetY < sunRadius {
+		targetY = sunRadius
+	}
+	if targetY > 600-sunRadius {
+		targetY = 600 - sunRadius
+	}
 
 	// 创建阳光实体
 	sunID := entities.NewSunEntity(s.entityManager, s.resourceManager, startX, targetY)
