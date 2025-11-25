@@ -867,9 +867,12 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	s.drawBackground(screen)
 
 	// Story 8.3.1: 开场动画或铺草皮动画期间隐藏 UI 元素
+	// 注意：需要检查 soddingAnimStarted 来避免开场动画完成和铺草皮动画开始之间的闪现
 	isOpeningPlaying := s.openingSystem != nil && !s.openingSystem.IsCompleted()
 	isSoddingPlaying := s.soddingSystem != nil && s.soddingSystem.IsPlaying()
-	hideUI := isOpeningPlaying || isSoddingPlaying
+	// 如果有开场动画系统且铺草皮动画还未启动，也要隐藏 UI（过渡期间）
+	isWaitingForSodding := s.openingSystem != nil && s.openingSystem.IsCompleted() && !s.soddingAnimStarted
+	hideUI := isOpeningPlaying || isSoddingPlaying || isWaitingForSodding
 
 	// Layer 2: Draw UI base elements (seed bank, shovel, plant cards)
 	// 按照原版PVZ设计，UI元素在游戏世界实体下方渲染
