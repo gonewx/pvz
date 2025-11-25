@@ -65,17 +65,19 @@ func (s *GameScene) easeOutQuad(t float64) float64 {
 //   - DialogInputSystem 负责更新 DialogComponent.HoveredButtonIdx
 //   - ButtonSystem 负责更新 ButtonComponent.State
 //   - InputSystem 负责更新 PlantCardComponent.UIComponent.State
+//   - InputSystem 负责更新 SunComponent 的 ClickableComponent.IsHovered
 //   - 这里只根据状态设置光标
 //
 // 检查优先级:
 //  1. 面板按钮 (ButtonComponent)
 //  2. 对话框按钮 (DialogComponent.HoveredButtonIdx)
 //  3. 植物卡片 (PlantCardComponent + UIComponent)
+//  4. 阳光 (SunComponent + ClickableComponent.IsHovered)
 func (s *GameScene) updateMouseCursor() {
 	// Default cursor shape
 	cursorShape := ebiten.CursorShapeDefault
 
-	// 1. Check if hovering over any panel button (pause menu, settings panel)
+	// 1. Check if hovering over any panel button (pause menu, settings panel, menu button)
 	panelButtons := ecs.GetEntitiesWith1[*components.ButtonComponent](s.entityManager)
 	for _, entityID := range panelButtons {
 		button, ok := ecs.GetComponent[*components.ButtonComponent](s.entityManager, entityID)
@@ -122,6 +124,21 @@ func (s *GameScene) updateMouseCursor() {
 
 			ui, ok := ecs.GetComponent[*components.UIComponent](s.entityManager, entityID)
 			if ok && ui.State == components.UIHovered {
+				cursorShape = ebiten.CursorShapePointer
+				break
+			}
+		}
+	}
+
+	// 4. Check if hovering over any clickable sun
+	if cursorShape == ebiten.CursorShapeDefault {
+		sunEntities := ecs.GetEntitiesWith2[
+			*components.SunComponent,
+			*components.ClickableComponent,
+		](s.entityManager)
+		for _, entityID := range sunEntities {
+			clickable, ok := ecs.GetComponent[*components.ClickableComponent](s.entityManager, entityID)
+			if ok && clickable.IsHovered && clickable.IsEnabled {
 				cursorShape = ebiten.CursorShapePointer
 				break
 			}

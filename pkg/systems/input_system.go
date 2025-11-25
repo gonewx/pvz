@@ -16,21 +16,21 @@ import (
 
 // InputSystem 处理所有用户输入，包括鼠标点击和键盘输入
 type InputSystem struct {
-	entityManager       *ecs.EntityManager
-	resourceManager     *game.ResourceManager
-	gameState           *game.GameState
-	reanimSystem        entities.ReanimSystemInterface // Reanim 系统（用于初始化植物动画）
-	sunCounterX         float64                        // 阳光计数器X坐标（收集动画目标）
-	sunCounterY         float64                        // 阳光计数器Y坐标（收集动画目标）
-	collectSoundPlayer  *audio.Player                  // 收集阳光音效播放器
-	lawnGridSystem      *LawnGridSystem                // 草坪网格管理系统
-	lawnGridEntityID    ecs.EntityID                   // 草坪网格实体ID
-	plantSoundPlayer    *audio.Player                  // 种植音效播放器
-	buzzerSoundPlayer   *audio.Player                  // 无效操作音效播放器 (Story 10.8)
-	lastBuzzerPlayTime  float64                        // 上次播放无效操作音效的时间 (Story 10.8)
-	buzzerCooldownTime  float64                        // 无效操作音效冷却时间（秒）(Story 10.8)
-	gameTime            float64                        // 游戏时间累计（秒）(Story 10.8)
-	tooltipEntity       ecs.EntityID                   // Tooltip 实体ID (Story 10.8)
+	entityManager      *ecs.EntityManager
+	resourceManager    *game.ResourceManager
+	gameState          *game.GameState
+	reanimSystem       entities.ReanimSystemInterface // Reanim 系统（用于初始化植物动画）
+	sunCounterX        float64                        // 阳光计数器X坐标（收集动画目标）
+	sunCounterY        float64                        // 阳光计数器Y坐标（收集动画目标）
+	collectSoundPlayer *audio.Player                  // 收集阳光音效播放器
+	lawnGridSystem     *LawnGridSystem                // 草坪网格管理系统
+	lawnGridEntityID   ecs.EntityID                   // 草坪网格实体ID
+	plantSoundPlayer   *audio.Player                  // 种植音效播放器
+	buzzerSoundPlayer  *audio.Player                  // 无效操作音效播放器 (Story 10.8)
+	lastBuzzerPlayTime float64                        // 上次播放无效操作音效的时间 (Story 10.8)
+	buzzerCooldownTime float64                        // 无效操作音效冷却时间（秒）(Story 10.8)
+	gameTime           float64                        // 游戏时间累计（秒）(Story 10.8)
+	tooltipEntity      ecs.EntityID                   // Tooltip 实体ID (Story 10.8)
 }
 
 // NewInputSystem 创建一个新的输入系统
@@ -105,6 +105,9 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 
 	// Story 8.2.1: 更新植物卡片悬停状态（每帧检测）
 	s.updatePlantCardHover()
+
+	// 更新阳光悬停状态（每帧检测，用于手形光标）
+	s.updateSunHover(cameraX)
 
 	// DEBUG: 按 P 键在鼠标位置生成 PeaSplat 粒子效果（测试用）
 	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
@@ -747,21 +750,13 @@ func (s *InputSystem) updatePlantCardHover() {
 		}
 	}
 
-	// Story 10.8: 更新 Tooltip 和鼠标光标
+	// Story 10.8: 更新 Tooltip（鼠标光标由 GameScene.updateMouseCursor() 统一管理）
 	if hoveredEntityID != 0 {
 		// 有卡片被悬停: 显示 Tooltip
 		s.showTooltip(hoveredEntityID, hoveredCard)
-
-		// 设置鼠标光标 (可点击/不可点击)
-		if s.isCardClickable(hoveredCard) {
-			ebiten.SetCursorShape(ebiten.CursorShapePointer) // 手形光标
-		} else {
-			ebiten.SetCursorShape(ebiten.CursorShapeDefault) // 默认箭头
-		}
 	} else {
 		// 没有卡片被悬停: 隐藏 Tooltip
 		s.hideTooltip()
-		ebiten.SetCursorShape(ebiten.CursorShapeDefault) // 默认箭头
 	}
 }
 
@@ -848,5 +843,49 @@ func (s *InputSystem) getPlantName(plantType components.PlantType) string {
 		return "坚果墙"
 	default:
 		return "未知植物"
+	}
+}
+
+// updateSunHover 更新阳光的悬停状态
+// 检测鼠标是否悬停在可点击的阳光上，更新 ClickableComponent.IsHovered 状态
+// 用于 updateMouseCursor() 读取状态以设置手形光标
+func (s *InputSystem) updateSunHover(cameraX float64) {
+	mouseScreenX, mouseScreenY := ebiten.CursorPosition()
+	mouseWorldX := float64(mouseScreenX) + cameraX
+	mouseWorldY := float64(mouseScreenY)
+
+	// 查询所有可点击的阳光实体
+	sunEntities := ecs.GetEntitiesWith3[
+		*components.PositionComponent,
+		*components.ClickableComponent,
+		*components.SunComponent,
+	](s.entityManager)
+
+	for _, id := range sunEntities {
+		pos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, id)
+		clickable, _ := ecs.GetComponent[*components.ClickableComponent](s.entityManager, id)
+		sun, _ := ecs.GetComponent[*components.SunComponent](s.entityManager, id)
+
+		// 跳过不可点击或正在被收集的阳光
+		if !clickable.IsEnabled || sun.State == components.SunCollecting {
+			clickable.IsHovered = false
+			continue
+		}
+
+		// 使用坐标转换工具库计算点击中心
+		clickCenterX, clickCenterY, err := utils.GetClickableCenter(s.entityManager, id, pos)
+		if err != nil {
+			clickCenterX = pos.X
+			clickCenterY = pos.Y
+		}
+
+		halfWidth := clickable.Width / 2.0
+		halfHeight := clickable.Height / 2.0
+
+		// 检测悬停
+		isHovered := mouseWorldX >= clickCenterX-halfWidth && mouseWorldX <= clickCenterX+halfWidth &&
+			mouseWorldY >= clickCenterY-halfHeight && mouseWorldY <= clickCenterY+halfHeight
+
+		clickable.IsHovered = isHovered
 	}
 }
