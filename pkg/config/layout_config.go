@@ -96,6 +96,11 @@ const (
 	// AdvisoryTutorialTextDisplayDuration 提示性教学文字显示时长（秒）
 	AdvisoryTutorialTextDisplayDuration = 5.0
 
+	// TutorialTextMinDisplayTime 教学文字最小显示时长（秒）
+	// 在此时间内，状态检测型触发器（如 sunSpawned、enoughSunAndCooldown）不会触发
+	// 确保事件触发型文本（如种植成功）有足够时间显示
+	TutorialTextMinDisplayTime = 1.5
+
 	// TutorialTextBackgroundAlpha 教学文本背景条的透明度（0-255）
 	TutorialTextBackgroundAlpha = 128
 

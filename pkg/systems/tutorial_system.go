@@ -31,9 +31,12 @@ type TutorialSystem struct {
 	lastPlantCount      int     // 上一帧的植物数量
 	lastZombieCount     int     // 上一帧的僵尸数量
 	plantCount          int     // 当前种植的植物总数（用于第二次种植检测）
+	newPlantThisFrame   bool    // 本帧是否有新植物种植（用于 plantPlaced 触发器）
+	sunClickedThisFrame bool    // 本帧是否收集了阳光（用于 sunClicked 触发器）
 	initialized         bool    // 是否已初始化（用于 gameStart 触发）
 	soddingComplete     bool    // 铺草皮动画是否完成（用于延迟 gameStart 触发）
-	sunSpawned          bool    // 第一颗阳光是否已生成（用于 sunSpawned 触发）
+	sunSpawned          bool    // 第一颗阳光是否已生成（用于 sunSpawned 触发）- 已废弃，改用 newSunThisFrame
+	newSunThisFrame     bool    // 本帧是否有新阳光生成（用于 sunSpawned 触发器）
 	lastSunCount        int     // 上一帧的阳光实体数量（用于检测新阳光生成）
 	lastTextDisplayTime float64 // 上次教学文本显示的时间（用于时长检测，防止文本闪烁）
 
@@ -131,16 +134,21 @@ func (s *TutorialSystem) Update(dt float64) {
 	// 检查是否还有未完成的步骤
 	if tutorial.CurrentStepIndex >= len(tutorial.TutorialSteps) {
 		// 所有步骤已完成，禁用教学系统
-		tutorial.IsActive = false
-		s.hideTutorialText()
-		log.Printf("[TutorialSystem] All tutorial steps completed")
+		// 但不立即隐藏文本，让最后一条文本显示足够时间
+		if s.lastTextDisplayTime >= config.TutorialTextMinDisplayTime {
+			tutorial.IsActive = false
+			s.hideTutorialText()
+			log.Printf("[TutorialSystem] All tutorial steps completed")
+		}
 		return
 	}
 
 	// 获取当前步骤
 	currentStep := tutorial.TutorialSteps[tutorial.CurrentStepIndex]
 
-	// 更新状态跟踪变量（在检查触发条件之前更新，确保使用最新状态）
+	// 更新状态跟踪变量
+	// 注意：必须在检查触发条件之前调用，因为 Level 1-2 的触发器依赖 sunflowerCount
+	// 但 plantPlaced 触发器需要特殊处理（见 checkTriggerCondition 中的实现）
 	s.updateTrackingState()
 
 	// 更新步骤计时器（用于超时触发器）
@@ -205,8 +213,8 @@ func (s *TutorialSystem) Update(dt float64) {
 			log.Printf("[TutorialSystem] Lawn flash disabled (plantPlaced)")
 			s.sunSpawnSystem.Enable() // 启用阳光自动生成（原版机制：种植后开始掉落阳光）
 			s.spawnSkyFallingSun()
-			s.sunSpawned = true // 标记阳光已生成（触发下一步骤）
-			log.Println("[TutorialSystem] Spawned first sun after planting peashooter, sunSpawned=true, auto spawn ENABLED")
+			// 不再手动设置 sunSpawned，改为在 updateTrackingState 中检测阳光实体变化
+			log.Println("[TutorialSystem] Spawned first sun after planting peashooter, auto spawn ENABLED")
 
 		case "sunClicked":
 			// 步骤5：收集第一颗阳光后，生成第二颗阳光（阳光自动生成已在 plantPlaced 启用）
@@ -321,21 +329,17 @@ func (s *TutorialSystem) checkTriggerCondition(trigger string) bool {
 		return false
 
 	case "sunClicked":
-		// 检查阳光是否增加（玩家点击了阳光）
-		currentSun := s.gameState.GetSun()
-		if currentSun > s.lastSunAmount {
-			return true
-		}
-		return false
+		// 检查本帧是否收集了阳光（阳光数量增加）
+		// 这是事件触发型，不需要等待最小显示时间
+		return s.sunClickedThisFrame
 
 	case "sunSpawned":
-		// 检查是否有新的阳光实体生成（由TutorialSystem在种植后触发）
-		// 直接检查标志位（在 plantPlaced case 中设置）
-		if s.sunSpawned {
-			s.sunSpawned = false // 重置标志（避免重复触发）
-			return true
+		// 检查本帧是否有新的阳光实体生成
+		// 这是状态检测型，需要等待最小显示时间
+		if !s.isMinDisplayTimeElapsed() {
+			return false
 		}
-		return false
+		return s.newSunThisFrame
 
 	case "enoughSun":
 		// 检查阳光是否达到 100（足够种植豌豆射手）
@@ -347,12 +351,10 @@ func (s *TutorialSystem) checkTriggerCondition(trigger string) bool {
 		return isPlanting
 
 	case "plantPlaced":
-		// 检查是否有新的植物实体创建
-		plantEntities := ecs.GetEntitiesWith1[*components.PlantComponent](s.entityManager)
-		if len(plantEntities) > s.lastPlantCount {
-			return true
-		}
-		return false
+		// 检查本帧是否有新植物种植
+		// 使用 newPlantThisFrame 标志（在 updateTrackingState 中设置）
+		// 这样即使 updateTrackingState 在 checkTriggerCondition 之前调用，也能正确检测
+		return s.newPlantThisFrame
 
 	case "zombieSpawned":
 		// 检查是否有僵尸生成（通过 BehaviorComponent 查询）
@@ -380,6 +382,10 @@ func (s *TutorialSystem) checkTriggerCondition(trigger string) bool {
 
 	case "enoughSunAndCooldown":
 		// 检测阳光≥100 且 豌豆射手卡片冷却完成（两个条件同时满足）
+		// 这是状态检测型，需要等待最小显示时间
+		if !s.isMinDisplayTimeElapsed() {
+			return false
+		}
 		if s.gameState.GetSun() < 100 {
 			return false
 		}
@@ -394,14 +400,19 @@ func (s *TutorialSystem) checkTriggerCondition(trigger string) bool {
 
 	case "enoughSunNotPlanting":
 		// 阳光≥100 且未进入种植模式（提醒玩家继续种植）
+		// 这是状态检测型，需要等待最小显示时间
+		if !s.isMinDisplayTimeElapsed() {
+			return false
+		}
 		isPlanting, _ := s.gameState.GetPlantingMode()
 		return s.gameState.GetSun() >= 100 && !isPlanting
 
 	case "sunClickedWhenEnough":
-		// 阳光≥100时触发（简化逻辑，修复时序bug）
-		// Bug修复（v1.11）：原逻辑要求"阳光增加 + ≥100 + 文本显示≥3秒"同一帧满足
-		// 但阳光增加只有1帧窗口，如果那一帧文本时长不足3秒，就永远错过触发
-		// 新逻辑：阳光≥100时立即触发，不依赖"点击收集"的精确帧
+		// 阳光≥100时触发
+		// 这是状态检测型，需要等待最小显示时间
+		if !s.isMinDisplayTimeElapsed() {
+			return false
+		}
 		currentSun := s.gameState.GetSun()
 		return currentSun >= 100
 
@@ -525,17 +536,34 @@ func (s *TutorialSystem) updateTextDisplayTime(dt float64) {
 	}
 }
 
+// isMinDisplayTimeElapsed 检查是否已经过了最小文本显示时间
+// 用于状态检测型触发器，确保事件触发型文本有足够时间显示
+func (s *TutorialSystem) isMinDisplayTimeElapsed() bool {
+	return s.lastTextDisplayTime >= config.TutorialTextMinDisplayTime
+}
+
 // updateTrackingState 更新状态跟踪变量（用于下一帧检测变化）
 func (s *TutorialSystem) updateTrackingState() {
-	s.lastSunAmount = s.gameState.GetSun()
+	// 检测阳光变化（玩家收集了阳光）
+	currentSun := s.gameState.GetSun()
+	if currentSun > s.lastSunAmount {
+		s.sunClickedThisFrame = true
+	} else {
+		s.sunClickedThisFrame = false
+	}
+	s.lastSunAmount = currentSun
 
 	plantEntities := ecs.GetEntitiesWith1[*components.PlantComponent](s.entityManager)
 	currentPlantCount := len(plantEntities)
 
 	// 检测新植物种植（植物数量增加）
+	// 设置 newPlantThisFrame 标志，供 plantPlaced 触发器使用
 	if currentPlantCount > s.lastPlantCount {
-		s.plantCount++ // 增加种植计数
+		s.plantCount++           // 增加种植计数
+		s.newPlantThisFrame = true // 本帧有新植物
 		log.Printf("[TutorialSystem] Plant placed, total plantCount: %d", s.plantCount)
+	} else {
+		s.newPlantThisFrame = false // 本帧无新植物
 	}
 
 	s.lastPlantCount = currentPlantCount
@@ -551,7 +579,13 @@ func (s *TutorialSystem) updateTrackingState() {
 
 	// 更新阳光实体计数（用于检测新阳光生成）
 	sunEntities := ecs.GetEntitiesWith1[*components.SunComponent](s.entityManager)
-	s.lastSunCount = len(sunEntities)
+	currentSunCount := len(sunEntities)
+	if currentSunCount > s.lastSunCount {
+		s.newSunThisFrame = true
+	} else {
+		s.newSunThisFrame = false
+	}
+	s.lastSunCount = currentSunCount
 
 	// 统计僵尸数量（通过 BehaviorComponent）
 	zombieCount := 0
