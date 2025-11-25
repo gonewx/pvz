@@ -181,15 +181,6 @@ const (
 	// PeashooterRechargeTime 豌豆射手的冷却时间（秒）
 	PeashooterRechargeTime = 7.5
 
-	// PeashooterAttackCooldown 豌豆射手攻击冷却时间（秒）
-	PeashooterAttackCooldown = 1.4
-
-	// PeashooterAnimationFrames 豌豆射手动画帧数
-	PeashooterAnimationFrames = 13
-
-	// PeashooterFrameSpeed 豌豆射手动画帧速率（秒/帧）
-	PeashooterFrameSpeed = 0.08
-
 	// Wallnut (坚果墙)
 	// WallnutAnimationFrames 坚果墙动画帧数
 	// 坚果墙的完好、轻伤、重伤状态都使用16帧动画

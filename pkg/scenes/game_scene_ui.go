@@ -3,6 +3,7 @@ package scenes
 import (
 	"fmt"
 	"image/color"
+	"math"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
@@ -11,6 +12,26 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
+
+// getSunFlashColor 计算闪烁颜色（方波）
+// Story 10.8: 阳光不足反馈的闪烁效果
+//
+// 参数:
+//   - timer: 当前闪烁时间（从 duration 倒计时到 0）
+//   - cycle: 闪烁周期（秒）
+//
+// 返回:
+//   - color.Color: 红色或黑色
+func getSunFlashColor(timer float64, cycle float64) color.Color {
+	// 方波逻辑：根据时间模除周期，确定当前相位
+	phase := math.Mod(timer, cycle)
+
+	if phase < cycle/2 {
+		return color.RGBA{R: 255, G: 0, B: 0, A: 255} // 红色 (#FF0000)
+	} else {
+		return color.RGBA{R: 0, G: 0, B: 0, A: 255} // 黑色 (#000000)
+	}
+}
 
 // drawSeedBank renders the plant selection bar at the top left of the screen.
 // If the seed bank image is not loaded, it draws a simple rectangle as fallback.
@@ -39,6 +60,7 @@ func (s *GameScene) drawSeedBank(screen *ebiten.Image) {
 // Note: The sun counter background and gold frame are already part of the bar5.png image,
 // so we don't need to draw them separately. This method displays the sun count number.
 // The text is horizontally centered to accommodate dynamic value lengths (e.g., 50, 150, 9990).
+// Story 10.8: 添加阳光不足时的闪烁效果（红黑闪烁）
 func (s *GameScene) drawSunCounter(screen *ebiten.Image) {
 	// Story 8.8: 游戏冻结时隐藏阳光计数器
 	freezeEntities := ecs.GetEntitiesWith1[*components.GameFreezeComponent](s.entityManager)
@@ -67,8 +89,18 @@ func (s *GameScene) drawSunCounter(screen *ebiten.Image) {
 		op := &text.DrawOptions{}
 		op.GeoM.Translate(sunDisplayX, sunDisplayY)
 
-		// Set text color to black for better visibility on the beige background
-		op.ColorScale.ScaleWithColor(color.RGBA{R: 0, G: 0, B: 0, A: 255})
+		// Story 10.8: 确定文本颜色（闪烁或默认黑色）
+		var textColor color.Color
+		if s.gameState.SunFlashTimer > 0 {
+			// 正在闪烁：使用闪烁颜色（红 ↔ 黑）
+			textColor = getSunFlashColor(s.gameState.SunFlashTimer, s.gameState.SunFlashCycle)
+		} else {
+			// 默认颜色：黑色（更好的可见性在米黄色背景上）
+			textColor = color.RGBA{R: 0, G: 0, B: 0, A: 255}
+		}
+
+		// Set text color
+		op.ColorScale.ScaleWithColor(textColor)
 
 		text.Draw(screen, sunText, s.sunCounterFont, op)
 	} else {
@@ -295,4 +327,97 @@ func (s *GameScene) drawLastWaveWarning(screen *ebiten.Image) {
 		textOp.ColorScale.ScaleWithColor(color.RGBA{R: 255, G: 255, B: 0, A: 255}) // 黄色
 		text.Draw(screen, warningText, s.sunCounterFont, textOp)
 	}
+}
+
+// drawTooltip 渲染植物卡片的 Tooltip
+// Story 10.8: 鼠标悬停植物卡片时显示提示信息
+func (s *GameScene) drawTooltip(screen *ebiten.Image) {
+	// 查询 Tooltip 实体
+	tooltipEntities := ecs.GetEntitiesWith1[*components.TooltipComponent](s.entityManager)
+	if len(tooltipEntities) == 0 {
+		return
+	}
+
+	// 获取第一个 Tooltip（游戏中只有一个全局 Tooltip）
+	tooltip, ok := ecs.GetComponent[*components.TooltipComponent](s.entityManager, tooltipEntities[0])
+	if !ok || !tooltip.IsVisible {
+		return
+	}
+
+	// 使用阳光计数器字体（sunCounterFont）
+	if s.sunCounterFont == nil {
+		return
+	}
+
+	// 测量文本尺寸
+	plantNameWidth, _ := text.Measure(tooltip.PlantName, s.sunCounterFont, 0)
+	statusTextWidth := 0.0
+	if tooltip.StatusText != "" {
+		statusTextWidth, _ = text.Measure(tooltip.StatusText, s.sunCounterFont, 0)
+	}
+
+	// 计算 Tooltip 尺寸（包含边距）
+	tooltipWidth := plantNameWidth
+	if statusTextWidth > tooltipWidth {
+		tooltipWidth = statusTextWidth
+	}
+	tooltipWidth += tooltip.Padding * 2
+
+	// 字体高度
+	fontMetrics := s.sunCounterFont.Metrics()
+	lineHeight := float64(fontMetrics.HAscent + fontMetrics.HDescent)
+
+	// 计算 Tooltip 高度（包含边距）
+	tooltipHeight := tooltip.Padding*2 + lineHeight
+	if tooltip.StatusText != "" {
+		tooltipHeight += lineHeight + tooltip.TextSpacing
+	}
+
+	// 计算 Tooltip 位置（卡片下方居中，因为卡片在屏幕顶部）
+	// tooltip.X 是卡片中心 X 坐标，tooltip.Y 是卡片底部 Y 坐标
+	tooltipX := tooltip.X - tooltipWidth/2
+	tooltipY := tooltip.Y + 5 // 卡片下方 5px
+
+	// 确保 Tooltip 不超出屏幕边界
+	if tooltipX < 5 {
+		tooltipX = 5
+	}
+	if tooltipX+tooltipWidth > float64(WindowWidth)-5 {
+		tooltipX = float64(WindowWidth) - tooltipWidth - 5
+	}
+
+	// 1. 绘制背景
+	ebitenutil.DrawRect(screen, tooltipX, tooltipY, tooltipWidth, tooltipHeight, tooltip.BackgroundColor)
+
+	// 2. 绘制边框（黑色，1px）
+	borderWidth := 1.0
+	// 上边框
+	ebitenutil.DrawRect(screen, tooltipX, tooltipY, tooltipWidth, borderWidth, tooltip.BorderColor)
+	// 下边框
+	ebitenutil.DrawRect(screen, tooltipX, tooltipY+tooltipHeight-borderWidth, tooltipWidth, borderWidth, tooltip.BorderColor)
+	// 左边框
+	ebitenutil.DrawRect(screen, tooltipX, tooltipY, borderWidth, tooltipHeight, tooltip.BorderColor)
+	// 右边框
+	ebitenutil.DrawRect(screen, tooltipX+tooltipWidth-borderWidth, tooltipY, borderWidth, tooltipHeight, tooltip.BorderColor)
+
+	// 3. 渲染文本（从 Tooltip 顶部 + padding 开始）
+	// Ebitengine text.Draw 的 Y 坐标是文字顶部位置
+	currentY := tooltipY + tooltip.Padding
+
+	// 3.1 渲染状态提示（第一行，如果存在）
+	if tooltip.StatusText != "" {
+		statusX := tooltipX + (tooltipWidth-statusTextWidth)/2
+		statusOp := &text.DrawOptions{}
+		statusOp.GeoM.Translate(statusX, currentY)
+		statusOp.ColorScale.ScaleWithColor(tooltip.StatusTextColor)
+		text.Draw(screen, tooltip.StatusText, s.sunCounterFont, statusOp)
+		currentY += lineHeight + tooltip.TextSpacing
+	}
+
+	// 3.2 渲染植物名
+	plantNameX := tooltipX + (tooltipWidth-plantNameWidth)/2
+	plantNameOp := &text.DrawOptions{}
+	plantNameOp.GeoM.Translate(plantNameX, currentY)
+	plantNameOp.ColorScale.ScaleWithColor(tooltip.PlantNameColor)
+	text.Draw(screen, tooltip.PlantName, s.sunCounterFont, plantNameOp)
 }

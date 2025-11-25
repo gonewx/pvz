@@ -1,6 +1,7 @@
 package game
 
 import (
+	"math"
 	"testing"
 
 	"github.com/decker502/pvz/pkg/components"
@@ -765,5 +766,111 @@ func TestPauseStateIndependent(t *testing.T) {
 	}
 	if !gs.IsPaused {
 		t.Error("Expected IsPaused to be true")
+	}
+}
+
+// TestTriggerSunFlash 测试触发阳光闪烁 (Story 10.8)
+func TestTriggerSunFlash(t *testing.T) {
+	gs := GetGameState()
+
+	// 初始状态：闪烁计时器应该为 0
+	if gs.SunFlashTimer != 0 {
+		t.Errorf("Expected SunFlashTimer 0 initially, got %f", gs.SunFlashTimer)
+	}
+
+	// 触发闪烁
+	gs.TriggerSunFlash()
+
+	// 验证闪烁计时器被设置为持续时间
+	if gs.SunFlashTimer != gs.SunFlashDuration {
+		t.Errorf("Expected SunFlashTimer %f, got %f", gs.SunFlashDuration, gs.SunFlashTimer)
+	}
+}
+
+// TestUpdateSunFlash 测试更新闪烁计时器 (Story 10.8)
+func TestUpdateSunFlash(t *testing.T) {
+	gs := GetGameState()
+
+	// 设置初始闪烁计时器
+	gs.SunFlashTimer = 1.0
+
+	// 更新 0.3 秒
+	gs.UpdateSunFlash(0.3)
+	expected := 0.7
+	if math.Abs(gs.SunFlashTimer-expected) > 0.0001 {
+		t.Errorf("Expected SunFlashTimer %.4f, got %.4f", expected, gs.SunFlashTimer)
+	}
+
+	// 更新 0.5 秒
+	gs.UpdateSunFlash(0.5)
+	expected = 0.2
+	if math.Abs(gs.SunFlashTimer-expected) > 0.0001 {
+		t.Errorf("Expected SunFlashTimer %.4f, got %.4f", expected, gs.SunFlashTimer)
+	}
+
+	// 更新超过剩余时间（应该停止在 0）
+	gs.UpdateSunFlash(0.5)
+	if gs.SunFlashTimer != 0.0 {
+		t.Errorf("Expected SunFlashTimer 0.0, got %f", gs.SunFlashTimer)
+	}
+}
+
+// TestUpdateSunFlash_NoNegative 测试闪烁计时器不会变为负数 (Story 10.8)
+func TestUpdateSunFlash_NoNegative(t *testing.T) {
+	gs := GetGameState()
+
+	// 设置初始闪烁计时器
+	gs.SunFlashTimer = 0.1
+
+	// 更新超过剩余时间
+	gs.UpdateSunFlash(0.5)
+
+	// 验证计时器不会变为负数
+	if gs.SunFlashTimer < 0 {
+		t.Errorf("Expected SunFlashTimer >= 0, got %f", gs.SunFlashTimer)
+	}
+	if gs.SunFlashTimer != 0.0 {
+		t.Errorf("Expected SunFlashTimer 0.0, got %f", gs.SunFlashTimer)
+	}
+}
+
+// TestSunFlashInitialValues 测试闪烁相关字段的初始值 (Story 10.8)
+func TestSunFlashInitialValues(t *testing.T) {
+	// 重置全局状态以测试初始化
+	globalGameState = nil
+	gs := GetGameState()
+
+	// 验证默认值
+	if gs.SunFlashTimer != 0.0 {
+		t.Errorf("Expected SunFlashTimer 0.0, got %f", gs.SunFlashTimer)
+	}
+	if gs.SunFlashCycle != 0.3 {
+		t.Errorf("Expected SunFlashCycle 0.3, got %f", gs.SunFlashCycle)
+	}
+	if gs.SunFlashDuration != 1.0 {
+		t.Errorf("Expected SunFlashDuration 1.0, got %f", gs.SunFlashDuration)
+	}
+}
+
+// TestSunFlashMultipleTriggers 测试多次触发闪烁（重置计时器）(Story 10.8)
+func TestSunFlashMultipleTriggers(t *testing.T) {
+	gs := GetGameState()
+
+	// 第一次触发
+	gs.TriggerSunFlash()
+	if gs.SunFlashTimer != 1.0 {
+		t.Errorf("Expected SunFlashTimer 1.0 after first trigger, got %f", gs.SunFlashTimer)
+	}
+
+	// 更新一段时间
+	gs.UpdateSunFlash(0.6)
+	if gs.SunFlashTimer != 0.4 {
+		t.Errorf("Expected SunFlashTimer 0.4 after update, got %f", gs.SunFlashTimer)
+	}
+
+	// 再次触发（应该重置为 1.0）
+	gs.TriggerSunFlash()
+	if gs.SunFlashTimer != 1.0 {
+		t.Errorf("Expected SunFlashTimer 1.0 after second trigger, got %f", gs.SunFlashTimer)
 	}
 }

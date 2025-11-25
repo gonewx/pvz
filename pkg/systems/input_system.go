@@ -16,30 +16,36 @@ import (
 
 // InputSystem 处理所有用户输入，包括鼠标点击和键盘输入
 type InputSystem struct {
-	entityManager      *ecs.EntityManager
-	resourceManager    *game.ResourceManager
-	gameState          *game.GameState
-	reanimSystem       entities.ReanimSystemInterface // Reanim 系统（用于初始化植物动画）
-	sunCounterX        float64                        // 阳光计数器X坐标（收集动画目标）
-	sunCounterY        float64                        // 阳光计数器Y坐标（收集动画目标）
-	collectSoundPlayer *audio.Player                  // 收集阳光音效播放器
-	lawnGridSystem     *LawnGridSystem                // 草坪网格管理系统
-	lawnGridEntityID   ecs.EntityID                   // 草坪网格实体ID
-	plantSoundPlayer   *audio.Player                  // 种植音效播放器
+	entityManager       *ecs.EntityManager
+	resourceManager     *game.ResourceManager
+	gameState           *game.GameState
+	reanimSystem        entities.ReanimSystemInterface // Reanim 系统（用于初始化植物动画）
+	sunCounterX         float64                        // 阳光计数器X坐标（收集动画目标）
+	sunCounterY         float64                        // 阳光计数器Y坐标（收集动画目标）
+	collectSoundPlayer  *audio.Player                  // 收集阳光音效播放器
+	lawnGridSystem      *LawnGridSystem                // 草坪网格管理系统
+	lawnGridEntityID    ecs.EntityID                   // 草坪网格实体ID
+	plantSoundPlayer    *audio.Player                  // 种植音效播放器
+	buzzerSoundPlayer   *audio.Player                  // 无效操作音效播放器 (Story 10.8)
+	lastBuzzerPlayTime  float64                        // 上次播放无效操作音效的时间 (Story 10.8)
+	buzzerCooldownTime  float64                        // 无效操作音效冷却时间（秒）(Story 10.8)
+	gameTime            float64                        // 游戏时间累计（秒）(Story 10.8)
+	tooltipEntity       ecs.EntityID                   // Tooltip 实体ID (Story 10.8)
 }
 
 // NewInputSystem 创建一个新的输入系统
 // 添加 reanimSystem 参数用于初始化植物动画
 func NewInputSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.GameState, rs entities.ReanimSystemInterface, sunCounterX, sunCounterY float64, lawnGridSystem *LawnGridSystem, lawnGridEntityID ecs.EntityID) *InputSystem {
 	system := &InputSystem{
-		entityManager:    em,
-		resourceManager:  rm,
-		gameState:        gs,
-		reanimSystem:     rs,
-		sunCounterX:      sunCounterX,
-		sunCounterY:      sunCounterY,
-		lawnGridSystem:   lawnGridSystem,
-		lawnGridEntityID: lawnGridEntityID,
+		entityManager:      em,
+		resourceManager:    rm,
+		gameState:          gs,
+		reanimSystem:       rs,
+		sunCounterX:        sunCounterX,
+		sunCounterY:        sunCounterY,
+		lawnGridSystem:     lawnGridSystem,
+		lawnGridEntityID:   lawnGridEntityID,
+		buzzerCooldownTime: 0.5, // Story 10.8: 0.5秒冷却时间，防止连续点击播放多次
 	}
 
 	// 加载收集阳光音效（使用 LoadSoundEffect 而非 LoadAudio 以避免循环播放）
@@ -60,6 +66,14 @@ func NewInputSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.Ga
 		system.plantSoundPlayer = plantPlayer
 	}
 
+	// Story 10.8: 加载无效操作音效（buzzer）
+	buzzerPlayer, err := rm.LoadSoundEffect("assets/sounds/buzzer.ogg")
+	if err != nil {
+		log.Printf("Warning: Failed to load buzzer sound: %v", err)
+	} else {
+		system.buzzerSoundPlayer = buzzerPlayer
+	}
+
 	return system
 }
 
@@ -68,6 +82,9 @@ func NewInputSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.Ga
 //   - deltaTime: 时间增量（秒）
 //   - cameraX: 摄像机的世界坐标X位置（用于屏幕坐标到世界坐标的转换）
 func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
+	// Story 10.8: 更新游戏时间（用于音效冷却）
+	s.gameTime += deltaTime
+
 	// ESC 键切换暂停/恢复
 	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
 		s.gameState.TogglePause()
@@ -339,18 +356,53 @@ func (s *InputSystem) handlePlantCardClick(mouseX, mouseY int, cameraX float64) 
 		log.Printf("[InputSystem] 卡片 %d: PlantType=%v, 位置=(%.1f, %.1f), 可点击区域=%.1fx%.1f, IsAvailable=%v, IsEnabled=%v",
 			entityID, card.PlantType, pos.X, pos.Y, clickable.Width, clickable.Height, card.IsAvailable, clickable.IsEnabled)
 
-		// 只处理可用的卡片
-		if !card.IsAvailable || !clickable.IsEnabled {
-			log.Printf("[InputSystem] 卡片 %d 不可用，跳过", entityID)
-			continue
-		}
-
-		// AABB 碰撞检测
+		// AABB 碰撞检测（先检测点击，再判断卡片状态）
 		if float64(mouseX) >= pos.X && float64(mouseX) <= pos.X+clickable.Width &&
 			float64(mouseY) >= pos.Y && float64(mouseY) <= pos.Y+clickable.Height {
 			// 点击命中卡片！
-			log.Printf("[InputSystem] 点击植物卡片: PlantType=%v, IsPlantingMode=%v",
-				card.PlantType, s.gameState.IsPlantingMode)
+			log.Printf("[InputSystem] 点击植物卡片: PlantType=%v, IsPlantingMode=%v, IsAvailable=%v",
+				card.PlantType, s.gameState.IsPlantingMode, card.IsAvailable)
+
+			// Story 10.8: 检查卡片状态
+			currentSun := s.gameState.GetSun()
+			plantCost := card.SunCost
+
+			// 1. 冷却中 - 不做任何反应
+			if card.CurrentCooldown > 0 {
+				log.Printf("[InputSystem] 卡片冷却中，跳过 (剩余 %.1f 秒)", card.CurrentCooldown)
+				return true // 已处理点击，但卡片冷却中
+			}
+
+			// 2. 阳光不足 - 触发闪烁反馈
+			if currentSun < plantCost {
+				log.Printf("[InputSystem] 阳光不足: 需要 %d, 当前 %d", plantCost, currentSun)
+				s.gameState.TriggerSunFlash()
+
+				// Story 10.8: 播放无效操作音效（带冷却）
+				if s.buzzerSoundPlayer != nil {
+					timeSinceLastBuzzer := s.gameTime - s.lastBuzzerPlayTime
+					if timeSinceLastBuzzer >= s.buzzerCooldownTime {
+						// 重置音效播放器
+						if err := s.buzzerSoundPlayer.Rewind(); err != nil {
+							log.Printf("[InputSystem] 警告: 重置buzzer音效失败: %v", err)
+						}
+						// 播放音效
+						s.buzzerSoundPlayer.Play()
+						s.lastBuzzerPlayTime = s.gameTime
+						log.Printf("[InputSystem] 播放无效操作音效 (buzzer)")
+					} else {
+						log.Printf("[InputSystem] 无效操作音效冷却中 (%.2f/%.2f)", timeSinceLastBuzzer, s.buzzerCooldownTime)
+					}
+				}
+
+				return true // 已处理点击，但阻止卡片选择
+			}
+
+			// 3. 其他不可用原因 - 跳过
+			if !clickable.IsEnabled {
+				log.Printf("[InputSystem] 卡片不可点击，跳过")
+				return true
+			}
 
 			// 检查当前是否已在种植模式
 			if s.gameState.IsPlantingMode {
@@ -637,6 +689,7 @@ func (s *InputSystem) resetPlantCardSelection(plantType components.PlantType) {
 
 // updatePlantCardHover 更新植物卡片的悬停状态
 // Story 8.2.1: 每帧检测鼠标是否悬停在植物卡片上，设置 UIComponent.State 为 UIHovered
+// Story 10.8: 添加 Tooltip 显示和鼠标光标切换
 func (s *InputSystem) updatePlantCardHover() {
 	mouseX, mouseY := ebiten.CursorPosition()
 
@@ -647,6 +700,10 @@ func (s *InputSystem) updatePlantCardHover() {
 		*components.PositionComponent,
 		*components.UIComponent,
 	](s.entityManager)
+
+	// 记录是否有卡片被悬停
+	hoveredEntityID := ecs.EntityID(0)
+	var hoveredCard *components.PlantCardComponent
 
 	// 遍历所有卡片，检测悬停
 	for _, entityID := range entities {
@@ -665,12 +722,19 @@ func (s *InputSystem) updatePlantCardHover() {
 		isHovering := float64(mouseX) >= pos.X && float64(mouseX) <= pos.X+clickable.Width &&
 			float64(mouseY) >= pos.Y && float64(mouseY) <= pos.Y+clickable.Height
 
-		// 只有可用的卡片才显示悬停效果
-		if isHovering && card.IsAvailable && clickable.IsEnabled {
-			// 只有当前状态不是 Clicked 时才设置为 Hovered（避免覆盖点击状态）
-			if ui.State != components.UIClicked {
-				ui.State = components.UIHovered
+		// Story 10.8: 悬停任何卡片都显示 Tooltip（不管是否可用）
+		if isHovering {
+			hoveredEntityID = entityID
+			hoveredCard = card
+
+			// 只有可用的卡片才显示悬停效果（UI状态变化）
+			if card.IsAvailable && clickable.IsEnabled {
+				// 只有当前状态不是 Clicked 时才设置为 Hovered（避免覆盖点击状态）
+				if ui.State != components.UIClicked {
+					ui.State = components.UIHovered
+				}
 			}
+			break // 找到悬停卡片后停止遍历
 		} else {
 			// 如果不再悬停且当前是 Hovered 状态，恢复为 Normal
 			if ui.State == components.UIHovered {
@@ -681,5 +745,108 @@ func (s *InputSystem) updatePlantCardHover() {
 				}
 			}
 		}
+	}
+
+	// Story 10.8: 更新 Tooltip 和鼠标光标
+	if hoveredEntityID != 0 {
+		// 有卡片被悬停: 显示 Tooltip
+		s.showTooltip(hoveredEntityID, hoveredCard)
+
+		// 设置鼠标光标 (可点击/不可点击)
+		if s.isCardClickable(hoveredCard) {
+			ebiten.SetCursorShape(ebiten.CursorShapePointer) // 手形光标
+		} else {
+			ebiten.SetCursorShape(ebiten.CursorShapeDefault) // 默认箭头
+		}
+	} else {
+		// 没有卡片被悬停: 隐藏 Tooltip
+		s.hideTooltip()
+		ebiten.SetCursorShape(ebiten.CursorShapeDefault) // 默认箭头
+	}
+}
+
+// showTooltip 显示 Tooltip
+// Story 10.8: 鼠标悬停植物卡片时显示提示信息
+func (s *InputSystem) showTooltip(cardEntityID ecs.EntityID, card *components.PlantCardComponent) {
+	// 获取或创建 Tooltip 实体
+	if s.tooltipEntity == 0 {
+		s.tooltipEntity = s.entityManager.CreateEntity()
+		tooltip := components.NewTooltipComponent()
+		s.entityManager.AddComponent(s.tooltipEntity, tooltip)
+	}
+
+	// 获取 Tooltip 组件
+	tooltip, ok := ecs.GetComponent[*components.TooltipComponent](s.entityManager, s.tooltipEntity)
+	if !ok {
+		log.Printf("[InputSystem] 警告: Tooltip 组件不存在")
+		return
+	}
+
+	// 获取卡片位置信息
+	pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, cardEntityID)
+	if !ok {
+		return
+	}
+	clickable, ok := ecs.GetComponent[*components.ClickableComponent](s.entityManager, cardEntityID)
+	if !ok {
+		return
+	}
+
+	// 更新 Tooltip 内容
+	tooltip.IsVisible = true
+	tooltip.TargetEntity = cardEntityID
+	tooltip.PlantName = s.getPlantName(card.PlantType)
+
+	// 设置状态提示文本
+	// 优先级：冷却中 > 阳光不足 > 可用
+	currentSun := s.gameState.GetSun()
+	if card.CurrentCooldown > 0 {
+		tooltip.StatusText = "重新装填中..."
+	} else if currentSun < card.SunCost {
+		tooltip.StatusText = "没有足够的阳光"
+	} else {
+		tooltip.StatusText = "" // 可用状态不显示状态提示
+	}
+
+	// 计算 Tooltip 位置（卡片下方居中，因为卡片在屏幕顶部）
+	// tooltip.X: 卡片中心 X 坐标
+	// tooltip.Y: 卡片底部 Y 坐标
+	tooltip.X = pos.X + clickable.Width/2
+	tooltip.Y = pos.Y + clickable.Height // 卡片底部 Y 坐标
+}
+
+// hideTooltip 隐藏 Tooltip
+// Story 10.8: 鼠标离开卡片时隐藏提示信息
+func (s *InputSystem) hideTooltip() {
+	if s.tooltipEntity == 0 {
+		return
+	}
+
+	tooltip, ok := ecs.GetComponent[*components.TooltipComponent](s.entityManager, s.tooltipEntity)
+	if ok {
+		tooltip.IsVisible = false
+	}
+}
+
+// isCardClickable 检测卡片是否可点击
+// Story 10.8: 判断卡片是否处于可点击状态（决定鼠标光标样式）
+func (s *InputSystem) isCardClickable(card *components.PlantCardComponent) bool {
+	return card.IsAvailable && card.CurrentCooldown <= 0 && s.gameState.Sun >= card.SunCost
+}
+
+// getPlantName 获取植物名称
+// Story 10.8: 根据植物类型返回中文名称
+func (s *InputSystem) getPlantName(plantType components.PlantType) string {
+	switch plantType {
+	case components.PlantPeashooter:
+		return "豌豆射手"
+	case components.PlantSunflower:
+		return "向日葵"
+	case components.PlantCherryBomb:
+		return "樱桃炸弹"
+	case components.PlantWallnut:
+		return "坚果墙"
+	default:
+		return "未知植物"
 	}
 }

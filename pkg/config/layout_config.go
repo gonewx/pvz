@@ -1,7 +1,5 @@
 package config
 
-import "github.com/decker502/pvz/internal/reanim"
-
 // 布局配置常量
 // 本文件定义了游戏场景中的布局参数，包括网格系统、UI元素位置等
 
@@ -63,7 +61,7 @@ const (
 
 	// SodRoll 动画Y偏移（相对于目标行中心）
 	// 调整此值可以改变草皮卷的垂直位置
-	SodRollOffsetY = -15.0 // 相对于行中心的Y偏移量
+	SodRollOffsetY = -8.0 // 相对于行中心的Y偏移量
 
 	// 草皮叠加图X偏移（相对于网格起点）
 	// 调整此值可以改变草皮显示的水平位置
@@ -323,115 +321,3 @@ const (
 	// 建议值范围：30.0 - 80.0
 	LawnmowerCollisionRange = 50.0
 )
-
-// GetGridWorldBounds 返回草坪网格的世界坐标边界
-// 返回值：startX, startY, endX, endY
-func GetGridWorldBounds() (float64, float64, float64, float64) {
-	startX := GridWorldStartX
-	startY := GridWorldStartY
-	endX := GridWorldStartX + float64(GridColumns)*CellWidth
-	endY := GridWorldStartY + float64(GridRows)*CellHeight
-	return startX, startY, endX, endY
-}
-
-// CalculateSodRollPosition 计算草皮卷动画的起点位置（世界坐标）
-// 动画终点由 reanim 文件的最后一帧决定，不需要配置
-// 参数：
-//   - enabledLanes: 启用的行列表
-//   - sodImageHeight: 草皮图片高度（未使用，保留接口兼容性）
-//   - reanimXML: SodRoll.reanim 数据（用于计算Y坐标对齐）
-//
-// 返回：
-//   - startX: 动画起点X（世界坐标）= 网格起点 + 配置偏移
-//   - startY: 动画起点Y（世界坐标）= 自动对齐到目标行中心
-func CalculateSodRollPosition(enabledLanes []int, sodImageHeight float64, reanimXML *reanim.ReanimXML) (startX, startY float64) {
-	if len(enabledLanes) == 0 {
-		return 0, 0
-	}
-
-	// 计算目标行的中心Y坐标
-	minLane := enabledLanes[0]
-	maxLane := enabledLanes[0]
-	for _, lane := range enabledLanes {
-		if lane < minLane {
-			minLane = lane
-		}
-		if lane > maxLane {
-			maxLane = lane
-		}
-	}
-	centerLane := float64(minLane+maxLane) / 2.0
-	targetCenterY := GridWorldStartY + (centerLane-1.0)*CellHeight + CellHeight/2.0
-
-	// X坐标：使用手工配置的偏移量
-	startX = GridWorldStartX + SodRollStartOffsetX
-
-	// Y坐标：自动对齐到目标行中心（需要 reanim 包围盒信息）
-	if reanimXML != nil {
-		// 从 reanim 数据计算包围盒
-		var minY, maxY *float64
-		for _, track := range reanimXML.Tracks {
-			for _, frame := range track.Frames {
-				if frame.Y != nil {
-					y := *frame.Y
-					if minY == nil || y < *minY {
-						minY = &y
-					}
-					if maxY == nil || y > *maxY {
-						maxY = &y
-					}
-				}
-			}
-		}
-
-		// 如果找到了Y坐标，计算包围盒中心并对齐
-		if minY != nil && maxY != nil {
-			animCenterY := (*minY + *maxY) / 2.0
-			startY = targetCenterY - animCenterY + SodRollOffsetY
-		} else {
-			// 降级：直接使用目标中心Y
-			startY = targetCenterY + SodRollOffsetY
-		}
-	} else {
-		// 没有 reanim 数据：直接使用目标中心Y
-		startY = targetCenterY + SodRollOffsetY
-	}
-
-	return startX, startY
-}
-
-// CalculateSodOverlayPosition 计算草皮叠加图的渲染位置（世界坐标）
-// 参数：
-//   - enabledLanes: 启用的行列表
-//   - sodImageHeight: 草皮图片高度
-//
-// 返回：
-//   - sodX: 草皮叠加图左上角X坐标
-//   - sodY: 草皮叠加图左上角Y坐标
-func CalculateSodOverlayPosition(enabledLanes []int, sodImageHeight float64) (sodX, sodY float64) {
-	if len(enabledLanes) == 0 {
-		return 0, 0
-	}
-
-	// 计算目标行的中心Y坐标
-	minLane := enabledLanes[0]
-	maxLane := enabledLanes[0]
-	for _, lane := range enabledLanes {
-		if lane < minLane {
-			minLane = lane
-		}
-		if lane > maxLane {
-			maxLane = lane
-		}
-	}
-	centerLane := float64(minLane+maxLane) / 2.0
-	rowCenterY := GridWorldStartY + (centerLane-1.0)*CellHeight + CellHeight/2.0
-
-	// 计算X坐标（网格起点 + 偏移）
-	sodX = GridWorldStartX + SodOverlayOffsetX
-
-	// 计算Y坐标（行中心 - 图片高度的一半 + 偏移）
-	sodY = rowCenterY - sodImageHeight/2.0 + SodOverlayOffsetY
-
-	return sodX, sodY
-}

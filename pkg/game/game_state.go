@@ -47,6 +47,11 @@ type GameState struct {
 
 	// Story 10.1: 暂停菜单系统
 	IsPaused bool // 游戏是否暂停
+
+	// Story 10.8: 阳光计数器闪烁反馈
+	SunFlashTimer    float64 // 闪烁剩余时间（秒），值 > 0 时触发闪烁动画，0 时停止
+	SunFlashCycle    float64 // 闪烁周期（秒），红色 ↔ 黑色切换周期，默认 0.3 秒
+	SunFlashDuration float64 // 闪烁总持续时间（秒），默认 1.0 秒（约 3 次完整闪烁）
 }
 
 // 全局单例实例（这是架构规范允许的唯一全局变量）
@@ -78,6 +83,9 @@ func GetGameState() *GameState {
 			SelectedPlants:     []string{},
 			LawnStrings:        lawnStrings,
 			saveManager:        saveManager,
+			// Story 10.8: 初始化闪烁参数
+			SunFlashCycle:    0.3,
+			SunFlashDuration: 1.0,
 		}
 	}
 	return globalGameState
@@ -367,6 +375,23 @@ func (gs *GameState) SetPaused(paused bool) {
 // Story 10.1: ESC 快捷键使用
 func (gs *GameState) TogglePause() {
 	gs.IsPaused = !gs.IsPaused
+}
+
+// TriggerSunFlash 触发阳光计数器闪烁
+// Story 10.8: 当玩家点击阳光不足的卡片时调用
+func (gs *GameState) TriggerSunFlash() {
+	gs.SunFlashTimer = gs.SunFlashDuration
+}
+
+// UpdateSunFlash 更新闪烁计时器
+// Story 10.8: 在每帧更新中调用，递减闪烁计时器
+func (gs *GameState) UpdateSunFlash(deltaTime float64) {
+	if gs.SunFlashTimer > 0 {
+		gs.SunFlashTimer -= deltaTime
+		if gs.SunFlashTimer < 0 {
+			gs.SunFlashTimer = 0
+		}
+	}
 }
 
 // ========================================

@@ -145,7 +145,7 @@ func (s *SoddingSystem) StartAnimation(onComplete func(), enabledLanes, animLane
 
 		// 重构简化: 计算此行的Y坐标（行中心）
 		// 草皮卷的 Reanim 包围盒中心会自动对齐到 Position
-		targetCenterY := config.GridWorldStartY + float64(lane-1)*config.CellHeight + config.CellHeight/2.0
+		targetCenterY := config.GridWorldStartY + float64(lane-1)*config.CellHeight + config.CellHeight/2.0 + config.SodRollOffsetY
 
 		log.Printf("[SoddingSystem] 创建第 %d 行草皮卷: Position=(0, %.1f)", lane, targetCenterY)
 

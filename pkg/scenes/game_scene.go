@@ -801,6 +801,8 @@ func (s *GameScene) Update(deltaTime float64) {
 	s.particleSystem.Update(deltaTime) // 9. Update particle effects (Story 7.2)
 	// 方案A+：闪烁效果系统
 	s.flashEffectSystem.Update(deltaTime) // 9.3. Update flash effects (hit feedback)
+	// Story 10.8: 更新阳光计数器闪烁计时器
+	s.gameState.UpdateSunFlash(deltaTime) // 9.4. Update sun flash timer (sun shortage feedback)
 	// Story 8.2: Tutorial system (only if active)
 	if s.tutorialSystem != nil {
 		s.tutorialSystem.Update(deltaTime) // 9.5. Update tutorial text display
@@ -939,6 +941,10 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	if s.dialogRenderSystem != nil {
 		s.dialogRenderSystem.Draw(screen)
 	}
+
+	// Story 10.8: Draw Tooltip (植物卡片提示框)
+	// Tooltip 在对话框之后、暂停菜单之前渲染
+	s.drawTooltip(screen)
 
 	// Story 10.1: Draw pause menu (最顶层 - 在所有其他元素之上)
 	if s.pauseMenuModule != nil {
