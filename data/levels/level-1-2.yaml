@@ -8,7 +8,7 @@ enabledLanes: [2, 3, 4]       # 中间3行草地
 availablePlants:              # 可用植物
   - "peashooter"
   - "sunflower"
-skipOpening: true            # 不跳过开场
+skipOpening: false            # 显示开场动画（展示预览僵尸）
 initialSun: 50                # 初始阳光50（标准值）
 
 # Story 8.3: 奖励配置

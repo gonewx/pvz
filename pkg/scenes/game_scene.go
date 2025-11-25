@@ -154,6 +154,10 @@ type GameScene struct {
 
 	// Cursor state tracking (光标状态追踪)
 	lastCursorShape ebiten.CursorShapeType // 上一帧的光标形状（避免不必要的API调用）
+
+	// Story 8.3.1: 僵尸预生成状态标志
+	// 实际关卡僵尸在开场动画完成后才预生成，与预览僵尸完全独立
+	zombiesPreSpawned bool
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -334,15 +338,10 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	log.Printf("[GameScene] Initialized wave spawn system")
 
 	// Pre-spawn all zombies for the level (they will be activated wave by wave)
-	// 关卡僵尸应该是根据配置,在开始前就已经生成好了,以便开场前展现给用户
-	if scene.gameState.CurrentLevel != nil && len(scene.gameState.CurrentLevel.Waves) > 0 {
-		totalZombies := scene.waveSpawnSystem.PreSpawnAllWaves()
-		log.Printf("[GameScene] Pre-spawned %d zombies for showcase", totalZombies)
-
-		// ❌ 不应该在预生成时计数，只有在激活僵尸时才计数
-		// 预生成的僵尸处于未激活状态，不参与游戏逻辑
-		// scene.gameState.IncrementZombiesSpawned(totalZombies) // 已删除
-	}
+	// Story 8.3.1: 僵尸预生成时机取决于是否有开场动画
+	// - 有开场动画：延迟到开场动画完成后预生成（见 Update() 方法）
+	// - 无开场动画：立即预生成
+	// 注意：预览僵尸由 OpeningAnimationSystem 独立生成，与此处的关卡僵尸完全独立
 
 	// Story 8.3: Create CameraSystem (always create, used by opening animation)
 	scene.cameraSystem = systems.NewCameraSystem(scene.entityManager, scene.gameState)
@@ -362,8 +361,16 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	scene.openingSystem = systems.NewOpeningAnimationSystem(scene.entityManager, scene.gameState, rm, levelConfig, scene.cameraSystem)
 	if scene.openingSystem != nil {
 		log.Printf("[GameScene] Initialized opening animation system")
+		// Story 8.3.1: 有开场动画时，僵尸预生成延迟到动画完成后
+		// zombiesPreSpawned 保持为 false，在 Update() 中检测动画完成后预生成
 	} else {
 		log.Printf("[GameScene] Skipping opening animation system (tutorial/skip/special level)")
+		// Story 8.3.1: 无开场动画时，立即预生成僵尸
+		if scene.gameState.CurrentLevel != nil && len(scene.gameState.CurrentLevel.Waves) > 0 {
+			totalZombies := scene.waveSpawnSystem.PreSpawnAllWaves()
+			log.Printf("[GameScene] Pre-spawned %d zombies (no opening animation)", totalZombies)
+			scene.zombiesPreSpawned = true
+		}
 	}
 
 	// Story 10.2: Create LawnmowerSystem (除草车系统 - 最后防线)
@@ -557,6 +564,13 @@ func (s *GameScene) Update(deltaTime float64) {
 	// 开场动画刚完成，触发铺草皮动画（如果配置了且还未启动）
 	// 修正：检查 ShowSoddingAnim 和 SodRollAnimation 配置
 	if s.openingSystem != nil && s.openingSystem.IsCompleted() && !s.soddingAnimStarted && s.soddingSystem != nil {
+		// Story 8.3.1: 开场动画完成后，预生成实际关卡僵尸
+		if !s.zombiesPreSpawned && s.gameState.CurrentLevel != nil && len(s.gameState.CurrentLevel.Waves) > 0 {
+			totalZombies := s.waveSpawnSystem.PreSpawnAllWaves()
+			log.Printf("[GameScene] Pre-spawned %d zombies (after opening animation)", totalZombies)
+			s.zombiesPreSpawned = true
+		}
+
 		// 检查是否应该播放铺草皮动画
 		shouldPlayAnim := s.gameState.CurrentLevel.ShowSoddingAnim || s.gameState.CurrentLevel.SodRollAnimation
 
@@ -796,7 +810,7 @@ func (s *GameScene) Update(deltaTime float64) {
 	}
 	s.physicsSystem.Update(deltaTime) // 7. Check collisions (Story 4.3)
 	// Story 6.3: Reanim 动画系统（替代旧的 AnimationSystem）
-	s.reanimSystem.Update(deltaTime)   // 8. Update Reanim animation frames
+	s.reanimSystem.Update(deltaTime) // 8. Update Reanim animation frames
 
 	s.particleSystem.Update(deltaTime) // 9. Update particle effects (Story 7.2)
 	// 方案A+：闪烁效果系统
@@ -852,20 +866,27 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	// Layer 1: Draw lawn background
 	s.drawBackground(screen)
 
+	// Story 8.3.1: 开场动画或铺草皮动画期间隐藏 UI 元素
+	isOpeningPlaying := s.openingSystem != nil && !s.openingSystem.IsCompleted()
+	isSoddingPlaying := s.soddingSystem != nil && s.soddingSystem.IsPlaying()
+	hideUI := isOpeningPlaying || isSoddingPlaying
+
 	// Layer 2: Draw UI base elements (seed bank, shovel, plant cards)
 	// 按照原版PVZ设计，UI元素在游戏世界实体下方渲染
-	s.drawSeedBank(screen)
-	s.drawShovel(screen)
+	if !hideUI {
+		s.drawSeedBank(screen)
+		s.drawShovel(screen)
 
-	// 使用 ECS 按钮系统渲染菜单按钮
-	if s.buttonRenderSystem != nil {
-		s.buttonRenderSystem.Draw(screen)
-	}
+		// 使用 ECS 按钮系统渲染菜单按钮
+		if s.buttonRenderSystem != nil {
+			s.buttonRenderSystem.Draw(screen)
+		}
 
-	// Layer 3: Draw plant cards (Story 3.1 架构优化)
-	// 在植物和僵尸下方渲染，符合原版PVZ设计
-	if s.plantSelectionModule != nil {
-		s.plantSelectionModule.Draw(screen)
+		// Layer 3: Draw plant cards (Story 3.1 架构优化)
+		// 在植物和僵尸下方渲染，符合原版PVZ设计
+		if s.plantSelectionModule != nil {
+			s.plantSelectionModule.Draw(screen)
+		}
 	}
 
 	// Layer 4: Draw game world entities (plants, zombies, projectiles) - 不包括阳光
@@ -883,7 +904,10 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 
 	// Layer 5: Draw UI overlays (sun counter text)
 	// 文字始终在最上层以确保可读性
-	s.drawSunCounter(screen)
+	// Story 8.3.1: 开场动画或铺草皮动画期间隐藏阳光计数器
+	if !hideUI {
+		s.drawSunCounter(screen)
+	}
 
 	// Layer 6: Draw particle effects (Story 7.3)
 	// 只渲染游戏世界的粒子（爆炸、溅射等），过滤掉 UI 粒子
@@ -910,7 +934,10 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 
 	// Layer 9: Draw level progress bar (Story 5.5 - 正式版本)
 	// 右下角图形化进度条
-	s.drawProgressBar(screen)
+	// Story 8.3.1: 开场动画或铺草皮动画期间隐藏进度条
+	if !hideUI {
+		s.drawProgressBar(screen)
+	}
 
 	// Layer 10: Draw last wave warning (Story 5.5) - DISABLED for production
 	// 最后一波提示（如果需要显示）（开发调试用，已禁用）

@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
@@ -66,13 +65,19 @@ func NewOpeningAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *ga
 
 	// 创建开场动画实体
 	oas.openingEntity = em.CreateEntity()
-	ecs.AddComponent(em, oas.openingEntity, &components.OpeningAnimationComponent{
+	openingComp := &components.OpeningAnimationComponent{
 		State:          "idle",
 		ElapsedTime:    0,
 		ZombieEntities: []ecs.EntityID{},
 		IsSkipped:      false,
 		IsCompleted:    false,
-	})
+	}
+	ecs.AddComponent(em, oas.openingEntity, openingComp)
+
+	// Story 8.3.1: 在系统创建时立即生成预览僵尸（而不是等镜头移动到位）
+	// 这样僵尸在开场一开始就存在，镜头移过去时玩家能看到它们
+	oas.spawnPreviewZombies(openingComp)
+	log.Printf("[OpeningAnimationSystem] 预览僵尸已在开场动画开始时生成")
 
 	return oas
 }
@@ -135,8 +140,7 @@ func (oas *OpeningAnimationSystem) updateCameraMoveRightState(openingComp *compo
 		openingComp.State = "showZombies"
 		openingComp.ElapsedTime = 0
 
-		// 不再生成预览僵尸
-		// 直接使用 WaveSpawnSystem 预生成的关卡僵尸（IsActivated=false 保持静止）
+		// Story 8.3.1: 预览僵尸已在系统创建时生成，这里不需要再生成
 
 		log.Println("[OpeningAnimationSystem] State: cameraMoveRight → showZombies")
 	}
@@ -144,9 +148,6 @@ func (oas *OpeningAnimationSystem) updateCameraMoveRightState(openingComp *compo
 
 // updateShowZombiesState 处理展示僵尸状态。
 func (oas *OpeningAnimationSystem) updateShowZombiesState(openingComp *components.OpeningAnimationComponent) {
-	// 不再生成预览僵尸，直接使用 WaveSpawnSystem 预生成的关卡僵尸
-	// 僵尸在开场动画期间保持静止（BehaviorSystem 检查 IsActivated 标志）
-
 	// 等待一定时间展示僵尸
 	if openingComp.ElapsedTime >= OpeningShowZombieTime {
 		// 切换到镜头返回状态
@@ -175,7 +176,8 @@ func (oas *OpeningAnimationSystem) updateCameraMoveLeftState(openingComp *compon
 
 // updateGameStartState 处理游戏开始状态。
 func (oas *OpeningAnimationSystem) updateGameStartState(openingComp *components.OpeningAnimationComponent) {
-	// 不再需要清理预览僵尸（因为直接使用关卡僵尸）
+	// Story 8.3.1: 清理预览僵尸（镜头返回后销毁独立的预览实体）
+	oas.clearPreviewZombies(openingComp)
 
 	// 标记开场动画完成
 	openingComp.IsCompleted = true
@@ -184,21 +186,29 @@ func (oas *OpeningAnimationSystem) updateGameStartState(openingComp *components.
 }
 
 // spawnPreviewZombies 生成预告僵尸实体。
+// Story 8.3.1: 预览僵尸是独立的展示实体，用于开场动画中的"情报侦察"功能。
+// 预览僵尸与实际关卡僵尸完全独立，不会参与游戏逻辑。
 func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.OpeningAnimationComponent) {
 	// 从关卡配置获取所有僵尸类型
 	zombieTypes := oas.getUniqueZombieTypes()
 
-	log.Printf("[OpeningAnimationSystem] Spawning %d preview zombies", len(zombieTypes))
-
 	if len(zombieTypes) == 0 {
+		log.Printf("[OpeningAnimationSystem] No zombie types found, skipping preview spawn")
 		return
 	}
+
+	// Story 8.3.1: 计算预览僵尸数量
+	previewCount := oas.calculatePreviewZombieCount()
+	log.Printf("[OpeningAnimationSystem] Spawning %d preview zombies (types: %v)", previewCount, zombieTypes)
 
 	// 初始化随机数种子（使用当前时间）
 	rand.Seed(time.Now().UnixNano())
 
-	// 生成僵尸实体，随机分配到5行
-	for i, zombieType := range zombieTypes {
+	// 生成指定数量的预览僵尸
+	for i := 0; i < previewCount; i++ {
+		// 从可用类型中随机选择
+		zombieType := zombieTypes[rand.Intn(len(zombieTypes))]
+
 		// 随机选择一行（0-4）
 		randomLane := rand.Intn(config.GridRows)
 
@@ -206,12 +216,15 @@ func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.O
 		// 必须与僵尸工厂函数的Y坐标计算公式保持一致
 		y := config.GridWorldStartY + float64(randomLane)*config.CellHeight + config.CellHeight/2 + config.ZombieVerticalOffset
 
+		// Story 8.3.1: 预览僵尸随机分布在屏幕右侧区域 (X: 1050-1250)
+		randomX := config.ZombieSpawnMinX + rand.Float64()*(config.ZombieSpawnMaxX-config.ZombieSpawnMinX)
+
 		// 创建僵尸实体
 		zombieEntity := oas.entityManager.CreateEntity()
 
 		// 添加位置组件
 		ecs.AddComponent(oas.entityManager, zombieEntity, &components.PositionComponent{
-			X: config.OpeningZombiePreviewX,
+			X: randomX,
 			Y: y,
 		})
 
@@ -224,14 +237,15 @@ func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.O
 		reanimXML := oas.resourceManager.GetReanimXML("Zombie")
 		partImages := oas.resourceManager.GetReanimPartImages("Zombie")
 		if reanimXML != nil && partImages != nil {
-			// 使用新的简化结构
+			// Story 8.3.1: 使用精简的初始化
+			// 注意：MergedTracks 必须为 nil，让 PlayCombo 自动初始化轨道
 			reanimComp := &components.ReanimComponent{
 				ReanimName:        "Zombie",
 				ReanimXML:         reanimXML,
 				PartImages:        partImages,
-				MergedTracks:      map[string][]reanim.Frame{}, // 稍后由 PlayAnimation 初始化
-				VisualTracks:      []string{},
-				LogicalTracks:     []string{},
+				MergedTracks:      nil, // Story 8.3.1: 必须为 nil，让 PlayCombo 初始化轨道
+				VisualTracks:      nil, // PlayCombo 会自动设置
+				LogicalTracks:     nil, // PlayCombo 会自动设置
 				CurrentFrame:      0,
 				FrameAccumulator:  0,
 				AnimationFPS:      12,
@@ -239,6 +253,7 @@ func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.O
 				AnimVisiblesMap:   map[string][]int{},
 				IsLooping:         true,
 				IsFinished:        false,
+				LastRenderFrame:   -1, // 确保首次渲染时触发缓存构建
 			}
 			ecs.AddComponent(oas.entityManager, zombieEntity, reanimComp)
 
@@ -253,7 +268,30 @@ func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.O
 		// 保存僵尸实体ID
 		openingComp.ZombieEntities = append(openingComp.ZombieEntities, zombieEntity)
 
-		log.Printf("[OpeningAnimationSystem] Spawned preview zombie %d: type=%s, lane=%d, x=%.0f, y=%.0f", i, zombieType, randomLane, config.OpeningZombiePreviewX, y)
+		log.Printf("[OpeningAnimationSystem] Spawned preview zombie %d: type=%s, lane=%d, x=%.0f, y=%.0f", i, zombieType, randomLane, randomX, y)
+	}
+}
+
+// calculatePreviewZombieCount 计算预览僵尸数量。
+// Story 8.3.1: 如果配置了 PreviewZombieCount 则使用配置值，否则根据关卡难度自动计算：
+//   - 简单关卡（≤2波）：3 只预览僵尸
+//   - 中等关卡（3-5波）：5 只预览僵尸
+//   - 困难关卡（>5波）：8 只预览僵尸
+func (oas *OpeningAnimationSystem) calculatePreviewZombieCount() int {
+	// 优先使用配置值
+	if oas.levelConfig.PreviewZombieCount > 0 {
+		return oas.levelConfig.PreviewZombieCount
+	}
+
+	// 根据波数自动计算
+	waveCount := len(oas.levelConfig.Waves)
+	switch {
+	case waveCount <= 2:
+		return 3 // 简单关卡
+	case waveCount <= 5:
+		return 5 // 中等关卡
+	default:
+		return 8 // 困难关卡
 	}
 }
 
@@ -268,12 +306,21 @@ func (oas *OpeningAnimationSystem) clearPreviewZombies(openingComp *components.O
 }
 
 // getUniqueZombieTypes 获取关卡中所有唯一的僵尸类型。
+// Story 8.3.1: 支持新格式 ZombieGroup 和旧格式 ZombieSpawn (向后兼容)
 func (oas *OpeningAnimationSystem) getUniqueZombieTypes() []string {
 	uniqueTypes := make(map[string]bool)
 	var result []string
 
 	for _, wave := range oas.levelConfig.Waves {
+		// 新格式：ZombieGroup
 		for _, zombie := range wave.Zombies {
+			if !uniqueTypes[zombie.Type] {
+				uniqueTypes[zombie.Type] = true
+				result = append(result, zombie.Type)
+			}
+		}
+		// 旧格式：ZombieSpawn (向后兼容)
+		for _, zombie := range wave.OldZombies {
 			if !uniqueTypes[zombie.Type] {
 				uniqueTypes[zombie.Type] = true
 				result = append(result, zombie.Type)
@@ -315,7 +362,8 @@ func (oas *OpeningAnimationSystem) Skip() {
 	// 停止镜头动画
 	oas.cameraSystem.StopAnimation()
 
-	// 不再需要清理预览僵尸（因为直接使用关卡僵尸）
+	// Story 8.3.1: 清理预览僵尸（跳过时也需要清理）
+	oas.clearPreviewZombies(openingComp)
 
 	// 设置跳过标志
 	openingComp.IsSkipped = true

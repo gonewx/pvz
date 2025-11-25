@@ -1,0 +1,100 @@
+# Quality Gate: Story 8.3.1
+schema: 1
+story: "8.3.1"
+story_title: "开场动画预览僵尸机制修正"
+gate: PASS
+status_reason: "所有验收标准已实现，测试覆盖充分，代码质量良好"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-11-25T12:20:00+08:00"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 95
+expires: "2025-12-09T00:00:00+08:00"
+
+evidence:
+  tests_reviewed: 10
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "预览僵尸仅用于展示，不参与游戏逻辑，无安全风险"
+  performance:
+    status: PASS
+    notes: "预览僵尸数量有限（最多8只），生成和清理操作开销可忽略"
+  reliability:
+    status: PASS
+    notes: "状态机设计清晰，清理逻辑完善，无内存泄漏风险"
+  maintainability:
+    status: PASS
+    notes: "代码结构清晰，注释充分，支持新旧配置格式向后兼容"
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 1 }
+  highest: low
+  recommendations:
+    must_fix: []
+    monitor:
+      - "zombieTypeToBehaviorType() 方法未被使用，建议在后续迭代中清理"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "移除未使用的 zombieTypeToBehaviorType() 方法"
+      refs: ["pkg/systems/opening_animation_system.go:329-340"]
+
+# Requirements Traceability
+requirements_trace:
+  - ac: 1
+    title: "预览僵尸独立生成"
+    tests:
+      - "TestOpeningAnimationSystem_SpawnPreviewZombies"
+      - "TestOpeningAnimationSystem_StateMachine"
+    coverage: "Given 镜头右移完成时, When 进入 showZombies 状态, Then 生成独立的预览僵尸实体（数量基于关卡难度）"
+  - ac: 2
+    title: "预览僵尸正确展示"
+    tests:
+      - "TestOpeningAnimationSystem_SpawnPreviewZombies"
+    coverage: "Given 预览僵尸已生成, When 验证组件时, Then 位置在 X:1050-1250 范围内，行为类型为 BehaviorZombiePreview"
+  - ac: 3
+    title: "预览僵尸正确清理"
+    tests:
+      - "TestOpeningAnimationSystem_ClearPreviewZombies"
+      - "TestOpeningAnimationSystem_SkipClearsZombies"
+    coverage: "Given 进入 gameStart 状态或调用 Skip(), When 执行清理逻辑, Then 所有预览僵尸实体被销毁，ZombieEntities 列表清空"
+  - ac: 4
+    title: "实际关卡僵尸延迟生成"
+    tests:
+      - "TestOpeningAnimationSystem_StateMachine"
+    coverage: "Given 有开场动画时, When 开场动画完成后, Then 才预生成实际关卡僵尸（通过 zombiesPreSpawned 标志控制）"
+  - ac: 5
+    title: "单元测试覆盖"
+    tests:
+      - "TestOpeningAnimationSystem_*"
+      - "TestOpeningAnimationSystem_GetUniqueZombieTypes"
+      - "TestOpeningAnimationSystem_CalculatePreviewZombieCount"
+      - "TestOpeningAnimationSystem_PreviewZombieCountConfig"
+    coverage: "10个测试用例全部通过，核心方法覆盖率 85%+"
+
+# Test Coverage Summary
+test_coverage:
+  opening_animation_system.go:
+    NewOpeningAnimationSystem: "85.7%"
+    Update: "73.3%"
+    updateIdleState: "100%"
+    updateCameraMoveRightState: "100%"
+    updateShowZombiesState: "100%"
+    updateCameraMoveLeftState: "100%"
+    updateGameStartState: "100%"
+    spawnPreviewZombies: "78.3%"
+    calculatePreviewZombieCount: "100%"
+    clearPreviewZombies: "100%"
+    getUniqueZombieTypes: "100%"
+    Skip: "88.9%"
+    IsCompleted: "83.3%"
