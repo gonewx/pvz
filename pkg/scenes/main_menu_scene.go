@@ -377,13 +377,14 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	log.Printf("[MainMenuScene] Set TextInputRenderSystem reference in DialogRenderSystem")
 
 	// Story 12.6: Create zombie hand entity (initially paused, for transition animation)
-	// Position: (0, 0) - Zombie_hand.reanim 中的坐标已经是绝对屏幕坐标
-	// 例如 arm 轨道的坐标是 (381.6, 712.5)，这是相对于屏幕左上角的绝对位置
+	// Position: 使用配置的偏移量调整位置
+	// Zombie_hand.reanim 中的坐标是绝对屏幕坐标（如 arm 轨道 x=381.6）
+	// 通过 config.ZombieHandOffsetX/Y 可以微调整体位置
 	zombieHandEntity, err := entities.NewZombieHandEntity(
 		scene.entityManager,
 		rm,
-		0, // X = 0，使用 Reanim 文件中的绝对坐标
-		0, // Y = 0，使用 Reanim 文件中的绝对坐标
+		config.ZombieHandOffsetX, // 水平偏移（正值向右）
+		config.ZombieHandOffsetY, // 垂直偏移（正值向下）
 	)
 	if err != nil {
 		log.Printf("[MainMenuScene] Warning: Failed to create zombie hand entity: %v", err)
@@ -392,7 +393,8 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 		scene.zombieHandEntity = zombieHandEntity
 		// Mark as UI element (not affected by camera)
 		ecs.AddComponent(scene.entityManager, zombieHandEntity, &components.UIComponent{})
-		log.Printf("[MainMenuScene] Zombie hand entity created (ID=%d, initially paused)", zombieHandEntity)
+		log.Printf("[MainMenuScene] Zombie hand entity created (ID=%d, offset=(%.1f, %.1f))",
+			zombieHandEntity, config.ZombieHandOffsetX, config.ZombieHandOffsetY)
 	}
 
 	return scene

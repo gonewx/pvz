@@ -251,3 +251,17 @@ func compareLevels(level1, level2 string) int {
 	// Both chapters and stages are equal
 	return 0
 }
+
+// ========== Zombie Hand Animation Config ==========
+// Story 12.6: 僵尸手臂过渡动画位置配置
+
+const (
+	// ZombieHandOffsetX 僵尸手臂动画的水平偏移量（像素）
+	// 正值向右偏移，负值向左偏移
+	// 用于微调僵尸手臂相对于 Adventure 按钮的位置
+	ZombieHandOffsetX float64 = -75.0
+
+	// ZombieHandOffsetY 僵尸手臂动画的垂直偏移量（像素）
+	// 正值向下偏移，负值向上偏移
+	ZombieHandOffsetY float64 = 0.0
+)
