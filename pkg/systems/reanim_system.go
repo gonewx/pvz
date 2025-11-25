@@ -557,10 +557,10 @@ func (s *ReanimSystem) processAnimationCommands() {
 }
 
 // Update 更新所有 Reanim 组件的动画帧
-// 基于 AnimationCell.Update() 的逻辑
+// 逻辑说明:
 //   - currentFrame 无限增长，不在 Update 中做循环检查
-//   - 循环逻辑完全由 findControllingAnimation 的取模处理
-//   - 支持多动画组合（不同轨道可以有不同的帧数）
+//   - 循环逻辑由各动画的 AnimationFrameIndices 独立处理
+//   - 支持多动画组合（不同动画可以有独立的帧索引）
 func (s *ReanimSystem) Update(deltaTime float64) {
 	s.processAnimationCommands()
 
