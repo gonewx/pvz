@@ -13,6 +13,9 @@ import (
 // drawGridDebug 绘制草坪网格边界（调试用）
 // 在开发阶段帮助可视化可种植区域
 func (s *GameScene) drawGridDebug(screen *ebiten.Image) {
+	// 调试绘制已禁用
+	return
+
 	// Story 8.2 QA: 临时启用调试绘制，验证草坪布局和SodRoll动画
 	// 在种植模式或SodRoll动画期间显示
 	showDebug := s.gameState.IsPlantingMode
