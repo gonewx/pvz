@@ -1152,6 +1152,11 @@ func (s *RenderSystem) DrawUIElements(screen *ebiten.Image) {
 
 	// 渲染所有 UI 实体（UI 元素不受摄像机影响，cameraX = 0）
 	for _, entityID := range uiEntities {
+		// 跳过奖励动画实体（由 RewardAnimationSystem.Draw() 单独处理）
+		// 奖励动画需要特殊的缩放处理，不能使用通用的 drawEntity
+		if _, hasRewardAnim := ecs.GetComponent[*components.RewardAnimationComponent](s.entityManager, entityID); hasRewardAnim {
+			continue
+		}
 		s.drawEntity(screen, entityID, 0)
 	}
 }

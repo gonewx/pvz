@@ -1221,9 +1221,9 @@ func (ras *RewardAnimationSystem) Draw(screen *ebiten.Image) {
 				if sprite.Image != nil {
 					op := &ebiten.DrawImageOptions{}
 
-					// 获取当前缩放值（与植物卡包逻辑一致）
+					// 获取当前缩放值
 					rewardComp, _ := ecs.GetComponent[*components.RewardAnimationComponent](ras.entityManager, ras.rewardEntity)
-					scale := config.PlantCardScale // 默认缩放 0.50
+					scale := config.ShovelRewardStartScale // 默认缩放（铲子初始大小）
 					if rewardComp != nil {
 						scale = rewardComp.Scale // 使用动画缩放值
 					}
