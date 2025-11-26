@@ -2,7 +2,6 @@ package behavior
 
 import (
 	"log"
-	"math/rand"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
@@ -589,27 +588,33 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 			if ok {
 				plantHealth.CurrentHealth -= config.ZombieEatingDamage
 
-				// 坚果墙被啃食时触发粒子效果
+				// 坚果墙被啃食时触发小碎屑粒子效果和发光效果
+				// WallnutEatSmall: 每次啃食伤害时触发
+				// WallnutEatLarge: 在受损状态变化时触发（在 handleWallnutBehavior 中）
 				if plantComp, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, plantID); ok {
 					if plantComp.PlantType == components.PlantWallnut {
-						// 获取植物位置
-						if plantPos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, plantID); ok {
-							// 随机选择大碎屑或小碎屑效果
-							effectName := "WallnutEatSmall"
-							if rand.Float64() < 0.3 { // 30% 概率触发大碎屑
-								effectName = "WallnutEatLarge"
-							}
-							_, err := entities.CreateParticleEffect(
-								s.entityManager,
-								s.resourceManager,
-								effectName,
-								plantPos.X,
-								plantPos.Y,
-							)
-							if err != nil {
-								log.Printf("[BehaviorSystem] 警告：创建坚果墙碎屑粒子效果失败: %v", err)
-							}
+						// 粒子位置：僵尸嘴巴位置（啃食接触点）
+						particleX := pos.X + config.ZombieEatParticleOffsetX
+						particleY := pos.Y + config.ZombieEatParticleOffsetY
+						_, err := entities.CreateParticleEffect(
+							s.entityManager,
+							s.resourceManager,
+							"WallnutEatSmall",
+							particleX,
+							particleY,
+						)
+						if err != nil {
+							log.Printf("[BehaviorSystem] 警告：创建坚果墙小碎屑粒子效果失败: %v", err)
 						}
+
+						// 添加发光效果（一闪一闪）
+						ecs.AddComponent(s.entityManager, plantID, &components.WallnutHitGlowComponent{
+							Intensity: 1.0,
+							FadeSpeed: config.WallnutHitGlowFadeSpeed,
+							ColorR:    config.WallnutHitGlowColorR,
+							ColorG:    config.WallnutHitGlowColorG,
+							ColorB:    config.WallnutHitGlowColorB,
+						})
 					}
 				}
 

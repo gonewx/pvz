@@ -49,6 +49,22 @@ type PlantComponent struct {
 	// 当计时器 <= 0 时，触发眨眼动画并重置为随机值（3-5秒）
 	// 注意：眨眼动画通过 PlayAnimation() 切换实现，不使用动画叠加
 	BlinkTimer float64
+
+	// WallnutDamageState 坚果墙受损状态（0=完好, 1=轻伤, 2=重伤）
+	// 用于跟踪坚果墙的损坏程度，状态变化时触发大碎屑粒子效果
+	WallnutDamageState int
+
+	// WallnutBeingEaten 坚果墙是否正在被啃食
+	// 用于控制动画切换（被啃食时播放 anim_blink_twitch，不摇摆）
+	WallnutBeingEaten bool
+
+	// WallnutBlinkTimer 坚果墙眨眼计时器（秒）
+	// 被啃食时，每隔一段时间随机播放 anim_blink_twice 或 anim_blink_thrice
+	WallnutBlinkTimer float64
+
+	// WallnutBlinkDuration 坚果墙眨眼动画剩余持续时间（秒）
+	// 当 > 0 时表示正在播放眨眼动画，递减到 0 后切换回静止状态
+	WallnutBlinkDuration float64
 }
 
 // Story 10.3: 射手类植物列表（用于判断是否需要攻击动画）

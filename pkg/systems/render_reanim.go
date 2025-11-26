@@ -108,6 +108,12 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		sunflowerGlow = glowComp
 	}
 
+	// 检查坚果墙被啃食发光效果
+	var wallnutHitGlow *components.WallnutHitGlowComponent
+	if glowComp, hasGlow := ecs.GetComponent[*components.WallnutHitGlowComponent](s.entityManager, id); hasGlow {
+		wallnutHitGlow = glowComp
+	}
+
 	// 使用坐标转换工具库计算屏幕坐标
 	baseScreenX, baseScreenY, err := utils.GetRenderScreenOrigin(s.entityManager, id, pos, cameraX)
 	if err != nil {
@@ -362,6 +368,35 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 			glowG := glowIntensity * float32(sunflowerGlow.ColorG)
 			glowB := glowIntensity * float32(sunflowerGlow.ColorB)
 			glowA := glowIntensity * 0.6 // 透明度也随强度衰减
+
+			glowVs := []ebiten.Vertex{
+				{DstX: float32(x0), DstY: float32(y0), SrcX: 0, SrcY: 0, ColorR: glowR, ColorG: glowG, ColorB: glowB, ColorA: glowA},
+				{DstX: float32(x1), DstY: float32(y1), SrcX: float32(w), SrcY: 0, ColorR: glowR, ColorG: glowG, ColorB: glowB, ColorA: glowA},
+				{DstX: float32(x2), DstY: float32(y2), SrcX: 0, SrcY: float32(h), ColorR: glowR, ColorG: glowG, ColorB: glowB, ColorA: glowA},
+				{DstX: float32(x3), DstY: float32(y3), SrcX: float32(w), SrcY: float32(h), ColorR: glowR, ColorG: glowG, ColorB: glowB, ColorA: glowA},
+			}
+			// 使用加法混合模式绘制发光层
+			glowOpts := &ebiten.DrawTrianglesOptions{
+				Blend: ebiten.Blend{
+					BlendFactorSourceRGB:        ebiten.BlendFactorOne,
+					BlendFactorDestinationRGB:   ebiten.BlendFactorOne,
+					BlendOperationRGB:           ebiten.BlendOperationAdd,
+					BlendFactorSourceAlpha:      ebiten.BlendFactorOne,
+					BlendFactorDestinationAlpha: ebiten.BlendFactorOne,
+					BlendOperationAlpha:         ebiten.BlendOperationAdd,
+				},
+			}
+			screen.DrawTriangles(glowVs, is, partData.Img, glowOpts)
+		}
+
+		// 坚果墙被啃食发光效果：使用加法混合绘制白色闪烁光层
+		if wallnutHitGlow != nil && wallnutHitGlow.Intensity > 0 {
+			glowIntensity := float32(wallnutHitGlow.Intensity)
+			// 白色/浅黄色发光层的颜色（乘以强度实现闪烁效果）
+			glowR := glowIntensity * float32(wallnutHitGlow.ColorR)
+			glowG := glowIntensity * float32(wallnutHitGlow.ColorG)
+			glowB := glowIntensity * float32(wallnutHitGlow.ColorB)
+			glowA := glowIntensity * 0.5 // 透明度随强度衰减
 
 			glowVs := []ebiten.Vertex{
 				{DstX: float32(x0), DstY: float32(y0), SrcX: 0, SrcY: 0, ColorR: glowR, ColorG: glowG, ColorB: glowB, ColorA: glowA},

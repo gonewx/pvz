@@ -925,8 +925,13 @@ func calculateCenterOffset(
 
 // analyzeTrackTypesWithOrder 分析轨道类型（使用带唯一后缀的轨道顺序）
 // 这个函数处理同名轨道问题，确保 visualTracks 中使用的是唯一键名（如 "rock", "rock#1", "rock#2"）
+//
+// 注意：对于像 Wallnut 这样的动画，所有图片都在 anim_* 轨道中（如 anim_face, anim_blink_twitch）。
+// 这些轨道既是动画定义轨道（用于控制可见性），也是视觉轨道（包含图片）。
+// 因此，对于有图片的 anim_* 轨道，我们应该将其视为视觉轨道，而不是跳过。
 func analyzeTrackTypesWithOrder(mergedTracks map[string][]reanim.Frame, trackOrder []string) (visualTracks []string, logicalTracks []string) {
-	animationDefinitionTracks := map[string]bool{
+	// 纯动画控制轨道（不包含图片，只用于控制其他轨道的可见性）
+	pureAnimationTracks := map[string]bool{
 		"anim_idle":      true,
 		"anim_shooting":  true,
 		"anim_head_idle": true,
@@ -940,23 +945,31 @@ func analyzeTrackTypesWithOrder(mergedTracks map[string][]reanim.Frame, trackOrd
 			originalName = trackKey[:idx]
 		}
 
-		// 跳过动画定义轨道
-		if animationDefinitionTracks[originalName] || strings.HasPrefix(originalName, "anim_") {
-			continue
-		}
-
 		// 获取轨道帧数据
 		frames, ok := mergedTracks[trackKey]
 		if !ok {
 			continue
 		}
 
+		// 检查是否有图片
 		hasImage := false
 		for _, frame := range frames {
 			if frame.ImagePath != "" {
 				hasImage = true
 				break
 			}
+		}
+
+		// 对于 anim_* 轨道：
+		// - 如果有图片，视为视觉轨道（如 Wallnut 的 anim_face）
+		// - 如果没有图片，视为纯动画控制轨道，跳过
+		if pureAnimationTracks[originalName] || strings.HasPrefix(originalName, "anim_") {
+			if hasImage {
+				// 有图片的 anim_* 轨道是视觉轨道
+				visualTracks = append(visualTracks, trackKey)
+			}
+			// 无图片的 anim_* 轨道跳过
+			continue
 		}
 
 		if hasImage {

@@ -1,7 +1,7 @@
 # Sprint 变更提案：坚果墙受击粒子效果
 
 **日期**: 2025-11-26
-**状态**: ✅ 已批准
+**状态**: ✅ 已实现
 **优先级**: 高（需要立即实现）
 
 ---
@@ -18,7 +18,7 @@
 
 **现有实现状态**:
 - ✅ 坚果墙外观破损状态（`Wallnut_cracked1.png`、`Wallnut_cracked2.png`）已实现
-- ❌ 坚果墙被啃食时的粒子碎屑效果（`WallnutEatLarge.xml`、`WallnutEatSmall.xml`）未实现
+- ✅ 坚果墙被啃食时的粒子碎屑效果（`WallnutEatLarge.xml`、`WallnutEatSmall.xml`）已实现
 
 ---
 
@@ -39,41 +39,98 @@
 
 ---
 
-## 具体修改提案
+## 具体修改提案（已实现）
+
+### 粒子效果触发逻辑
+
+两种粒子效果有不同的触发时机：
+
+| 效果 | 触发时机 | 位置 |
+|------|----------|------|
+| `WallnutEatSmall` | 每次啃食伤害时 | 僵尸嘴巴位置（啃食接触点） |
+| `WallnutEatLarge` | 受损状态变化时（图片切换） | 坚果墙位置 |
 
 ### 修改文件
 
-**`pkg/systems/behavior/zombie_behavior_handler.go`**
+#### 1. `pkg/systems/behavior/zombie_behavior_handler.go`
 
-在 `handleZombieEatingBehavior` 函数中（约第 589 行），当僵尸对植物造成伤害后，添加坚果墙粒子效果触发逻辑：
+在 `handleZombieEatingBehavior` 函数中，每次啃食伤害后触发小碎屑效果：
 
 ```go
-// 在 plantHealth.CurrentHealth -= config.ZombieEatingDamage 之后添加：
-
-// 坚果墙被啃食时触发粒子效果
+// 坚果墙被啃食时触发小碎屑粒子效果
+// WallnutEatSmall: 每次啃食伤害时触发
 if plantComp, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, plantID); ok {
     if plantComp.PlantType == components.PlantWallnut {
-        // 获取植物位置
-        if plantPos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, plantID); ok {
-            // 随机选择大碎屑或小碎屑效果
-            effectName := "WallnutEatSmall"
-            if rand.Float64() < 0.3 { // 30% 概率触发大碎屑
-                effectName = "WallnutEatLarge"
-            }
-            _, err := entities.CreateParticleEffect(
-                s.entityManager,
-                s.resourceManager,
-                effectName,
-                plantPos.X,
-                plantPos.Y,
-            )
-            if err != nil {
-                log.Printf("[BehaviorSystem] 警告：创建坚果墙碎屑粒子效果失败: %v", err)
-            }
+        // 粒子位置：僵尸嘴巴位置（啃食接触点）
+        particleX := pos.X + config.ZombieEatParticleOffsetX
+        particleY := pos.Y + config.ZombieEatParticleOffsetY
+        _, err := entities.CreateParticleEffect(
+            s.entityManager,
+            s.resourceManager,
+            "WallnutEatSmall",
+            particleX,
+            particleY,
+        )
+        if err != nil {
+            log.Printf("[BehaviorSystem] 警告：创建坚果墙小碎屑粒子效果失败: %v", err)
         }
     }
 }
 ```
+
+#### 2. `pkg/systems/behavior/plant_behavior_handler.go`
+
+在 `handleWallnutBehavior` 函数中，受损状态变化时触发大碎屑效果：
+
+```go
+// 如果图片不同，则替换并触发大碎屑粒子效果
+if currentBodyImage != targetBodyImage {
+    // 检查是否是从更好的状态变为更差的状态
+    if hasPlant && newDamageState > plantComp.WallnutDamageState {
+        // 状态变差，触发大碎屑粒子效果
+        if plantPos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID); ok {
+            _, err := entities.CreateParticleEffect(
+                s.entityManager,
+                s.resourceManager,
+                "WallnutEatLarge",
+                plantPos.X,
+                plantPos.Y,
+            )
+            // ...
+        }
+        plantComp.WallnutDamageState = newDamageState
+    }
+    // 切换图片...
+}
+```
+
+#### 3. `pkg/components/plant.go`
+
+添加坚果墙受损状态跟踪字段：
+
+```go
+// WallnutDamageState 坚果墙受损状态（0=完好, 1=轻伤, 2=重伤）
+WallnutDamageState int
+```
+
+#### 4. `pkg/config/unit_config.go`
+
+添加僵尸嘴巴位置偏移常量：
+
+```go
+// ZombieEatParticleOffsetX 僵尸啃食粒子效果 X 偏移量
+ZombieEatParticleOffsetX = 35.0
+
+// ZombieEatParticleOffsetY 僵尸啃食粒子效果 Y 偏移量
+ZombieEatParticleOffsetY = -20.0
+```
+
+#### 5. 修复图片路径大小写
+
+修正 `handleWallnutBehavior` 中的图片路径，使用正确的大小写：
+- `assets/reanim/Wallnut_body.png`
+- `assets/reanim/Wallnut_cracked1.png`
+- `assets/reanim/Wallnut_cracked2.png`
 
 ### 资源文件
 
@@ -85,11 +142,12 @@ if plantComp, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager
 
 ## 验收标准
 
-1. ✅ 僵尸啃食坚果墙时，每次造成伤害都会产生碎屑粒子效果
-2. ✅ 粒子效果位置与坚果墙位置一致
-3. ✅ 大碎屑（`WallnutEatLarge`）和小碎屑（`WallnutEatSmall`）随机出现（约 30%/70%）
-4. ✅ 不影响其他植物的啃食行为
-5. ✅ 不影响游戏性能
+1. ✅ 僵尸啃食坚果墙时，每次造成伤害都会产生小碎屑粒子效果（WallnutEatSmall）
+2. ✅ 坚果墙受损状态变化时，产生大碎屑粒子效果（WallnutEatLarge）
+3. ✅ 小碎屑粒子位置在僵尸嘴巴位置（啃食接触点）
+4. ✅ 坚果墙受损图片正确切换（修复文件名大小写问题）
+5. ✅ 不影响其他植物的啃食行为
+6. ✅ 不影响游戏性能
 
 ---
 
@@ -97,20 +155,21 @@ if plantComp, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager
 
 1. 启动游戏，进入 1-3 或 1-4 关卡（有坚果墙可用）
 2. 种植坚果墙，等待僵尸接近并开始啃食
-3. 观察是否有碎屑粒子效果产生
-4. 确认粒子位置正确、效果自然
-5. 验证大小碎屑随机出现
+3. 观察每次啃食时是否有小碎屑粒子效果产生（在接触点位置）
+4. 观察坚果墙受损状态变化时是否有大碎屑粒子效果产生
+5. 确认坚果墙图片正确切换（完好→轻伤→重伤）
 
 ---
 
 ## 行动计划
 
-| 步骤 | 任务 | 负责角色 |
-|------|------|----------|
-| 1 | 修改 `zombie_behavior_handler.go` 添加粒子触发逻辑 | 开发 |
-| 2 | 添加必要的 import（`math/rand`、`entities`） | 开发 |
-| 3 | 运行游戏验证粒子效果 | 开发 |
-| 4 | 确认不影响现有功能 | 开发 |
+| 步骤 | 任务 | 负责角色 | 状态 |
+|------|------|----------|------|
+| 1 | 修复图片路径大小写问题 | 开发 | ✅ |
+| 2 | 修改粒子触发逻辑（Small/Large 分离） | 开发 | ✅ |
+| 3 | 添加 WallnutDamageState 字段跟踪状态变化 | 开发 | ✅ |
+| 4 | 修正粒子位置为僵尸嘴巴接触点 | 开发 | ✅ |
+| 5 | 添加配置常量 | 开发 | ✅ |
 
 ---
 
@@ -129,3 +188,13 @@ if plantComp, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager
 
 - **批准时间**: 2025-11-26
 - **批准人**: 用户
+
+## 实现记录
+
+- **实现时间**: 2025-11-26
+- **实现人**: James (Dev Agent)
+- **修改文件**:
+  - `pkg/systems/behavior/zombie_behavior_handler.go`
+  - `pkg/systems/behavior/plant_behavior_handler.go`
+  - `pkg/components/plant.go`
+  - `pkg/config/unit_config.go`

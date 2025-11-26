@@ -202,6 +202,26 @@ const (
 	// WallnutCracked2Threshold 坚果墙重伤状态生命值阈值（百分比）
 	// 当生命值 <= 33% 时，坚果墙进入重伤状态（出现第二级裂痕）
 	WallnutCracked2Threshold = 0.33
+
+	// WallnutHitGlowColorR 坚果墙被啃食发光效果的红色通道
+	// 使用白色/浅黄色发光效果
+	WallnutHitGlowColorR = 1.5
+
+	// WallnutHitGlowColorG 坚果墙被啃食发光效果的绿色通道
+	WallnutHitGlowColorG = 1.5
+
+	// WallnutHitGlowColorB 坚果墙被啃食发光效果的蓝色通道
+	WallnutHitGlowColorB = 1.2
+
+	// WallnutHitGlowFadeSpeed 坚果墙被啃食发光效果的衰减速度（每秒）
+	// 4.0 表示 0.25 秒内从最亮完全衰减（快速闪烁效果）
+	WallnutHitGlowFadeSpeed = 4.0
+
+	// WallnutBlinkIntervalMin 坚果墙眨眼最小间隔（秒）
+	WallnutBlinkIntervalMin = 4.0
+
+	// WallnutBlinkIntervalMax 坚果墙眨眼最大间隔（秒）
+	WallnutBlinkIntervalMax = 8.0
 )
 
 // Plant Health Configuration (植物生命值配置)
@@ -237,6 +257,15 @@ const (
 
 	// ZombieEatingSoundPath 僵尸啃食音效路径
 	ZombieEatingSoundPath = "assets/audio/Sound/chomp.ogg"
+
+	// ZombieEatParticleOffsetX 僵尸啃食粒子效果 X 偏移量
+	// 僵尸面朝左，嘴巴在身体前方（左侧）
+	// 负值表示向左偏移（朝向植物方向，即僵尸嘴巴位置）
+	ZombieEatParticleOffsetX = -30.0
+
+	// ZombieEatParticleOffsetY 僵尸啃食粒子效果 Y 偏移量
+	// 嘴巴位置相对于僵尸中心略微偏上（头部位置）
+	ZombieEatParticleOffsetY = -20.0
 )
 
 // Cherry Bomb Configuration (樱桃炸弹配置)

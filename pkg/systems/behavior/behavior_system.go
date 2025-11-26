@@ -115,7 +115,7 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 		case components.BehaviorPeashooter:
 			s.handlePeashooterBehavior(entityID, deltaTime, allZombieEntityList)
 		case components.BehaviorWallnut:
-			s.handleWallnutBehavior(entityID)
+			s.handleWallnutBehavior(entityID, deltaTime)
 		case components.BehaviorCherryBomb:
 			s.handleCherryBombBehavior(entityID, deltaTime)
 		default:
@@ -133,6 +133,9 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 
 	// 更新向日葵脸部发光效果（渐变衰减）
 	s.updateSunflowerGlowEffects(deltaTime)
+
+	// 更新坚果墙被啃食发光效果（渐变衰减）
+	s.updateWallnutHitGlowEffects(deltaTime)
 
 	// 遍历所有移动中的僵尸实体，根据行为类型分发处理
 	for _, entityID := range zombieEntityList {

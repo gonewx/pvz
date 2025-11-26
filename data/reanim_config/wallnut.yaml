@@ -25,3 +25,22 @@ animation_combos:
       animations:
         - anim_idle
       binding_strategy: auto
+    - name: being_eaten
+      display_name: 被啃食
+      animations:
+        - anim_idle
+      binding_strategy: auto
+    - name: blink_twice
+      display_name: 眨眼两次
+      animations:
+        - anim_idle
+        - anim_blink_twice
+      binding_strategy: auto
+      loop: false
+    - name: blink_thrice
+      display_name: 眨眼三次
+      animations:
+        - anim_idle
+        - anim_blink_thrice
+      binding_strategy: auto
+      loop: false
