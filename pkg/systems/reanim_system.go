@@ -553,6 +553,89 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 	return nil
 }
 
+// PlayComboWithOptions 播放配置组合（带选项）
+// 扩展 PlayCombo，支持动画进度保留等高级选项
+//
+// 参数：
+//   - entityID: 实体 ID
+//   - unitID: 单位 ID（如 "peashooter", "sunflower"）
+//   - comboName: 组合名称（如 "attack", "idle"）。如果为空，使用第一个 combo
+//   - preserveProgress: 是否保留当前动画进度（平滑过渡）
+//
+// 返回：
+//   - error: 如果实体不存在、配置缺失，返回错误
+func (s *ReanimSystem) PlayComboWithOptions(entityID ecs.EntityID, unitID, comboName string, preserveProgress bool) error {
+	// 如果不需要保留进度，直接调用 PlayCombo
+	if !preserveProgress {
+		return s.PlayCombo(entityID, unitID, comboName)
+	}
+
+	// 获取当前动画进度
+	comp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !ok {
+		return fmt.Errorf("entity %d does not have ReanimComponent", entityID)
+	}
+
+	// 计算当前动画的相对进度（0.0 - 1.0）
+	var currentProgress float64 = 0.0
+	if len(comp.CurrentAnimations) > 0 && comp.AnimationFrameIndices != nil {
+		// 使用第一个动画的进度作为参考
+		firstAnim := comp.CurrentAnimations[0]
+		if animVisibles, exists := comp.AnimVisiblesMap[firstAnim]; exists {
+			visibleCount := countVisibleFrames(animVisibles)
+			if visibleCount > 0 {
+				currentFrameIndex := comp.AnimationFrameIndices[firstAnim]
+				currentProgress = currentFrameIndex / float64(visibleCount)
+				// 确保进度在 0-1 范围内
+				if currentProgress > 1.0 {
+					currentProgress = currentProgress - float64(int(currentProgress))
+				}
+				log.Printf("[ReanimSystem] PlayComboWithOptions: 保留进度 %.2f (frame %.1f / %d)",
+					currentProgress, currentFrameIndex, visibleCount)
+			}
+		}
+	}
+
+	// 调用 PlayCombo 设置新动画
+	err := s.PlayCombo(entityID, unitID, comboName)
+	if err != nil {
+		return err
+	}
+
+	// 如果有有效进度，应用到新动画
+	if currentProgress > 0 {
+		// 重新获取组件（PlayCombo 可能修改了它）
+		comp, ok = ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+		if !ok {
+			return nil // PlayCombo 成功，只是无法应用进度
+		}
+
+		// 为每个新动画设置相对进度
+		for _, animName := range comp.CurrentAnimations {
+			if animVisibles, exists := comp.AnimVisiblesMap[animName]; exists {
+				visibleCount := countVisibleFrames(animVisibles)
+				if visibleCount > 0 {
+					newFrameIndex := currentProgress * float64(visibleCount)
+					comp.AnimationFrameIndices[animName] = newFrameIndex
+					log.Printf("[ReanimSystem] PlayComboWithOptions: 动画 %s 设置进度 %.2f (frame %.1f / %d)",
+						animName, currentProgress, newFrameIndex, visibleCount)
+				}
+			}
+		}
+
+		// 同步 CurrentFrame
+		if len(comp.CurrentAnimations) > 0 {
+			firstAnim := comp.CurrentAnimations[0]
+			comp.CurrentFrame = int(comp.AnimationFrameIndices[firstAnim])
+		}
+
+		// 标记缓存失效
+		comp.LastRenderFrame = -1
+	}
+
+	return nil
+}
+
 // ==================================================================
 // 系统更新 (System Update)
 // ==================================================================
@@ -612,8 +695,9 @@ func (s *ReanimSystem) processAnimationCommands() {
 			err = s.PlayAnimation(id, cmd.AnimationName)
 		} else if cmd.UnitID != "" {
 			// 模式 2: 配置组合模式
-			log.Printf("[ReanimSystem] 执行组合命令: entity=%d, unit=%s, combo=%s", id, cmd.UnitID, cmd.ComboName)
-			err = s.PlayCombo(id, cmd.UnitID, cmd.ComboName)
+			log.Printf("[ReanimSystem] 执行组合命令: entity=%d, unit=%s, combo=%s, preserveProgress=%v",
+				id, cmd.UnitID, cmd.ComboName, cmd.PreserveProgress)
+			err = s.PlayComboWithOptions(id, cmd.UnitID, cmd.ComboName, cmd.PreserveProgress)
 		} else {
 			// 错误：无效命令
 			log.Printf("[ReanimSystem] 无效命令: entity=%d, UnitID 和 AnimationName 都为空", id)

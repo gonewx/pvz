@@ -178,9 +178,10 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 			// 没有僵尸了，切换回空闲状态
 			log.Printf("[BehaviorSystem] 豌豆射手 %d 没有目标，切换回空闲状态", entityID)
 			ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
-				UnitID:    "peashootersingle",
-				ComboName: "idle", // 使用配置驱动的 idle 组合（播放 anim_full_idle）
-				Processed: false,
+				UnitID:           "peashootersingle",
+				ComboName:        "idle", // 使用配置驱动的 idle 组合（播放 anim_full_idle）
+				Processed:        false,
+				PreserveProgress: true, // 保留动画进度，避免抖动
 			})
 			plant.AttackAnimState = components.AttackAnimIdle
 			plant.PendingProjectile = false
@@ -221,9 +222,10 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 
 		// 切换到攻击动画
 		ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
-			UnitID:    "peashootersingle",
-			ComboName: "attack_with_sway",
-			Processed: false,
+			UnitID:           "peashootersingle",
+			ComboName:        "attack_with_sway",
+			Processed:        false,
+			PreserveProgress: true, // 保留动画进度，避免抖动
 		})
 
 		log.Printf("[BehaviorSystem] 🎯 豌豆射手 %d 切换到攻击动画（配置驱动），计时器=%.3f", entityID, timer.CurrentTime)
