@@ -239,3 +239,158 @@ func CreateParticleEffect(em *ecs.EntityManager, rm *game.ResourceManager, effec
 
 	return firstEmitterID, nil
 }
+
+// CreateParticleEffectWithColor creates a particle emitter with custom color override.
+// This is useful for effects that need a specific color different from the XML configuration.
+//
+// Parameters:
+//   - em: EntityManager instance for creating entities
+//   - rm: ResourceManager instance for loading particle configurations
+//   - effectName: Name of the particle effect (e.g., "PottedPlantGlow")
+//   - worldX, worldY: World coordinates where the emitter should be positioned
+//   - colorR, colorG, colorB: RGB color values (0-1) to override the particle color
+//
+// Returns:
+//   - ecs.EntityID: The ID of the first emitter entity
+//   - error: Error if loading configuration fails
+//
+// Example:
+//
+//	// Create golden glow for sunflower (R=1.0, G=0.85, B=0.3)
+//	emitterID, err := CreateParticleEffectWithColor(em, rm, "PottedPlantGlow", x, y, 1.0, 0.85, 0.3)
+func CreateParticleEffectWithColor(em *ecs.EntityManager, rm *game.ResourceManager, effectName string, worldX, worldY float64, colorR, colorG, colorB float64) (ecs.EntityID, error) {
+	log.Printf("[ParticleFactory] CreateParticleEffectWithColor 被调用: effectName='%s', 位置=(%.1f, %.1f), 颜色RGB=(%.2f, %.2f, %.2f)",
+		effectName, worldX, worldY, colorR, colorG, colorB)
+
+	// Load particle configuration from ResourceManager
+	particleConfig, err := rm.LoadParticleConfig(effectName)
+	if err != nil {
+		log.Printf("[ParticleFactory] 加载粒子配置失败: %v", err)
+		return 0, fmt.Errorf("failed to load particle config '%s': %w", effectName, err)
+	}
+
+	// Validate that configuration has at least one emitter
+	if len(particleConfig.Emitters) == 0 {
+		log.Printf("[ParticleFactory] 粒子配置没有发射器")
+		return 0, fmt.Errorf("particle config '%s' has no emitters", effectName)
+	}
+
+	log.Printf("[ParticleFactory] 粒子配置加载成功（带颜色覆盖）: %d 个发射器", len(particleConfig.Emitters))
+
+	// 粒子效果作为整体管理
+	sharedPosition := &components.PositionComponent{
+		X: worldX,
+		Y: worldY,
+	}
+
+	var firstEmitterID ecs.EntityID
+
+	for i, emitterConfig := range particleConfig.Emitters {
+		emitterID := em.CreateEntity()
+		if i == 0 {
+			firstEmitterID = emitterID
+		}
+
+		em.AddComponent(emitterID, sharedPosition)
+
+		// Parse emitter parameters
+		spawnRateMin, spawnRateMax, spawnRateKeyframes, spawnRateInterp := particle.ParseValue(emitterConfig.SpawnRate)
+		spawnRate := particle.RandomInRange(spawnRateMin, spawnRateMax)
+
+		spawnMinActiveVal, _, spawnMinActiveKeyframes, spawnMinActiveInterp := particle.ParseValue(emitterConfig.SpawnMinActive)
+		spawnMaxActiveVal, _, spawnMaxActiveKeyframes, spawnMaxActiveInterp := particle.ParseValue(emitterConfig.SpawnMaxActive)
+		spawnMaxLaunchedVal, _, spawnMaxLaunchedKeyframes, spawnMaxLaunchedInterp := particle.ParseValue(emitterConfig.SpawnMaxLaunched)
+
+		emitterBoxXMin, emitterBoxXMax, emitterBoxXMinKf, emitterBoxXWidthKf, emitterBoxXInterp := particle.ParseRangeValue(emitterConfig.EmitterBoxX)
+		emitterBoxYMin, emitterBoxYMax, emitterBoxYMinKf, emitterBoxYWidthKf, emitterBoxYInterp := particle.ParseRangeValue(emitterConfig.EmitterBoxY)
+
+		emitterRadiusMin, emitterRadiusMax, _, _ := particle.ParseValue(emitterConfig.EmitterRadius)
+
+		emitterOffsetXVal, _, _, _ := particle.ParseValue(emitterConfig.EmitterOffsetX)
+		emitterOffsetYVal, _, _, _ := particle.ParseValue(emitterConfig.EmitterOffsetY)
+
+		systemDurationMin, systemDurationMax, _, _ := particle.ParseValue(emitterConfig.SystemDuration)
+		systemDuration := particle.RandomInRange(systemDurationMin, systemDurationMax) / 100.0
+
+		_, _, systemAlphaKeyframes, systemAlphaInterp := particle.ParseValue(emitterConfig.SystemAlpha)
+
+		var systemPosXKeyframes, systemPosYKeyframes []particle.Keyframe
+		var systemPosXInterp, systemPosYInterp string
+
+		for _, field := range emitterConfig.SystemFields {
+			if field.FieldType == "SystemPosition" {
+				_, _, systemPosXKeyframes, systemPosXInterp = particle.ParseValue(field.X)
+				_, _, systemPosYKeyframes, systemPosYInterp = particle.ParseValue(field.Y)
+				break
+			}
+		}
+
+		// Create EmitterComponent with color override enabled
+		emitterComp := &components.EmitterComponent{
+			Config:          &emitterConfig,
+			Active:          true,
+			Age:             0,
+			SystemDuration:  systemDuration,
+			NextSpawnTime:   0,
+			ActiveParticles: make([]ecs.EntityID, 0),
+			TotalLaunched:   0,
+			SpawnRate:       spawnRate,
+
+			SpawnRateKeyframes: spawnRateKeyframes,
+			SpawnRateInterp:    spawnRateInterp,
+
+			SpawnMinActive:            int(spawnMinActiveVal),
+			SpawnMinActiveKeyframes:   spawnMinActiveKeyframes,
+			SpawnMinActiveInterp:      spawnMinActiveInterp,
+			SpawnMaxActive:            int(spawnMaxActiveVal),
+			SpawnMaxActiveKeyframes:   spawnMaxActiveKeyframes,
+			SpawnMaxActiveInterp:      spawnMaxActiveInterp,
+			SpawnMaxLaunched:          int(spawnMaxLaunchedVal),
+			SpawnMaxLaunchedKeyframes: spawnMaxLaunchedKeyframes,
+			SpawnMaxLaunchedInterp:    spawnMaxLaunchedInterp,
+
+			EmitterBoxX:    emitterBoxXMax - emitterBoxXMin,
+			EmitterBoxY:    emitterBoxYMax - emitterBoxYMin,
+			EmitterBoxXMin: emitterBoxXMin,
+			EmitterBoxYMin: emitterBoxYMin,
+
+			EmitterRadius:    emitterRadiusMin,
+			EmitterRadiusMin: emitterRadiusMin,
+			EmitterRadiusMax: emitterRadiusMax,
+
+			EmitterBoxXKeyframes:    emitterBoxXWidthKf,
+			EmitterBoxXInterp:       emitterBoxXInterp,
+			EmitterBoxYKeyframes:    emitterBoxYWidthKf,
+			EmitterBoxYInterp:       emitterBoxYInterp,
+			EmitterBoxXMinKeyframes: emitterBoxXMinKf,
+			EmitterBoxYMinKeyframes: emitterBoxYMinKf,
+			EmitterOffsetX:          emitterOffsetXVal,
+			EmitterOffsetY:          emitterOffsetYVal,
+
+			SystemAlphaKeyframes: systemAlphaKeyframes,
+			SystemAlphaInterp:    systemAlphaInterp,
+
+			SystemPositionXKeyframes: systemPosXKeyframes,
+			SystemPositionXInterp:    systemPosXInterp,
+			SystemPositionYKeyframes: systemPosYKeyframes,
+			SystemPositionYInterp:    systemPosYInterp,
+
+			InitialX: worldX,
+			InitialY: worldY,
+
+			AngleOffset: 0,
+
+			// 颜色覆盖设置
+			ColorOverrideEnabled: true,
+			ColorOverrideR:       colorR,
+			ColorOverrideG:       colorG,
+			ColorOverrideB:       colorB,
+		}
+		em.AddComponent(emitterID, emitterComp)
+
+		log.Printf("[ParticleFactory] 发射器实体创建成功（颜色覆盖）: ID=%d, Name='%s', RGB=(%.2f, %.2f, %.2f)",
+			emitterID, emitterConfig.Name, colorR, colorG, colorB)
+	}
+
+	return firstEmitterID, nil
+}

@@ -79,3 +79,35 @@ const (
 	// 建议值：40-60像素（视觉上自然，不会太远也不会太近）
 	SunDropBelowPlantOffset = 50.0
 )
+
+// 向日葵阳光生产调试配置
+var (
+	// SunflowerProduceSunEnabled 控制向日葵是否生产阳光
+	// true: 正常生产阳光
+	// false: 禁用阳光生产（调试发光效果时使用）
+	SunflowerProduceSunEnabled = true // 调试模式：暂时禁用阳光生产
+)
+
+// 向日葵脸部发光效果配置
+// 向日葵生产阳光时，整个向日葵（特别是脸部）会发出渐变的金色亮光
+const (
+	// SunflowerGlowColorR 向日葵发光效果的红色通道（叠加值）
+	// 金色发光：R=1.5, G=1.0, B=0.3 （高于1.0才能有明显发光效果）
+	SunflowerGlowColorR = 2.5
+
+	// SunflowerGlowColorG 向日葵发光效果的绿色通道（叠加值）
+	SunflowerGlowColorG = 1.0
+
+	// SunflowerGlowColorB 向日葵发光效果的蓝色通道（叠加值）
+	SunflowerGlowColorB = 0.3
+
+	// SunflowerGlowFadeSpeed 向日葵发光效果的衰减速度（每秒）
+	// 0.2 表示 5 秒内从最亮完全衰减
+	// 建议值：0.2-0.5
+	SunflowerGlowFadeSpeed = 0.2
+
+	// SunflowerGlowPrewarmTime 向日葵发光效果提前触发时间（秒）
+	// 发光效果在阳光生产前多少秒开始亮起
+	// 建议值：0.3-0.8
+	SunflowerGlowPrewarmTime = 0.5
+)

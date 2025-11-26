@@ -447,14 +447,24 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 	}
 
 	// Color channels
-	redMin, redMax, _, _ := particlePkg.ParseValue(config.ParticleRed)
-	greenMin, greenMax, _, _ := particlePkg.ParseValue(config.ParticleGreen)
-	blueMin, blueMax, _, _ := particlePkg.ParseValue(config.ParticleBlue)
-	red := particlePkg.RandomInRange(redMin, redMax)
-	green := particlePkg.RandomInRange(greenMin, greenMax)
-	blue := particlePkg.RandomInRange(blueMin, blueMax)
-	if red == 0 && green == 0 && blue == 0 {
-		red, green, blue = 1.0, 1.0, 1.0 // Default white (显示原始纹理颜色)
+	var red, green, blue float64
+	if emitter.ColorOverrideEnabled {
+		// 使用发射器的颜色覆盖值
+		red = emitter.ColorOverrideR
+		green = emitter.ColorOverrideG
+		blue = emitter.ColorOverrideB
+		log.Printf("[ParticleSystem] 使用颜色覆盖: RGB=(%.2f, %.2f, %.2f)", red, green, blue)
+	} else {
+		// 从配置解析颜色
+		redMin, redMax, _, _ := particlePkg.ParseValue(config.ParticleRed)
+		greenMin, greenMax, _, _ := particlePkg.ParseValue(config.ParticleGreen)
+		blueMin, blueMax, _, _ := particlePkg.ParseValue(config.ParticleBlue)
+		red = particlePkg.RandomInRange(redMin, redMax)
+		green = particlePkg.RandomInRange(greenMin, greenMax)
+		blue = particlePkg.RandomInRange(blueMin, blueMax)
+		if red == 0 && green == 0 && blue == 0 {
+			red, green, blue = 1.0, 1.0, 1.0 // Default white (显示原始纹理颜色)
+		}
 	}
 
 	// Brightness

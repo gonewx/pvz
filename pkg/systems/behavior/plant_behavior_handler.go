@@ -19,8 +19,29 @@ func (s *BehaviorSystem) handleSunflowerBehavior(entityID ecs.EntityID, deltaTim
 		return
 	}
 
+	// 记录更新前的时间（用于检测是否跨过预热阈值）
+	prevTime := timer.CurrentTime
+
 	// 更新计时器
 	timer.CurrentTime += deltaTime
+
+	// 检查是否需要提前触发发光效果（预热）
+	// 在阳光生产前 SunflowerGlowPrewarmTime 秒开始发光
+	prewarmThreshold := timer.TargetTime - config.SunflowerGlowPrewarmTime
+	if prevTime < prewarmThreshold && timer.CurrentTime >= prewarmThreshold {
+		// 刚刚跨过预热阈值，触发发光效果
+		_, hasGlow := ecs.GetComponent[*components.SunflowerGlowComponent](s.entityManager, entityID)
+		if !hasGlow {
+			ecs.AddComponent(s.entityManager, entityID, &components.SunflowerGlowComponent{
+				Intensity: 1.0,
+				FadeSpeed: config.SunflowerGlowFadeSpeed,
+				ColorR:    config.SunflowerGlowColorR,
+				ColorG:    config.SunflowerGlowColorG,
+				ColorB:    config.SunflowerGlowColorB,
+			})
+			log.Printf("[BehaviorSystem] 向日葵 %d 预热发光效果（阳光即将生产）", entityID)
+		}
+	}
 
 	// 检查计时器是否完成
 	if timer.CurrentTime >= timer.TargetTime {
@@ -74,45 +95,51 @@ func (s *BehaviorSystem) handleSunflowerBehavior(entityID ecs.EntityID, deltaTim
 			sunTargetY = 600 - sunRadius
 		}
 
-		log.Printf("[BehaviorSystem] 创建阳光实体，起始位置: (%.0f, %.0f), 目标位置: (%.0f, %.0f), 随机偏移: (%.1f, %.1f)",
-			sunStartX, sunStartY, sunTargetX, sunTargetY, randomOffsetX, randomOffsetY)
+		// 根据配置决定是否生产阳光（调试开关）
+		if config.SunflowerProduceSunEnabled {
+			log.Printf("[BehaviorSystem] 创建阳光实体，起始位置: (%.0f, %.0f), 目标位置: (%.0f, %.0f), 随机偏移: (%.1f, %.1f)",
+				sunStartX, sunStartY, sunTargetX, sunTargetY, randomOffsetX, randomOffsetY)
 
-		// 创建向日葵生产的阳光实体
-		sunID := entities.NewPlantSunEntity(s.entityManager, s.resourceManager, sunStartX, sunStartY, sunTargetX, sunTargetY)
+			// 创建向日葵生产的阳光实体
+			sunID := entities.NewPlantSunEntity(s.entityManager, s.resourceManager, sunStartX, sunStartY, sunTargetX, sunTargetY)
 
-		// 添加 AnimationCommand 组件来播放阳光动画（与自然生成的阳光一致）
-		// Sun.reanim 只有轨道(Sun1, Sun2, Sun3)，使用配置的"idle"组合播放动画
-		ecs.AddComponent(s.entityManager, sunID, &components.AnimationCommandComponent{
-			UnitID:    "sun",
-			ComboName: "idle",
-			Processed: false,
-		})
+			// 添加 AnimationCommand 组件来播放阳光动画（与自然生成的阳光一致）
+			// Sun.reanim 只有轨道(Sun1, Sun2, Sun3)，使用配置的"idle"组合播放动画
+			ecs.AddComponent(s.entityManager, sunID, &components.AnimationCommandComponent{
+				UnitID:    "sun",
+				ComboName: "idle",
+				Processed: false,
+			})
 
-		// 设置阳光的速度：抛物线运动
-		// 阳光先向上弹起，然后在重力作用下落到目标位置
-		sunVel, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, sunID)
-		if ok {
-			// 使用固定的向上初速度，让阳光弹起
-			initialUpwardSpeed := -100.0 // 向上初速度（负值表示向上）
+			// 设置阳光的速度：抛物线运动
+			// 阳光先向上弹起，然后在重力作用下落到目标位置
+			sunVel, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, sunID)
+			if ok {
+				// 使用固定的向上初速度，让阳光弹起
+				initialUpwardSpeed := -100.0 // 向上初速度（负值表示向上）
 
-			// 水平速度：匀速运动到目标X位置
-			duration := 1.5 // 预计运动时间（秒）
-			sunVel.VX = (sunTargetX - sunStartX) / duration
+				// 水平速度：匀速运动到目标X位置
+				duration := 1.5 // 预计运动时间（秒）
+				sunVel.VX = (sunTargetX - sunStartX) / duration
 
-			// 垂直初速度：固定向上弹起
-			// 重力会自然地将阳光拉向目标位置
-			sunVel.VY = initialUpwardSpeed
+				// 垂直初速度：固定向上弹起
+				// 重力会自然地将阳光拉向目标位置
+				sunVel.VY = initialUpwardSpeed
+			}
+
+			log.Printf("[BehaviorSystem] 阳光实体创建完成，ID=%d, 状态: Rising, 速度: (%.1f, %.1f)",
+				sunID, sunVel.VX, sunVel.VY)
+		} else {
+			log.Printf("[BehaviorSystem] 向日葵阳光生产已禁用（调试模式）")
 		}
 
-		log.Printf("[BehaviorSystem] 阳光实体创建完成，ID=%d, 状态: Rising, 速度: (%.1f, %.1f)",
-			sunID, sunVel.VX, sunVel.VY)
+		// 发光效果已在预热阶段触发，这里不需要再添加
+		// 如果预热时发光组件已存在，保持其自然衰减即可
 
 		// 重置计时器
 		timer.CurrentTime = 0
 		// 首次生产后，后续生产周期为 24 秒
 		timer.TargetTime = 24.0
-
-		// 注意：向日葵的待机动画一直循环播放，生产阳光时不需要特殊动画
 	}
 }
 
@@ -531,4 +558,27 @@ func (s *BehaviorSystem) updatePlantAttackAnimation(entityID ecs.EntityID, delta
 
 	// 注意：攻击动画现在是循环的，不依赖 IsFinished 切换回空闲
 	// 切换回空闲状态的逻辑在 handlePeashooterBehavior 中（检测没有僵尸时）
+}
+
+// updateSunflowerGlowEffects 更新所有向日葵脸部发光效果
+// 每帧降低发光强度，实现渐变效果
+// 当强度归零时，移除发光组件
+func (s *BehaviorSystem) updateSunflowerGlowEffects(deltaTime float64) {
+	// 查询所有拥有向日葵发光组件的实体
+	entities := ecs.GetEntitiesWith1[*components.SunflowerGlowComponent](s.entityManager)
+
+	for _, entityID := range entities {
+		glowComp, ok := ecs.GetComponent[*components.SunflowerGlowComponent](s.entityManager, entityID)
+		if !ok {
+			continue
+		}
+
+		// 降低发光强度
+		glowComp.Intensity -= glowComp.FadeSpeed * deltaTime
+
+		// 如果强度归零，移除组件
+		if glowComp.Intensity <= 0 {
+			ecs.RemoveComponent[*components.SunflowerGlowComponent](s.entityManager, entityID)
+		}
+	}
 }

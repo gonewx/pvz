@@ -102,6 +102,12 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		flashIntensity = flashComp.Intensity
 	}
 
+	// 检查向日葵脸部发光效果
+	var sunflowerGlow *components.SunflowerGlowComponent
+	if glowComp, hasGlow := ecs.GetComponent[*components.SunflowerGlowComponent](s.entityManager, id); hasGlow {
+		sunflowerGlow = glowComp
+	}
+
 	// 使用坐标转换工具库计算屏幕坐标
 	baseScreenX, baseScreenY, err := utils.GetRenderScreenOrigin(s.entityManager, id, pos, cameraX)
 	if err != nil {
@@ -328,15 +334,13 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		x3 := a*w + c*h + tx
 		y3 := b*w + d*h + ty
 
-		// 构建顶点数组（应用闪烁效果和透明度）
+		// 构建顶点数组（应用闪烁效果、向日葵发光和透明度）
 		colorR := float32(1.0 + flashIntensity)
 		colorG := float32(1.0 + flashIntensity)
 		colorB := float32(1.0 + flashIntensity)
 		colorA := float32(1.0)
 
 		// 应用透明度（Alpha）值
-		// Ebiten 默认使用 ColorScaleModeStraightAlpha，会自动将 RGB 乘以 Alpha
-		// 我们只需要设置 ColorA，不需要手动预乘 RGB
 		if frame.Alpha != nil {
 			colorA = float32(*frame.Alpha)
 		}
@@ -349,6 +353,35 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		}
 		is := []uint16{0, 1, 2, 1, 3, 2}
 		screen.DrawTriangles(vs, is, partData.Img, nil)
+
+		// 向日葵脸部发光效果：使用加法混合绘制金色光层
+		if sunflowerGlow != nil && sunflowerGlow.Intensity > 0 {
+			glowIntensity := float32(sunflowerGlow.Intensity)
+			// 金色发光层的颜色（乘以强度实现渐变）
+			glowR := glowIntensity * float32(sunflowerGlow.ColorR)
+			glowG := glowIntensity * float32(sunflowerGlow.ColorG)
+			glowB := glowIntensity * float32(sunflowerGlow.ColorB)
+			glowA := glowIntensity * 0.6 // 透明度也随强度衰减
+
+			glowVs := []ebiten.Vertex{
+				{DstX: float32(x0), DstY: float32(y0), SrcX: 0, SrcY: 0, ColorR: glowR, ColorG: glowG, ColorB: glowB, ColorA: glowA},
+				{DstX: float32(x1), DstY: float32(y1), SrcX: float32(w), SrcY: 0, ColorR: glowR, ColorG: glowG, ColorB: glowB, ColorA: glowA},
+				{DstX: float32(x2), DstY: float32(y2), SrcX: 0, SrcY: float32(h), ColorR: glowR, ColorG: glowG, ColorB: glowB, ColorA: glowA},
+				{DstX: float32(x3), DstY: float32(y3), SrcX: float32(w), SrcY: float32(h), ColorR: glowR, ColorG: glowG, ColorB: glowB, ColorA: glowA},
+			}
+			// 使用加法混合模式绘制发光层
+			glowOpts := &ebiten.DrawTrianglesOptions{
+				Blend: ebiten.Blend{
+					BlendFactorSourceRGB:        ebiten.BlendFactorOne,
+					BlendFactorDestinationRGB:   ebiten.BlendFactorOne,
+					BlendOperationRGB:           ebiten.BlendOperationAdd,
+					BlendFactorSourceAlpha:      ebiten.BlendFactorOne,
+					BlendFactorDestinationAlpha: ebiten.BlendFactorOne,
+					BlendOperationAlpha:         ebiten.BlendOperationAdd,
+				},
+			}
+			screen.DrawTriangles(glowVs, is, partData.Img, glowOpts)
+		}
 	}
 }
 

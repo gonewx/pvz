@@ -112,4 +112,12 @@ type EmitterComponent struct {
 	// 当 SystemPosition 关键帧非空时，SystemPosition 的值是相对于初始位置的偏移
 	InitialX float64 // 发射器初始X坐标
 	InitialY float64 // 发射器初始Y坐标
+
+	// 颜色覆盖（用于动态修改粒子颜色）
+	// 如果 ColorOverrideEnabled 为 true，将使用这些值覆盖配置中的颜色
+	// 例如：向日葵发光效果需要金色（而不是配置中的默认颜色）
+	ColorOverrideEnabled bool    // 是否启用颜色覆盖
+	ColorOverrideR       float64 // 红色通道覆盖值（0-1）
+	ColorOverrideG       float64 // 绿色通道覆盖值（0-1）
+	ColorOverrideB       float64 // 蓝色通道覆盖值（0-1）
 }

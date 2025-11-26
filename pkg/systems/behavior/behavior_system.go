@@ -131,6 +131,9 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 		s.updatePlantAttackAnimation(entityID, deltaTime)
 	}
 
+	// 更新向日葵脸部发光效果（渐变衰减）
+	s.updateSunflowerGlowEffects(deltaTime)
+
 	// 遍历所有移动中的僵尸实体，根据行为类型分发处理
 	for _, entityID := range zombieEntityList {
 		behaviorComp, _ := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
