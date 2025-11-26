@@ -5,6 +5,7 @@ import (
 	"math/rand"
 
 	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
@@ -95,22 +96,21 @@ func (s *SunSpawnSystem) Update(deltaTime float64) {
 			targetY = s.maxTargetY
 		}
 
-		// 边界检查（AC10）：确保阳光完整显示在屏幕内
-		// 屏幕尺寸800x600，阳光尺寸80x80（半径40）
-		// PositionComponent 存储中心坐标，中心有效范围：[40, 760] x [40, 560]
+		// 边界检查：确保阳光完整显示在屏幕内
+		// 使用配置常量而不是硬编码值
 		originalX, originalY := startX, targetY
-		sunRadius := 40.0 // 阳光半径（SunOffsetCenterX）
+		sunRadius := config.SunOffsetCenterX // 阳光半径 40
 		if startX < sunRadius {
 			startX = sunRadius
 		}
-		if startX > 800-sunRadius {
-			startX = 800 - sunRadius
+		if startX > config.ScreenWidth-sunRadius {
+			startX = config.ScreenWidth - sunRadius
 		}
 		if targetY < sunRadius {
 			targetY = sunRadius
 		}
-		if targetY > 600-sunRadius {
-			targetY = 600 - sunRadius
+		if targetY > config.ScreenHeight-sunRadius {
+			targetY = config.ScreenHeight - sunRadius
 		}
 
 		// 记录边界调整（仅当位置被修改时）

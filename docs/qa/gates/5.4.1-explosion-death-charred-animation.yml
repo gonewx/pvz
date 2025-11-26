@@ -4,41 +4,30 @@
 schema: 1
 story: "5.4.1"
 story_title: "爆炸死亡烧焦动画"
-gate: CONCERNS
-status_reason: "功能实现完整且通过游戏内测试，但缺少专用单元测试（Task 6 未完成）"
+gate: PASS
+status_reason: "功能实现完整，所有专用单元测试通过，代码已格式化"
 reviewer: "Quinn (Test Architect)"
-updated: "2025-11-26T11:00:00+08:00"
+updated: "2025-11-26T11:12:00+08:00"
 
 waiver: { active: false }
 
-top_issues:
-  - id: "TEST-001"
-    severity: medium
-    finding: "缺少专用单元测试 TestBehaviorZombieDyingExplosion() 和 TestCherryBombExplosionCharredAnimation()"
-    suggested_action: "添加 Story 定义的 Task 6 测试用例，验证烧焦死亡行为处理和樱桃炸弹爆炸触发"
-    suggested_owner: dev
-  - id: "DOC-001"
-    severity: low
-    finding: "Task 8-9 (代码格式化和文档更新) 未完成"
-    suggested_action: "运行 gofmt -w . 并更新相关文档"
-    suggested_owner: dev
+top_issues: []  # 所有问题已修复
 
 risk_summary:
-  totals: { critical: 0, high: 0, medium: 1, low: 1 }
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
   recommendations:
-    must_fix:
-      - "添加专用单元测试以确保长期可维护性"
+    must_fix: []
     monitor:
-      - "现有 TestCherryBombExplosionReleasesGrid 测试已验证基本功能"
+      - "持续关注后续相关 Story 的测试覆盖"
 
-quality_score: 80  # 100 - (0*20) - (1*10) - (1*5) = 85, 但考虑测试缺失严重性调整为 80
+quality_score: 95  # 功能完整，测试完善，代码规范
 
 evidence:
-  tests_reviewed: 3
-  risks_identified: 2
+  tests_reviewed: 8
+  risks_identified: 0
   trace:
-    ac_covered: [1, 2, 3, 4, 5, 6]  # 所有 AC 已通过游戏内测试验证
-    ac_gaps: []  # 功能层面无缺口
+    ac_covered: [1, 2, 3, 4, 5, 6]  # 所有 AC 已通过单元测试和游戏内测试验证
+    ac_gaps: []
 
 nfr_validation:
   security:
@@ -51,18 +40,12 @@ nfr_validation:
     status: PASS
     notes: "运行时单位切换机制健壮，有错误处理"
   maintainability:
-    status: CONCERNS
-    notes: "缺少专用单元测试可能影响未来重构的信心"
+    status: PASS
+    notes: "专用单元测试确保未来重构的信心"
 
 recommendations:
-  immediate:
-    - action: "添加 TestBehaviorZombieDyingExplosion() 测试"
-      refs: ["pkg/systems/behavior/behavior_system_test.go"]
-    - action: "添加 TestCherryBombExplosionCharredAnimation() 测试"
-      refs: ["pkg/systems/behavior/behavior_system_test.go"]
+  immediate: []  # 无紧急修复项
   future:
-    - action: "运行 gofmt -w . 格式化代码"
-      refs: ["pkg/systems/behavior/"]
     - action: "更新 PRD 和架构文档"
       refs: ["docs/prd/requirements.md", "docs/architecture/data-models.md"]
 
@@ -74,6 +57,23 @@ review_summary:
     - "运行时单位切换：ReanimSystem.PlayCombo() 扩展是有价值的架构改进"
     - "配置驱动：zombie_charred.yaml 完整定义了 death 组合"
     - "游戏内测试：所有 6 个 AC 已验证通过"
-  weaknesses:
-    - "缺少专用单元测试（Task 6 未完成）"
-    - "部分收尾工作未完成（Task 8-9）"
+    - "单元测试完善：5 个专用测试覆盖核心功能"
+  weaknesses: []  # 所有问题已修复
+
+# 测试清单
+tests_added:
+  - name: "TestBehaviorZombieDyingExplosion"
+    file: "pkg/systems/behavior/behavior_system_test.go"
+    description: "验证烧焦死亡行为处理：动画完成后删除僵尸并增加消灭计数"
+  - name: "TestBehaviorZombieDyingExplosion_AnimationNotFinished"
+    file: "pkg/systems/behavior/behavior_system_test.go"
+    description: "验证动画未完成时不删除僵尸"
+  - name: "TestCherryBombExplosionCharredAnimation"
+    file: "pkg/systems/behavior/behavior_system_test.go"
+    description: "验证樱桃炸弹爆炸触发烧焦死亡动画"
+  - name: "TestCherryBombExplosion_NormalDeathUnaffected"
+    file: "pkg/systems/behavior/behavior_system_test.go"
+    description: "验证普通死亡不受影响"
+  - name: "TestQueryExplosionDyingZombies"
+    file: "pkg/systems/behavior/behavior_system_test.go"
+    description: "验证查询爆炸烧焦死亡中的僵尸"

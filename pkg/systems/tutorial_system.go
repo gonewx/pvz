@@ -417,9 +417,15 @@ func (s *TutorialSystem) checkTriggerCondition(trigger string) bool {
 		return currentSun >= 100
 
 	case "secondSeedClicked":
-		// 第二次点击豌豆射手卡片（需检查已种植1个植物）
+		// 第二次点击豌豆射手卡片
+		// 修复：如果玩家已经种植了≥2个植物，跳过此步骤直接进入下一步
+		plantEntities := ecs.GetEntitiesWith1[*components.PlantComponent](s.entityManager)
+		if len(plantEntities) >= 2 {
+			return true // 玩家已种植多个植物，跳过此步骤
+		}
+		// 正常情况：等待玩家点击卡片
 		isPlanting, _ := s.gameState.GetPlantingMode()
-		return s.plantCount == 1 && isPlanting
+		return s.plantCount >= 1 && isPlanting
 
 	case "secondPlantPlaced":
 		// 种植第二个植物
@@ -800,30 +806,12 @@ func (s *TutorialSystem) updateArrowRepeat(dt float64, currentStep config.Tutori
 // spawnSkyFallingSun 在教学关卡中生成一颗从天空掉落的阳光
 // 这是教学关卡的特殊机制：阳光不是定时生成，而是由教学步骤触发
 func (s *TutorialSystem) spawnSkyFallingSun() {
-	// 生成随机X坐标（草坪范围内）
-	minX := 100.0
-	maxX := 700.0
-	startX := minX + rand.Float64()*(maxX-minX) // 随机位置
+	// 使用配置常量生成随机X坐标（与 SunSpawnSystem 一致）
+	startX := config.SkyDropSunMinX + rand.Float64()*(config.SkyDropSunMaxX-config.SkyDropSunMinX)
 
-	// 生成随机Y坐标（落地位置）
-	minY := 150.0
-	maxY := 450.0
-	targetY := minY + rand.Float64()*(maxY-minY) // 随机位置
-
-	// 边界检查：确保阳光完整显示在屏幕内
-	sunRadius := 40.0 // 阳光半径
-	if startX < sunRadius {
-		startX = sunRadius
-	}
-	if startX > 800-sunRadius {
-		startX = 800 - sunRadius
-	}
-	if targetY < sunRadius {
-		targetY = sunRadius
-	}
-	if targetY > 600-sunRadius {
-		targetY = 600 - sunRadius
-	}
+	// 生成随机Y坐标（落地位置）- 使用更保守的范围确保阳光完整显示
+	// 考虑阳光半径40px，避免阳光落在屏幕边缘
+	targetY := config.SkyDropSunMinTargetY + rand.Float64()*(config.SkyDropSunMaxTargetY-config.SkyDropSunMinTargetY-80)
 
 	// 创建阳光实体
 	sunID := entities.NewSunEntity(s.entityManager, s.resourceManager, startX, targetY)

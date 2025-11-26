@@ -39,6 +39,27 @@ const (
 	PlantOffsetY = -10.0
 )
 
+// 天空掉落阳光生成范围配置
+// 确保阳光完整显示在屏幕内，不会部分或全部超出屏幕边界
+// 阳光应该落在草坪区域内，避免与左侧卡片槽重叠
+const (
+	// SkyDropSunMinX 天空掉落阳光的最小 X 坐标（中心坐标）
+	// 草坪起始X约为 255，加上阳光半径 40，确保阳光完整在草坪范围内
+	SkyDropSunMinX = 280.0
+
+	// SkyDropSunMaxX 天空掉落阳光的最大 X 坐标（中心坐标）
+	// 屏幕宽度 800 - 阳光半径 40 = 760
+	SkyDropSunMaxX = 760.0
+
+	// SkyDropSunMinTargetY 天空掉落阳光落地的最小 Y 坐标（中心坐标）
+	// 需要考虑阳光半径（40px），确保顶边不超出屏幕
+	SkyDropSunMinTargetY = 100.0
+
+	// SkyDropSunMaxTargetY 天空掉落阳光落地的最大 Y 坐标（中心坐标）
+	// 屏幕高度 600 - 阳光半径 40 = 560，但考虑 UI 元素留出空间
+	SkyDropSunMaxTargetY = 500.0
+)
+
 // 向日葵阳光生产位置配置
 // Story 12.1: 向日葵阳光生产动画效果
 const (
