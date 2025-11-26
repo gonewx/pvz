@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
@@ -18,6 +19,10 @@ const (
 	OpeningShowZombieTime    = 2.0   // 展示僵尸时间（秒）
 	OpeningCameraSpeed       = 300.0 // 镜头移动速度（像素/秒）
 	OpeningCameraRightTarget = 600.0 // 镜头右移目标位置（背景最右边）
+
+	// ReadySetPlant 动画常量
+	ReadySetPlantFPS      = 12   // 动画帧率
+	ReadySetPlantDuration = 2.25 // 动画总时长（25帧 / 12FPS ≈ 2.08秒，加缓冲）
 )
 
 // OpeningAnimationSystem 管理关卡开场动画流程。
@@ -166,12 +171,124 @@ func (oas *OpeningAnimationSystem) updateShowZombiesState(openingComp *component
 func (oas *OpeningAnimationSystem) updateCameraMoveLeftState(openingComp *components.OpeningAnimationComponent) {
 	// 检查镜头是否移动完成
 	if !oas.cameraSystem.IsAnimating() {
-		// 切换到游戏开始状态
+		// 直接切换到游戏开始状态
+		// ReadySetPlant 动画将在铺草皮完成、UI 显示后由 GameScene 触发
 		openingComp.State = "gameStart"
 		openingComp.ElapsedTime = 0
 
 		log.Println("[OpeningAnimationSystem] State: cameraMoveLeft → gameStart")
 	}
+}
+
+// createReadySetPlantAnimation 创建 ReadySetPlant 动画实体。
+func (oas *OpeningAnimationSystem) createReadySetPlantAnimation(openingComp *components.OpeningAnimationComponent) {
+	if openingComp.ReadySetPlantStarted {
+		return
+	}
+
+	// 获取 Reanim 资源
+	reanimXML := oas.resourceManager.GetReanimXML("StartReadySetPlant")
+	partImages := oas.resourceManager.GetReanimPartImages("StartReadySetPlant")
+	if reanimXML == nil || partImages == nil {
+		log.Println("[OpeningAnimationSystem] ⚠️ Failed to load StartReadySetPlant reanim resources")
+		return
+	}
+
+	// 创建动画实体
+	entity := oas.entityManager.CreateEntity()
+	openingComp.ReadySetPlantEntity = entity
+	openingComp.ReadySetPlantStarted = true
+
+	// 添加位置组件（屏幕中心）
+	// 屏幕尺寸：800x600，中心点 (400, 300)
+	ecs.AddComponent(oas.entityManager, entity, &components.PositionComponent{
+		X: config.ScreenWidth / 2,
+		Y: config.ScreenHeight / 2,
+	})
+
+	// 添加 UI 组件（标记为 UI 元素，不受摄像机影响）
+	ecs.AddComponent(oas.entityManager, entity, &components.UIComponent{
+		State: components.UINormal,
+	})
+
+	// 构建 MergedTracks（关键：这是动画数据的核心）
+	mergedTracks := reanim.BuildMergedTracks(reanimXML)
+
+	// 计算总帧数（简单动画的帧数 = 所有轨道中最大的帧数）
+	totalFrames := 0
+	for _, track := range reanimXML.Tracks {
+		if len(track.Frames) > totalFrames {
+			totalFrames = len(track.Frames)
+		}
+	}
+
+	// 初始化 AnimVisiblesMap：使用合成动画名 "_root"
+	// 对于简单动画文件（没有配置文件定义的动画组合），使用 "_root" 作为动画名
+	// prepareRenderCache 会识别 "_root" 并直接使用物理帧，无需映射
+	animVisiblesMap := make(map[string][]int)
+	visibles := make([]int, totalFrames)
+	for i := range visibles {
+		visibles[i] = 0 // 所有帧可见
+	}
+	animVisiblesMap["_root"] = visibles
+
+	// 分析轨道类型（所有轨道都是可视轨道）
+	var visualTracks, logicalTracks []string
+	for _, track := range reanimXML.Tracks {
+		visualTracks = append(visualTracks, track.Name)
+	}
+
+	// 添加 ReanimComponent
+	reanimComp := &components.ReanimComponent{
+		ReanimName:        "StartReadySetPlant",
+		ReanimXML:         reanimXML,
+		PartImages:        partImages,
+		MergedTracks:      mergedTracks,
+		VisualTracks:      visualTracks,
+		LogicalTracks:     logicalTracks,
+		CurrentFrame:      0,
+		FrameAccumulator:  0,
+		AnimationFPS:      float64(reanimXML.FPS),
+		CurrentAnimations: []string{"_root"}, // 使用合成动画名，简单动画直接播放所有帧
+		AnimVisiblesMap:   animVisiblesMap,
+		IsLooping:         false, // 单次播放
+		IsFinished:        false,
+		LastRenderFrame:   -1,
+	}
+	ecs.AddComponent(oas.entityManager, entity, reanimComp)
+
+	// 播放音效
+	oas.playReadySetPlantSound()
+
+	log.Printf("[OpeningAnimationSystem] Created ReadySetPlant animation entity: %d (FPS=%d, Tracks=%d, Frames=%d)",
+		entity, reanimXML.FPS, len(reanimXML.Tracks), totalFrames)
+}
+
+// clearReadySetPlantAnimation 清理 ReadySetPlant 动画实体。
+func (oas *OpeningAnimationSystem) clearReadySetPlantAnimation(openingComp *components.OpeningAnimationComponent) {
+	if openingComp.ReadySetPlantEntity != 0 {
+		oas.entityManager.DestroyEntity(openingComp.ReadySetPlantEntity)
+		openingComp.ReadySetPlantEntity = 0
+		openingComp.ReadySetPlantStarted = false
+		log.Println("[OpeningAnimationSystem] Cleared ReadySetPlant animation entity")
+	}
+}
+
+// playReadySetPlantSound 播放 ReadySetPlant 音效。
+func (oas *OpeningAnimationSystem) playReadySetPlantSound() {
+	if oas.resourceManager == nil {
+		return
+	}
+
+	// 尝试播放 readysetplant 音效
+	player, err := oas.resourceManager.LoadSoundEffect("assets/sounds/readysetplant.ogg")
+	if err != nil {
+		log.Printf("[OpeningAnimationSystem] ⚠️ Failed to load ReadySetPlant sound: %v", err)
+		return
+	}
+
+	player.Play()
+	log.Println("[OpeningAnimationSystem] Playing ReadySetPlant sound effect")
 }
 
 // updateGameStartState 处理游戏开始状态。
@@ -364,6 +481,9 @@ func (oas *OpeningAnimationSystem) Skip() {
 
 	// Story 8.3.1: 清理预览僵尸（跳过时也需要清理）
 	oas.clearPreviewZombies(openingComp)
+
+	// 清理 ReadySetPlant 动画（如果正在播放）
+	oas.clearReadySetPlantAnimation(openingComp)
 
 	// 设置跳过标志
 	openingComp.IsSkipped = true

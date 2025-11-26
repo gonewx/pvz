@@ -1092,7 +1092,6 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 		if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 10 {
 			log.Printf("[ReanimSystem] 🎨 处理轨道: %s", trackName)
 		}
-
 		// 检查隐藏轨道（黑名单）
 		if comp.HiddenTracks != nil && comp.HiddenTracks[trackName] {
 			skippedHidden++

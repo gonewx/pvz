@@ -120,8 +120,9 @@ type GameScene struct {
 	soddingSystem *systems.SoddingSystem // 铺草皮动画系统（SodRoll 滚动动画）
 
 	// Story 8.3: Camera and Opening Animation Systems
-	cameraSystem  *systems.CameraSystem           // 镜头控制系统（镜头移动、缓动）
-	openingSystem *systems.OpeningAnimationSystem // 开场动画系统（僵尸预告、跳过）
+	cameraSystem       *systems.CameraSystem           // 镜头控制系统（镜头移动、缓动）
+	openingSystem      *systems.OpeningAnimationSystem // 开场动画系统（僵尸预告、跳过）
+	readySetPlantSystem *systems.ReadySetPlantSystem    // ReadySetPlant 动画系统（铺草皮后播放）
 
 	// Story 8.3 + 8.4重构: Reward Animation System (完全封装奖励流程)
 	// 内部自动管理卡片包动画、粒子效果、奖励面板渲染等所有细节
@@ -377,6 +378,10 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 		}
 	}
 
+	// Create ReadySetPlantSystem (在铺草皮完成、UI 显示后播放)
+	scene.readySetPlantSystem = systems.NewReadySetPlantSystem(scene.entityManager, rm)
+	log.Printf("[GameScene] Initialized ReadySetPlant animation system")
+
 	// Story 10.2: Create LawnmowerSystem (除草车系统 - 最后防线)
 	// Story 10.3: 传递 ReanimSystem 用于播放僵尸死亡动画
 	scene.lawnmowerSystem = systems.NewLawnmowerSystem(scene.entityManager, rm, scene.gameState)
@@ -623,6 +628,12 @@ func (s *GameScene) Update(deltaTime float64) {
 				}
 				// Story 10.2: 铺草皮完成后创建除草车（原版行为）
 				s.initLawnmowers()
+
+				// 铺草皮完成后播放 ReadySetPlant 动画
+				// 此时 UI（植物选择栏、除草车）已显示
+				if s.readySetPlantSystem != nil {
+					s.readySetPlantSystem.Start()
+				}
 			}, enabledLanes, animLanes, s.sodOverlayX, float64(s.sodHeight), enableParticles)
 
 			s.soddingAnimStarted = true
@@ -639,6 +650,11 @@ func (s *GameScene) Update(deltaTime float64) {
 			// 通知教学系统
 			if s.tutorialSystem != nil {
 				s.tutorialSystem.OnSoddingComplete()
+			}
+
+			// 播放 ReadySetPlant 动画（即使没有铺草皮动画）
+			if s.readySetPlantSystem != nil {
+				s.readySetPlantSystem.Start()
 			}
 			// 继续游戏流程，不return
 		}
@@ -815,6 +831,10 @@ func (s *GameScene) Update(deltaTime float64) {
 	s.physicsSystem.Update(deltaTime) // 7. Check collisions (Story 4.3)
 	// Story 6.3: Reanim 动画系统（替代旧的 AnimationSystem）
 	s.reanimSystem.Update(deltaTime) // 8. Update Reanim animation frames
+	// Story 8.3: ReadySetPlant 动画系统（铺草皮完成后播放）
+	if s.readySetPlantSystem != nil {
+		s.readySetPlantSystem.Update(deltaTime) // 8.5. Update ReadySetPlant animation duration
+	}
 
 	s.particleSystem.Update(deltaTime) // 9. Update particle effects (Story 7.2)
 	// 方案A+：闪烁效果系统
