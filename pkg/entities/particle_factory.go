@@ -132,9 +132,9 @@ func CreateParticleEffect(em *ecs.EntityManager, rm *game.ResourceManager, effec
 			}
 		}
 
-		// 解析发射器位置偏移量
-		emitterOffsetXVal, _, _, _ := particle.ParseValue(emitterConfig.EmitterOffsetX)
-		emitterOffsetYVal, _, _, _ := particle.ParseValue(emitterConfig.EmitterOffsetY)
+		// 解析发射器位置偏移量（支持范围格式，如 WallnutEatLarge 的 "[-30 10]"）
+		emitterOffsetXMin, emitterOffsetXMax, _, _ := particle.ParseValue(emitterConfig.EmitterOffsetX)
+		emitterOffsetYMin, emitterOffsetYMax, _, _ := particle.ParseValue(emitterConfig.EmitterOffsetY)
 
 		systemDurationMin, systemDurationMax, _, _ := particle.ParseValue(emitterConfig.SystemDuration)
 		systemDuration := particle.RandomInRange(systemDurationMin, systemDurationMax) / 100.0 // centiseconds to seconds
@@ -197,8 +197,13 @@ func CreateParticleEffect(em *ecs.EntityManager, rm *game.ResourceManager, effec
 			EmitterBoxYInterp:       emitterBoxYInterp,
 			EmitterBoxXMinKeyframes: emitterBoxXMinKf,
 			EmitterBoxYMinKeyframes: emitterBoxYMinKf,
-			EmitterOffsetX:          emitterOffsetXVal,
-			EmitterOffsetY:          emitterOffsetYVal,
+			// EmitterOffset 范围支持（每个粒子生成时随机选择）
+			EmitterOffsetX:    emitterOffsetXMin, // 兼容：单值格式时 min=max
+			EmitterOffsetY:    emitterOffsetYMin,
+			EmitterOffsetXMin: emitterOffsetXMin,
+			EmitterOffsetXMax: emitterOffsetXMax,
+			EmitterOffsetYMin: emitterOffsetYMin,
+			EmitterOffsetYMax: emitterOffsetYMax,
 			// Story 7.5: SystemAlpha
 			SystemAlphaKeyframes: systemAlphaKeyframes,
 			SystemAlphaInterp:    systemAlphaInterp,
@@ -306,8 +311,9 @@ func CreateParticleEffectWithColor(em *ecs.EntityManager, rm *game.ResourceManag
 
 		emitterRadiusMin, emitterRadiusMax, _, _ := particle.ParseValue(emitterConfig.EmitterRadius)
 
-		emitterOffsetXVal, _, _, _ := particle.ParseValue(emitterConfig.EmitterOffsetX)
-		emitterOffsetYVal, _, _, _ := particle.ParseValue(emitterConfig.EmitterOffsetY)
+		// 解析发射器位置偏移量（支持范围格式）
+		emitterOffsetXMin, emitterOffsetXMax, _, _ := particle.ParseValue(emitterConfig.EmitterOffsetX)
+		emitterOffsetYMin, emitterOffsetYMax, _, _ := particle.ParseValue(emitterConfig.EmitterOffsetY)
 
 		systemDurationMin, systemDurationMax, _, _ := particle.ParseValue(emitterConfig.SystemDuration)
 		systemDuration := particle.RandomInRange(systemDurationMin, systemDurationMax) / 100.0
@@ -364,8 +370,13 @@ func CreateParticleEffectWithColor(em *ecs.EntityManager, rm *game.ResourceManag
 			EmitterBoxYInterp:       emitterBoxYInterp,
 			EmitterBoxXMinKeyframes: emitterBoxXMinKf,
 			EmitterBoxYMinKeyframes: emitterBoxYMinKf,
-			EmitterOffsetX:          emitterOffsetXVal,
-			EmitterOffsetY:          emitterOffsetYVal,
+			// EmitterOffset 范围支持（每个粒子生成时随机选择）
+			EmitterOffsetX:    emitterOffsetXMin,
+			EmitterOffsetY:    emitterOffsetYMin,
+			EmitterOffsetXMin: emitterOffsetXMin,
+			EmitterOffsetXMax: emitterOffsetXMax,
+			EmitterOffsetYMin: emitterOffsetYMin,
+			EmitterOffsetYMax: emitterOffsetYMax,
 
 			SystemAlphaKeyframes: systemAlphaKeyframes,
 			SystemAlphaInterp:    systemAlphaInterp,

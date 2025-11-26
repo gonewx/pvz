@@ -87,4 +87,12 @@ type ParticleComponent struct {
 	InitialY        float64 // 粒子初始 Y 坐标
 	PositionOffsetX float64 // Position Field 计算的 X 偏移量（每帧更新）
 	PositionOffsetY float64 // Position Field 计算的 Y 偏移量
+
+	// Position Field 关键帧（在粒子生成时解析一次，避免每帧重复解析）
+	// 支持特殊格式如 "0 [-40 10]"：从初始值 0 插值到范围内的随机目标值
+	PositionFieldXKeyframes []particle.Keyframe // Position Field X 轴关键帧
+	PositionFieldYKeyframes []particle.Keyframe // Position Field Y 轴关键帧
+	PositionFieldXInterp    string              // X 轴插值模式
+	PositionFieldYInterp    string              // Y 轴插值模式
+	HasPositionField        bool                // 是否有 Position Field（用于快速检查）
 }

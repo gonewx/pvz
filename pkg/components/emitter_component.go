@@ -86,8 +86,13 @@ type EmitterComponent struct {
 	// Emitter position offset (发射器位置偏移)
 	// 相对于发射器实体位置的偏移量，用于将粒子生成位置微调到特定位置
 	// 例如：SeedPacket 光晕效果使用 EmitterOffsetY=62 将光晕向下移动
-	EmitterOffsetX float64 // Horizontal offset from emitter position
-	EmitterOffsetY float64 // Vertical offset from emitter position
+	// 支持范围格式：如 WallnutEatLarge 的 EmitterOffsetX="[-30 10]"
+	EmitterOffsetX    float64 // Horizontal offset from emitter position (单值格式用)
+	EmitterOffsetY    float64 // Vertical offset from emitter position (单值格式用)
+	EmitterOffsetXMin float64 // EmitterOffsetX 范围最小值
+	EmitterOffsetXMax float64 // EmitterOffsetX 范围最大值
+	EmitterOffsetYMin float64 // EmitterOffsetY 范围最小值
+	EmitterOffsetYMax float64 // EmitterOffsetY 范围最大值
 
 	// System-level properties (Story 7.5: ZombieHead 系统透明度)
 	SystemAlphaKeyframes []particle.Keyframe // 系统级透明度关键帧（影响所有粒子）

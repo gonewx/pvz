@@ -29,9 +29,16 @@ import (
 func (ps *ParticleSystem) GetDynamicSpawnRate(emitter *components.EmitterComponent) float64 {
 	// 如果有关键帧，使用动态计算
 	if len(emitter.SpawnRateKeyframes) > 0 {
-		// SpawnRate 的关键帧使用绝对时间（厘秒），而不是归一化时间
-		// 例如："50,70 0,90" 表示在 50 厘秒时 SpawnRate=70，在 0 厘秒时 SpawnRate=90
-		t := emitter.Age * 100.0 // 转换为厘秒
+		// SpawnRate 的关键帧使用归一化时间（0-1），与其他参数保持一致
+		// 例如："40 0" 表示 SpawnRate 从 40 线性衰减到 0（在 SystemDuration 内）
+		var t float64
+		if emitter.SystemDuration > 0 {
+			// 有限持续时间 → 使用归一化时间 (0-1)
+			t = emitter.Age / emitter.SystemDuration
+		} else {
+			// 无限持续时间 → 使用绝对时间（秒）
+			t = emitter.Age
+		}
 		value := particlePkg.EvaluateKeyframes(emitter.SpawnRateKeyframes, t, emitter.SpawnRateInterp)
 		return value
 	}
@@ -476,15 +483,20 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 
 	// Spawn position
 	// 优先使用圆形发射半径（EmitterRadius），否则回退到方形发射盒（EmitterBoxX/Y）
-	// 应用发射器偏移量（EmitterOffsetX/Y）
-	spawnX := emitterPos.X + emitter.EmitterOffsetX
-	spawnY := emitterPos.Y + emitter.EmitterOffsetY
+	// 应用发射器偏移量（EmitterOffsetX/Y）- 支持范围格式，每个粒子随机偏移
+	// 例如：WallnutEatLarge 的 EmitterOffsetX="[-30 10]" 表示每个粒子在 -30 到 10 之间随机偏移
+	offsetX := particlePkg.RandomInRange(emitter.EmitterOffsetXMin, emitter.EmitterOffsetXMax)
+	offsetY := particlePkg.RandomInRange(emitter.EmitterOffsetYMin, emitter.EmitterOffsetYMax)
+	spawnX := emitterPos.X + offsetX
+	spawnY := emitterPos.Y + offsetY
 
 	// DEBUG: 输出基础生成位置
 	if emitter.TotalLaunched < 3 {
-		log.Printf("[DEBUG SpawnBase] 粒子#%d: emitterPos=(%.1f, %.1f), offset=(%.1f, %.1f), spawnBase=(%.1f, %.1f)",
+		log.Printf("[DEBUG SpawnBase] 粒子#%d: emitterPos=(%.1f, %.1f), offsetRange=([%.1f,%.1f], [%.1f,%.1f]), offset=(%.1f, %.1f), spawnBase=(%.1f, %.1f)",
 			emitter.TotalLaunched+1, emitterPos.X, emitterPos.Y,
-			emitter.EmitterOffsetX, emitter.EmitterOffsetY, spawnX, spawnY)
+			emitter.EmitterOffsetXMin, emitter.EmitterOffsetXMax,
+			emitter.EmitterOffsetYMin, emitter.EmitterOffsetYMax,
+			offsetX, offsetY, spawnX, spawnY)
 	}
 
 	// 动态计算 EmitterBox（支持关键帧插值）
@@ -668,6 +680,56 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 		}
 	}
 
+	// 预解析 Position Field（在粒子生成时解析一次，避免每帧重复解析）
+	// 支持特殊格式如 "0 [-40 10]"：从初始值 0 插值到范围内的随机目标值
+	var positionFieldXKeyframes, positionFieldYKeyframes []particlePkg.Keyframe
+	var positionFieldXInterp, positionFieldYInterp string
+	hasPositionField := false
+
+	for _, field := range config.Fields {
+		if field.FieldType == "Position" {
+			hasPositionField = true
+
+			// 解析 X 轴关键帧
+			if field.X != "" {
+				_, _, xKf, xInterp := particlePkg.ParseValue(field.X)
+				if len(xKf) > 0 {
+					positionFieldXKeyframes = xKf
+					positionFieldXInterp = xInterp
+				} else {
+					// 静态值（无动画）：生成常量关键帧
+					xMin, xMax, _, _ := particlePkg.ParseValue(field.X)
+					staticValue := particlePkg.RandomInRange(xMin, xMax)
+					positionFieldXKeyframes = []particlePkg.Keyframe{
+						{Time: 0, Value: staticValue},
+						{Time: 1, Value: staticValue},
+					}
+				}
+			}
+
+			// 解析 Y 轴关键帧
+			if field.Y != "" {
+				_, _, yKf, yInterp := particlePkg.ParseValue(field.Y)
+				if len(yKf) > 0 {
+					positionFieldYKeyframes = yKf
+					positionFieldYInterp = yInterp
+				} else {
+					// 静态值（无动画）：生成常量关键帧
+					yMin, yMax, _, _ := particlePkg.ParseValue(field.Y)
+					staticValue := particlePkg.RandomInRange(yMin, yMax)
+					positionFieldYKeyframes = []particlePkg.Keyframe{
+						{Time: 0, Value: staticValue},
+						{Time: 1, Value: staticValue},
+					}
+				}
+			}
+
+			log.Printf("[DEBUG] Position Field 预解析: X 关键帧=%d个, Y 关键帧=%d个",
+				len(positionFieldXKeyframes), len(positionFieldYKeyframes))
+			break // 只处理第一个 Position Field
+		}
+	}
+
 	// DEBUG: 粒子创建日志
 	log.Printf("[DEBUG] 创建粒子: pos=(%.1f,%.1f), velocity=(%.1f,%.1f), angle=%.1f°, speed=%.1f, scale=%.2f, groundY=%.1f, image=%v",
 		spawnX, spawnY, velocityX, velocityY, angle, speed, initialScale, groundY, particleImage != nil)
@@ -716,11 +778,16 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 		EmitterAge:           emitter.Age,            // 使用发射器的当前年龄（修复：粒子应该基于发射器年龄，而不是自己的独立计数器）
 		EmitterDuration:      emitter.SystemDuration, // 发射器持续时间（用于归一化）
 
-		// Position Field 支持：保存初始位置
-		InitialX:        spawnX,
-		InitialY:        spawnY,
-		PositionOffsetX: 0,
-		PositionOffsetY: 0,
+		// Position Field 支持：保存初始位置和预解析的关键帧
+		InitialX:                spawnX,
+		InitialY:                spawnY,
+		PositionOffsetX:         0,
+		PositionOffsetY:         0,
+		PositionFieldXKeyframes: positionFieldXKeyframes,
+		PositionFieldYKeyframes: positionFieldYKeyframes,
+		PositionFieldXInterp:    positionFieldXInterp,
+		PositionFieldYInterp:    positionFieldYInterp,
+		HasPositionField:        hasPositionField,
 	}
 
 	// Create PositionComponent

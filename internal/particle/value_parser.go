@@ -223,6 +223,42 @@ func ParseValue(s string) (min, max float64, keyframes []Keyframe, interpolation
 		}
 	}
 
+	// Story: 支持 "initialValue [minEnd maxEnd]" 格式（Position Field 特殊格式）
+	// 例如：WallnutEatLarge 的 Position Field X="0 [-40 10]"
+	// 含义：粒子从初始偏移 0 移动到 [-40, 10] 范围内的随机位置
+	// 解析：生成两个关键帧 [{0, initialValue}, {1, randomValueInRange}]
+	if !strings.HasPrefix(s, "[") && strings.Contains(s, "[") && strings.HasSuffix(s, "]") {
+		// 查找 '[' 的位置，分离初始值和目标范围
+		bracketIdx := strings.Index(s, "[")
+		if bracketIdx > 0 {
+			initialPart := strings.TrimSpace(s[:bracketIdx])
+			rangePart := strings.TrimSpace(s[bracketIdx:])
+
+			// 解析初始值
+			initialValue, err := strconv.ParseFloat(initialPart, 64)
+			if err == nil && strings.HasPrefix(rangePart, "[") && strings.HasSuffix(rangePart, "]") {
+				// 解析目标范围
+				rangeStr := strings.TrimPrefix(rangePart, "[")
+				rangeStr = strings.TrimSuffix(rangeStr, "]")
+				rangeParts := strings.Fields(rangeStr)
+
+				if len(rangeParts) == 2 {
+					rangeMin, err1 := strconv.ParseFloat(rangeParts[0], 64)
+					rangeMax, err2 := strconv.ParseFloat(rangeParts[1], 64)
+					if err1 == nil && err2 == nil {
+						// 成功解析！生成关键帧，使用范围内的随机值作为结束值
+						endValue := RandomInRange(rangeMin, rangeMax)
+						keyframes = []Keyframe{
+							{Time: 0, Value: initialValue},
+							{Time: 1, Value: endValue},
+						}
+						return 0, 0, keyframes, "Linear"
+					}
+				}
+			}
+		}
+	}
+
 	// Check for range format: "[min max]" or "[value]"
 	if strings.HasPrefix(s, "[") && strings.HasSuffix(s, "]") {
 		rangeStr := strings.TrimPrefix(s, "[")

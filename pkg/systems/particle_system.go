@@ -299,26 +299,17 @@ func (ps *ParticleSystem) applyFields(p *components.ParticleComponent, dt float6
 			//   - t=0.5 (中点): offsetY = 10
 			//   - t=1.0 (结束): offsetY = 0
 			//   效果：箭头向下移动10像素，再回到原位
+			//
+			// 优化：使用预解析的关键帧（在 spawnParticle 时解析一次）
+			// 支持特殊格式如 "0 [-40 10]"：每个粒子有独立的随机目标值
 
-			// Parse position values (must use keyframes for animation)
-			_, _, xKeyframes, xInterp := particlePkg.ParseValue(field.X)
-			_, _, yKeyframes, yInterp := particlePkg.ParseValue(field.Y)
-
-			// Calculate position offset for this frame
-			if len(xKeyframes) > 0 {
-				p.PositionOffsetX = particlePkg.EvaluateKeyframes(xKeyframes, t, xInterp)
-			} else if field.X != "" {
-				// 静态值（无动画）
-				xMin, xMax, _, _ := particlePkg.ParseValue(field.X)
-				p.PositionOffsetX = particlePkg.RandomInRange(xMin, xMax)
+			// 使用预解析的 Position Field 关键帧
+			if len(p.PositionFieldXKeyframes) > 0 {
+				p.PositionOffsetX = particlePkg.EvaluateKeyframes(p.PositionFieldXKeyframes, t, p.PositionFieldXInterp)
 			}
 
-			if len(yKeyframes) > 0 {
-				p.PositionOffsetY = particlePkg.EvaluateKeyframes(yKeyframes, t, yInterp)
-			} else if field.Y != "" {
-				// 静态值（无动画）
-				yMin, yMax, _, _ := particlePkg.ParseValue(field.Y)
-				p.PositionOffsetY = particlePkg.RandomInRange(yMin, yMax)
+			if len(p.PositionFieldYKeyframes) > 0 {
+				p.PositionOffsetY = particlePkg.EvaluateKeyframes(p.PositionFieldYKeyframes, t, p.PositionFieldYInterp)
 			}
 
 			// Additional field types can be added here
