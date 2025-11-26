@@ -402,6 +402,12 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 					}
 					log.Printf("[BehaviorSystem] 僵尸 %d 生命值受损：%d -> %d（伤害：%d）",
 						zombieID, originalHealth, health.CurrentHealth, damage)
+
+					// Story 5.4.1: 如果僵尸被爆炸杀死（生命值归零），立即触发烧焦死亡动画
+					if health.CurrentHealth <= 0 {
+						log.Printf("[CherryBomb] 僵尸 %d 被爆炸杀死，触发烧焦死亡", zombieID)
+						s.triggerZombieExplosionDeath(zombieID)
+					}
 				}
 			}
 		}

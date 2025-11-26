@@ -74,16 +74,29 @@ tutorialSteps:
 # Story 8.6: 使用新的 ZombieGroup 格式（lanes 为数组）
 waves:
   # 第一波：游戏开始后出现，2个普通僵尸
-  - zombies:
-      - type: "basic"
-        lanes: [3]  # 只在第3行（中间行）生成
-        count: 2
-        spawnInterval: 2.0
-
-  # 第二波（最后一波）：第一波消灭后自动触发，3个普通僵尸
-  - minDelay: 1
+  - delay: 5
     zombies:
       - type: "basic"
         lanes: [3]  # 只在第3行（中间行）生成
-        count: 3
+        count: 1
+        spawnInterval: 2.0
+
+  # 第二波（最后一波）：第一波消灭后自动触发，3个普通僵尸
+  - delay: 8
+    zombies:
+      - type: "basic"
+        lanes: [3]  # 只在第3行（中间行）生成
+        count: 1
+        spawnInterval: 2.0
+  - delay: 10
+    zombies:
+      - type: "basic"
+        lanes: [3]  # 只在第3行（中间行）生成
+        count: 1
+        spawnInterval: 2.0
+  - delay: 12
+    zombies:
+      - type: "basic"
+        lanes: [3]  # 只在第3行（中间行）生成
+        count: 2
         spawnInterval: 2.0

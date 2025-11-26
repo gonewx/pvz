@@ -22,6 +22,19 @@ const (
 	// BehaviorZombieSquashing 僵尸被压扁中：播放除草车碾压动画（位移、旋转、缩放）
 	// 动画完成后切换为 BehaviorZombieDying，触发粒子效果并删除实体
 	BehaviorZombieSquashing
+	// BehaviorZombieDyingExplosion 僵尸死亡中（爆炸烧焦死亡动画）
+	//
+	// 使用场景：僵尸被爆炸类攻击（樱桃炸弹、土豆雷、辣椒等）杀死时
+	//
+	// 与其他死亡类型的区别：
+	//   - BehaviorZombieDying: 普通死亡（豌豆、坚果等）- 头部掉落动画
+	//   - BehaviorZombieSquashing: 压扁死亡（除草车）- 铲起旋转压扁动画
+	//   - BehaviorZombieDyingExplosion: 爆炸死亡 - 烧焦黑化动画
+	//
+	// 动画资源：使用 Zombie_charred.reanim（烧焦僵尸骨骼动画），非循环
+	//
+	// 参考实现：Story 10.6 (压扁动画)
+	BehaviorZombieDyingExplosion
 	// BehaviorWallnut 坚果墙行为：无攻击能力的纯防御植物，根据生命值百分比切换外观状态
 	// 坚果墙拥有极高的生命值(4000)，用于阻挡僵尸前进
 	// 外观状态：完好(>66%) → 轻伤(33-66%) → 重伤(<33%)

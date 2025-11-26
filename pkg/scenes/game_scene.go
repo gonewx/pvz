@@ -263,6 +263,9 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 		scene.reanimSystem.SetConfigManager(configManager)
 	}
 
+	// Story 5.4.1: 设置资源加载器，用于运行时单位切换（如僵尸切换到烧焦僵尸）
+	scene.reanimSystem.SetResourceLoader(rm)
+
 	// ✅ 修复：设置 ReanimSystem 引用，以便 RenderSystem 调用 GetRenderData()
 	scene.renderSystem.SetReanimSystem(scene.reanimSystem)
 
@@ -291,13 +294,14 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	)
 
 	// Initialize sun spawn system with lawn area parameters
+	// 使用配置常量确保阳光完整显示在屏幕内
 	scene.sunSpawnSystem = systems.NewSunSpawnSystem(
 		scene.entityManager,
 		rm,
-		250.0, // minX - 草坪左边界
-		900.0, // maxX - 草坪右边界
-		100.0, // minTargetY - 草坪上边界
-		550.0, // maxTargetY - 草坪下边界
+		config.SkyDropSunMinX,       // minX - 阳光中心最小 X 坐标
+		config.SkyDropSunMaxX,       // maxX - 阳光中心最大 X 坐标
+		config.SkyDropSunMinTargetY, // minTargetY - 阳光落地最小 Y 坐标
+		config.SkyDropSunMaxTargetY, // maxTargetY - 阳光落地最大 Y 坐标
 	)
 
 	// Story 8.2 QA改进：关卡加载后，加载草皮相关资源

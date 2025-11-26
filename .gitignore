@@ -1,11 +1,11 @@
 # BMAD (local only)
 .bmad-core/
 .bmad-*/
+/docs/prd
+/docs/architecture
 
 .claude/settings.local.json
 
-/docs/prd
-/docs/architecture
 
 /pvz-go
 /pvz
@@ -35,3 +35,6 @@ scenes.test
 verify_reward_animation
 verify_reward_card
 verify_reward_panel
+
+.windsurf
+.agent/workflows

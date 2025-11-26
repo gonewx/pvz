@@ -184,6 +184,12 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 		}
 	}
 
+	// Story 5.4.1: 处理爆炸烧焦死亡中的僵尸实体
+	explosionDyingZombieEntityList := s.queryExplosionDyingZombies()
+	for _, entityID := range explosionDyingZombieEntityList {
+		s.handleZombieDyingExplosionBehavior(entityID)
+	}
+
 	// 查询所有击中效果实体（拥有 BehaviorComponent 和 TimerComponent）
 	hitEffectEntityList := ecs.GetEntitiesWith2[
 		*components.BehaviorComponent,
@@ -300,6 +306,34 @@ func (s *BehaviorSystem) queryDyingZombies() []ecs.EntityID {
 	}
 
 	return dyingZombies
+}
+
+// queryExplosionDyingZombies 查询所有爆炸烧焦死亡中的僵尸实体
+//
+// 返回所有处于爆炸烧焦死亡状态的僵尸（BehaviorType == BehaviorZombieDyingExplosion）
+// Story 5.4.1: 实现爆炸类攻击（樱桃炸弹、土豆雷等）的专用烧焦死亡动画
+func (s *BehaviorSystem) queryExplosionDyingZombies() []ecs.EntityID {
+	// 查询所有拥有 BehaviorComponent, PositionComponent, ReanimComponent 的实体
+	candidates := ecs.GetEntitiesWith3[
+		*components.BehaviorComponent,
+		*components.PositionComponent,
+		*components.ReanimComponent,
+	](s.entityManager)
+
+	// 过滤出真正处于爆炸烧焦死亡状态的僵尸
+	var explosionDyingZombies []ecs.EntityID
+	for _, entityID := range candidates {
+		behaviorComp, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
+		if !ok {
+			continue
+		}
+
+		if behaviorComp.Type == components.BehaviorZombieDyingExplosion {
+			explosionDyingZombies = append(explosionDyingZombies, entityID)
+		}
+	}
+
+	return explosionDyingZombies
 }
 
 // queryProjectiles 查询所有豌豆子弹实体

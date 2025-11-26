@@ -791,5 +791,86 @@ func (s *BehaviorSystem) updateTriggerZombieMovement(entityID ecs.EntityID, delt
 	// 注意：不检测边界删除，由 ZombiesWonPhaseSystem 处理
 }
 
+// triggerZombieExplosionDeath 触发僵尸爆炸烧焦死亡动画
+//
+// 当僵尸被爆炸类攻击（樱桃炸弹、土豆雷、辣椒等）杀死时调用此方法
+// 切换为烧焦死亡行为，播放 Zombie_charred.reanim 动画
+//
+// 参数:
+//   - entityID: 僵尸实体ID
+//
+// 使用场景:
+//   - 樱桃炸弹爆炸杀死僵尸 (Story 5.4)
+//   - 土豆雷爆炸杀死僵尸（未来实现）
+//
+// 技术说明:
+//   - 使用 AnimationCommand 组件触发动画切换
+//   - ReanimSystem 的 PlayCombo 负责处理单位切换（Story 5.4.1 重构）
+//   - 不隐藏头部轨道（烧焦动画中僵尸整体烧焦，头不掉落）
+//   - 不触发粒子效果（爆炸效果已在爆炸时播放）
+//   - 参考实现: triggerZombieDeath() (普通死亡)
+func (s *BehaviorSystem) triggerZombieExplosionDeath(entityID ecs.EntityID) {
+	// 1. 切换行为类型为 BehaviorZombieDyingExplosion
+	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
+	if !ok {
+		log.Printf("[BehaviorSystem] 僵尸 %d 缺少 BehaviorComponent，无法触发爆炸死亡", entityID)
+		return
+	}
+	behavior.Type = components.BehaviorZombieDyingExplosion
+	log.Printf("[BehaviorSystem] 僵尸 %d 行为切换为 BehaviorZombieDyingExplosion", entityID)
+
+	// 2. 移除 VelocityComponent（停止移动）
+	ecs.RemoveComponent[*components.VelocityComponent](s.entityManager, entityID)
+	log.Printf("[BehaviorSystem] 僵尸 %d 移除速度组件，停止移动", entityID)
+
+	// 3. 使用 AnimationCommand 触发烧焦死亡动画
+	//    Story 5.4.1: ReanimSystem.PlayCombo 现在支持单位切换
+	//    当 UnitID 与当前 ReanimName 不同时，自动重新加载 Reanim 数据
+	ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
+		UnitID:    "zombie_charred", // 指向 zombie_charred 配置
+		ComboName: "death",          // 配置中的 death 组合
+		Processed: false,
+	})
+	log.Printf("[BehaviorSystem] 僵尸 %d 添加烧焦死亡动画命令 (zombie_charred/death)", entityID)
+
+	log.Printf("[BehaviorSystem] 僵尸 %d 烧焦死亡动画已开始播放 (zombie_charred/death, 不循环)", entityID)
+}
+
+// handleZombieDyingExplosionBehavior 处理僵尸爆炸烧焦死亡动画播放
+//
+// 当僵尸被爆炸类攻击杀死时，播放专用的烧焦黑化动画
+// 动画播放完成后删除僵尸实体并增加消灭计数
+//
+// 参数:
+//   - entityID: 僵尸实体ID
+//
+// 技术说明:
+//   - 烧焦动画为非循环动画，ReanimSystem 会自动推进帧
+//   - 当 reanim.IsFinished = true 时，动画完成
+//   - 必须在删除实体前增加计数，否则计数丢失
+//   - 参考实现: handleZombieDyingBehavior() (普通死亡)
+func (s *BehaviorSystem) handleZombieDyingExplosionBehavior(entityID ecs.EntityID) {
+	// 获取 ReanimComponent
+	reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !ok {
+		// 如果没有 ReanimComponent，直接删除僵尸
+		log.Printf("[BehaviorSystem] 爆炸死亡中的僵尸 %d 缺少 ReanimComponent，直接删除", entityID)
+		s.gameState.IncrementZombiesKilled()
+		s.entityManager.DestroyEntity(entityID)
+		return
+	}
+
+	// 检查烧焦死亡动画是否完成
+	if reanim.IsFinished {
+		log.Printf("[BehaviorSystem] 僵尸 %d 烧焦死亡动画完成，删除实体", entityID)
+
+		// 增加僵尸消灭计数
+		s.gameState.IncrementZombiesKilled()
+
+		// 删除僵尸实体
+		s.entityManager.DestroyEntity(entityID)
+	}
+}
+
 // handleCherryBombBehavior 处理樱桃炸弹的行为逻辑
 // 樱桃炸弹种植后开始引信倒计时（1.5秒），倒计时结束后触发爆炸

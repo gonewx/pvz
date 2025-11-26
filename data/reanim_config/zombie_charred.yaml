@@ -26,3 +26,13 @@ available_animations:
       display_name: blink
     - name: anim_crumble
       display_name: crumble
+
+# 动画组合配置：烧焦僵尸死亡动画
+# Story 5.4.1: 爆炸死亡烧焦动画
+animation_combos:
+    - name: death
+      display_name: 烧焦死亡
+      animations:
+          - anim_crumble  # 烧焦僵尸崩溃动画
+      loop: false
+      binding_strategy: auto

@@ -137,6 +137,9 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 		scene.reanimSystem.SetConfigManager(configManager)
 	}
 
+	// Story 5.4.1: 设置资源加载器，用于运行时单位切换
+	scene.reanimSystem.SetResourceLoader(rm)
+
 	scene.renderSystem = systems.NewRenderSystem(scene.entityManager)
 	// ✅ 修复：设置 ReanimSystem 引用，以便 RenderSystem 调用 GetRenderData()
 	scene.renderSystem.SetReanimSystem(scene.reanimSystem)

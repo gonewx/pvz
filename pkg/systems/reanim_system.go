@@ -12,15 +12,30 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
+// ReanimResourceLoader 定义 ReanimSystem 所需的资源加载接口
+// 用于运行时切换单位时加载新的 Reanim 数据
+//
+// 这个接口由 ResourceManager 实现，通过接口注入避免循环依赖
+// Story 5.4.1: 支持运行时单位切换（如僵尸切换到烧焦僵尸）
+type ReanimResourceLoader interface {
+	// GetReanimXML 获取指定单位的 ReanimXML 数据
+	GetReanimXML(unitName string) *reanim.ReanimXML
+	// GetReanimPartImages 获取指定单位的部件图片
+	GetReanimPartImages(unitName string) map[string]*ebiten.Image
+}
+
 // ReanimSystem 是 Reanim 动画系统
 // 基于 animation_showcase/AnimationCell 重写，简化并修复 遗留问题
 //
 // - API 数量从 50+ 减少到 2 个核心 API
 // - 代码行数从 2808 减少到 ~1000 行
 // - 与 AnimationCell 保持一致的逻辑
+//
+// Story 5.4.1: 支持运行时单位切换（如僵尸切换到烧焦僵尸）
 type ReanimSystem struct {
-	entityManager *ecs.EntityManager
-	configManager *config.ReanimConfigManager
+	entityManager  *ecs.EntityManager
+	configManager  *config.ReanimConfigManager
+	resourceLoader ReanimResourceLoader // Story 5.4.1: 用于运行时加载不同单位的 Reanim 数据
 
 	// 游戏 TPS（用于帧推进计算）
 	targetTPS float64
@@ -44,6 +59,16 @@ func NewReanimSystem(em *ecs.EntityManager) *ReanimSystem {
 // SetConfigManager 设置配置管理器
 func (s *ReanimSystem) SetConfigManager(cm *config.ReanimConfigManager) {
 	s.configManager = cm
+}
+
+// SetResourceLoader 设置资源加载器
+// Story 5.4.1: 用于运行时单位切换时加载新的 Reanim 数据
+//
+// 参数：
+//   - loader: 实现 ReanimResourceLoader 接口的资源管理器（通常是 ResourceManager）
+func (s *ReanimSystem) SetResourceLoader(loader ReanimResourceLoader) {
+	s.resourceLoader = loader
+	log.Printf("[ReanimSystem] 资源加载器已设置")
 }
 
 // SetTargetTPS 设置目标 TPS（用于帧推进计算）
@@ -301,6 +326,9 @@ func (s *ReanimSystem) finalizeAnimations(entityID ecs.EntityID) error {
 // PlayCombo 播放配置组合（推荐 API，应用所有配置）
 // 从配置管理器读取 combo 配置，应用所有设置（hidden_tracks, parent_tracks, binding）
 //
+// Story 5.4.1: 支持运行时单位切换（如僵尸切换到烧焦僵尸）
+// 当 unitID 与当前 ReanimName 不同时，自动重新加载 Reanim 数据
+//
 // 参数：
 //   - entityID: 实体 ID
 //   - unitID: 单位 ID（如 "peashooter", "sunflower"）
@@ -318,9 +346,58 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 		return fmt.Errorf("entity %d has no ReanimXML data", entityID)
 	}
 
+	// Story 5.4.1: 检测单位切换
+	// 当请求的 unitID 与当前 ReanimName 不同时，需要重新加载 Reanim 数据
+	// 注意：使用忽略大小写的比较，因为配置文件中的 ID 通常是小写，而 ReanimName 可能是原始大小写
+	unitSwitched := false
+	if comp.ReanimName != "" && !strings.EqualFold(comp.ReanimName, unitID) {
+		// 单位切换：需要从 ResourceLoader 加载新的 Reanim 数据
+		if s.resourceLoader == nil {
+			return fmt.Errorf("cannot switch unit from %s to %s: resourceLoader not set", comp.ReanimName, unitID)
+		}
+
+		// 获取单位配置以确定 Reanim 文件名
+		if s.configManager == nil {
+			return fmt.Errorf("cannot switch unit: configManager not set")
+		}
+		unitConfig, err := s.configManager.GetUnit(unitID)
+		if err != nil {
+			return fmt.Errorf("failed to get config for unit %s: %w", unitID, err)
+		}
+
+		// 从配置中提取 Reanim 文件名（去掉路径和扩展名）
+		// 例如 "data/reanim/Zombie_charred.reanim" -> "Zombie_charred"
+		reanimFileName := unitConfig.Name // 直接使用配置中的 Name 字段
+		if reanimFileName == "" {
+			// 回退：从 ReanimFile 路径提取
+			reanimFileName = strings.TrimSuffix(unitConfig.ReanimFile, ".reanim")
+			if idx := strings.LastIndex(reanimFileName, "/"); idx != -1 {
+				reanimFileName = reanimFileName[idx+1:]
+			}
+		}
+
+		// 加载新的 Reanim 数据
+		newReanimXML := s.resourceLoader.GetReanimXML(reanimFileName)
+		newPartImages := s.resourceLoader.GetReanimPartImages(reanimFileName)
+
+		if newReanimXML == nil || newPartImages == nil {
+			return fmt.Errorf("failed to load Reanim resources for unit %s (file: %s)", unitID, reanimFileName)
+		}
+
+		log.Printf("[ReanimSystem] PlayCombo: 单位切换 %s -> %s，重新加载 Reanim 数据 (file: %s)",
+			comp.ReanimName, unitID, reanimFileName)
+
+		// 替换 Reanim 数据
+		comp.ReanimXML = newReanimXML
+		comp.PartImages = newPartImages
+		comp.MergedTracks = nil // 清空，下面会重新构建
+		unitSwitched = true
+	}
+
 	// 原因：plant_card_factory 等调用者只设置 ReanimXML 和 PartImages
 	// 需要 PlayCombo 自动初始化 MergedTracks, VisualTracks 等字段
-	if comp.MergedTracks == nil {
+	// Story 5.4.1: 单位切换后也需要重新初始化
+	if comp.MergedTracks == nil || unitSwitched {
 		comp.ReanimName = unitID
 		comp.MergedTracks = reanim.BuildMergedTracks(comp.ReanimXML)
 		comp.VisualTracks, comp.LogicalTracks = s.analyzeTrackTypes(comp.ReanimXML)
@@ -328,6 +405,12 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 		// IsLooping 默认为 true，会在后面根据配置覆盖
 		comp.IsLooping = true
 		comp.LastRenderFrame = -1
+		// 清空旧的动画状态
+		comp.HiddenTracks = nil
+		comp.AnimationFrameIndices = nil
+		comp.AnimationFPSOverrides = nil
+		comp.AnimationSpeedOverrides = nil
+		comp.AnimationLoopStates = nil
 		log.Printf("[ReanimSystem] PlayCombo: 初始化实体 %d, ReanimName='%s', VisualTracks=%d, LogicalTracks=%d, FPS=%.1f",
 			entityID, comp.ReanimName, len(comp.VisualTracks), len(comp.LogicalTracks), comp.AnimationFPS)
 	}
