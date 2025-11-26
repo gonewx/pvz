@@ -80,10 +80,8 @@ func (s *GameScene) drawSoddingOverlay(screen *ebiten.Image, viewportX, viewport
 
 	// 选择叠加背景（优先使用完整背景，否则使用预渲染背景）
 	overlayBg := s.soddedBackground
-	usingPreSoddedImage := false
 	if overlayBg == nil {
 		overlayBg = s.preSoddedImage
-		usingPreSoddedImage = true
 	}
 
 	if overlayBg == nil {
@@ -97,14 +95,16 @@ func (s *GameScene) drawSoddingOverlay(screen *ebiten.Image, viewportX, viewport
 	// 计算可见宽度（从世界坐标 0 到草皮卷中心）
 	visibleWorldWidth := int(sodRollCenterX)
 
-	// 特殊处理：如果有预铺草皮（preSoddedLanes）且动画未启动，显示整个预渲染背景
-	// 这样可以在动画开始前显示预铺的草皮（如 1-2 关的第2/4行）
-	// Level 1-1: preSoddedLanes=[] → 动画前不显示叠加层
-	// Level 1-2: preSoddedLanes=[2,4] → 动画前显示预铺草皮
-	hasPreSoddedLanes := len(s.gameState.CurrentLevel.PreSoddedLanes) > 0
-	if usingPreSoddedImage && !s.soddingSystem.HasStarted() && hasPreSoddedLanes {
-		bgBounds := overlayBg.Bounds()
-		visibleWorldWidth = bgBounds.Dx()
+	// 重要修复：动画未启动时，不应显示叠加层
+	// 底层背景 (s.background) 已经预渲染了 preSoddedLanes 草皮
+	// 叠加层 (preSoddedImage) 包含所有启用行的草皮，应该在动画启动后才渐进显示
+	//
+	// Level 1-1: preSoddedLanes=[] → 动画前底层无草皮，动画开始后显示第3行
+	// Level 1-2: preSoddedLanes=[3] → 动画前底层已有第3行草皮，动画开始后显示2,4行
+	//
+	// 因此：动画未启动时，直接返回不显示叠加层（底层背景已包含预铺草皮）
+	if !s.soddingSystem.HasStarted() {
+		return
 	}
 
 	// 优化：动画接近完成时（≥99%），直接显示完整叠加层，避免切换时闪烁
