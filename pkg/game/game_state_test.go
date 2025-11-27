@@ -217,8 +217,8 @@ func TestLoadLevel(t *testing.T) {
 		ID:   "test-1",
 		Name: "Test Level",
 		Waves: []config.WaveConfig{
-			{MinDelay: 0, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
-			{MinDelay: 5, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 2, Count: 2}}},
+			{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
+			{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 2, Count: 2}}},
 		},
 	}
 
@@ -261,7 +261,7 @@ func TestUpdateLevelTime(t *testing.T) {
 	levelConfig := &config.LevelConfig{
 		ID:    "test-1",
 		Name:  "Test Level",
-		Waves: []config.WaveConfig{{MinDelay: 0, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}}},
+		Waves: []config.WaveConfig{{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}}},
 	}
 	gs.LoadLevel(levelConfig)
 
@@ -277,16 +277,18 @@ func TestUpdateLevelTime(t *testing.T) {
 	}
 }
 
-// TestGetCurrentWave 测试获取当前波次（新机制：上一波消灭后触发下一波）
+// TestGetCurrentWave 测试获取当前波次
+// Story 17.6: 波次计时由 WaveTimingSystem 管理
+// GetCurrentWave 简化为后备逻辑：场上无僵尸时立即触发下一波
 func TestGetCurrentWave(t *testing.T) {
 	gs := GetGameState()
 	levelConfig := &config.LevelConfig{
 		ID:   "test-1",
 		Name: "Test Level",
 		Waves: []config.WaveConfig{
-			{MinDelay: 0, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
-			{MinDelay: 5, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 2, Count: 2}}},
-			{MinDelay: 3, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 3, Count: 1}}},
+			{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
+			{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 2, Count: 2}}},
+			{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 3, Count: 1}}},
 		},
 	}
 	gs.LoadLevel(levelConfig)
@@ -310,45 +312,40 @@ func TestGetCurrentWave(t *testing.T) {
 	// 消灭第一波所有僵尸
 	gs.IncrementZombiesKilled()
 
-	// 刚消灭完，进入等待状态
-	wave = gs.GetCurrentWave()
-	if wave != -1 {
-		t.Errorf("Expected wave -1 (waiting for delay), got %d", wave)
-	}
-
-	// 等待时间不够（MinDelay=5秒，只过了3秒）
-	gs.UpdateLevelTime(3.0)
-	wave = gs.GetCurrentWave()
-	if wave != -1 {
-		t.Errorf("Expected wave -1 (delay not finished), got %d", wave)
-	}
-
-	// 等待时间足够（再过2秒，总共5秒）
-	gs.UpdateLevelTime(2.0)
+	// 场上无僵尸，立即触发第二波（无延迟）
 	wave = gs.GetCurrentWave()
 	if wave != 1 {
-		t.Errorf("Expected wave 1 after delay, got %d", wave)
+		t.Errorf("Expected wave 1 (no zombies on field), got %d", wave)
 	}
 
 	// 标记第二波已生成（2个僵尸）
 	gs.MarkWaveSpawned(1)
 	gs.IncrementZombiesSpawned(2)
 
+	// 场上有僵尸，不触发第三波
+	wave = gs.GetCurrentWave()
+	if wave != -1 {
+		t.Errorf("Expected wave -1 (zombies on field), got %d", wave)
+	}
+
 	// 消灭第二波所有僵尸
 	gs.IncrementZombiesKilled()
 	gs.IncrementZombiesKilled()
 
-	// 刚消灭完第二波，进入等待状态
-	wave = gs.GetCurrentWave()
-	if wave != -1 {
-		t.Errorf("Expected wave -1 (entering wait state), got %d", wave)
-	}
-
-	// 等待第三波（MinDelay=3秒）
-	gs.UpdateLevelTime(3.0)
+	// 场上无僵尸，立即触发第三波
 	wave = gs.GetCurrentWave()
 	if wave != 2 {
-		t.Errorf("Expected wave 2 after delay, got %d", wave)
+		t.Errorf("Expected wave 2 (no zombies on field), got %d", wave)
+	}
+
+	// 标记第三波已生成
+	gs.MarkWaveSpawned(2)
+	gs.IncrementZombiesSpawned(1)
+
+	// 所有波次已生成，返回 -1
+	wave = gs.GetCurrentWave()
+	if wave != -1 {
+		t.Errorf("Expected wave -1 (all waves spawned), got %d", wave)
 	}
 }
 
@@ -359,8 +356,8 @@ func TestMarkWaveSpawned(t *testing.T) {
 		ID:   "test-1",
 		Name: "Test Level",
 		Waves: []config.WaveConfig{
-			{MinDelay: 0, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
-			{MinDelay: 5, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 2, Count: 2}}},
+			{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
+			{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 2, Count: 2}}},
 		},
 	}
 	gs.LoadLevel(levelConfig)
@@ -391,8 +388,8 @@ func TestIsWaveSpawned(t *testing.T) {
 		ID:   "test-1",
 		Name: "Test Level",
 		Waves: []config.WaveConfig{
-			{MinDelay: 0, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
-			{MinDelay: 5, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 2, Count: 2}}},
+			{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
+			{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 2, Count: 2}}},
 		},
 	}
 	gs.LoadLevel(levelConfig)
@@ -429,7 +426,7 @@ func TestIncrementZombiesSpawned(t *testing.T) {
 	levelConfig := &config.LevelConfig{
 		ID:    "test-1",
 		Name:  "Test Level",
-		Waves: []config.WaveConfig{{MinDelay: 0, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}}},
+		Waves: []config.WaveConfig{{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}}},
 	}
 	gs.LoadLevel(levelConfig)
 
@@ -456,7 +453,7 @@ func TestIncrementZombiesKilled(t *testing.T) {
 	levelConfig := &config.LevelConfig{
 		ID:    "test-1",
 		Name:  "Test Level",
-		Waves: []config.WaveConfig{{MinDelay: 0, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}}},
+		Waves: []config.WaveConfig{{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}}},
 	}
 	gs.LoadLevel(levelConfig)
 
@@ -485,8 +482,8 @@ func TestCheckVictory(t *testing.T) {
 		ID:   "test-1",
 		Name: "Test Level",
 		Waves: []config.WaveConfig{
-			{MinDelay: 10, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 2}}},
-			{MinDelay: 30, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 2, Count: 3}}},
+			{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 2}}},
+			{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 2, Count: 3}}},
 		},
 	}
 	gs.LoadLevel(levelConfig)
@@ -530,7 +527,7 @@ func TestSetGameResult(t *testing.T) {
 	levelConfig := &config.LevelConfig{
 		ID:    "test-1",
 		Name:  "Test Level",
-		Waves: []config.WaveConfig{{MinDelay: 0, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}}},
+		Waves: []config.WaveConfig{{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}}},
 	}
 
 	t.Run("win result", func(t *testing.T) {
@@ -569,9 +566,9 @@ func TestGetLevelProgress(t *testing.T) {
 		ID:   "test-1",
 		Name: "Test Level",
 		Waves: []config.WaveConfig{
-			{MinDelay: 10, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
-			{MinDelay: 30, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 2, Count: 2}}},
-			{MinDelay: 50, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 3, Count: 1}}},
+			{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
+			{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 2, Count: 2}}},
+			{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 3, Count: 1}}},
 		},
 	}
 	gs.LoadLevel(levelConfig)
@@ -625,7 +622,7 @@ func TestLoadLevel_InitialSun(t *testing.T) {
 				ID:   "test-level",
 				Name: tc.name,
 				Waves: []config.WaveConfig{
-					{MinDelay: 10, OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
+					{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
 				},
 				InitialSun: tc.initialSun,
 			}

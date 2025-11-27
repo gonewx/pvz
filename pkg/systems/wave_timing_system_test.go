@@ -16,8 +16,6 @@ func createTestLevelConfig(waveCount int) *config.LevelConfig {
 	waves := make([]config.WaveConfig, waveCount)
 	for i := 0; i < waveCount; i++ {
 		waves[i] = config.WaveConfig{
-			Delay:    0,
-			MinDelay: 5.0,
 			Zombies: []config.ZombieGroup{
 				{Type: "basic", Count: 2, Lanes: []int{1, 2, 3}},
 			},
@@ -477,9 +475,7 @@ func createTestLevelConfigWithFlagWave(waveCount int, flagWaveIndex int) *config
 	waves := make([]config.WaveConfig, waveCount)
 	for i := 0; i < waveCount; i++ {
 		waves[i] = config.WaveConfig{
-			Delay:    0,
-			MinDelay: 5.0,
-			IsFlag:   i == flagWaveIndex, // 标记旗帜波
+			IsFlag: i == flagWaveIndex, // 标记旗帜波
 			Zombies: []config.ZombieGroup{
 				{Type: "basic", Count: 2, Lanes: []int{1, 2, 3}},
 			},

@@ -17,14 +17,12 @@ func TestLoadLevelConfig(t *testing.T) {
 name: "Test Level"
 description: "A test level"
 waves:
-  - minDelay: 0
-    zombies:
+  - zombies:
       - type: basic
         lanes: [3]
         count: 1
         spawnInterval: 2.0
-  - minDelay: 5
-    zombies:
+  - zombies:
       - type: basic
         lanes: [1]
         count: 2
@@ -62,9 +60,6 @@ waves:
 
 		// 验证第一波
 		wave1 := config.Waves[0]
-		if wave1.MinDelay != 0 {
-			t.Errorf("Wave 1: Expected minDelay 0, got %f", wave1.MinDelay)
-		}
 		if len(wave1.Zombies) != 1 {
 			t.Fatalf("Wave 1: Expected 1 zombie spawn, got %d", len(wave1.Zombies))
 		}
@@ -80,9 +75,6 @@ waves:
 
 		// 验证第二波
 		wave2 := config.Waves[1]
-		if wave2.MinDelay != 5 {
-			t.Errorf("Wave 2: Expected minDelay 5, got %f", wave2.MinDelay)
-		}
 		if len(wave2.Zombies) != 2 {
 			t.Fatalf("Wave 2: Expected 2 zombie spawns, got %d", len(wave2.Zombies))
 		}
@@ -120,7 +112,7 @@ func TestLevelConfigValidation(t *testing.T) {
 		config := &LevelConfig{
 			Name: "Test Level",
 			Waves: []WaveConfig{
-				{MinDelay: 10, OldZombies: []ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
+				{OldZombies: []ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
 			},
 		}
 		err := validateLevelConfig(config)
@@ -133,7 +125,7 @@ func TestLevelConfigValidation(t *testing.T) {
 		config := &LevelConfig{
 			ID: "1-1",
 			Waves: []WaveConfig{
-				{MinDelay: 10, OldZombies: []ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
+				{OldZombies: []ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
 			},
 		}
 		err := validateLevelConfig(config)
@@ -154,26 +146,12 @@ func TestLevelConfigValidation(t *testing.T) {
 		}
 	})
 
-	t.Run("negative wave time", func(t *testing.T) {
-		config := &LevelConfig{
-			ID:   "1-1",
-			Name: "Test Level",
-			Waves: []WaveConfig{
-				{MinDelay: -5, OldZombies: []ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
-			},
-		}
-		err := validateLevelConfig(config)
-		if err == nil {
-			t.Error("Expected error for negative wave time, got nil")
-		}
-	})
-
 	t.Run("wave with no zombies", func(t *testing.T) {
 		config := &LevelConfig{
 			ID:   "1-1",
 			Name: "Test Level",
 			Waves: []WaveConfig{
-				{MinDelay: 10, OldZombies: []ZombieSpawn{}},
+				{OldZombies: []ZombieSpawn{}},
 			},
 		}
 		err := validateLevelConfig(config)
@@ -187,7 +165,7 @@ func TestLevelConfigValidation(t *testing.T) {
 			ID:   "1-1",
 			Name: "Test Level",
 			Waves: []WaveConfig{
-				{MinDelay: 10, OldZombies: []ZombieSpawn{{Type: "", Lane: 1, Count: 1}}},
+				{OldZombies: []ZombieSpawn{{Type: "", Lane: 1, Count: 1}}},
 			},
 		}
 		err := validateLevelConfig(config)
@@ -210,7 +188,7 @@ func TestLevelConfigValidation(t *testing.T) {
 				ID:   "1-1",
 				Name: "Test Level",
 				Waves: []WaveConfig{
-					{MinDelay: 10, OldZombies: []ZombieSpawn{{Type: "basic", Lane: tc.lane, Count: 1}}},
+					{OldZombies: []ZombieSpawn{{Type: "basic", Lane: tc.lane, Count: 1}}},
 				},
 			}
 			err := validateLevelConfig(config)
@@ -225,7 +203,7 @@ func TestLevelConfigValidation(t *testing.T) {
 			ID:   "1-1",
 			Name: "Test Level",
 			Waves: []WaveConfig{
-				{MinDelay: 10, OldZombies: []ZombieSpawn{{Type: "basic", Lane: 1, Count: 0}}},
+				{OldZombies: []ZombieSpawn{{Type: "basic", Lane: 1, Count: 0}}},
 			},
 		}
 		err := validateLevelConfig(config)
@@ -239,8 +217,8 @@ func TestLevelConfigValidation(t *testing.T) {
 			ID:   "1-1",
 			Name: "Test Level",
 			Waves: []WaveConfig{
-				{MinDelay: 10, OldZombies: []ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
-				{MinDelay: 30, OldZombies: []ZombieSpawn{{Type: "conehead", Lane: 3, Count: 2}}},
+				{OldZombies: []ZombieSpawn{{Type: "basic", Lane: 1, Count: 1}}},
+				{OldZombies: []ZombieSpawn{{Type: "conehead", Lane: 3, Count: 2}}},
 			},
 		}
 		err := validateLevelConfig(config)
@@ -262,8 +240,7 @@ availablePlants: ["peashooter", "sunflower"]
 skipOpening: true
 specialRules: "bowling"
 waves:
-  - time: 10
-    zombies:
+  - zombies:
       - type: basic
         lanes: [2]
         count: 1
@@ -332,8 +309,7 @@ func TestLoadLevelConfig_Defaults(t *testing.T) {
 	yamlContent := `id: "old-1"
 name: "Old Level"
 waves:
-  - time: 10
-    zombies:
+  - zombies:
       - type: basic
         lanes: [3]
         count: 1
@@ -408,7 +384,6 @@ func TestValidateLevelConfig_InvalidEnabledLanes(t *testing.T) {
 				EnabledLanes: tt.enabledLanes,
 				Waves: []WaveConfig{
 					{
-						MinDelay: 10,
 						OldZombies: []ZombieSpawn{
 							{Type: "basic", Lane: 2, Count: 1},
 						},
@@ -450,7 +425,6 @@ func TestValidateLevelConfig_InvalidOpeningType(t *testing.T) {
 				OpeningType: tt.openingType,
 				Waves: []WaveConfig{
 					{
-						MinDelay: 10,
 						OldZombies: []ZombieSpawn{
 							{Type: "basic", Lane: 2, Count: 1},
 						},
@@ -491,7 +465,6 @@ func TestValidateLevelConfig_InvalidSpecialRules(t *testing.T) {
 				SpecialRules: tt.specialRules,
 				Waves: []WaveConfig{
 					{
-						MinDelay: 10,
 						OldZombies: []ZombieSpawn{
 							{Type: "basic", Lane: 2, Count: 1},
 						},
@@ -520,14 +493,12 @@ func TestLoadLevelConfig_BackwardCompatibility(t *testing.T) {
 name: "前院白天 1-1"
 description: "教学关卡"
 waves:
-  - time: 10
-    zombies:
+  - zombies:
       - type: basic
         lanes: [3]
         count: 1
         spawnInterval: 2.0
-  - time: 30
-    zombies:
+  - zombies:
       - type: basic
         lanes: [2]
         count: 2
@@ -577,8 +548,7 @@ tutorialSteps:
     textKey: "TUTORIAL_PLANT_PEASHOOTER"
     action: "waitForPlantPlaced"
 waves:
-  - time: 10
-    zombies:
+  - zombies:
       - type: basic
         lanes: [3]
         count: 1
@@ -633,7 +603,6 @@ rowMax: 6
 waves:
   - waveNum: 1
     type: "Fixed"
-    delay: 5
     extraPoints: 0
     laneRestriction: [1, 2, 3]
     zombies:
@@ -643,7 +612,6 @@ waves:
         spawnInterval: 1.5
   - waveNum: 2
     type: "ExtraPoints"
-    delay: 10
     extraPoints: 100
     zombies:
       - type: conehead
@@ -651,7 +619,6 @@ waves:
         count: 3
   - waveNum: 3
     type: "Final"
-    delay: 15
     isFlag: true
     flagIndex: 1
     zombies:
@@ -734,13 +701,11 @@ func TestLoadLevelConfig_NewFormatDefaults(t *testing.T) {
 	yamlContent := `id: "test-defaults"
 name: "Test Defaults"
 waves:
-  - delay: 5
-    zombies:
+  - zombies:
       - type: basic
         lanes: [3]
         count: 1
-  - delay: 10
-    isFlag: true
+  - isFlag: true
     flagIndex: 1
     zombies:
       - type: basic
@@ -803,7 +768,6 @@ func TestValidateLevelConfig_InvalidSceneType(t *testing.T) {
 		SceneType: "invalid_scene",
 		Waves: []WaveConfig{
 			{
-				Delay: 10,
 				Zombies: []ZombieGroup{
 					{Type: "basic", Lanes: []int{3}, Count: 1},
 				},
@@ -844,7 +808,6 @@ func TestValidateLevelConfig_InvalidRowMax(t *testing.T) {
 				RowMax: tt.rowMax,
 				Waves: []WaveConfig{
 					{
-						Delay: 10,
 						Zombies: []ZombieGroup{
 							{Type: "basic", Lanes: []int{3}, Count: 1},
 						},
@@ -886,8 +849,7 @@ func TestValidateLevelConfig_InvalidWaveType(t *testing.T) {
 				Name: "Test",
 				Waves: []WaveConfig{
 					{
-						Type:  tt.waveType,
-						Delay: 10,
+						Type: tt.waveType,
 						Zombies: []ZombieGroup{
 							{Type: "basic", Lanes: []int{3}, Count: 1},
 						},
@@ -932,7 +894,6 @@ func TestValidateLevelConfig_ExtraPointsValidation(t *testing.T) {
 					{
 						Type:        tt.waveType,
 						ExtraPoints: tt.extraPoints,
-						Delay:       10,
 						Zombies: []ZombieGroup{
 							{Type: "basic", Lanes: []int{3}, Count: 1},
 						},
@@ -976,7 +937,6 @@ func TestValidateLevelConfig_LaneRestriction(t *testing.T) {
 				RowMax: tt.rowMax,
 				Waves: []WaveConfig{
 					{
-						Delay:           10,
 						LaneRestriction: tt.laneRestriction,
 						Zombies: []ZombieGroup{
 							{Type: "basic", Lanes: []int{1}, Count: 1},
@@ -1079,7 +1039,6 @@ func TestValidateLevelConfig_NegativeFlags(t *testing.T) {
 		Flags: -1,
 		Waves: []WaveConfig{
 			{
-				Delay: 10,
 				Zombies: []ZombieGroup{
 					{Type: "basic", Lanes: []int{3}, Count: 1},
 				},
@@ -1103,7 +1062,6 @@ func TestValidateLevelConfig_NegativeExtraPoints(t *testing.T) {
 			{
 				Type:        "ExtraPoints",
 				ExtraPoints: -10,
-				Delay:       10,
 				Zombies: []ZombieGroup{
 					{Type: "basic", Lanes: []int{3}, Count: 1},
 				},
@@ -1140,7 +1098,6 @@ func TestValidateLevelConfig_ZombieLanesWithRowMax6(t *testing.T) {
 				RowMax: tt.rowMax,
 				Waves: []WaveConfig{
 					{
-						Delay: 10,
 						Zombies: []ZombieGroup{
 							{Type: "basic", Lanes: tt.lanes, Count: 1},
 						},
@@ -1190,7 +1147,6 @@ func TestValidateLevelConfig_ValidSceneTypes(t *testing.T) {
 				SceneType: sceneType,
 				Waves: []WaveConfig{
 					{
-						Delay: 10,
 						Zombies: []ZombieGroup{
 							{Type: "basic", Lanes: []int{3}, Count: 1},
 						},
@@ -1216,7 +1172,6 @@ func TestValidateLevelConfig_WaveNumEdgeCases(t *testing.T) {
 		Waves: []WaveConfig{
 			{
 				WaveNum: 0, // 0 will be auto-corrected to 1
-				Delay:   10,
 				Zombies: []ZombieGroup{
 					{Type: "basic", Lanes: []int{3}, Count: 1},
 				},
@@ -1244,7 +1199,6 @@ func TestValidateLevelConfig_ZeroFlags(t *testing.T) {
 		Flags: 0, // 0 是有效的 (无旗帜关卡)
 		Waves: []WaveConfig{
 			{
-				Delay: 10,
 				Zombies: []ZombieGroup{
 					{Type: "basic", Lanes: []int{3}, Count: 1},
 				},
@@ -1266,7 +1220,6 @@ func TestValidateLevelConfig_LaneRestrictionEmpty(t *testing.T) {
 		Name: "Test",
 		Waves: []WaveConfig{
 			{
-				Delay:           10,
 				LaneRestriction: []int{}, // 空数组是有效的
 				Zombies: []ZombieGroup{
 					{Type: "basic", Lanes: []int{3}, Count: 1},
@@ -1298,7 +1251,6 @@ func TestApplyDefaults_EmptySceneType(t *testing.T) {
 		SceneType: "", // 应该被设置为 "day"
 		Waves: []WaveConfig{
 			{
-				Delay: 10,
 				Zombies: []ZombieGroup{
 					{Type: "basic", Lanes: []int{3}, Count: 1},
 				},
@@ -1321,7 +1273,6 @@ func TestApplyDefaults_ZeroRowMax(t *testing.T) {
 		RowMax: 0, // 应该被设置为 5
 		Waves: []WaveConfig{
 			{
-				Delay: 10,
 				Zombies: []ZombieGroup{
 					{Type: "basic", Lanes: []int{3}, Count: 1},
 				},

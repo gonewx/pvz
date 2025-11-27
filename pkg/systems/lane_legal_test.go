@@ -125,7 +125,7 @@ func TestFilterLegalLanes_WaterRestrictions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := FilterLegalLanes(laneStates, tt.zombieType, tt.sceneType, spawnRules, []int{1, 2, 3, 4, 5})
+			result := FilterLegalLanes(laneStates, tt.zombieType, tt.sceneType, spawnRules, []int{1, 2, 3, 4, 5}, nil)
 			if len(result) != len(tt.expected) {
 				t.Errorf("Expected length %d, got %d", len(tt.expected), len(result))
 			}
@@ -171,7 +171,7 @@ func TestFilterLegalLanes_DancingRestrictions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := FilterLegalLanes(laneStates, "dancing", tt.sceneType, spawnRules, tt.enabledLanes)
+			result := FilterLegalLanes(laneStates, "dancing", tt.sceneType, spawnRules, tt.enabledLanes, nil)
 			if len(result) != len(tt.expected) {
 				t.Errorf("Expected length %d, got %d", len(tt.expected), len(result))
 			}
@@ -204,7 +204,7 @@ func TestFilterLegalLanes_Scene6thRow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := FilterLegalLanes(laneStates, "basic", tt.sceneType, nil, []int{5, 6})
+			result := FilterLegalLanes(laneStates, "basic", tt.sceneType, nil, []int{5, 6}, nil)
 			if len(result) != len(tt.expected) {
 				t.Errorf("Expected length %d, got %d", len(tt.expected), len(result))
 			}

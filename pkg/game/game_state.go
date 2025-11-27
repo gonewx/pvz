@@ -181,8 +181,13 @@ func (gs *GameState) LoadLevel(levelConfig *config.LevelConfig) {
 	// 用于胜利条件判断：必须消灭配置中的所有僵尸才算胜利
 	totalZombies := 0
 	for _, wave := range levelConfig.Waves {
+		// 新格式：使用 Zombies 字段
 		for _, zombieGroup := range wave.Zombies {
 			totalZombies += zombieGroup.Count
+		}
+		// 旧格式：使用 OldZombies 字段（向后兼容）
+		for _, zombieSpawn := range wave.OldZombies {
+			totalZombies += zombieSpawn.Count
 		}
 	}
 	gs.TotalZombiesInLevel = totalZombies // 关卡配置中的总僵尸数（固定不变）
@@ -205,12 +210,16 @@ func (gs *GameState) UpdateLevelTime(deltaTime float64) {
 }
 
 // GetCurrentWave 获取当前应该生成的波次索引
-// 原版机制：上一波僵尸全部消灭后，等待 MinDelay 秒后触发下一波
-// 返回 -1 表示没有波次需要生成（延迟中或全部生成完毕）
+// Story 17.6: 波次计时由 WaveTimingSystem 自动管理
+// 返回 -1 表示没有波次需要生成（等待中或全部生成完毕）
 func (gs *GameState) GetCurrentWave() int {
 	if gs.CurrentLevel == nil {
 		return -1
 	}
+
+	// Story 17.6: 波次计时由 WaveTimingSystem 管理
+	// 此方法仅作为后备逻辑，当 WaveTimingSystem 未启用时使用
+	// 简化逻辑：场上无僵尸且有未生成的波次时，立即触发下一波
 
 	// 获取当前场上的僵尸数量（已生成 - 已消灭）
 	zombiesOnField := gs.TotalZombiesSpawned - gs.ZombiesKilled
@@ -221,44 +230,18 @@ func (gs *GameState) GetCurrentWave() int {
 			gs.CurrentWaveIndex, zombiesOnField, gs.IsWaitingForNextWave)
 	}
 
-	// 第一波：检查 delay 参数
+	// 第一波：立即触发
 	if gs.CurrentWaveIndex == 0 && !gs.SpawnedWaves[0] {
-		waveConfig := gs.CurrentLevel.Waves[0]
-		// 如果配置了 delay，等待指定时间后触发
-		if waveConfig.Delay > 0 {
-			if gs.LevelTime >= waveConfig.Delay {
-				log.Printf("[GetCurrentWave] ✅ 第一波触发 (delay=%.1fs, levelTime=%.1fs)", waveConfig.Delay, gs.LevelTime)
-				return 0
-			}
-			// 还未到延迟时间，继续等待
-			return -1
-		}
-		// 无 delay 配置，立即触发
-		log.Printf("[GetCurrentWave] ✅ 第一波立即触发 (无delay配置)")
+		log.Printf("[GetCurrentWave] ✅ 第一波立即触发")
 		return 0
 	}
 
-	// 后续波次：上一波消灭完毕后，等待 MinDelay 秒
+	// 后续波次：场上无僵尸时触发下一波
 	if zombiesOnField == 0 && gs.CurrentWaveIndex < len(gs.CurrentLevel.Waves) {
-		// 检查是否已经标记为等待状态
-		if !gs.IsWaitingForNextWave {
-			// 第一次检测到场上无僵尸，开始等待
-			gs.IsWaitingForNextWave = true
-			gs.LastWaveCompletedTime = gs.LevelTime
-			return -1 // 进入延迟等待
-		}
-
-		// 检查延迟时间是否已过
 		currentWaveIndex := gs.CurrentWaveIndex
 		if currentWaveIndex < len(gs.CurrentLevel.Waves) && !gs.SpawnedWaves[currentWaveIndex] {
-			waveConfig := gs.CurrentLevel.Waves[currentWaveIndex]
-			elapsedSinceCompletion := gs.LevelTime - gs.LastWaveCompletedTime
-
-			if elapsedSinceCompletion >= waveConfig.MinDelay {
-				// 延迟已过，触发下一波
-				gs.IsWaitingForNextWave = false
-				return currentWaveIndex
-			}
+			log.Printf("[GetCurrentWave] ✅ 波次 %d 触发（场上无僵尸）", currentWaveIndex+1)
+			return currentWaveIndex
 		}
 	}
 

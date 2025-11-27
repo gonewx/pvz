@@ -156,100 +156,82 @@ func TestCalculateFlagPositions(t *testing.T) {
 // ========================================
 
 // TestIsFinalWaveApproaching 测试最后一波检测逻辑
+// Story 17.6: 当 WaveTimingSystem 启用时（默认行为），isFinalWaveApproaching 返回 false
+// 警告由 FlagWaveWarningSystem 处理，此测试验证 WaveTimingSystem 禁用时的后备逻辑
 func TestIsFinalWaveApproaching(t *testing.T) {
 	tests := []struct {
 		name                  string
 		currentWaveIndex      int
-		levelTime             float64
-		lastWaveCompletedTime float64
 		isWaitingForNextWave  bool
 		waves                 []config.WaveConfig
-		finalWaveLeadTime     float64
+		spawnedWaves          []bool
+		useWaveTimingSystem   bool
 		expected              bool
 	}{
 		{
-			name:                  "最后一波前 2 秒（应触发）",
-			currentWaveIndex:      2,
-			levelTime:             53.0, // 上一波完成于 50 秒
-			lastWaveCompletedTime: 50.0,
-			isWaitingForNextWave:  true,
+			name:                 "WaveTimingSystem 启用时返回 false",
+			currentWaveIndex:     2,
+			isWaitingForNextWave: true,
 			waves: []config.WaveConfig{
-				{MinDelay: 0},   // 第一波
-				{MinDelay: 0},   // 第二波
-				{MinDelay: 5.0}, // 第三波（最后一波），需要等待 5 秒
+				{Zombies: []config.ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+				{Zombies: []config.ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+				{Zombies: []config.ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
 			},
-			finalWaveLeadTime: 3.0,
-			expected:          true, // 已等待 3 秒，还剩 2 秒，应触发
+			spawnedWaves:        []bool{true, true, false},
+			useWaveTimingSystem: true,
+			expected:            false, // WaveTimingSystem 启用时，由 FlagWaveWarningSystem 处理
 		},
 		{
-			name:                  "最后一波前 5 秒（不触发）",
-			currentWaveIndex:      2,
-			levelTime:             50.0, // 上一波刚完成
-			lastWaveCompletedTime: 50.0,
-			isWaitingForNextWave:  true,
+			name:                 "WaveTimingSystem 禁用时，等待最后一波应触发",
+			currentWaveIndex:     2,
+			isWaitingForNextWave: true,
 			waves: []config.WaveConfig{
-				{MinDelay: 0},
-				{MinDelay: 0},
-				{MinDelay: 5.0}, // 最后一波
+				{Zombies: []config.ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+				{Zombies: []config.ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+				{Zombies: []config.ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
 			},
-			finalWaveLeadTime: 3.0,
-			expected:          false, // 还剩 5 秒，不应触发
+			spawnedWaves:        []bool{true, true, false},
+			useWaveTimingSystem: false,
+			expected:            true, // 等待最后一波
 		},
 		{
-			name:                  "不是最后一波（不触发）",
-			currentWaveIndex:      0,
-			levelTime:             3.0,
-			lastWaveCompletedTime: 0.0,
-			isWaitingForNextWave:  true,
+			name:                 "WaveTimingSystem 禁用时，不是最后一波不触发",
+			currentWaveIndex:     0,
+			isWaitingForNextWave: true,
 			waves: []config.WaveConfig{
-				{MinDelay: 0},
-				{MinDelay: 5.0},
-				{MinDelay: 5.0},
+				{Zombies: []config.ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+				{Zombies: []config.ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+				{Zombies: []config.ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
 			},
-			finalWaveLeadTime: 3.0,
-			expected:          false, // 不是最后一波
+			spawnedWaves:        []bool{false, false, false},
+			useWaveTimingSystem: false,
+			expected:            false, // 不是最后一波
 		},
 		{
-			name:                  "未进入等待状态（不触发）",
-			currentWaveIndex:      2,
-			levelTime:             53.0,
-			lastWaveCompletedTime: 50.0,
-			isWaitingForNextWave:  false, // 上一波还有僵尸
+			name:                 "WaveTimingSystem 禁用时，未进入等待状态不触发",
+			currentWaveIndex:     2,
+			isWaitingForNextWave: false, // 上一波还有僵尸
 			waves: []config.WaveConfig{
-				{MinDelay: 0},
-				{MinDelay: 0},
-				{MinDelay: 5.0},
+				{Zombies: []config.ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+				{Zombies: []config.ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+				{Zombies: []config.ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
 			},
-			finalWaveLeadTime: 3.0,
-			expected:          false, // 未进入等待状态
+			spawnedWaves:        []bool{true, true, false},
+			useWaveTimingSystem: false,
+			expected:            false, // 未进入等待状态
 		},
 		{
-			name:                  "恰好剩余 3 秒（边界，应触发）",
-			currentWaveIndex:      2,
-			levelTime:             52.0,
-			lastWaveCompletedTime: 50.0,
-			isWaitingForNextWave:  true,
+			name:                 "WaveTimingSystem 禁用时，最后一波已激活不触发",
+			currentWaveIndex:     2,
+			isWaitingForNextWave: true,
 			waves: []config.WaveConfig{
-				{MinDelay: 0},
-				{MinDelay: 0},
-				{MinDelay: 5.0},
+				{Zombies: []config.ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+				{Zombies: []config.ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+				{Zombies: []config.ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
 			},
-			finalWaveLeadTime: 3.0,
-			expected:          true, // 恰好 3 秒，应触发
-		},
-		{
-			name:                  "时间已过（不触发）",
-			currentWaveIndex:      2,
-			levelTime:             56.0, // 已超过触发时间
-			lastWaveCompletedTime: 50.0,
-			isWaitingForNextWave:  true,
-			waves: []config.WaveConfig{
-				{MinDelay: 0},
-				{MinDelay: 0},
-				{MinDelay: 5.0},
-			},
-			finalWaveLeadTime: 3.0,
-			expected:          false, // 时间已过（> 0），不应触发
+			spawnedWaves:        []bool{true, true, true}, // 最后一波已激活
+			useWaveTimingSystem: false,
+			expected:            false, // 最后一波已激活
 		},
 	}
 
@@ -257,10 +239,9 @@ func TestIsFinalWaveApproaching(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// 创建 GameState
 			gs := &game.GameState{
-				CurrentWaveIndex:      tt.currentWaveIndex,
-				LevelTime:             tt.levelTime,
-				LastWaveCompletedTime: tt.lastWaveCompletedTime,
-				IsWaitingForNextWave:  tt.isWaitingForNextWave,
+				CurrentWaveIndex:     tt.currentWaveIndex,
+				IsWaitingForNextWave: tt.isWaitingForNextWave,
+				SpawnedWaves:         tt.spawnedWaves,
 				CurrentLevel: &config.LevelConfig{
 					Waves: tt.waves,
 				},
@@ -269,7 +250,8 @@ func TestIsFinalWaveApproaching(t *testing.T) {
 			// 创建 LevelSystem
 			ls := &LevelSystem{
 				gameState:                gs,
-				finalWaveWarningLeadTime: tt.finalWaveLeadTime,
+				finalWaveWarningLeadTime: 3.0,
+				useWaveTimingSystem:      tt.useWaveTimingSystem,
 			}
 
 			// 测试
@@ -277,28 +259,27 @@ func TestIsFinalWaveApproaching(t *testing.T) {
 			if actual != tt.expected {
 				t.Errorf("isFinalWaveApproaching() = %v, expected %v", actual, tt.expected)
 				t.Logf("  CurrentWaveIndex: %d", tt.currentWaveIndex)
-				t.Logf("  LevelTime: %.1f", tt.levelTime)
-				t.Logf("  LastWaveCompletedTime: %.1f", tt.lastWaveCompletedTime)
 				t.Logf("  IsWaitingForNextWave: %v", tt.isWaitingForNextWave)
-				t.Logf("  MinDelay: %.1f", tt.waves[tt.currentWaveIndex].MinDelay)
+				t.Logf("  useWaveTimingSystem: %v", tt.useWaveTimingSystem)
 			}
 		})
 	}
 }
 
 // TestCheckFinalWaveWarningTriggerOnce 测试只触发一次
+// Story 17.6: WaveTimingSystem 启用时，警告由 FlagWaveWarningSystem 处理
+// 此测试验证 WaveTimingSystem 禁用时的后备逻辑
 func TestCheckFinalWaveWarningTriggerOnce(t *testing.T) {
 	// 创建 GameState
 	gs := &game.GameState{
-		CurrentWaveIndex:      2,
-		LevelTime:             53.0, // 恰好满足触发条件
-		LastWaveCompletedTime: 50.0,
-		IsWaitingForNextWave:  true,
+		CurrentWaveIndex:     2,
+		IsWaitingForNextWave: true,
+		SpawnedWaves:         []bool{true, true, false}, // 最后一波未激活
 		CurrentLevel: &config.LevelConfig{
 			Waves: []config.WaveConfig{
-				{MinDelay: 0},
-				{MinDelay: 0},
-				{MinDelay: 5.0}, // 最后一波
+				{Zombies: []config.ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+				{Zombies: []config.ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+				{Zombies: []config.ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
 			},
 		},
 	}
@@ -315,7 +296,7 @@ func TestCheckFinalWaveWarningTriggerOnce(t *testing.T) {
 		resourceManager:           rm,
 		finalWaveWarningTriggered: false,
 		finalWaveWarningLeadTime:  3.0,
-		// Story 14.3: Epic 14 - Removed reanimSystem dependency
+		useWaveTimingSystem:       false, // 禁用 WaveTimingSystem 以测试后备逻辑
 	}
 
 	// 第一次检查：应触发

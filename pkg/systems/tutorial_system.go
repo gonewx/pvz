@@ -886,28 +886,23 @@ func (s *TutorialSystem) manageWaveSpawning(dt float64) {
 		!s.gameState.IsWaveSpawned(currentWaveIndex) &&
 		s.lastWaveKilled {
 
-		// 获取波次配置
-		waveConfig := s.gameState.CurrentLevel.Waves[currentWaveIndex]
-
-		// 检查延迟时间是否已过
-		if s.waveDelayTimer >= waveConfig.MinDelay {
-			// 显示"最后一波"提示（在最后一波前）
-			if currentWaveIndex == len(s.gameState.CurrentLevel.Waves)-1 {
-				s.showFinalWaveWarning()
-			}
-
-			log.Printf("[TutorialSystem] Activating wave %d after %.1f seconds delay", currentWaveIndex+1, s.waveDelayTimer)
-			activatedCount := s.waveSpawnSystem.ActivateWave(currentWaveIndex)
-			log.Printf("[TutorialSystem] Spawned wave %d (%d zombies activated)", currentWaveIndex+1, activatedCount)
-
-			// 标记波次已生成
-			s.gameState.MarkWaveSpawned(currentWaveIndex)
-			// s.gameState.IncrementZombiesSpawned(activatedCount) // BUG: 导致僵尸计数重复增加
-
-			// 重置延迟计时器和标志
-			s.waveDelayTimer = 0
-			s.lastWaveKilled = false
+		// Story 17.6: 简化逻辑，立即触发下一波（由 WaveTimingSystem 管理延迟）
+		// 显示"最后一波"提示（在最后一波前）
+		if currentWaveIndex == len(s.gameState.CurrentLevel.Waves)-1 {
+			s.showFinalWaveWarning()
 		}
+
+		log.Printf("[TutorialSystem] Activating wave %d after %.1f seconds delay", currentWaveIndex+1, s.waveDelayTimer)
+		activatedCount := s.waveSpawnSystem.ActivateWave(currentWaveIndex)
+		log.Printf("[TutorialSystem] Spawned wave %d (%d zombies activated)", currentWaveIndex+1, activatedCount)
+
+		// 标记波次已生成
+		s.gameState.MarkWaveSpawned(currentWaveIndex)
+		// s.gameState.IncrementZombiesSpawned(activatedCount) // BUG: 导致僵尸计数重复增加
+
+		// 重置延迟计时器和标志
+		s.waveDelayTimer = 0
+		s.lastWaveKilled = false
 	}
 }
 

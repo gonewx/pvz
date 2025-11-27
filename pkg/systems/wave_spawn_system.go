@@ -197,11 +197,13 @@ func (s *WaveSpawnSystem) PreSpawnAllWaves() int {
 				// 为组内每个僵尸预选一个随机行（从 lanes 列表中选择）
 				for i := 0; i < zombieGroup.Count; i++ {
 					// Story 17.5: 使用 LaneAllocator 选择行（带合法行判定）
+					// Story 17.2: 传入 laneRestriction 波次级行限制
 					selectedLane := s.laneAllocator.SelectLane(
 						zombieGroup.Type,
 						s.levelConfig.SceneType,
 						s.spawnRules,
 						s.levelConfig.EnabledLanes,
+						waveConfig.LaneRestriction,
 					)
 					s.laneAllocator.UpdateLaneCounters(selectedLane)
 

@@ -55,6 +55,7 @@ func (la *LaneAllocator) InitializeLanes(rowMax int, initialWeight float64) {
 //   - sceneType: 场景类型（用于合法行判定）
 //   - spawnRules: 僵尸生成规则配置
 //   - enabledLanes: 关卡启用的行列表（草地行）
+//   - laneRestriction: 波次级行限制（可选，为空则不限制）
 //
 // 返回:
 //   - 选中的行号（1-6）
@@ -63,6 +64,7 @@ func (la *LaneAllocator) SelectLane(
 	sceneType string,
 	spawnRules *config.SpawnRulesConfig,
 	enabledLanes []int,
+	laneRestriction []int,
 ) int {
 	// 收集所有行的状态
 	laneStates := make([]*components.LaneStateComponent, 0, len(la.laneEntities))
@@ -79,7 +81,7 @@ func (la *LaneAllocator) SelectLane(
 	}
 
 	// 过滤出合法行（在计算权重之前）
-	legalLaneIndices := FilterLegalLanes(laneStates, zombieType, sceneType, spawnRules, enabledLanes)
+	legalLaneIndices := FilterLegalLanes(laneStates, zombieType, sceneType, spawnRules, enabledLanes, laneRestriction)
 
 	// 如果没有合法行，返回默认第六行
 	if len(legalLaneIndices) == 0 {
@@ -260,6 +262,7 @@ func CalculateSmoothWeight(weightP float64, pLast float64, pSecondLast float64) 
 //   - sceneType: 场景类型（用于场景限制判定）
 //   - spawnRules: 僵尸生成规则配置
 //   - enabledLanes: 关卡启用的行列表（草地行）
+//   - laneRestriction: 波次级行限制（可选，为空则不限制）
 //
 // 返回:
 //   - 合法行的索引列表
@@ -269,6 +272,7 @@ func FilterLegalLanes(
 	sceneType string,
 	spawnRules *config.SpawnRulesConfig,
 	enabledLanes []int,
+	laneRestriction []int,
 ) []int {
 	legalLanes := make([]int, 0, len(laneStates))
 
@@ -285,7 +289,21 @@ func FilterLegalLanes(
 			continue
 		}
 
-		// 2. 水路限制（如果配置可用）
+		// 2. 波次级行限制（Story 17.2: laneRestriction）
+		if len(laneRestriction) > 0 {
+			found := false
+			for _, lane := range laneRestriction {
+				if lane == state.LaneIndex {
+					found = true
+					break
+				}
+			}
+			if !found {
+				continue
+			}
+		}
+
+		// 3. 水路限制（如果配置可用）
 		if spawnRules != nil {
 			isWater := IsWaterLane(state.LaneIndex, sceneType, spawnRules.SceneTypeRestrictions.WaterLaneConfig)
 			isWaterZombie := IsWaterZombie(zombieType, spawnRules.SceneTypeRestrictions.WaterZombies)
@@ -299,7 +317,7 @@ func FilterLegalLanes(
 				continue
 			}
 
-			// 3. 舞王限制
+			// 4. 舞王限制
 			if zombieType == "dancing" {
 				// 屋顶场景禁止舞王
 				if sceneType == "roof" {

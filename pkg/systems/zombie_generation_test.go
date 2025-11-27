@@ -364,6 +364,7 @@ func TestLevel1_4_LaneNoConsecutive(t *testing.T) {
 			env.LevelConfig.SceneType,
 			env.SpawnRules,
 			env.LevelConfig.EnabledLanes,
+			nil, // laneRestriction
 		)
 		env.LaneAllocator.UpdateLaneCounters(lane)
 
@@ -652,6 +653,7 @@ func TestLaneAllocation_Distribution(t *testing.T) {
 			env.LevelConfig.SceneType,
 			env.SpawnRules,
 			env.LevelConfig.EnabledLanes,
+			nil, // laneRestriction
 		)
 		laneCounts[lane]++
 		env.LaneAllocator.UpdateLaneCounters(lane)
@@ -694,6 +696,7 @@ func TestLaneAllocation_NoConsecutive(t *testing.T) {
 			env.LevelConfig.SceneType,
 			env.SpawnRules,
 			env.LevelConfig.EnabledLanes,
+			nil, // laneRestriction
 		)
 		env.LaneAllocator.UpdateLaneCounters(lane)
 
@@ -773,6 +776,7 @@ func TestLaneAllocation_LegalLaneOnly(t *testing.T) {
 			env.LevelConfig.SceneType,
 			env.SpawnRules,
 			env.LevelConfig.EnabledLanes,
+			nil, // laneRestriction
 		)
 		env.LaneAllocator.UpdateLaneCounters(lane)
 
@@ -974,6 +978,7 @@ func BenchmarkLaneAllocator_Pick(b *testing.B) {
 			env.LevelConfig.SceneType,
 			env.SpawnRules,
 			env.LevelConfig.EnabledLanes,
+			nil, // laneRestriction
 		)
 		env.LaneAllocator.UpdateLaneCounters(lane)
 	}
@@ -1025,6 +1030,7 @@ func TestBenchmarkLaneAllocator_LessThan1ms(t *testing.T) {
 			env.LevelConfig.SceneType,
 			env.SpawnRules,
 			env.LevelConfig.EnabledLanes,
+			nil, // laneRestriction
 		)
 		env.LaneAllocator.UpdateLaneCounters(lane)
 	})

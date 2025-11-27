@@ -262,14 +262,14 @@ func TestLaneAllocatorSelectLane(t *testing.T) {
 
 	// 测试单行选择
 	allocator.InitializeLanes(1, 1.0)
-	selectedLane := allocator.SelectLane("basic", "day", nil, []int{1})
+	selectedLane := allocator.SelectLane("basic", "day", nil, []int{1}, nil)
 	if selectedLane != 1 {
 		t.Errorf("Single lane: expected 1, got %d", selectedLane)
 	}
 
 	// 测试全零权重时返回第六行
 	allocator.InitializeLanes(5, 0.0)
-	selectedLane = allocator.SelectLane("basic", "day", nil, []int{1, 2, 3, 4, 5})
+	selectedLane = allocator.SelectLane("basic", "day", nil, []int{1, 2, 3, 4, 5}, nil)
 	if selectedLane != 6 {
 		t.Errorf("All zero weights: expected 6, got %d", selectedLane)
 	}
@@ -286,7 +286,7 @@ func TestLaneSelectionDistribution(t *testing.T) {
 	counts := make(map[int]int)
 
 	for i := 0; i < iterations; i++ {
-		selectedLane := allocator.SelectLane("basic", "day", nil, []int{1, 2, 3, 4, 5})
+		selectedLane := allocator.SelectLane("basic", "day", nil, []int{1, 2, 3, 4, 5}, nil)
 		counts[selectedLane]++
 		allocator.UpdateLaneCounters(selectedLane)
 	}
@@ -358,7 +358,7 @@ func TestFilterLegalLanes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := FilterLegalLanes(tt.laneStates, "basic", "day", nil, []int{1, 2, 3, 4, 5})
+			result := FilterLegalLanes(tt.laneStates, "basic", "day", nil, []int{1, 2, 3, 4, 5}, nil)
 			if len(result) != len(tt.expected) {
 				t.Errorf("Expected length %d, got %d", len(tt.expected), len(result))
 			}
@@ -368,5 +368,108 @@ func TestFilterLegalLanes(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestFilterLegalLanes_LaneRestriction 测试波次级行限制 (Story 17.2)
+func TestFilterLegalLanes_LaneRestriction(t *testing.T) {
+	laneStates := []*components.LaneStateComponent{
+		{LaneIndex: 1, Weight: 1.0},
+		{LaneIndex: 2, Weight: 1.0},
+		{LaneIndex: 3, Weight: 1.0},
+		{LaneIndex: 4, Weight: 1.0},
+		{LaneIndex: 5, Weight: 1.0},
+	}
+
+	tests := []struct {
+		name            string
+		laneRestriction []int
+		expected        []int
+	}{
+		{
+			name:            "无行限制时所有行合法",
+			laneRestriction: nil,
+			expected:        []int{0, 1, 2, 3, 4},
+		},
+		{
+			name:            "空行限制时所有行合法",
+			laneRestriction: []int{},
+			expected:        []int{0, 1, 2, 3, 4},
+		},
+		{
+			name:            "限制为单行",
+			laneRestriction: []int{3},
+			expected:        []int{2}, // 索引 2 对应 LaneIndex 3
+		},
+		{
+			name:            "限制为多行",
+			laneRestriction: []int{1, 3, 5},
+			expected:        []int{0, 2, 4}, // 索引 0, 2, 4 对应 LaneIndex 1, 3, 5
+		},
+		{
+			name:            "限制为连续行",
+			laneRestriction: []int{2, 3, 4},
+			expected:        []int{1, 2, 3},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FilterLegalLanes(laneStates, "basic", "day", nil, []int{1, 2, 3, 4, 5}, tt.laneRestriction)
+			if len(result) != len(tt.expected) {
+				t.Errorf("Expected length %d, got %d", len(tt.expected), len(result))
+				return
+			}
+			for i := range result {
+				if result[i] != tt.expected[i] {
+					t.Errorf("Index %d: expected %d, got %d", i, tt.expected[i], result[i])
+				}
+			}
+		})
+	}
+}
+
+// TestSelectLane_WithLaneRestriction 测试带行限制的行选择 (Story 17.2)
+func TestSelectLane_WithLaneRestriction(t *testing.T) {
+	em := ecs.NewEntityManager()
+	allocator := NewLaneAllocator(em)
+	allocator.InitializeLanes(5, 1.0)
+
+	// 测试限制为单行时，必定选中该行
+	for i := 0; i < 10; i++ {
+		selectedLane := allocator.SelectLane("basic", "day", nil, []int{1, 2, 3, 4, 5}, []int{3})
+		if selectedLane != 3 {
+			t.Errorf("With laneRestriction=[3], expected lane 3, got %d", selectedLane)
+		}
+	}
+
+	// 测试限制为多行时，只选择限制内的行
+	laneCounts := make(map[int]int)
+	restriction := []int{1, 5}
+	for i := 0; i < 100; i++ {
+		selectedLane := allocator.SelectLane("basic", "day", nil, []int{1, 2, 3, 4, 5}, restriction)
+		laneCounts[selectedLane]++
+		allocator.UpdateLaneCounters(selectedLane)
+	}
+
+	// 验证只有限制内的行被选中
+	for lane, count := range laneCounts {
+		found := false
+		for _, r := range restriction {
+			if r == lane {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Lane %d was selected %d times but is not in restriction %v", lane, count, restriction)
+		}
+	}
+
+	// 验证限制内的行都有被选中
+	for _, lane := range restriction {
+		if laneCounts[lane] == 0 {
+			t.Errorf("Lane %d in restriction was never selected", lane)
+		}
 	}
 }

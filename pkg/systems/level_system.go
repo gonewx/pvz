@@ -87,8 +87,8 @@ func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *
 		lawnmowerSystem:           lawnmowerSystem,
 		lastWaveWarningShown:      false, // 已废弃，保留向后兼容
 		finalWaveWarningTriggered: false, // 新标志位
-		finalWaveWarningLeadTime:  3.0,   // 提前 3 秒
-		useWaveTimingSystem:       false, // 默认不启用，待完全集成后启用
+		finalWaveWarningLeadTime:  3.0,  // 提前 3 秒
+		useWaveTimingSystem:       true, // Story 17.6: 默认启用波次计时系统
 	}
 
 	// Story 17.6: 如果有关卡配置，创建 WaveTimingSystem
@@ -98,6 +98,9 @@ func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *
 		// Story 17.7: 创建旗帜波警告和最终波白字系统
 		ls.flagWaveWarningSystem = NewFlagWaveWarningSystem(em, ls.waveTimingSystem)
 		ls.finalWaveTextSystem = NewFinalWaveTextSystem(em, ls.waveTimingSystem)
+
+		// Story 17.6: 自动初始化计时器（默认一周目首次）
+		ls.waveTimingSystem.InitializeTimer(true)
 	}
 
 	return ls
@@ -591,20 +594,24 @@ func (s *LevelSystem) checkFinalWaveWarning(deltaTime float64) {
 
 // isFinalWaveApproaching 检测最后一波是否即将到来
 //
+// Story 17.6: 当 WaveTimingSystem 启用时，最后一波警告由 FlagWaveWarningSystem 处理
+// 此方法仅在 WaveTimingSystem 未启用时作为后备逻辑
+//
 // 判断条件：
 //  1. CurrentWaveIndex 指向最后一波（len-1）或者已经触发完所有波次（len）
 //  2. 最后一波尚未被激活
 //  3. 正在等待下一波（IsWaitingForNextWave = true）
-//  4. 距离触发还剩 <= 3 秒
-//
-// 注意：CurrentWaveIndex 在 MarkWaveSpawned 后会变成 waveIndex+1，
-// 所以最后一波激活后 CurrentWaveIndex 会变成 len（超出索引范围）
 //
 // 返回：
 //
 //	true - 最后一波即将到来，应触发提示
 //	false - 不应触发提示
 func (s *LevelSystem) isFinalWaveApproaching() bool {
+	// Story 17.6: WaveTimingSystem 启用时，由 FlagWaveWarningSystem 处理警告
+	if s.useWaveTimingSystem {
+		return false
+	}
+
 	// 检查关卡配置是否存在
 	if s.gameState.CurrentLevel == nil || len(s.gameState.CurrentLevel.Waves) == 0 {
 		return false
@@ -614,8 +621,6 @@ func (s *LevelSystem) isFinalWaveApproaching() bool {
 	lastWaveIndex := totalWaves - 1
 
 	// 检查当前是否正在等待最后一波
-	// 情况1: CurrentWaveIndex == lastWaveIndex（第一波刚消灭完，等待第二波）
-	// 情况2: CurrentWaveIndex == totalWaves（最后一波已标记，但可能在等待激活）
 	isWaitingForFinalWave := s.gameState.CurrentWaveIndex == lastWaveIndex
 
 	if !isWaitingForFinalWave {
@@ -632,24 +637,8 @@ func (s *LevelSystem) isFinalWaveApproaching() bool {
 		return false
 	}
 
-	// 计算自上一波完成以来经过的时间
-	lastWave := s.gameState.CurrentLevel.Waves[lastWaveIndex]
-	elapsedSinceCompletion := s.gameState.LevelTime - s.gameState.LastWaveCompletedTime
-	timeUntilFinalWave := lastWave.MinDelay - elapsedSinceCompletion
-
-	// 兼容两种情况：
-	// 1. MinDelay > 0: 在剩余时间 <= 3 秒时触发
-	// 2. MinDelay = 0: 刚进入等待状态时触发（elapsed <= 0.5秒）
-	var shouldTrigger bool
-	if lastWave.MinDelay > 0 {
-		// 标准情况：检查剩余时间
-		shouldTrigger = timeUntilFinalWave <= s.finalWaveWarningLeadTime && timeUntilFinalWave > 0
-	} else {
-		// MinDelay=0 情况：刚进入等待状态时触发
-		shouldTrigger = elapsedSinceCompletion <= 0.5
-	}
-
-	return shouldTrigger
+	// Story 17.6: 简化逻辑，立即触发警告（由 WaveTimingSystem 管理实际延迟）
+	return true
 }
 
 // triggerFinalWaveWarning 触发最后一波提示

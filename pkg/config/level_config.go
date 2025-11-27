@@ -90,16 +90,15 @@ type TutorialStep struct {
 // 定义了僵尸波次的触发条件和生成的僵尸列表
 // Story 8.6 扩展：支持旗帜波次和混合僵尸生成
 // Story 17.2 扩展：支持波次编号、类型和额外点数
+// Story 17.6: 波次计时由 WaveTimingSystem 自动管理，不再需要 delay 字段
 type WaveConfig struct {
-	Delay      float64       `yaml:"delay"`      // 游戏开始后延迟（第1波使用），单位：秒
-	MinDelay   float64       `yaml:"minDelay"`   // 上一波消灭后最小延迟（秒），默认 0（立即触发）
 	IsFlag     bool          `yaml:"isFlag"`     // 是否为旗帜波次（Story 8.6）
 	FlagIndex  int           `yaml:"flagIndex"`  // 旗帜索引（第几面旗帜），从1开始（Story 8.6）
 	Zombies    []ZombieGroup `yaml:"zombies"`    // 本波次要生成的僵尸组列表（Story 8.6 使用 ZombieGroup）
 	OldZombies []ZombieSpawn `yaml:"oldZombies"` // 兼容旧格式：单个僵尸生成配置（已废弃，向后兼容）
 
 	// Story 17.2: 新增波次配置字段
-	WaveNum         int   `yaml:"waveNum"`         // 当前波次编号（从 1 开始），默认从 slice 索引 +1 推断
+	WaveNum         int    `yaml:"waveNum"`         // 当前波次编号（从 1 开始），默认从 slice 索引 +1 推断
 	Type            string `yaml:"type"`            // 波次类型: "Fixed", "ExtraPoints", "Final"，默认从 isFlag 推断
 	ExtraPoints     int    `yaml:"extraPoints"`     // 额外点数（用于动态点数分配关卡，仅 Type="ExtraPoints" 时有效）
 	LaneRestriction []int  `yaml:"laneRestriction"` // 行限制（可选，指定僵尸必须出现的行）
@@ -274,14 +273,6 @@ func validateLevelConfig(config *LevelConfig) error {
 
 	// 验证每个波次的配置
 	for i, wave := range config.Waves {
-		if wave.Delay < 0 {
-			return fmt.Errorf("wave %d: delay cannot be negative", i)
-		}
-
-		if wave.MinDelay < 0 {
-			return fmt.Errorf("wave %d: minDelay cannot be negative", i)
-		}
-
 		// Story 17.2: 验证波次新字段
 		// 验证 WaveNum（如果指定，必须 > 0）
 		if wave.WaveNum < 0 {
