@@ -339,8 +339,14 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	// Story 5.5: Initialize level management systems
 	// 1. Create WaveSpawnSystem (LevelSystem depends on it)
 	// Story 14.3: Epic 14 - Removed ReanimSystem dependency
-	scene.waveSpawnSystem = systems.NewWaveSpawnSystem(scene.entityManager, rm, scene.gameState.CurrentLevel, scene.gameState)
-	log.Printf("[GameScene] Initialized wave spawn system")
+	// Story 17.3: Load spawn rules config (optional, nil means no constraint checking)
+	spawnRules, err := config.LoadSpawnRules("data/spawn_rules.yaml")
+	if err != nil {
+		log.Printf("[GameScene] Warning: Failed to load spawn rules: %v (constraint checking disabled)", err)
+		spawnRules = nil
+	}
+	scene.waveSpawnSystem = systems.NewWaveSpawnSystem(scene.entityManager, rm, scene.gameState.CurrentLevel, scene.gameState, spawnRules)
+	log.Printf("[GameScene] Initialized wave spawn system (spawn rules enabled: %v)", spawnRules != nil)
 
 	// Pre-spawn all zombies for the level (they will be activated wave by wave)
 	// Story 8.3.1: 僵尸预生成时机取决于是否有开场动画

@@ -18,6 +18,7 @@ import (
 //   - 按波次激活僵尸（使其开始移动）
 //   - 处理不同僵尸类型的工厂调用
 //   - Story 8.1: 验证僵尸生成行是否在 EnabledLanes 中
+//   - Story 17.3: 验证僵尸生成是否符合限制规则
 //
 // 架构说明：
 //   - 作为 LevelSystem 的依赖，由 LevelSystem 调用
@@ -30,8 +31,10 @@ import (
 type WaveSpawnSystem struct {
 	entityManager   *ecs.EntityManager
 	resourceManager *game.ResourceManager
-	levelConfig     *config.LevelConfig // 关卡配置（用于验证行数限制）
-	gameState       *game.GameState     // 用于更新僵尸生成计数
+	levelConfig     *config.LevelConfig        // 关卡配置（用于验证行数限制）
+	gameState       *game.GameState            // 用于更新僵尸生成计数
+	spawnRules      *config.SpawnRulesConfig   // Story 17.3: 僵尸生成规则配置
+	constraintID    ecs.EntityID               // Story 17.3: 生成限制组件实体ID
 }
 
 // NewWaveSpawnSystem 创建波次生成系统
@@ -42,15 +45,70 @@ type WaveSpawnSystem struct {
 //	rm - 资源管理器
 //	lc - 关卡配置（用于验证行数限制）
 //	gs - 游戏状态（用于更新僵尸生成计数）
+//	sr - Story 17.3: 僵尸生成规则配置（可选，nil 表示不启用限制检查）
 //
 // Removed ReanimSystem dependency, using AnimationCommand component
-func NewWaveSpawnSystem(em *ecs.EntityManager, rm *game.ResourceManager, lc *config.LevelConfig, gs *game.GameState) *WaveSpawnSystem {
-	return &WaveSpawnSystem{
+func NewWaveSpawnSystem(em *ecs.EntityManager, rm *game.ResourceManager, lc *config.LevelConfig, gs *game.GameState, sr *config.SpawnRulesConfig) *WaveSpawnSystem {
+	sys := &WaveSpawnSystem{
 		entityManager:   em,
 		resourceManager: rm,
 		levelConfig:     lc,
 		gameState:       gs,
+		spawnRules:      sr,
 	}
+
+	// Story 17.3: 如果提供了生成规则，创建限制检查组件实体
+	if sr != nil {
+		sys.constraintID = sys.createConstraintEntity()
+	}
+
+	return sys
+}
+
+// createConstraintEntity 创建生成限制组件实体
+// Story 17.3: 用于存储关卡级别的生成限制状态
+func (s *WaveSpawnSystem) createConstraintEntity() ecs.EntityID {
+	entityID := s.entityManager.CreateEntity()
+
+	// 从关卡配置中提取允许的僵尸类型
+	allowedTypes := s.extractAllowedZombieTypes()
+
+	// 添加限制组件
+	ecs.AddComponent(s.entityManager, entityID, &components.SpawnConstraintComponent{
+		RedEyeCount:        0,
+		CurrentWaveNum:     1, // 初始波次
+		AllowedZombieTypes: allowedTypes,
+		SceneType:          s.levelConfig.SceneType,
+	})
+
+	log.Printf("[WaveSpawnSystem] Created spawn constraint entity %d (scene: %s, allowed types: %d)",
+		entityID, s.levelConfig.SceneType, len(allowedTypes))
+
+	return entityID
+}
+
+// extractAllowedZombieTypes 从关卡配置中提取允许的僵尸类型
+func (s *WaveSpawnSystem) extractAllowedZombieTypes() []string {
+	typeSet := make(map[string]bool)
+
+	// 从所有波次配置中提取僵尸类型
+	for _, wave := range s.levelConfig.Waves {
+		for _, zombie := range wave.Zombies {
+			typeSet[zombie.Type] = true
+		}
+		// 兼容旧格式
+		for _, zombie := range wave.OldZombies {
+			typeSet[zombie.Type] = true
+		}
+	}
+
+	// 转换为列表
+	types := make([]string, 0, len(typeSet))
+	for zombieType := range typeSet {
+		types = append(types, zombieType)
+	}
+
+	return types
 }
 
 // SpawnWave 生成一波僵尸（已废弃）
@@ -95,6 +153,7 @@ func (s *WaveSpawnSystem) SpawnWave(waveConfig config.WaveConfig) int {
 // 僵尸初始状态为"待命"（不移动），等待 ActivateWave() 激活
 //
 // 支持新的 ZombieGroup 格式（随机行选择）
+// Story 17.3: 在生成每波前更新限制组件的当前波次
 //
 // 返回：
 //
@@ -110,6 +169,13 @@ func (s *WaveSpawnSystem) PreSpawnAllWaves() int {
 
 	// 遍历所有波次
 	for waveIndex, waveConfig := range s.levelConfig.Waves {
+		// Story 17.3: 更新限制组件的当前波次编号
+		if s.spawnRules != nil && s.constraintID != 0 {
+			if constraint, ok := ecs.GetComponent[*components.SpawnConstraintComponent](s.entityManager, s.constraintID); ok {
+				constraint.CurrentWaveNum = waveIndex + 1 // 波次从 1 开始
+			}
+		}
+
 		// 支持新格式 ZombieGroup
 		if len(waveConfig.Zombies) > 0 {
 			// 遍历本波的所有僵尸组配置
@@ -238,6 +304,8 @@ func (s *WaveSpawnSystem) ActivateWave(waveIndex int) int {
 //
 // 生成的僵尸初始状态为"待命"（不移动），需要调用 ActivateWave() 激活
 //
+// Story 17.3: 添加生成限制检查
+//
 // 参数：
 //
 //	zombieType - 僵尸类型
@@ -249,6 +317,45 @@ func (s *WaveSpawnSystem) ActivateWave(waveIndex int) int {
 //
 //	僵尸实体ID
 func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIndex int, indexInWave int) ecs.EntityID {
+	// Story 17.3: 生成前检查限制规则
+	if s.spawnRules != nil && s.constraintID != 0 {
+		constraint, ok := ecs.GetComponent[*components.SpawnConstraintComponent](s.entityManager, s.constraintID)
+		if ok {
+			// 计算当前轮数
+			// 公式: RoundNumber = TotalCompletedFlags / 2 - 1
+			// 对于当前关卡，暂时假设 CompletedFlags = 0，即 RoundNumber = -1
+			// TODO: 需要从 GameState 获取 TotalCompletedFlags
+			roundNumber := -1 // 默认第一轮
+			if s.gameState.TotalCompletedFlags > 0 {
+				roundNumber = s.gameState.TotalCompletedFlags/2 - 1
+			}
+
+			// 转换 lane (1-5) 为 row (0-4)
+			row := lane - 1
+			if row < 0 {
+				row = 0
+			}
+			if row > 4 {
+				row = 4
+			}
+
+			// 使用纯函数验证
+			valid, reason := ValidateZombieSpawn(zombieType, lane, constraint, roundNumber, s.spawnRules)
+			if !valid {
+				log.Printf("[WaveSpawnSystem] Zombie spawn rejected: type=%s, lane=%d, wave=%d, reason=%s",
+					zombieType, lane, waveIndex+1, reason)
+				return 0 // 跳过生成
+			}
+
+			// 如果是红眼巨人，增加计数
+			if zombieType == "gargantuar_redeye" {
+				constraint.RedEyeCount++
+				log.Printf("[WaveSpawnSystem] Red eye count increased: %d (round %d)",
+					constraint.RedEyeCount, roundNumber)
+			}
+		}
+	}
+
 	// 开场预览期间，僵尸随机分布在5行上
 	// 激活后，僵尸会移动到随机选择的有效行
 

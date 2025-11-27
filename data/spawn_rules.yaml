@@ -1,0 +1,69 @@
+# 僵尸生成规则配置
+# 基于原版 PvZ 逆向工程数据
+
+# 僵尸阶数映射表
+# 阶数决定僵尸最早可出现的波次
+zombieTiers:
+  # 一阶僵尸（第1波起）
+  basic: 1              # 普通僵尸
+  conehead: 1           # 路障僵尸
+  flag: 1               # 旗帜僵尸
+
+  # 二阶僵尸（第3波起）
+  buckethead: 2         # 铁桶僵尸
+  newspaper: 2          # 读报僵尸
+  screendoor: 2         # 铁栅门僵尸
+
+  # 三阶僵尸（第8波起）
+  polevaulter: 3        # 撑杆跳僵尸
+  football: 3           # 橄榄球僵尸
+  dancing: 3            # 舞王僵尸
+  backup_dancer: 3      # 伴舞僵尸
+  snorkel: 3            # 潜水僵尸
+  dolphinrider: 3       # 海豚骑士僵尸
+  ducky: 3              # 鸭子救生圈僵尸
+  jack: 3               # 小丑僵尸
+  balloon: 3            # 气球僵尸
+  digger: 3             # 矿工僵尸
+  pogo: 3               # 蹦蹦僵尸
+  zomboni: 3            # 雪橇车僵尸
+
+  # 四阶僵尸（第15波起，根据轮数调整）
+  gargantuar: 4         # 白眼巨人
+  gargantuar_redeye: 4  # 红眼巨人
+  imp: 4                # 小鬼（巨人扔出）
+
+# 阶数波次限制
+# 每个阶数对应的最早出现波次
+tierWaveRestrictions:
+  1: 1   # 一阶：第 1 波起
+  2: 3   # 二阶：第 3 波起
+  3: 8   # 三阶：第 8 波起
+  4: 15  # 四阶：第 15 波起（会根据轮数调整）
+
+# 红眼数量上限配置
+redEyeRules:
+  startRound: 5         # 从第 5 轮开始允许红眼
+  capacityPerRound: 1   # 每轮增加 1 个红眼上限
+
+# 场景类型限制
+sceneTypeRestrictions:
+  # 水路专属僵尸（只能在水路行生成）
+  waterZombies:
+    - snorkel           # 潜水僵尸
+    - dolphinrider      # 海豚骑士僵尸
+    - ducky             # 鸭子救生圈僵尸
+
+  # 舞王限制
+  dancingRestrictions:
+    # 舞王禁止出现的场景类型
+    prohibitedScenes:
+      - roof            # 屋顶场景禁止舞王
+
+    # 舞王需要上下相邻行都是草地（泳池场景限制）
+    requiresAdjacentLanes: true
+
+  # 水路场景配置
+  waterLaneConfig:
+    pool: [3, 4]        # 泳池场景：第 3、4 行为水路
+    fog: [3, 4]         # 雾夜场景：第 3、4 行为水路
