@@ -437,3 +437,103 @@ func TestTriggerZombiesWonFlow_OnlyCreatesOnce(t *testing.T) {
 		t.Fatalf("expected 2 phase entities (one per call), got %d", len(phaseEntities))
 	}
 }
+
+// ========================================
+// Story 17.9: Type-Specific Defeat Boundary Tests
+// ========================================
+
+// TestGetDefeatBoundary_WithPhysicsConfig 测试使用物理配置时的进家边界
+func TestGetDefeatBoundary_WithPhysicsConfig(t *testing.T) {
+	ls := &LevelSystem{
+		zombiePhysics: &config.ZombiePhysicsConfig{
+			DefeatBoundary: map[string]float64{
+				"default":  -100,
+				"basic":    -100,
+				"football": -175,
+			},
+		},
+	}
+
+	tests := []struct {
+		name         string
+		zombieType   string
+		expectedGrid float64
+	}{
+		{"basic zombie", "basic", -100},
+		{"football zombie", "football", -175},
+		{"unknown uses default", "unknown", -100},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			boundary := ls.getDefeatBoundary(tt.zombieType)
+			expected := config.GridToWorldX(tt.expectedGrid)
+			if boundary != expected {
+				t.Errorf("getDefeatBoundary(%s) = %.1f, want %.1f", tt.zombieType, boundary, expected)
+			}
+		})
+	}
+}
+
+// TestGetDefeatBoundary_WithoutPhysicsConfig 测试未配置物理参数时使用默认值
+func TestGetDefeatBoundary_WithoutPhysicsConfig(t *testing.T) {
+	ls := &LevelSystem{
+		zombiePhysics: nil, // 无配置
+	}
+
+	// 应使用默认常量 DefeatBoundaryX
+	boundary := ls.getDefeatBoundary("basic")
+	if boundary != DefeatBoundaryX {
+		t.Errorf("getDefeatBoundary without config = %.1f, want %.1f", boundary, DefeatBoundaryX)
+	}
+}
+
+// TestBehaviorTypeToString 测试行为类型到字符串的映射
+func TestBehaviorTypeToString(t *testing.T) {
+	ls := &LevelSystem{}
+
+	tests := []struct {
+		name         string
+		behaviorType components.BehaviorType
+		expected     string
+	}{
+		{"basic zombie", components.BehaviorZombieBasic, "basic"},
+		{"eating zombie", components.BehaviorZombieEating, "basic"},
+		{"dying zombie", components.BehaviorZombieDying, "basic"},
+		{"conehead", components.BehaviorZombieConehead, "conehead"},
+		{"buckethead", components.BehaviorZombieBuckethead, "buckethead"},
+		{"unknown type", components.BehaviorSunflower, "default"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ls.behaviorTypeToString(tt.behaviorType)
+			if result != tt.expected {
+				t.Errorf("behaviorTypeToString(%v) = %s, want %s", tt.behaviorType, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestSetZombiePhysicsConfig 测试设置物理配置
+func TestSetZombiePhysicsConfig(t *testing.T) {
+	ls := &LevelSystem{}
+
+	// 初始状态：无配置
+	if ls.zombiePhysics != nil {
+		t.Errorf("initial zombiePhysics should be nil")
+	}
+
+	// 设置配置
+	cfg := &config.ZombiePhysicsConfig{
+		DefeatBoundary: map[string]float64{
+			"default": -100,
+		},
+	}
+	ls.SetZombiePhysicsConfig(cfg)
+
+	// 验证配置已设置
+	if ls.zombiePhysics != cfg {
+		t.Errorf("zombiePhysics not set correctly")
+	}
+}

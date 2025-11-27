@@ -393,7 +393,7 @@ func (s *WaveTimingSystem) IsHugeWaveWarningActive() bool {
 
 // CheckAcceleratedRefresh 检查并执行加速刷新
 //
-// Story 17.7: 旗帜波前一波的加速刷新逻辑
+// Story 17.7: 旗帜波前一波的加速刷新逻辑（消灭触发）
 //
 // 加速刷新条件：
 //   - 当前波刷出时间 > 401cs
@@ -446,6 +446,79 @@ func (s *WaveTimingSystem) CheckAcceleratedRefresh(allZombiesCleared bool) bool 
 
 	log.Printf("[WaveTimingSystem] ⚡ Accelerated refresh triggered! Countdown: %d cs → %d cs (elapsed: %d cs)",
 		oldCountdown, AcceleratedRefreshCountdownCs, timer.WaveElapsedCs)
+
+	return true
+}
+
+// CheckHealthAcceleratedRefresh 检查并执行血量触发的加速刷新
+//
+// Story 17.8: 常规波次（非旗帜波前）的血量触发加速刷新逻辑
+//
+// 加速刷新条件：
+//   - 非旗帜波前（!IsFlagWaveApproaching）
+//   - 本波刷出时间 > 401cs
+//   - 当前倒计时 > 200cs
+//   - 当前血量 <= 初始血量 × 阈值（0.50~0.65）
+//   - 未触发过血量加速
+//
+// 当条件满足时，将倒计时设为 200cs
+//
+// 参数：
+//   - currentHealth: 当前僵尸总血量（由调用方计算提供）
+//
+// 返回：
+//   - bool: true 表示触发了加速刷新
+func (s *WaveTimingSystem) CheckHealthAcceleratedRefresh(currentHealth int) bool {
+	timer := s.getTimerComponent()
+	if timer == nil {
+		return false
+	}
+
+	// 只在常规波次（非旗帜波前）检查血量加速
+	if timer.IsFlagWaveApproaching {
+		return false
+	}
+
+	// 红字警告阶段不加速
+	if timer.FlagWaveCountdownPhase > 0 {
+		return false
+	}
+
+	// 已触发过血量加速，不重复触发
+	if timer.HealthAccelerationTriggered {
+		return false
+	}
+
+	// 检查加速刷新条件
+	// 1. 刷出时间 > 401cs
+	if timer.WaveElapsedCs <= AcceleratedRefreshMinTimeCs {
+		return false
+	}
+
+	// 2. 倒计时 > 200cs
+	if timer.CountdownCs <= AcceleratedRefreshCountdownCs {
+		return false
+	}
+
+	// 3. 初始血量必须 > 0（有僵尸生成）
+	if timer.WaveInitialHealthCs <= 0 {
+		return false
+	}
+
+	// 4. 当前血量 <= 初始血量 × 阈值
+	threshold := float64(timer.WaveInitialHealthCs) * timer.HealthTriggerThreshold
+	if float64(currentHealth) > threshold {
+		return false
+	}
+
+	// 触发血量加速刷新
+	oldCountdown := timer.CountdownCs
+	timer.CountdownCs = AcceleratedRefreshCountdownCs
+	timer.AccumulatedCs = 0
+	timer.HealthAccelerationTriggered = true
+
+	log.Printf("[WaveTimingSystem] 🩸 Health-triggered acceleration! Countdown: %d cs → %d cs (health: %d/%d, threshold: %.0f)",
+		oldCountdown, AcceleratedRefreshCountdownCs, currentHealth, timer.WaveInitialHealthCs, threshold)
 
 	return true
 }
@@ -693,5 +766,166 @@ func (s *WaveTimingSystem) getTimerComponent() *components.WaveTimerComponent {
 // GetTimerEntityID 获取计时器实体ID（用于测试）
 func (s *WaveTimingSystem) GetTimerEntityID() ecs.EntityID {
 	return s.timerEntityID
+}
+
+// ========== Story 17.8: 血量计算与追踪 ==========
+
+// CalculateZombieEffectiveHealth 计算僵尸有效血量
+//
+// Story 17.8: 血量计算公式
+// 有效血量 = 本体血量 + I类饰品血量 + 0.20 × II类饰品血量
+//
+// I类饰品: 路障(370), 铁桶(1100), 橄榄球帽, 雪橇车, 气球, 矿工帽, 僵尸坚果
+// II类饰品: 报纸, 铁栅门, 扶梯
+//
+// 参数:
+//   - baseHealth: 本体血量
+//   - tier1Health: I类饰品血量
+//   - tier2Health: II类饰品血量
+//
+// 返回:
+//   - int: 有效血量
+func CalculateZombieEffectiveHealth(baseHealth, tier1Health, tier2Health int) int {
+	return baseHealth + tier1Health + int(float64(tier2Health)*0.20)
+}
+
+// GetZombieTypeEffectiveHealth 从配置获取僵尸类型的有效血量
+//
+// Story 17.8: 根据僵尸类型查询配置，计算有效血量
+//
+// 参数:
+//   - zombieStatsConfig: 僵尸属性配置
+//   - zombieType: 僵尸类型名称
+//
+// 返回:
+//   - int: 有效血量（类型不存在时返回 270，即默认普僵血量）
+func GetZombieTypeEffectiveHealth(zombieStatsConfig *config.ZombieStatsConfig, zombieType string) int {
+	if zombieStatsConfig == nil {
+		return 270 // 默认普僵血量
+	}
+
+	stats, ok := zombieStatsConfig.GetZombieStats(zombieType)
+	if !ok {
+		return 270 // 未知类型使用默认值
+	}
+
+	return CalculateZombieEffectiveHealth(stats.BaseHealth, stats.Tier1AccessoryHealth, stats.Tier2AccessoryHealth)
+}
+
+// ZombieSpawnInfo 描述单个僵尸生成信息
+// 用于 InitializeWaveHealth 计算波次总血量
+type ZombieSpawnInfo struct {
+	Type  string // 僵尸类型
+	Count int    // 数量
+}
+
+// InitializeWaveHealth 初始化波次血量追踪
+//
+// Story 17.8: 在波次开始时调用，计算并记录本波僵尸总血量
+//
+// 参数:
+//   - zombieList: 本波僵尸列表（类型和数量）
+//   - zombieStatsConfig: 僵尸属性配置
+func (s *WaveTimingSystem) InitializeWaveHealth(zombieList []ZombieSpawnInfo, zombieStatsConfig *config.ZombieStatsConfig) {
+	timer := s.getTimerComponent()
+	if timer == nil {
+		return
+	}
+
+	// 计算本波僵尸总有效血量
+	totalHealth := 0
+	for _, zombie := range zombieList {
+		effectiveHealth := GetZombieTypeEffectiveHealth(zombieStatsConfig, zombie.Type)
+		totalHealth += effectiveHealth * zombie.Count
+	}
+
+	// 设置初始血量和当前血量
+	timer.WaveInitialHealthCs = totalHealth
+	timer.WaveCurrentHealthCs = totalHealth
+
+	// 随机生成血量触发阈值 [0.50, 0.65]
+	timer.HealthTriggerThreshold = 0.50 + rand.Float64()*0.15
+
+	// 重置血量加速触发标志
+	timer.HealthAccelerationTriggered = false
+
+	log.Printf("[WaveTimingSystem] Wave health initialized: total=%d, threshold=%.2f (%.0f hp)",
+		totalHealth, timer.HealthTriggerThreshold, float64(totalHealth)*timer.HealthTriggerThreshold)
+}
+
+// UpdateWaveCurrentHealth 更新波次当前血量
+//
+// Story 17.8: 由 LevelSystem 或外部系统调用，更新当前血量
+//
+// 参数:
+//   - currentHealth: 当前僵尸总血量
+func (s *WaveTimingSystem) UpdateWaveCurrentHealth(currentHealth int) {
+	timer := s.getTimerComponent()
+	if timer == nil {
+		return
+	}
+
+	timer.WaveCurrentHealthCs = currentHealth
+}
+
+// GetWaveHealthInfo 获取波次血量信息（用于调试和测试）
+//
+// Story 17.8: 返回当前波次的血量追踪信息
+//
+// 返回:
+//   - initialHealth: 初始总血量
+//   - currentHealth: 当前总血量
+//   - threshold: 血量触发阈值
+//   - triggered: 是否已触发血量加速
+func (s *WaveTimingSystem) GetWaveHealthInfo() (initialHealth, currentHealth int, threshold float64, triggered bool) {
+	timer := s.getTimerComponent()
+	if timer == nil {
+		return 0, 0, 0, false
+	}
+
+	return timer.WaveInitialHealthCs, timer.WaveCurrentHealthCs, timer.HealthTriggerThreshold, timer.HealthAccelerationTriggered
+}
+
+// CalculateCurrentWaveHealth 计算当前波次僵尸的实时总血量
+//
+// Story 17.8: 遍历所有本波僵尸，累加 Health + Armor
+// 由 LevelSystem 调用以获取实时血量
+//
+// 参数:
+//   - em: 实体管理器
+//   - currentWaveIndex: 当前波次索引（0-based）
+//
+// 返回:
+//   - int: 当前僵尸总血量（health + armor）
+func CalculateCurrentWaveHealth(em *ecs.EntityManager, currentWaveIndex int) int {
+	totalHealth := 0
+
+	// 遍历所有具有 ZombieWaveStateComponent 的实体
+	entities := ecs.GetEntitiesWith1[*components.ZombieWaveStateComponent](em)
+	for _, entity := range entities {
+		waveState, ok := ecs.GetComponent[*components.ZombieWaveStateComponent](em, entity)
+		if !ok {
+			continue
+		}
+
+		// 筛选本波僵尸
+		if waveState.WaveIndex != currentWaveIndex {
+			continue
+		}
+
+		// 累加血量
+		health, hasHealth := ecs.GetComponent[*components.HealthComponent](em, entity)
+		if hasHealth && health.CurrentHealth > 0 {
+			totalHealth += health.CurrentHealth
+		}
+
+		// 累加护甲
+		armor, hasArmor := ecs.GetComponent[*components.ArmorComponent](em, entity)
+		if hasArmor && armor.CurrentArmor > 0 {
+			totalHealth += armor.CurrentArmor
+		}
+	}
+
+	return totalHealth
 }
 

@@ -19,6 +19,7 @@ import (
 //   - 处理不同僵尸类型的工厂调用
 //   - Story 8.1: 验证僵尸生成行是否在 EnabledLanes 中
 //   - Story 17.3: 验证僵尸生成是否符合限制规则
+//   - Story 17.9: 使用精确的僵尸出生坐标
 //
 // 架构说明：
 //   - 作为 LevelSystem 的依赖，由 LevelSystem 调用
@@ -31,11 +32,12 @@ import (
 type WaveSpawnSystem struct {
 	entityManager   *ecs.EntityManager
 	resourceManager *game.ResourceManager
-	levelConfig     *config.LevelConfig        // 关卡配置（用于验证行数限制）
-	gameState       *game.GameState            // 用于更新僵尸生成计数
-	spawnRules      *config.SpawnRulesConfig   // Story 17.3: 僵尸生成规则配置
-	constraintID    ecs.EntityID               // Story 17.3: 生成限制组件实体ID
-	laneAllocator   *LaneAllocator             // Story 17.4: 行分配器系统
+	levelConfig     *config.LevelConfig          // 关卡配置（用于验证行数限制）
+	gameState       *game.GameState              // 用于更新僵尸生成计数
+	spawnRules      *config.SpawnRulesConfig     // Story 17.3: 僵尸生成规则配置
+	constraintID    ecs.EntityID                 // Story 17.3: 生成限制组件实体ID
+	laneAllocator   *LaneAllocator               // Story 17.4: 行分配器系统
+	zombiePhysics   *config.ZombiePhysicsConfig  // Story 17.9: 僵尸物理配置（出生点、进家边界）
 }
 
 // NewWaveSpawnSystem 创建波次生成系统
@@ -47,15 +49,17 @@ type WaveSpawnSystem struct {
 //	lc - 关卡配置（用于验证行数限制）
 //	gs - 游戏状态（用于更新僵尸生成计数）
 //	sr - Story 17.3: 僵尸生成规则配置（可选，nil 表示不启用限制检查）
+//	zp - Story 17.9: 僵尸物理配置（可选，nil 表示使用默认坐标）
 //
 // Removed ReanimSystem dependency, using AnimationCommand component
-func NewWaveSpawnSystem(em *ecs.EntityManager, rm *game.ResourceManager, lc *config.LevelConfig, gs *game.GameState, sr *config.SpawnRulesConfig) *WaveSpawnSystem {
+func NewWaveSpawnSystem(em *ecs.EntityManager, rm *game.ResourceManager, lc *config.LevelConfig, gs *game.GameState, sr *config.SpawnRulesConfig, zp *config.ZombiePhysicsConfig) *WaveSpawnSystem {
 	sys := &WaveSpawnSystem{
 		entityManager:   em,
 		resourceManager: rm,
 		levelConfig:     lc,
 		gameState:       gs,
 		spawnRules:      sr,
+		zombiePhysics:   zp,
 	}
 
 	// Story 17.3: 如果提供了生成规则，创建限制检查组件实体
@@ -320,6 +324,7 @@ func (s *WaveSpawnSystem) ActivateWave(waveIndex int) int {
 // 生成的僵尸初始状态为"待命"（不移动），需要调用 ActivateWave() 激活
 //
 // Story 17.3: 添加生成限制检查
+// Story 17.9: 使用精确的出生坐标
 //
 // 参数：
 //
@@ -371,15 +376,21 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 		}
 	}
 
+	// Story 17.9: 判断是否为旗帜波
+	isFlagWave := false
+	if s.levelConfig != nil && waveIndex >= 0 && waveIndex < len(s.levelConfig.Waves) {
+		isFlagWave = s.levelConfig.Waves[waveIndex].IsFlag
+	}
+
 	// 开场预览期间，僵尸随机分布在5行上
 	// 激活后，僵尸会移动到随机选择的有效行
 
 	// 预览行：随机选择一行（0-4）用于开场预览展示
 	previewRow := rand.Intn(5)
 
-	// 计算预览位置（僵尸初始站位）
-	// X坐标：在配置的范围内随机生成，根据预览行的最大X值
-	spawnX := s.getZombieSpawnX(previewRow)
+	// Story 17.9: 计算预览位置（僵尸初始站位）
+	// X坐标：根据波次类型和僵尸类型使用精确坐标
+	spawnX := s.getZombieSpawnXForWave(zombieType, isFlagWave, false)
 	spawnY := s.getZombieSpawnY(previewRow) // 使用随机行的Y坐标
 
 	// 根据类型创建僵尸
@@ -588,6 +599,8 @@ func (s *WaveSpawnSystem) addTargetLaneComponent(entityID ecs.EntityID, targetRo
 
 // getZombieSpawnX 获取僵尸生成X坐标
 //
+// Story 17.9: 优先使用物理配置的出生点范围，向后兼容旧逻辑
+//
 // 在配置的范围内随机生成，根据行号使用不同的最大X值
 // 范围：config.ZombieSpawnMinX ~ getZombieSpawnMaxX(row)
 //
@@ -597,14 +610,52 @@ func (s *WaveSpawnSystem) addTargetLaneComponent(entityID ecs.EntityID, targetRo
 //
 // 返回：
 //
-//	随机生成的X坐标
+//	随机生成的X坐标（世界坐标）
 func (s *WaveSpawnSystem) getZombieSpawnX(row int) float64 {
-	// 根据行号获取最大X值
-	maxX := s.getZombieSpawnMaxX(row)
+	// Story 17.9: 如果有物理配置，使用新坐标系
+	if s.zombiePhysics != nil {
+		// 使用默认的普通波配置（向后兼容调用）
+		minGridX, maxGridX := s.zombiePhysics.GetSpawnXRange("basic", false, false)
+		spawnRange := maxGridX - minGridX
+		gridX := minGridX + rand.Float64()*spawnRange
+		return config.GridToWorldX(gridX)
+	}
 
-	// 在配置范围内均匀随机分布
+	// 向后兼容：使用旧的硬编码逻辑
+	maxX := s.getZombieSpawnMaxX(row)
 	spawnRange := maxX - config.ZombieSpawnMinX
 	return config.ZombieSpawnMinX + rand.Float64()*spawnRange
+}
+
+// getZombieSpawnXForWave 获取指定波次和僵尸类型的出生点X坐标
+//
+// Story 17.9: 根据波次类型和僵尸类型返回精确的出生点坐标
+//
+// 参数：
+//
+//	zombieType - 僵尸类型字符串（如 "basic", "gargantuar"）
+//	isFlagWave - 是否为旗帜波
+//	isFlagZombie - 是否为旗帜僵尸
+//
+// 返回：
+//
+//	随机生成的X坐标（世界坐标）
+func (s *WaveSpawnSystem) getZombieSpawnXForWave(zombieType string, isFlagWave bool, isFlagZombie bool) float64 {
+	// Story 17.9: 如果有物理配置，使用精确坐标
+	if s.zombiePhysics != nil {
+		minGridX, maxGridX := s.zombiePhysics.GetSpawnXRange(zombieType, isFlagWave, isFlagZombie)
+		spawnRange := maxGridX - minGridX
+		var gridX float64
+		if spawnRange > 0 {
+			gridX = minGridX + rand.Float64()*spawnRange
+		} else {
+			gridX = minGridX // 固定位置（如旗帜僵尸）
+		}
+		return config.GridToWorldX(gridX)
+	}
+
+	// 向后兼容：使用旧的硬编码逻辑
+	return s.getZombieSpawnX(0)
 }
 
 // getZombieSpawnMaxX 根据行号获取僵尸生成的最大X坐标

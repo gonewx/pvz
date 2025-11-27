@@ -67,3 +67,10 @@ sceneTypeRestrictions:
   waterLaneConfig:
     pool: [3, 4]        # 泳池场景：第 3、4 行为水路
     fog: [3, 4]         # 雾夜场景：第 3、4 行为水路
+
+# Story 17.8: 血量触发加速刷新配置
+healthAcceleration:
+  minTriggerTimeCs: 401      # 最小刷出时间（厘秒）
+  targetCountdownCs: 200     # 触发后倒计时（厘秒）
+  thresholdMin: 0.50         # 血量阈值下限
+  thresholdMax: 0.65         # 血量阈值上限

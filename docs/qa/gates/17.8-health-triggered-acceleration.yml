@@ -1,0 +1,116 @@
+schema: 1
+story: "17.8"
+story_title: "加速刷新机制 - 血量触发"
+gate: PASS
+status_reason: "所有验收标准已满足，12个单元测试全部通过，代码质量良好，遵循ECS架构规范。"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-11-27T17:00:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 12
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "无安全敏感代码，纯游戏逻辑"
+  performance:
+    status: PASS
+    notes: "血量遍历每帧执行，但僵尸数量有限（通常<50），性能影响可忽略"
+  reliability:
+    status: PASS
+    notes: "防重复触发标志确保逻辑可靠性"
+  maintainability:
+    status: PASS
+    notes: "代码文档完善，遵循GoDoc标准，逻辑清晰"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "考虑将HealthAccelerationConfig常量从spawn_rules.yaml读取并应用到WaveTimingSystem"
+      refs: ["pkg/systems/wave_timing_system.go:51-56"]
+
+# 需求追溯 (Given-When-Then)
+trace_matrix:
+  - ac: 1
+    title: "血量计算"
+    tests:
+      - name: "TestCalculateZombieEffectiveHealth"
+        given: "僵尸类型配置包含 baseHealth, tier1, tier2 血量"
+        when: "调用 CalculateZombieEffectiveHealth(base, tier1, tier2)"
+        then: "返回 base + tier1 + int(tier2 * 0.20)"
+      - name: "TestGetZombieTypeEffectiveHealth"
+        given: "ZombieStatsConfig 包含僵尸配置"
+        when: "调用 GetZombieTypeEffectiveHealth(config, zombieType)"
+        then: "返回该类型的有效血量"
+    status: COVERED
+
+  - ac: 2
+    title: "刷新激活条件"
+    tests:
+      - name: "TestWaveTimingSystem_HealthAcceleration_BasicTrigger"
+        given: "波次刷出 > 401cs，倒计时 > 200cs，血量 <= 阈值"
+        when: "调用 CheckHealthAcceleratedRefresh(currentHealth)"
+        then: "返回 true，倒计时设为 200cs"
+      - name: "TestWaveTimingSystem_HealthAcceleration_MinTimeRequirement"
+        given: "波次刷出 <= 401cs"
+        when: "调用 CheckHealthAcceleratedRefresh"
+        then: "返回 false，不触发加速"
+      - name: "TestWaveTimingSystem_HealthAcceleration_CountdownAlreadyLow"
+        given: "倒计时 <= 200cs"
+        when: "调用 CheckHealthAcceleratedRefresh"
+        then: "返回 false，不触发加速"
+      - name: "TestWaveTimingSystem_HealthAcceleration_NotOnFlagWave"
+        given: "IsFlagWaveApproaching = true"
+        when: "调用 CheckHealthAcceleratedRefresh"
+        then: "返回 false，旗帜波前使用消灭触发"
+    status: COVERED
+
+  - ac: 3
+    title: "血量追踪"
+    tests:
+      - name: "TestWaveTimingSystem_InitializeWaveHealth"
+        given: "波次僵尸列表"
+        when: "调用 InitializeWaveHealth(zombieList, config)"
+        then: "设置 WaveInitialHealthCs，随机生成阈值 [0.50, 0.65]"
+      - name: "TestCalculateCurrentWaveHealth"
+        given: "EntityManager 包含本波僵尸实体"
+        when: "调用 CalculateCurrentWaveHealth(em, waveIndex)"
+        then: "返回 Health + Armor 总和"
+      - name: "TestWaveTimingSystem_UpdateWaveCurrentHealth"
+        given: "WaveTimerComponent 已初始化"
+        when: "调用 UpdateWaveCurrentHealth(currentHealth)"
+        then: "WaveCurrentHealthCs 更新为传入值"
+    status: COVERED
+
+  - ac: 4
+    title: "配置参数"
+    tests:
+      - name: "TestWaveTimingSystem_HealthAcceleration_ThresholdRange"
+        given: "调用 InitializeWaveHealth 100次"
+        when: "检查 HealthTriggerThreshold"
+        then: "值在 [0.50, 0.65] 范围内"
+      - name: "TestLoadSpawnRules"
+        given: "spawn_rules.yaml 包含 healthAcceleration 配置"
+        when: "调用 LoadSpawnRules"
+        then: "成功加载并验证配置"
+    status: COVERED
+
+  - ac: 5
+    title: "单元测试覆盖率 >= 80%"
+    tests:
+      - name: "TestWaveTimingSystem_HealthAcceleration_PreventDoubleTrigger"
+        given: "HealthAccelerationTriggered = true"
+        when: "再次调用 CheckHealthAcceleratedRefresh"
+        then: "返回 false，防止重复触发"
+    status: COVERED
+    notes: "12个测试用例覆盖所有核心逻辑，满足80%覆盖率目标"

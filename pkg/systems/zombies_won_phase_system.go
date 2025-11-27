@@ -49,6 +49,7 @@ const (
 	ScreenShakeDuration  = 2.5   // 抖动持续时间（秒）
 
 	// 僵尸触发失败的边界X坐标（进入 Phase 1）
+	// Story 17.9: 此常量作为兼容默认值，LevelSystem 会优先使用类型化的配置边界
 	DefeatBoundaryX = 220.0
 )
 

@@ -26,6 +26,8 @@ const (
 //   - 触发最后一波提示
 //   - 触发关卡完成奖励动画（Story 8.3）
 //   - Story 17.7: 管理旗帜波警告和最终波白字显示
+//   - Story 17.8: 血量触发加速刷新
+//   - Story 17.9: 类型化进家判定
 //
 // 架构说明：
 //   - 通过 GameState 单例管理关卡状态
@@ -44,6 +46,12 @@ type LevelSystem struct {
 
 	// Story 17.6: 是否使用新的波次计时系统
 	useWaveTimingSystem bool
+
+	// Story 17.8: 僵尸属性配置（用于血量计算）
+	zombieStatsConfig *config.ZombieStatsConfig
+
+	// Story 17.9: 僵尸物理配置（用于类型化进家判定）
+	zombiePhysics *config.ZombiePhysicsConfig
 
 	// 关卡进度条支持
 	progressBarEntityID ecs.EntityID // 进度条实体ID（如果存在）
@@ -173,27 +181,36 @@ func (s *LevelSystem) Update(deltaTime float64) {
 
 // checkAcceleratedRefresh 检查加速刷新条件
 //
-// Story 17.7: 旗帜波前一波的加速刷新逻辑
+// Story 17.7: 旗帜波前一波的加速刷新逻辑（消灭触发）
+// Story 17.8: 常规波次的血量触发加速刷新
+//
 // 当满足以下条件时触发加速刷新：
-//   - 正在接近旗帜波
-//   - 刷出时间 > 401cs
-//   - 倒计时 > 200cs
-//   - 本波僵尸已全部消灭
+//   - 消灭触发（旗帜波前）: 僵尸全部消灭
+//   - 血量触发（常规波）: 当前血量 <= 初始血量 × 阈值
 func (s *LevelSystem) checkAcceleratedRefresh() {
 	if s.waveTimingSystem == nil {
 		return
 	}
 
-	// 只在接近旗帜波时检查
-	if !s.waveTimingSystem.IsFlagWaveApproaching() {
+	// Story 17.7: 旗帜波前消灭触发
+	if s.waveTimingSystem.IsFlagWaveApproaching() {
+		// 检查本波僵尸是否全部消灭
+		allZombiesCleared := s.areCurrentWaveZombiesCleared()
+		// 调用 WaveTimingSystem 执行消灭触发加速刷新检查
+		s.waveTimingSystem.CheckAcceleratedRefresh(allZombiesCleared)
 		return
 	}
 
-	// 检查本波僵尸是否全部消灭
-	allZombiesCleared := s.areCurrentWaveZombiesCleared()
-
-	// 调用 WaveTimingSystem 执行加速刷新检查
-	s.waveTimingSystem.CheckAcceleratedRefresh(allZombiesCleared)
+	// Story 17.8: 常规波次血量触发
+	// 获取当前波次索引（用于计算该波僵尸血量）
+	currentWaveIndex := s.waveTimingSystem.GetCurrentWaveIndex()
+	if currentWaveIndex > 0 {
+		// 计算上一波（刚激活的波次）的当前血量
+		// 注意：currentWaveIndex 是下一个要触发的波次，所以刚激活的是 currentWaveIndex-1
+		lastActivatedWaveIndex := currentWaveIndex - 1
+		currentHealth := CalculateCurrentWaveHealth(s.entityManager, lastActivatedWaveIndex)
+		s.waveTimingSystem.CheckHealthAcceleratedRefresh(currentHealth)
+	}
 }
 
 // areCurrentWaveZombiesCleared 检查当前波僵尸是否全部消灭
@@ -239,6 +256,7 @@ func (s *LevelSystem) areCurrentWaveZombiesCleared() bool {
 // 教学关卡由 TutorialSystem 控制僵尸激活，不使用此方法
 //
 // Story 17.6: 如果启用了 WaveTimingSystem，从计时系统获取触发信号
+// Story 17.8: 在激活波次后初始化血量追踪
 func (s *LevelSystem) checkAndSpawnWaves() {
 	// 教学关卡：僵尸由 TutorialSystem 控制激活
 	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.OpeningType == "tutorial" {
@@ -271,6 +289,9 @@ func (s *LevelSystem) checkAndSpawnWaves() {
 
 	// 标记波次已激活
 	s.gameState.MarkWaveSpawned(waveIndex)
+
+	// Story 17.8: 初始化波次血量追踪
+	s.initializeWaveHealth(waveIndex)
 
 	// 第一波僵尸生成后显示完整进度条
 	if waveIndex == 0 {
@@ -374,6 +395,7 @@ func (s *LevelSystem) checkDefeatCondition() {
 }
 
 // checkDefeatWithLawnmower 检查失败条件（有除草车）
+// Story 17.9: 使用类型化进家边界
 func (s *LevelSystem) checkDefeatWithLawnmower() {
 	// 获取除草车状态组件
 	stateEntityID := s.lawnmowerSystem.GetStateEntityID()
@@ -407,8 +429,12 @@ func (s *LevelSystem) checkDefeatWithLawnmower() {
 			continue
 		}
 
+		// Story 17.9: 获取类型化的进家边界
+		zombieTypeStr := s.behaviorTypeToString(behavior.Type)
+		defeatBoundary := s.getDefeatBoundary(zombieTypeStr)
+
 		// 僵尸到达左边界
-		if pos.X < DefeatBoundaryX {
+		if pos.X < defeatBoundary {
 			// 计算僵尸所在行
 			lane := s.getEntityLane(pos.Y)
 
@@ -416,14 +442,14 @@ func (s *LevelSystem) checkDefeatWithLawnmower() {
 			if state.UsedLanes[lane] {
 				// 除草车已使用，游戏失败
 				s.gameState.SetGameResult("lose")
-				log.Printf("[LevelSystem] Defeat! Zombie (ID:%d) reached the left boundary on lane %d (lawnmower used)", entityID, lane)
+				log.Printf("[LevelSystem] Defeat! Zombie (ID:%d, type:%s) reached the left boundary on lane %d (lawnmower used, boundary=%.1f)", entityID, zombieTypeStr, lane, defeatBoundary)
 
 				// 触发完整的僵尸获胜流程（Story 8.8）
 				s.triggerZombiesWonFlow(entityID)
 				return
 			} else {
 				// 除草车未使用，不触发失败（让除草车触发）
-				log.Printf("[LevelSystem] Zombie (ID:%d) reached left boundary on lane %d, waiting for lawnmower to trigger", entityID, lane)
+				log.Printf("[LevelSystem] Zombie (ID:%d, type:%s) reached left boundary on lane %d, waiting for lawnmower to trigger", entityID, zombieTypeStr, lane)
 				// 注意：不 return，继续检查其他行是否有除草车用完的情况
 			}
 		}
@@ -431,6 +457,7 @@ func (s *LevelSystem) checkDefeatWithLawnmower() {
 }
 
 // checkDefeatWithoutLawnmower 检查失败条件（无除草车，原逻辑）
+// Story 17.9: 使用类型化进家边界
 func (s *LevelSystem) checkDefeatWithoutLawnmower() {
 	zombieEntities := ecs.GetEntitiesWith2[
 		*components.BehaviorComponent,
@@ -452,15 +479,61 @@ func (s *LevelSystem) checkDefeatWithoutLawnmower() {
 			continue
 		}
 
+		// Story 17.9: 获取类型化的进家边界
+		zombieTypeStr := s.behaviorTypeToString(behavior.Type)
+		defeatBoundary := s.getDefeatBoundary(zombieTypeStr)
+
 		// 僵尸到达左边界，游戏失败
-		if pos.X < DefeatBoundaryX {
+		if pos.X < defeatBoundary {
 			s.gameState.SetGameResult("lose")
-			log.Printf("[LevelSystem] Defeat! Zombie (ID:%d) reached the left boundary at X=%.0f", entityID, pos.X)
+			log.Printf("[LevelSystem] Defeat! Zombie (ID:%d, type:%s) reached the left boundary at X=%.0f (boundary=%.1f)", entityID, zombieTypeStr, pos.X, defeatBoundary)
 
 			// 触发完整的僵尸获胜流程（Story 8.8）
 			s.triggerZombiesWonFlow(entityID)
 			return
 		}
+	}
+}
+
+// getDefeatBoundary 获取僵尸类型对应的进家边界（世界坐标）
+//
+// Story 17.9: 使用类型化进家边界配置
+// 如果未加载物理配置，使用现有 DefeatBoundaryX 常量（向后兼容）
+//
+// 参数:
+//   - zombieType: 僵尸类型字符串（如 "basic", "polevaulter"）
+//
+// 返回:
+//   - float64: 进家判定边界（世界坐标）
+func (s *LevelSystem) getDefeatBoundary(zombieType string) float64 {
+	if s.zombiePhysics != nil {
+		boundary := s.zombiePhysics.GetDefeatBoundary(zombieType)
+		return config.GridToWorldX(boundary)
+	}
+	// 兼容现有常量
+	return DefeatBoundaryX
+}
+
+// behaviorTypeToString 将 BehaviorType 转换为僵尸类型字符串
+//
+// Story 17.9: 用于查找进家边界配置
+//
+// 参数:
+//   - behaviorType: 行为类型枚举
+//
+// 返回:
+//   - string: 僵尸类型字符串
+func (s *LevelSystem) behaviorTypeToString(behaviorType components.BehaviorType) string {
+	switch behaviorType {
+	case components.BehaviorZombieBasic, components.BehaviorZombieEating, components.BehaviorZombieDying:
+		return "basic"
+	case components.BehaviorZombieConehead:
+		return "conehead"
+	case components.BehaviorZombieBuckethead:
+		return "buckethead"
+	// 以下为未来扩展的僵尸类型，当前返回默认值
+	default:
+		return "default"
 	}
 }
 
@@ -1020,4 +1093,94 @@ func (s *LevelSystem) GetFlagWaveWarningSystem() *FlagWaveWarningSystem {
 // Story 17.7: 供测试和调试使用
 func (s *LevelSystem) GetFinalWaveTextSystem() *FinalWaveTextSystem {
 	return s.finalWaveTextSystem
+}
+
+// ========== Story 17.8: 血量触发加速刷新 ==========
+
+// SetZombieStatsConfig 设置僵尸属性配置
+//
+// Story 17.8: 用于血量计算
+// 在关卡初始化时调用
+//
+// 参数:
+//   - cfg: 僵尸属性配置
+func (s *LevelSystem) SetZombieStatsConfig(cfg *config.ZombieStatsConfig) {
+	s.zombieStatsConfig = cfg
+}
+
+// SetZombiePhysicsConfig 设置僵尸物理配置
+//
+// Story 17.9: 用于类型化进家判定
+// 在关卡初始化时调用
+//
+// 参数:
+//   - cfg: 僵尸物理配置
+func (s *LevelSystem) SetZombiePhysicsConfig(cfg *config.ZombiePhysicsConfig) {
+	s.zombiePhysics = cfg
+}
+
+// initializeWaveHealth 初始化波次血量追踪
+//
+// Story 17.8: 在波次激活后调用，计算并设置本波僵尸总血量
+//
+// 参数:
+//   - waveIndex: 波次索引（0-based）
+func (s *LevelSystem) initializeWaveHealth(waveIndex int) {
+	// 不使用 WaveTimingSystem 时跳过
+	if !s.useWaveTimingSystem || s.waveTimingSystem == nil {
+		return
+	}
+
+	// 获取关卡配置
+	levelConfig := s.gameState.CurrentLevel
+	if levelConfig == nil {
+		return
+	}
+
+	// 确保波次索引有效
+	if waveIndex < 0 || waveIndex >= len(levelConfig.Waves) {
+		return
+	}
+
+	// 从关卡配置中获取波次僵尸信息
+	waveConfig := levelConfig.Waves[waveIndex]
+	zombieList := s.extractZombieSpawnInfo(&waveConfig)
+
+	// 调用 WaveTimingSystem 初始化血量
+	s.waveTimingSystem.InitializeWaveHealth(zombieList, s.zombieStatsConfig)
+}
+
+// extractZombieSpawnInfo 从波次配置中提取僵尸生成信息
+//
+// Story 17.8: 支持新格式 ZombieGroup 和旧格式 OldZombies
+//
+// 参数:
+//   - waveConfig: 波次配置
+//
+// 返回:
+//   - []ZombieSpawnInfo: 僵尸生成信息列表
+func (s *LevelSystem) extractZombieSpawnInfo(waveConfig *config.WaveConfig) []ZombieSpawnInfo {
+	var result []ZombieSpawnInfo
+
+	// 处理新格式 ZombieGroup
+	for _, group := range waveConfig.Zombies {
+		result = append(result, ZombieSpawnInfo{
+			Type:  group.Type,
+			Count: group.Count,
+		})
+	}
+
+	// 处理旧格式 OldZombies（向后兼容）
+	for _, spawn := range waveConfig.OldZombies {
+		count := spawn.Count
+		if count == 0 {
+			count = 1 // 默认生成 1 只
+		}
+		result = append(result, ZombieSpawnInfo{
+			Type:  spawn.Type,
+			Count: count,
+		})
+	}
+
+	return result
 }

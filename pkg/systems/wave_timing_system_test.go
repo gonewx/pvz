@@ -835,3 +835,363 @@ func TestWaveTimingSystem_IsHugeWaveWarningActive(t *testing.T) {
 	}
 }
 
+// ========================================
+// Story 17.8: 血量触发加速刷新测试
+// ========================================
+
+// TestCalculateZombieEffectiveHealth 测试血量计算公式
+func TestCalculateZombieEffectiveHealth(t *testing.T) {
+	tests := []struct {
+		name       string
+		baseHealth int
+		tier1      int
+		tier2      int
+		expected   int
+	}{
+		{"basic zombie", 270, 0, 0, 270},
+		{"conehead zombie", 270, 370, 0, 640},
+		{"buckethead zombie", 270, 1100, 0, 1370},
+		{"with tier2 accessory", 270, 0, 500, 370}, // 270 + 0 + 500*0.2 = 370
+		{"full combo", 270, 370, 500, 740},         // 270 + 370 + 500*0.2 = 740
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := CalculateZombieEffectiveHealth(tt.baseHealth, tt.tier1, tt.tier2)
+			if result != tt.expected {
+				t.Errorf("CalculateZombieEffectiveHealth(%d, %d, %d) = %d, want %d",
+					tt.baseHealth, tt.tier1, tt.tier2, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestGetZombieTypeEffectiveHealth 测试从配置获取有效血量
+func TestGetZombieTypeEffectiveHealth(t *testing.T) {
+	// 创建测试配置
+	cfg := &config.ZombieStatsConfig{
+		Zombies: map[string]config.ZombieStats{
+			"basic": {
+				BaseHealth:           270,
+				Tier1AccessoryHealth: 0,
+				Tier2AccessoryHealth: 0,
+			},
+			"conehead": {
+				BaseHealth:           270,
+				Tier1AccessoryHealth: 370,
+				Tier2AccessoryHealth: 0,
+			},
+			"buckethead": {
+				BaseHealth:           270,
+				Tier1AccessoryHealth: 1100,
+				Tier2AccessoryHealth: 0,
+			},
+		},
+	}
+
+	tests := []struct {
+		zombieType string
+		expected   int
+	}{
+		{"basic", 270},
+		{"conehead", 640},
+		{"buckethead", 1370},
+		{"unknown", 270}, // 默认普僵血量
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.zombieType, func(t *testing.T) {
+			result := GetZombieTypeEffectiveHealth(cfg, tt.zombieType)
+			if result != tt.expected {
+				t.Errorf("GetZombieTypeEffectiveHealth(%q) = %d, want %d",
+					tt.zombieType, result, tt.expected)
+			}
+		})
+	}
+
+	// 测试 nil 配置
+	t.Run("nil config", func(t *testing.T) {
+		result := GetZombieTypeEffectiveHealth(nil, "basic")
+		if result != 270 {
+			t.Errorf("GetZombieTypeEffectiveHealth(nil, \"basic\") = %d, want 270", result)
+		}
+	})
+}
+
+// TestWaveTimingSystem_InitializeWaveHealth 测试波次血量初始化
+func TestWaveTimingSystem_InitializeWaveHealth(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := createTestGameState()
+	levelConfig := createTestLevelConfig(3)
+	resetGameState(gs, levelConfig)
+
+	system := NewWaveTimingSystem(em, gs, levelConfig)
+
+	// 创建测试配置
+	cfg := &config.ZombieStatsConfig{
+		Zombies: map[string]config.ZombieStats{
+			"basic":    {BaseHealth: 270},
+			"conehead": {BaseHealth: 270, Tier1AccessoryHealth: 370},
+		},
+	}
+
+	// 初始化波次血量
+	zombieList := []ZombieSpawnInfo{
+		{Type: "basic", Count: 3},    // 3 * 270 = 810
+		{Type: "conehead", Count: 2}, // 2 * 640 = 1280
+	}
+	system.InitializeWaveHealth(zombieList, cfg)
+
+	// 检查血量信息
+	initialHealth, currentHealth, threshold, triggered := system.GetWaveHealthInfo()
+
+	expectedHealth := 810 + 1280 // 2090
+	if initialHealth != expectedHealth {
+		t.Errorf("Expected initialHealth = %d, got %d", expectedHealth, initialHealth)
+	}
+
+	if currentHealth != expectedHealth {
+		t.Errorf("Expected currentHealth = %d, got %d", expectedHealth, currentHealth)
+	}
+
+	// 阈值应该在 [0.50, 0.65] 范围内
+	if threshold < 0.50 || threshold > 0.65 {
+		t.Errorf("Expected threshold in [0.50, 0.65], got %.2f", threshold)
+	}
+
+	// 初始时不应触发
+	if triggered {
+		t.Error("Expected HealthAccelerationTriggered = false")
+	}
+}
+
+// TestWaveTimingSystem_HealthAcceleration_BasicTrigger 测试血量加速基本触发
+func TestWaveTimingSystem_HealthAcceleration_BasicTrigger(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := createTestGameState()
+	levelConfig := createTestLevelConfig(5)
+	resetGameState(gs, levelConfig)
+
+	system := NewWaveTimingSystem(em, gs, levelConfig)
+
+	timer := system.getTimerComponent()
+	timer.CurrentWaveIndex = 2 // 常规波次
+	timer.CountdownCs = 3000   // > 200cs
+	timer.WaveElapsedCs = 500  // > 401cs
+	timer.IsFlagWaveApproaching = false
+	timer.WaveInitialHealthCs = 1000
+	timer.WaveCurrentHealthCs = 1000
+	timer.HealthTriggerThreshold = 0.50
+	timer.HealthAccelerationTriggered = false
+
+	// 当前血量正好 50%，应该触发
+	triggered := system.CheckHealthAcceleratedRefresh(500)
+
+	if !triggered {
+		t.Error("Expected health acceleration to be triggered")
+	}
+
+	if timer.CountdownCs != AcceleratedRefreshCountdownCs {
+		t.Errorf("Expected CountdownCs = %d, got %d", AcceleratedRefreshCountdownCs, timer.CountdownCs)
+	}
+
+	if !timer.HealthAccelerationTriggered {
+		t.Error("Expected HealthAccelerationTriggered = true")
+	}
+}
+
+// TestWaveTimingSystem_HealthAcceleration_ThresholdRange 测试阈值范围
+func TestWaveTimingSystem_HealthAcceleration_ThresholdRange(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := createTestGameState()
+	levelConfig := createTestLevelConfig(3)
+	resetGameState(gs, levelConfig)
+
+	system := NewWaveTimingSystem(em, gs, levelConfig)
+
+	cfg := &config.ZombieStatsConfig{
+		Zombies: map[string]config.ZombieStats{
+			"basic": {BaseHealth: 270},
+		},
+	}
+
+	// 多次测试阈值范围
+	for i := 0; i < 100; i++ {
+		zombieList := []ZombieSpawnInfo{{Type: "basic", Count: 1}}
+		system.InitializeWaveHealth(zombieList, cfg)
+
+		_, _, threshold, _ := system.GetWaveHealthInfo()
+
+		if threshold < 0.50 || threshold > 0.65 {
+			t.Errorf("Iteration %d: threshold %.4f not in [0.50, 0.65]", i, threshold)
+		}
+	}
+}
+
+// TestWaveTimingSystem_HealthAcceleration_NotOnFlagWave 测试旗帜波前不触发
+func TestWaveTimingSystem_HealthAcceleration_NotOnFlagWave(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := createTestGameState()
+	levelConfig := createTestLevelConfigWithFlagWave(10, 9)
+	resetGameState(gs, levelConfig)
+
+	system := NewWaveTimingSystem(em, gs, levelConfig)
+
+	timer := system.getTimerComponent()
+	timer.CurrentWaveIndex = 9
+	timer.CountdownCs = 3000
+	timer.WaveElapsedCs = 500
+	timer.IsFlagWaveApproaching = true // 旗帜波前
+	timer.WaveInitialHealthCs = 1000
+	timer.HealthTriggerThreshold = 0.50
+	timer.HealthAccelerationTriggered = false
+
+	// 血量条件满足，但因为是旗帜波前，不应触发血量加速
+	triggered := system.CheckHealthAcceleratedRefresh(400)
+
+	if triggered {
+		t.Error("Expected health acceleration NOT to be triggered on flag wave prefix")
+	}
+}
+
+// TestWaveTimingSystem_HealthAcceleration_PreventDoubleTrigger 测试防止重复触发
+func TestWaveTimingSystem_HealthAcceleration_PreventDoubleTrigger(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := createTestGameState()
+	levelConfig := createTestLevelConfig(5)
+	resetGameState(gs, levelConfig)
+
+	system := NewWaveTimingSystem(em, gs, levelConfig)
+
+	timer := system.getTimerComponent()
+	timer.CurrentWaveIndex = 2
+	timer.CountdownCs = 3000
+	timer.WaveElapsedCs = 500
+	timer.IsFlagWaveApproaching = false
+	timer.WaveInitialHealthCs = 1000
+	timer.HealthTriggerThreshold = 0.50
+	timer.HealthAccelerationTriggered = false
+
+	// 第一次触发
+	triggered1 := system.CheckHealthAcceleratedRefresh(400)
+	if !triggered1 {
+		t.Error("First trigger should succeed")
+	}
+
+	// 重置倒计时以便测试重复触发
+	timer.CountdownCs = 2500
+
+	// 第二次触发应该被阻止
+	triggered2 := system.CheckHealthAcceleratedRefresh(300)
+	if triggered2 {
+		t.Error("Second trigger should be prevented")
+	}
+}
+
+// TestWaveTimingSystem_HealthAcceleration_MinTimeRequirement 测试最小时间要求
+func TestWaveTimingSystem_HealthAcceleration_MinTimeRequirement(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := createTestGameState()
+	levelConfig := createTestLevelConfig(5)
+	resetGameState(gs, levelConfig)
+
+	system := NewWaveTimingSystem(em, gs, levelConfig)
+
+	timer := system.getTimerComponent()
+	timer.CurrentWaveIndex = 2
+	timer.CountdownCs = 3000
+	timer.WaveElapsedCs = 400 // <= 401cs，不满足
+	timer.IsFlagWaveApproaching = false
+	timer.WaveInitialHealthCs = 1000
+	timer.HealthTriggerThreshold = 0.50
+	timer.HealthAccelerationTriggered = false
+
+	// 时间不足，不应触发
+	triggered := system.CheckHealthAcceleratedRefresh(400)
+
+	if triggered {
+		t.Error("Expected health acceleration NOT to be triggered (elapsed time < 401cs)")
+	}
+}
+
+// TestWaveTimingSystem_HealthAcceleration_CountdownAlreadyLow 测试倒计时已经很低
+func TestWaveTimingSystem_HealthAcceleration_CountdownAlreadyLow(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := createTestGameState()
+	levelConfig := createTestLevelConfig(5)
+	resetGameState(gs, levelConfig)
+
+	system := NewWaveTimingSystem(em, gs, levelConfig)
+
+	timer := system.getTimerComponent()
+	timer.CurrentWaveIndex = 2
+	timer.CountdownCs = 150 // <= 200cs，已经很低
+	timer.WaveElapsedCs = 500
+	timer.IsFlagWaveApproaching = false
+	timer.WaveInitialHealthCs = 1000
+	timer.HealthTriggerThreshold = 0.50
+	timer.HealthAccelerationTriggered = false
+
+	// 倒计时已经很低，不应触发
+	triggered := system.CheckHealthAcceleratedRefresh(400)
+
+	if triggered {
+		t.Error("Expected health acceleration NOT to be triggered (countdown <= 200cs)")
+	}
+}
+
+// TestCalculateCurrentWaveHealth 测试实时血量计算
+func TestCalculateCurrentWaveHealth(t *testing.T) {
+	em := ecs.NewEntityManager()
+
+	// 创建波次 0 的僵尸
+	zombie1 := em.CreateEntity()
+	ecs.AddComponent(em, zombie1, &components.ZombieWaveStateComponent{WaveIndex: 0})
+	ecs.AddComponent(em, zombie1, &components.HealthComponent{CurrentHealth: 100})
+	ecs.AddComponent(em, zombie1, &components.ArmorComponent{CurrentArmor: 50})
+
+	zombie2 := em.CreateEntity()
+	ecs.AddComponent(em, zombie2, &components.ZombieWaveStateComponent{WaveIndex: 0})
+	ecs.AddComponent(em, zombie2, &components.HealthComponent{CurrentHealth: 200})
+
+	// 创建波次 1 的僵尸（不应计入）
+	zombie3 := em.CreateEntity()
+	ecs.AddComponent(em, zombie3, &components.ZombieWaveStateComponent{WaveIndex: 1})
+	ecs.AddComponent(em, zombie3, &components.HealthComponent{CurrentHealth: 300})
+
+	// 计算波次 0 的血量
+	totalHealth := CalculateCurrentWaveHealth(em, 0)
+
+	// 期望：100 + 50 + 200 = 350
+	expected := 350
+	if totalHealth != expected {
+		t.Errorf("CalculateCurrentWaveHealth = %d, want %d", totalHealth, expected)
+	}
+
+	// 计算波次 1 的血量
+	totalHealth1 := CalculateCurrentWaveHealth(em, 1)
+	if totalHealth1 != 300 {
+		t.Errorf("CalculateCurrentWaveHealth(wave 1) = %d, want 300", totalHealth1)
+	}
+}
+
+// TestWaveTimingSystem_UpdateWaveCurrentHealth 测试更新当前血量
+func TestWaveTimingSystem_UpdateWaveCurrentHealth(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := createTestGameState()
+	levelConfig := createTestLevelConfig(3)
+	resetGameState(gs, levelConfig)
+
+	system := NewWaveTimingSystem(em, gs, levelConfig)
+
+	timer := system.getTimerComponent()
+	timer.WaveCurrentHealthCs = 1000
+
+	// 更新血量
+	system.UpdateWaveCurrentHealth(500)
+
+	if timer.WaveCurrentHealthCs != 500 {
+		t.Errorf("Expected WaveCurrentHealthCs = 500, got %d", timer.WaveCurrentHealthCs)
+	}
+}
+

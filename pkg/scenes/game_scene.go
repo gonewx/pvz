@@ -345,8 +345,14 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 		log.Printf("[GameScene] Warning: Failed to load spawn rules: %v (constraint checking disabled)", err)
 		spawnRules = nil
 	}
-	scene.waveSpawnSystem = systems.NewWaveSpawnSystem(scene.entityManager, rm, scene.gameState.CurrentLevel, scene.gameState, spawnRules)
-	log.Printf("[GameScene] Initialized wave spawn system (spawn rules enabled: %v)", spawnRules != nil)
+	// Story 17.9: Load zombie physics config (optional, nil means use default coordinates)
+	zombiePhysics, err := config.LoadZombiePhysicsConfig("data/zombie_physics.yaml")
+	if err != nil {
+		log.Printf("[GameScene] Warning: Failed to load zombie physics config: %v (using default coordinates)", err)
+		zombiePhysics = nil
+	}
+	scene.waveSpawnSystem = systems.NewWaveSpawnSystem(scene.entityManager, rm, scene.gameState.CurrentLevel, scene.gameState, spawnRules, zombiePhysics)
+	log.Printf("[GameScene] Initialized wave spawn system (spawn rules enabled: %v, physics config enabled: %v)", spawnRules != nil, zombiePhysics != nil)
 
 	// Pre-spawn all zombies for the level (they will be activated wave by wave)
 	// Story 8.3.1: 僵尸预生成时机取决于是否有开场动画
@@ -399,6 +405,10 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	// 2. Create LevelSystem (需要 RewardAnimationSystem 和 LawnmowerSystem)
 	// Story 14.3: Epic 14 - Removed ReanimSystem dependency
 	scene.levelSystem = systems.NewLevelSystem(scene.entityManager, scene.gameState, scene.waveSpawnSystem, rm, scene.rewardSystem, scene.lawnmowerSystem)
+	// Story 17.9: 设置僵尸物理配置（用于类型化进家判定）
+	if zombiePhysics != nil {
+		scene.levelSystem.SetZombiePhysicsConfig(zombiePhysics)
+	}
 	log.Printf("[GameScene] Initialized level system")
 
 	// Story 11.3: Create FinalWaveWarningSystem (最后一波提示系统)

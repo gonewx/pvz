@@ -83,5 +83,25 @@ type WaveTimerComponent struct {
 	// HugeWaveWarningTriggered 红字警告是否已触发
 	// 防止重复触发警告
 	HugeWaveWarningTriggered bool
+
+	// ========== Story 17.8: 血量触发加速刷新字段 ==========
+
+	// WaveInitialHealthCs 本波僵尸初始总血量（加权有效血量）
+	// 计算公式: baseHealth + tier1AccessoryHealth + int(tier2AccessoryHealth * 0.20)
+	// 在波次开始时由 WaveTimingSystem 设置
+	WaveInitialHealthCs int
+
+	// WaveCurrentHealthCs 本波僵尸当前总血量
+	// 动态更新，用于与 WaveInitialHealthCs 比较判断血量触发条件
+	WaveCurrentHealthCs int
+
+	// HealthTriggerThreshold 血量触发比例阈值
+	// 范围 [0.50, 0.65]，每波次随机生成
+	// 当 WaveCurrentHealthCs <= WaveInitialHealthCs * HealthTriggerThreshold 时触发加速
+	HealthTriggerThreshold float64
+
+	// HealthAccelerationTriggered 是否已触发血量加速
+	// 防止同一波内重复触发
+	HealthAccelerationTriggered bool
 }
 

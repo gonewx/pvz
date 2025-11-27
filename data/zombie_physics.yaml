@@ -1,0 +1,54 @@
+# 僵尸物理配置文件
+#
+# 坐标系原点说明:
+# 以 Level 1-1 格子左上角为原点 (0, 0)
+# 即 GridWorldStartX, GridWorldStartY
+#
+# 世界坐标转换公式:
+# worldX = GridWorldStartX + gridRelativeX
+# worldY = GridWorldStartY + gridRelativeY
+#
+# 当前 GridWorldStartX = 255.0 (pkg/config/layout_config.go)
+
+# 出生点X坐标配置 (相对于网格原点的X偏移)
+spawnX:
+  # 普通波: 僵尸出生在 780~819 范围内随机
+  normal:
+    min: 780
+    max: 819
+  # 旗帜波: 僵尸出生在 820~859 范围内随机
+  flagWave:
+    min: 820
+    max: 859
+  # 旗帜僵尸: 固定位置 800
+  flagZombie: 800
+  # 冰车 (Zomboni): 800~809 范围
+  zomboni:
+    min: 800
+    max: 809
+  # 巨人 (Gargantuar): 845~854 范围
+  gargantuar:
+    min: 845
+    max: 854
+
+# 进家判定X坐标 (相对于网格原点, 负值表示在网格左侧)
+# 当僵尸X坐标 <= GridWorldStartX + defeatBoundary 时判定为进家
+defeatBoundary:
+  # 默认边界: 普僵/路障/铁桶
+  default: -100
+  # 橄榄球僵尸 (Football Zombie)
+  football: -175
+  # 冰车 (Zomboni)
+  zomboni: -175
+  # 投篮车 (Catapult Zombie)
+  catapult: -175
+  # 舞王 (Dancing Zombie)
+  dancer: -130
+  # 伴舞 (Backup Dancer)
+  backupDancer: -130
+  # 潜水僵尸 (Snorkel Zombie)
+  snorkel: -130
+  # 撑杆僵尸 (Pole Vaulting Zombie)
+  polevaulter: -150
+  # 巨人 (Gargantuar)
+  gargantuar: -150
