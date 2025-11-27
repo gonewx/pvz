@@ -35,6 +35,7 @@ type WaveSpawnSystem struct {
 	gameState       *game.GameState            // 用于更新僵尸生成计数
 	spawnRules      *config.SpawnRulesConfig   // Story 17.3: 僵尸生成规则配置
 	constraintID    ecs.EntityID               // Story 17.3: 生成限制组件实体ID
+	laneAllocator   *LaneAllocator             // Story 17.4: 行分配器系统
 }
 
 // NewWaveSpawnSystem 创建波次生成系统
@@ -61,6 +62,15 @@ func NewWaveSpawnSystem(em *ecs.EntityManager, rm *game.ResourceManager, lc *con
 	if sr != nil {
 		sys.constraintID = sys.createConstraintEntity()
 	}
+
+	// Story 17.4: 创建并初始化行分配器
+	sys.laneAllocator = NewLaneAllocator(em)
+	// 冒险模式初始权重为 1，rowMax 根据场景类型确定（前院5行，后院6行）
+	rowMax := lc.RowMax
+	if rowMax == 0 {
+		rowMax = 5 // 默认值
+	}
+	sys.laneAllocator.InitializeLanes(rowMax, 1.0)
 
 	return sys
 }
@@ -182,9 +192,9 @@ func (s *WaveSpawnSystem) PreSpawnAllWaves() int {
 			for groupIndex, zombieGroup := range waveConfig.Zombies {
 				// 为组内每个僵尸预选一个随机行（从 lanes 列表中选择）
 				for i := 0; i < zombieGroup.Count; i++ {
-					// 从配置的 lanes 列表中随机选择一行
-					randomLaneIndex := rand.Intn(len(zombieGroup.Lanes))
-					selectedLane := zombieGroup.Lanes[randomLaneIndex] // 1-5
+					// Story 17.4: 使用 LaneAllocator 选择行（平滑权重算法）
+					selectedLane := s.laneAllocator.SelectLane(zombieGroup.Type, s.levelConfig.SceneType)
+					s.laneAllocator.UpdateLaneCounters(selectedLane)
 
 					entityID := s.spawnZombieForWave(zombieGroup.Type, selectedLane, waveIndex, groupIndex*100+i)
 					if entityID != 0 {
