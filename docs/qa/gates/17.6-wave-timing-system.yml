@@ -1,0 +1,52 @@
+# Quality Gate: 17.6 - 波次刷新计时器
+schema: 1
+story: "17.6"
+story_title: "波次刷新计时器 - 常规波次"
+gate: PASS
+status_reason: "所有验收标准已满足，测试覆盖率达标（主要逻辑函数 ≥80%），代码符合 ECS 架构和编码规范。"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-11-27T15:50:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 92
+
+expires: "2025-12-11T15:50:00Z"
+
+evidence:
+  tests_reviewed: 20
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "无安全敏感代码"
+  performance:
+    status: PASS
+    notes: "厘秒精度时间转换高效，无性能瓶颈"
+  reliability:
+    status: PASS
+    notes: "边界条件处理完善（暂停状态、波次完成、负数倒计时）"
+  maintainability:
+    status: PASS
+    notes: "完整的 GoDoc 注释，遵循 ECS 数据-行为分离原则"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "启用 WaveTimingSystem（当前默认禁用 useWaveTimingSystem = false）"
+      refs: ["pkg/systems/level_system.go:78"]
+    - action: "添加 SetVerbose 测试覆盖"
+      refs: ["pkg/systems/wave_timing_system.go:304"]
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
+  recommendations:
+    must_fix: []
+    monitor: []
+
