@@ -61,11 +61,11 @@ tutorialSteps:
     action: "hideSunflowerHint"
 
 # === 波次配置 (Story 17.2 新格式) ===
+# Story 17.6: 波次计时由 WaveTimingSystem 自动管理
 waves:
   # 第1波：常规波次
   - waveNum: 1
     type: "Fixed"
-    delay: 30
     zombies:
       - type: "basic"
         lanes: [2, 3, 4]
@@ -75,7 +75,6 @@ waves:
   # 第2波
   - waveNum: 2
     type: "Fixed"
-    minDelay: 25
     zombies:
       - type: "basic"
         lanes: [2, 3, 4]
@@ -85,7 +84,6 @@ waves:
   # 第3波
   - waveNum: 3
     type: "Fixed"
-    minDelay: 25
     zombies:
       - type: "basic"
         lanes: [2, 3, 4]
@@ -95,7 +93,6 @@ waves:
   # 第4波
   - waveNum: 4
     type: "Fixed"
-    minDelay: 20
     zombies:
       - type: "basic"
         lanes: [2, 3, 4]
@@ -105,7 +102,6 @@ waves:
   # 第5波
   - waveNum: 5
     type: "Fixed"
-    minDelay: 15
     zombies:
       - type: "basic"
         lanes: [2, 3, 4]
@@ -117,7 +113,6 @@ waves:
     type: "Final"
     isFlag: true
     flagIndex: 1
-    minDelay: 5
     zombies:
       - type: "basic"
         lanes: [2, 3, 4]

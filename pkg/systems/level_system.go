@@ -78,6 +78,9 @@ type LevelSystem struct {
 //
 // Removed ReanimSystem dependency, using AnimationCommand component
 func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *WaveSpawnSystem, rm *game.ResourceManager, rewardSystem *RewardAnimationSystem, lawnmowerSystem *LawnmowerSystem) *LevelSystem {
+	// 教学关卡使用 TutorialSystem 控制僵尸生成，不使用 WaveTimingSystem
+	isTutorialLevel := gs.CurrentLevel != nil && gs.CurrentLevel.OpeningType == "tutorial"
+
 	ls := &LevelSystem{
 		entityManager:             em,
 		gameState:                 gs,
@@ -85,22 +88,22 @@ func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *
 		resourceManager:           rm,
 		rewardSystem:              rewardSystem,
 		lawnmowerSystem:           lawnmowerSystem,
-		lastWaveWarningShown:      false, // 已废弃，保留向后兼容
-		finalWaveWarningTriggered: false, // 新标志位
-		finalWaveWarningLeadTime:  3.0,  // 提前 3 秒
-		useWaveTimingSystem:       true, // Story 17.6: 默认启用波次计时系统
+		lastWaveWarningShown:      false,            // 已废弃，保留向后兼容
+		finalWaveWarningTriggered: false,            // 新标志位
+		finalWaveWarningLeadTime:  3.0,              // 提前 3 秒
+		useWaveTimingSystem:       !isTutorialLevel, // 教学关卡禁用 WaveTimingSystem
 	}
 
-	// Story 17.6: 如果有关卡配置，创建 WaveTimingSystem
-	if gs.CurrentLevel != nil {
+	// Story 17.6: 如果有关卡配置且非教学关卡，创建 WaveTimingSystem
+	if gs.CurrentLevel != nil && !isTutorialLevel {
 		ls.waveTimingSystem = NewWaveTimingSystem(em, gs, gs.CurrentLevel)
 
 		// Story 17.7: 创建旗帜波警告和最终波白字系统
 		ls.flagWaveWarningSystem = NewFlagWaveWarningSystem(em, ls.waveTimingSystem)
 		ls.finalWaveTextSystem = NewFinalWaveTextSystem(em, ls.waveTimingSystem)
 
-		// Story 17.6: 自动初始化计时器（默认一周目首次）
-		ls.waveTimingSystem.InitializeTimer(true)
+		// Story 17.6: 自动初始化计时器，使用关卡配置的首波延迟
+		ls.waveTimingSystem.InitializeTimerWithDelay(true, gs.CurrentLevel)
 	}
 
 	return ls

@@ -138,6 +138,8 @@ func (s *WaveTimingSystem) createTimerEntity() {
 //   - 首次选卡后：立即开始第一波（CountdownCs = 0）
 //   - 非首次：600 厘秒（6秒）倒计时
 //
+// 已废弃：请使用 InitializeTimerWithDelay，支持从关卡配置读取首波延迟
+//
 // 参数：
 //   - isFirstPlaythrough: 是否为首次游戏（一周目首次）
 func (s *WaveTimingSystem) InitializeTimer(isFirstPlaythrough bool) {
@@ -163,6 +165,46 @@ func (s *WaveTimingSystem) InitializeTimer(isFirstPlaythrough bool) {
 	timer.CurrentWaveIndex = 0
 	timer.WaveTriggered = false
 	timer.AccumulatedCs = 0
+}
+
+// InitializeTimerWithDelay 使用关卡配置初始化计时器
+//
+// Story 17.6: delay 字段已移除，使用默认首波延迟
+// 首次游戏：20 秒延迟（让玩家有时间布置防线）
+// 非首次：6 秒延迟
+//
+// 参数：
+//   - isFirstPlaythrough: 是否为首次游戏（一周目首次）
+//   - levelConfig: 关卡配置（保留参数用于将来扩展）
+func (s *WaveTimingSystem) InitializeTimerWithDelay(isFirstPlaythrough bool, levelConfig *config.LevelConfig) {
+	timer := s.getTimerComponent()
+	if timer == nil {
+		log.Printf("[WaveTimingSystem] ERROR: Timer component not found")
+		return
+	}
+
+	// Story 17.6: delay 字段已从 WaveConfig 移除，使用默认延迟
+	var firstWaveDelaySec float64
+	if isFirstPlaythrough {
+		// 首次游戏默认 20 秒延迟（让玩家有时间布置防线）
+		firstWaveDelaySec = 20.0
+	} else {
+		// 非首次游戏默认 6 秒延迟
+		firstWaveDelaySec = 6.0
+	}
+
+	// 转换为厘秒
+	firstWaveDelayCs := int(firstWaveDelaySec * 100)
+
+	timer.CountdownCs = firstWaveDelayCs
+	timer.IsFirstWave = true
+	timer.LastRefreshTimeCs = firstWaveDelayCs
+	timer.CurrentWaveIndex = 0
+	timer.WaveTriggered = false
+	timer.AccumulatedCs = 0
+
+	log.Printf("[WaveTimingSystem] Initialized: %d cs (%.1f sec) delay for first wave (firstPlaythrough=%v)",
+		firstWaveDelayCs, firstWaveDelaySec, isFirstPlaythrough)
 }
 
 // Update 更新计时器

@@ -39,11 +39,11 @@ sodRollAnimation: false                       # 禁用铺草皮动画
 sodRollParticles: false                       # 禁用土粒飞溅特效
 
 # === 波次配置 (Story 17.2 新格式) ===
+# Story 17.6: 波次计时由 WaveTimingSystem 自动管理
 waves:
   # 第1波：常规波次
   - waveNum: 1
     type: "Fixed"
-    delay: 20
     zombies:
       - type: "basic"
         lanes: [2, 3, 4]
@@ -53,7 +53,6 @@ waves:
   # 第2波
   - waveNum: 2
     type: "Fixed"
-    minDelay: 15
     zombies:
       - type: "basic"
         lanes: [2, 3, 4]
@@ -65,7 +64,6 @@ waves:
     type: "Final"
     isFlag: true
     flagIndex: 1
-    minDelay: 5
     zombies:
       - type: "basic"
         lanes: [2, 3, 4]
