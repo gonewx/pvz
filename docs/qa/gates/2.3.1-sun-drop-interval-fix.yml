@@ -1,0 +1,52 @@
+# Quality Gate Decision
+# Story 2.3.1: 修正阳光掉落间隔为原版机制
+
+schema: 1
+story: "2.3.1"
+story_title: "修正阳光掉落间隔为原版机制"
+gate: PASS
+status_reason: "所有验收标准已满足，原版公式正确实现，单元测试覆盖全面，代码质量符合项目标准。"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-11-27T11:45:00+08:00"
+
+waiver: { active: false }
+
+top_issues: []
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
+  recommendations:
+    must_fix: []
+    monitor:
+      - action: "确保 GameScene 关卡重置时调用 SunSpawnSystem.Reset()"
+        refs: ["pkg/scenes/game_scene.go"]
+
+quality_score: 100
+expires: "2025-12-11T11:45:00+08:00"
+
+evidence:
+  tests_reviewed: 6
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "纯游戏逻辑，无安全风险"
+  performance:
+    status: PASS
+    notes: "简单整数运算，计算开销可忽略"
+  reliability:
+    status: PASS
+    notes: "公式实现正确，边界条件处理完善"
+  maintainability:
+    status: PASS
+    notes: "代码结构清晰，注释充分，易于理解和维护"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "在 GameScene 实现完整关卡重置流程时，调用 SunSpawnSystem.Reset()"
+      refs: ["pkg/scenes/game_scene.go"]

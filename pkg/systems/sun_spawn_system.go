@@ -17,6 +17,7 @@ type SunSpawnSystem struct {
 	resourceManager *game.ResourceManager
 	spawnTimer      float64 // 当前计时器
 	spawnInterval   float64 // 生成间隔(秒)
+	sunDroppedCount int     // 已掉落阳光计数（用于计算间隔）
 	minX            float64 // 阳光生成的最小X坐标
 	maxX            float64 // 阳光生成的最大X坐标
 	minTargetY      float64 // 阳光落地的最小Y坐标
@@ -31,24 +32,23 @@ type SunSpawnSystem struct {
 //   - minX, maxX: 阳光生成的水平范围
 //   - minTargetY, maxTargetY: 阳光落地的垂直范围
 func NewSunSpawnSystem(em *ecs.EntityManager, rm *game.ResourceManager, minX, maxX, minTargetY, maxTargetY float64) *SunSpawnSystem {
-	// 基础间隔: 8秒 ±2秒随机变化
-	baseInterval := 8.0
-	randomOffset := -2.0 + rand.Float64()*4.0 // -2 到 +2 秒
-	initialInterval := baseInterval + randomOffset
-
-	log.Printf("[SunSpawnSystem] Initialized with interval=%.1fs (base 8±2s), area=(%.0f-%.0f, %.0f-%.0f)",
-		initialInterval, minX, maxX, minTargetY, maxTargetY)
-	return &SunSpawnSystem{
+	system := &SunSpawnSystem{
 		entityManager:   em,
 		resourceManager: rm,
 		spawnTimer:      0,
-		spawnInterval:   initialInterval, // 原版游戏机制: 8秒±1秒随机
+		sunDroppedCount: 0, // 初始为 0
 		minX:            minX,
 		maxX:            maxX,
 		minTargetY:      minTargetY,
 		maxTargetY:      maxTargetY,
 		enabled:         true, // 默认启用（教学关卡会在初始化后禁用）
 	}
+	// 使用原版公式计算初始间隔
+	system.spawnInterval = system.calculateNextInterval()
+
+	log.Printf("[SunSpawnSystem] Initialized with interval=%.2fs (count=%d), area=(%.0f-%.0f, %.0f-%.0f)",
+		system.spawnInterval, system.sunDroppedCount, minX, maxX, minTargetY, maxTargetY)
+	return system
 }
 
 // Update 更新阳光生成计时器
@@ -68,11 +68,8 @@ func (s *SunSpawnSystem) Update(deltaTime float64) {
 
 	// 检查是否到达生成间隔
 	if s.spawnTimer >= s.spawnInterval {
-		// 重置计时器并重新随机化下次间隔
+		// 重置计时器
 		s.spawnTimer = 0
-		baseInterval := 8.0
-		randomOffset := -2.0 + rand.Float64()*4.0 // -2 到 +2 秒
-		s.spawnInterval = baseInterval + randomOffset
 
 		// 生成随机起始X坐标（增加±80像素的随机偏移）
 		baseX := s.minX + rand.Float64()*(s.maxX-s.minX)
@@ -120,9 +117,14 @@ func (s *SunSpawnSystem) Update(deltaTime float64) {
 		}
 
 		// 创建阳光实体
-		log.Printf("[SunSpawnSystem] *** SPAWNING SUN *** at X=%.1f, targetY=%.1f", startX, targetY)
+		log.Printf("[SunSpawnSystem] *** SPAWNING SUN #%d *** at X=%.1f, targetY=%.1f", s.sunDroppedCount+1, startX, targetY)
 		sunID := entities.NewSunEntity(s.entityManager, s.resourceManager, startX, targetY)
-		log.Printf("[SunSpawnSystem] Created sun entity ID: %d", sunID)
+
+		// 更新计数和间隔
+		s.sunDroppedCount++
+		s.spawnInterval = s.calculateNextInterval()
+		log.Printf("[SunSpawnSystem] Created sun entity ID: %d, next interval=%.2fs (count=%d)",
+			sunID, s.spawnInterval, s.sunDroppedCount)
 
 		// Sun.reanim 只有轨道(Sun1, Sun2, Sun3),没有动画定义
 		// 使用 AnimationCommand 组件播放配置的"idle"组合（包含所有3个轨道）
@@ -144,4 +146,33 @@ func (s *SunSpawnSystem) Enable() {
 func (s *SunSpawnSystem) Disable() {
 	s.enabled = false
 	log.Printf("[SunSpawnSystem] Auto spawn DISABLED")
+}
+
+// Reset 重置阳光生成系统状态（关卡重新开始时调用）
+func (s *SunSpawnSystem) Reset() {
+	s.spawnTimer = 0
+	s.sunDroppedCount = 0
+	s.spawnInterval = s.calculateNextInterval()
+	log.Printf("[SunSpawnSystem] Reset: interval=%.2fs", s.spawnInterval)
+}
+
+// calculateNextInterval 计算下一次阳光掉落间隔
+// 原版公式: min{count * 10 + 425, 950} + rand(0~275)
+// 单位: 厘秒 (centiseconds), 1cs = 0.01秒
+// 参考: .meta/prompts.md - 原版游戏机制
+// 间隔范围:
+//   - count=0: 4.25~7.00秒
+//   - count=52+: 9.50~12.25秒
+func (s *SunSpawnSystem) calculateNextInterval() float64 {
+	// 计算基础间隔 (厘秒)
+	baseCS := s.sunDroppedCount*10 + 425
+	if baseCS > 950 {
+		baseCS = 950
+	}
+	// 添加随机偏移 (0-275 厘秒)
+	randomCS := rand.Intn(276)
+	// 总间隔 (厘秒)
+	totalCS := baseCS + randomCS
+	// 转换为秒
+	return float64(totalCS) / 100.0
 }
