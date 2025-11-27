@@ -121,9 +121,17 @@ func (s *GameScene) initPauseMenuModule(rm *game.ResourceManager) {
 			},
 			OnPauseMusic: func() {
 				// TODO: 暂停 BGM（当BGM系统实现后）
+				// Story 17.6: 暂停波次计时
+				if s.levelSystem != nil {
+					s.levelSystem.PauseWaveTiming()
+				}
 			},
 			OnResumeMusic: func() {
 				// TODO: 恢复 BGM（当BGM系统实现后）
+				// Story 17.6: 恢复波次计时
+				if s.levelSystem != nil {
+					s.levelSystem.ResumeWaveTiming()
+				}
 			},
 		},
 	)

@@ -29,15 +29,20 @@ const (
 // 架构说明：
 //   - 通过 GameState 单例管理关卡状态
 //   - 依赖 WaveSpawnSystem 进行僵尸生成（通过构造函数注入）
+//   - 依赖 WaveTimingSystem 管理波次计时（Story 17.6）
 //   - 遵循零耦合原则：不直接修改其他系统的状态
 type LevelSystem struct {
 	entityManager        *ecs.EntityManager
 	gameState            *game.GameState
 	waveSpawnSystem      *WaveSpawnSystem
+	waveTimingSystem     *WaveTimingSystem      // Story 17.6: 波次计时系统
 	resourceManager      *game.ResourceManager  // 用于加载 FinalWave 音效
 	rewardSystem         *RewardAnimationSystem // 用于触发奖励动画（Story 8.3）
 	lawnmowerSystem      *LawnmowerSystem       // 用于检查除草车状态（Story 10.2）
 	lastWaveWarningShown bool                   // 已废弃：使用 finalWaveWarningTriggered 代替
+
+	// Story 17.6: 是否使用新的波次计时系统
+	useWaveTimingSystem bool
 
 	// 关卡进度条支持
 	progressBarEntityID ecs.EntityID // 进度条实体ID（如果存在）
@@ -60,7 +65,7 @@ type LevelSystem struct {
 //
 // Removed ReanimSystem dependency, using AnimationCommand component
 func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *WaveSpawnSystem, rm *game.ResourceManager, rewardSystem *RewardAnimationSystem, lawnmowerSystem *LawnmowerSystem) *LevelSystem {
-	return &LevelSystem{
+	ls := &LevelSystem{
 		entityManager:             em,
 		gameState:                 gs,
 		waveSpawnSystem:           waveSpawnSystem,
@@ -70,7 +75,15 @@ func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *
 		lastWaveWarningShown:      false, // 已废弃，保留向后兼容
 		finalWaveWarningTriggered: false, // 新标志位
 		finalWaveWarningLeadTime:  3.0,   // 提前 3 秒
+		useWaveTimingSystem:       false, // 默认不启用，待完全集成后启用
 	}
+
+	// Story 17.6: 如果有关卡配置，创建 WaveTimingSystem
+	if gs.CurrentLevel != nil {
+		ls.waveTimingSystem = NewWaveTimingSystem(em, gs, gs.CurrentLevel)
+	}
+
+	return ls
 }
 
 // Update 更新关卡系统
@@ -78,10 +91,11 @@ func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *
 // 执行流程：
 //  1. 检查游戏是否结束，如果是则不处理
 //  2. 更新关卡时间
-//  3. 检查并生成到期的僵尸波次
-//  4. 检查最后一波提示
-//  5. 检查失败条件（僵尸到达左边界）
-//  6. 检查胜利条件（所有僵尸消灭）
+//  3. 更新波次计时器（Story 17.6）
+//  4. 检查并生成到期的僵尸波次
+//  5. 检查最后一波提示
+//  6. 检查失败条件（僵尸到达左边界）
+//  7. 检查胜利条件（所有僵尸消灭）
 //
 // 参数：
 //
@@ -99,6 +113,11 @@ func (s *LevelSystem) Update(deltaTime float64) {
 
 	// 更新关卡时间
 	s.gameState.UpdateLevelTime(deltaTime)
+
+	// Story 17.6: 更新波次计时器（如果启用）
+	if s.useWaveTimingSystem && s.waveTimingSystem != nil {
+		s.waveTimingSystem.Update(deltaTime)
+	}
 
 	// 检查并生成僵尸波次
 	s.checkAndSpawnWaves()
@@ -132,16 +151,33 @@ func (s *LevelSystem) Update(deltaTime float64) {
 //
 // 遍历所有波次，找到时间已到且未激活的波次，调用 WaveSpawnSystem.ActivateWave() 激活僵尸
 // 教学关卡由 TutorialSystem 控制僵尸激活，不使用此方法
+//
+// Story 17.6: 如果启用了 WaveTimingSystem，从计时系统获取触发信号
 func (s *LevelSystem) checkAndSpawnWaves() {
 	// 教学关卡：僵尸由 TutorialSystem 控制激活
 	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.OpeningType == "tutorial" {
 		return
 	}
 
-	waveIndex := s.gameState.GetCurrentWave()
-	if waveIndex == -1 {
-		// 没有到期的波次
-		return
+	var waveIndex int
+
+	// Story 17.6: 优先使用 WaveTimingSystem 的触发信号
+	if s.useWaveTimingSystem && s.waveTimingSystem != nil {
+		triggered, idx := s.waveTimingSystem.IsWaveTriggered()
+		if !triggered {
+			// 没有到期的波次
+			return
+		}
+		waveIndex = idx
+		// 清除触发标志
+		s.waveTimingSystem.ClearWaveTriggered()
+	} else {
+		// 原有逻辑：从 GameState 获取
+		waveIndex = s.gameState.GetCurrentWave()
+		if waveIndex == -1 {
+			// 没有到期的波次
+			return
+		}
 	}
 
 	// 调用 WaveSpawnSystem 激活僵尸（而不是生成）
@@ -806,4 +842,76 @@ func (s *LevelSystem) triggerZombiesWonFlow(triggerZombieID ecs.EntityID) {
 	flowEntityID := StartZombiesWonFlow(s.entityManager, triggerZombieID)
 
 	log.Printf("[LevelSystem] Flow entity created (ID:%d), zombie ID:%d", flowEntityID, triggerZombieID)
+}
+
+// ========================================
+// Story 17.6: 波次计时系统集成
+// ========================================
+
+// EnableWaveTimingSystem 启用波次计时系统
+//
+// Story 17.6: 启用新的波次计时系统
+// 调用此方法后，波次触发将由 WaveTimingSystem 控制
+//
+// 参数：
+//   - isFirstPlaythrough: 是否为首次游戏（一周目首次）
+func (s *LevelSystem) EnableWaveTimingSystem(isFirstPlaythrough bool) {
+	if s.waveTimingSystem == nil {
+		log.Printf("[LevelSystem] WARNING: WaveTimingSystem not initialized, cannot enable")
+		return
+	}
+
+	s.useWaveTimingSystem = true
+	s.waveTimingSystem.InitializeTimer(isFirstPlaythrough)
+	log.Printf("[LevelSystem] WaveTimingSystem enabled (first playthrough: %v)", isFirstPlaythrough)
+}
+
+// DisableWaveTimingSystem 禁用波次计时系统
+//
+// Story 17.6: 禁用新的波次计时系统，恢复使用原有逻辑
+func (s *LevelSystem) DisableWaveTimingSystem() {
+	s.useWaveTimingSystem = false
+	log.Printf("[LevelSystem] WaveTimingSystem disabled, using legacy timing")
+}
+
+// PauseWaveTiming 暂停波次计时
+//
+// Story 17.6: 在游戏暂停时调用
+func (s *LevelSystem) PauseWaveTiming() {
+	if s.waveTimingSystem != nil {
+		s.waveTimingSystem.Pause()
+	}
+}
+
+// ResumeWaveTiming 恢复波次计时
+//
+// Story 17.6: 在游戏恢复时调用
+func (s *LevelSystem) ResumeWaveTiming() {
+	if s.waveTimingSystem != nil {
+		s.waveTimingSystem.Resume()
+	}
+}
+
+// GetWaveTimingSystem 获取波次计时系统（用于测试）
+func (s *LevelSystem) GetWaveTimingSystem() *WaveTimingSystem {
+	return s.waveTimingSystem
+}
+
+// IsWaveTimingSystemEnabled 检查波次计时系统是否启用
+func (s *LevelSystem) IsWaveTimingSystemEnabled() bool {
+	return s.useWaveTimingSystem
+}
+
+// InitializeWaveTimingSystem 初始化波次计时系统
+//
+// Story 17.6: 在关卡加载后调用，创建 WaveTimingSystem
+// 用于在 NewLevelSystem 之后关卡配置才加载的情况
+func (s *LevelSystem) InitializeWaveTimingSystem() {
+	if s.gameState.CurrentLevel == nil {
+		log.Printf("[LevelSystem] WARNING: No level loaded, cannot initialize WaveTimingSystem")
+		return
+	}
+
+	s.waveTimingSystem = NewWaveTimingSystem(s.entityManager, s.gameState, s.gameState.CurrentLevel)
+	log.Printf("[LevelSystem] WaveTimingSystem initialized")
 }

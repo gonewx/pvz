@@ -202,25 +202,162 @@ pvz3/
 
 ## 关卡配置
 
-关卡配置位于 `data/levels/` 目录，使用 YAML 格式：
+关卡配置位于 `data/levels/` 目录，使用 YAML 格式。
+
+### 关卡配置格式 (Story 17.2)
 
 ```yaml
-# data/levels/level-1-1.yaml
-id: "1-1"
-chapter: 1
-name: "第一关"
-flags: 1
-enabledLanes: [3]  # 仅中间一行草地
-availablePlants:
+# data/levels/level-1-4.yaml (新格式示例)
+id: "1-4"
+name: "前院白天 1-4"
+description: "标准关卡"
+
+# Story 17.2 新增顶层字段
+flags: 1                       # 旗帜数量，默认从 waves 中 isFlag 数量推断
+sceneType: "day"               # 场景类型: day, night, pool, fog, roof, moon
+rowMax: 5                      # 最大行数: 5 (前院/屋顶) 或 6 (后院)
+
+# 其他配置字段
+openingType: "standard"        # 开场类型: tutorial, standard, special
+enabledLanes: [1, 2, 3, 4, 5]  # 启用的行
+availablePlants:               # 可用植物
   - peashooter
   - sunflower
-zombieWaves:
-  - wave: 1
-    time: 10.0
+initialSun: 50                 # 初始阳光
+
+# 波次配置
+waves:
+  # 常规波次
+  - waveNum: 1                  # Story 17.2: 波次编号（从 1 开始）
+    type: "Fixed"               # Story 17.2: 波次类型 (Fixed/ExtraPoints/Final)
+    delay: 10
     zombies:
-      - type: normal
-        lane: 3
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 2
+        spawnInterval: 2.0
+
+  # 旗帜波次
+  - waveNum: 4
+    type: "Final"               # 最终波
+    delay: 5
+    isFlag: true
+    flagIndex: 1
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 6
 ```
+
+### 波次类型 (Story 17.2)
+
+| 类型 | 说明 | 使用场景 |
+|------|------|----------|
+| `Fixed` | 固定出怪列表 | 标准关卡的常规波次 |
+| `ExtraPoints` | 动态点数分配 | 1-10 传送带关卡 |
+| `Final` | 最终波 | 关卡最后一波 |
+
+### 场景类型 (Story 17.2)
+
+| 类型 | 章节 | RowMax | 特殊规则 |
+|------|------|--------|----------|
+| `day` | 白天 | 5 | 无 |
+| `night` | 黑夜 | 5 | 墓碑 |
+| `pool` | 泳池 | 6 | 第3,4行水路 |
+| `fog` | 雾夜 | 6 | 第3,4行水路 + 迷雾 |
+| `roof` | 屋顶 | 5 | 左5列斜坡 |
+| `moon` | 月夜 | 5 | 墓碑 |
+
+### 向后兼容性
+
+所有新字段都是可选的，现有关卡配置无需修改即可正常加载：
+- `Flags`: 默认从 waves 中的 isFlag 数量推断
+- `SceneType`: 默认 "day"
+- `RowMax`: 默认 5
+- `WaveNum`: 默认从数组索引 +1 推断
+- `Type`: 默认从 isFlag 字段推断 ("Final" 或 "Fixed")
+
+## 僵尸生成规则 (Story 17.3)
+
+僵尸生成限制检查系统确保只有符合游戏规则的僵尸会被生成。配置文件位于 `data/spawn_rules.yaml`。
+
+### 规则配置格式
+
+```yaml
+# 僵尸阶数映射表
+zombieTiers:
+  basic: 1        # 一阶：第 1 波起可出现
+  conehead: 1
+  buckethead: 2   # 二阶：第 3 波起
+  polevaulter: 3  # 三阶：第 8 波起
+  gargantuar: 4   # 四阶：第 15 波起（根据轮数调整）
+
+# 阶数波次限制
+tierWaveRestrictions:
+  1: 1   # 一阶：第 1 波起
+  2: 3   # 二阶：第 3 波起
+  3: 8   # 三阶：第 8 波起
+  4: 15  # 四阶：第 15 波起（会根据轮数调整）
+
+# 红眼数量上限配置
+redEyeRules:
+  startRound: 5         # 从第 5 轮开始允许红眼
+  capacityPerRound: 1   # 每轮增加 1 个红眼上限
+
+# 场景类型限制
+sceneTypeRestrictions:
+  waterZombies:        # 水路专属僵尸
+    - snorkel
+    - dolphinrider
+  dancingRestrictions:
+    prohibitedScenes:  # 舞王禁止的场景
+      - roof
+  waterLaneConfig:     # 水路行配置
+    pool: [3, 4]
+    fog: [3, 4]
+```
+
+### 限制规则说明
+
+**1. 阶数限制**：
+- 一阶僵尸（普僵、路障）：第 1 波起可出现
+- 二阶僵尸（铁桶、读报）：第 3 波起
+- 三阶僵尸（撑杆、橄榄球等）：第 8 波起
+- 四阶僵尸（巨人）：第 15 波起，根据轮数提前：`MinWave = max(15 - RoundNumber, 1)`
+
+**2. 红眼数量上限**：
+```
+红眼上限 = 0  (轮数 < 5)
+红眼上限 = 轮数 - 4  (轮数 ≥ 5)
+```
+
+**3. 场景限制**：
+- 水路僵尸（潜水、海豚）只能在水路行（泳池第 3、4 行）生成
+- 非水路僵尸不能在水路行生成
+- 舞王禁止在屋顶场景出现
+
+### 代码集成
+
+生成限制检查通过纯函数实现，遵循 ECS 零耦合原则：
+
+```go
+// 在 WaveSpawnSystem 中使用
+valid, reason := ValidateZombieSpawn(
+    zombieType,
+    lane,
+    constraint,  // SpawnConstraintComponent
+    roundNumber,
+    spawnRules,  // SpawnRulesConfig
+)
+if !valid {
+    log.Printf("Zombie spawn rejected: %s", reason)
+    return 0 // 跳过生成
+}
+```
+
+### 关卡配置覆盖
+
+如需为特定关卡覆盖默认规则，可在关卡配置中添加 `spawnRulesOverride` 字段（未来扩展）。
 
 ## 技术参考
 
