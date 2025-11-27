@@ -976,6 +976,14 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	// 最后一波提示（如果需要显示）（开发调试用，已禁用）
 	// s.drawLastWaveWarning(screen) // 已禁用：改为使用 FinalWave.reanim 动画
 
+	// Layer 10.1: Draw huge wave warning (Story 17.7)
+	// 红字警告 "A Huge Wave of Zombies is Approaching!"
+	s.drawHugeWaveWarning(screen)
+
+	// Layer 10.2: Draw final wave text (Story 17.7)
+	// 白字 "FINAL WAVE"
+	s.drawFinalWaveText(screen)
+
 	// Layer 10.5: Draw reward panel (Story 8.3 + 8.4)
 	// Story 8.4重构：RewardAnimationSystem完全封装奖励面板渲染
 	// 内部自动管理面板和植物卡片的渲染，调用者只需调用Draw方法

@@ -47,5 +47,41 @@ type WaveTimerComponent struct {
 	// Update 后如果为 true，表示本帧应触发下一波
 	// 由 LevelSystem 读取后重置
 	WaveTriggered bool
+
+	// ========== Story 17.7: 旗帜波特殊计时字段 ==========
+
+	// IsFlagWaveApproaching 是否正在接近旗帜波
+	// 当下一波为旗帜波时设置为 true，用于触发红字警告
+	IsFlagWaveApproaching bool
+
+	// FlagWaveCountdownPhase 红字警告阶段
+	// 0 = 无警告
+	// 5 = 显示红字 "A Huge Wave of Zombies is Approaching!"
+	// 4 = 红字停留阶段（725cs）
+	FlagWaveCountdownPhase int
+
+	// FlagWavePhaseTimeCs 当前阶段已持续时间（厘秒）
+	// 用于控制 Phase 4 停留 725cs
+	FlagWavePhaseTimeCs int
+
+	// IsFinalWave 是否为最终波
+	// 最终波有特殊的 5500cs 倒计时和白字显示逻辑
+	IsFinalWave bool
+
+	// FinalWaveTextActive 白字 "FINAL WAVE" 是否激活
+	// 当最终波倒计时减至 0 时激活
+	FinalWaveTextActive bool
+
+	// FinalWaveTextTimeCs 白字已显示时间（厘秒）
+	// 白字显示 500cs 后检查胜利条件
+	FinalWaveTextTimeCs int
+
+	// WaveElapsedCs 当前波刷出后已过的时间（厘秒）
+	// 用于加速刷新判定（需要 > 401cs）
+	WaveElapsedCs int
+
+	// HugeWaveWarningTriggered 红字警告是否已触发
+	// 防止重复触发警告
+	HugeWaveWarningTriggered bool
 }
 

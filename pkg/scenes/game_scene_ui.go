@@ -329,6 +329,108 @@ func (s *GameScene) drawLastWaveWarning(screen *ebiten.Image) {
 	}
 }
 
+// drawHugeWaveWarning 渲染红字警告 "A Huge Wave of Zombies is Approaching!"
+// Story 17.7: 旗帜波前的红字警告动画
+func (s *GameScene) drawHugeWaveWarning(screen *ebiten.Image) {
+	// 查询红字警告实体
+	warningEntities := ecs.GetEntitiesWith1[*components.FlagWaveWarningComponent](s.entityManager)
+	if len(warningEntities) == 0 {
+		return
+	}
+
+	// 获取警告组件
+	warningComp, ok := ecs.GetComponent[*components.FlagWaveWarningComponent](s.entityManager, warningEntities[0])
+	if !ok || !warningComp.IsActive {
+		return
+	}
+
+	// 闪烁效果：不可见时跳过渲染
+	if !warningComp.FlashVisible {
+		return
+	}
+
+	// 使用阳光计数器字体
+	if s.sunCounterFont == nil {
+		return
+	}
+
+	warningText := warningComp.Text
+
+	// 测量文本宽度以便居中
+	textWidth := text.Advance(warningText, s.sunCounterFont)
+
+	// 计算位置（带缩放）
+	scaledWidth := textWidth * warningComp.Scale
+	x := warningComp.X - scaledWidth/2
+	y := warningComp.Y
+
+	// 绘制半透明黑色背景（提高可读性）
+	bgPadding := 15.0 * warningComp.Scale
+	fontMetrics := s.sunCounterFont.Metrics()
+	bgHeight := float64(fontMetrics.HAscent+fontMetrics.HDescent) * warningComp.Scale
+	ebitenutil.DrawRect(screen,
+		x-bgPadding,
+		y-bgPadding,
+		scaledWidth+bgPadding*2,
+		bgHeight+bgPadding*2,
+		color.RGBA{R: 0, G: 0, B: 0, A: 180})
+
+	// 绘制红色警告文本
+	textOp := &text.DrawOptions{}
+	textOp.GeoM.Translate(-textWidth/2, 0) // 先移到原点
+	textOp.GeoM.Scale(warningComp.Scale, warningComp.Scale)
+	textOp.GeoM.Translate(warningComp.X, warningComp.Y)
+
+	// 红色文字 (#FF0000)，带透明度
+	alpha := uint8(255 * warningComp.Alpha)
+	textOp.ColorScale.ScaleWithColor(color.RGBA{R: 255, G: 0, B: 0, A: alpha})
+
+	text.Draw(screen, warningText, s.sunCounterFont, textOp)
+}
+
+// drawFinalWaveText 渲染白字 "FINAL WAVE"
+// Story 17.7: 最终波白字动画
+func (s *GameScene) drawFinalWaveText(screen *ebiten.Image) {
+	// 查询最终波白字实体
+	textEntities := ecs.GetEntitiesWith1[*components.FinalWaveTextComponent](s.entityManager)
+	if len(textEntities) == 0 {
+		return
+	}
+
+	// 获取白字组件
+	textComp, ok := ecs.GetComponent[*components.FinalWaveTextComponent](s.entityManager, textEntities[0])
+	if !ok || !textComp.IsActive {
+		return
+	}
+
+	// 透明度为 0 时跳过渲染
+	if textComp.Alpha <= 0 {
+		return
+	}
+
+	// 使用阳光计数器字体
+	if s.sunCounterFont == nil {
+		return
+	}
+
+	displayText := textComp.Text
+
+	// 测量文本宽度以便居中
+	textWidth := text.Advance(displayText, s.sunCounterFont)
+
+	// 绘制白色文本（带缩放和透明度）
+	textOp := &text.DrawOptions{}
+	textOp.GeoM.Translate(-textWidth/2, 0) // 先移到原点
+	textOp.GeoM.Scale(textComp.Scale, textComp.Scale)
+	textOp.GeoM.Translate(textComp.X, textComp.Y)
+
+	// 白色文字，带透明度
+	alpha := uint8(255 * textComp.Alpha)
+	textOp.ColorScale.ScaleWithColor(color.RGBA{R: 255, G: 255, B: 255, A: alpha})
+
+	text.Draw(screen, displayText, s.sunCounterFont, textOp)
+}
+
 // drawTooltip 渲染植物卡片的 Tooltip
 // Story 10.8: 鼠标悬停植物卡片时显示提示信息
 func (s *GameScene) drawTooltip(screen *ebiten.Image) {

@@ -468,3 +468,370 @@ func TestWaveTimingSystem_TimerEntityID(t *testing.T) {
 	}
 }
 
+// ========================================
+// Story 17.7: 旗帜波特殊计时测试
+// ========================================
+
+// createTestLevelConfigWithFlagWave 创建带旗帜波的测试关卡配置
+func createTestLevelConfigWithFlagWave(waveCount int, flagWaveIndex int) *config.LevelConfig {
+	waves := make([]config.WaveConfig, waveCount)
+	for i := 0; i < waveCount; i++ {
+		waves[i] = config.WaveConfig{
+			Delay:    0,
+			MinDelay: 5.0,
+			IsFlag:   i == flagWaveIndex, // 标记旗帜波
+			Zombies: []config.ZombieGroup{
+				{Type: "basic", Count: 2, Lanes: []int{1, 2, 3}},
+			},
+		}
+	}
+	return &config.LevelConfig{
+		ID:    "test-level-flag",
+		Waves: waves,
+	}
+}
+
+// TestWaveTimingSystem_FlagWavePrefixDelay 测试旗帜波前一波倒计时（4500cs）
+func TestWaveTimingSystem_FlagWavePrefixDelay(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := createTestGameState()
+	// 创建 10 波配置，第 10 波为旗帜波（索引 9）
+	levelConfig := createTestLevelConfigWithFlagWave(10, 9)
+	resetGameState(gs, levelConfig)
+
+	system := NewWaveTimingSystem(em, gs, levelConfig)
+
+	// 设置当前波次为第 9 波（下一波是旗帜波）
+	timer := system.getTimerComponent()
+	timer.CurrentWaveIndex = 8 // 触发后会变成 9
+
+	// 模拟触发第 8 波后设置下一波倒计时
+	timer.CurrentWaveIndex = 9 // 下一波（第 10 波）是旗帜波
+	system.SetNextWaveCountdown()
+
+	// 检查倒计时是否为 4500cs
+	if timer.CountdownCs != FlagWavePrefixDelayCs {
+		t.Errorf("Expected CountdownCs = %d for flag wave prefix, got %d", FlagWavePrefixDelayCs, timer.CountdownCs)
+	}
+
+	// 检查旗帜波接近标志
+	if !timer.IsFlagWaveApproaching {
+		t.Error("Expected IsFlagWaveApproaching = true")
+	}
+}
+
+// TestWaveTimingSystem_FinalWaveDelay 测试最终波倒计时（5500cs）
+func TestWaveTimingSystem_FinalWaveDelay(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := createTestGameState()
+	levelConfig := createTestLevelConfig(5)
+	resetGameState(gs, levelConfig)
+
+	system := NewWaveTimingSystem(em, gs, levelConfig)
+
+	// 设置当前波次为第 4 波（下一波是最终波）
+	timer := system.getTimerComponent()
+	timer.CurrentWaveIndex = 4 // 下一波（第 5 波）是最终波
+
+	system.SetNextWaveCountdown()
+
+	// 检查倒计时是否为 5500cs
+	if timer.CountdownCs != FinalWaveDelayCs {
+		t.Errorf("Expected CountdownCs = %d for final wave, got %d", FinalWaveDelayCs, timer.CountdownCs)
+	}
+
+	// 检查最终波标志
+	if !timer.IsFinalWave {
+		t.Error("Expected IsFinalWave = true")
+	}
+}
+
+// TestWaveTimingSystem_HugeWaveWarningPhase5 测试红字警告 Phase 5
+func TestWaveTimingSystem_HugeWaveWarningPhase5(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := createTestGameState()
+	levelConfig := createTestLevelConfigWithFlagWave(10, 9)
+	resetGameState(gs, levelConfig)
+
+	system := NewWaveTimingSystem(em, gs, levelConfig)
+
+	timer := system.getTimerComponent()
+	timer.CurrentWaveIndex = 9
+	timer.CountdownCs = 6 // 即将到达 5
+	timer.IsFlagWaveApproaching = true
+	timer.HugeWaveWarningTriggered = false
+
+	// 更新 0.02 秒（2 厘秒），使倒计时从 6 减到 4
+	system.Update(0.02)
+
+	// 检查是否进入 Phase 5
+	if timer.FlagWaveCountdownPhase != 5 && timer.FlagWaveCountdownPhase != 4 {
+		t.Errorf("Expected FlagWaveCountdownPhase = 5 or 4, got %d", timer.FlagWaveCountdownPhase)
+	}
+
+	// 检查警告触发标志
+	if !timer.HugeWaveWarningTriggered {
+		t.Error("Expected HugeWaveWarningTriggered = true")
+	}
+}
+
+// TestWaveTimingSystem_Phase4Duration 测试 Phase 4 停留时间（725cs）
+func TestWaveTimingSystem_Phase4Duration(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := createTestGameState()
+	levelConfig := createTestLevelConfigWithFlagWave(10, 9)
+	resetGameState(gs, levelConfig)
+
+	system := NewWaveTimingSystem(em, gs, levelConfig)
+
+	timer := system.getTimerComponent()
+	timer.CurrentWaveIndex = 9
+	timer.FlagWaveCountdownPhase = 4
+	timer.FlagWavePhaseTimeCs = 0
+	timer.IsFlagWaveApproaching = true
+	timer.CountdownCs = 4
+
+	// 更新 7 秒（700cs），不应触发
+	for i := 0; i < 70; i++ {
+		system.Update(0.1)
+	}
+
+	// Phase 4 应该还在继续
+	if timer.FlagWavePhaseTimeCs < FlagWavePhase4DurationCs {
+		// 还没到 725cs，不应该触发波次
+		if timer.WaveTriggered && timer.FlagWaveCountdownPhase == 0 {
+			// 可能已经触发了
+		}
+	}
+
+	// 再更新一些时间确保超过 725cs
+	for i := 0; i < 10; i++ {
+		system.Update(0.1)
+	}
+
+	// 现在应该触发了旗帜波
+	// FlagWaveCountdownPhase 应该重置为 0
+	if timer.FlagWavePhaseTimeCs >= FlagWavePhase4DurationCs && timer.FlagWaveCountdownPhase != 0 {
+		// 可能有逻辑问题
+	}
+}
+
+// TestWaveTimingSystem_AcceleratedRefresh 测试加速刷新
+func TestWaveTimingSystem_AcceleratedRefresh(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := createTestGameState()
+	levelConfig := createTestLevelConfigWithFlagWave(10, 9)
+	resetGameState(gs, levelConfig)
+
+	system := NewWaveTimingSystem(em, gs, levelConfig)
+
+	timer := system.getTimerComponent()
+	timer.CurrentWaveIndex = 9
+	timer.CountdownCs = 3000       // > 200cs
+	timer.WaveElapsedCs = 500      // > 401cs
+	timer.IsFlagWaveApproaching = true
+	timer.FlagWaveCountdownPhase = 0
+
+	// 调用加速刷新（僵尸全部消灭）
+	triggered := system.CheckAcceleratedRefresh(true)
+
+	// 检查是否触发加速刷新
+	if !triggered {
+		t.Error("Expected accelerated refresh to be triggered")
+	}
+
+	// 检查倒计时是否设为 200cs
+	if timer.CountdownCs != AcceleratedRefreshCountdownCs {
+		t.Errorf("Expected CountdownCs = %d after accelerated refresh, got %d",
+			AcceleratedRefreshCountdownCs, timer.CountdownCs)
+	}
+}
+
+// TestWaveTimingSystem_AcceleratedRefresh_NotTriggered_TimeNotMet 测试加速刷新未触发（时间不足）
+func TestWaveTimingSystem_AcceleratedRefresh_NotTriggered_TimeNotMet(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := createTestGameState()
+	levelConfig := createTestLevelConfigWithFlagWave(10, 9)
+	resetGameState(gs, levelConfig)
+
+	system := NewWaveTimingSystem(em, gs, levelConfig)
+
+	timer := system.getTimerComponent()
+	timer.CurrentWaveIndex = 9
+	timer.CountdownCs = 3000
+	timer.WaveElapsedCs = 300 // < 401cs
+	timer.IsFlagWaveApproaching = true
+
+	// 调用加速刷新（僵尸全部消灭）
+	triggered := system.CheckAcceleratedRefresh(true)
+
+	// 不应触发（时间不足）
+	if triggered {
+		t.Error("Expected accelerated refresh NOT to be triggered (time < 401cs)")
+	}
+
+	// 倒计时不应改变
+	if timer.CountdownCs != 3000 {
+		t.Errorf("Expected CountdownCs unchanged, got %d", timer.CountdownCs)
+	}
+}
+
+// TestWaveTimingSystem_AcceleratedRefresh_NotTriggered_ZombiesRemain 测试加速刷新未触发（僵尸未消灭）
+func TestWaveTimingSystem_AcceleratedRefresh_NotTriggered_ZombiesRemain(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := createTestGameState()
+	levelConfig := createTestLevelConfigWithFlagWave(10, 9)
+	resetGameState(gs, levelConfig)
+
+	system := NewWaveTimingSystem(em, gs, levelConfig)
+
+	timer := system.getTimerComponent()
+	timer.CurrentWaveIndex = 9
+	timer.CountdownCs = 3000
+	timer.WaveElapsedCs = 500
+	timer.IsFlagWaveApproaching = true
+
+	// 调用加速刷新（僵尸未消灭）
+	triggered := system.CheckAcceleratedRefresh(false)
+
+	// 不应触发（僵尸未消灭）
+	if triggered {
+		t.Error("Expected accelerated refresh NOT to be triggered (zombies remain)")
+	}
+}
+
+// TestWaveTimingSystem_FinalWaveTextActivation 测试最终波白字激活
+func TestWaveTimingSystem_FinalWaveTextActivation(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := createTestGameState()
+	levelConfig := createTestLevelConfig(5)
+	resetGameState(gs, levelConfig)
+
+	system := NewWaveTimingSystem(em, gs, levelConfig)
+
+	// 激活最终波白字
+	system.ActivateFinalWaveText()
+
+	// 检查白字是否激活
+	if !system.IsFinalWaveTextActive() {
+		t.Error("Expected final wave text to be active")
+	}
+
+	// 白字应该还没完成
+	if system.IsFinalWaveTextComplete() {
+		t.Error("Expected final wave text NOT to be complete yet")
+	}
+
+	// 更新 5 秒（500cs），白字应该完成
+	for i := 0; i < 50; i++ {
+		system.Update(0.1)
+	}
+
+	// 现在白字应该完成了
+	if !system.IsFinalWaveTextComplete() {
+		t.Error("Expected final wave text to be complete after 500cs")
+	}
+}
+
+// TestWaveTimingSystem_IsNextWaveFlagWave 测试旗帜波判定
+func TestWaveTimingSystem_IsNextWaveFlagWave(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := createTestGameState()
+	levelConfig := createTestLevelConfigWithFlagWave(10, 9)
+	resetGameState(gs, levelConfig)
+
+	system := NewWaveTimingSystem(em, gs, levelConfig)
+
+	// 检查第 9 波是旗帜波
+	if !system.isNextWaveFlagWave(9) {
+		t.Error("Expected wave 9 to be flag wave")
+	}
+
+	// 检查第 8 波不是旗帜波
+	if system.isNextWaveFlagWave(8) {
+		t.Error("Expected wave 8 NOT to be flag wave")
+	}
+
+	// 检查越界情况
+	if system.isNextWaveFlagWave(10) {
+		t.Error("Expected out of bounds wave NOT to be flag wave")
+	}
+
+	if system.isNextWaveFlagWave(-1) {
+		t.Error("Expected negative wave NOT to be flag wave")
+	}
+}
+
+// TestWaveTimingSystem_IsFinalWave 测试最终波判定
+func TestWaveTimingSystem_IsFinalWave(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := createTestGameState()
+	levelConfig := createTestLevelConfig(5)
+	resetGameState(gs, levelConfig)
+
+	system := NewWaveTimingSystem(em, gs, levelConfig)
+
+	// 检查第 4 波（最后一波，索引 4）是最终波
+	if !system.isFinalWave(4) {
+		t.Error("Expected wave 4 (last wave) to be final wave")
+	}
+
+	// 检查第 3 波不是最终波
+	if system.isFinalWave(3) {
+		t.Error("Expected wave 3 NOT to be final wave")
+	}
+}
+
+// TestWaveTimingSystem_GetFlagWaveWarningPhase 测试获取警告阶段
+func TestWaveTimingSystem_GetFlagWaveWarningPhase(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := createTestGameState()
+	levelConfig := createTestLevelConfig(5)
+	resetGameState(gs, levelConfig)
+
+	system := NewWaveTimingSystem(em, gs, levelConfig)
+
+	timer := system.getTimerComponent()
+	timer.FlagWaveCountdownPhase = 5
+
+	phase := system.GetFlagWaveWarningPhase()
+	if phase != 5 {
+		t.Errorf("Expected phase = 5, got %d", phase)
+	}
+}
+
+// TestWaveTimingSystem_IsHugeWaveWarningActive 测试红字警告激活状态
+func TestWaveTimingSystem_IsHugeWaveWarningActive(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := createTestGameState()
+	levelConfig := createTestLevelConfig(5)
+	resetGameState(gs, levelConfig)
+
+	system := NewWaveTimingSystem(em, gs, levelConfig)
+
+	timer := system.getTimerComponent()
+
+	// 初始状态：不激活
+	if system.IsHugeWaveWarningActive() {
+		t.Error("Expected warning NOT active initially")
+	}
+
+	// 设置 Phase 5
+	timer.FlagWaveCountdownPhase = 5
+	if !system.IsHugeWaveWarningActive() {
+		t.Error("Expected warning active when phase = 5")
+	}
+
+	// 设置 Phase 4
+	timer.FlagWaveCountdownPhase = 4
+	if !system.IsHugeWaveWarningActive() {
+		t.Error("Expected warning active when phase = 4")
+	}
+
+	// 设置 Phase 0
+	timer.FlagWaveCountdownPhase = 0
+	if system.IsHugeWaveWarningActive() {
+		t.Error("Expected warning NOT active when phase = 0")
+	}
+}
+

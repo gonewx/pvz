@@ -25,6 +25,7 @@ const (
 //   - 检测胜利/失败条件
 //   - 触发最后一波提示
 //   - 触发关卡完成奖励动画（Story 8.3）
+//   - Story 17.7: 管理旗帜波警告和最终波白字显示
 //
 // 架构说明：
 //   - 通过 GameState 单例管理关卡状态
@@ -50,6 +51,10 @@ type LevelSystem struct {
 	// 最后一波提示相关
 	finalWaveWarningTriggered bool    // 是否已触发提示（防止重复）
 	finalWaveWarningLeadTime  float64 // 提前触发时间（秒，默认 3.0）
+
+	// Story 17.7: 旗帜波警告和最终波白字系统
+	flagWaveWarningSystem *FlagWaveWarningSystem // 红字警告系统
+	finalWaveTextSystem   *FinalWaveTextSystem   // 白字显示系统
 }
 
 // NewLevelSystem 创建关卡管理系统
@@ -81,6 +86,10 @@ func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *
 	// Story 17.6: 如果有关卡配置，创建 WaveTimingSystem
 	if gs.CurrentLevel != nil {
 		ls.waveTimingSystem = NewWaveTimingSystem(em, gs, gs.CurrentLevel)
+
+		// Story 17.7: 创建旗帜波警告和最终波白字系统
+		ls.flagWaveWarningSystem = NewFlagWaveWarningSystem(em, ls.waveTimingSystem)
+		ls.finalWaveTextSystem = NewFinalWaveTextSystem(em, ls.waveTimingSystem)
 	}
 
 	return ls
@@ -92,10 +101,12 @@ func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *
 //  1. 检查游戏是否结束，如果是则不处理
 //  2. 更新关卡时间
 //  3. 更新波次计时器（Story 17.6）
-//  4. 检查并生成到期的僵尸波次
-//  5. 检查最后一波提示
-//  6. 检查失败条件（僵尸到达左边界）
-//  7. 检查胜利条件（所有僵尸消灭）
+//  4. Story 17.7: 更新旗帜波警告和最终波白字系统
+//  5. Story 17.7: 检查加速刷新条件
+//  6. 检查并生成到期的僵尸波次
+//  7. 检查最后一波提示
+//  8. 检查失败条件（僵尸到达左边界）
+//  9. 检查胜利条件（所有僵尸消灭）
 //
 // 参数：
 //
@@ -117,6 +128,19 @@ func (s *LevelSystem) Update(deltaTime float64) {
 	// Story 17.6: 更新波次计时器（如果启用）
 	if s.useWaveTimingSystem && s.waveTimingSystem != nil {
 		s.waveTimingSystem.Update(deltaTime)
+
+		// Story 17.7: 更新旗帜波警告系统
+		if s.flagWaveWarningSystem != nil {
+			s.flagWaveWarningSystem.Update(deltaTime)
+		}
+
+		// Story 17.7: 更新最终波白字系统
+		if s.finalWaveTextSystem != nil {
+			s.finalWaveTextSystem.Update(deltaTime)
+		}
+
+		// Story 17.7: 检查加速刷新条件
+		s.checkAcceleratedRefresh()
 	}
 
 	// 检查并生成僵尸波次
@@ -145,6 +169,68 @@ func (s *LevelSystem) Update(deltaTime float64) {
 
 	// 更新进度条
 	s.UpdateProgressBar()
+}
+
+// checkAcceleratedRefresh 检查加速刷新条件
+//
+// Story 17.7: 旗帜波前一波的加速刷新逻辑
+// 当满足以下条件时触发加速刷新：
+//   - 正在接近旗帜波
+//   - 刷出时间 > 401cs
+//   - 倒计时 > 200cs
+//   - 本波僵尸已全部消灭
+func (s *LevelSystem) checkAcceleratedRefresh() {
+	if s.waveTimingSystem == nil {
+		return
+	}
+
+	// 只在接近旗帜波时检查
+	if !s.waveTimingSystem.IsFlagWaveApproaching() {
+		return
+	}
+
+	// 检查本波僵尸是否全部消灭
+	allZombiesCleared := s.areCurrentWaveZombiesCleared()
+
+	// 调用 WaveTimingSystem 执行加速刷新检查
+	s.waveTimingSystem.CheckAcceleratedRefresh(allZombiesCleared)
+}
+
+// areCurrentWaveZombiesCleared 检查当前波僵尸是否全部消灭
+//
+// Story 17.7: 用于加速刷新判定
+// 注意：不计算伴舞僵尸
+//
+// 返回：
+//   - bool: true 表示本波僵尸已全部消灭
+func (s *LevelSystem) areCurrentWaveZombiesCleared() bool {
+	// 查询所有活跃僵尸
+	zombieEntities := ecs.GetEntitiesWith2[
+		*components.BehaviorComponent,
+		*components.PositionComponent,
+	](s.entityManager)
+
+	for _, entityID := range zombieEntities {
+		behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
+		if !ok {
+			continue
+		}
+
+		// 只检查僵尸类型
+		if !isZombieType(behavior.Type) {
+			continue
+		}
+
+		// 跳过伴舞僵尸（BackupDancer）
+		// 注意：当前代码库可能没有 BehaviorZombieBackupDancer 类型
+		// 如果有，需要在这里排除
+
+		// 有活跃僵尸，返回 false
+		return false
+	}
+
+	// 没有活跃僵尸，返回 true
+	return true
 }
 
 // checkAndSpawnWaves 检查并激活到期的僵尸波次
@@ -905,6 +991,7 @@ func (s *LevelSystem) IsWaveTimingSystemEnabled() bool {
 // InitializeWaveTimingSystem 初始化波次计时系统
 //
 // Story 17.6: 在关卡加载后调用，创建 WaveTimingSystem
+// Story 17.7: 同时创建旗帜波警告和最终波白字系统
 // 用于在 NewLevelSystem 之后关卡配置才加载的情况
 func (s *LevelSystem) InitializeWaveTimingSystem() {
 	if s.gameState.CurrentLevel == nil {
@@ -913,5 +1000,24 @@ func (s *LevelSystem) InitializeWaveTimingSystem() {
 	}
 
 	s.waveTimingSystem = NewWaveTimingSystem(s.entityManager, s.gameState, s.gameState.CurrentLevel)
-	log.Printf("[LevelSystem] WaveTimingSystem initialized")
+
+	// Story 17.7: 创建旗帜波警告和最终波白字系统
+	s.flagWaveWarningSystem = NewFlagWaveWarningSystem(s.entityManager, s.waveTimingSystem)
+	s.finalWaveTextSystem = NewFinalWaveTextSystem(s.entityManager, s.waveTimingSystem)
+
+	log.Printf("[LevelSystem] WaveTimingSystem initialized with FlagWaveWarning and FinalWaveText systems")
+}
+
+// GetFlagWaveWarningSystem 获取旗帜波警告系统（用于测试）
+//
+// Story 17.7: 供测试和调试使用
+func (s *LevelSystem) GetFlagWaveWarningSystem() *FlagWaveWarningSystem {
+	return s.flagWaveWarningSystem
+}
+
+// GetFinalWaveTextSystem 获取最终波白字系统（用于测试）
+//
+// Story 17.7: 供测试和调试使用
+func (s *LevelSystem) GetFinalWaveTextSystem() *FinalWaveTextSystem {
+	return s.finalWaveTextSystem
 }
