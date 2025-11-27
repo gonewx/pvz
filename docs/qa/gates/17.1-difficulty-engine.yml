@@ -1,0 +1,50 @@
+# Quality Gate: 17.1
+schema: 1
+story: "17.1"
+story_title: "难度引擎 - 轮数与级别容量计算"
+gate: PASS
+status_reason: "所有验收标准满足，测试覆盖率100%，代码质量优秀，架构设计合理"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-11-27T12:35:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
+  recommendations:
+    must_fix: []
+    monitor: []
+
+quality_score: 100
+expires: "2025-12-11T00:00:00Z"
+
+evidence:
+  tests_reviewed: 47
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "无安全相关代码，配置文件只读加载"
+  performance:
+    status: PASS
+    notes: "所有计算均为O(n)或O(1)复杂度，无性能问题"
+  reliability:
+    status: PASS
+    notes: "完善的错误处理，nil检查，默认值处理"
+  maintainability:
+    status: PASS
+    notes: "代码结构清晰，注释完整，遵循ECS架构规范"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "考虑为 GameState 的难度计算方法添加单元测试"
+      refs: ["pkg/game/game_state.go:493-539"]
+    - action: "后续故事可添加僵尸类型的热重载支持"
+      refs: ["pkg/config/zombie_stats.go"]

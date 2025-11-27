@@ -52,6 +52,10 @@ type GameState struct {
 	SunFlashTimer    float64 // 闪烁剩余时间（秒），值 > 0 时触发闪烁动画，0 时停止
 	SunFlashCycle    float64 // 闪烁周期（秒），红色 ↔ 黑色切换周期，默认 0.3 秒
 	SunFlashDuration float64 // 闪烁总持续时间（秒），默认 1.0 秒（约 3 次完整闪烁）
+
+	// Story 17.1: 难度引擎数据
+	TotalCompletedFlags int // 已完成的旗帜总数（跨关卡累计）
+	WavesPerRound       int // 每轮波次数（默认20）
 }
 
 // 全局单例实例（这是架构规范允许的唯一全局变量）
@@ -86,6 +90,9 @@ func GetGameState() *GameState {
 			// Story 10.8: 初始化闪烁参数
 			SunFlashCycle:    0.3,
 			SunFlashDuration: 1.0,
+			// Story 17.1: 初始化难度引擎数据
+			TotalCompletedFlags: 0,
+			WavesPerRound:       20, // 默认每轮20波
 		}
 	}
 	return globalGameState
@@ -472,4 +479,61 @@ func (gs *GameState) IsToolUnlocked(toolID string) bool {
 		return false
 	}
 	return gs.saveManager.IsToolUnlocked(toolID)
+}
+
+// ========================================
+// Story 17.1: 难度引擎辅助方法
+// ========================================
+
+// GetCurrentRoundNumber 获取当前轮数
+// 公式: RoundNumber = TotalCompletedFlags / 2 - 1
+//
+// 返回:
+//   - int: 当前轮数（可能为负数，表示一周目早期关卡）
+func (gs *GameState) GetCurrentRoundNumber() int {
+	return gs.TotalCompletedFlags/2 - 1
+}
+
+// GetWaveCapacity 获取指定波次的级别容量上限
+// 公式: CapacityCap = int(int((CurrentWaveNum + RoundNumber * WavesPerRound) * 0.8) / 2) + 1
+// 旗帜波（大波）容量 × 2.5 并向零取整
+//
+// 参数:
+//   - waveNum: 当前波次号（从1开始）
+//   - isFlagWave: 是否为旗帜波（大波）
+//
+// 返回:
+//   - int: 级别容量上限
+func (gs *GameState) GetWaveCapacity(waveNum int, isFlagWave bool) int {
+	roundNumber := gs.GetCurrentRoundNumber()
+	wavesPerRound := gs.WavesPerRound
+	if wavesPerRound <= 0 {
+		wavesPerRound = 20 // 默认值
+	}
+
+	base := int(int(float64(waveNum+roundNumber*wavesPerRound)*0.8)/2) + 1
+	if isFlagWave {
+		return int(float64(base) * 2.5)
+	}
+	return base
+}
+
+// IncrementCompletedFlags 增加已完成旗帜计数
+// 在完成关卡旗帜波时调用
+//
+// 参数:
+//   - count: 增加的旗帜数量
+func (gs *GameState) IncrementCompletedFlags(count int) {
+	gs.TotalCompletedFlags += count
+	log.Printf("[GameState] IncrementCompletedFlags: +%d, Total=%d, RoundNumber=%d",
+		count, gs.TotalCompletedFlags, gs.GetCurrentRoundNumber())
+}
+
+// IsSecondPlaythrough 检查是否为二周目
+// 一周目完成需要约50旗（25个常规关卡 × 2旗/关卡）
+//
+// 返回:
+//   - bool: true 表示二周目，false 表示一周目
+func (gs *GameState) IsSecondPlaythrough() bool {
+	return gs.TotalCompletedFlags >= 50
 }

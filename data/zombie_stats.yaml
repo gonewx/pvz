@@ -1,0 +1,31 @@
+# 僵尸属性配置文件
+# 用于难度引擎计算级别容量
+
+zombies:
+  basic:
+    level: 1
+    weight: 4000
+    baseHealth: 270
+    tier1AccessoryHealth: 0
+    tier2AccessoryHealth: 0
+
+  conehead:
+    level: 2
+    weight: 4000
+    baseHealth: 270
+    tier1AccessoryHealth: 370
+    tier2AccessoryHealth: 0
+
+  buckethead:
+    level: 4
+    weight: 3000
+    baseHealth: 270
+    tier1AccessoryHealth: 1100
+    tier2AccessoryHealth: 0
+
+  gargantuar:
+    level: 10
+    weight: 1500
+    baseHealth: 3000
+    tier1AccessoryHealth: 0
+    tier2AccessoryHealth: 0
