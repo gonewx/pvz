@@ -12,6 +12,9 @@ availablePlants:              # 可用植物
 skipOpening: false            # 启用开场动画
 initialSun: 50                # 初始阳光50
 
+# "Ready Set Plant" 提示动画（原版设计：仅 1-3 关卡播放）
+showReadySetPlant: true
+
 # Story 8.7: 僵尸行转换模式
 laneTransitionMode: "instant" # 瞬间模式：僵尸立即调整到有效行（无动画）
 

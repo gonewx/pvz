@@ -629,9 +629,9 @@ func (s *GameScene) Update(deltaTime float64) {
 				// Story 10.2: 铺草皮完成后创建除草车（原版行为）
 				s.initLawnmowers()
 
-				// 铺草皮完成后播放 ReadySetPlant 动画
+				// 铺草皮完成后播放 ReadySetPlant 动画（仅限配置启用的关卡）
 				// 此时 UI（植物选择栏、除草车）已显示
-				if s.readySetPlantSystem != nil {
+				if s.readySetPlantSystem != nil && s.gameState.CurrentLevel.ShowReadySetPlant {
 					s.readySetPlantSystem.Start()
 				}
 			}, enabledLanes, animLanes, s.sodOverlayX, float64(s.sodHeight), enableParticles)
@@ -652,8 +652,8 @@ func (s *GameScene) Update(deltaTime float64) {
 				s.tutorialSystem.OnSoddingComplete()
 			}
 
-			// 播放 ReadySetPlant 动画（即使没有铺草皮动画）
-			if s.readySetPlantSystem != nil {
+			// 播放 ReadySetPlant 动画（仅限配置启用的关卡）
+			if s.readySetPlantSystem != nil && s.gameState.CurrentLevel.ShowReadySetPlant {
 				s.readySetPlantSystem.Start()
 			}
 			// 继续游戏流程，不return

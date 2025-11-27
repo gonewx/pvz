@@ -65,6 +65,11 @@ type LevelConfig struct {
 	//   - 中等关卡（3-5波）：5 只预览僵尸
 	//   - 困难关卡（>5波）：8 只预览僵尸
 	PreviewZombieCount int `yaml:"previewZombieCount"`
+
+	// ShowReadySetPlant 是否播放 "Ready Set Plant" 提示动画
+	// 原版设计：只在 level 1-3 播放（玩家首次进入全3行草地关卡时的引导）
+	// 默认 false
+	ShowReadySetPlant bool `yaml:"showReadySetPlant"`
 }
 
 // TutorialStep 教学步骤配置（Story 8.2）
