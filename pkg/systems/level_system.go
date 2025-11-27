@@ -830,7 +830,12 @@ func (s *LevelSystem) calculateTotalZombies() int {
 
 	total := 0
 	for _, wave := range s.gameState.CurrentLevel.Waves {
+		// 新格式：Zombies 字段
 		for _, zombie := range wave.Zombies {
+			total += zombie.Count
+		}
+		// 旧格式：OldZombies 字段（向后兼容）
+		for _, zombie := range wave.OldZombies {
 			total += zombie.Count
 		}
 	}
@@ -861,7 +866,12 @@ func (s *LevelSystem) calculateFlagPositions() []float64 {
 		// 计算旗帜波次前的僵尸总数
 		zombiesBeforeFlag := 0
 		for i := 0; i < flagWaveIndex; i++ {
+			// 新格式：Zombies 字段
 			for _, zombie := range s.gameState.CurrentLevel.Waves[i].Zombies {
+				zombiesBeforeFlag += zombie.Count
+			}
+			// 旧格式：OldZombies 字段（向后兼容）
+			for _, zombie := range s.gameState.CurrentLevel.Waves[i].OldZombies {
 				zombiesBeforeFlag += zombie.Count
 			}
 		}

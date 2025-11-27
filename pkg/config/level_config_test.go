@@ -958,10 +958,11 @@ func TestValidateLevelConfig_LaneRestriction(t *testing.T) {
 }
 
 // TestLoadLevelConfig_V2File 测试加载 v2 格式示例文件 (Story 17.2)
+// 现在 level-1-1.yaml 已经迁移到新格式，直接测试该文件
 func TestLoadLevelConfig_V2File(t *testing.T) {
-	config, err := LoadLevelConfig("../../data/levels/level-1-1-v2.yaml")
+	config, err := LoadLevelConfig("../../data/levels/level-1-1.yaml")
 	if err != nil {
-		t.Fatalf("Failed to load level-1-1-v2.yaml: %v", err)
+		t.Fatalf("Failed to load level-1-1.yaml: %v", err)
 	}
 
 	// 验证基本字段

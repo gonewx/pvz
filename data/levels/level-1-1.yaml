@@ -1,8 +1,14 @@
+# Level 1-1 (Story 17.2 新格式)
 id: "1-1"
 name: "前院白天 1-1"
 description: "教学关卡：学习基本的植物种植和僵尸防御"
 
-# Story 8.1: 关卡配置增强
+# === Story 17.2: 顶层字段 ===
+flags: 0                       # 本关卡无旗帜波次
+sceneType: "day"               # 场景类型: 白天前院
+rowMax: 5                      # 最大行数: 前院 5 行
+
+# === 开场配置 ===
 openingType: "tutorial"       # 教学关卡
 enabledLanes: [3]             # 只启用第3行（中间行）
 availablePlants:              # 只有豌豆射手
@@ -69,34 +75,44 @@ tutorialSteps:
     textKey: "ADVICE_ZOMBIE_ONSLAUGHT"
     action: "waitForLevelEnd"
 
-# 波次配置：2波，总共5个僵尸（符合原版设计：缓慢出现）
-# 原版机制：上一波消灭完毕后，自动触发下一波（可设置最小延迟）
-# Story 8.6: 使用新的 ZombieGroup 格式（lanes 为数组）
+# === 波次配置 (Story 17.2 新格式) ===
 waves:
-  # 第一波：游戏开始后出现，2个普通僵尸
-  - delay: 5
+  # 第一波：常规波次
+  - waveNum: 1
+    type: "Fixed"
+    delay: 5
     zombies:
       - type: "basic"
-        lanes: [3]  # 只在第3行（中间行）生成
+        lanes: [3]
         count: 1
         spawnInterval: 2.0
 
-  # 第二波（最后一波）：第一波消灭后自动触发，3个普通僵尸
-  - delay: 8
+  # 第二波
+  - waveNum: 2
+    type: "Fixed"
+    delay: 8
     zombies:
       - type: "basic"
-        lanes: [3]  # 只在第3行（中间行）生成
+        lanes: [3]
         count: 1
         spawnInterval: 2.0
-  - delay: 10
+
+  # 第三波
+  - waveNum: 3
+    type: "Fixed"
+    delay: 10
     zombies:
       - type: "basic"
-        lanes: [3]  # 只在第3行（中间行）生成
+        lanes: [3]
         count: 1
         spawnInterval: 2.0
-  - delay: 12
+
+  # 第四波（最终波）
+  - waveNum: 4
+    type: "Final"
+    delay: 12
     zombies:
       - type: "basic"
-        lanes: [3]  # 只在第3行（中间行）生成
+        lanes: [3]
         count: 2
         spawnInterval: 2.0

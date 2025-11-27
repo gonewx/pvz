@@ -851,7 +851,7 @@ func (s *TutorialSystem) spawnTutorialZombies() {
 }
 
 // manageWaveSpawning 管理教学关卡的后续波次生成
-// 机制：上一波僵尸全部消灭后，等待 MinDelay 秒后触发下一波
+// Story 17.6: ��次计时由 WaveTimingSystem 管理，场上无僵尸时触发下一波
 func (s *TutorialSystem) manageWaveSpawning(dt float64) {
 	// 检查关卡配置
 	if s.gameState.CurrentLevel == nil || len(s.gameState.CurrentLevel.Waves) == 0 {
