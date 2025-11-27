@@ -265,8 +265,9 @@ waves:
   - time: 10
     zombies:
       - type: basic
-        lane: 2
+        lanes: [2]
         count: 1
+        spawnInterval: 2.0
 `
 
 	tmpDir := t.TempDir()
@@ -334,8 +335,9 @@ waves:
   - time: 10
     zombies:
       - type: basic
-        lane: 3
+        lanes: [3]
         count: 1
+        spawnInterval: 2.0
 `
 
 	tmpDir := t.TempDir()
@@ -521,13 +523,15 @@ waves:
   - time: 10
     zombies:
       - type: basic
-        lane: 3
+        lanes: [3]
         count: 1
+        spawnInterval: 2.0
   - time: 30
     zombies:
       - type: basic
-        lane: 2
+        lanes: [2]
         count: 2
+        spawnInterval: 2.0
 `
 
 	tmpDir := t.TempDir()
@@ -576,8 +580,9 @@ waves:
   - time: 10
     zombies:
       - type: basic
-        lane: 3
+        lanes: [3]
         count: 1
+        spawnInterval: 2.0
 `
 
 	tmpDir := t.TempDir()
@@ -609,5 +614,724 @@ waves:
 	// 验证第二个步骤
 	if config.TutorialSteps[1].Trigger != "sunCollected" {
 		t.Errorf("Expected second step trigger 'sunCollected', got %q", config.TutorialSteps[1].Trigger)
+	}
+}
+
+// ============================================================
+// Story 17.2: 关卡脚本格式升级测试
+// ============================================================
+
+// TestLoadLevelConfig_NewFormatFields 测试新格式字段解析 (Story 17.2)
+func TestLoadLevelConfig_NewFormatFields(t *testing.T) {
+	// 创建包含所有新字段的配置文件
+	yamlContent := `id: "test-17.2"
+name: "Test Level New Format"
+description: "Testing new format fields"
+flags: 2
+sceneType: "pool"
+rowMax: 6
+waves:
+  - waveNum: 1
+    type: "Fixed"
+    delay: 5
+    extraPoints: 0
+    laneRestriction: [1, 2, 3]
+    zombies:
+      - type: basic
+        lanes: [1, 2, 3]
+        count: 2
+        spawnInterval: 1.5
+  - waveNum: 2
+    type: "ExtraPoints"
+    delay: 10
+    extraPoints: 100
+    zombies:
+      - type: conehead
+        lanes: [4, 5, 6]
+        count: 3
+  - waveNum: 3
+    type: "Final"
+    delay: 15
+    isFlag: true
+    flagIndex: 1
+    zombies:
+      - type: buckethead
+        lanes: [1, 2, 3, 4, 5, 6]
+        count: 5
+`
+
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test-new-format.yaml")
+	if err := os.WriteFile(testFile, []byte(yamlContent), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	config, err := LoadLevelConfig(testFile)
+	if err != nil {
+		t.Fatalf("LoadLevelConfig failed: %v", err)
+	}
+
+	// 验证顶层新字段
+	if config.Flags != 2 {
+		t.Errorf("Expected Flags 2, got %d", config.Flags)
+	}
+	if config.SceneType != "pool" {
+		t.Errorf("Expected SceneType 'pool', got %q", config.SceneType)
+	}
+	if config.RowMax != 6 {
+		t.Errorf("Expected RowMax 6, got %d", config.RowMax)
+	}
+
+	// 验证波次数量
+	if len(config.Waves) != 3 {
+		t.Fatalf("Expected 3 waves, got %d", len(config.Waves))
+	}
+
+	// 验证第一波 (Fixed)
+	wave1 := config.Waves[0]
+	if wave1.WaveNum != 1 {
+		t.Errorf("Wave 1: Expected WaveNum 1, got %d", wave1.WaveNum)
+	}
+	if wave1.Type != "Fixed" {
+		t.Errorf("Wave 1: Expected Type 'Fixed', got %q", wave1.Type)
+	}
+	if wave1.ExtraPoints != 0 {
+		t.Errorf("Wave 1: Expected ExtraPoints 0, got %d", wave1.ExtraPoints)
+	}
+	expectedLaneRestriction := []int{1, 2, 3}
+	if len(wave1.LaneRestriction) != len(expectedLaneRestriction) {
+		t.Errorf("Wave 1: Expected LaneRestriction length %d, got %d", len(expectedLaneRestriction), len(wave1.LaneRestriction))
+	}
+
+	// 验证第二波 (ExtraPoints)
+	wave2 := config.Waves[1]
+	if wave2.WaveNum != 2 {
+		t.Errorf("Wave 2: Expected WaveNum 2, got %d", wave2.WaveNum)
+	}
+	if wave2.Type != "ExtraPoints" {
+		t.Errorf("Wave 2: Expected Type 'ExtraPoints', got %q", wave2.Type)
+	}
+	if wave2.ExtraPoints != 100 {
+		t.Errorf("Wave 2: Expected ExtraPoints 100, got %d", wave2.ExtraPoints)
+	}
+
+	// 验证第三波 (Final)
+	wave3 := config.Waves[2]
+	if wave3.WaveNum != 3 {
+		t.Errorf("Wave 3: Expected WaveNum 3, got %d", wave3.WaveNum)
+	}
+	if wave3.Type != "Final" {
+		t.Errorf("Wave 3: Expected Type 'Final', got %q", wave3.Type)
+	}
+	if !wave3.IsFlag {
+		t.Errorf("Wave 3: Expected IsFlag true, got false")
+	}
+}
+
+// TestLoadLevelConfig_NewFormatDefaults 测试新字段默认值 (Story 17.2)
+func TestLoadLevelConfig_NewFormatDefaults(t *testing.T) {
+	// 创建不包含新字段的旧格式配置
+	yamlContent := `id: "test-defaults"
+name: "Test Defaults"
+waves:
+  - delay: 5
+    zombies:
+      - type: basic
+        lanes: [3]
+        count: 1
+  - delay: 10
+    isFlag: true
+    flagIndex: 1
+    zombies:
+      - type: basic
+        lanes: [3]
+        count: 2
+`
+
+	tmpDir := t.TempDir()
+	testFile := filepath.Join(tmpDir, "test-defaults.yaml")
+	if err := os.WriteFile(testFile, []byte(yamlContent), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	config, err := LoadLevelConfig(testFile)
+	if err != nil {
+		t.Fatalf("LoadLevelConfig failed: %v", err)
+	}
+
+	// 验证默认值
+	if config.SceneType != "day" {
+		t.Errorf("Expected default SceneType 'day', got %q", config.SceneType)
+	}
+	if config.RowMax != 5 {
+		t.Errorf("Expected default RowMax 5, got %d", config.RowMax)
+	}
+	// Flags 默认从 isFlag 数量推断
+	if config.Flags != 1 {
+		t.Errorf("Expected Flags 1 (inferred from isFlag), got %d", config.Flags)
+	}
+
+	// 验证波次默认值
+	if len(config.Waves) != 2 {
+		t.Fatalf("Expected 2 waves, got %d", len(config.Waves))
+	}
+
+	// 第一波：WaveNum 从索引推断，Type 从 isFlag 推断
+	wave1 := config.Waves[0]
+	if wave1.WaveNum != 1 {
+		t.Errorf("Wave 1: Expected default WaveNum 1, got %d", wave1.WaveNum)
+	}
+	if wave1.Type != "Fixed" {
+		t.Errorf("Wave 1: Expected default Type 'Fixed', got %q", wave1.Type)
+	}
+
+	// 第二波：isFlag=true，Type 应为 Final
+	wave2 := config.Waves[1]
+	if wave2.WaveNum != 2 {
+		t.Errorf("Wave 2: Expected default WaveNum 2, got %d", wave2.WaveNum)
+	}
+	if wave2.Type != "Final" {
+		t.Errorf("Wave 2: Expected Type 'Final' (inferred from isFlag), got %q", wave2.Type)
+	}
+}
+
+// TestValidateLevelConfig_InvalidSceneType 测试无效 SceneType 验证 (Story 17.2)
+func TestValidateLevelConfig_InvalidSceneType(t *testing.T) {
+	config := &LevelConfig{
+		ID:        "test",
+		Name:      "Test",
+		SceneType: "invalid_scene",
+		Waves: []WaveConfig{
+			{
+				Delay: 10,
+				Zombies: []ZombieGroup{
+					{Type: "basic", Lanes: []int{3}, Count: 1},
+				},
+			},
+		},
+	}
+
+	applyDefaults(config)
+	err := validateLevelConfig(config)
+	if err == nil {
+		t.Error("Expected validation error for invalid SceneType, got nil")
+	}
+	if err != nil && !containsString(err.Error(), "sceneType") {
+		t.Errorf("Expected error message to mention 'sceneType', got: %v", err)
+	}
+}
+
+// TestValidateLevelConfig_InvalidRowMax 测试无效 RowMax 验证 (Story 17.2)
+func TestValidateLevelConfig_InvalidRowMax(t *testing.T) {
+	tests := []struct {
+		name        string
+		rowMax      int
+		expectError bool
+	}{
+		{"Valid 5", 5, false},
+		{"Valid 6", 6, false},
+		{"Valid 0 (default)", 0, false},
+		{"Invalid 4", 4, true},
+		{"Invalid 7", 7, true},
+		{"Invalid -1", -1, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &LevelConfig{
+				ID:     "test",
+				Name:   "Test",
+				RowMax: tt.rowMax,
+				Waves: []WaveConfig{
+					{
+						Delay: 10,
+						Zombies: []ZombieGroup{
+							{Type: "basic", Lanes: []int{3}, Count: 1},
+						},
+					},
+				},
+			}
+
+			applyDefaults(config)
+			err := validateLevelConfig(config)
+			if tt.expectError && err == nil {
+				t.Errorf("Expected validation error for RowMax %d, got nil", tt.rowMax)
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Unexpected validation error for RowMax %d: %v", tt.rowMax, err)
+			}
+		})
+	}
+}
+
+// TestValidateLevelConfig_InvalidWaveType 测试无效波次类型验证 (Story 17.2)
+func TestValidateLevelConfig_InvalidWaveType(t *testing.T) {
+	tests := []struct {
+		name        string
+		waveType    string
+		expectError bool
+	}{
+		{"Valid Fixed", "Fixed", false},
+		{"Valid ExtraPoints", "ExtraPoints", false},
+		{"Valid Final", "Final", false},
+		{"Valid empty (default)", "", false},
+		{"Invalid type", "Unknown", true},
+		{"Invalid lowercase", "fixed", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &LevelConfig{
+				ID:   "test",
+				Name: "Test",
+				Waves: []WaveConfig{
+					{
+						Type:  tt.waveType,
+						Delay: 10,
+						Zombies: []ZombieGroup{
+							{Type: "basic", Lanes: []int{3}, Count: 1},
+						},
+					},
+				},
+			}
+
+			applyDefaults(config)
+			err := validateLevelConfig(config)
+			if tt.expectError && err == nil {
+				t.Errorf("Expected validation error for wave type %q, got nil", tt.waveType)
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Unexpected validation error for wave type %q: %v", tt.waveType, err)
+			}
+		})
+	}
+}
+
+// TestValidateLevelConfig_ExtraPointsValidation 测试 ExtraPoints 验证 (Story 17.2)
+func TestValidateLevelConfig_ExtraPointsValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		waveType    string
+		extraPoints int
+		expectError bool
+	}{
+		{"ExtraPoints type with points", "ExtraPoints", 100, false},
+		{"ExtraPoints type with zero", "ExtraPoints", 0, false},
+		{"Fixed type with zero", "Fixed", 0, false},
+		{"Fixed type with points", "Fixed", 100, true},
+		{"Final type with points", "Final", 50, true},
+		{"Empty type with points", "", 100, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &LevelConfig{
+				ID:   "test",
+				Name: "Test",
+				Waves: []WaveConfig{
+					{
+						Type:        tt.waveType,
+						ExtraPoints: tt.extraPoints,
+						Delay:       10,
+						Zombies: []ZombieGroup{
+							{Type: "basic", Lanes: []int{3}, Count: 1},
+						},
+					},
+				},
+			}
+
+			applyDefaults(config)
+			err := validateLevelConfig(config)
+			if tt.expectError && err == nil {
+				t.Errorf("Expected validation error for type=%q extraPoints=%d, got nil", tt.waveType, tt.extraPoints)
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Unexpected validation error for type=%q extraPoints=%d: %v", tt.waveType, tt.extraPoints, err)
+			}
+		})
+	}
+}
+
+// TestValidateLevelConfig_LaneRestriction 测试 LaneRestriction 验证 (Story 17.2)
+func TestValidateLevelConfig_LaneRestriction(t *testing.T) {
+	tests := []struct {
+		name            string
+		rowMax          int
+		laneRestriction []int
+		expectError     bool
+	}{
+		{"Valid lanes for RowMax 5", 5, []int{1, 3, 5}, false},
+		{"Valid lanes for RowMax 6", 6, []int{1, 3, 6}, false},
+		{"Invalid lane 6 for RowMax 5", 5, []int{1, 6}, true},
+		{"Invalid lane 0", 5, []int{0, 1}, true},
+		{"Invalid negative lane", 5, []int{-1, 1}, true},
+		{"Empty restriction (valid)", 5, []int{}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &LevelConfig{
+				ID:     "test",
+				Name:   "Test",
+				RowMax: tt.rowMax,
+				Waves: []WaveConfig{
+					{
+						Delay:           10,
+						LaneRestriction: tt.laneRestriction,
+						Zombies: []ZombieGroup{
+							{Type: "basic", Lanes: []int{1}, Count: 1},
+						},
+					},
+				},
+			}
+
+			applyDefaults(config)
+			err := validateLevelConfig(config)
+			if tt.expectError && err == nil {
+				t.Errorf("Expected validation error for laneRestriction %v with RowMax %d, got nil", tt.laneRestriction, tt.rowMax)
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Unexpected validation error for laneRestriction %v with RowMax %d: %v", tt.laneRestriction, tt.rowMax, err)
+			}
+		})
+	}
+}
+
+// TestLoadLevelConfig_V2File 测试加载 v2 格式示例文件 (Story 17.2)
+func TestLoadLevelConfig_V2File(t *testing.T) {
+	config, err := LoadLevelConfig("../../data/levels/level-1-1-v2.yaml")
+	if err != nil {
+		t.Fatalf("Failed to load level-1-1-v2.yaml: %v", err)
+	}
+
+	// 验证基本字段
+	if config.ID != "1-1" {
+		t.Errorf("Expected ID '1-1', got %q", config.ID)
+	}
+	if config.SceneType != "day" {
+		t.Errorf("Expected SceneType 'day', got %q", config.SceneType)
+	}
+	if config.RowMax != 5 {
+		t.Errorf("Expected RowMax 5, got %d", config.RowMax)
+	}
+	if config.Flags != 0 {
+		t.Errorf("Expected Flags 0, got %d", config.Flags)
+	}
+
+	// 验证波次
+	if len(config.Waves) != 4 {
+		t.Fatalf("Expected 4 waves, got %d", len(config.Waves))
+	}
+
+	// 验证波次类型
+	for i, expectedType := range []string{"Fixed", "Fixed", "Fixed", "Final"} {
+		if config.Waves[i].Type != expectedType {
+			t.Errorf("Wave %d: Expected Type %q, got %q", i+1, expectedType, config.Waves[i].Type)
+		}
+		if config.Waves[i].WaveNum != i+1 {
+			t.Errorf("Wave %d: Expected WaveNum %d, got %d", i+1, i+1, config.Waves[i].WaveNum)
+		}
+	}
+}
+
+// TestLoadLevelConfig_RealFilesBackwardCompat 测试现有关卡文件向后兼容 (Story 17.2)
+func TestLoadLevelConfig_RealFilesBackwardCompat(t *testing.T) {
+	files := []string{
+		"../../data/levels/level-1-1.yaml",
+		"../../data/levels/level-1-2.yaml",
+		"../../data/levels/level-1-3.yaml",
+		"../../data/levels/level-1-4.yaml",
+	}
+
+	for _, file := range files {
+		t.Run(file, func(t *testing.T) {
+			config, err := LoadLevelConfig(file)
+			if err != nil {
+				t.Fatalf("Failed to load %s: %v", file, err)
+			}
+
+			// 验证默认值已应用
+			if config.SceneType != "day" {
+				t.Errorf("Expected default SceneType 'day', got %q", config.SceneType)
+			}
+			if config.RowMax != 5 {
+				t.Errorf("Expected default RowMax 5, got %d", config.RowMax)
+			}
+
+			// 验证波次有默认的 WaveNum 和 Type
+			for i, wave := range config.Waves {
+				if wave.WaveNum != i+1 {
+					t.Errorf("Wave %d: Expected default WaveNum %d, got %d", i, i+1, wave.WaveNum)
+				}
+				if wave.Type == "" {
+					t.Errorf("Wave %d: Expected non-empty Type (should have default)", i)
+				}
+			}
+		})
+	}
+}
+
+// TestValidateLevelConfig_NegativeFlags 测试负数 Flags 验证 (Story 17.2)
+func TestValidateLevelConfig_NegativeFlags(t *testing.T) {
+	config := &LevelConfig{
+		ID:    "test",
+		Name:  "Test",
+		Flags: -1,
+		Waves: []WaveConfig{
+			{
+				Delay: 10,
+				Zombies: []ZombieGroup{
+					{Type: "basic", Lanes: []int{3}, Count: 1},
+				},
+			},
+		},
+	}
+
+	applyDefaults(config)
+	err := validateLevelConfig(config)
+	if err == nil {
+		t.Error("Expected validation error for negative Flags, got nil")
+	}
+}
+
+// TestValidateLevelConfig_NegativeExtraPoints 测试负数 ExtraPoints 验证 (Story 17.2)
+func TestValidateLevelConfig_NegativeExtraPoints(t *testing.T) {
+	config := &LevelConfig{
+		ID:   "test",
+		Name: "Test",
+		Waves: []WaveConfig{
+			{
+				Type:        "ExtraPoints",
+				ExtraPoints: -10,
+				Delay:       10,
+				Zombies: []ZombieGroup{
+					{Type: "basic", Lanes: []int{3}, Count: 1},
+				},
+			},
+		},
+	}
+
+	applyDefaults(config)
+	err := validateLevelConfig(config)
+	if err == nil {
+		t.Error("Expected validation error for negative ExtraPoints, got nil")
+	}
+}
+
+// TestValidateLevelConfig_ZombieLanesWithRowMax6 测试 RowMax=6 时的僵尸行验证 (Story 17.2)
+func TestValidateLevelConfig_ZombieLanesWithRowMax6(t *testing.T) {
+	tests := []struct {
+		name        string
+		rowMax      int
+		lanes       []int
+		expectError bool
+	}{
+		{"Lane 6 with RowMax 6", 6, []int{6}, false},
+		{"Lane 6 with RowMax 5", 5, []int{6}, true},
+		{"Lanes 1-6 with RowMax 6", 6, []int{1, 2, 3, 4, 5, 6}, false},
+		{"Lanes 1-5 with RowMax 5", 5, []int{1, 2, 3, 4, 5}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &LevelConfig{
+				ID:     "test",
+				Name:   "Test",
+				RowMax: tt.rowMax,
+				Waves: []WaveConfig{
+					{
+						Delay: 10,
+						Zombies: []ZombieGroup{
+							{Type: "basic", Lanes: tt.lanes, Count: 1},
+						},
+					},
+				},
+			}
+
+			applyDefaults(config)
+			err := validateLevelConfig(config)
+			if tt.expectError && err == nil {
+				t.Errorf("Expected validation error for lanes %v with RowMax %d, got nil", tt.lanes, tt.rowMax)
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Unexpected validation error for lanes %v with RowMax %d: %v", tt.lanes, tt.rowMax, err)
+			}
+		})
+	}
+}
+
+// containsString 辅助函数：检查字符串是否包含子串
+func containsString(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsSubstring(s, substr))
+}
+
+func containsSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+// ============================================================
+// Story 17.2: 额外边缘情况测试 - 提升覆盖率
+// ============================================================
+
+// TestValidateLevelConfig_ValidSceneTypes 测试所有有效场景类型 (Story 17.2)
+func TestValidateLevelConfig_ValidSceneTypes(t *testing.T) {
+	validSceneTypes := []string{"day", "night", "pool", "fog", "roof", "moon"}
+
+	for _, sceneType := range validSceneTypes {
+		t.Run("SceneType_"+sceneType, func(t *testing.T) {
+			config := &LevelConfig{
+				ID:        "test",
+				Name:      "Test",
+				SceneType: sceneType,
+				Waves: []WaveConfig{
+					{
+						Delay: 10,
+						Zombies: []ZombieGroup{
+							{Type: "basic", Lanes: []int{3}, Count: 1},
+						},
+					},
+				},
+			}
+
+			applyDefaults(config)
+			err := validateLevelConfig(config)
+			if err != nil {
+				t.Errorf("Expected no error for sceneType %q, got: %v", sceneType, err)
+			}
+		})
+	}
+}
+
+// TestValidateLevelConfig_WaveNumEdgeCases 测试 WaveNum 边缘情况 (Story 17.2)
+func TestValidateLevelConfig_WaveNumEdgeCases(t *testing.T) {
+	// WaveNum 为 0 应该被 applyDefaults 修正为索引+1
+	config := &LevelConfig{
+		ID:   "test",
+		Name: "Test",
+		Waves: []WaveConfig{
+			{
+				WaveNum: 0, // 0 will be auto-corrected to 1
+				Delay:   10,
+				Zombies: []ZombieGroup{
+					{Type: "basic", Lanes: []int{3}, Count: 1},
+				},
+			},
+		},
+	}
+
+	applyDefaults(config)
+	err := validateLevelConfig(config)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// 验证 WaveNum 被正确设置为 1
+	if config.Waves[0].WaveNum != 1 {
+		t.Errorf("Expected WaveNum 1 after applyDefaults, got %d", config.Waves[0].WaveNum)
+	}
+}
+
+// TestValidateLevelConfig_ZeroFlags 测试 Flags=0 的有效情况 (Story 17.2)
+func TestValidateLevelConfig_ZeroFlags(t *testing.T) {
+	config := &LevelConfig{
+		ID:    "test",
+		Name:  "Test",
+		Flags: 0, // 0 是有效的 (无旗帜关卡)
+		Waves: []WaveConfig{
+			{
+				Delay: 10,
+				Zombies: []ZombieGroup{
+					{Type: "basic", Lanes: []int{3}, Count: 1},
+				},
+			},
+		},
+	}
+
+	applyDefaults(config)
+	err := validateLevelConfig(config)
+	if err != nil {
+		t.Errorf("Expected no error for Flags=0, got: %v", err)
+	}
+}
+
+// TestValidateLevelConfig_LaneRestrictionEmpty 测试空行限制 (Story 17.2)
+func TestValidateLevelConfig_LaneRestrictionEmpty(t *testing.T) {
+	config := &LevelConfig{
+		ID:   "test",
+		Name: "Test",
+		Waves: []WaveConfig{
+			{
+				Delay:           10,
+				LaneRestriction: []int{}, // 空数组是有效的
+				Zombies: []ZombieGroup{
+					{Type: "basic", Lanes: []int{3}, Count: 1},
+				},
+			},
+		},
+	}
+
+	applyDefaults(config)
+	err := validateLevelConfig(config)
+	if err != nil {
+		t.Errorf("Expected no error for empty LaneRestriction, got: %v", err)
+	}
+}
+
+// TestLoadLevelConfig_FileReadError 测试文件读取错误 (Story 17.2)
+func TestLoadLevelConfig_FileReadError(t *testing.T) {
+	_, err := LoadLevelConfig("/nonexistent/path/to/level.yaml")
+	if err == nil {
+		t.Error("Expected error for nonexistent file, got nil")
+	}
+}
+
+// TestApplyDefaults_EmptySceneType 测试空场景类型默认值 (Story 17.2)
+func TestApplyDefaults_EmptySceneType(t *testing.T) {
+	config := &LevelConfig{
+		ID:        "test",
+		Name:      "Test",
+		SceneType: "", // 应该被设置为 "day"
+		Waves: []WaveConfig{
+			{
+				Delay: 10,
+				Zombies: []ZombieGroup{
+					{Type: "basic", Lanes: []int{3}, Count: 1},
+				},
+			},
+		},
+	}
+
+	applyDefaults(config)
+
+	if config.SceneType != "day" {
+		t.Errorf("Expected default SceneType 'day', got %q", config.SceneType)
+	}
+}
+
+// TestApplyDefaults_ZeroRowMax 测试 RowMax=0 的默认值 (Story 17.2)
+func TestApplyDefaults_ZeroRowMax(t *testing.T) {
+	config := &LevelConfig{
+		ID:     "test",
+		Name:   "Test",
+		RowMax: 0, // 应该被设置为 5
+		Waves: []WaveConfig{
+			{
+				Delay: 10,
+				Zombies: []ZombieGroup{
+					{Type: "basic", Lanes: []int{3}, Count: 1},
+				},
+			},
+		},
+	}
+
+	applyDefaults(config)
+
+	if config.RowMax != 5 {
+		t.Errorf("Expected default RowMax 5, got %d", config.RowMax)
 	}
 }

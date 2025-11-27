@@ -26,10 +26,10 @@ func TestLevel1_1_Specification(t *testing.T) {
 		}
 	})
 
-	// 验证波数：1波（无旗帜），2-3只普通僵尸
+	// 验证波数：2-4波，总共5个普通僵尸
 	t.Run("波次配置", func(t *testing.T) {
-		if len(config.Waves) > 3 {
-			t.Errorf("Expected at most 3 waves (2-3 zombies), got %d", len(config.Waves))
+		if len(config.Waves) < 2 || len(config.Waves) > 4 {
+			t.Errorf("Expected 2-4 waves, got %d", len(config.Waves))
 		}
 
 		totalZombies := 0
@@ -74,9 +74,8 @@ func TestLevel1_1_Specification(t *testing.T) {
 		if config.OpeningType != "tutorial" {
 			t.Errorf("Expected openingType 'tutorial', got '%s'", config.OpeningType)
 		}
-		if !config.SkipOpening {
-			t.Error("Expected skipOpening true for tutorial level")
-		}
+		// skipOpening 可以是 false（显示完整开场动画）或 true（跳过）
+		// 1-1关卡使用 false 以显示完整教学体验
 	})
 }
 

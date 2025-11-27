@@ -15,6 +15,11 @@ type LevelConfig struct {
 	Description string       `yaml:"description"` // 关卡描述（可选）
 	Waves       []WaveConfig `yaml:"waves"`       // 僵尸波次配置列表
 
+	// Story 17.2: 关卡脚本格式升级
+	Flags     int    `yaml:"flags"`     // 本关卡的旗帜数量，默认从 waves 中的 isFlag 数量推断
+	SceneType string `yaml:"sceneType"` // 场景类型: day, night, pool, fog, roof, moon，默认 "day"
+	RowMax    int    `yaml:"rowMax"`    // 最大行数: 前院/屋顶 5 行，后院 6 行，默认 5
+
 	// Story 8.1 新增字段
 	OpeningType     string         `yaml:"openingType"`     // 开场类型：\"tutorial\", \"standard\", \"special\"，默认\"standard\"
 	EnabledLanes    []int          `yaml:"enabledLanes"`    // 启用的行列表，如 [1,2,3] 或 [3]，默认 [1,2,3,4,5]
@@ -84,6 +89,7 @@ type TutorialStep struct {
 // WaveConfig 单个僵尸波次配置
 // 定义了僵尸波次的触发条件和生成的僵尸列表
 // Story 8.6 扩展：支持旗帜波次和混合僵尸生成
+// Story 17.2 扩展：支持波次编号、类型和额外点数
 type WaveConfig struct {
 	Delay      float64       `yaml:"delay"`      // 游戏开始后延迟（第1波使用），单位：秒
 	MinDelay   float64       `yaml:"minDelay"`   // 上一波消灭后最小延迟（秒），默认 0（立即触发）
@@ -91,6 +97,12 @@ type WaveConfig struct {
 	FlagIndex  int           `yaml:"flagIndex"`  // 旗帜索引（第几面旗帜），从1开始（Story 8.6）
 	Zombies    []ZombieGroup `yaml:"zombies"`    // 本波次要生成的僵尸组列表（Story 8.6 使用 ZombieGroup）
 	OldZombies []ZombieSpawn `yaml:"oldZombies"` // 兼容旧格式：单个僵尸生成配置（已废弃，向后兼容）
+
+	// Story 17.2: 新增波次配置字段
+	WaveNum         int   `yaml:"waveNum"`         // 当前波次编号（从 1 开始），默认从 slice 索引 +1 推断
+	Type            string `yaml:"type"`            // 波次类型: "Fixed", "ExtraPoints", "Final"，默认从 isFlag 推断
+	ExtraPoints     int    `yaml:"extraPoints"`     // 额外点数（用于动态点数分配关卡，仅 Type="ExtraPoints" 时有效）
+	LaneRestriction []int  `yaml:"laneRestriction"` // 行限制（可选，指定僵尸必须出现的行）
 }
 
 // ZombieGroup 僵尸组配置（Story 8.6 新增）
@@ -167,6 +179,47 @@ func applyDefaults(config *LevelConfig) {
 		config.BackgroundImage = "IMAGE_BACKGROUND1"
 	}
 
+	// Story 17.2: 新字段默认值
+	// SceneType 默认 "day"
+	if config.SceneType == "" {
+		config.SceneType = "day"
+	}
+
+	// RowMax 默认 5
+	if config.RowMax == 0 {
+		config.RowMax = 5
+	}
+
+	// Flags 默认从 waves 中的 isFlag 数量推断
+	if config.Flags == 0 {
+		flagCount := 0
+		for _, wave := range config.Waves {
+			if wave.IsFlag {
+				flagCount++
+			}
+		}
+		config.Flags = flagCount
+	}
+
+	// 为每个 wave 应用默认值
+	for i := range config.Waves {
+		wave := &config.Waves[i]
+
+		// WaveNum 默认从 slice 索引 +1 推断
+		if wave.WaveNum == 0 {
+			wave.WaveNum = i + 1
+		}
+
+		// Type 默认从 isFlag 字段推断
+		if wave.Type == "" {
+			if wave.IsFlag {
+				wave.Type = "Final"
+			} else {
+				wave.Type = "Fixed"
+			}
+		}
+	}
+
 	// AvailablePlants、TutorialSteps、SpecialRules、SodRowImage 默认为空值（nil/空字符串），无需处理
 	// SkipOpening 默认为 false（bool 零值），无需处理
 }
@@ -183,9 +236,40 @@ func validateLevelConfig(config *LevelConfig) error {
 		return fmt.Errorf("level name is required")
 	}
 
+	// Story 17.2: 验证新字段
+	// 验证 Flags（必须 >= 0）
+	if config.Flags < 0 {
+		return fmt.Errorf("flags must be >= 0, got %d", config.Flags)
+	}
+
+	// 验证 SceneType（必须是有效值或空）
+	validSceneTypes := map[string]bool{
+		"day":   true,
+		"night": true,
+		"pool":  true,
+		"fog":   true,
+		"roof":  true,
+		"moon":  true,
+	}
+	if config.SceneType != "" && !validSceneTypes[config.SceneType] {
+		return fmt.Errorf("sceneType must be one of: day, night, pool, fog, roof, moon, got %q", config.SceneType)
+	}
+
+	// 验证 RowMax（必须在 5-6 范围内或为 0 表示使用默认值）
+	if config.RowMax != 0 && (config.RowMax < 5 || config.RowMax > 6) {
+		return fmt.Errorf("rowMax must be 5 or 6, got %d", config.RowMax)
+	}
+
 	// 验证波次配置
 	if len(config.Waves) == 0 {
 		return fmt.Errorf("at least one wave is required")
+	}
+
+	// Story 17.2: 波次类型有效值
+	validWaveTypes := map[string]bool{
+		"Fixed":       true,
+		"ExtraPoints": true,
+		"Final":       true,
 	}
 
 	// 验证每个波次的配置
@@ -198,9 +282,47 @@ func validateLevelConfig(config *LevelConfig) error {
 			return fmt.Errorf("wave %d: minDelay cannot be negative", i)
 		}
 
+		// Story 17.2: 验证波次新字段
+		// 验证 WaveNum（如果指定，必须 > 0）
+		if wave.WaveNum < 0 {
+			return fmt.Errorf("wave %d: waveNum must be >= 0, got %d", i, wave.WaveNum)
+		}
+
+		// 验证 Type（必须是有效值或空）
+		if wave.Type != "" && !validWaveTypes[wave.Type] {
+			return fmt.Errorf("wave %d: type must be one of: Fixed, ExtraPoints, Final, got %q", i, wave.Type)
+		}
+
+		// 验证 ExtraPoints（仅在 Type="ExtraPoints" 时允许非零值）
+		if wave.ExtraPoints != 0 && wave.Type != "ExtraPoints" {
+			return fmt.Errorf("wave %d: extraPoints can only be set when type is 'ExtraPoints', got type %q with extraPoints %d", i, wave.Type, wave.ExtraPoints)
+		}
+
+		// 验证 ExtraPoints（必须 >= 0）
+		if wave.ExtraPoints < 0 {
+			return fmt.Errorf("wave %d: extraPoints must be >= 0, got %d", i, wave.ExtraPoints)
+		}
+
+		// 验证 LaneRestriction（如果配置了，所有值必须在 1-6 范围内，考虑后院 6 行）
+		for j, lane := range wave.LaneRestriction {
+			maxLane := 5
+			if config.RowMax == 6 {
+				maxLane = 6
+			}
+			if lane < 1 || lane > maxLane {
+				return fmt.Errorf("wave %d: laneRestriction[%d] must be between 1 and %d, got %d", i, j, maxLane, lane)
+			}
+		}
+
 		// Story 8.6: 支持 ZombieGroup 和旧格式 ZombieSpawn
 		if len(wave.Zombies) == 0 && len(wave.OldZombies) == 0 {
 			return fmt.Errorf("wave %d: at least one zombie group or spawn is required", i)
+		}
+
+		// 获取最大行数限制（用于验证僵尸行）
+		maxLane := 5
+		if config.RowMax == 6 {
+			maxLane = 6
 		}
 
 		// 验证新格式 ZombieGroup
@@ -213,10 +335,10 @@ func validateLevelConfig(config *LevelConfig) error {
 				return fmt.Errorf("wave %d, zombie group %d: at least one lane is required", i, j)
 			}
 
-			// 验证所有 lanes 必须在 1-5 范围内
+			// 验证所有 lanes 必须在有效范围内
 			for k, lane := range zombieGroup.Lanes {
-				if lane < 1 || lane > 5 {
-					return fmt.Errorf("wave %d, zombie group %d, lane %d: lane must be between 1 and 5, got %d", i, j, k, lane)
+				if lane < 1 || lane > maxLane {
+					return fmt.Errorf("wave %d, zombie group %d, lane %d: lane must be between 1 and %d, got %d", i, j, k, maxLane, lane)
 				}
 			}
 
@@ -235,8 +357,8 @@ func validateLevelConfig(config *LevelConfig) error {
 				return fmt.Errorf("wave %d, old zombie %d: type is required", i, j)
 			}
 
-			if zombie.Lane < 1 || zombie.Lane > 5 {
-				return fmt.Errorf("wave %d, old zombie %d: lane must be between 1 and 5, got %d", i, j, zombie.Lane)
+			if zombie.Lane < 1 || zombie.Lane > maxLane {
+				return fmt.Errorf("wave %d, old zombie %d: lane must be between 1 and %d, got %d", i, j, maxLane, zombie.Lane)
 			}
 
 			if zombie.Count < 1 {

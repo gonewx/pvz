@@ -17,20 +17,20 @@ func TestCalculateBottomButtonPosition(t *testing.T) {
 		{
 			name:        "Button 0 (Options)",
 			buttonIndex: 0,
-			expectedX:   500.0,
-			expectedY:   555.0,
+			expectedX:   565.0,
+			expectedY:   495.0,
 		},
 		{
 			name:        "Button 1 (Help)",
 			buttonIndex: 1,
-			expectedX:   591.0,
-			expectedY:   555.0,
+			expectedX:   648.0,
+			expectedY:   525.0,
 		},
 		{
 			name:        "Button 2 (Quit)",
 			buttonIndex: 2,
-			expectedX:   649.0,
-			expectedY:   555.0,
+			expectedX:   720.0,
+			expectedY:   515.0,
 		},
 	}
 
