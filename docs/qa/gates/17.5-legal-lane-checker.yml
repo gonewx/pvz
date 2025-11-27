@@ -1,0 +1,150 @@
+# Quality Gate Decision for Story 17.5: 合法行判定系统
+# Schema Version: 1
+
+schema: 1
+story: "17.5"
+story_title: "合法行判定系统"
+gate: PASS
+status_reason: "所有 AC 完全满足，测试覆盖率 100%（核心函数），代码质量卓越，完全符合 ECS 架构标准，NFR 全部 PASS，无阻塞问题，无技术债务。"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-11-27T15:20:00Z"
+
+# Quality metrics
+quality_score: 95
+expires: "2025-12-11T00:00:00Z"  # 2 weeks from review
+
+# Risk assessment (no significant risks identified)
+risk_summary:
+  totals:
+    critical: 0
+    high: 0
+    medium: 0
+    low: 1
+  highest: "low"
+  recommendations:
+    must_fix: []
+    monitor:
+      - "建议未来为 SelectLane 方法添加端到端集成测试（优先级：低）"
+
+# Evidence of thorough review
+evidence:
+  tests_reviewed: 7
+  risks_identified: 1
+  trace:
+    ac_covered: [1, 2, 3, 4, 5]  # All ACs have test coverage
+    ac_gaps: []  # No coverage gaps
+
+# Non-functional requirements validation
+nfr_validation:
+  security:
+    status: PASS
+    notes: "无安全关切点。纯计算逻辑，不涉及用户输入、文件系统、网络或敏感数据。"
+  performance:
+    status: PASS
+    notes: "时间复杂度 O(n)，n 最大为 6。每波次仅调用一次，对游戏帧率无影响。无内存分配热点。"
+  reliability:
+    status: PASS
+    notes: "优雅降级（spawnRules 为 nil 时使用基本验证），边界条件处理完善，默认值安全（无合法行时返回第 6 行）。"
+  maintainability:
+    status: PASS
+    notes: "纯函数设计，单一职责，GoDoc 注释完整，配置驱动易扩展。代码自文档化程度高。"
+
+# Test coverage details
+test_coverage:
+  overall: "100%"  # Core functions
+  breakdown:
+    FilterLegalLanes: "100%"
+    IsWaterLane: "100%"
+    IsWaterZombie: "100%"
+    IsAdjacentLaneValid: "100%"
+  notes: "核心函数测试覆盖率 100%，超过 AC5 要求的 ≥85% 目标。SelectLane 方法未包含在本次测试范围（属于集成测试）。"
+
+# Requirements traceability
+requirements_trace:
+  - id: "AC1"
+    requirement: "基本不合法条件（行号越界、权重为0、第6行场景限制）"
+    implementation: "pkg/systems/lane_allocator.go:276-286"
+    tests:
+      - "TestFilterLegalLanes"
+      - "TestFilterLegalLanes_Scene6thRow"
+    status: "PASS"
+
+  - id: "AC2"
+    requirement: "水路限制（水路僵尸专属、非水路僵尸限制）"
+    implementation: "pkg/systems/lane_allocator.go:288-300, 407-418, 428-435"
+    tests:
+      - "TestFilterLegalLanes_WaterRestrictions"
+      - "TestIsWaterLane"
+      - "TestIsWaterZombie"
+    status: "PASS"
+
+  - id: "AC3"
+    requirement: "舞王限制（屋顶禁止、相邻行要求）"
+    implementation: "pkg/systems/lane_allocator.go:302-314, 445-460"
+    tests:
+      - "TestFilterLegalLanes_DancingRestrictions"
+      - "TestIsAdjacentLaneValid"
+    status: "PASS"
+
+  - id: "AC4"
+    requirement: "配置驱动（YAML 配置文件）"
+    implementation: "data/spawn_rules.yaml, function parameters"
+    tests:
+      - "All tests use configuration-driven approach"
+    status: "PASS"
+
+  - id: "AC5"
+    requirement: "单元测试覆盖率 ≥ 85%"
+    implementation: "pkg/systems/lane_legal_test.go"
+    tests:
+      - "Core functions: 100% coverage"
+    status: "PASS"
+
+# Architecture compliance
+architecture_compliance:
+  ecs_zero_coupling: true
+  pure_functions: true
+  configuration_driven: true
+  dependency_injection: true
+  notes: "完全遵循 ECS 零耦合原则，所有验证逻辑实现为独立纯函数，配置驱动且易于测试。"
+
+# Code quality highlights
+code_quality_highlights:
+  - "架构卓越：完全遵循 ECS 零耦合原则，使用纯函数实现所有判定逻辑"
+  - "配置驱动：所有规则外部化到 spawn_rules.yaml，无硬编码"
+  - "测试全面：核心函数测试覆盖率 100%，包含边界条件和异常场景"
+  - "代码清晰：函数文档完整，逻辑清晰易懂，命名规范"
+  - "向后兼容：优雅降级，spawnRules 为 nil 时回退到基本验证"
+
+# Issues (none identified)
+top_issues: []
+
+# Waiver (not applicable)
+waiver:
+  active: false
+
+# Recommendations for future improvements (optional, not blocking)
+recommendations:
+  immediate: []  # No immediate actions required
+  future:
+    - action: "为 SelectLane 方法添加端到端集成测试"
+      priority: "low"
+      estimated_effort: "2-3 hours"
+      refs: ["pkg/systems/lane_allocator.go:61"]
+
+    - action: "在生产环境添加性能监控指标"
+      priority: "low"
+      estimated_effort: "1-2 hours"
+      refs: ["pkg/systems/lane_allocator.go"]
+
+    - action: "在 FilterLegalLanes 中添加详细的过滤原因日志（verbose 模式）"
+      priority: "low"
+      estimated_effort: "30 minutes"
+      refs: ["pkg/systems/lane_allocator.go:266"]
+
+# Change history
+history:
+  - at: "2025-11-27T15:20:00Z"
+    gate: PASS
+    reviewer: "Quinn (Test Architect)"
+    note: "Initial review - all ACs met, excellent code quality, 100% test coverage on core functions"

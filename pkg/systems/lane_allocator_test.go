@@ -262,14 +262,14 @@ func TestLaneAllocatorSelectLane(t *testing.T) {
 
 	// 测试单行选择
 	allocator.InitializeLanes(1, 1.0)
-	selectedLane := allocator.SelectLane("basic", "day")
+	selectedLane := allocator.SelectLane("basic", "day", nil, []int{1})
 	if selectedLane != 1 {
 		t.Errorf("Single lane: expected 1, got %d", selectedLane)
 	}
 
 	// 测试全零权重时返回第六行
 	allocator.InitializeLanes(5, 0.0)
-	selectedLane = allocator.SelectLane("basic", "day")
+	selectedLane = allocator.SelectLane("basic", "day", nil, []int{1, 2, 3, 4, 5})
 	if selectedLane != 6 {
 		t.Errorf("All zero weights: expected 6, got %d", selectedLane)
 	}
@@ -286,7 +286,7 @@ func TestLaneSelectionDistribution(t *testing.T) {
 	counts := make(map[int]int)
 
 	for i := 0; i < iterations; i++ {
-		selectedLane := allocator.SelectLane("basic", "day")
+		selectedLane := allocator.SelectLane("basic", "day", nil, []int{1, 2, 3, 4, 5})
 		counts[selectedLane]++
 		allocator.UpdateLaneCounters(selectedLane)
 	}
@@ -358,7 +358,7 @@ func TestFilterLegalLanes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := FilterLegalLanes(tt.laneStates, "basic", "day")
+			result := FilterLegalLanes(tt.laneStates, "basic", "day", nil, []int{1, 2, 3, 4, 5})
 			if len(result) != len(tt.expected) {
 				t.Errorf("Expected length %d, got %d", len(tt.expected), len(result))
 			}

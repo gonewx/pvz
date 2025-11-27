@@ -5,6 +5,7 @@ import (
 	"math/rand"
 
 	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 )
 
@@ -52,10 +53,17 @@ func (la *LaneAllocator) InitializeLanes(rowMax int, initialWeight float64) {
 // 参数:
 //   - zombieType: 僵尸类型（用于合法行判定）
 //   - sceneType: 场景类型（用于合法行判定）
+//   - spawnRules: 僵尸生成规则配置
+//   - enabledLanes: 关卡启用的行列表（草地行）
 //
 // 返回:
 //   - 选中的行号（1-6）
-func (la *LaneAllocator) SelectLane(zombieType string, sceneType string) int {
+func (la *LaneAllocator) SelectLane(
+	zombieType string,
+	sceneType string,
+	spawnRules *config.SpawnRulesConfig,
+	enabledLanes []int,
+) int {
 	// 收集所有行的状态
 	laneStates := make([]*components.LaneStateComponent, 0, len(la.laneEntities))
 	for _, entity := range la.laneEntities {
@@ -70,9 +78,24 @@ func (la *LaneAllocator) SelectLane(zombieType string, sceneType string) int {
 		return 6
 	}
 
+	// 过滤出合法行（在计算权重之前）
+	legalLaneIndices := FilterLegalLanes(laneStates, zombieType, sceneType, spawnRules, enabledLanes)
+
+	// 如果没有合法行，返回默认第六行
+	if len(legalLaneIndices) == 0 {
+		log.Printf("[LaneAllocator] WARNING: No legal lanes for zombie type %s in scene %s, using default lane 6", zombieType, sceneType)
+		return 6
+	}
+
+	// 仅对合法行计算平滑权重
+	legalLaneStates := make([]*components.LaneStateComponent, len(legalLaneIndices))
+	for i, idx := range legalLaneIndices {
+		legalLaneStates[i] = laneStates[idx]
+	}
+
 	// 提取权重
-	laneWeights := make([]float64, len(laneStates))
-	for i, state := range laneStates {
+	laneWeights := make([]float64, len(legalLaneStates))
+	for i, state := range legalLaneStates {
 		laneWeights[i] = state.Weight
 	}
 
@@ -80,8 +103,8 @@ func (la *LaneAllocator) SelectLane(zombieType string, sceneType string) int {
 	weightP := CalculateWeightP(laneWeights)
 
 	// 计算平滑权重
-	smoothWeights := make([]float64, len(laneStates))
-	for i, state := range laneStates {
+	smoothWeights := make([]float64, len(legalLaneStates))
+	for i, state := range legalLaneStates {
 		pLast := CalculatePLast(state.LastPicked, weightP[i])
 		pSecondLast := CalculatePSecondLast(state.SecondLastPicked, weightP[i])
 		smoothWeights[i] = CalculateSmoothWeight(weightP[i], pLast, pSecondLast)
@@ -103,12 +126,12 @@ func (la *LaneAllocator) SelectLane(zombieType string, sceneType string) int {
 	for i, sw := range smoothWeights {
 		cumulativeWeight += sw
 		if cumulativeWeight >= randNum {
-			return laneStates[i].LaneIndex
+			return legalLaneStates[i].LaneIndex
 		}
 	}
 
 	// 理论上不应该到达这里，但作为保险返回最后一行
-	return laneStates[len(laneStates)-1].LaneIndex
+	return legalLaneStates[len(legalLaneStates)-1].LaneIndex
 }
 
 // UpdateLaneCounters 更新选中行的计数器
@@ -235,31 +258,61 @@ func CalculateSmoothWeight(weightP float64, pLast float64, pSecondLast float64) 
 //   - laneStates: 所有行的状态列表
 //   - zombieType: 僵尸类型（用于特殊限制判定）
 //   - sceneType: 场景类型（用于场景限制判定）
+//   - spawnRules: 僵尸生成规则配置
+//   - enabledLanes: 关卡启用的行列表（草地行）
 //
 // 返回:
 //   - 合法行的索引列表
-//
-// 注意: 本故事仅实现基本的行号验证和全零权重处理
-// 详细的合法行判定（水路、舞王等）将在 Story 17.5 中完成
-func FilterLegalLanes(laneStates []*components.LaneStateComponent, zombieType string, sceneType string) []int {
+func FilterLegalLanes(
+	laneStates []*components.LaneStateComponent,
+	zombieType string,
+	sceneType string,
+	spawnRules *config.SpawnRulesConfig,
+	enabledLanes []int,
+) []int {
 	legalLanes := make([]int, 0, len(laneStates))
 
 	for i, state := range laneStates {
-		// 基本不合法条件：行号不在 1~6 之间
+		// 1. 基本不合法条件
 		if state.LaneIndex < 1 || state.LaneIndex > 6 {
 			continue
 		}
-
-		// 权重为 0 的行不合法
 		if state.Weight <= 0 {
 			continue
 		}
+		// 非泳池/浓雾关卡的第 6 行不合法
+		if state.LaneIndex == 6 && sceneType != "pool" && sceneType != "fog" {
+			continue
+		}
 
-		// TODO: Story 17.5 将实现详细的合法行判定：
-		// - 水路僵尸（潜水、海豚）只能在水路行（泳池第 3、4 行）
-		// - 非水路僵尸不能在水路行
-		// - 舞王禁止在屋顶场景出现
-		// - 无草皮之地关卡外的裸地行限制
+		// 2. 水路限制（如果配置可用）
+		if spawnRules != nil {
+			isWater := IsWaterLane(state.LaneIndex, sceneType, spawnRules.SceneTypeRestrictions.WaterLaneConfig)
+			isWaterZombie := IsWaterZombie(zombieType, spawnRules.SceneTypeRestrictions.WaterZombies)
+
+			// 水路行不允许非水路僵尸
+			if isWater && !isWaterZombie {
+				continue
+			}
+			// 非水路行不允许水路僵尸
+			if !isWater && isWaterZombie {
+				continue
+			}
+
+			// 3. 舞王限制
+			if zombieType == "dancing" {
+				// 屋顶场景禁止舞王
+				if sceneType == "roof" {
+					continue
+				}
+				// 非后院场景：检查上下相邻行
+				if sceneType != "pool" && sceneType != "fog" {
+					if len(enabledLanes) > 0 && !IsAdjacentLaneValid(state.LaneIndex, enabledLanes) {
+						continue
+					}
+				}
+			}
+		}
 
 		legalLanes = append(legalLanes, i)
 	}
@@ -340,4 +393,68 @@ func (la *LaneAllocator) LogLaneSelectionProbability(verbose bool) {
 		log.Printf("[LaneAllocator] Lane %d: Weight=%.2f, LastPicked=%d, SmoothWeight=%.4f, Probability=%.2f%%",
 			state.LaneIndex, state.Weight, state.LastPicked, smoothWeights[i], probability)
 	}
+}
+
+// IsWaterLane 判断指定行是否为水路
+//
+// 参数:
+//   - laneIndex: 行号（1-6）
+//   - sceneType: 场景类型（如 "pool", "fog"）
+//   - waterLaneConfig: 水路配置映射（场景 -> 水路行号列表）
+//
+// 返回:
+//   - true 表示该行为水路
+func IsWaterLane(laneIndex int, sceneType string, waterLaneConfig map[string][]int) bool {
+	waterLanes, exists := waterLaneConfig[sceneType]
+	if !exists {
+		return false
+	}
+	for _, lane := range waterLanes {
+		if lane == laneIndex {
+			return true
+		}
+	}
+	return false
+}
+
+// IsWaterZombie 判断僵尸类型是否为水路专属
+//
+// 参数:
+//   - zombieType: 僵尸类型
+//   - waterZombies: 水路专属僵尸列表
+//
+// 返回:
+//   - true 表示该僵尸为水路专属
+func IsWaterZombie(zombieType string, waterZombies []string) bool {
+	for _, wz := range waterZombies {
+		if wz == zombieType {
+			return true
+		}
+	}
+	return false
+}
+
+// IsAdjacentLaneValid 检查舞王僵尸的上下相邻行是否有效
+//
+// 参数:
+//   - laneIndex: 当前行号（1-6）
+//   - enabledLanes: 启用的行列表（草地行）
+//
+// 返回:
+//   - true 表示上下至少有一行有效
+func IsAdjacentLaneValid(laneIndex int, enabledLanes []int) bool {
+	hasUpper := false
+	hasLower := false
+
+	for _, lane := range enabledLanes {
+		if lane == laneIndex-1 {
+			hasUpper = true
+		}
+		if lane == laneIndex+1 {
+			hasLower = true
+		}
+	}
+
+	// 至少上下有一行有效
+	return hasUpper || hasLower
 }

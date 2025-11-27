@@ -192,8 +192,13 @@ func (s *WaveSpawnSystem) PreSpawnAllWaves() int {
 			for groupIndex, zombieGroup := range waveConfig.Zombies {
 				// 为组内每个僵尸预选一个随机行（从 lanes 列表中选择）
 				for i := 0; i < zombieGroup.Count; i++ {
-					// Story 17.4: 使用 LaneAllocator 选择行（平滑权重算法）
-					selectedLane := s.laneAllocator.SelectLane(zombieGroup.Type, s.levelConfig.SceneType)
+					// Story 17.5: 使用 LaneAllocator 选择行（带合法行判定）
+					selectedLane := s.laneAllocator.SelectLane(
+						zombieGroup.Type,
+						s.levelConfig.SceneType,
+						s.spawnRules,
+						s.levelConfig.EnabledLanes,
+					)
 					s.laneAllocator.UpdateLaneCounters(selectedLane)
 
 					entityID := s.spawnZombieForWave(zombieGroup.Type, selectedLane, waveIndex, groupIndex*100+i)
