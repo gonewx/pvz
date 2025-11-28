@@ -99,7 +99,7 @@ func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *
 		ls.waveTimingSystem = NewWaveTimingSystem(em, gs, gs.CurrentLevel)
 
 		// Story 17.7: 创建旗帜波警告和最终波白字系统
-		ls.flagWaveWarningSystem = NewFlagWaveWarningSystem(em, ls.waveTimingSystem)
+		ls.flagWaveWarningSystem = NewFlagWaveWarningSystem(em, ls.waveTimingSystem, rm)
 		ls.finalWaveTextSystem = NewFinalWaveTextSystem(em, ls.waveTimingSystem)
 
 		// Story 17.6: 自动初始化计时器，使用关卡配置的首波延迟
@@ -1077,7 +1077,7 @@ func (s *LevelSystem) InitializeWaveTimingSystem() {
 	s.waveTimingSystem = NewWaveTimingSystem(s.entityManager, s.gameState, s.gameState.CurrentLevel)
 
 	// Story 17.7: 创建旗帜波警告和最终波白字系统
-	s.flagWaveWarningSystem = NewFlagWaveWarningSystem(s.entityManager, s.waveTimingSystem)
+	s.flagWaveWarningSystem = NewFlagWaveWarningSystem(s.entityManager, s.waveTimingSystem, s.resourceManager)
 	s.finalWaveTextSystem = NewFinalWaveTextSystem(s.entityManager, s.waveTimingSystem)
 
 	log.Printf("[LevelSystem] WaveTimingSystem initialized with FlagWaveWarning and FinalWaveText systems")

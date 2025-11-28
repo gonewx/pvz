@@ -167,6 +167,14 @@ func (s *TutorialSystem) Update(dt float64) {
 			log.Printf("[TutorialSystem] Skipping sunflowerReminder text display (sunflowerCount=%d >= 3)", s.sunflowerCount)
 		}
 
+		// 特殊处理：secondSeedClicked 触发时，如果已有≥2个植物，跳过文本显示
+		// 这是为了让玩家快速种植时，优先显示 ADVICE_ZOMBIE_ONSLAUGHT 而不是 ADVICE_CLICK_ON_GRASS
+		plantEntities := ecs.GetEntitiesWith1[*components.PlantComponent](s.entityManager)
+		if currentStep.Trigger == "secondSeedClicked" && len(plantEntities) >= 2 {
+			skipTextDisplay = true
+			log.Printf("[TutorialSystem] Skipping secondSeedClicked text display (plantCount=%d >= 2), prioritizing ADVICE_ZOMBIE_ONSLAUGHT", len(plantEntities))
+		}
+
 		// 如果 textKey 为空，也跳过文本显示（如 hideSunflowerHint 步骤）
 		if currentStep.TextKey == "" {
 			skipTextDisplay = true

@@ -17,7 +17,7 @@ func TestFlagWaveWarningSystem_Creation(t *testing.T) {
 	gs.LoadLevel(levelConfig)
 
 	wts := NewWaveTimingSystem(em, gs, levelConfig)
-	system := NewFlagWaveWarningSystem(em, wts)
+	system := NewFlagWaveWarningSystem(em, wts, nil) // rm=nil 使用回退方案
 
 	if system == nil {
 		t.Fatal("Expected system to be created, got nil")
@@ -36,7 +36,7 @@ func TestFlagWaveWarningSystem_CreateWarningEntity(t *testing.T) {
 	gs.LoadLevel(levelConfig)
 
 	wts := NewWaveTimingSystem(em, gs, levelConfig)
-	system := NewFlagWaveWarningSystem(em, wts)
+	system := NewFlagWaveWarningSystem(em, wts, nil) // rm=nil 使用回退方案
 
 	// 设置警告阶段
 	timer := wts.getTimerComponent()
@@ -50,7 +50,7 @@ func TestFlagWaveWarningSystem_CreateWarningEntity(t *testing.T) {
 		t.Error("Expected warning entity to be created")
 	}
 
-	// 检查组件是否添加
+	// 检查组件是否添加（回退方案使用 FlagWaveWarningComponent）
 	warningComp, ok := ecs.GetComponent[*components.FlagWaveWarningComponent](em, system.GetWarningEntityID())
 	if !ok {
 		t.Fatal("Expected FlagWaveWarningComponent to be added")
@@ -77,7 +77,7 @@ func TestFlagWaveWarningSystem_DestroyWarningEntity(t *testing.T) {
 	gs.LoadLevel(levelConfig)
 
 	wts := NewWaveTimingSystem(em, gs, levelConfig)
-	system := NewFlagWaveWarningSystem(em, wts)
+	system := NewFlagWaveWarningSystem(em, wts, nil) // rm=nil 使用回退方案
 
 	// 设置警告阶段并创建实体
 	timer := wts.getTimerComponent()
@@ -111,7 +111,7 @@ func TestFlagWaveWarningSystem_AnimationUpdate(t *testing.T) {
 	gs.LoadLevel(levelConfig)
 
 	wts := NewWaveTimingSystem(em, gs, levelConfig)
-	system := NewFlagWaveWarningSystem(em, wts)
+	system := NewFlagWaveWarningSystem(em, wts, nil) // rm=nil 使用回退方案
 
 	// 设置警告阶段
 	timer := wts.getTimerComponent()
@@ -151,7 +151,7 @@ func TestFlagWaveWarningSystem_IsWarningActive(t *testing.T) {
 	gs.LoadLevel(levelConfig)
 
 	wts := NewWaveTimingSystem(em, gs, levelConfig)
-	system := NewFlagWaveWarningSystem(em, wts)
+	system := NewFlagWaveWarningSystem(em, wts, nil) // rm=nil 使用回退方案
 
 	// 初始状态：不激活
 	if system.IsWarningActive() {
@@ -177,7 +177,7 @@ func TestFlagWaveWarningSystem_FlashingEffect(t *testing.T) {
 	gs.LoadLevel(levelConfig)
 
 	wts := NewWaveTimingSystem(em, gs, levelConfig)
-	system := NewFlagWaveWarningSystem(em, wts)
+	system := NewFlagWaveWarningSystem(em, wts, nil) // rm=nil 使用回退方案
 
 	// 设置警告阶段
 	timer := wts.getTimerComponent()
@@ -207,7 +207,7 @@ func TestFlagWaveWarningSystem_NilWaveTimingSystem(t *testing.T) {
 	em := ecs.NewEntityManager()
 
 	// 创建系统时传入 nil
-	system := NewFlagWaveWarningSystem(em, nil)
+	system := NewFlagWaveWarningSystem(em, nil, nil)
 
 	// 更新不应该崩溃
 	system.Update(0.01)
