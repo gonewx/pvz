@@ -201,7 +201,13 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 		// log.Printf("[InputSystem] 鼠标点击: 屏幕(%d, %d) -> 世界(%.1f, %.1f)",
 		// 	mouseScreenX, mouseScreenY, mouseWorldX, mouseWorldY)
 
-		// 优先检查植物卡片点击（UI元素不受摄像机影响，使用屏幕坐标）
+		// 优先检查阳光点击（阳光可能飘到UI区域，优先级高于植物卡片）
+		sunHandled := s.handleSunClickAt(mouseWorldX, mouseWorldY)
+		if sunHandled {
+			return // 已处理阳光点击，不继续处理其他点击
+		}
+
+		// 检查植物卡片点击（UI元素不受摄像机影响，使用屏幕坐标）
 		cardHandled := s.handlePlantCardClick(mouseScreenX, mouseScreenY, cameraX)
 		if cardHandled {
 			return // 已处理卡片点击，不继续处理其他点击
@@ -211,73 +217,62 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 		// 注意：handleLawnClick 内部会调用 MouseToGridCoords 进行坐标转换，所以传递屏幕坐标
 		lawnHandled := s.handleLawnClick(mouseScreenX, mouseScreenY)
 		if lawnHandled {
-			return // 已处理草坪种植，不继续处理阳光
-		}
-
-		// 查询所有可点击的阳光实体（使用世界坐标）
-		entities := ecs.GetEntitiesWith3[
-			*components.PositionComponent,
-			*components.ClickableComponent,
-			*components.SunComponent,
-		](s.entityManager)
-
-		// DEBUG: 阳光实体数量日志（每次点击都打印会刷屏，已禁用）
-		// log.Printf("[InputSystem] 找到 %d 个阳光实体", len(entities))
-
-		// 从后向前遍历，确保点击最上层的阳光（假设后面的实体渲染在上层）
-		for i := len(entities) - 1; i >= 0; i-- {
-			id := entities[i]
-
-			// 获取组件
-			pos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, id)
-			clickable, _ := ecs.GetComponent[*components.ClickableComponent](s.entityManager, id)
-			sun, _ := ecs.GetComponent[*components.SunComponent](s.entityManager, id)
-
-			// 只处理可点击的阳光（允许下落中和已落地的阳光）
-			if !clickable.IsEnabled {
-				continue
-			}
-
-			// 不允许点击已被收集的阳光
-			if sun.State == components.SunCollecting {
-				continue
-			}
-
-			// 计算点击检测的中心位置
-			//
-			// 问题分析：阳光的视觉中心（Sun1 核心）和几何中心不一致
-			// - Sun.reanim 有3个部件：Sun1(小核心), Sun2(中), Sun3(大光晕)
-			// - Sun1 (36x36) 在 (-14.2, -14.2)，是视觉上的"阳光核心"
-			// - Sun3 (117x116) 在 (16, -70.6)，是大光晕，占据右侧大量空间
-			// - calculateCenterOffset 计算的是几何中心 ≈ (44.2, -19.4)
-			// - 但玩家点击的是视觉中心（Sun1），而不是几何中心
-			//
-			// 修复方案：点击中心应该对齐到实际的视觉中心（渲染后的中心）
-			// - 渲染原点 = pos - CenterOffset
-			// - Sun1 中心 ≈ 渲染原点 + Sun1 偏移 ≈ 渲染原点
-			// - 因此点击中心 = pos - CenterOffset
-
-			// 使用坐标转换工具库计算点击中心
-			clickCenterX, clickCenterY, err := utils.GetClickableCenter(s.entityManager, id, pos)
-			if err != nil {
-				// 实体没有 ReanimComponent，使用 Position 作为默认中心
-				clickCenterX = pos.X
-				clickCenterY = pos.Y
-			}
-
-			halfWidth := clickable.Width / 2.0
-			halfHeight := clickable.Height / 2.0
-
-			if mouseWorldX >= clickCenterX-halfWidth && mouseWorldX <= clickCenterX+halfWidth &&
-				mouseWorldY >= clickCenterY-halfHeight && mouseWorldY <= clickCenterY+halfHeight {
-				// 点击命中！
-				log.Printf("[InputSystem] ✓ 点击命中阳光! 鼠标=(%.1f, %.1f), 点击中心=(%.1f, %.1f)",
-					mouseWorldX, mouseWorldY, clickCenterX, clickCenterY)
-				s.handleSunClick(id, pos)
-				break // 只处理第一个命中的阳光
-			}
+			return // 已处理草坪种植
 		}
 	}
+}
+
+// handleSunClickAt 检测并处理阳光点击
+// 返回 true 表示处理了点击，false 表示未处理
+func (s *InputSystem) handleSunClickAt(mouseWorldX, mouseWorldY float64) bool {
+	// 查询所有可点击的阳光实体（使用世界坐标）
+	sunEntities := ecs.GetEntitiesWith3[
+		*components.PositionComponent,
+		*components.ClickableComponent,
+		*components.SunComponent,
+	](s.entityManager)
+
+	// 从后向前遍历，确保点击最上层的阳光（假设后面的实体渲染在上层）
+	for i := len(sunEntities) - 1; i >= 0; i-- {
+		id := sunEntities[i]
+
+		// 获取组件
+		pos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, id)
+		clickable, _ := ecs.GetComponent[*components.ClickableComponent](s.entityManager, id)
+		sun, _ := ecs.GetComponent[*components.SunComponent](s.entityManager, id)
+
+		// 只处理可点击的阳光（允许下落中和已落地的阳光）
+		if !clickable.IsEnabled {
+			continue
+		}
+
+		// 不允许点击已被收集的阳光
+		if sun.State == components.SunCollecting {
+			continue
+		}
+
+		// 使用坐标转换工具库计算点击中心
+		clickCenterX, clickCenterY, err := utils.GetClickableCenter(s.entityManager, id, pos)
+		if err != nil {
+			// 实体没有 ReanimComponent，使用 Position 作为默认中心
+			clickCenterX = pos.X
+			clickCenterY = pos.Y
+		}
+
+		halfWidth := clickable.Width / 2.0
+		halfHeight := clickable.Height / 2.0
+
+		if mouseWorldX >= clickCenterX-halfWidth && mouseWorldX <= clickCenterX+halfWidth &&
+			mouseWorldY >= clickCenterY-halfHeight && mouseWorldY <= clickCenterY+halfHeight {
+			// 点击命中！
+			log.Printf("[InputSystem] ✓ 点击命中阳光! 鼠标=(%.1f, %.1f), 点击中心=(%.1f, %.1f)",
+				mouseWorldX, mouseWorldY, clickCenterX, clickCenterY)
+			s.handleSunClick(id, pos)
+			return true // 已处理阳光点击
+		}
+	}
+
+	return false // 未点击到任何阳光
 }
 
 // handleSunClick 处理阳光被点击的逻辑
