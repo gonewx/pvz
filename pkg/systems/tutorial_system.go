@@ -20,7 +20,7 @@ type TutorialSystem struct {
 	resourceManager      *game.ResourceManager
 	lawnGridSystem       *LawnGridSystem  // 用于控制草坪闪烁效果（Story 8.2）
 	sunSpawnSystem       *SunSpawnSystem  // 用于启用阳光自动生成（Story 8.2）
-	waveSpawnSystem      *WaveSpawnSystem // 用于激活预生成的僵尸（替代自己创建僵尸）
+	levelSystem          *LevelSystem     // 用于访问 WaveTimingSystem（统一波次管理）
 	tutorialEntity       ecs.EntityID     // 教学实体ID
 	textEntity           ecs.EntityID     // 教学文本实体ID（用于显示/隐藏）
 	arrowIndicatorEntity ecs.EntityID     // 箭头指示符实体ID（用于显示/隐藏）
@@ -44,10 +44,6 @@ type TutorialSystem struct {
 	arrowRepeatTimer    float64 // 箭头重复显示计时器（秒）
 	arrowRepeatInterval float64 // 箭头重复间隔（秒），粒子效果播放1秒后重新创建
 
-	// 僵尸波次管理（教学关卡专用）
-	waveDelayTimer float64 // 波次延迟计时器（秒）
-	lastWaveKilled bool    // 上一波是否已全部击杀
-
 	// 向日葵教学相关（Level 1-2）
 	sunflowerCount  int     // 向日葵种植计数
 	stepTimeElapsed float64 // 当前步骤经过时间（用于超时触发）
@@ -60,12 +56,13 @@ type TutorialSystem struct {
 //   - rm: ResourceManager 实例
 //   - lgs: LawnGridSystem 实例（用于控制草坪闪烁）
 //   - sss: SunSpawnSystem 实例（用于启用阳光自动生成）
-//   - wss: WaveSpawnSystem 实例（用于激活预生成的僵尸）
 //   - levelConfig: 关卡配置（包含 tutorialSteps）
 //
 // 返回：
 //   - *TutorialSystem: 系统实例
-func NewTutorialSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.ResourceManager, lgs *LawnGridSystem, sss *SunSpawnSystem, wss *WaveSpawnSystem, levelConfig *config.LevelConfig) *TutorialSystem {
+//
+// 注意：创建后需调用 SetLevelSystem() 设置 LevelSystem 引用，用于访问 WaveTimingSystem
+func NewTutorialSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.ResourceManager, lgs *LawnGridSystem, sss *SunSpawnSystem, levelConfig *config.LevelConfig) *TutorialSystem {
 	// 创建教学实体
 	tutorialEntity := em.CreateEntity()
 	ecs.AddComponent(em, tutorialEntity, &components.TutorialComponent{
@@ -86,7 +83,7 @@ func NewTutorialSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.Resou
 		resourceManager:      rm,
 		lawnGridSystem:       lgs,
 		sunSpawnSystem:       sss, // 保存 SunSpawnSystem 引用
-		waveSpawnSystem:      wss, // 保存 WaveSpawnSystem 引用
+		levelSystem:          nil, // 通过 SetLevelSystem 设置（避免循环依赖）
 		tutorialEntity:       tutorialEntity,
 		textEntity:           0, // 未创建
 		arrowIndicatorEntity: 0, // 未创建
@@ -94,18 +91,24 @@ func NewTutorialSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.Resou
 		lastSunAmount:        gs.GetSun(),
 		lastPlantCount:       0,
 		lastZombieCount:      0,
-		plantCount:           0, // 初始化植物计数
+		plantCount:           0,     // 初始化植物计数
 		initialized:          false,
 		sunSpawned:           false, // 阳光未生成
 		lastSunCount:         0,     // 初始化阳光实体计数
 		lastTextDisplayTime:  0,     // 初始化文本显示时间
 		arrowRepeatTimer:     0,     // 定时器初始化
 		arrowRepeatInterval:  1.0,   // Story 8.2.1: 箭头每1.0秒重复一次（粒子播放1秒），无缝衔接避免闪烁
-		waveDelayTimer:       0,     // 波次延迟计时器初始化
-		lastWaveKilled:       false, // 初始化为false
 		sunflowerCount:       0,     // 向日葵计数初始化
 		stepTimeElapsed:      0,     // 步骤计时器初始化
 	}
+}
+
+// SetLevelSystem 设置 LevelSystem 引用
+// 用于访问 WaveTimingSystem，实现统一波次管理
+// 由于 TutorialSystem 和 LevelSystem 创建顺序的原因，需要通过 setter 设置
+func (s *TutorialSystem) SetLevelSystem(ls *LevelSystem) {
+	s.levelSystem = ls
+	log.Printf("[TutorialSystem] LevelSystem reference set")
 }
 
 // Update 更新教学系统状态
@@ -122,8 +125,7 @@ func (s *TutorialSystem) Update(dt float64) {
 		s.lastTextDisplayTime += dt
 	}
 
-	// 教学关卡专用：管理后续波次生成（在教学步骤完成后）
-	s.manageWaveSpawning(dt)
+	// 波次管理现在统一由 WaveTimingSystem 处理（第一波触发后自动恢复计时器）
 
 	// 获取教学组件
 	tutorial, ok := ecs.GetComponent[*components.TutorialComponent](s.entityManager, s.tutorialEntity)
@@ -390,6 +392,11 @@ func (s *TutorialSystem) checkTriggerCondition(trigger string) bool {
 
 	case "enoughSunAndCooldown":
 		// 检测阳光≥100 且 豌豆射手卡片冷却完成（两个条件同时满足）
+		// 修复：如果玩家已经种植了≥2个植物，跳过此步骤
+		plantEntities := ecs.GetEntitiesWith1[*components.PlantComponent](s.entityManager)
+		if len(plantEntities) >= 2 {
+			return true // 玩家已种植多个植物，跳过此步骤
+		}
 		// 这是状态检测型，需要等待最小显示时间
 		if !s.isMinDisplayTimeElapsed() {
 			return false
@@ -417,6 +424,11 @@ func (s *TutorialSystem) checkTriggerCondition(trigger string) bool {
 
 	case "sunClickedWhenEnough":
 		// 阳光≥100时触发
+		// 修复：如果玩家已经种植了≥2个植物，跳过此步骤
+		plantEntities := ecs.GetEntitiesWith1[*components.PlantComponent](s.entityManager)
+		if len(plantEntities) >= 2 {
+			return true // 玩家已种植多个植物，跳过此步骤
+		}
 		currentSun := s.gameState.GetSun()
 		return currentSun >= 100
 
@@ -831,7 +843,7 @@ func (s *TutorialSystem) spawnSkyFallingSun() {
 }
 
 // spawnTutorialZombies 开始生成教学关卡的僵尸波次
-// 激活第一波预生成的僵尸，后续波次由 manageWaveSpawning 管理
+// 通过 WaveTimingSystem 触发第一波，后续波次由 WaveTimingSystem 统一管理
 func (s *TutorialSystem) spawnTutorialZombies() {
 	// 获取关卡配置
 	levelConfig := s.gameState.CurrentLevel
@@ -840,123 +852,25 @@ func (s *TutorialSystem) spawnTutorialZombies() {
 		return
 	}
 
-	if len(levelConfig.Waves) > 0 && !s.gameState.IsWaveSpawned(0) {
-		// 使用 WaveSpawnSystem 激活第一波僵尸
-		activatedCount := s.waveSpawnSystem.ActivateWave(0)
-		log.Printf("[TutorialSystem] Activated wave 1 (%d pre-spawned zombies)", activatedCount)
-
-		// 标记波次已生成
-		s.gameState.MarkWaveSpawned(0)
-		// s.gameState.IncrementZombiesSpawned(activatedCount) // BUG: 导致僵尸计数重复增加
+	// 通过 WaveTimingSystem 统一触发第一波
+	if s.levelSystem != nil {
+		wts := s.levelSystem.GetWaveTimingSystem()
+		if wts != nil {
+			// 立即触发第一波，同时恢复计时器管理后续波次
+			waveIndex := wts.TriggerNextWaveImmediately()
+			if waveIndex >= 0 {
+				log.Printf("[TutorialSystem] Triggered wave %d via WaveTimingSystem", waveIndex+1)
+			} else {
+				log.Printf("[TutorialSystem] ERROR: Failed to trigger first wave via WaveTimingSystem")
+			}
+		} else {
+			log.Printf("[TutorialSystem] ERROR: WaveTimingSystem not available")
+		}
+	} else {
+		log.Printf("[TutorialSystem] ERROR: LevelSystem not set, cannot trigger waves")
 	}
 
-	// 后续波次将由 manageWaveSpawning 自动处理
 	log.Printf("[TutorialSystem] Zombie spawning started, %d waves total", len(levelConfig.Waves))
 }
 
-// manageWaveSpawning 管理教学关卡的后续波次生成
-// Story 17.6: ��次计时由 WaveTimingSystem 管理，场上无僵尸时触发下一波
-func (s *TutorialSystem) manageWaveSpawning(dt float64) {
-	// 检查关卡配置
-	if s.gameState.CurrentLevel == nil || len(s.gameState.CurrentLevel.Waves) == 0 {
-		return
-	}
 
-	// 获取当前场上的僵尸数量
-	zombiesOnField := s.gameState.TotalZombiesSpawned - s.gameState.ZombiesKilled
-	currentWaveIndex := s.gameState.CurrentWaveIndex
-
-	// 检查是否上一波已全部击杀
-	if zombiesOnField == 0 && s.gameState.TotalZombiesSpawned > 0 {
-		if !s.lastWaveKilled {
-			// 刚击杀完毕，开始延迟计时
-			s.lastWaveKilled = true
-			s.waveDelayTimer = 0
-			log.Printf("[TutorialSystem] Wave cleared, starting delay timer (WaveIndex=%d, Spawned=%d, Killed=%d)",
-				currentWaveIndex, s.gameState.TotalZombiesSpawned, s.gameState.ZombiesKilled)
-		} else {
-			// 延迟计时中
-			s.waveDelayTimer += dt
-		}
-	} else {
-		// 如果场上有僵尸，重置标志
-		if zombiesOnField > 0 {
-			s.lastWaveKilled = false
-		}
-	}
-
-	// 检查是否需要生成下一波
-	if currentWaveIndex < len(s.gameState.CurrentLevel.Waves) &&
-		!s.gameState.IsWaveSpawned(currentWaveIndex) &&
-		s.lastWaveKilled {
-
-		// Story 17.6: 简化逻辑，立即触发下一波（由 WaveTimingSystem 管理延迟）
-		// 显示"最后一波"提示（在最后一波前）
-		if currentWaveIndex == len(s.gameState.CurrentLevel.Waves)-1 {
-			s.showFinalWaveWarning()
-		}
-
-		log.Printf("[TutorialSystem] Activating wave %d after %.1f seconds delay", currentWaveIndex+1, s.waveDelayTimer)
-		activatedCount := s.waveSpawnSystem.ActivateWave(currentWaveIndex)
-		log.Printf("[TutorialSystem] Spawned wave %d (%d zombies activated)", currentWaveIndex+1, activatedCount)
-
-		// 标记波次已生成
-		s.gameState.MarkWaveSpawned(currentWaveIndex)
-		// s.gameState.IncrementZombiesSpawned(activatedCount) // BUG: 导致僵尸计数重复增加
-
-		// 重置延迟计时器和标志
-		s.waveDelayTimer = 0
-		s.lastWaveKilled = false
-	}
-}
-
-// showFinalWaveWarning 显示"最后一波"提示
-// 使用 FinalWave.reanim 动画效果
-func (s *TutorialSystem) showFinalWaveWarning() {
-	// 加载 FinalWave.reanim
-	reanimXML := s.resourceManager.GetReanimXML("FinalWave")
-	partImages := s.resourceManager.GetReanimPartImages("FinalWave")
-
-	if reanimXML == nil {
-		log.Printf("[TutorialSystem] WARNING: FinalWave.reanim not found, skipping animation")
-		return
-	}
-
-	// 创建动画实体
-	finalWaveEntity := s.entityManager.CreateEntity()
-
-	// 添加位置组件（屏幕中央）
-	centerX := float64(config.ScreenWidth) / 2
-	centerY := float64(config.ScreenHeight) / 2
-	ecs.AddComponent(s.entityManager, finalWaveEntity, &components.PositionComponent{
-		X: centerX,
-		Y: centerY,
-	})
-
-	// 添加 Reanim 组件（初始状态，将被 PlayCombo 覆盖）
-	ecs.AddComponent(s.entityManager, finalWaveEntity, &components.ReanimComponent{
-		ReanimXML:         reanimXML,
-		PartImages:        partImages,
-		CurrentAnimations: []string{}, // 将由 PlayCombo 设置
-		IsLooping:         true,       // 将由 PlayCombo 根据配置设置为 false
-	})
-
-	// 添加 FinalWaveWarningComponent（用于自动删除）
-	ecs.AddComponent(s.entityManager, finalWaveEntity, &components.FinalWaveWarningComponent{
-		DisplayTime: 2.0, // 显示 2 秒后自动删除
-		ElapsedTime: 0.0,
-	})
-
-	// 标记为UI元素（不受摄像机影响）
-	ecs.AddComponent(s.entityManager, finalWaveEntity, &components.UIComponent{
-		State: components.UINormal,
-	})
-
-	// 使用配置化的 combo 播放非循环动画
-	ecs.AddComponent(s.entityManager, finalWaveEntity, &components.AnimationCommandComponent{
-		UnitID:    "finalwave",
-		ComboName: "warning",
-		Processed: false,
-	})
-	log.Printf("[TutorialSystem] Final wave warning displayed at (%.1f, %.1f), using combo: finalwave/warning (loop: false)", centerX, centerY)
-}

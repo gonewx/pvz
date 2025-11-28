@@ -225,8 +225,9 @@ func (s *WaveTimingSystem) Update(deltaTime float64) {
 		return
 	}
 
-	// 重置触发标志
-	timer.WaveTriggered = false
+	// 注意：不在这里重置 WaveTriggered 标志
+	// WaveTriggered 只在 ClearWaveTriggered() 中重置
+	// 这确保 TriggerNextWaveImmediately() 设置的标志能被 LevelSystem 正确处理
 
 	// 暂停时不更新
 	if timer.IsPaused {
@@ -738,6 +739,39 @@ func (s *WaveTimingSystem) Resume() {
 
 	timer.IsPaused = false
 	log.Printf("[WaveTimingSystem] Timer resumed at %d cs", timer.CountdownCs)
+}
+
+// TriggerNextWaveImmediately 立即触发下一波
+//
+// 用于教学关卡：当玩家完成种植条件后，立即触发第一波僵尸
+// 同时恢复计时器，让后续波次由计时系统管理
+//
+// 返回：
+//   - int: 触发的波次索引（-1 表示失败）
+func (s *WaveTimingSystem) TriggerNextWaveImmediately() int {
+	timer := s.getTimerComponent()
+	if timer == nil {
+		return -1
+	}
+
+	// 记录触发的波次索引
+	waveIndex := timer.CurrentWaveIndex
+
+	// 检查是否还有波次可触发
+	if waveIndex >= timer.TotalWaves {
+		log.Printf("[WaveTimingSystem] No more waves to trigger (current: %d, total: %d)", waveIndex, timer.TotalWaves)
+		return -1
+	}
+
+	// 恢复计时器
+	timer.IsPaused = false
+
+	// 立即触发下一波（triggerNextWave 会自动为后续波次设置倒计时）
+	s.triggerNextWave()
+
+	log.Printf("[WaveTimingSystem] Immediately triggered wave %d, timer resumed for subsequent waves", waveIndex+1)
+
+	return waveIndex
 }
 
 // IsWaveTriggered 检查本帧是否触发了波次

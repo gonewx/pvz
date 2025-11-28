@@ -65,7 +65,7 @@ const (
 const (
 	// PeaBulletSpeed 豌豆子弹移动速度（像素/秒）
 	// 正值表示向右移动
-	PeaBulletSpeed = 200.0
+	PeaBulletSpeed = 333.0
 
 	// PeaBulletDamage 豌豆子弹伤害值
 	PeaBulletDamage = 20

@@ -439,7 +439,9 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 
 	// Story 8.2: Initialize tutorial system (if this is a tutorial level)
 	if scene.gameState.CurrentLevel != nil && len(scene.gameState.CurrentLevel.TutorialSteps) > 0 {
-		scene.tutorialSystem = systems.NewTutorialSystem(scene.entityManager, scene.gameState, scene.resourceManager, scene.lawnGridSystem, scene.sunSpawnSystem, scene.waveSpawnSystem, scene.gameState.CurrentLevel)
+		scene.tutorialSystem = systems.NewTutorialSystem(scene.entityManager, scene.gameState, scene.resourceManager, scene.lawnGridSystem, scene.sunSpawnSystem, scene.gameState.CurrentLevel)
+		// Story 17.6+统一：设置 LevelSystem 引用，用于访问 WaveTimingSystem
+		scene.tutorialSystem.SetLevelSystem(scene.levelSystem)
 		log.Printf("[GameScene] Tutorial system activated for level %s", scene.gameState.CurrentLevel.ID)
 
 		// 仅强制性教学关卡禁用自动阳光生成

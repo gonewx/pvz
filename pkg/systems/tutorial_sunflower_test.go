@@ -25,10 +25,7 @@ func createTestTutorialSystemForSunflower(tutorialSteps []config.TutorialStep) (
 	// 创建 mock SunSpawnSystem
 	sss := &SunSpawnSystem{entityManager: em}
 
-	// 创建 mock WaveSpawnSystem
-	wss := &WaveSpawnSystem{entityManager: em, gameState: gs}
-
-	ts := NewTutorialSystem(em, gs, nil, lgs, sss, wss, levelConfig)
+	ts := NewTutorialSystem(em, gs, nil, lgs, sss, levelConfig)
 
 	// 模拟铺草皮完成
 	ts.OnSoddingComplete()

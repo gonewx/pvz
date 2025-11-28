@@ -78,7 +78,6 @@ type LevelSystem struct {
 //
 // Removed ReanimSystem dependency, using AnimationCommand component
 func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *WaveSpawnSystem, rm *game.ResourceManager, rewardSystem *RewardAnimationSystem, lawnmowerSystem *LawnmowerSystem) *LevelSystem {
-	// 教学关卡使用 TutorialSystem 控制僵尸生成，不使用 WaveTimingSystem
 	isTutorialLevel := gs.CurrentLevel != nil && gs.CurrentLevel.OpeningType == "tutorial"
 
 	ls := &LevelSystem{
@@ -88,22 +87,30 @@ func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *
 		resourceManager:           rm,
 		rewardSystem:              rewardSystem,
 		lawnmowerSystem:           lawnmowerSystem,
-		lastWaveWarningShown:      false,            // 已废弃，保留向后兼容
-		finalWaveWarningTriggered: false,            // 新标志位
-		finalWaveWarningLeadTime:  3.0,              // 提前 3 秒
-		useWaveTimingSystem:       !isTutorialLevel, // 教学关卡禁用 WaveTimingSystem
+		lastWaveWarningShown:      false, // 已废弃，保留向后兼容
+		finalWaveWarningTriggered: false, // 已废弃，统一由 FlagWaveWarningSystem 处理
+		finalWaveWarningLeadTime:  3.0,   // 已废弃
+		useWaveTimingSystem:       true,  // 统一使用 WaveTimingSystem
 	}
 
-	// Story 17.6: 如果有关卡配置且非教学关卡，创建 WaveTimingSystem
-	if gs.CurrentLevel != nil && !isTutorialLevel {
+	// Story 17.6+统一: 所有关卡都创建 WaveTimingSystem
+	// 教学关卡：初始暂停，等待 TutorialSystem 触发第一波后恢复
+	// 非教学关卡：自动开始计时
+	if gs.CurrentLevel != nil {
 		ls.waveTimingSystem = NewWaveTimingSystem(em, gs, gs.CurrentLevel)
 
-		// Story 17.7: 创建旗帜波警告和最终波白字系统
+		// Story 17.7: 创建旗帜波警告和最终波白字系统（统一处理所有关卡）
 		ls.flagWaveWarningSystem = NewFlagWaveWarningSystem(em, ls.waveTimingSystem, rm)
 		ls.finalWaveTextSystem = NewFinalWaveTextSystem(em, ls.waveTimingSystem)
 
-		// Story 17.6: 自动初始化计时器，使用关卡配置的首波延迟
-		ls.waveTimingSystem.InitializeTimerWithDelay(true, gs.CurrentLevel)
+		if isTutorialLevel {
+			// 教学关卡：暂停计时器，等待 TutorialSystem 触发第一波
+			ls.waveTimingSystem.Pause()
+			log.Printf("[LevelSystem] Tutorial level: WaveTimingSystem created in paused state")
+		} else {
+			// 非教学关卡：自动初始化计时器
+			ls.waveTimingSystem.InitializeTimerWithDelay(true, gs.CurrentLevel)
+		}
 	}
 
 	return ls
@@ -160,8 +167,7 @@ func (s *LevelSystem) Update(deltaTime float64) {
 	// 检查并生成僵尸波次
 	s.checkAndSpawnWaves()
 
-	// 检查是否需要显示最后一波提示（基于时间提前量）
-	s.checkFinalWaveWarning(deltaTime)
+	// 最后一波警告现在由 FlagWaveWarningSystem 统一处理（所有关卡类型）
 
 	// 检查失败条件（必须在胜利条件之前，优先级更高）
 	s.checkDefeatCondition()
@@ -259,16 +265,11 @@ func (s *LevelSystem) areCurrentWaveZombiesCleared() bool {
 // checkAndSpawnWaves 检查并激活到期的僵尸波次
 //
 // 遍历所有波次，找到时间已到且未激活的波次，调用 WaveSpawnSystem.ActivateWave() 激活僵尸
-// 教学关卡由 TutorialSystem 控制僵尸激活，不使用此方法
 //
 // Story 17.6: 如果启用了 WaveTimingSystem，从计时系统获取触发信号
 // Story 17.8: 在激活波次后初始化血量追踪
+// Story 17.6+统一: 所有关卡（包括教学关卡）的波次都由 WaveTimingSystem 统一管理
 func (s *LevelSystem) checkAndSpawnWaves() {
-	// 教学关卡：僵尸由 TutorialSystem 控制激活
-	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.OpeningType == "tutorial" {
-		return
-	}
-
 	var waveIndex int
 
 	// Story 17.6: 优先使用 WaveTimingSystem 的触发信号
@@ -569,19 +570,13 @@ func isZombieType(behaviorType components.BehaviorType) bool {
 }
 
 // ========================================
-// 最后一波提示系统
+// 已废弃方法（保留向后兼容）
 // ========================================
 
-// checkFinalWaveWarning 检查是否需要触发最后一波提示
+// checkFinalWaveWarning 已废弃：统一由 FlagWaveWarningSystem 处理
 //
-// 基于时间的精确提示：
-//   - 在最后一波到来前 3 秒触发提示
-//   - 只触发一次（通过 finalWaveWarningTriggered 标志）
-//   - 教学关卡同样适用（不受特殊规则影响）
-//
-// 参数：
-//
-//	deltaTime - 未使用（保留用于未来扩展）
+// @deprecated Story 17.6+统一后，所有最后一波警告由 FlagWaveWarningSystem 处理
+// 此方法不再被调用，保留用于向后兼容
 func (s *LevelSystem) checkFinalWaveWarning(deltaTime float64) {
 	// 如果已触发，直接返回
 	if s.finalWaveWarningTriggered {
@@ -595,22 +590,11 @@ func (s *LevelSystem) checkFinalWaveWarning(deltaTime float64) {
 	}
 }
 
-// isFinalWaveApproaching 检测最后一波是否即将到来
+// isFinalWaveApproaching 已废弃：统一由 FlagWaveWarningSystem 处理
 //
-// Story 17.6: 当 WaveTimingSystem 启用时，最后一波警告由 FlagWaveWarningSystem 处理
-// 此方法仅在 WaveTimingSystem 未启用时作为后备逻辑
-//
-// 判断条件：
-//  1. CurrentWaveIndex 指向最后一波（len-1）或者已经触发完所有波次（len）
-//  2. 最后一波尚未被激活
-//  3. 正在等待下一波（IsWaitingForNextWave = true）
-//
-// 返回：
-//
-//	true - 最后一波即将到来，应触发提示
-//	false - 不应触发提示
+// @deprecated Story 17.6+统一后，此方法不再被调用
 func (s *LevelSystem) isFinalWaveApproaching() bool {
-	// Story 17.6: WaveTimingSystem 启用时，由 FlagWaveWarningSystem 处理警告
+	// 统一使用 WaveTimingSystem，此方法永远返回 false
 	if s.useWaveTimingSystem {
 		return false
 	}
@@ -627,50 +611,33 @@ func (s *LevelSystem) isFinalWaveApproaching() bool {
 	isWaitingForFinalWave := s.gameState.CurrentWaveIndex == lastWaveIndex
 
 	if !isWaitingForFinalWave {
-		return false // 不是在等待最后一波
+		return false
 	}
 
-	// 检查最后一波是否已经激活
 	if s.gameState.IsWaveSpawned(lastWaveIndex) {
-		return false // 最后一波已经激活，不需要提示
+		return false
 	}
 
-	// 必须处于等待下一波的状态（上一波已消灭完毕）
 	if !s.gameState.IsWaitingForNextWave {
 		return false
 	}
 
-	// Story 17.6: 简化逻辑，立即触发警告（由 WaveTimingSystem 管理实际延迟）
 	return true
 }
 
-// triggerFinalWaveWarning 触发最后一波提示
+// triggerFinalWaveWarning 已废弃：统一由 FlagWaveWarningSystem 处理
 //
-// 执行步骤：
-//  1. 设置 GameState 标志 ShowingFinalWave = true
-//  2. 播放音效 SOUND_AWOOGA
-//  3. 创建 FinalWave.reanim 动画实体（调用工厂函数）
-//
-// 注意：
-//   - 音效使用 SOUND_AWOOGA（原版 "僵尸来袭" 音效）
-//   - 动画实体由 FinalWaveWarningSystem 自动管理生命周期
+// @deprecated Story 17.6+统一后，此方法不再被调用
 func (s *LevelSystem) triggerFinalWaveWarning() {
-	log.Printf("[LevelSystem] Triggering final wave warning!")
+	log.Printf("[LevelSystem] [DEPRECATED] triggerFinalWaveWarning called - should use FlagWaveWarningSystem")
 
-	// 设置 GameState 标志
 	s.gameState.ShowingFinalWave = true
 
-	// 播放音效：SOUND_AWOOGA（僵尸来袭音效）
 	if audioPlayer := s.resourceManager.GetAudioPlayer("SOUND_AWOOGA"); audioPlayer != nil {
 		audioPlayer.Rewind()
 		audioPlayer.Play()
-		log.Printf("[LevelSystem] Playing SOUND_AWOOGA")
-	} else {
-		log.Printf("[LevelSystem] WARNING: SOUND_AWOOGA not loaded")
 	}
 
-	// 创建提示动画实体（屏幕中央）
-	// 使用配置常量确保位置正确
 	centerX := float64(config.ScreenWidth) / 2
 	centerY := float64(config.ScreenHeight) / 2
 
@@ -686,16 +653,11 @@ func (s *LevelSystem) triggerFinalWaveWarning() {
 		return
 	}
 
-	// 使用组件通信替代直接调用
-	// 使用配置化的 combo 播放非循环动画
 	ecs.AddComponent(s.entityManager, warningEntity, &components.AnimationCommandComponent{
 		UnitID:    "finalwave",
 		ComboName: "warning",
 		Processed: false,
 	})
-	log.Printf("[LevelSystem] 添加 FinalWave 动画命令 (entity: %d, combo: warning, loop: false)", warningEntity)
-
-	log.Printf("[LevelSystem] Created FinalWave warning entity (ID: %d)", warningEntity)
 }
 
 // ========================================
