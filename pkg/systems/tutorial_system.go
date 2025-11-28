@@ -40,10 +40,6 @@ type TutorialSystem struct {
 	lastSunCount        int     // 上一帧的阳光实体数量（用于检测新阳光生成）
 	lastTextDisplayTime float64 // 上次教学文本显示的时间（用于时长检测，防止文本闪烁）
 
-	// 粒子效果重复显示定时器
-	arrowRepeatTimer    float64 // 箭头重复显示计时器（秒）
-	arrowRepeatInterval float64 // 箭头重复间隔（秒），粒子效果播放1秒后重新创建
-
 	// 向日葵教学相关（Level 1-2）
 	sunflowerCount   int     // 向日葵种植计数
 	stepTimeElapsed  float64 // 当前步骤经过时间（用于超时触发）
@@ -97,8 +93,6 @@ func NewTutorialSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.Resou
 		sunSpawned:           false, // 阳光未生成
 		lastSunCount:         0,     // 初始化阳光实体计数
 		lastTextDisplayTime:  0,     // 初始化文本显示时间
-		arrowRepeatTimer:     0,     // 定时器初始化
-		arrowRepeatInterval:  1.0,   // Story 8.2.1: 箭头每1.0秒重复一次（粒子播放1秒），无缝衔接避免闪烁
 		sunflowerCount:       0,     // 向日葵计数初始化
 		stepTimeElapsed:      0,     // 步骤计时器初始化
 		sunSpawnObserved:     false, // 初始化未观察到阳光
