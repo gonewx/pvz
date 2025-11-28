@@ -216,55 +216,55 @@ func (s *TutorialSystem) Update(dt float64) {
 				}
 
 			case "plantPlaced":
-			// 步骤3：种植第一个豌豆射手后，禁用草坪闪烁，启用阳光自动生成，生成一颗阳光
-			s.lawnGridSystem.DisableFlash() // 禁用草坪闪烁
-			log.Printf("[TutorialSystem] Lawn flash disabled (plantPlaced)")
-			s.sunSpawnSystem.Enable() // 启用阳光自动生成（原版机制：种植后开始掉落阳光）
-			s.spawnSkyFallingSun()
-			// 不再手动设置 sunSpawned，改为在 updateTrackingState 中检测阳光实体变化
-			log.Println("[TutorialSystem] Spawned first sun after planting peashooter, auto spawn ENABLED")
+				// 步骤3：种植第一个豌豆射手后，禁用草坪闪烁，启用阳光自动生成，生成一颗阳光
+				s.lawnGridSystem.DisableFlash() // 禁用草坪闪烁
+				log.Printf("[TutorialSystem] Lawn flash disabled (plantPlaced)")
+				s.sunSpawnSystem.Enable() // 启用阳光自动生成（原版机制：种植后开始掉落阳光）
+				s.spawnSkyFallingSun()
+				// 不再手动设置 sunSpawned，改为在 updateTrackingState 中检测阳光实体变化
+				log.Println("[TutorialSystem] Spawned first sun after planting peashooter, auto spawn ENABLED")
 
-		case "sunClicked":
-			// 步骤5：收集第一颗阳光后，生成第二颗阳光（阳光自动生成已在 plantPlaced 启用）
-			s.spawnSkyFallingSun()
-			log.Println("[TutorialSystem] Spawned second sun after clicking first sun")
+			case "sunClicked":
+				// 步骤5：收集第一颗阳光后，生成第二颗阳光（阳光自动生成已在 plantPlaced 启用）
+				s.spawnSkyFallingSun()
+				log.Println("[TutorialSystem] Spawned second sun after clicking first sun")
 
-		case "secondPlantPlaced":
-			// 步骤9：种植第二个豌豆射手后，禁用草坪闪烁，开始生成僵尸
-			s.lawnGridSystem.DisableFlash() // 禁用草坪闪烁
-			log.Printf("[TutorialSystem] Lawn flash disabled (secondPlantPlaced)")
-			s.spawnTutorialZombies()
-			log.Println("[TutorialSystem] Started spawning zombies after second plant")
+			case "secondPlantPlaced":
+				// 步骤9：种植第二个豌豆射手后，禁用草坪闪烁，开始生成僵尸
+				s.lawnGridSystem.DisableFlash() // 禁用草坪闪烁
+				log.Printf("[TutorialSystem] Lawn flash disabled (secondPlantPlaced)")
+				s.spawnTutorialZombies()
+				log.Println("[TutorialSystem] Started spawning zombies after second plant")
 
-		case "seedClicked":
-			// 步骤2：点击卡片后，隐藏箭头，启用草坪闪烁
-			s.hideArrowIndicator()
-			s.unhighlightPlantCard()       // Story 8.2.1: 隐藏卡片闪光
-			s.lawnGridSystem.EnableFlash() // 启用草坪闪烁效果（由明变暗）
-			log.Printf("[TutorialSystem] Lawn flash enabled (seedClicked)")
+			case "seedClicked":
+				// 步骤2：点击卡片后，隐藏箭头，启用草坪闪烁
+				s.hideArrowIndicator()
+				s.unhighlightPlantCard()       // Story 8.2.1: 隐藏卡片闪光
+				s.lawnGridSystem.EnableFlash() // 启用草坪闪烁效果（由明变暗）
+				log.Printf("[TutorialSystem] Lawn flash enabled (seedClicked)")
 
-		case "cooldownFinished":
-			// 步骤6（旧版）：卡片冷却完成，再次显示箭头
-			if cardID := s.findPeashooterCard(); cardID != 0 {
-				s.showArrowIndicator(cardID)
-				// Story 8.2.1: 启用卡片闪光效果
-				s.highlightPlantCard(cardID)
-			}
+			case "cooldownFinished":
+				// 步骤6（旧版）：卡片冷却完成，再次显示箭头
+				if cardID := s.findPeashooterCard(); cardID != 0 {
+					s.showArrowIndicator(cardID)
+					// Story 8.2.1: 启用卡片闪光效果
+					s.highlightPlantCard(cardID)
+				}
 
-		case "enoughSunAndCooldown":
-			// 步骤6（新版）：阳光足够且卡片冷却完成，显示箭头指向豌豆射手卡片
-			if cardID := s.findPeashooterCard(); cardID != 0 {
-				s.showArrowIndicator(cardID)
-				s.highlightPlantCard(cardID) // Story 8.2.1: 启用卡片闪光效果
-				log.Printf("[TutorialSystem] enoughSunAndCooldown: showing arrow to peashooter card")
-			}
+			case "enoughSunAndCooldown":
+				// 步骤6（新版）：阳光足够且卡片冷却完成，显示箭头指向豌豆射手卡片
+				if cardID := s.findPeashooterCard(); cardID != 0 {
+					s.showArrowIndicator(cardID)
+					s.highlightPlantCard(cardID) // Story 8.2.1: 启用卡片闪光效果
+					log.Printf("[TutorialSystem] enoughSunAndCooldown: showing arrow to peashooter card")
+				}
 
-		case "secondSeedClicked":
-			// 步骤8：第二次点击卡片，隐藏箭头，启用草坪闪烁
-			s.hideArrowIndicator()
-			s.unhighlightPlantCard()       // Story 8.2.1: 隐藏卡片闪光
-			s.lawnGridSystem.EnableFlash() // 启用草坪闪烁效果（由明变暗）
-			log.Printf("[TutorialSystem] Lawn flash enabled (secondSeedClicked)")
+			case "secondSeedClicked":
+				// 步骤8：第二次点击卡片，隐藏箭头，启用草坪闪烁
+				s.hideArrowIndicator()
+				s.unhighlightPlantCard()       // Story 8.2.1: 隐藏卡片闪光
+				s.lawnGridSystem.EnableFlash() // 启用草坪闪烁效果（由明变暗）
+				log.Printf("[TutorialSystem] Lawn flash enabled (secondSeedClicked)")
 			}
 		}
 
@@ -417,10 +417,6 @@ func (s *TutorialSystem) checkTriggerCondition(trigger string) bool {
 
 	case "sunClickedWhenEnough":
 		// 阳光≥100时触发
-		// 这是状态检测型，需要等待最小显示时间
-		if !s.isMinDisplayTimeElapsed() {
-			return false
-		}
 		currentSun := s.gameState.GetSun()
 		return currentSun >= 100
 
@@ -573,7 +569,7 @@ func (s *TutorialSystem) updateTrackingState() {
 	// 检测新植物种植（植物数量增加）
 	// 设置 newPlantThisFrame 标志，供 plantPlaced 触发器使用
 	if currentPlantCount > s.lastPlantCount {
-		s.plantCount++           // 增加种植计数
+		s.plantCount++             // 增加种植计数
 		s.newPlantThisFrame = true // 本帧有新植物
 		log.Printf("[TutorialSystem] Plant placed, total plantCount: %d", s.plantCount)
 	} else {
