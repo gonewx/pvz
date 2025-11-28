@@ -58,5 +58,46 @@ const (
 	LevelTextOffsetY     float64 = 10                     // 关卡文本Y轴偏移（相对于进度条顶部）
 )
 
+// ==============================
+// Story 11.5: 原版进度条机制常量
+// ==============================
+
+const (
+	// ----------------
+	// 进度条结构常量
+	// ----------------
+	// 原版进度条总长度为 150 格（逻辑单位）
+	ProgressBarTotalLength int = 150
+
+	// 红字波段长度（每波 12 格）
+	// 每次红字波刷新时，进度立即 +12
+	ProgressBarFlagSegmentLength int = 12
+
+	// 普通波段基础长度（无尽模式为 126）
+	// 计算公式：TotalLength - (FlagCount × FlagSegmentLength)
+	// 例如：1个旗帜波 = 150 - 12 = 138，2个旗帜波 = 150 - 24 = 126
+	ProgressBarNormalSegmentDefault int = 126
+
+	// ----------------
+	// 虚拟/现实追踪常量
+	// ----------------
+	// 追踪速度（厘秒间隔）
+	// 落后 1-6 格时，每 20cs (0.2秒) 前进一格
+	SlowTrackIntervalCS int = 20
+
+	// 落后 7+ 格时，每 5cs (0.05秒) 前进一格
+	FastTrackIntervalCS int = 5
+
+	// 快速追踪阈值（格数）
+	// 当虚拟进度超过现实进度 7 格以上时，使用快速追踪
+	FastTrackThreshold int = 7
+
+	// ----------------
+	// 时间常量
+	// ----------------
+	// 厘秒转换系数：1秒 = 100厘秒
+	CentisecondsPerSecond float64 = 100.0
+)
+
 // DebugProgressBar 调试模式开关（启用后绘制边界框）
 const DebugProgressBar bool = false

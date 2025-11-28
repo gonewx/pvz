@@ -618,6 +618,7 @@ func (ras *RewardAnimationSystem) updatePausingPhase(dt float64, rewardComp *com
 // - 卡片包淡出（透明度 1.0 → 0.0）
 // - 持续时间由 config.RewardDisappearDuration 配置
 // - 消失完成后，立即进入 Phase 4 显示面板
+// - 注意：Award 粒子在此阶段保持显示，直到面板完全显示后才清理
 func (ras *RewardAnimationSystem) updateDisappearingPhase(dt float64, rewardComp *components.RewardAnimationComponent) {
 	// 计算透明度（从 1.0 淡出到 0.0）
 	progress := rewardComp.ElapsedTime / config.RewardDisappearDuration
@@ -651,10 +652,8 @@ func (ras *RewardAnimationSystem) updateDisappearingPhase(dt float64, rewardComp
 			}
 		}
 
-		// 清理 Award 粒子特效（避免与面板视觉冲突）
-		if ras.glowEntity != 0 {
-			ras.cleanupGlowParticles()
-		}
+		// 注意：不在此处清理 Award 粒子！
+		// 粒子将在 showing 阶段面板淡入完成后清理，避免背景闪烁
 
 		// 立即移除所有标记的实体
 		ras.entityManager.RemoveMarkedEntities()
@@ -667,14 +666,15 @@ func (ras *RewardAnimationSystem) updateDisappearingPhase(dt float64, rewardComp
 		ras.currentPlantID = plantID // 保存植物ID（向后兼容）
 
 		// 创建奖励面板（传递完整奖励信息）
+		// 面板初始 FadeAlpha=0，将逐渐淡入
 		ras.createRewardPanel(rewardType, plantID, toolID)
-		log.Printf("[RewardAnimationSystem] 进入 Phase 4 (showing)，显示奖励面板")
+		log.Printf("[RewardAnimationSystem] 进入 Phase 4 (showing)，显示奖励面板（粒子保持显示直到面板淡入完成）")
 	}
 }
 
 // updateShowingPhaseInternal 处理显示奖励面板阶段（内部版本，不依赖rewardComp）。
 // - 面板淡入动画（透明度 0.0 → 1.0，持续 config.RewardPanelFadeInDuration）
-// - 淡入完成后，等待玩家点击"下一关"按钮
+// - 淡入完成后清理粒子效果，然后等待玩家点击"下一关"按钮
 func (ras *RewardAnimationSystem) updateShowingPhaseInternal(dt float64) {
 	ras.phaseElapsed += dt
 
@@ -693,6 +693,13 @@ func (ras *RewardAnimationSystem) updateShowingPhaseInternal(dt float64) {
 
 			// 应用淡入效果
 			panelComp.FadeAlpha = progress
+
+			// 当面板完全显示后（淡入完成），清理粒子效果
+			// 这样可以避免背景闪烁问题
+			if progress >= 1.0 && ras.glowEntity != 0 {
+				log.Printf("[RewardAnimationSystem] 面板淡入完成，清理 Award 粒子效果")
+				ras.cleanupGlowParticles()
+			}
 		}
 	}
 

@@ -1005,3 +1005,58 @@ func CalculateCurrentWaveHealth(em *ecs.EntityManager, currentWaveIndex int) int
 	return totalHealth
 }
 
+// GetNextWaveDelay 获取下一波的初始倒计时（秒）
+//
+// Story 11.5: 用于进度条的时间进度计算
+// 返回当前波次触发后到下一波的预计延迟时间
+//
+// 修复说明：
+// 此函数在 checkAndSpawnWaves() 中调用，此时 triggerNextWave() 已经执行完毕，
+// CurrentWaveIndex 已递增，LastRefreshTimeCs 已经被 SetNextWaveCountdown() 设置。
+// 所以直接返回 LastRefreshTimeCs 即可，不需要重新计算。
+//
+// 返回:
+//   - float64: 下一波延迟时间（秒），如果是最后一波返回 0
+func (s *WaveTimingSystem) GetNextWaveDelay() float64 {
+	timer := s.getTimerComponent()
+	if timer == nil {
+		return 0
+	}
+
+	// 直接使用已设置的 LastRefreshTimeCs
+	// 这个值在 SetNextWaveCountdown() 中已经正确设置
+	if timer.LastRefreshTimeCs > 0 {
+		return float64(timer.LastRefreshTimeCs) / 100.0
+	}
+
+	return 0
+}
+
+// calculateWaveDelayCs 计算指定波次的延迟（厘秒）
+//
+// Story 11.5: 内部辅助函数，根据波次类型计算延迟
+//
+// 参数:
+//   - waveIndex: 波次索引（0-based）
+//
+// 返回:
+//   - int: 延迟时间（厘秒）
+func (s *WaveTimingSystem) calculateWaveDelayCs(waveIndex int) int {
+	totalWaves := len(s.levelConfig.Waves)
+
+	// 最后一波使用 FinalWaveDelayCs
+	if waveIndex == totalWaves-1 {
+		return FinalWaveDelayCs
+	}
+
+	// 检查是否是旗帜波前一波
+	for _, flagWaveIndex := range s.levelConfig.FlagWaves {
+		if waveIndex == flagWaveIndex-1 {
+			return FlagWavePrefixDelayCs
+		}
+	}
+
+	// 常规波次：基础延迟 + 随机延迟
+	return RegularWaveBaseDelayCs + rand.Intn(RegularWaveRandomDelayCs)
+}
+
