@@ -282,9 +282,16 @@ const (
 	// 1800点伤害足以秒杀所有僵尸（包括铁桶僵尸1370总生命值）
 	CherryBombDamage = 1800
 
-	// CherryBombRangeRadius 樱桃炸弹爆炸范围半径（格子数）
-	// 1表示3x3范围（中心格子±1格）
-	CherryBombRangeRadius = 1
+	// CherryBombExplosionCenterOffsetX 爆炸圆心相对于植物位置的X偏移（像素）
+	// 精确数据: 圆心在植物坐标 (x+40, y+40)
+	CherryBombExplosionCenterOffsetX = 40.0
+
+	// CherryBombExplosionCenterOffsetY 爆炸圆心相对于植物位置的Y偏移（像素）
+	CherryBombExplosionCenterOffsetY = 40.0
+
+	// CherryBombExplosionRadius 爆炸范围半径（像素）
+	// 精确数据: 半径 115 像素的圆形范围
+	CherryBombExplosionRadius = 115.0
 
 	// CherryBombCooldown 樱桃炸弹的冷却时间（秒）
 	CherryBombCooldown = 50.0

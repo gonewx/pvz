@@ -601,9 +601,19 @@ func TestCherryBombConfiguration(t *testing.T) {
 			expected: 1800,
 		},
 		{
-			name:     "爆炸范围半径应为1（3x3格子）",
-			constant: config.CherryBombRangeRadius,
-			expected: 1,
+			name:     "爆炸圆心X偏移应为40像素",
+			constant: config.CherryBombExplosionCenterOffsetX,
+			expected: 40.0,
+		},
+		{
+			name:     "爆炸圆心Y偏移应为40像素",
+			constant: config.CherryBombExplosionCenterOffsetY,
+			expected: 40.0,
+		},
+		{
+			name:     "爆炸范围半径应为115像素",
+			constant: config.CherryBombExplosionRadius,
+			expected: 115.0,
 		},
 		{
 			name:     "冷却时间应为50秒",

@@ -495,18 +495,15 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 		return
 	}
 
-	// 计算基于世界坐标的3x3爆炸范围
-	// 3x3格子 = 横向和纵向各覆盖1.5个格子的距离
-	// 这样可以确保即使在边缘网格，爆炸范围也能扩展到网格外
-	explosionRadiusX := (float64(config.CherryBombRangeRadius) + 0.5) * config.CellWidth  // 1.5 * 80 = 120
-	explosionRadiusY := (float64(config.CherryBombRangeRadius) + 0.5) * config.CellHeight // 1.5 * 100 = 150
+	// 计算爆炸圆心：植物位置 + 偏移量
+	// 精确数据: 圆心在 (x+40, y+40)，半径 115 像素
+	explosionCenterX := position.X + config.CherryBombExplosionCenterOffsetX
+	explosionCenterY := position.Y + config.CherryBombExplosionCenterOffsetY
+	explosionRadius := config.CherryBombExplosionRadius
+	explosionRadiusSq := explosionRadius * explosionRadius // 预计算半径平方，避免开方运算
 
-	minX := position.X - explosionRadiusX
-	maxX := position.X + explosionRadiusX
-	minY := position.Y - explosionRadiusY
-	maxY := position.Y + explosionRadiusY
-
-	log.Printf("[BehaviorSystem] 樱桃炸弹爆炸范围 (世界坐标): X[%.1f-%.1f], Y[%.1f-%.1f]", minX, maxX, minY, maxY)
+	log.Printf("[BehaviorSystem] 樱桃炸弹爆炸范围 (圆形): 圆心(%.1f, %.1f), 半径%.1f",
+		explosionCenterX, explosionCenterY, explosionRadius)
 
 	// 查询所有僵尸实体（移动中和啃食中的僵尸）
 	allZombies := ecs.GetEntitiesWith2[*components.BehaviorComponent, *components.PositionComponent](s.entityManager)
@@ -537,10 +534,13 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 			continue
 		}
 
-		// 使用世界坐标检查僵尸是否在爆炸范围内
-		// 这样可以覆盖网格边界外的僵尸
-		if zombiePos.X >= minX && zombiePos.X <= maxX &&
-			zombiePos.Y >= minY && zombiePos.Y <= maxY {
+		// 使用圆形范围检测：计算僵尸到爆炸圆心的距离平方
+		dx := zombiePos.X - explosionCenterX
+		dy := zombiePos.Y - explosionCenterY
+		distanceSq := dx*dx + dy*dy
+
+		// 如果距离平方 <= 半径平方，则在爆炸范围内
+		if distanceSq <= explosionRadiusSq {
 			affectedZombies++
 			log.Printf("[BehaviorSystem] 僵尸 %d 在爆炸范围内（世界坐标: %.1f, %.1f），应用伤害", zombieID, zombiePos.X, zombiePos.Y)
 
