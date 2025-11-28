@@ -236,6 +236,12 @@ func NewWallnutEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameSta
 		return 0, fmt.Errorf("failed to load Wallnut Reanim resources")
 	}
 
+	// Clone partImages to avoid shared state issues when modifying images (e.g. cracking)
+	clonedPartImages := make(map[string]*ebiten.Image, len(partImages))
+	for k, v := range partImages {
+		clonedPartImages[k] = v
+	}
+
 	// 添加植物组件（用于碰撞检测和网格位置追踪）
 	em.AddComponent(entityID, &components.PlantComponent{
 		PlantType:       components.PlantWallnut,
@@ -259,7 +265,7 @@ func NewWallnutEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameSta
 	em.AddComponent(entityID, &components.ReanimComponent{
 		ReanimName: "Wallnut",
 		ReanimXML:  reanimXML,
-		PartImages: partImages,
+		PartImages: clonedPartImages,
 	})
 
 	// Story 13.8: 使用 PlayCombo API 播放默认动画

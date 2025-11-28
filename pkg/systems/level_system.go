@@ -261,6 +261,13 @@ func (s *LevelSystem) areCurrentWaveZombiesCleared() bool {
 		// 如果有，需要在这里排除
 
 		// 有活跃僵尸，返回 false
+		// Story 17.8: 只统计已激活的僵尸
+		if waveState, ok := ecs.GetComponent[*components.ZombieWaveStateComponent](s.entityManager, entityID); ok {
+			if !waveState.IsActivated {
+				continue
+			}
+		}
+
 		return false
 	}
 
@@ -1344,12 +1351,21 @@ func (s *LevelSystem) calculateVirtualProgress(pb *components.LevelProgressBarCo
 		// 计算波进度（取时间进度和血量削减进度的最大值）
 		waveProgress := s.calculateWaveProgress(pb)
 
+		// 限制波进度不超过 1.0，防止进度条溢出
+		// 只有在波次真正切换时（通过 OnWaveActivated），才会进入下一段
+		if waveProgress > 1.0 {
+			waveProgress = 1.0
+		}
+
 		// 计算普通波段内的进度
 		// Story 11.5 Task 5: 不限制 waveProgress，允许超过 1.0
 		normalProgress = (rightEndpoint-leftEndpoint)*waveProgress + leftEndpoint
 	} else if pb.TotalWaves == 1 && pb.CurrentWaveNum > 0 {
 		// 单波次关卡：普通波段进度直接等于波进度
 		waveProgress := s.calculateWaveProgress(pb)
+		if waveProgress > 1.0 {
+			waveProgress = 1.0
+		}
 		normalProgress = float64(pb.NormalSegmentBase) * waveProgress
 	}
 

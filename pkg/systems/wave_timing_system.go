@@ -257,7 +257,12 @@ func (s *WaveTimingSystem) Update(deltaTime float64) {
 		// Story 17.7: 处理红字警告阶段
 		if timer.FlagWaveCountdownPhase > 0 {
 			s.updateFlagWaveWarningPhase(deltaCsInt)
-			return // 红字警告阶段不递减倒计时
+			
+			// 如果在 Phase 4 (Hold)，则不递减倒计时（保持波次不触发）
+			if timer.FlagWaveCountdownPhase == 4 {
+				return
+			}
+			// Phase 5 (Red Text) 需要继续递减倒计时，以便转换到 Phase 4
 		}
 
 		timer.CountdownCs -= deltaCsInt
