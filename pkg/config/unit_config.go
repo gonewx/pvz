@@ -283,11 +283,12 @@ const (
 	CherryBombDamage = 1800
 
 	// CherryBombExplosionCenterOffsetX 爆炸圆心相对于植物位置的X偏移（像素）
-	// 精确数据: 圆心在植物坐标 (x+40, y+40)
-	CherryBombExplosionCenterOffsetX = 40.0
+	// 修正：植物坐标本身已是网格中心，偏移量设为 0
+	CherryBombExplosionCenterOffsetX = 0.0
 
 	// CherryBombExplosionCenterOffsetY 爆炸圆心相对于植物位置的Y偏移（像素）
-	CherryBombExplosionCenterOffsetY = 40.0
+	// 修正：植物坐标本身已是网格中心（微调），偏移量设为 0
+	CherryBombExplosionCenterOffsetY = 0.0
 
 	// CherryBombExplosionRadius 爆炸范围半径（像素）
 	// 精确数据: 半径 115 像素的圆形范围

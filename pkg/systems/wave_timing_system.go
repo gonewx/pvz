@@ -257,7 +257,7 @@ func (s *WaveTimingSystem) Update(deltaTime float64) {
 		// Story 17.7: 处理红字警告阶段
 		if timer.FlagWaveCountdownPhase > 0 {
 			s.updateFlagWaveWarningPhase(deltaCsInt)
-			
+
 			// 如果在 Phase 4 (Hold)，则不递减倒计时（保持波次不触发）
 			if timer.FlagWaveCountdownPhase == 4 {
 				return
@@ -621,6 +621,14 @@ func (s *WaveTimingSystem) triggerNextWave() {
 	// 如果还有后续波次，设置下一波倒计时
 	if timer.CurrentWaveIndex < timer.TotalWaves {
 		s.SetNextWaveCountdown()
+	} else {
+		// 所有波次已触发，清除相关标志和计时器
+		timer.IsFlagWaveApproaching = false
+		timer.IsFinalWave = false
+		timer.LastRefreshTimeCs = 0
+		timer.CountdownCs = 0
+		timer.WaveElapsedCs = 0
+		log.Printf("[WaveTimingSystem] All waves triggered. Timer stopped.")
 	}
 }
 
@@ -1028,6 +1036,11 @@ func (s *WaveTimingSystem) GetNextWaveDelay() float64 {
 		return 0
 	}
 
+	// 如果已经是最后一波之后，返回 0
+	if timer.CurrentWaveIndex >= timer.TotalWaves {
+		return 0
+	}
+
 	// 直接使用已设置的 LastRefreshTimeCs
 	// 这个值在 SetNextWaveCountdown() 中已经正确设置
 	if timer.LastRefreshTimeCs > 0 {
@@ -1064,4 +1077,3 @@ func (s *WaveTimingSystem) calculateWaveDelayCs(waveIndex int) int {
 	// 常规波次：基础延迟 + 随机延迟
 	return RegularWaveBaseDelayCs + rand.Intn(RegularWaveRandomDelayCs)
 }
-

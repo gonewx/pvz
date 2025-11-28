@@ -496,7 +496,7 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 	}
 
 	// 计算爆炸圆心：植物位置 + 偏移量
-	// 精确数据: 圆心在 (x+40, y+40)，半径 115 像素
+	// 修正：PositionComponent 已经是网格中心，偏移量已在配置中归零
 	explosionCenterX := position.X + config.CherryBombExplosionCenterOffsetX
 	explosionCenterY := position.Y + config.CherryBombExplosionCenterOffsetY
 	explosionRadius := config.CherryBombExplosionRadius
@@ -535,8 +535,13 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 		}
 
 		// 使用圆形范围检测：计算僵尸到爆炸圆心的距离平方
+		// 修正：僵尸的 PositionComponent.Y 包含了 ZombieVerticalOffset (-25.0)
+		// 这导致上行僵尸距离变远 (100 - (-25) = 125 > 115)，下行僵尸距离变近 (100 + (-25) = 75 < 115)
+		// 为了保证上下行对称判定，我们需要还原到格子中心进行距离计算
+		zombieEffectiveY := zombiePos.Y - config.ZombieVerticalOffset
+
 		dx := zombiePos.X - explosionCenterX
-		dy := zombiePos.Y - explosionCenterY
+		dy := zombieEffectiveY - explosionCenterY
 		distanceSq := dx*dx + dy*dy
 
 		// 如果距离平方 <= 半径平方，则在爆炸范围内

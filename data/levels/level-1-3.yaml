@@ -47,7 +47,7 @@ waves:
     zombies:
       - type: "basic"
         lanes: [2, 3, 4]
-        count: 3
+        count: 1
         spawnInterval: 2.0
 
   # 第2波
@@ -56,20 +56,60 @@ waves:
     zombies:
       - type: "basic"
         lanes: [2, 3, 4]
-        count: 4
+        count: 1
         spawnInterval: 2.0
 
-  # 第3波（旗帜波/最终波）：包含路障僵尸
   - waveNum: 3
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [2, 3, 4]
+        count: 1
+        spawnInterval: 2.0
+
+  - waveNum: 4
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [2, 3, 4]
+        count: 1
+        spawnInterval: 2.0
+
+  - waveNum: 5
+    type: "Fixed"
+    zombies:
+      - type: "conehead"
+        lanes: [2, 3, 4]
+        count: 1
+        spawnInterval: 2.0
+
+  - waveNum: 6
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [2, 3, 4]
+        count: 1
+        spawnInterval: 2.0
+
+  - waveNum: 7
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [2, 3, 4]
+        count: 1
+        spawnInterval: 2.0
+
+  #（旗帜波/最终波）：包含路障僵尸
+  - waveNum: 8
     type: "Final"
     isFlag: true
     flagIndex: 1
     zombies:
       - type: "basic"
         lanes: [2, 3, 4]
-        count: 6
+        count: 5
         spawnInterval: 1.5
       - type: "conehead"
         lanes: [2, 3, 4]
-        count: 2
+        count: 1
         spawnInterval: 1.2
