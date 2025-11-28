@@ -70,10 +70,18 @@ func (ps *ParticleSystem) updateParticles(dt float64) {
 
 		// Check if particle has expired
 		if particle.Age >= particle.Lifetime {
-			ps.EntityManager.DestroyEntity(particleID)
-			// DEBUG: 销毁粒子日志（每个粒子结束时打印会刷屏，已禁用）
-			// log.Printf("[ParticleSystem] 销毁过期粒子: ID=%d, Age=%.2f, Lifetime=%.2f", particleID, particle.Age, particle.Lifetime)
-			continue
+			if particle.ParticleLoops {
+				// Loop mode: reset particle age to continue animation
+				particle.Age = 0
+				// DEBUG: 粒子循环重置日志（已禁用）
+				// log.Printf("[ParticleSystem] 粒子循环重置: ID=%d, Lifetime=%.2f", particleID, particle.Lifetime)
+			} else {
+				// Normal mode: destroy particle
+				ps.EntityManager.DestroyEntity(particleID)
+				// DEBUG: 销毁粒子日志（每个粒子结束时打印会刷屏，已禁用）
+				// log.Printf("[ParticleSystem] 销毁过期粒子: ID=%d, Age=%.2f, Lifetime=%.2f", particleID, particle.Age, particle.Lifetime)
+				continue
+			}
 		}
 
 		// DEBUG: 粒子生命周期信息（每帧打印会刷屏，已禁用）

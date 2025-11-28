@@ -197,13 +197,28 @@ func (ps *ParticleSystem) updateEmitters(dt float64) {
 		}
 
 		// Check system duration (0 = infinite)
+		// When SystemLoops is true, reset Age instead of stopping (loop mode)
 		if emitter.SystemDuration > 0 && emitter.Age >= emitter.SystemDuration {
-			// Story 11.4 DEBUG: 记录发射器停止
-			if emitter.Config.Image == "IMAGE_DIRTSMALL" {
-				log.Printf("[ParticleSystem] 停止 SodRoll 发射器: Age=%.3f >= SystemDuration=%.3f",
-					emitter.Age, emitter.SystemDuration)
+			if emitter.SystemLoops {
+				// Loop mode: reset emitter age to continue spawning
+				// Also reset TotalLaunched so SpawnMaxLaunched constraints work correctly in the new cycle
+				emitter.Age = 0
+				emitter.NextSpawnTime = 0
+				emitter.TotalLaunched = 0
+				// DEBUG: 记录循环重置
+				if emitter.Config != nil {
+					log.Printf("[ParticleSystem] 发射器循环重置: Name='%s', SystemDuration=%.2fs",
+						emitter.Config.Name, emitter.SystemDuration)
+				}
+			} else {
+				// Non-loop mode: stop emitter
+				// Story 11.4 DEBUG: 记录发射器停止
+				if emitter.Config.Image == "IMAGE_DIRTSMALL" {
+					log.Printf("[ParticleSystem] 停止 SodRoll 发射器: Age=%.3f >= SystemDuration=%.3f",
+						emitter.Age, emitter.SystemDuration)
+				}
+				emitter.Active = false
 			}
-			emitter.Active = false
 		}
 
 		// 修复：在计算 activeCount 之前先清理已删除的粒子
@@ -748,6 +763,7 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 		Brightness:    brightness,
 		Age:           0,
 		Lifetime:      lifetime,
+		ParticleLoops: emitter.ParticleLoops, // Inherit from emitter config
 
 		AlphaKeyframes:     alphaKeyframes,
 		ScaleKeyframes:     scaleKeyframes,

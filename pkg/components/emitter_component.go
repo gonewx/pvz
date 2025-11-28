@@ -24,6 +24,8 @@ type EmitterComponent struct {
 
 	// System properties (系统级设置)
 	SystemDuration float64 // Total duration before emitter stops (seconds, 0 = infinite)
+	SystemLoops    bool    // If true, emitter loops when reaching SystemDuration instead of stopping
+	ParticleLoops  bool    // If true, spawned particles loop when reaching Lifetime instead of being destroyed
 
 	// Spawn timing (发射时机)
 	NextSpawnTime float64 // Time (in emitter age) when next particle should spawn

@@ -18,13 +18,13 @@ type TutorialSystem struct {
 	entityManager        *ecs.EntityManager
 	gameState            *game.GameState
 	resourceManager      *game.ResourceManager
-	lawnGridSystem       *LawnGridSystem  // 用于控制草坪闪烁效果（Story 8.2）
-	sunSpawnSystem       *SunSpawnSystem  // 用于启用阳光自动生成（Story 8.2）
-	levelSystem          *LevelSystem     // 用于访问 WaveTimingSystem（统一波次管理）
-	tutorialEntity       ecs.EntityID     // 教学实体ID
-	textEntity           ecs.EntityID     // 教学文本实体ID（用于显示/隐藏）
-	arrowIndicatorEntity ecs.EntityID     // 箭头指示符实体ID（用于显示/隐藏）
-	cardHighlightEntity  ecs.EntityID     // 卡片闪烁效果实体ID（用于显示/隐藏）
+	lawnGridSystem       *LawnGridSystem // 用于控制草坪闪烁效果（Story 8.2）
+	sunSpawnSystem       *SunSpawnSystem // 用于启用阳光自动生成（Story 8.2）
+	levelSystem          *LevelSystem    // 用于访问 WaveTimingSystem（统一波次管理）
+	tutorialEntity       ecs.EntityID    // 教学实体ID
+	textEntity           ecs.EntityID    // 教学文本实体ID（用于显示/隐藏）
+	arrowIndicatorEntity ecs.EntityID    // 箭头指示符实体ID（用于显示/隐藏）
+	cardHighlightEntity  ecs.EntityID    // 卡片闪烁效果实体ID（用于显示/隐藏）
 
 	// 状态跟踪变量（用于检测变化）
 	lastSunAmount       int     // 上一帧的阳光数量
@@ -45,8 +45,9 @@ type TutorialSystem struct {
 	arrowRepeatInterval float64 // 箭头重复间隔（秒），粒子效果播放1秒后重新创建
 
 	// 向日葵教学相关（Level 1-2）
-	sunflowerCount  int     // 向日葵种植计数
-	stepTimeElapsed float64 // 当前步骤经过时间（用于超时触发）
+	sunflowerCount   int     // 向日葵种植计数
+	stepTimeElapsed  float64 // 当前步骤经过时间（用于超时触发）
+	sunSpawnObserved bool    // 是否观察到了阳光生成事件（用于 sunSpawned 触发器防止事件丢失）
 }
 
 // NewTutorialSystem 创建教学系统实例
@@ -91,7 +92,7 @@ func NewTutorialSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.Resou
 		lastSunAmount:        gs.GetSun(),
 		lastPlantCount:       0,
 		lastZombieCount:      0,
-		plantCount:           0,     // 初始化植物计数
+		plantCount:           0, // 初始化植物计数
 		initialized:          false,
 		sunSpawned:           false, // 阳光未生成
 		lastSunCount:         0,     // 初始化阳光实体计数
@@ -100,6 +101,7 @@ func NewTutorialSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.Resou
 		arrowRepeatInterval:  1.0,   // Story 8.2.1: 箭头每1.0秒重复一次（粒子播放1秒），无缝衔接避免闪烁
 		sunflowerCount:       0,     // 向日葵计数初始化
 		stepTimeElapsed:      0,     // 步骤计时器初始化
+		sunSpawnObserved:     false, // 初始化未观察到阳光
 	}
 }
 
@@ -349,7 +351,12 @@ func (s *TutorialSystem) checkTriggerCondition(trigger string) bool {
 		if !s.isMinDisplayTimeElapsed() {
 			return false
 		}
-		return s.newSunThisFrame
+		// 只要本帧有新阳光，或者之前观察到了阳光生成事件（未被消费），就触发
+		if s.newSunThisFrame || s.sunSpawnObserved {
+			s.sunSpawnObserved = false // 消费事件
+			return true
+		}
+		return false
 
 	case "enoughSun":
 		// 检查阳光是否达到 100（足够种植豌豆射手）
@@ -604,6 +611,7 @@ func (s *TutorialSystem) updateTrackingState() {
 	currentSunCount := len(sunEntities)
 	if currentSunCount > s.lastSunCount {
 		s.newSunThisFrame = true
+		s.sunSpawnObserved = true // 记录事件，供 sunSpawned 触发器使用（防止事件在等待期间丢失）
 	} else {
 		s.newSunThisFrame = false
 	}
@@ -700,6 +708,15 @@ func (s *TutorialSystem) showArrowIndicator(targetEntity ecs.EntityID) {
 // hideArrowIndicator 隐藏箭头指示符
 func (s *TutorialSystem) hideArrowIndicator() {
 	if s.arrowIndicatorEntity != 0 {
+		// 修复：同时销毁发射器生成的粒子
+		// 如果发射器被销毁但粒子是循环的(ParticleLoops=true)，粒子会残留导致重影
+		if emitter, ok := ecs.GetComponent[*components.EmitterComponent](s.entityManager, s.arrowIndicatorEntity); ok {
+			for _, particleID := range emitter.ActiveParticles {
+				s.entityManager.DestroyEntity(particleID)
+			}
+			log.Printf("[TutorialSystem] Destroyed %d particles associated with arrow indicator", len(emitter.ActiveParticles))
+		}
+
 		s.entityManager.DestroyEntity(s.arrowIndicatorEntity)
 		s.arrowIndicatorEntity = 0
 		log.Printf("[TutorialSystem] Arrow indicator hidden")
@@ -778,45 +795,15 @@ func (s *TutorialSystem) unhighlightPlantCard() {
 //   - currentStep: 当前教学步骤
 //
 // 功能：
-//   - 因为粒子效果只播放1秒（SystemLoops=1, SystemDuration=100厘秒）
-//   - 只要箭头实体存在，就定期重新创建箭头和闪光效果
+//   - SeedPacket/UpsellArrow 粒子效果配置了 SystemLoops=1，会自动循环
+//   - 不再需要手动重建箭头，粒子系统会自动处理循环
+//   - 此函数保留用于未来可能的位置更新需求
 func (s *TutorialSystem) updateArrowRepeat(dt float64, currentStep config.TutorialStep) {
-	// 只要箭头实体存在，就重复显示（不再检查闪光实体）
-	needsRepeat := (s.arrowIndicatorEntity != 0)
-
-	if !needsRepeat {
-		s.arrowRepeatTimer = 0 // 重置定时器
-		return
-	}
-
-	// Story 8.2.1 修复：移除阳光检查逻辑，箭头应该持续显示直到玩家点击卡片
-	// 原有的 L609-614 逻辑会导致箭头在阳光<100时被错误隐藏
-	// 教学流程中，箭头在 gameStart 时显示（阳光=0），应该持续到 seedClicked
-
-	// 更新定时器
-	s.arrowRepeatTimer += dt
-
-	// 每隔 arrowRepeatInterval 秒重新创建箭头
-	if s.arrowRepeatTimer >= s.arrowRepeatInterval {
-		s.arrowRepeatTimer = 0 // 重置定时器
-
-		// 根据当前步骤的 action 决定指向哪个卡片
-		var cardID ecs.EntityID
-		if currentStep.Action == "sunflowerHint" {
-			cardID = s.findSunflowerCard()
-		} else {
-			cardID = s.findPeashooterCard()
-		}
-
-		if cardID != 0 {
-			// 先隐藏旧的箭头（避免重复创建）
-			s.hideArrowIndicator()
-
-			// 重新创建箭头（不创建闪光）
-			s.showArrowIndicator(cardID)
-			log.Printf("[TutorialSystem] Repeated arrow (timer reset)")
-		}
-	}
+	// SystemLoops=1 已正确实现，粒子效果会自动循环
+	// 不再需要定期重建箭头，否则会导致重复箭头
+	// 保留此函数框架，以备未来需要动态更新箭头位置时使用
+	_ = dt
+	_ = currentStep
 }
 
 // spawnSkyFallingSun 在教学关卡中生成一颗从天空掉落的阳光
@@ -872,5 +859,3 @@ func (s *TutorialSystem) spawnTutorialZombies() {
 
 	log.Printf("[TutorialSystem] Zombie spawning started, %d waves total", len(levelConfig.Waves))
 }
-
-

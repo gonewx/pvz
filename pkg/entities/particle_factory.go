@@ -139,6 +139,14 @@ func CreateParticleEffect(em *ecs.EntityManager, rm *game.ResourceManager, effec
 		systemDurationMin, systemDurationMax, _, _ := particle.ParseValue(emitterConfig.SystemDuration)
 		systemDuration := particle.RandomInRange(systemDurationMin, systemDurationMax) / 100.0 // centiseconds to seconds
 
+		// Parse SystemLoops: "1" means loop (true), "0" or empty means no loop (false)
+		// When SystemLoops is true, emitter resets Age when reaching SystemDuration instead of stopping
+		systemLoops := emitterConfig.SystemLoops == "1"
+
+		// Parse ParticleLoops: "1" means loop (true), "0" or empty means no loop (false)
+		// When ParticleLoops is true, particles reset Age when reaching Lifetime instead of being destroyed
+		particleLoops := emitterConfig.ParticleLoops == "1"
+
 		// Story 7.5: Parse SystemAlpha (ZombieHead 系统级透明度)
 		_, _, systemAlphaKeyframes, systemAlphaInterp := particle.ParseValue(emitterConfig.SystemAlpha)
 
@@ -164,6 +172,8 @@ func CreateParticleEffect(em *ecs.EntityManager, rm *game.ResourceManager, effec
 			Active:          true,
 			Age:             0,
 			SystemDuration:  systemDuration,
+			SystemLoops:     systemLoops,
+			ParticleLoops:   particleLoops,
 			NextSpawnTime:   0, // Spawn immediately
 			ActiveParticles: make([]ecs.EntityID, 0),
 			TotalLaunched:   0,
@@ -318,6 +328,12 @@ func CreateParticleEffectWithColor(em *ecs.EntityManager, rm *game.ResourceManag
 		systemDurationMin, systemDurationMax, _, _ := particle.ParseValue(emitterConfig.SystemDuration)
 		systemDuration := particle.RandomInRange(systemDurationMin, systemDurationMax) / 100.0
 
+		// Parse SystemLoops: "1" means loop (true), "0" or empty means no loop (false)
+		systemLoops := emitterConfig.SystemLoops == "1"
+
+		// Parse ParticleLoops: "1" means loop (true), "0" or empty means no loop (false)
+		particleLoops := emitterConfig.ParticleLoops == "1"
+
 		_, _, systemAlphaKeyframes, systemAlphaInterp := particle.ParseValue(emitterConfig.SystemAlpha)
 
 		var systemPosXKeyframes, systemPosYKeyframes []particle.Keyframe
@@ -337,6 +353,8 @@ func CreateParticleEffectWithColor(em *ecs.EntityManager, rm *game.ResourceManag
 			Active:          true,
 			Age:             0,
 			SystemDuration:  systemDuration,
+			SystemLoops:     systemLoops,
+			ParticleLoops:   particleLoops,
 			NextSpawnTime:   0,
 			ActiveParticles: make([]ecs.EntityID, 0),
 			TotalLaunched:   0,

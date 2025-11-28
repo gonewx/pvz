@@ -279,4 +279,3 @@ func (s *FlagWaveWarningSystem) GetWarningEntityID() ecs.EntityID {
 func (s *FlagWaveWarningSystem) IsWarningActive() bool {
 	return s.warningEntityID != 0
 }
-

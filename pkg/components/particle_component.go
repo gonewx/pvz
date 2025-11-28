@@ -40,8 +40,9 @@ type ParticleComponent struct {
 	Brightness float64 // Brightness multiplier applied to final color
 
 	// Lifecycle (生命周期, 秒)
-	Age      float64 // Time this particle has been alive (seconds)
-	Lifetime float64 // Total lifetime before particle is destroyed (seconds)
+	Age           float64 // Time this particle has been alive (seconds)
+	Lifetime      float64 // Total lifetime before particle is destroyed (seconds)
+	ParticleLoops bool    // If true, particle resets Age when reaching Lifetime instead of being destroyed
 
 	// Animation keyframes (动画关键帧)
 	// These are used by ParticleSystem to interpolate values over the particle's lifetime
