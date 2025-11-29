@@ -1,6 +1,7 @@
 package game
 
 import (
+	"encoding/gob"
 	"os"
 	"path/filepath"
 	"testing"
@@ -457,5 +458,151 @@ func TestSaveManager_UserListPersistence(t *testing.T) {
 	// 验证当前用户被正确恢复
 	if sm2.GetCurrentUser() != "persistent" {
 		t.Errorf("Expected current user 'persistent', got %q", sm2.GetCurrentUser())
+	}
+}
+
+// --- 战斗存档管理方法测试 (Story 18.1) ---
+
+func TestSaveManager_GetBattleSavePath(t *testing.T) {
+	tempDir := t.TempDir()
+	sm, _ := NewSaveManager(tempDir)
+
+	path := sm.GetBattleSavePath("testuser")
+	expected := filepath.Join(tempDir, "testuser"+BattleSaveFileSuffix)
+
+	if path != expected {
+		t.Errorf("Expected path %q, got %q", expected, path)
+	}
+}
+
+func TestSaveManager_HasBattleSave_NotExists(t *testing.T) {
+	tempDir := t.TempDir()
+	sm, _ := NewSaveManager(tempDir)
+
+	if sm.HasBattleSave("nonexistent") {
+		t.Error("Expected HasBattleSave to return false for non-existent save")
+	}
+}
+
+func TestSaveManager_HasBattleSave_Exists(t *testing.T) {
+	tempDir := t.TempDir()
+	sm, _ := NewSaveManager(tempDir)
+
+	// 创建一个空的战斗存档文件
+	battleSavePath := sm.GetBattleSavePath("testuser")
+	if err := os.WriteFile(battleSavePath, []byte("dummy data"), 0644); err != nil {
+		t.Fatalf("Failed to create dummy save file: %v", err)
+	}
+
+	if !sm.HasBattleSave("testuser") {
+		t.Error("Expected HasBattleSave to return true for existing save")
+	}
+}
+
+func TestSaveManager_DeleteBattleSave(t *testing.T) {
+	tempDir := t.TempDir()
+	sm, _ := NewSaveManager(tempDir)
+
+	// 创建战斗存档文件
+	battleSavePath := sm.GetBattleSavePath("testuser")
+	if err := os.WriteFile(battleSavePath, []byte("dummy data"), 0644); err != nil {
+		t.Fatalf("Failed to create save file: %v", err)
+	}
+
+	// 验证文件存在
+	if !sm.HasBattleSave("testuser") {
+		t.Fatal("Save file should exist before deletion")
+	}
+
+	// 删除
+	err := sm.DeleteBattleSave("testuser")
+	if err != nil {
+		t.Fatalf("DeleteBattleSave failed: %v", err)
+	}
+
+	// 验证文件已删除
+	if sm.HasBattleSave("testuser") {
+		t.Error("Save file should not exist after deletion")
+	}
+}
+
+func TestSaveManager_DeleteBattleSave_NotExists(t *testing.T) {
+	tempDir := t.TempDir()
+	sm, _ := NewSaveManager(tempDir)
+
+	// 删除不存在的文件应该不返回错误
+	err := sm.DeleteBattleSave("nonexistent")
+	if err != nil {
+		t.Errorf("DeleteBattleSave for non-existent file should not return error: %v", err)
+	}
+}
+
+func TestSaveManager_GetBattleSaveInfo(t *testing.T) {
+	tempDir := t.TempDir()
+	sm, _ := NewSaveManager(tempDir)
+
+	// 使用 BattleSerializer 创建有效的存档
+	serializer := NewBattleSerializer()
+	saveData := NewBattleSaveData()
+	saveData.LevelID = "1-3"
+	saveData.Sun = 200
+	saveData.CurrentWaveIndex = 4
+
+	// 手动保存（模拟完整保存流程）
+	battleSavePath := sm.GetBattleSavePath("testuser")
+	file, err := os.Create(battleSavePath)
+	if err != nil {
+		t.Fatalf("Failed to create save file: %v", err)
+	}
+	defer file.Close()
+
+	// 用于测试的简单序列化（直接使用 gob）
+	_ = serializer
+	encoder := gob.NewEncoder(file)
+	if err := encoder.Encode(saveData); err != nil {
+		t.Fatalf("Failed to encode save data: %v", err)
+	}
+	file.Close() // 确保写入完成
+
+	// 获取存档信息
+	info, err := sm.GetBattleSaveInfo("testuser")
+	if err != nil {
+		t.Fatalf("GetBattleSaveInfo failed: %v", err)
+	}
+
+	if info.LevelID != "1-3" {
+		t.Errorf("Expected LevelID '1-3', got %q", info.LevelID)
+	}
+	if info.Sun != 200 {
+		t.Errorf("Expected Sun 200, got %d", info.Sun)
+	}
+	if info.WaveIndex != 4 {
+		t.Errorf("Expected WaveIndex 4, got %d", info.WaveIndex)
+	}
+}
+
+func TestSaveManager_GetBattleSaveInfo_NotExists(t *testing.T) {
+	tempDir := t.TempDir()
+	sm, _ := NewSaveManager(tempDir)
+
+	_, err := sm.GetBattleSaveInfo("nonexistent")
+	if err == nil {
+		t.Error("Expected error when getting info for non-existent save")
+	}
+}
+
+func TestSaveManager_GetBattleSaveInfo_Corrupted(t *testing.T) {
+	tempDir := t.TempDir()
+	sm, _ := NewSaveManager(tempDir)
+
+	// 创建损坏的存档文件
+	battleSavePath := sm.GetBattleSavePath("testuser")
+	if err := os.WriteFile(battleSavePath, []byte("corrupted data"), 0644); err != nil {
+		t.Fatalf("Failed to create corrupted file: %v", err)
+	}
+
+	_, err := sm.GetBattleSaveInfo("testuser")
+	if err == nil {
+		t.Error("Expected error when getting info for corrupted save")
 	}
 }

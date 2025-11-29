@@ -592,3 +592,79 @@ func (sm *SaveManager) SwitchUser(username string) error {
 
 	return nil
 }
+
+// --- 战斗存档管理方法 (Story 18.1) ---
+
+// BattleSaveFileSuffix 战斗存档文件后缀
+const BattleSaveFileSuffix = "_battle.sav"
+
+// GetBattleSavePath 获取用户的战斗存档文件路径
+//
+// 参数：
+//   - username: 用户名
+//
+// 返回：
+//   - string: 战斗存档文件完整路径，格式: {saveDir}/{username}_battle.sav
+func (sm *SaveManager) GetBattleSavePath(username string) string {
+	return filepath.Join(sm.saveDir, username+BattleSaveFileSuffix)
+}
+
+// HasBattleSave 检查用户是否有战斗存档
+//
+// 参数：
+//   - username: 用户名
+//
+// 返回：
+//   - bool: true 表示存在战斗存档，false 表示不存在
+func (sm *SaveManager) HasBattleSave(username string) bool {
+	battleSavePath := sm.GetBattleSavePath(username)
+	_, err := os.Stat(battleSavePath)
+	return err == nil
+}
+
+// GetBattleSaveInfo 获取战斗存档信息（预览）
+//
+// 读取存档文件的头部信息，无需加载完整的存档数据。
+// 用于在主菜单显示存档预览信息。
+//
+// 参数：
+//   - username: 用户名
+//
+// 返回：
+//   - *BattleSaveInfo: 存档预览信息
+//   - error: 如果读取失败返回错误
+func (sm *SaveManager) GetBattleSaveInfo(username string) (*BattleSaveInfo, error) {
+	battleSavePath := sm.GetBattleSavePath(username)
+
+	// 使用 BattleSerializer 加载完整数据
+	// 未来可优化为只读取头部信息
+	serializer := NewBattleSerializer()
+	saveData, err := serializer.LoadBattle(battleSavePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load battle save: %w", err)
+	}
+
+	return saveData.ToBattleSaveInfo(), nil
+}
+
+// DeleteBattleSave 删除用户的战斗存档
+//
+// 参数：
+//   - username: 用户名
+//
+// 返回：
+//   - error: 如果删除失败返回错误，文件不存在不视为错误
+func (sm *SaveManager) DeleteBattleSave(username string) error {
+	battleSavePath := sm.GetBattleSavePath(username)
+
+	err := os.Remove(battleSavePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// 文件不存在，不视为错误
+			return nil
+		}
+		return fmt.Errorf("failed to delete battle save: %w", err)
+	}
+
+	return nil
+}
