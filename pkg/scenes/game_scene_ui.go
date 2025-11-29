@@ -388,49 +388,6 @@ func (s *GameScene) drawHugeWaveWarning(screen *ebiten.Image) {
 	text.Draw(screen, warningText, s.sunCounterFont, textOp)
 }
 
-// drawFinalWaveText 渲染白字 "FINAL WAVE"
-// Story 17.7: 最终波白字动画
-func (s *GameScene) drawFinalWaveText(screen *ebiten.Image) {
-	// 查询最终波白字实体
-	textEntities := ecs.GetEntitiesWith1[*components.FinalWaveTextComponent](s.entityManager)
-	if len(textEntities) == 0 {
-		return
-	}
-
-	// 获取白字组件
-	textComp, ok := ecs.GetComponent[*components.FinalWaveTextComponent](s.entityManager, textEntities[0])
-	if !ok || !textComp.IsActive {
-		return
-	}
-
-	// 透明度为 0 时跳过渲染
-	if textComp.Alpha <= 0 {
-		return
-	}
-
-	// 使用阳光计数器字体
-	if s.sunCounterFont == nil {
-		return
-	}
-
-	displayText := textComp.Text
-
-	// 测量文本宽度以便居中
-	textWidth := text.Advance(displayText, s.sunCounterFont)
-
-	// 绘制白色文本（带缩放和透明度）
-	textOp := &text.DrawOptions{}
-	textOp.GeoM.Translate(-textWidth/2, 0) // 先移到原点
-	textOp.GeoM.Scale(textComp.Scale, textComp.Scale)
-	textOp.GeoM.Translate(textComp.X, textComp.Y)
-
-	// 白色文字，带透明度
-	alpha := uint8(255 * textComp.Alpha)
-	textOp.ColorScale.ScaleWithColor(color.RGBA{R: 255, G: 255, B: 255, A: alpha})
-
-	text.Draw(screen, displayText, s.sunCounterFont, textOp)
-}
-
 // drawTooltip 渲染植物卡片的 Tooltip
 // Story 10.8: 鼠标悬停植物卡片时显示提示信息
 func (s *GameScene) drawTooltip(screen *ebiten.Image) {

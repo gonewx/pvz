@@ -7,17 +7,17 @@ story_title: "旗帜波特殊计时与红字警告"
 gate: PASS
 status_reason: "所有验收标准已满足，代码遵循 ECS 架构原则，测试覆盖全面"
 reviewer: "Quinn (Test Architect)"
-updated: "2025-11-27T16:20:00+08:00"
+updated: "2025-11-29T14:00:00+08:00"
 
 waiver: { active: false }
 
 top_issues: []
 
 quality_score: 100
-expires: "2025-12-11T00:00:00+08:00"
+expires: "2025-12-13T00:00:00+08:00"
 
 evidence:
-  tests_reviewed: 27
+  tests_reviewed: 20
   risks_identified: 0
   trace:
     ac_covered: [1, 2, 3, 4, 5]
@@ -43,8 +43,8 @@ recommendations:
 
 # Test Results Summary
 test_summary:
-  total_tests: 27
-  passed: 27
+  total_tests: 20
+  passed: 20
   failed: 0
   coverage: "Story 17.7 相关测试 100% 通过"
 
@@ -66,7 +66,7 @@ acceptance_criteria:
     status: PASS
     evidence:
       - "FlagWaveCountdownPhase 字段实现阶段状态机"
-      - "Phase 5 显示红字，Phase 4 停留 725cs"
+      - "Phase 5 显示红字，Phase 4 停留 400cs"
       - "FlagWaveWarningSystem 管理动画生命周期"
     tests:
       - "TestWaveTimingSystem_HugeWaveWarningPhase5"
@@ -81,22 +81,15 @@ acceptance_criteria:
     status: PASS
     evidence:
       - "FinalWaveDelayCs = 5500 常量定义"
-      - "FinalWaveTextDurationCs = 500 白字显示时长"
-      - "ActivateFinalWaveText() 激活白字显示"
+      - "最终波使用 FinalWave.reanim 动画显示"
     tests:
       - "TestWaveTimingSystem_FinalWaveDelay"
-      - "TestWaveTimingSystem_FinalWaveTextActivation"
-      - "TestFinalWaveTextSystem_Creation"
-      - "TestFinalWaveTextSystem_CreateTextEntity"
-      - "TestFinalWaveTextSystem_Completion"
-      - "TestFinalWaveTextSystem_IsTextActive"
-      - "TestFinalWaveTextSystem_DestroyTextEntity"
 
   ac4_ui_integration:
     status: PASS
     evidence:
       - "drawHugeWaveWarning() 渲染红字警告"
-      - "drawFinalWaveText() 渲染最终波白字"
+      - "最终波使用现有 FinalWave.reanim 动画系统"
       - "缩放、闪烁、淡入效果实现完整"
     tests:
       - "运行时验证通过"
@@ -104,10 +97,11 @@ acceptance_criteria:
   ac5_test_coverage:
     status: PASS
     evidence:
-      - "27 个 Story 17.7 相关测试用例"
+      - "20 个 Story 17.7 相关测试用例"
       - "覆盖全部正常路径和边界条件"
       - "nil 检查、阶段转换、计时精度均已测试"
     tests:
       - "全部通过"
+
 
 

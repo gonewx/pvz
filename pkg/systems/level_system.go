@@ -60,9 +60,8 @@ type LevelSystem struct {
 	finalWaveWarningTriggered bool    // 是否已触发提示（防止重复）
 	finalWaveWarningLeadTime  float64 // 提前触发时间（秒，默认 3.0）
 
-	// Story 17.7: 旗帜波警告和最终波白字系统
+	// Story 17.7: 旗帜波警告系统
 	flagWaveWarningSystem *FlagWaveWarningSystem // 红字警告系统
-	finalWaveTextSystem   *FinalWaveTextSystem   // 白字显示系统
 }
 
 // NewLevelSystem 创建关卡管理系统
@@ -99,9 +98,8 @@ func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *
 	if gs.CurrentLevel != nil {
 		ls.waveTimingSystem = NewWaveTimingSystem(em, gs, gs.CurrentLevel)
 
-		// Story 17.7: 创建旗帜波警告和最终波白字系统（统一处理所有关卡）
+		// Story 17.7: 创建旗帜波警告系统
 		ls.flagWaveWarningSystem = NewFlagWaveWarningSystem(em, ls.waveTimingSystem, rm)
-		ls.finalWaveTextSystem = NewFinalWaveTextSystem(em, ls.waveTimingSystem)
 
 		if isTutorialLevel {
 			// 教学关卡：暂停计时器，等待 TutorialSystem 触发第一波
@@ -159,11 +157,6 @@ func (s *LevelSystem) Update(deltaTime float64) {
 		// Story 17.7: 更新旗帜波警告系统
 		if s.flagWaveWarningSystem != nil {
 			s.flagWaveWarningSystem.Update(deltaTime)
-		}
-
-		// Story 17.7: 更新最终波白字系统
-		if s.finalWaveTextSystem != nil {
-			s.finalWaveTextSystem.Update(deltaTime)
 		}
 
 		// Story 17.7: 检查加速刷新条件
@@ -1098,11 +1091,10 @@ func (s *LevelSystem) InitializeWaveTimingSystem() {
 
 	s.waveTimingSystem = NewWaveTimingSystem(s.entityManager, s.gameState, s.gameState.CurrentLevel)
 
-	// Story 17.7: 创建旗帜波警告和最终波白字系统
+	// Story 17.7: 创建旗帜波警告系统
 	s.flagWaveWarningSystem = NewFlagWaveWarningSystem(s.entityManager, s.waveTimingSystem, s.resourceManager)
-	s.finalWaveTextSystem = NewFinalWaveTextSystem(s.entityManager, s.waveTimingSystem)
 
-	log.Printf("[LevelSystem] WaveTimingSystem initialized with FlagWaveWarning and FinalWaveText systems")
+	log.Printf("[LevelSystem] WaveTimingSystem initialized with FlagWaveWarning system")
 }
 
 // GetFlagWaveWarningSystem 获取旗帜波警告系统（用于测试）
@@ -1110,13 +1102,6 @@ func (s *LevelSystem) InitializeWaveTimingSystem() {
 // Story 17.7: 供测试和调试使用
 func (s *LevelSystem) GetFlagWaveWarningSystem() *FlagWaveWarningSystem {
 	return s.flagWaveWarningSystem
-}
-
-// GetFinalWaveTextSystem 获取最终波白字系统（用于测试）
-//
-// Story 17.7: 供测试和调试使用
-func (s *LevelSystem) GetFinalWaveTextSystem() *FinalWaveTextSystem {
-	return s.finalWaveTextSystem
 }
 
 // ========== Story 17.8: 血量触发加速刷新 ==========

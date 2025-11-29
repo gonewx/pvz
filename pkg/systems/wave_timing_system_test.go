@@ -696,39 +696,6 @@ func TestWaveTimingSystem_AcceleratedRefresh_NotTriggered_ZombiesRemain(t *testi
 	}
 }
 
-// TestWaveTimingSystem_FinalWaveTextActivation 测试最终波白字激活
-func TestWaveTimingSystem_FinalWaveTextActivation(t *testing.T) {
-	em := ecs.NewEntityManager()
-	gs := createTestGameState()
-	levelConfig := createTestLevelConfig(5)
-	resetGameState(gs, levelConfig)
-
-	system := NewWaveTimingSystem(em, gs, levelConfig)
-
-	// 激活最终波白字
-	system.ActivateFinalWaveText()
-
-	// 检查白字是否激活
-	if !system.IsFinalWaveTextActive() {
-		t.Error("Expected final wave text to be active")
-	}
-
-	// 白字应该还没完成
-	if system.IsFinalWaveTextComplete() {
-		t.Error("Expected final wave text NOT to be complete yet")
-	}
-
-	// 更新 5 秒（500cs），白字应该完成
-	for i := 0; i < 50; i++ {
-		system.Update(0.1)
-	}
-
-	// 现在白字应该完成了
-	if !system.IsFinalWaveTextComplete() {
-		t.Error("Expected final wave text to be complete after 500cs")
-	}
-}
-
 // TestWaveTimingSystem_IsNextWaveFlagWave 测试旗帜波判定
 func TestWaveTimingSystem_IsNextWaveFlagWave(t *testing.T) {
 	em := ecs.NewEntityManager()

@@ -65,16 +65,8 @@ type WaveTimerComponent struct {
 	FlagWavePhaseTimeCs int
 
 	// IsFinalWave 是否为最终波
-	// 最终波有特殊的 5500cs 倒计时和白字显示逻辑
+	// 最终波有特殊的 5500cs 倒计时
 	IsFinalWave bool
-
-	// FinalWaveTextActive 白字 "FINAL WAVE" 是否激活
-	// 当最终波倒计时减至 0 时激活
-	FinalWaveTextActive bool
-
-	// FinalWaveTextTimeCs 白字已显示时间（厘秒）
-	// 白字显示 500cs 后检查胜利条件
-	FinalWaveTextTimeCs int
 
 	// WaveElapsedCs 当前波刷出后已过的时间（厘秒）
 	// 用于加速刷新判定（需要 > 401cs）
