@@ -42,6 +42,13 @@ func NewBehaviorSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game
 
 // Update 更新所有拥有行为组件的实体
 func (s *BehaviorSystem) Update(deltaTime float64) {
+	// 检查游戏是否胜利（奖励动画阶段）
+	// 胜利后植物应停止所有行为（包括向日葵生产阳光）
+	if s.gameState != nil && s.gameState.IsGameOver && s.gameState.GameResult == "win" {
+		// 游戏胜利时，不再更新任何行为
+		return
+	}
+
 	// 检查游戏是否冻结（僵尸获胜流程期间）
 	// Story 8.8: 游戏冻结时，所有植物停止攻击，但触发僵尸继续移动
 	freezeEntities := ecs.GetEntitiesWith1[*components.GameFreezeComponent](s.entityManager)

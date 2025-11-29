@@ -342,6 +342,9 @@ func (s *LevelSystem) checkVictoryCondition() {
 		s.gameState.SetGameResult("win")
 		log.Println("[LevelSystem] Victory! All zombies defeated!")
 
+		// 清理场上所有阳光实体（避免在奖励动画阶段继续显示）
+		s.cleanupAllSunEntities()
+
 		// 保存关卡进度
 		if s.gameState.CurrentLevel != nil {
 			levelID := s.gameState.CurrentLevel.ID
@@ -1644,4 +1647,27 @@ func (s *LevelSystem) getZombieTypeHealth(zombieType string) float64 {
 	default:
 		return 200 // 默认普通僵尸血量
 	}
+}
+
+// cleanupAllSunEntities 清理场上所有阳光实体
+//
+// 在游戏胜利时调用，清理所有天空掉落和向日葵生成的阳光
+// 确保奖励动画阶段场上不会残留阳光
+func (s *LevelSystem) cleanupAllSunEntities() {
+	// 查询所有阳光实体
+	sunEntities := ecs.GetEntitiesWith1[*components.SunComponent](s.entityManager)
+
+	if len(sunEntities) == 0 {
+		return
+	}
+
+	// 销毁所有阳光实体
+	for _, entityID := range sunEntities {
+		s.entityManager.DestroyEntity(entityID)
+	}
+
+	// 立即清理标记的实体
+	s.entityManager.RemoveMarkedEntities()
+
+	log.Printf("[LevelSystem] Cleaned up %d sun entities on victory", len(sunEntities))
 }
