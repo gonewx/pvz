@@ -93,6 +93,7 @@ func (s *GameScene) initMenuButton(rm *game.ResourceManager) {
 
 // initPauseMenuModule 初始化暂停菜单（ECS 架构）
 // Story 10.1: 创建暂停菜单实体和三个按钮
+// Story 18.2: 添加战斗存档保存回调
 func (s *GameScene) initPauseMenuModule(rm *game.ResourceManager) {
 	var err error
 	s.pauseMenuModule, err = modules.NewPauseMenuModule(
@@ -108,6 +109,8 @@ func (s *GameScene) initPauseMenuModule(rm *game.ResourceManager) {
 				s.gameState.SetPaused(false) // 恢复游戏
 			},
 			OnRestart: func() {
+				// Story 18.2: 重新开始时删除战斗存档
+				s.deleteBattleSave()
 				// 重新加载当前关卡（使用当前关卡ID）
 				currentLevelID := "1-1" // 默认值
 				if s.gameState.CurrentLevel != nil {
@@ -132,6 +135,10 @@ func (s *GameScene) initPauseMenuModule(rm *game.ResourceManager) {
 				if s.levelSystem != nil {
 					s.levelSystem.ResumeWaveTiming()
 				}
+			},
+			// Story 18.2: 保存战斗状态回调
+			OnSaveBattle: func() {
+				s.saveBattleState()
 			},
 		},
 	)
@@ -212,4 +219,140 @@ func (s *GameScene) initLawnmowers() {
 	}
 
 	log.Printf("[GameScene] Initialized %d lawnmowers for enabled lanes: %v", len(enabledLanes), enabledLanes)
+}
+
+// saveBattleState 保存当前战斗状态
+//
+// Story 18.2: 战斗存档保存触发
+//
+// 调用时机：
+//   - 玩家点击暂停菜单的"返回主菜单"按钮
+//
+// 保存内容：
+//   - 关卡ID、时间、阳光
+//   - 波次进度
+//   - 所有实体状态（植物、僵尸、子弹、阳光、除草车）
+func (s *GameScene) saveBattleState() {
+	// 获取当前用户
+	saveManager := s.gameState.GetSaveManager()
+	currentUser := saveManager.GetCurrentUser()
+	if currentUser == "" {
+		log.Printf("[GameScene] Warning: No current user, cannot save battle state")
+		return
+	}
+
+	// 获取存档文件路径
+	battleSavePath := saveManager.GetBattleSavePath(currentUser)
+
+	// 创建序列化器并保存
+	serializer := game.NewBattleSerializer()
+	if err := serializer.SaveBattle(s.entityManager, s.gameState, battleSavePath); err != nil {
+		log.Printf("[GameScene] ERROR: Failed to save battle state: %v", err)
+		return
+	}
+
+	log.Printf("[GameScene] Battle state saved successfully to %s", battleSavePath)
+}
+
+// deleteBattleSave 删除当前用户的战斗存档
+//
+// Story 18.2: 重新开始时删除存档
+//
+// 调用时机：
+//   - 玩家点击暂停菜单的"重新开始"按钮
+//   - 游戏胜利后（进入下一关）
+//   - 从存档恢复后
+func (s *GameScene) deleteBattleSave() {
+	// 获取当前用户
+	saveManager := s.gameState.GetSaveManager()
+	currentUser := saveManager.GetCurrentUser()
+	if currentUser == "" {
+		log.Printf("[GameScene] Warning: No current user, cannot delete battle save")
+		return
+	}
+
+	// 删除存档
+	if err := saveManager.DeleteBattleSave(currentUser); err != nil {
+		log.Printf("[GameScene] ERROR: Failed to delete battle save: %v", err)
+		return
+	}
+
+	log.Printf("[GameScene] Battle save deleted for user: %s", currentUser)
+}
+
+// restoreBattleState 从战斗存档恢复战斗状态
+//
+// Story 18.2: 战斗存档自动加载
+//
+// 恢复流程：
+//  1. 获取当前用户的存档路径
+//  2. 使用 BattleSerializer.LoadBattle() 加载存档数据
+//  3. 恢复游戏状态（阳光、波次进度）
+//  4. 成功后删除存档（避免重复加载）
+//  5. 失败时记录日志，继续正常游戏
+//
+// 注意：实体恢复（植物、僵尸等）将在 Story 18.3 中实现
+func (s *GameScene) restoreBattleState() {
+	saveManager := s.gameState.GetSaveManager()
+	currentUser := saveManager.GetCurrentUser()
+	if currentUser == "" {
+		log.Printf("[GameScene] Warning: No current user, cannot restore battle state")
+		return
+	}
+
+	// 检查是否有存档
+	if !saveManager.HasBattleSave(currentUser) {
+		log.Printf("[GameScene] No battle save found for user: %s", currentUser)
+		return
+	}
+
+	// 获取存档路径
+	battleSavePath := saveManager.GetBattleSavePath(currentUser)
+	log.Printf("[GameScene] 开始从战斗存档恢复: %s", battleSavePath)
+
+	// 创建序列化器并加载
+	serializer := game.NewBattleSerializer()
+	saveData, err := serializer.LoadBattle(battleSavePath)
+	if err != nil {
+		log.Printf("[GameScene] ERROR: Failed to load battle data: %v", err)
+		log.Printf("[GameScene] 继续正常游戏...")
+		return
+	}
+
+	// 恢复游戏状态
+	s.gameState.Sun = saveData.Sun
+	s.gameState.LevelTime = saveData.LevelTime
+	s.gameState.CurrentWaveIndex = saveData.CurrentWaveIndex
+	if len(saveData.SpawnedWaves) > 0 {
+		s.gameState.SpawnedWaves = make([]bool, len(saveData.SpawnedWaves))
+		copy(s.gameState.SpawnedWaves, saveData.SpawnedWaves)
+	}
+	s.gameState.TotalZombiesSpawned = saveData.TotalZombiesSpawned
+	s.gameState.ZombiesKilled = saveData.ZombiesKilled
+
+	log.Printf("[GameScene] 游戏状态已恢复: Sun=%d, Wave=%d, Time=%.1f",
+		s.gameState.Sun, s.gameState.CurrentWaveIndex, s.gameState.LevelTime)
+
+	// TODO: Story 18.3 将实现实体恢复（植物、僵尸等）
+	log.Printf("[GameScene] 实体恢复: Plants=%d, Zombies=%d (待 Story 18.3 实现)",
+		len(saveData.Plants), len(saveData.Zombies))
+
+	// 跳过开场动画
+	s.isIntroAnimPlaying = false
+	s.cameraX = config.GameCameraX
+	if s.cameraSystem != nil {
+		s.gameState.CameraX = config.GameCameraX
+	}
+
+	// 跳过铺草皮动画
+	s.soddingAnimStarted = true
+
+	// 恢复后删除存档
+	if err := saveManager.DeleteBattleSave(currentUser); err != nil {
+		log.Printf("[GameScene] Warning: Failed to delete battle save after restore: %v", err)
+	} else {
+		log.Printf("[GameScene] 存档已删除（恢复成功后）")
+	}
+
+	log.Printf("[GameScene] 战斗状态恢复完成!")
 }

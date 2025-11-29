@@ -1,6 +1,7 @@
 package scenes
 
 import (
+	"fmt"
 	"image/color"
 	"log"
 	"os"
@@ -103,6 +104,10 @@ type MainMenuScene struct {
 	zombieHandEntity ecs.EntityID  // Zombie hand entity ID
 	menuState        MainMenuState // Main menu state
 	pendingScene     string        // Pending scene to switch to after animation
+
+	// Story 18.2: Battle save detection
+	hasBattleSave  bool                // Whether current user has a battle save
+	battleSaveInfo *game.BattleSaveInfo // Battle save info (for dialog display)
 }
 
 // NewMainMenuScene creates and returns a new MainMenuScene instance.
@@ -166,6 +171,19 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 			}
 			scene.hasStartedGame = saveManager.GetHasStartedGame()
 			log.Printf("[MainMenuScene] Loaded highest level: %s, hasStartedGame: %v", scene.currentLevel, scene.hasStartedGame)
+
+			// Story 18.2: 检测战斗存档
+			currentUser := saveManager.GetCurrentUser()
+			if currentUser != "" && saveManager.HasBattleSave(currentUser) {
+				scene.hasBattleSave = true
+				scene.battleSaveInfo, _ = saveManager.GetBattleSaveInfo(currentUser)
+				if scene.battleSaveInfo != nil {
+					log.Printf("[MainMenuScene] 检测到战斗存档: 关卡=%s, 波次=%d, 阳光=%d",
+						scene.battleSaveInfo.LevelID,
+						scene.battleSaveInfo.WaveIndex+1,
+						scene.battleSaveInfo.Sun)
+				}
+			}
 		} else {
 			scene.currentLevel = "1-1"
 			scene.hasStartedGame = false
@@ -1345,9 +1363,131 @@ func (m *MainMenuScene) onStartAdventureClicked() {
 		}
 	}
 
+	// Story 18.2: 检查是否需要从战斗存档加载
+	if m.pendingScene == "GameSceneFromSave" {
+		// 从存档加载，使用存档中的关卡ID
+		if m.battleSaveInfo != nil {
+			levelToLoad = m.battleSaveInfo.LevelID
+			log.Printf("[MainMenuScene] 从战斗存档加载: level=%s", levelToLoad)
+		}
+		// 创建 GameScene 并标记需要从存档恢复
+		gameScene := NewGameSceneFromBattleSave(m.resourceManager, m.sceneManager, levelToLoad)
+		m.sceneManager.SwitchTo(gameScene)
+		return
+	}
+
 	// Pass ResourceManager, SceneManager, and levelID to GameScene
 	gameScene := NewGameScene(m.resourceManager, m.sceneManager, levelToLoad)
 	m.sceneManager.SwitchTo(gameScene)
+}
+
+// showBattleSaveDialog 显示战斗存档选择对话框
+//
+// Story 18.2: 战斗存档自动加载
+//
+// 当检测到未完成的战斗存档时，显示对话框让玩家选择：
+//   - "继续游戏": 从存档恢复战斗状态
+//   - "重新开始": 删除存档并开始新游戏
+//
+// 对话框显示信息：
+//   - 关卡ID
+//   - 波次进度
+//   - 阳光数量
+func (m *MainMenuScene) showBattleSaveDialog() {
+	// 关闭现有对话框
+	if m.currentDialog != 0 {
+		m.entityManager.DestroyEntity(m.currentDialog)
+		m.currentDialog = 0
+	}
+
+	// 构建对话框消息
+	var message string
+	if m.battleSaveInfo != nil {
+		message = fmt.Sprintf(
+			"检测到未完成的战斗存档：\n\n关卡: %s\n波次: %d\n阳光: %d\n\n是否继续上次的游戏？",
+			m.battleSaveInfo.LevelID,
+			m.battleSaveInfo.WaveIndex+1,
+			m.battleSaveInfo.Sun,
+		)
+	} else {
+		message = "检测到未完成的战斗存档。\n\n是否继续上次的游戏？"
+	}
+
+	// 创建带两个按钮的对话框
+	dialogEntity, err := entities.NewDialogEntityWithCallback(
+		m.entityManager,
+		m.resourceManager,
+		"战斗存档",
+		message,
+		[]string{"继续游戏", "重新开始"},
+		WindowWidth,
+		WindowHeight,
+		func(buttonIndex int) {
+			// 关闭对话框
+			m.currentDialog = 0
+
+			if buttonIndex == 0 {
+				// "继续游戏": 从存档加载
+				log.Printf("[MainMenuScene] 用户选择继续游戏，从存档加载")
+				m.startGameFromBattleSave()
+			} else {
+				// "重新开始": 删除存档并开始新游戏
+				log.Printf("[MainMenuScene] 用户选择重新开始，删除存档")
+				m.deleteBattleSaveAndStartNew()
+			}
+		},
+	)
+
+	if err != nil {
+		log.Printf("[MainMenuScene] Warning: Failed to create battle save dialog: %v", err)
+		// 如果创建对话框失败，直接进入游戏
+		m.triggerZombieHandAnimation()
+		return
+	}
+
+	m.currentDialog = dialogEntity
+	log.Printf("[MainMenuScene] 战斗存档对话框已显示")
+}
+
+// startGameFromBattleSave 从战斗存档开始游戏
+//
+// Story 18.2: 从存档恢复战斗
+//
+// 步骤：
+//  1. 触发僵尸手动画
+//  2. 动画完成后创建 GameScene，传入 fromBattleSave=true
+func (m *MainMenuScene) startGameFromBattleSave() {
+	// 设置标记，表示需要从存档加载
+	m.pendingScene = "GameSceneFromSave"
+	// 触发僵尸手动画
+	m.triggerZombieHandAnimation()
+}
+
+// deleteBattleSaveAndStartNew 删除战斗存档并开始新游戏
+//
+// Story 18.2: 删除存档开始新游戏
+//
+// 步骤：
+//  1. 删除当前用户的战斗存档
+//  2. 清除本地存档状态
+//  3. 触发僵尸手动画进入新游戏
+func (m *MainMenuScene) deleteBattleSaveAndStartNew() {
+	// 删除战斗存档
+	currentUser := m.saveManager.GetCurrentUser()
+	if currentUser != "" {
+		if err := m.saveManager.DeleteBattleSave(currentUser); err != nil {
+			log.Printf("[MainMenuScene] Warning: Failed to delete battle save: %v", err)
+		} else {
+			log.Printf("[MainMenuScene] 战斗存档已删除: user=%s", currentUser)
+		}
+	}
+
+	// 清除本地存档状态
+	m.hasBattleSave = false
+	m.battleSaveInfo = nil
+
+	// 触发僵尸手动画进入新游戏
+	m.triggerZombieHandAnimation()
 }
 
 // onExitClicked handles the "Exit Game" button click.
@@ -1511,9 +1651,15 @@ func (m *MainMenuScene) onMenuButtonClicked(buttonType config.MenuButtonType) {
 	// Route to appropriate handler based on button type
 	switch buttonType {
 	case config.MenuButtonAdventure:
-		// Story 12.6: Trigger zombie hand animation before starting adventure
-		log.Printf("[MainMenuScene] Adventure button clicked - triggering zombie hand animation")
-		m.triggerZombieHandAnimation()
+		// Story 18.2: 检测是否有战斗存档
+		if m.hasBattleSave && m.battleSaveInfo != nil {
+			log.Printf("[MainMenuScene] 检测到战斗存档，显示继续/重新开始对话框")
+			m.showBattleSaveDialog()
+		} else {
+			// Story 12.6: Trigger zombie hand animation before starting adventure
+			log.Printf("[MainMenuScene] Adventure button clicked - triggering zombie hand animation")
+			m.triggerZombieHandAnimation()
+		}
 
 	case config.MenuButtonChallenges:
 		// TODO: Implement challenges/mini-games mode

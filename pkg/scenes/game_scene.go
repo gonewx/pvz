@@ -159,6 +159,9 @@ type GameScene struct {
 	// Story 8.3.1: 僵尸预生成状态标志
 	// 实际关卡僵尸在开场动画完成后才预生成，与预览僵尸完全独立
 	zombiesPreSpawned bool
+
+	// Story 18.2: 战斗存档加载标志
+	loadFromBattleSave bool // 是否从战斗存档恢复
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -498,6 +501,34 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	return scene
 }
 
+// NewGameSceneFromBattleSave 创建从战斗存档恢复的游戏场景
+//
+// Story 18.2: 战斗存档自动加载
+//
+// 与 NewGameScene 的区别：
+//   - 设置 loadFromBattleSave = true
+//   - 跳过开场动画和教学
+//   - 在初始化完成后调用 restoreBattleState() 恢复战斗状态
+//
+// 参数：
+//   - rm: 资源管理器
+//   - sm: 场景管理器
+//   - levelID: 关卡ID（从存档中获取）
+//
+// 返回：
+//   - 配置为从存档恢复的 GameScene 实例
+func NewGameSceneFromBattleSave(rm *game.ResourceManager, sm *game.SceneManager, levelID string) *GameScene {
+	// 使用标准构造函数创建场景
+	scene := NewGameScene(rm, sm, levelID)
+
+	// 标记为从存档加载
+	scene.loadFromBattleSave = true
+
+	log.Printf("[GameScene] 创建从战斗存档恢复的场景: level=%s", levelID)
+
+	return scene
+}
+
 // initPlantCardSystems initializes the plant selection module.
 // Story 3.1 架构优化：使用 PlantSelectionModule 统一管理所有选卡功能
 // Story 8.3: 使用 PlantUnlockManager 统一管理植物可用性
@@ -540,6 +571,12 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 //   - System execution order ensures correct game logic flow
 //   - Story 10.1: Pause menu (只更新 UI 系统，跳过游戏逻辑)
 func (s *GameScene) Update(deltaTime float64) {
+	// Story 18.2: 从战斗存档恢复（只执行一次）
+	if s.loadFromBattleSave {
+		s.loadFromBattleSave = false // 标记为已处理
+		s.restoreBattleState()
+	}
+
 	// DEBUG: Check for GameFreezeComponent on every frame to debug freeze issue
 	freezeEntities := ecs.GetEntitiesWith1[*components.GameFreezeComponent](s.entityManager)
 	if len(freezeEntities) > 0 && s.zombiesWonPhaseSystem == nil {

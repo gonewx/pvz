@@ -240,3 +240,124 @@ func calculateDialogSize(message string) (width, height float64) {
 
 	return width, height
 }
+
+// NewDialogEntityWithCallback 创建带回调的对话框实体
+//
+// Story 18.2: 战斗存档对话框需要自定义回调
+//
+// 参数：
+//   - em: 实体管理器
+//   - rm: 资源管理器
+//   - title: 对话框标题
+//   - message: 对话框消息
+//   - buttons: 按钮文字列表
+//   - windowWidth, windowHeight: 游戏窗口大小（用于居中）
+//   - callback: 点击回调函数，参数为按钮索引
+//
+// 返回：
+//   - 对话框实体ID
+//   - 错误信息
+func NewDialogEntityWithCallback(
+	em *ecs.EntityManager,
+	rm *game.ResourceManager,
+	title string,
+	message string,
+	buttons []string,
+	windowWidth, windowHeight int,
+	callback func(buttonIndex int),
+) (ecs.EntityID, error) {
+	// 加载九宫格资源
+	parts, err := loadDialogParts(rm)
+	if err != nil {
+		return 0, fmt.Errorf("加载对话框资源失败: %w", err)
+	}
+
+	// 加载按钮图片资源
+	btnLeftImg, err := rm.LoadImageByID("IMAGE_BUTTON_LEFT")
+	if err != nil {
+		return 0, fmt.Errorf("加载按钮左边图片失败: %w", err)
+	}
+
+	btnMiddleImg, err := rm.LoadImageByID("IMAGE_BUTTON_MIDDLE")
+	if err != nil {
+		return 0, fmt.Errorf("加载按钮中间图片失败: %w", err)
+	}
+
+	btnRightImg, err := rm.LoadImageByID("IMAGE_BUTTON_RIGHT")
+	if err != nil {
+		return 0, fmt.Errorf("加载按钮右边图片失败: %w", err)
+	}
+
+	// 计算对话框大小
+	dialogWidth, dialogHeight := calculateDialogSize(message)
+
+	// 计算居中位置
+	x := float64(windowWidth)/2 - dialogWidth/2
+	y := float64(windowHeight)/2 - dialogHeight/2
+
+	// 创建对话框实体
+	entity := em.CreateEntity()
+
+	// 添加位置组件
+	ecs.AddComponent(em, entity, &components.PositionComponent{
+		X: x,
+		Y: y,
+	})
+
+	// 创建对话框按钮
+	dialogButtons := make([]components.DialogButton, 0, len(buttons))
+	btnLeftWidth := float64(btnLeftImg.Bounds().Dx())
+	btnRightWidth := float64(btnRightImg.Bounds().Dx())
+	btnMiddleWidth := 100.0 // 按钮中间宽度
+	btnTotalWidth := btnLeftWidth + btnMiddleWidth + btnRightWidth
+	btnHeight := float64(btnLeftImg.Bounds().Dy())
+	btnSpacing := 20.0 // 按钮间距
+
+	// 计算按钮组总宽度
+	totalButtonsWidth := float64(len(buttons))*btnTotalWidth + float64(len(buttons)-1)*btnSpacing
+	startX := dialogWidth/2 - totalButtonsWidth/2
+
+	for i, btnText := range buttons {
+		btnIdx := i // 捕获闭包变量
+		btnX := startX + float64(i)*(btnTotalWidth+btnSpacing)
+		btnY := dialogHeight - 65.0
+
+		dialogButtons = append(dialogButtons, components.DialogButton{
+			Label:       btnText,
+			X:           btnX,
+			Y:           btnY,
+			Width:       btnTotalWidth,
+			Height:      btnHeight,
+			LeftImage:   btnLeftImg,
+			MiddleImage: btnMiddleImg,
+			RightImage:  btnRightImg,
+			MiddleWidth: btnMiddleWidth,
+			OnClick: func() {
+				if callback != nil {
+					callback(btnIdx)
+				}
+			},
+		})
+	}
+
+	// 添加对话框组件
+	ecs.AddComponent(em, entity, &components.DialogComponent{
+		Title:            title,
+		Message:          message,
+		Buttons:          dialogButtons,
+		Parts:            parts,
+		IsVisible:        true,
+		Width:            dialogWidth,
+		Height:           dialogHeight,
+		AutoClose:        true, // 点击后自动关闭
+		HoveredButtonIdx: -1,
+		PressedButtonIdx: -1,
+	})
+
+	// 添加 UI 组件标记
+	ecs.AddComponent(em, entity, &components.UIComponent{
+		State: components.UINormal,
+	})
+
+	return entity, nil
+}

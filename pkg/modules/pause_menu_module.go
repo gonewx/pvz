@@ -55,6 +55,7 @@ type PauseMenuModule struct {
 	onMainMenu    func() // "返回主菜单"按钮回调
 	onPauseMusic  func() // 暂停音乐回调
 	onResumeMusic func() // 恢复音乐回调
+	onSaveBattle  func() // Story 18.2: 保存战斗状态回调
 
 	// 内部状态（用于检测状态变化）
 	wasActive bool // 上一帧的激活状态
@@ -71,6 +72,7 @@ type PauseMenuCallbacks struct {
 	OnMainMenu    func() // "返回主菜单"按钮回调
 	OnPauseMusic  func() // 暂停音乐回调（可选）
 	OnResumeMusic func() // 恢复音乐回调（可选）
+	OnSaveBattle  func() // Story 18.2: 保存战斗状态回调（返回主菜单时触发）
 }
 
 // NewPauseMenuModule 创建暂停菜单模块
@@ -109,6 +111,7 @@ func NewPauseMenuModule(
 		onMainMenu:         callbacks.OnMainMenu,
 		onPauseMusic:       callbacks.OnPauseMusic,
 		onResumeMusic:      callbacks.OnResumeMusic,
+		onSaveBattle:       callbacks.OnSaveBattle, // Story 18.2
 		windowWidth:        windowWidth,
 		windowHeight:       windowHeight,
 		buttonEntities:     make([]ecs.EntityID, 0, 3),
@@ -217,6 +220,11 @@ func (m *PauseMenuModule) createPauseMenuButtons(rm *game.ResourceManager) error
 	// 3. 创建"主菜单"按钮
 	mainMenuEntity, err := m.createThreeSliceButton(rm, hiddenX, hiddenY, "主菜单", func() {
 		log.Printf("[PauseMenuModule] Main menu button clicked!")
+		// Story 18.2: 返回主菜单前先保存战斗状态
+		if m.onSaveBattle != nil {
+			log.Printf("[PauseMenuModule] Triggering battle save before returning to main menu...")
+			m.onSaveBattle()
+		}
 		m.Hide()
 		if m.onMainMenu != nil {
 			m.onMainMenu()
