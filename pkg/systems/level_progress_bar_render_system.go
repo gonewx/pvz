@@ -182,12 +182,14 @@ func (s *LevelProgressBarRenderSystem) drawZombieHead(screen *ebiten.Image, prog
 	)
 	zombieHeadImage := progressBar.PartsImage.SubImage(zombieHeadRect).(*ebiten.Image)
 
-	// 背景框实际宽度
-	bgWidth := 158.0
+	// 有效进度区域配置
+	// 背景框 158 像素，有效区域 150 像素，左边距 4 像素
+	leftMargin := config.ProgressBarLeftMargin         // 4 像素
+	effectiveWidth := config.ProgressBarEffectiveWidth // 150 像素
 
 	// 计算僵尸头位置（从右边开始，随进度向左移动）
 	// 进度0% = 最右边，进度100% = 最左边
-	headX := progressBar.X + bgWidth*(1.0-progressBar.ProgressPercent) + config.ZombieHeadOffsetX - float64(partWidth)/2.0
+	headX := progressBar.X + leftMargin + effectiveWidth*(1.0-progressBar.ProgressPercent) + config.ZombieHeadOffsetX - float64(partWidth)/2.0
 	headY := progressBar.Y + config.ZombieHeadOffsetY
 
 	// 绘制僵尸头
@@ -196,7 +198,7 @@ func (s *LevelProgressBarRenderSystem) drawZombieHead(screen *ebiten.Image, prog
 	screen.DrawImage(zombieHeadImage, op)
 }
 
-// drawFlags 绘制旗帜图标
+// drawFlags 绘制旗帜图标（旗杆 + 旗帜）
 func (s *LevelProgressBarRenderSystem) drawFlags(screen *ebiten.Image, progressBar *components.LevelProgressBarComponent) {
 	if progressBar.PartsImage == nil || len(progressBar.FlagPositions) == 0 {
 		return
@@ -207,8 +209,17 @@ func (s *LevelProgressBarRenderSystem) drawFlags(screen *ebiten.Image, progressB
 	imgWidth := bounds.Dx()
 	imgHeight := bounds.Dy()
 
-	// 计算每个部分的宽度（3个等宽部分）
+	// 计算每个部分的宽度（3个等宽部分：僵尸头、旗杆、旗帜）
 	partWidth := imgWidth / config.PartsImageColumns
+
+	// 从精灵图裁剪旗杆图标（第2列，索引1）
+	poleRect := image.Rect(
+		partWidth,   // X起始位置：第2列
+		0,           // Y起始位置
+		partWidth*2, // X结束位置
+		imgHeight,   // Y结束位置
+	)
+	poleImage := progressBar.PartsImage.SubImage(poleRect).(*ebiten.Image)
 
 	// 从精灵图裁剪旗帜图标（第3列，索引2）
 	flagRect := image.Rect(
@@ -219,17 +230,26 @@ func (s *LevelProgressBarRenderSystem) drawFlags(screen *ebiten.Image, progressB
 	)
 	flagImage := progressBar.PartsImage.SubImage(flagRect).(*ebiten.Image)
 
-	// 背景框实际宽度
-	bgWidth := 158.0
+	// 有效进度区域配置
+	// 背景框 158 像素，有效区域 150 像素，左边距 4 像素
+	leftMargin := config.ProgressBarLeftMargin         // 4 像素
+	effectiveWidth := config.ProgressBarEffectiveWidth // 150 像素
 
-	// 在每个旗帜位置绘制旗帜
+	// 在每个旗帜位置绘制旗杆和旗帜
 	for _, flagPos := range progressBar.FlagPositions {
-		flagX := progressBar.X + bgWidth*flagPos - float64(partWidth)/2.0
-		flagY := progressBar.Y + config.FlagIconOffsetY
+		// 旗帜左边缘对齐到红字波段右边缘
+		// 8% 位置 = 4 + 150*0.08 = 16 像素，旗帜显示在红字波段右侧
+		flagX := progressBar.X + leftMargin + effectiveWidth*flagPos
 
-		op := &ebiten.DrawImageOptions{}
-		op.GeoM.Translate(flagX, flagY)
-		screen.DrawImage(flagImage, op)
+		// 先绘制旗杆（独立 Y 偏移）
+		poleOp := &ebiten.DrawImageOptions{}
+		poleOp.GeoM.Translate(flagX, progressBar.Y+config.FlagPoleOffsetY)
+		screen.DrawImage(poleImage, poleOp)
+
+		// 再绘制旗帜（独立 Y 偏移）
+		flagOp := &ebiten.DrawImageOptions{}
+		flagOp.GeoM.Translate(flagX, progressBar.Y+config.FlagIconOffsetY)
+		screen.DrawImage(flagImage, flagOp)
 	}
 }
 

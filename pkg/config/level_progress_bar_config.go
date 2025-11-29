@@ -24,6 +24,12 @@ const (
 	ProgressBarWidth            int     = 158   // 进度条实际宽度（与背景框宽度一致）
 	ProgressBarHeight           int     = 27    // 进度条实际高度（背景框单行高度）
 
+	// 进度条有效区域配置（逻辑长度 150 对应像素区域）
+	// 背景框 158 像素，有效区域 150 像素，左右各 4 像素边距
+	ProgressBarEffectiveWidth float64 = 150.0                                    // 有效进度区域宽度（像素）
+	ProgressBarLeftMargin     float64 = (ProgressBarBackgroundWidth - 150.0) / 2 // 左边距 = (158-150)/2 = 4
+	ProgressBarRightPadding   float64 = ProgressBarBackgroundWidth - 150.0 - 4.0 // 右边距 = 4
+
 	// ----------------
 	// FlagMeterLevelProgress.png 装饰条配置
 	// ----------------
@@ -40,14 +46,17 @@ const (
 	// ----------------
 	// 注意：FlagMeterParts.png 包含3个等宽的部分（僵尸头、分隔线、旗帜）
 	// X坐标会在渲染时根据图片实际宽度自动计算
-	PartsImageColumns int = 3 // 精灵图列数（僵尸头、分隔线、旗帜）
+	PartsImageColumns int = 3 // 精灵图列数（僵尸头、旗杆、旗帜）
 
 	// 僵尸头配置
 	ZombieHeadOffsetX float64 = 0  // 僵尸头X轴偏移手工调整（正值向右，负值向左）
 	ZombieHeadOffsetY float64 = -2 // 僵尸头Y轴偏移（相对于进度条中心）
 
+	// 旗杆配置
+	FlagPoleOffsetY float64 = -4 // 旗杆Y轴偏移（相对于进度条顶部）
+
 	// 旗帜图标配置
-	FlagIconOffsetY float64 = -15 // 旗帜Y轴偏移（相对于进度条中心）
+	FlagIconOffsetY float64 = -6 // 旗帜Y轴偏移（相对于进度条顶部）
 
 	// ----------------
 	// 关卡文本配置（右对齐）

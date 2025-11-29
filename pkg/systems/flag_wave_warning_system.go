@@ -280,3 +280,4 @@ func (s *FlagWaveWarningSystem) IsWarningActive() bool {
 	return s.warningEntityID != 0
 }
 
+

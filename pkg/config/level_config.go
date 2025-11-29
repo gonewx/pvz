@@ -200,6 +200,16 @@ func applyDefaults(config *LevelConfig) {
 		config.Flags = flagCount
 	}
 
+	// FlagWaves 默认从 waves 中的 isFlag 字段推断
+	// Story 11.5 修复：确保旗帜位置正确显示在进度条上
+	if len(config.FlagWaves) == 0 {
+		for i, wave := range config.Waves {
+			if wave.IsFlag {
+				config.FlagWaves = append(config.FlagWaves, i)
+			}
+		}
+	}
+
 	// 为每个 wave 应用默认值
 	for i := range config.Waves {
 		wave := &config.Waves[i]

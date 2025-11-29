@@ -586,62 +586,6 @@ func isZombieType(behaviorType components.BehaviorType) bool {
 		behaviorType == components.BehaviorZombieBuckethead
 }
 
-// ========================================
-// 已废弃方法（保留向后兼容）
-// ========================================
-
-// checkFinalWaveWarning 已废弃：统一由 FlagWaveWarningSystem 处理
-//
-// @deprecated Story 17.6+统一后，所有最后一波警告由 FlagWaveWarningSystem 处理
-// 此方法不再被调用，保留用于向后兼容
-func (s *LevelSystem) checkFinalWaveWarning(deltaTime float64) {
-	// 如果已触发，直接返回
-	if s.finalWaveWarningTriggered {
-		return
-	}
-
-	// 检测是否接近最后一波
-	if s.isFinalWaveApproaching() {
-		s.triggerFinalWaveWarning()
-		s.finalWaveWarningTriggered = true
-	}
-}
-
-// isFinalWaveApproaching 已废弃：统一由 FlagWaveWarningSystem 处理
-//
-// @deprecated Story 17.6+统一后，此方法不再被调用
-func (s *LevelSystem) isFinalWaveApproaching() bool {
-	// 统一使用 WaveTimingSystem，此方法永远返回 false
-	if s.useWaveTimingSystem {
-		return false
-	}
-
-	// 检查关卡配置是否存在
-	if s.gameState.CurrentLevel == nil || len(s.gameState.CurrentLevel.Waves) == 0 {
-		return false
-	}
-
-	totalWaves := len(s.gameState.CurrentLevel.Waves)
-	lastWaveIndex := totalWaves - 1
-
-	// 检查当前是否正在等待最后一波
-	isWaitingForFinalWave := s.gameState.CurrentWaveIndex == lastWaveIndex
-
-	if !isWaitingForFinalWave {
-		return false
-	}
-
-	if s.gameState.IsWaveSpawned(lastWaveIndex) {
-		return false
-	}
-
-	if !s.gameState.IsWaitingForNextWave {
-		return false
-	}
-
-	return true
-}
-
 // triggerFinalWaveWarning 已废弃：统一由 FlagWaveWarningSystem 处理
 //
 // @deprecated Story 17.6+统一后，此方法不再被调用
@@ -675,87 +619,6 @@ func (s *LevelSystem) triggerFinalWaveWarning() {
 		ComboName: "warning",
 		Processed: false,
 	})
-}
-
-// ========================================
-// 已废弃方法（保留向后兼容）
-// ========================================
-
-// checkLastWaveWarning 已废弃：请使用 checkFinalWaveWarning
-//
-// 在最后一波即将生成时显示提示（倒数第二波消灭完毕后）
-// 提示只显示一次
-//
-// 废弃原因：
-//   - Story 11.3 需要基于时间的精确提示（提前 3 秒）
-//   - 新方法 checkFinalWaveWarning 提供更准确的时机控制
-func (s *LevelSystem) checkLastWaveWarning() {
-	// 如果已经显示过，不再显示
-	if s.lastWaveWarningShown {
-		return
-	}
-
-	// 获取总波次数
-	totalWaves := len(s.gameState.CurrentLevel.Waves)
-	if totalWaves == 0 {
-		return
-	}
-
-	// 在倒数第二波消灭完毕后（等待最后一波触发时）显示提示
-	// 条件：当前波次索引 == totalWaves-1（最后一波） 且最后一波尚未生成
-	currentWaveIndex := s.gameState.CurrentWaveIndex
-	lastWaveIndex := totalWaves - 1
-
-	if currentWaveIndex == lastWaveIndex && !s.gameState.IsWaveSpawned(lastWaveIndex) {
-		s.showLastWaveWarning()
-		s.lastWaveWarningShown = true
-		log.Println("[LevelSystem] Last wave warning displayed!")
-	}
-}
-
-// showLastWaveWarning 已废弃：请使用 triggerFinalWaveWarning
-//
-// 创建 FinalWave.reanim 动画实体，播放最后一波警告动画和音效
-// 动画在屏幕中心显示，从大到小缩放并淡出
-//
-// 废弃原因：
-//   - Story 11.3 统一使用 triggerFinalWaveWarning 方法
-//   - 新方法使用 SOUND_AWOOGA 而不是 SOUND_FINALWAVE
-func (s *LevelSystem) showLastWaveWarning() {
-	// 设置 GameState 标志
-	s.gameState.ShowingFinalWave = true
-
-	// 播放最后一波音效
-	if s.resourceManager != nil {
-		sfx, err := s.resourceManager.LoadSoundEffect("assets/sounds/finalwave.ogg")
-		if err != nil {
-			log.Printf("[LevelSystem] WARNING: Failed to load finalwave.ogg: %v", err)
-		} else {
-			sfx.Play()
-			log.Printf("[LevelSystem] Playing finalwave.ogg sound effect")
-		}
-	}
-
-	// 创建 FinalWave 动画实体（显示在屏幕中心）
-	// 动画会自动播放一次后消失
-	// 工厂函数不再接受 reanimSystem 参数
-	finalWaveEntityID, err := entities.CreateFinalWaveEntity(
-		s.entityManager,
-		s.resourceManager,
-		400.0, // X坐标（屏幕中心，世界坐标）
-		300.0, // Y坐标（屏幕中心）
-	)
-
-	if err != nil {
-		log.Printf("[LevelSystem] ERROR: Failed to create FinalWave entity: %v", err)
-	} else {
-		// 使用组件通信初始化动画
-		ecs.AddComponent(s.entityManager, finalWaveEntityID, &components.AnimationCommandComponent{
-			AnimationName: "anim",
-			Processed:     false,
-		})
-		log.Printf("[LevelSystem] Created FinalWave warning entity (ID: %d)", finalWaveEntityID)
-	}
 }
 
 // ========================================
@@ -832,41 +695,78 @@ func (s *LevelSystem) calculateTotalZombies() int {
 }
 
 // calculateFlagPositions 计算旗帜在进度条上的位置百分比
+//
+// Story 11.5 修复：使用双段式结构计算旗帜位置
+// 原版机制：
+//   - 进度条总长 = 150 单位
+//   - 红字波段 = 旗帜数 × 12（每个旗帜波刷新时立即 +12）
+//   - 普通波段 = 150 - 红字波段（平均分配给普通波）
+//   - 旗帜位置 = 该旗帜波刷新前的进度位置
+//
+// 计算公式：
+//
+//	旗帜位置 = (已完成红字波数 × 12 + 已完成普通波数 × 每波普通进度) / 150
 func (s *LevelSystem) calculateFlagPositions() []float64 {
 	if s.gameState.CurrentLevel == nil {
 		return []float64{}
 	}
 
-	totalZombies := s.calculateTotalZombies()
-	if totalZombies == 0 {
+	levelConfig := s.gameState.CurrentLevel
+	flagWaves := levelConfig.FlagWaves
+	totalWaves := len(levelConfig.Waves)
+	flagCount := len(flagWaves)
+
+	if flagCount == 0 || totalWaves == 0 {
 		return []float64{}
 	}
 
-	flagWaves := s.gameState.CurrentLevel.FlagWaves
-	positions := make([]float64, 0, len(flagWaves))
+	// 双段式结构计算
+	totalLength := float64(config.ProgressBarTotalLength)       // 150
+	flagSegment := float64(config.ProgressBarFlagSegmentLength) // 12
+	normalSegment := totalLength - float64(flagCount)*flagSegment
 
-	// 计算每个旗帜波次前已经出现的僵尸数
-	for _, flagWaveIndex := range flagWaves {
-		if flagWaveIndex < 0 || flagWaveIndex >= len(s.gameState.CurrentLevel.Waves) {
-			continue
-		}
+	// 普通波数 = 总波数 - 旗帜波数
+	normalWaveCount := totalWaves - flagCount
 
-		// 计算旗帜波次前的僵尸总数
-		zombiesBeforeFlag := 0
-		for i := 0; i < flagWaveIndex; i++ {
-			// 新格式：Zombies 字段
-			for _, zombie := range s.gameState.CurrentLevel.Waves[i].Zombies {
-				zombiesBeforeFlag += zombie.Count
+	// 每波普通进度
+	progressPerNormalWave := 0.0
+	if normalWaveCount > 0 {
+		progressPerNormalWave = normalSegment / float64(normalWaveCount)
+	}
+
+	positions := make([]float64, 0, flagCount)
+
+	// 构建旗帜波索引集合（用于快速查找）
+	flagWaveSet := make(map[int]bool)
+	for _, idx := range flagWaves {
+		flagWaveSet[idx] = true
+	}
+
+	// 遍历所有波次，计算每个旗帜波的位置
+	completedFlags := 0
+	completedNormalWaves := 0
+
+	for waveIdx := 0; waveIdx < totalWaves; waveIdx++ {
+		if flagWaveSet[waveIdx] {
+			// 这是旗帜波，计算其位置（刷新前的进度）
+			flagProgress := float64(completedFlags) * flagSegment
+			normalProgress := float64(completedNormalWaves) * progressPerNormalWave
+			position := (flagProgress + normalProgress) / totalLength
+
+			// 进度条从右到左显示，旗帜段在左边，需要反转位置
+			// 原始位置 92% -> 显示位置 8%（1 - 0.92 = 0.08）
+			position = 1.0 - position
+
+			// 限制在 [0, 1] 范围内
+			if position < 0 {
+				position = 0
 			}
-			// 旧格式：OldZombies 字段（向后兼容）
-			for _, zombie := range s.gameState.CurrentLevel.Waves[i].OldZombies {
-				zombiesBeforeFlag += zombie.Count
-			}
-		}
+			positions = append(positions, position)
 
-		// 旗帜位置 = 旗帜波次前的僵尸数 / 总僵尸数
-		flagPercent := float64(zombiesBeforeFlag) / float64(totalZombies)
-		positions = append(positions, flagPercent)
+			completedFlags++
+		} else {
+			completedNormalWaves++
+		}
 	}
 
 	return positions
@@ -943,54 +843,6 @@ func (s *LevelSystem) ShowProgressBar() {
 	// 切换到完整显示模式
 	progressBar.ShowLevelTextOnly = false
 	log.Println("[LevelSystem] Progress bar now showing full display (background + progress + flags)")
-}
-
-// ========================================
-// 僵尸胜利动画
-// ========================================
-
-// triggerZombiesWon 触发僵尸胜利动画（旧版本）
-//
-// @deprecated 请使用 triggerZombiesWonFlow() 来触发完整的四阶段僵尸获胜流程
-//
-// 当僵尸到达左边界且所有除草车已用完时调用。
-// 显示 ZombiesWon.reanim 动画，覆盖整个屏幕。
-//
-// 执行步骤：
-//  1. 创建僵尸胜利动画实体（屏幕中央）
-//  2. 使用 AnimationCommandComponent 播放动画
-//
-// 注意：
-//   - 动画会一直显示直到玩家退出游戏
-//   - 使用单动画模式播放 "anim_screen"
-//   - 新代码请使用 triggerZombiesWonFlow() 实现完整流程（Story 8.8）
-func (s *LevelSystem) triggerZombiesWon() {
-	log.Printf("[LevelSystem] Triggering zombies won animation!")
-
-	// 创建僵尸胜利动画实体（屏幕中央）
-	centerX := float64(config.ScreenWidth) / 2
-	centerY := float64(config.ScreenHeight) / 2
-
-	zombiesWonEntity, err := entities.NewZombiesWonEntity(
-		s.entityManager,
-		s.resourceManager,
-		centerX,
-		centerY,
-	)
-
-	if err != nil {
-		log.Printf("[LevelSystem] ERROR: Failed to create ZombiesWon entity: %v", err)
-		return
-	}
-
-	// 使用组件通信播放动画
-	// 直接使用单动画模式播放 anim_screen
-	ecs.AddComponent(s.entityManager, zombiesWonEntity, &components.AnimationCommandComponent{
-		AnimationName: "anim_screen", // 直接播放单个动画
-		Processed:     false,
-	})
-
-	log.Printf("[LevelSystem] Created ZombiesWon entity (ID: %d), playing anim_screen animation", zombiesWonEntity)
 }
 
 // triggerZombiesWonFlow 触发完整的四阶段僵尸获胜流程（Story 8.8）

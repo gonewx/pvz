@@ -54,3 +54,4 @@ type FlagWaveWarningComponent struct {
 // FlagWaveWarningText 红字警告默认文本
 const FlagWaveWarningText = "A Huge Wave of Zombies is Approaching!"
 
+
