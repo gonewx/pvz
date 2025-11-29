@@ -165,8 +165,15 @@ func TestFilterLegalLanes_DancingRestrictions(t *testing.T) {
 	}{
 		{"屋顶场景舞王被完全过滤", "roof", []int{1, 2, 3, 4, 5}, []int{}},
 		{"白天场景舞王需要相邻行", "day", []int{1, 2, 3, 4, 5}, []int{0, 1, 2, 3, 4}},
-		{"白天场景部分行无相邻行被过滤", "day", []int{1, 3, 5}, []int{1, 3}},
-		{"泳池场景舞王无相邻限制", "pool", []int{1, 3, 5}, []int{0, 1, 2, 3, 4}},
+		// 白天场景 enabledLanes=[1,3,5]，舞王需要相邻行在 enabledLanes 中
+		// 第1行: 相邻行2不在enabledLanes，无效
+		// 第3行: 相邻行2,4不在enabledLanes，无效
+		// 第5行: 相邻行4不在enabledLanes，无效
+		// 所以没有合法行
+		{"白天场景部分行无相邻行被过滤", "day", []int{1, 3, 5}, []int{}},
+		// 泳池场景舞王无相邻限制，但 enabledLanes 仍然过滤行
+		// 只有第1、3、5行（索引0、2、4）在 enabledLanes 中
+		{"泳池场景舞王无相邻限制", "pool", []int{1, 3, 5}, []int{0, 2, 4}},
 	}
 
 	for _, tt := range tests {
@@ -174,6 +181,50 @@ func TestFilterLegalLanes_DancingRestrictions(t *testing.T) {
 			result := FilterLegalLanes(laneStates, "dancing", tt.sceneType, spawnRules, tt.enabledLanes, nil)
 			if len(result) != len(tt.expected) {
 				t.Errorf("Expected length %d, got %d", len(tt.expected), len(result))
+			}
+			for i := range result {
+				if result[i] != tt.expected[i] {
+					t.Errorf("Index %d: expected %d, got %d", i, tt.expected[i], result[i])
+				}
+			}
+		})
+	}
+}
+
+// TestFilterLegalLanes_EnabledLanes 测试关卡级行限制（enabledLanes）
+// 这是修复实时生成僵尸不按可用网格行生成的关键测试
+func TestFilterLegalLanes_EnabledLanes(t *testing.T) {
+	laneStates := []*components.LaneStateComponent{
+		{LaneIndex: 1, Weight: 1.0},
+		{LaneIndex: 2, Weight: 1.0},
+		{LaneIndex: 3, Weight: 1.0},
+		{LaneIndex: 4, Weight: 1.0},
+		{LaneIndex: 5, Weight: 1.0},
+	}
+
+	tests := []struct {
+		name         string
+		enabledLanes []int
+		expected     []int // 期望的合法行索引
+	}{
+		// 当 enabledLanes 为空时，所有行合法
+		{"空 enabledLanes 时所有行合法", []int{}, []int{0, 1, 2, 3, 4}},
+		// 只有中间三行启用（模拟 level-1-2）
+		{"只启用中间三行 [2,3,4]", []int{2, 3, 4}, []int{1, 2, 3}},
+		// 只有单行启用（模拟 level-1-1）
+		{"只启用第三行 [3]", []int{3}, []int{2}},
+		// 所有行启用
+		{"所有行启用 [1,2,3,4,5]", []int{1, 2, 3, 4, 5}, []int{0, 1, 2, 3, 4}},
+		// 只启用边缘行
+		{"只启用边缘行 [1,5]", []int{1, 5}, []int{0, 4}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FilterLegalLanes(laneStates, "basic", "day", nil, tt.enabledLanes, nil)
+			if len(result) != len(tt.expected) {
+				t.Errorf("Expected length %d, got %d", len(tt.expected), len(result))
+				return
 			}
 			for i := range result {
 				if result[i] != tt.expected[i] {

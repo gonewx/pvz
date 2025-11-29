@@ -43,10 +43,6 @@ const (
 	// 约 450cs
 	FlagWarningTotalDurationCs = 450
 
-	// FinalWaveTextDurationCs 白字 "FINAL WAVE" 显示时间（厘秒）
-	// 白字显示 500cs 后检查胜利条件
-	FinalWaveTextDurationCs = 500
-
 	// AcceleratedRefreshMinTimeCs 加速刷新最小刷出时间（厘秒）
 	// 刷出 > 401cs 后才能触发加速刷新
 	AcceleratedRefreshMinTimeCs = 401
@@ -235,12 +231,6 @@ func (s *WaveTimingSystem) Update(deltaTime float64) {
 		return
 	}
 
-	// Story 17.7: 处理最终波白字显示逻辑
-	if timer.FinalWaveTextActive {
-		s.updateFinalWaveText(deltaTime)
-		return // 白字显示期间不更新其他计时
-	}
-
 	// 检查是否已完成所有波次
 	if timer.CurrentWaveIndex >= timer.TotalWaves {
 		return
@@ -317,7 +307,7 @@ func (s *WaveTimingSystem) updateFlagWaveWarningPhase(deltaCsInt int) {
 		// Phase 4: 红字停留阶段
 		// 每秒输出一次日志，避免玩家以为卡死
 		if timer.FlagWavePhaseTimeCs%100 == 0 {
-			log.Printf("[WaveTimingSystem] Huge wave warning Phase 4 holding... (%d/%d cs)", 
+			log.Printf("[WaveTimingSystem] Huge wave warning Phase 4 holding... (%d/%d cs)",
 				timer.FlagWavePhaseTimeCs, FlagWavePhase4DurationCs)
 		}
 
@@ -327,6 +317,8 @@ func (s *WaveTimingSystem) updateFlagWaveWarningPhase(deltaCsInt int) {
 			timer.FlagWaveCountdownPhase = 0
 			timer.FlagWavePhaseTimeCs = 0
 			timer.IsFlagWaveApproaching = false
+			// 重置倒计时，防止 Update 中再次触发
+			timer.CountdownCs = 9999
 			s.triggerNextWave()
 		}
 	}
@@ -348,76 +340,6 @@ func (s *WaveTimingSystem) checkFlagWaveWarningPhase() {
 		timer.HugeWaveWarningTriggered = true
 		log.Printf("[WaveTimingSystem] Huge wave warning triggered! Entering Phase 5")
 	}
-}
-
-// updateFinalWaveText 更新最终波白字显示
-//
-// Story 17.7: 白字 "FINAL WAVE" 显示 500cs 后设置完成标志
-//
-// 参数：
-//   - deltaTime: 自上一帧以来经过的时间（秒）
-func (s *WaveTimingSystem) updateFinalWaveText(deltaTime float64) {
-	timer := s.getTimerComponent()
-	if timer == nil {
-		return
-	}
-
-	// 累积白字显示时间
-	deltaCsFloat := deltaTime * 100
-	timer.FinalWaveTextTimeCs += int(deltaCsFloat)
-
-	if timer.FinalWaveTextTimeCs >= FinalWaveTextDurationCs {
-		log.Printf("[WaveTimingSystem] Final wave text display complete (500cs), resuming normal flow")
-		// 修复：必须重置 FinalWaveTextActive，否则 Update 会一直提前返回，导致卡死
-		timer.FinalWaveTextActive = false
-		
-		// 白字显示结束后，立即触发下一波（通常是 Final Wave）
-		s.triggerNextWave()
-	}
-}
-
-// ActivateFinalWaveText 激活最终波白字显示
-//
-// Story 17.7: 当最终波倒计时减至 0 时调用
-func (s *WaveTimingSystem) ActivateFinalWaveText() {
-	timer := s.getTimerComponent()
-	if timer == nil {
-		return
-	}
-
-	timer.FinalWaveTextActive = true
-	timer.FinalWaveTextTimeCs = 0
-	log.Printf("[WaveTimingSystem] Final wave text activated!")
-}
-
-// IsFinalWaveTextComplete 检查白字显示是否完成
-//
-// Story 17.7: 供 LevelSystem 检查胜利条件
-//
-// 返回：
-//   - bool: true 表示白字显示已完成 500cs
-func (s *WaveTimingSystem) IsFinalWaveTextComplete() bool {
-	timer := s.getTimerComponent()
-	if timer == nil {
-		return false
-	}
-
-	return timer.FinalWaveTextActive && timer.FinalWaveTextTimeCs >= FinalWaveTextDurationCs
-}
-
-// IsFinalWaveTextActive 检查白字是否正在显示
-//
-// Story 17.7: 供 UI 渲染系统检查是否显示白字
-//
-// 返回：
-//   - bool: true 表示白字正在显示
-func (s *WaveTimingSystem) IsFinalWaveTextActive() bool {
-	timer := s.getTimerComponent()
-	if timer == nil {
-		return false
-	}
-
-	return timer.FinalWaveTextActive
 }
 
 // GetFlagWaveWarningPhase 获取当前红字警告阶段
@@ -637,7 +559,9 @@ func (s *WaveTimingSystem) triggerNextWave() {
 		timer.IsFlagWaveApproaching = false
 		timer.IsFinalWave = false
 		timer.LastRefreshTimeCs = 0
-		timer.CountdownCs = 0
+		// 设置一个很大的值防止 Update() 中再次触发
+		// 不能设为 0，否则 CountdownCs <= 1 条件会再次触发 triggerNextWave()
+		timer.CountdownCs = 999999
 		timer.WaveElapsedCs = 0
 		log.Printf("[WaveTimingSystem] All waves triggered. Timer stopped.")
 	}

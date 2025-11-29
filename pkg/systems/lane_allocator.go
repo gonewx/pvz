@@ -289,7 +289,21 @@ func FilterLegalLanes(
 			continue
 		}
 
-		// 2. 波次级行限制（Story 17.2: laneRestriction）
+		// 2. 关卡级行限制（enabledLanes: 草地行）
+		if len(enabledLanes) > 0 {
+			found := false
+			for _, lane := range enabledLanes {
+				if lane == state.LaneIndex {
+					found = true
+					break
+				}
+			}
+			if !found {
+				continue
+			}
+		}
+
+		// 3. 波次级行限制（Story 17.2: laneRestriction）
 		if len(laneRestriction) > 0 {
 			found := false
 			for _, lane := range laneRestriction {
@@ -303,7 +317,7 @@ func FilterLegalLanes(
 			}
 		}
 
-		// 3. 水路限制（如果配置可用）
+		// 4. 水路限制（如果配置可用）
 		if spawnRules != nil {
 			isWater := IsWaterLane(state.LaneIndex, sceneType, spawnRules.SceneTypeRestrictions.WaterLaneConfig)
 			isWaterZombie := IsWaterZombie(zombieType, spawnRules.SceneTypeRestrictions.WaterZombies)
