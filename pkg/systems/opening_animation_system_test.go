@@ -98,8 +98,13 @@ func TestOpeningAnimationSystem_NewOpeningAnimationSystem(t *testing.T) {
 					t.Errorf("初始状态不应标记为已跳过")
 				}
 
-				if len(openingComp.ZombieEntities) != 0 {
-					t.Errorf("初始僵尸实体列表应为空")
+				// Story 8.3.1: 预览僵尸现在在系统创建时就生成，而不是等镜头移动到位后
+				// 因此初始状态下 ZombieEntities 不再为空
+				// 预览数量 = min(按波数计算的预览数量, 配置中僵尸总数)
+				// 测试用例只有 1 只僵尸，所以预览数量为 1
+				expectedPreviewCount := 1
+				if len(openingComp.ZombieEntities) != expectedPreviewCount {
+					t.Errorf("初始状态应有 %d 个预览僵尸，实际 %d 个", expectedPreviewCount, len(openingComp.ZombieEntities))
 				}
 			}
 		})
@@ -166,8 +171,9 @@ func TestOpeningAnimationSystem_StateMachine(t *testing.T) {
 
 	// Story 8.3.1: 恢复预览僵尸生成，ZombieEntities 应有实体
 	// 注意：测试环境下没有 Reanim 资源，所以僵尸实体会创建但没有动画组件
-	// 1波关卡（简单）= 3只预览僵尸
-	expectedPreviewCount := 3
+	// 预览数量 = min(按波数计算的预览数量, 配置中僵尸总数)
+	// 测试用例只有 1 只僵尸，所以预览数量为 1
+	expectedPreviewCount := 1
 	if len(openingComp.ZombieEntities) != expectedPreviewCount {
 		t.Errorf("showZombies 状态应生成 %d 个预览僵尸，实际 %d 个", expectedPreviewCount, len(openingComp.ZombieEntities))
 	}
@@ -224,30 +230,34 @@ func TestOpeningAnimationSystem_SpawnPreviewZombies(t *testing.T) {
 		expectedCount int // 期望的预览僵尸数量
 	}{
 		{
-			name: "简单关卡(1波)生成3只预览僵尸",
+			// 1波关卡: calculatePreviewZombieCount=3, 配置僵尸总数=1, 实际=min(3,1)=1
+			name: "简单关卡(1波)生成1只预览僵尸(受配置数量限制)",
 			waves: []config.WaveConfig{
 				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 3}}},
 			},
-			expectedCount: 3,
+			expectedCount: 1,
 		},
 		{
-			name: "简单关卡(2波)生成3只预览僵尸",
+			// 2波关卡: calculatePreviewZombieCount=3, 配置僵尸总数=2, 实际=min(3,2)=2
+			name: "简单关卡(2波)生成2只预览僵尸(受配置数量限制)",
 			waves: []config.WaveConfig{
 				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 3}}},
 				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 2}}},
 			},
-			expectedCount: 3,
+			expectedCount: 2,
 		},
 		{
-			name: "中等关卡(3波)生成5只预览僵尸",
+			// 3波关卡: calculatePreviewZombieCount=5, 配置僵尸总数=3, 实际=min(5,3)=3
+			name: "中等关卡(3波)生成3只预览僵尸(受配置数量限制)",
 			waves: []config.WaveConfig{
 				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 3}}},
 				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 2}}},
 				{OldZombies: []config.ZombieSpawn{{Type: "conehead", Lane: 1}}},
 			},
-			expectedCount: 5,
+			expectedCount: 3,
 		},
 		{
+			// 5波关卡: calculatePreviewZombieCount=5, 配置僵尸总数=5, 实际=min(5,5)=5
 			name: "中等关卡(5波)生成5只预览僵尸",
 			waves: []config.WaveConfig{
 				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 3}}},
@@ -259,7 +269,8 @@ func TestOpeningAnimationSystem_SpawnPreviewZombies(t *testing.T) {
 			expectedCount: 5,
 		},
 		{
-			name: "困难关卡(6波)生成8只预览僵尸",
+			// 6波关卡: calculatePreviewZombieCount=8, 配置僵尸总数=6, 实际=min(8,6)=6
+			name: "困难关卡(6波)生成6只预览僵尸(受配置数量限制)",
 			waves: []config.WaveConfig{
 				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 3}}},
 				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 2}}},
@@ -268,7 +279,7 @@ func TestOpeningAnimationSystem_SpawnPreviewZombies(t *testing.T) {
 				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 5}}},
 				{OldZombies: []config.ZombieSpawn{{Type: "buckethead", Lane: 3}}},
 			},
-			expectedCount: 8,
+			expectedCount: 6,
 		},
 	}
 
@@ -521,7 +532,12 @@ func TestOpeningAnimationSystem_PreviewZombieCountConfig(t *testing.T) {
 		SpecialRules:       "",
 		PreviewZombieCount: 10, // 配置值优先
 		Waves: []config.WaveConfig{
-			{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 3}}}, // 1波
+			// 增加足够多的僵尸以支持 PreviewZombieCount=10
+			{Zombies: []config.ZombieGroup{
+				{Type: "basic", Count: 5, Lanes: []int{1, 2, 3, 4, 5}},
+				{Type: "conehead", Count: 3, Lanes: []int{2, 3, 4}},
+				{Type: "buckethead", Count: 2, Lanes: []int{3, 4}},
+			}},
 		},
 	}
 

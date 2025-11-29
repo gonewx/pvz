@@ -320,26 +320,43 @@ func (oas *OpeningAnimationSystem) updateGameStartState(openingComp *components.
 // spawnPreviewZombies 生成预告僵尸实体。
 // Story 8.3.1: 预览僵尸是独立的展示实体，用于开场动画中的"情报侦察"功能。
 // 预览僵尸与实际关卡僵尸完全独立，不会参与游戏逻辑。
+// 每种类型的预览僵尸数量不超过关卡配置中该类型的实际数量。
 func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.OpeningAnimationComponent) {
-	// 从关卡配置获取所有僵尸类型
-	zombieTypes := oas.getUniqueZombieTypes()
+	// 获取每种僵尸类型在关卡配置中的数量
+	zombieTypeCounts := oas.getZombieTypeCounts()
 
-	if len(zombieTypes) == 0 {
+	if len(zombieTypeCounts) == 0 {
 		log.Printf("[OpeningAnimationSystem] No zombie types found, skipping preview spawn")
 		return
 	}
 
-	// Story 8.3.1: 计算预览僵尸数量
+	// 构建预览僵尸类型列表（每种类型的数量不超过配置中的数量）
+	var previewTypes []string
+	for zombieType, count := range zombieTypeCounts {
+		for i := 0; i < count; i++ {
+			previewTypes = append(previewTypes, zombieType)
+		}
+	}
+
+	// 计算实际预览数量（不超过可用僵尸总数）
 	previewCount := oas.calculatePreviewZombieCount()
-	log.Printf("[OpeningAnimationSystem] Spawning %d preview zombies (types: %v)", previewCount, zombieTypes)
+	if previewCount > len(previewTypes) {
+		previewCount = len(previewTypes)
+	}
+
+	log.Printf("[OpeningAnimationSystem] Spawning %d preview zombies (available types: %v)", previewCount, zombieTypeCounts)
 
 	// 初始化随机数种子（使用当前时间）
 	rand.Seed(time.Now().UnixNano())
 
+	// 随机打乱预览类型列表
+	rand.Shuffle(len(previewTypes), func(i, j int) {
+		previewTypes[i], previewTypes[j] = previewTypes[j], previewTypes[i]
+	})
+
 	// 生成指定数量的预览僵尸
 	for i := 0; i < previewCount; i++ {
-		// 从可用类型中随机选择
-		zombieType := zombieTypes[rand.Intn(len(zombieTypes))]
+		zombieType := previewTypes[i]
 
 		// 随机选择一行（0-4）
 		randomLane := rand.Intn(config.GridRows)
@@ -365,7 +382,11 @@ func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.O
 			Type: components.BehaviorZombiePreview, // 使用预览行为，防止僵尸移动
 		})
 
+		// 根据僵尸类型获取对应的 UnitID（用于显示正确的装备外观）
+		unitID := oas.zombieTypeToUnitID(zombieType)
+
 		// 添加 ReanimComponent 播放 idle 动画
+		// 所有僵尸类型都使用基础 "Zombie" 动画资源，通过 UnitID 控制装备显示
 		reanimXML := oas.resourceManager.GetReanimXML("Zombie")
 		partImages := oas.resourceManager.GetReanimPartImages("Zombie")
 		if reanimXML != nil && partImages != nil {
@@ -389,9 +410,10 @@ func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.O
 			}
 			ecs.AddComponent(oas.entityManager, zombieEntity, reanimComp)
 
-			// 使用 AnimationCommand 组件播放配置的动画组合（自动隐藏装备轨道）
+			// 使用 AnimationCommand 组件播放配置的动画组合
+			// 根据僵尸类型使用对应的 UnitID，以显示正确的装备（路障/铁桶等）
 			ecs.AddComponent(oas.entityManager, zombieEntity, &components.AnimationCommandComponent{
-				UnitID:    "zombie",
+				UnitID:    unitID,
 				ComboName: "idle",
 				Processed: false,
 			})
@@ -400,7 +422,48 @@ func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.O
 		// 保存僵尸实体ID
 		openingComp.ZombieEntities = append(openingComp.ZombieEntities, zombieEntity)
 
-		log.Printf("[OpeningAnimationSystem] Spawned preview zombie %d: type=%s, lane=%d, x=%.0f, y=%.0f", i, zombieType, randomLane, randomX, y)
+		log.Printf("[OpeningAnimationSystem] Spawned preview zombie %d: type=%s, unitID=%s, lane=%d, x=%.0f, y=%.0f", i, zombieType, unitID, randomLane, randomX, y)
+	}
+}
+
+// getZombieTypeCounts 获取关卡中每种僵尸类型的总数量。
+// 返回一个 map，key 为僵尸类型，value 为该类型在所有波次中的总数量。
+func (oas *OpeningAnimationSystem) getZombieTypeCounts() map[string]int {
+	counts := make(map[string]int)
+
+	for _, wave := range oas.levelConfig.Waves {
+		// 新格式：ZombieGroup
+		for _, zombie := range wave.Zombies {
+			counts[zombie.Type] += zombie.Count
+		}
+		// 旧格式：ZombieSpawn (向后兼容)
+		for _, zombie := range wave.OldZombies {
+			counts[zombie.Type]++
+		}
+	}
+
+	return counts
+}
+
+// zombieTypeToUnitID 将僵尸类型字符串转换为动画配置的 UnitID。
+// UnitID 用于 AnimationCommand 组件，以正确显示僵尸的装备外观（路障/铁桶等）。
+func (oas *OpeningAnimationSystem) zombieTypeToUnitID(zombieType string) string {
+	switch zombieType {
+	case "basic":
+		return "zombie"
+	case "conehead":
+		return "zombie_conehead"
+	case "buckethead":
+		return "zombie_buckethead"
+	case "flag":
+		return "zombie_flag"
+	case "newspaper":
+		return "zombie_newspaper"
+	case "polevaulter":
+		return "zombie_polevaulter"
+	default:
+		// 默认返回基础僵尸
+		return "zombie"
 	}
 }
 
@@ -461,20 +524,6 @@ func (oas *OpeningAnimationSystem) getUniqueZombieTypes() []string {
 	}
 
 	return result
-}
-
-// zombieTypeToBehaviorType 将僵尸类型字符串转换为 BehaviorType。
-func (oas *OpeningAnimationSystem) zombieTypeToBehaviorType(zombieType string) components.BehaviorType {
-	switch zombieType {
-	case "basic":
-		return components.BehaviorZombieBasic
-	case "conehead":
-		return components.BehaviorZombieConehead
-	case "buckethead":
-		return components.BehaviorZombieBuckethead
-	default:
-		return components.BehaviorZombieBasic
-	}
 }
 
 // checkSkipInput 检查是否按下跳过快捷键。

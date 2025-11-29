@@ -116,5 +116,5 @@ waves:
     zombies:
       - type: "basic"
         lanes: [2, 3, 4]
-        count: 3
+        count: 5
         spawnInterval: 1.5

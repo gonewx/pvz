@@ -17,7 +17,7 @@ availablePlants:              # 可用植物
   - "cherrybomb"
   - "wallnut"
 skipOpening: false            # 不跳过开场
-initialSun: 500               # 初始阳光500（调试用）
+initialSun: 50               # 初始阳光500（调试用）
 
 # Story 8.6: 工具解锁
 unlockTools: ["shovel"]       # 完成后解锁铲子工具
@@ -38,43 +38,81 @@ soddingAnimLanes: [1, 5]                      # 在第1,5行播放动画（第2,
 # === 波次配置 (Story 17.2 新格式) ===
 # Story 17.6: 波次计时由 WaveTimingSystem 自动管理
 waves:
-  # 第1波：常规波次
   - waveNum: 1
     type: "Fixed"
     zombies:
       - type: "basic"
         lanes: [1, 2, 3, 4, 5]
-        count: 4
+        count: 1
         spawnInterval: 2.0
 
-  # 第2波：包含路障僵尸
   - waveNum: 2
     type: "Fixed"
     zombies:
       - type: "basic"
         lanes: [1, 2, 3, 4, 5]
-        count: 4
-        spawnInterval: 2.0
-      - type: "conehead"
-        lanes: [1, 2, 3, 4, 5]
         count: 1
-        spawnInterval: 0
+        spawnInterval: 2.0
 
-  # 第3波：更多路障僵尸
   - waveNum: 3
     type: "Fixed"
     zombies:
       - type: "basic"
         lanes: [1, 2, 3, 4, 5]
-        count: 4
+        count: 1
         spawnInterval: 1.5
-      - type: "conehead"
-        lanes: [1, 2, 3, 4, 5]
-        count: 2
-        spawnInterval: 1.0
 
-  # 第4波（旗帜波/最终波）：包含铁桶僵尸
   - waveNum: 4
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 2.0
+
+  - waveNum: 5
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 2.0
+
+  - waveNum: 6
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 2.0
+
+  - waveNum: 7
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 2.0
+
+  - waveNum: 8
+    type: "Fixed"
+    flagIndex: 1
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 5
+        spawnInterval: 1.5
+
+  - waveNum: 9
+    type: "Fixed"
+    flagIndex: 1
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 1.5
+
+  - waveNum: 10
     type: "Final"
     isFlag: true
     flagIndex: 1
@@ -85,9 +123,5 @@ waves:
         spawnInterval: 1.0
       - type: "conehead"
         lanes: [1, 2, 3, 4, 5]
-        count: 4
+        count: 1
         spawnInterval: 1.2
-      - type: "buckethead"
-        lanes: [1, 2, 3, 4, 5]
-        count: 2
-        spawnInterval: 1.5
