@@ -437,30 +437,8 @@ func (s *InputSystem) createPlantPreview(plantType components.PlantType, x, y fl
 	// 先删除现有预览
 	s.destroyPlantPreview()
 
-	// 获取植物对应的资源名称和配置ID
-	var resourceName string
-	var configID string
-	switch plantType {
-	case components.PlantSunflower:
-		resourceName = "SunFlower"
-		configID = "sunflower"
-	case components.PlantPeashooter:
-		resourceName = "PeaShooterSingle"
-		configID = "peashooter"
-	case components.PlantWallnut:
-		resourceName = "Wallnut"
-		configID = "wallnut"
-	case components.PlantCherryBomb:
-		resourceName = "CherryBomb"
-		configID = "cherrybomb"
-	default:
-		log.Printf("[InputSystem] Unknown plant type for preview: %v", plantType)
-		return
-	}
-
-	// 使用 RenderPlantIcon 复用卡片渲染逻辑
-	// 这确保预览图像与卡片上的图标完全一致
-	plantIcon, err := entities.RenderPlantIcon(s.entityManager, s.resourceManager, s.reanimSystem, resourceName, configID)
+	// 使用 RenderPlantIcon 复用卡片渲染逻辑（直接传入 plantType）
+	plantIcon, err := entities.RenderPlantIcon(s.entityManager, s.resourceManager, s.reanimSystem, plantType)
 	if err != nil {
 		log.Printf("[InputSystem] Failed to render plant icon for preview: %v", err)
 		return
@@ -486,8 +464,8 @@ func (s *InputSystem) createPlantPreview(plantType components.PlantType, x, y fl
 		Alpha:     0.5, // 半透明效果
 	})
 
-	log.Printf("[InputSystem] Created plant preview (ID: %d, Type: %v, Resource: %s) at (%.1f, %.1f)",
-		entityID, plantType, resourceName, x, y)
+	log.Printf("[InputSystem] Created plant preview (ID: %d, Type: %v) at (%.1f, %.1f)",
+		entityID, plantType, x, y)
 }
 
 // destroyPlantPreview 删除所有植物预览实体

@@ -90,12 +90,13 @@ func TestNewZombieEntity(t *testing.T) {
 			}
 
 			// ✅ Epic 14: 验证 AnimationCommandComponent（替代直接调用 ReanimSystem）
+			// Story 17.10: 使用 UnitID + ComboName 模式（配置驱动）
 			animCmd, ok := ecs.GetComponent[*components.AnimationCommandComponent](em, zombieID)
 			if !ok {
 				t.Error("Zombie entity should have AnimationCommandComponent")
 			} else {
-				if animCmd.AnimationName == "" {
-					t.Error("AnimationCommandComponent should have AnimationName")
+				if animCmd.UnitID == "" && animCmd.AnimationName == "" {
+					t.Error("AnimationCommandComponent should have UnitID or AnimationName")
 				}
 				if animCmd.Processed {
 					t.Error("AnimationCommand should not be processed yet (Processed=false)")

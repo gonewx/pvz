@@ -9,6 +9,7 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/types"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -1559,22 +1560,30 @@ func (s *ReanimSystem) InitReanimComponent(
 }
 
 // PrepareStaticPreview prepares a Reanim entity for static preview (e.g., plant card icons).
-// 简化版本，使用配置驱动的方式
+// 使用配置驱动的方式选择最佳预览帧和隐藏轨道
 //
-// 策略：
-// 1. 播放默认动画组合
-// 2. 将当前帧设置为中间帧（最佳预览帧）
-// 3. 暂停动画播放（IsPaused = true）
+// 策略（按优先级）：
+// 1. 从 config.PlantConfigs 获取植物配置
+// 2. 如果配置了 PreviewFrame >= 0，使用配置的帧
+// 3. 如果 PreviewFrame == -1，使用动画的中间帧（自动选择）
+// 4. 应用 HiddenTracks 配置（黑名单模式）隐藏不需要的轨道
+// 5. 暂停动画播放（IsPaused = true）
 //
 // Parameters:
 //   - entityID: the ID of the entity to prepare for static preview
-//   - reanimName: the Reanim resource name (e.g., "sunflower", "peashooter")
+//   - plantType: 植物类型（types.PlantType）
 //
 // Returns:
 //   - An error if preparation fails
-func (s *ReanimSystem) PrepareStaticPreview(entityID ecs.EntityID, reanimName string) error {
+func (s *ReanimSystem) PrepareStaticPreview(entityID ecs.EntityID, plantType types.PlantType) error {
+	// 从配置获取植物信息
+	cfg := config.GetPlantConfig(plantType)
+	if cfg == nil {
+		return fmt.Errorf("no config found for plant type %d", plantType)
+	}
+
 	// 使用 PlayCombo 播放默认动画
-	if err := s.PlayCombo(entityID, reanimName, ""); err != nil {
+	if err := s.PlayCombo(entityID, cfg.ConfigID, ""); err != nil {
 		return fmt.Errorf("failed to play default animation: %w", err)
 	}
 
@@ -1584,15 +1593,41 @@ func (s *ReanimSystem) PrepareStaticPreview(entityID ecs.EntityID, reanimName st
 		return fmt.Errorf("entity %d does not have ReanimComponent", entityID)
 	}
 
-	// 查找最佳预览帧（使用第一个动画的中间帧）
-	if len(comp.CurrentAnimations) > 0 {
+	// 应用 HiddenTracks 配置（黑名单模式）
+	if len(cfg.HiddenTracks) > 0 {
+		if comp.HiddenTracks == nil {
+			comp.HiddenTracks = make(map[string]bool)
+		}
+		for _, trackName := range cfg.HiddenTracks {
+			comp.HiddenTracks[trackName] = true
+		}
+		log.Printf("[ReanimSystem] PrepareStaticPreview: %s hiding %d tracks: %v",
+			cfg.ConfigID, len(cfg.HiddenTracks), cfg.HiddenTracks)
+	}
+
+	// 查找最佳预览帧
+	var targetFrame int
+	if cfg.PreviewFrame >= 0 {
+		// 策略 1：使用配置的帧
+		targetFrame = cfg.PreviewFrame
+		log.Printf("[ReanimSystem] PrepareStaticPreview: %s using configured frame %d",
+			cfg.ConfigID, cfg.PreviewFrame)
+	} else if len(comp.CurrentAnimations) > 0 {
+		// 策略 2：自动选择中间帧
 		animName := comp.CurrentAnimations[0]
 		if visibles, ok := comp.AnimVisiblesMap[animName]; ok && len(visibles) > 0 {
-			// 使用中间帧作为预览帧
-			bestFrame := len(visibles) / 2
-			comp.CurrentFrame = bestFrame
-			log.Printf("[ReanimSystem] PrepareStaticPreview: %s set to frame %d/%d",
-				reanimName, bestFrame, len(visibles))
+			targetFrame = len(visibles) / 2
+			log.Printf("[ReanimSystem] PrepareStaticPreview: %s auto-selected frame %d/%d",
+				cfg.ConfigID, targetFrame, len(visibles))
+		}
+	}
+
+	// 同步设置 CurrentFrame 和 AnimationFrameIndices
+	// 修复：渲染时优先使用 AnimationFrameIndices，所以必须同步更新
+	comp.CurrentFrame = targetFrame
+	if comp.AnimationFrameIndices != nil {
+		for _, animName := range comp.CurrentAnimations {
+			comp.AnimationFrameIndices[animName] = float64(targetFrame)
 		}
 	}
 

@@ -9,6 +9,7 @@ import (
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/decker502/pvz/pkg/types"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
@@ -25,46 +26,41 @@ import (
 //   - cardScale: 卡片整体缩放因子（控制卡片大小，如 0.54 为标准大小，1.0 为原始大小）
 //
 // 返回: 创建的实体ID和可能的错误
-//
-// 注意：所有植物卡片的内部配置（背景图、图标缩放、偏移等）都在 config.plant_card_config.go 中定义，
-// 不暴露给调用者，确保卡片作为统一整体，由工厂函数完全封装。
 func NewPlantCardEntity(em *ecs.EntityManager, rm *game.ResourceManager, rs ReanimSystemInterface, plantType components.PlantType, x, y, cardScale float64) (ecs.EntityID, error) {
 	entity := em.CreateEntity()
 
-	// 根据植物类型设置属性
+	// 从统一配置获取植物信息
+	cfg := config.GetPlantConfig(plantType)
+	if cfg == nil {
+		em.DestroyEntity(entity)
+		em.RemoveMarkedEntities()
+		return 0, fmt.Errorf("no config found for plant type: %v", plantType)
+	}
+
+	// 根据植物类型设置阳光消耗和冷却时间
 	var sunCost int
-	var resourceName string // 资源名称（用于 ResourceManager 缓存查找）
-	var configID string     // 配置ID（用于配置文件查找）
 	var cooldownTime float64
 
 	switch plantType {
 	case components.PlantSunflower:
-		sunCost = config.SunflowerSunCost           // 50
-		resourceName = "SunFlower"                  // 资源管理器中的缓存键
-		configID = "sunflower"                      // 配置文件中的 ID
-		cooldownTime = config.SunflowerRechargeTime // 7.5
+		sunCost = config.SunflowerSunCost
+		cooldownTime = config.SunflowerRechargeTime
 	case components.PlantPeashooter:
-		sunCost = config.PeashooterSunCost           // 100
-		resourceName = "PeaShooterSingle"            // 资源管理器中的缓存键
-		configID = "peashooter"                      // 配置文件中的 ID
-		cooldownTime = config.PeashooterRechargeTime // 7.5
+		sunCost = config.PeashooterSunCost
+		cooldownTime = config.PeashooterRechargeTime
 	case components.PlantWallnut:
-		sunCost = config.WallnutCost              // 50
-		resourceName = "Wallnut"                  // 资源管理器中的缓存键
-		configID = "wallnut"                      // 配置文件中的 ID
-		cooldownTime = config.WallnutRechargeTime // 30.0
+		sunCost = config.WallnutCost
+		cooldownTime = config.WallnutRechargeTime
 	case components.PlantCherryBomb:
-		sunCost = config.CherryBombSunCost       // 150
-		resourceName = "CherryBomb"              // 资源管理器中的缓存键
-		configID = "cherrybomb"                  // 配置文件中的 ID
-		cooldownTime = config.CherryBombCooldown // 50.0
+		sunCost = config.CherryBombSunCost
+		cooldownTime = config.CherryBombCooldown
 	default:
 		em.DestroyEntity(entity)
 		em.RemoveMarkedEntities()
 		return 0, fmt.Errorf("unknown plant type: %v", plantType)
 	}
 
-	// 加载卡片背景框（从配置获取，所有卡片共享）
+	// 加载卡片背景框
 	backgroundImg, err := rm.LoadImageByID(config.PlantCardBackgroundID)
 	if err != nil {
 		em.DestroyEntity(entity)
@@ -73,13 +69,12 @@ func NewPlantCardEntity(em *ecs.EntityManager, rm *game.ResourceManager, rs Rean
 		return 0, fmt.Errorf("failed to load card background: %w", err)
 	}
 
-	// 渲染植物预览图标（Reanim 离屏渲染）
-	// Story 13.8: 分别传入资源名称和配置ID
-	plantIcon, err := RenderPlantIcon(em, rm, rs, resourceName, configID)
+	// 渲染植物预览图标（简化：直接传入 plantType）
+	plantIcon, err := RenderPlantIcon(em, rm, rs, plantType)
 	if err != nil {
 		em.DestroyEntity(entity)
 		em.RemoveMarkedEntities()
-		log.Printf("[PlantCardFactory] Failed to render plant icon for %s: %v", resourceName, err)
+		log.Printf("[PlantCardFactory] Failed to render plant icon for %s: %v", cfg.ResourceName, err)
 		return 0, fmt.Errorf("failed to render plant icon: %w", err)
 	}
 
@@ -139,11 +134,16 @@ func NewPlantCardEntity(em *ecs.EntityManager, rm *game.ResourceManager, rs Rean
 //   - em: 实体管理器
 //   - rm: 资源管理器
 //   - rs: Reanim 系统接口
-//   - resourceName: Reanim 资源名称（用于ResourceManager缓存查找，如 "SunFlower", "PeaShooterSingle"）
-//   - configID: 配置文件ID（用于配置查找，如 "sunflower", "peashooter"）
+//   - plantType: 植物类型（从配置自动获取资源名称等信息）
 //
 // 返回: 渲染好的植物图标纹理和可能的错误
-func RenderPlantIcon(em *ecs.EntityManager, rm *game.ResourceManager, rs ReanimSystemInterface, resourceName string, configID string) (*ebiten.Image, error) {
+func RenderPlantIcon(em *ecs.EntityManager, rm *game.ResourceManager, rs ReanimSystemInterface, plantType types.PlantType) (*ebiten.Image, error) {
+	// 从配置获取植物资源信息
+	cfg := config.GetPlantConfig(plantType)
+	if cfg == nil {
+		return nil, fmt.Errorf("no config found for plant type %d", plantType)
+	}
+
 	// 1. 创建临时实体
 	tempEntity := em.CreateEntity()
 	defer func() {
@@ -152,61 +152,45 @@ func RenderPlantIcon(em *ecs.EntityManager, rm *game.ResourceManager, rs ReanimS
 	}()
 
 	// 2. 加载 Reanim 资源（使用资源名称）
-	reanimXML := rm.GetReanimXML(resourceName)
-	partImages := rm.GetReanimPartImages(resourceName)
+	reanimXML := rm.GetReanimXML(cfg.ResourceName)
+	partImages := rm.GetReanimPartImages(cfg.ResourceName)
 
 	if reanimXML == nil || partImages == nil {
-		log.Printf("[PlantCardFactory] Failed to load Reanim resources for %s", resourceName)
-		return nil, fmt.Errorf("failed to load Reanim resources for %s", resourceName)
+		log.Printf("[PlantCardFactory] Failed to load Reanim resources for %s", cfg.ResourceName)
+		return nil, fmt.Errorf("failed to load Reanim resources for %s", cfg.ResourceName)
 	}
 
 	// 3. 创建离屏渲染目标纹理
-	// 使用更大的纹理尺寸以避免植物边缘被裁剪
-	// 原因：RenderSystem 会应用 CenterOffset，如果纹理太小，部分内容会超出边界
 	iconWidth := 80
 	iconHeight := 90
 
 	// 4. 添加必要的组件
-	// 将植物位置设置为纹理中心，确保有足够边距容纳 CenterOffset
 	ecs.AddComponent(em, tempEntity, &components.PositionComponent{
-		X: float64(iconWidth) / 2,  // 纹理中心 X (40)
-		Y: float64(iconHeight) / 2, // 纹理中心 Y (45)
+		X: float64(iconWidth) / 2,
+		Y: float64(iconHeight) / 2,
 	})
 
-	// 为预览图标添加 VisibleTracks 白名单
-	// Story 11.1: 使用配置文件中的预览轨道白名单（使用资源名称作为键）
-	visibleTracks := config.PlantPreviewVisibleTracks[resourceName]
-	if visibleTracks == nil {
-		// 如果配置中没有此植物的白名单，使用空白名单（允许所有轨道）
-		visibleTracks = make(map[string]bool)
-		log.Printf("[PlantCardFactory] Warning: No preview track config for %s, using all tracks", resourceName)
-	}
-
 	ecs.AddComponent(em, tempEntity, &components.ReanimComponent{
-		ReanimName: resourceName, // 添加资源名称，用于调试日志
+		ReanimName: cfg.ResourceName,
 		ReanimXML:  reanimXML,
 		PartImages: partImages,
 	})
 
-	// 5. Story 13.8: 使用配置ID准备静态预览
-	// 原因：PrepareStaticPreview → PlayCombo 需要配置文件中的 ID
-	if err := rs.PrepareStaticPreview(tempEntity, configID); err != nil {
-		log.Printf("[PlantCardFactory] Warning: Failed to prepare preview for %s (config ID: %s): %v", resourceName, configID, err)
-		// 继续执行，使用默认姿态
+	// 5. 准备静态预览（使用植物类型，配置会自动获取）
+	if err := rs.PrepareStaticPreview(tempEntity, plantType); err != nil {
+		log.Printf("[PlantCardFactory] Warning: Failed to prepare preview for %s: %v", cfg.ResourceName, err)
 	}
 
 	// 6. 创建渲染目标纹理
 	iconTexture := ebiten.NewImage(iconWidth, iconHeight)
 
 	// 7. 渲染 Reanim 到纹理
-	// 注意：需要临时调用 ReanimSystem 的渲染逻辑
-	// 这里使用一个辅助方法来渲染单个实体
 	if err := rs.RenderToTexture(tempEntity, iconTexture); err != nil {
-		log.Printf("[PlantCardFactory] Failed to render %s to texture: %v", resourceName, err)
+		log.Printf("[PlantCardFactory] Failed to render %s to texture: %v", cfg.ResourceName, err)
 		return nil, fmt.Errorf("failed to render plant to texture: %w", err)
 	}
 
-	log.Printf("[PlantCardFactory] Rendered plant icon: %s (config: %s, size: %dx%d)", resourceName, configID, iconWidth, iconHeight)
+	log.Printf("[PlantCardFactory] Rendered plant icon: %s (size: %dx%d)", cfg.ResourceName, iconWidth, iconHeight)
 
 	return iconTexture, nil
 }

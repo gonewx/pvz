@@ -601,14 +601,14 @@ func TestCherryBombConfiguration(t *testing.T) {
 			expected: 1800,
 		},
 		{
-			name:     "爆炸圆心X偏移应为40像素",
+			name:     "爆炸圆心X偏移应为0像素",
 			constant: config.CherryBombExplosionCenterOffsetX,
-			expected: 40.0,
+			expected: 0.0,
 		},
 		{
-			name:     "爆炸圆心Y偏移应为40像素",
+			name:     "爆炸圆心Y偏移应为0像素",
 			constant: config.CherryBombExplosionCenterOffsetY,
-			expected: 40.0,
+			expected: 0.0,
 		},
 		{
 			name:     "爆炸范围半径应为115像素",

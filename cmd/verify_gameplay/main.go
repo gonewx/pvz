@@ -55,6 +55,7 @@ type VerifyGameplayGame struct {
 	lawnGridSystem      *systems.LawnGridSystem
 	sunCollectionSystem *systems.SunCollectionSystem
 	sunMovementSystem   *systems.SunMovementSystem
+	flashEffectSystem   *systems.FlashEffectSystem
 
 	// 植物预览系统
 	plantPreviewSystem       *systems.PlantPreviewSystem
@@ -168,6 +169,9 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 	sunCollectionSystem := systems.NewSunCollectionSystem(em, gs, sunTargetX, sunTargetY)
 	sunMovementSystem := systems.NewSunMovementSystem(em)
 
+	// 创建闪烁效果系统
+	flashEffectSystem := systems.NewFlashEffectSystem(em)
+
 	// 加载字体
 	sunCounterFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.SunCounterFontSize)
 	if err != nil {
@@ -236,6 +240,7 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 		lawnGridSystem:           lawnGridSystem,
 		sunCollectionSystem:      sunCollectionSystem,
 		sunMovementSystem:        sunMovementSystem,
+		flashEffectSystem:        flashEffectSystem,
 		plantPreviewSystem:       plantPreviewSystem,
 		plantPreviewRenderSystem: plantPreviewRenderSystem,
 		plantCardRenderSystem:    plantCardRenderSystem,
@@ -255,10 +260,11 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 func (vg *VerifyGameplayGame) setupScene() {
 	// 创建草坪网格实体
 	vg.lawnGridEntityID = vg.entityManager.CreateEntity()
-	ecs.AddComponent(vg.entityManager, vg.lawnGridEntityID, &components.LawnGridComponent{})
 
 	// 创建植物卡片（所有可用植物）
 	vg.createPlantCards()
+
+	ecs.AddComponent(vg.entityManager, vg.lawnGridEntityID, &components.LawnGridComponent{})
 
 	// 创建除草车（每行一台）
 	vg.createLawnmowers()
@@ -517,6 +523,7 @@ func (vg *VerifyGameplayGame) Update() error {
 	vg.sunCollectionSystem.Update(dt)
 	vg.sunMovementSystem.Update(dt)
 	vg.rewardSystem.Update(dt)
+	vg.flashEffectSystem.Update(dt)
 	vg.plantPreviewSystem.Update(dt)
 
 	// 清理已删除的实体（必须在所有系统更新后调用）
@@ -578,33 +585,12 @@ func (vg *VerifyGameplayGame) handlePlantCardClick() {
 
 // createPlantPreview 创建植物预览实体
 func (vg *VerifyGameplayGame) createPlantPreview(plantType components.PlantType) {
-	// 获取植物资源名称
-	var resourceName, configID string
-	switch plantType {
-	case components.PlantSunflower:
-		resourceName = "SunFlower"
-		configID = "sunflower"
-	case components.PlantPeashooter:
-		resourceName = "PeaShooterSingle"
-		configID = "peashooter"
-	case components.PlantWallnut:
-		resourceName = "Wallnut"
-		configID = "wallnut"
-	case components.PlantCherryBomb:
-		resourceName = "CherryBomb"
-		configID = "cherrybomb"
-	default:
-		log.Printf("[VerifyGameplay] Unknown plant type: %d", plantType)
-		return
-	}
-
-	// 渲染植物图标
+	// 渲染植物图标（直接传入 plantType）
 	plantIcon, err := entities.RenderPlantIcon(
 		vg.entityManager,
 		vg.resourceManager,
 		vg.reanimSystem,
-		resourceName,
-		configID,
+		plantType,
 	)
 	if err != nil {
 		log.Printf("[VerifyGameplay] Failed to render plant preview: %v", err)

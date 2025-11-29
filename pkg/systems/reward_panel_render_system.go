@@ -241,23 +241,12 @@ func (rprs *RewardPanelRenderSystem) drawPlantCard(screen *ebiten.Image, panel *
 		log.Printf("[RewardPanelRenderSystem] WARNING: Card background image not loaded! ID: %s", config.PlantCardBackgroundID)
 	}
 
-	// 获取 Reanim 名称
-	resourceName := rprs.getReanimName(plantType)
-	if resourceName == "" {
-		log.Printf("[RewardPanelRenderSystem] No reanim name for plant type: %d", plantType)
-		return
-	}
-
-	// 获取配置ID（小写）
-	configID := rprs.getConfigID(plantType)
-
-	// 使用 ReanimSystem 渲染植物图标
+	// 使用 ReanimSystem 渲染植物图标（直接传入 plantType）
 	plantIcon, err := entities.RenderPlantIcon(
 		rprs.entityManager,
 		rprs.resourceManager,
 		rprs.reanimSystem,
-		resourceName,
-		configID,
+		plantType,
 	)
 	if err != nil {
 		log.Printf("[RewardPanelRenderSystem] Failed to render plant icon: %v", err)

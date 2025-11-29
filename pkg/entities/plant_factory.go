@@ -8,6 +8,7 @@ import (
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/decker502/pvz/pkg/types"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -21,7 +22,7 @@ type ReanimSystemInterface interface {
 	// RenderToTexture 将指定实体的 Reanim 渲染到目标纹理（离屏渲染）
 	RenderToTexture(entityID ecs.EntityID, target *ebiten.Image) error
 	// PrepareStaticPreview prepares a Reanim entity for static preview (Story 11.1)
-	PrepareStaticPreview(entityID ecs.EntityID, reanimName string) error
+	PrepareStaticPreview(entityID ecs.EntityID, plantType types.PlantType) error
 }
 
 // NewPlantEntity 创建植物实体

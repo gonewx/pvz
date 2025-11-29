@@ -1,21 +1,20 @@
 package components
 
-import "github.com/hajimehoshi/ebiten/v2"
+import (
+	"github.com/decker502/pvz/pkg/types"
+	"github.com/hajimehoshi/ebiten/v2"
+)
 
-// PlantType 定义植物的类型
-type PlantType int
+// PlantType 是 types.PlantType 的类型别名，保持向后兼容
+type PlantType = types.PlantType
 
+// 植物类型常量（从 types 包重新导出，保持向后兼容）
 const (
-	// PlantUnknown 未知植物类型
-	PlantUnknown PlantType = iota
-	// PlantSunflower 向日葵
-	PlantSunflower
-	// PlantPeashooter 豌豆射手
-	PlantPeashooter
-	// PlantWallnut 坚果墙
-	PlantWallnut
-	// PlantCherryBomb 樱桃炸弹
-	PlantCherryBomb
+	PlantUnknown    = types.PlantUnknown
+	PlantSunflower  = types.PlantSunflower
+	PlantPeashooter = types.PlantPeashooter
+	PlantWallnut    = types.PlantWallnut
+	PlantCherryBomb = types.PlantCherryBomb
 )
 
 // PlantCardComponent 表示植物选择卡片的数据

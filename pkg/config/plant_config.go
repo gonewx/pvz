@@ -1,5 +1,77 @@
 package config
 
+import "github.com/decker502/pvz/pkg/types"
+
+// PlantResourceConfig 植物资源配置（统一管理）
+// 将植物的资源名称、配置ID、预览帧、隐藏轨道等配置集中管理
+type PlantResourceConfig struct {
+	ResourceName string   // Reanim 资源名称（如 "SunFlower"）
+	ConfigID     string   // reanim_config.yaml 中的 ID（如 "sunflower"）
+	PreviewFrame int      // 预览帧索引（-1 表示自动选择）
+	HiddenTracks []string // 预览隐藏轨道（黑名单模式，nil 表示显示所有）
+}
+
+// PlantConfigs 植物配置表（使用 types.PlantType 作为键）
+var PlantConfigs = map[types.PlantType]*PlantResourceConfig{
+	types.PlantSunflower: {
+		ResourceName: "SunFlower",
+		ConfigID:     "sunflower",
+		PreviewFrame: 8,
+		HiddenTracks: []string{
+			"anim_blink", // 隐藏眨眼轨道
+		},
+	},
+	types.PlantPeashooter: {
+		ResourceName: "PeaShooterSingle",
+		ConfigID:     "peashootersingle",
+		PreviewFrame: -1, // 自动选择
+		HiddenTracks: []string{
+			"anim_blink",       // 隐藏眨眼轨道
+			"idle_shoot_blink", // 隐藏射击眨眼轨道
+		},
+	},
+	types.PlantWallnut: {
+		ResourceName: "Wallnut",
+		ConfigID:     "wallnut",
+		PreviewFrame: -1, // 自动选择
+		HiddenTracks: []string{
+			"anim_blink", // 隐藏眨眼轨道
+		},
+	},
+	types.PlantCherryBomb: {
+		ResourceName: "CherryBomb",
+		ConfigID:     "cherrybomb",
+		PreviewFrame: 0,
+		HiddenTracks: nil, // 无需隐藏轨道
+	},
+}
+
+// GetPlantConfig 获取植物配置
+func GetPlantConfig(plantType types.PlantType) *PlantResourceConfig {
+	if cfg, ok := PlantConfigs[plantType]; ok {
+		return cfg
+	}
+	return nil
+}
+
+// GetPlantPreviewFrame 获取植物预览帧配置
+// 返回值：帧索引，-1 表示自动选择
+func GetPlantPreviewFrame(plantType types.PlantType) int {
+	if cfg := GetPlantConfig(plantType); cfg != nil {
+		return cfg.PreviewFrame
+	}
+	return -1
+}
+
+// GetPlantHiddenTracks 获取植物预览隐藏轨道配置（黑名单模式）
+// 返回值：要隐藏的轨道列表，nil 表示显示所有轨道
+func GetPlantHiddenTracks(plantType types.PlantType) []string {
+	if cfg := GetPlantConfig(plantType); cfg != nil {
+		return cfg.HiddenTracks
+	}
+	return nil
+}
+
 // 植物攻击动画关键帧配置
 // 本文件定义了射手类植物的子弹发射关键帧号
 
@@ -36,7 +108,7 @@ const (
 	// RepeaterShootingFireFrame1  = 5  // 双发射手（第一发）
 	// RepeaterShootingFireFrame2  = 8  // 双发射手（第二发，延迟约 0.25秒）
 
-	PlantOffsetY = -10.0
+	PlantOffsetY = 0.0
 )
 
 // 天空掉落阳光生成范围配置

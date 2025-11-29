@@ -8,6 +8,7 @@ import (
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/decker502/pvz/pkg/types"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -54,7 +55,7 @@ func (m *mockReanimSystem) RenderToTexture(entityID ecs.EntityID, target *ebiten
 	return nil
 }
 
-func (m *mockReanimSystem) PrepareStaticPreview(entityID ecs.EntityID, reanimName string) error {
+func (m *mockReanimSystem) PrepareStaticPreview(entityID ecs.EntityID, plantType types.PlantType) error {
 	// Mock implementation - 用于静态预览准备（Story 11.1）
 	// 在测试中，设置基本的静态预览状态
 	// Story 13.2: 移除 CurrentFrame 设置（已废弃）
