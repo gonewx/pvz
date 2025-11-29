@@ -370,6 +370,16 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 		log.Printf("[ParticleSystem] 警告：ParticleDuration 未配置，使用 SystemDuration 作为默认值: %.2fs", lifetime)
 	}
 
+	// HACK: 修复护甲掉落粒子生命周期过短的问题 (ZombieTrafficCone, ZombiePail)
+	// 这些粒子的 SystemDuration 只有 50 (0.5s)，而 ParticleDuration 未配置
+	// 导致粒子存活时间只有 0.5s，不足以展示掉落和弹跳效果
+	// 强制将生命周期延长到 2.0s
+	if (config.Image == "IMAGE_REANIM_ZOMBIE_CONE3" || config.Image == "IMAGE_REANIM_ZOMBIE_BUCKET3") && lifetime < 2.0 {
+		oldLifetime := lifetime
+		lifetime = 2.0
+		log.Printf("[ParticleSystem] 修复护甲掉落粒子生命周期: %.2fs -> %.2fs (Image=%s)", oldLifetime, lifetime, config.Image)
+	}
+
 	// Launch speed and angle
 	speedMin, speedMax, _, _ := particlePkg.ParseValue(config.LaunchSpeed)
 	angleMin, angleMax, _, _ := particlePkg.ParseValue(config.LaunchAngle)

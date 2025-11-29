@@ -187,3 +187,4 @@ func (s *FinalWaveTextSystem) IsTextComplete() bool {
 	return textComp.IsComplete
 }
 
+

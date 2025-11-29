@@ -32,12 +32,12 @@ import (
 type WaveSpawnSystem struct {
 	entityManager   *ecs.EntityManager
 	resourceManager *game.ResourceManager
-	levelConfig     *config.LevelConfig          // 关卡配置（用于验证行数限制）
-	gameState       *game.GameState              // 用于更新僵尸生成计数
-	spawnRules      *config.SpawnRulesConfig     // Story 17.3: 僵尸生成规则配置
-	constraintID    ecs.EntityID                 // Story 17.3: 生成限制组件实体ID
-	laneAllocator   *LaneAllocator               // Story 17.4: 行分配器系统
-	zombiePhysics   *config.ZombiePhysicsConfig  // Story 17.9: 僵尸物理配置（出生点、进家边界）
+	levelConfig     *config.LevelConfig         // 关卡配置（用于验证行数限制）
+	gameState       *game.GameState             // 用于更新僵尸生成计数
+	spawnRules      *config.SpawnRulesConfig    // Story 17.3: 僵尸生成规则配置
+	constraintID    ecs.EntityID                // Story 17.3: 生成限制组件实体ID
+	laneAllocator   *LaneAllocator              // Story 17.4: 行分配器系统
+	zombiePhysics   *config.ZombiePhysicsConfig // Story 17.9: 僵尸物理配置（出生点、进家边界）
 }
 
 // NewWaveSpawnSystem 创建波次生成系统
@@ -300,8 +300,17 @@ func (s *WaveSpawnSystem) ActivateWave(waveIndex int) int {
 			if behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID); ok {
 				if behavior.ZombieAnimState == components.ZombieAnimIdle {
 					behavior.ZombieAnimState = components.ZombieAnimWalking
+					// Determine correct unit ID based on behavior type
+					unitID := "zombie"
+					switch behavior.Type {
+					case components.BehaviorZombieConehead:
+						unitID = "zombie_conehead"
+					case components.BehaviorZombieBuckethead:
+						unitID = "zombie_buckethead"
+					}
+
 					ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
-						UnitID:    "zombie",
+						UnitID:    unitID,
 						ComboName: "walk",
 						Processed: false,
 					})
@@ -319,6 +328,211 @@ func (s *WaveSpawnSystem) ActivateWave(waveIndex int) int {
 
 	log.Printf("[WaveSpawnSystem] Activated wave %d: %d zombies", waveIndex, activated)
 	return activated
+}
+
+// SpawnWaveRealtime 实时生成并激活指定波次的僵尸
+//
+// 与 PreSpawnAllWaves + ActivateWave 的预生成模式不同，此方法在波次触发时
+// 实时生成僵尸并立即激活它们（开始移动和播放行走动画）
+//
+// 参数：
+//
+//	waveIndex - 波次索引（0-based）
+//
+// 返回：
+//
+//	生成的僵尸总数
+func (s *WaveSpawnSystem) SpawnWaveRealtime(waveIndex int) int {
+	if s.levelConfig == nil {
+		log.Printf("[WaveSpawnSystem] ERROR: No level config, cannot spawn wave")
+		return 0
+	}
+
+	if waveIndex < 0 || waveIndex >= len(s.levelConfig.Waves) {
+		log.Printf("[WaveSpawnSystem] ERROR: Invalid wave index %d (total waves: %d)", waveIndex, len(s.levelConfig.Waves))
+		return 0
+	}
+
+	waveConfig := s.levelConfig.Waves[waveIndex]
+	totalSpawned := 0
+
+	// Story 17.3: 更新限制组件的当前波次编号
+	if s.spawnRules != nil && s.constraintID != 0 {
+		if constraint, ok := ecs.GetComponent[*components.SpawnConstraintComponent](s.entityManager, s.constraintID); ok {
+			constraint.CurrentWaveNum = waveIndex + 1 // 波次从 1 开始
+		}
+	}
+
+	log.Printf("[WaveSpawnSystem] SpawnWaveRealtime: wave %d, zombies groups=%d", waveIndex+1, len(waveConfig.Zombies))
+
+	// 支持新格式 ZombieGroup
+	if len(waveConfig.Zombies) > 0 {
+		for groupIndex, zombieGroup := range waveConfig.Zombies {
+			for i := 0; i < zombieGroup.Count; i++ {
+				// Story 17.5: 使用 LaneAllocator 选择行
+				selectedLane := s.laneAllocator.SelectLane(
+					zombieGroup.Type,
+					s.levelConfig.SceneType,
+					s.spawnRules,
+					s.levelConfig.EnabledLanes,
+					waveConfig.LaneRestriction,
+				)
+				s.laneAllocator.UpdateLaneCounters(selectedLane)
+
+				entityID := s.spawnAndActivateZombie(zombieGroup.Type, selectedLane, waveIndex, groupIndex*100+i)
+				if entityID != 0 {
+					totalSpawned++
+				}
+			}
+		}
+	}
+
+	// 向后兼容：支持旧格式 OldZombies
+	if len(waveConfig.OldZombies) > 0 {
+		for _, zombieSpawn := range waveConfig.OldZombies {
+			for i := 0; i < zombieSpawn.Count; i++ {
+				entityID := s.spawnAndActivateZombie(zombieSpawn.Type, zombieSpawn.Lane, waveIndex, i)
+				if entityID != 0 {
+					totalSpawned++
+				}
+			}
+		}
+	}
+
+	// 增加已激活僵尸计数
+	s.gameState.IncrementZombiesSpawned(totalSpawned)
+
+	log.Printf("[WaveSpawnSystem] SpawnWaveRealtime: wave %d completed, spawned %d zombies", waveIndex+1, totalSpawned)
+	return totalSpawned
+}
+
+// spawnAndActivateZombie 生成并直接激活单个僵尸（实时生成模式）
+//
+// 生成僵尸后立即设置为激活状态，开始移动和播放行走动画
+//
+// 参数：
+//
+//	zombieType - 僵尸类型
+//	lane - 行号（1-5）
+//	waveIndex - 所属波次索引（0-based）
+//	indexInWave - 在本波中的索引
+//
+// 返回：
+//
+//	僵尸实体ID
+func (s *WaveSpawnSystem) spawnAndActivateZombie(zombieType string, lane int, waveIndex int, indexInWave int) ecs.EntityID {
+	// Story 17.3: 生成前检查限制规则
+	if s.spawnRules != nil && s.constraintID != 0 {
+		constraint, ok := ecs.GetComponent[*components.SpawnConstraintComponent](s.entityManager, s.constraintID)
+		if ok {
+			roundNumber := -1
+			if s.gameState.TotalCompletedFlags > 0 {
+				roundNumber = s.gameState.TotalCompletedFlags/2 - 1
+			}
+
+			valid, reason := ValidateZombieSpawn(zombieType, lane, constraint, roundNumber, s.spawnRules)
+			if !valid {
+				log.Printf("[WaveSpawnSystem] Zombie spawn rejected: type=%s, lane=%d, wave=%d, reason=%s",
+					zombieType, lane, waveIndex+1, reason)
+				return 0
+			}
+
+			if zombieType == "gargantuar_redeye" {
+				constraint.RedEyeCount++
+			}
+		}
+	}
+
+	// 将行号转换为行索引
+	row := lane - 1
+	if row < 0 {
+		row = 0
+	}
+	if row > 4 {
+		row = 4
+	}
+
+	// Story 17.9: 判断是否为旗帜波
+	isFlagWave := false
+	if s.levelConfig != nil && waveIndex >= 0 && waveIndex < len(s.levelConfig.Waves) {
+		isFlagWave = s.levelConfig.Waves[waveIndex].IsFlag
+	}
+
+	// Story 17.9: 计算生成位置
+	spawnX := s.getZombieSpawnXForWave(zombieType, isFlagWave, false)
+	spawnY := s.getZombieSpawnY(row)
+
+	// 根据类型创建僵尸
+	var entityID ecs.EntityID
+	var err error
+
+	switch zombieType {
+	case "basic":
+		entityID, err = entities.NewZombieEntity(
+			s.entityManager,
+			s.resourceManager,
+			row,
+			spawnX,
+		)
+	case "conehead":
+		entityID, err = entities.NewConeheadZombieEntity(
+			s.entityManager,
+			s.resourceManager,
+			row,
+			spawnX,
+		)
+	case "buckethead":
+		entityID, err = entities.NewBucketheadZombieEntity(
+			s.entityManager,
+			s.resourceManager,
+			row,
+			spawnX,
+		)
+	default:
+		log.Printf("[WaveSpawnSystem] ERROR: Unknown zombie type '%s'", zombieType)
+		return 0
+	}
+
+	if err != nil {
+		log.Printf("[WaveSpawnSystem] ERROR: Failed to spawn zombie: %v", err)
+		return 0
+	}
+
+	// 添加波次状态组件（直接标记为已激活）
+	ecs.AddComponent(s.entityManager, entityID, &components.ZombieWaveStateComponent{
+		WaveIndex:   waveIndex,
+		IsActivated: true, // 直接激活
+		IndexInWave: indexInWave,
+	})
+
+	// 设置移动速度（开始向左移动）
+	if vel, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID); ok {
+		vel.VX = -23.0 // 僵尸标准移动速度
+	}
+
+	// 设置行走动画
+	if behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID); ok {
+		behavior.ZombieAnimState = components.ZombieAnimWalking
+
+		unitID := "zombie"
+		switch behavior.Type {
+		case components.BehaviorZombieConehead:
+			unitID = "zombie_conehead"
+		case components.BehaviorZombieBuckethead:
+			unitID = "zombie_buckethead"
+		}
+
+		ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
+			UnitID:    unitID,
+			ComboName: "walk",
+			Processed: false,
+		})
+	}
+
+	log.Printf("[WaveSpawnSystem] Spawned and activated zombie %d: type=%s, wave=%d, index=%d, row=%d, pos=(%.1f, %.1f)",
+		entityID, zombieType, waveIndex+1, indexInWave, row, spawnX, spawnY)
+
+	return entityID
 }
 
 // spawnZombieForWave 为指定波次生成僵尸（预生成模式）
@@ -462,10 +676,19 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 			log.Printf("[WaveSpawnSystem] Zombie %d 切换前动画: %s, 帧: %d", entityID, currentAnim, currentFrame)
 		}
 
+		// Determine correct unit ID based on behavior type
+		unitID := "zombie"
+		switch behavior.Type {
+		case components.BehaviorZombieConehead:
+			unitID = "zombie_conehead"
+		case components.BehaviorZombieBuckethead:
+			unitID = "zombie_buckethead"
+		}
+
 		// 使用组件通信替代直接调用
 		// 僵尸使用配置驱动的动画组合（自动隐藏装备轨道）
 		ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
-			UnitID:    "zombie",
+			UnitID:    unitID,
 			ComboName: "idle",
 			Processed: false,
 		})

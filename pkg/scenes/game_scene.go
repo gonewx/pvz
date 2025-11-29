@@ -382,12 +382,7 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 		// zombiesPreSpawned 保持为 false，在 Update() 中检测动画完成后预生成
 	} else {
 		log.Printf("[GameScene] Skipping opening animation system (tutorial/skip/special level)")
-		// Story 8.3.1: 无开场动画时，立即预生成僵尸
-		if scene.gameState.CurrentLevel != nil && len(scene.gameState.CurrentLevel.Waves) > 0 {
-			totalZombies := scene.waveSpawnSystem.PreSpawnAllWaves()
-			log.Printf("[GameScene] Pre-spawned %d zombies (no opening animation)", totalZombies)
-			scene.zombiesPreSpawned = true
-		}
+		// 实时生成模式：不再预生成僵尸，由 WaveTimingSystem 触发时实时生成
 	}
 
 	// Create ReadySetPlantSystem (在铺草皮完成、UI 显示后播放)
@@ -591,12 +586,7 @@ func (s *GameScene) Update(deltaTime float64) {
 	// 开场动画刚完成，触发铺草皮动画（如果配置了且还未启动）
 	// 修正：检查 ShowSoddingAnim 和 SodRollAnimation 配置
 	if s.openingSystem != nil && s.openingSystem.IsCompleted() && !s.soddingAnimStarted && s.soddingSystem != nil {
-		// Story 8.3.1: 开场动画完成后，预生成实际关卡僵尸
-		if !s.zombiesPreSpawned && s.gameState.CurrentLevel != nil && len(s.gameState.CurrentLevel.Waves) > 0 {
-			totalZombies := s.waveSpawnSystem.PreSpawnAllWaves()
-			log.Printf("[GameScene] Pre-spawned %d zombies (after opening animation)", totalZombies)
-			s.zombiesPreSpawned = true
-		}
+		// 实时生成模式：不再预生成僵尸，由 WaveTimingSystem 触发时实时生成
 
 		// 检查是否应该播放铺草皮动画
 		shouldPlayAnim := s.gameState.CurrentLevel.ShowSoddingAnim || s.gameState.CurrentLevel.SodRollAnimation

@@ -366,14 +366,19 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 		}
 
 		// 从配置中提取 Reanim 文件名（去掉路径和扩展名）
-		// 例如 "data/reanim/Zombie_charred.reanim" -> "Zombie_charred"
-		reanimFileName := unitConfig.Name // 直接使用配置中的 Name 字段
-		if reanimFileName == "" {
-			// 回退：从 ReanimFile 路径提取
+		// 优先从 ReanimFile 路径提取，因为这是实际的资源文件名
+		// 例如 "data/reanim/Zombie.reanim" -> "Zombie"
+		reanimFileName := ""
+		if unitConfig.ReanimFile != "" {
 			reanimFileName = strings.TrimSuffix(unitConfig.ReanimFile, ".reanim")
 			if idx := strings.LastIndex(reanimFileName, "/"); idx != -1 {
 				reanimFileName = reanimFileName[idx+1:]
 			}
+		}
+
+		// 如果 ReanimFile 解析结果为空，回退到 Name
+		if reanimFileName == "" {
+			reanimFileName = unitConfig.Name
 		}
 
 		// 加载新的 Reanim 数据

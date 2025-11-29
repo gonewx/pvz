@@ -6,6 +6,8 @@ scale: 1
 images:
     IMAGE_REANIM_ZOMBIE_BODY: assets/reanim/Zombie_body.png
     IMAGE_REANIM_ZOMBIE_BUCKET1: assets/reanim/Zombie_bucket1.png
+    IMAGE_REANIM_ZOMBIE_BUCKET2: assets/reanim/Zombie_bucket2.png
+    IMAGE_REANIM_ZOMBIE_BUCKET3: assets/reanim/Zombie_bucket3.png
     IMAGE_REANIM_ZOMBIE_HEAD: assets/reanim/Zombie_head.png
     IMAGE_REANIM_ZOMBIE_INNERARM_HAND: assets/reanim/Zombie_innerarm_hand.png
     IMAGE_REANIM_ZOMBIE_INNERARM_LOWER: assets/reanim/Zombie_innerarm_lower.png

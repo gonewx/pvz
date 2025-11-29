@@ -72,10 +72,12 @@ func NewZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spawnX f
 
 	// ✅ Epic 14: 使用 AnimationCommand 触发动画（替代直接调用 ReanimSystem）
 	// 添加动画命令组件，让 ReanimSystem 在 Update 中处理
-	// 默认播放 anim_idle 动画，WaveSpawnSystem 激活时会切换到 anim_walk
+	// Story 17.10: 使用配置驱动的 ComboName 而不是直接指定 AnimationName
+	// 这样可以确保正确应用 hidden_tracks（例如隐藏路障/铁桶）
 	ecs.AddComponent(em, entityID, &components.AnimationCommandComponent{
-		AnimationName: "anim_idle",
-		Processed:     false,
+		UnitID:    "zombie",
+		ComboName: "idle",
+		Processed: false,
 	})
 
 	// 添加速度组件（初始速度为0，待命状态）
@@ -180,10 +182,12 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, 
 
 	// ✅ Epic 14: 使用 AnimationCommand 触发动画（替代直接调用 ReanimSystem）
 	// 添加动画命令组件，让 ReanimSystem 在 Update 中处理
-	// 默认播放 anim_idle 动画，WaveSpawnSystem 激活时会切换到 anim_walk
+	// Story 17.10: 使用配置驱动的 ComboName 而不是直接指定 AnimationName
+	// 这样可以确保正确显示路障（不被隐藏）同时隐藏其他装备
 	ecs.AddComponent(em, entityID, &components.AnimationCommandComponent{
-		AnimationName: "anim_idle",
-		Processed:     false,
+		UnitID:    "zombie_conehead",
+		ComboName: "idle",
+		Processed: false,
 	})
 
 	// 添加速度组件（初始速度为0，待命状态）
@@ -294,10 +298,12 @@ func NewBucketheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int
 
 	// ✅ Epic 14: 使用 AnimationCommand 触发动画（替代直接调用 ReanimSystem）
 	// 添加动画命令组件，让 ReanimSystem 在 Update 中处理
-	// 默认播放 anim_idle 动画，WaveSpawnSystem 激活时会切换到 anim_walk
+	// Story 17.10: 使用配置驱动的 ComboName 而不是直接指定 AnimationName
+	// 这样可以确保正确显示铁桶（不被隐藏）同时隐藏其他装备
 	ecs.AddComponent(em, entityID, &components.AnimationCommandComponent{
-		AnimationName: "anim_idle",
-		Processed:     false,
+		UnitID:    "zombie_buckethead",
+		ComboName: "idle",
+		Processed: false,
 	})
 
 	// 添加速度组件（初始速度为0，待命状态）

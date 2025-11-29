@@ -43,3 +43,4 @@ type FinalWaveTextComponent struct {
 
 // FinalWaveText 最终波白字默认文本
 const FinalWaveText = "FINAL WAVE"
+

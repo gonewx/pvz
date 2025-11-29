@@ -6,6 +6,8 @@ scale: 1
 images:
     IMAGE_REANIM_ZOMBIE_BODY: assets/reanim/Zombie_body.png
     IMAGE_REANIM_ZOMBIE_CONE1: assets/reanim/Zombie_cone1.png
+    IMAGE_REANIM_ZOMBIE_CONE2: assets/reanim/Zombie_cone2.png
+    IMAGE_REANIM_ZOMBIE_CONE3: assets/reanim/Zombie_cone3.png
     IMAGE_REANIM_ZOMBIE_HEAD: assets/reanim/Zombie_head.png
     IMAGE_REANIM_ZOMBIE_INNERARM_HAND: assets/reanim/Zombie_innerarm_hand.png
     IMAGE_REANIM_ZOMBIE_INNERARM_LOWER: assets/reanim/Zombie_innerarm_lower.png

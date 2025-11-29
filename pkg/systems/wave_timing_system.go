@@ -35,12 +35,13 @@ const (
 	FinalWaveDelayCs = 5500
 
 	// FlagWavePhase4DurationCs Phase 4 停留时间（厘秒）
-	// 红字警告在倒计时=4时停留 725cs
-	FlagWavePhase4DurationCs = 725
+	// 红字警告在倒计时=4时停留。原设定 725cs 可能过长导致玩家以为卡死
+	// 调整为 400cs (4秒)
+	FlagWavePhase4DurationCs = 400
 
 	// FlagWarningTotalDurationCs 红字总显示时间（厘秒）
-	// 约 750cs（从 Phase 5 到触发下一波）
-	FlagWarningTotalDurationCs = 750
+	// 约 450cs
+	FlagWarningTotalDurationCs = 450
 
 	// FinalWaveTextDurationCs 白字 "FINAL WAVE" 显示时间（厘秒）
 	// 白字显示 500cs 后检查胜利条件
@@ -313,7 +314,13 @@ func (s *WaveTimingSystem) updateFlagWaveWarningPhase(deltaCsInt int) {
 			log.Printf("[WaveTimingSystem] Huge wave warning entering Phase 4 (725cs hold)")
 		}
 	case 4:
-		// Phase 4: 红字停留阶段（725cs）
+		// Phase 4: 红字停留阶段
+		// 每秒输出一次日志，避免玩家以为卡死
+		if timer.FlagWavePhaseTimeCs%100 == 0 {
+			log.Printf("[WaveTimingSystem] Huge wave warning Phase 4 holding... (%d/%d cs)", 
+				timer.FlagWavePhaseTimeCs, FlagWavePhase4DurationCs)
+		}
+
 		if timer.FlagWavePhaseTimeCs >= FlagWavePhase4DurationCs {
 			// 停留结束，触发旗帜波
 			log.Printf("[WaveTimingSystem] Huge wave warning Phase 4 complete, triggering flag wave")
@@ -360,8 +367,12 @@ func (s *WaveTimingSystem) updateFinalWaveText(deltaTime float64) {
 	timer.FinalWaveTextTimeCs += int(deltaCsFloat)
 
 	if timer.FinalWaveTextTimeCs >= FinalWaveTextDurationCs {
-		log.Printf("[WaveTimingSystem] Final wave text display complete (500cs)")
-		// 注意：此处不重置 FinalWaveTextActive，让 LevelSystem 检查胜利条件
+		log.Printf("[WaveTimingSystem] Final wave text display complete (500cs), resuming normal flow")
+		// 修复：必须重置 FinalWaveTextActive，否则 Update 会一直提前返回，导致卡死
+		timer.FinalWaveTextActive = false
+		
+		// 白字显示结束后，立即触发下一波（通常是 Final Wave）
+		s.triggerNextWave()
 	}
 }
 
@@ -1048,32 +1059,4 @@ func (s *WaveTimingSystem) GetNextWaveDelay() float64 {
 	}
 
 	return 0
-}
-
-// calculateWaveDelayCs 计算指定波次的延迟（厘秒）
-//
-// Story 11.5: 内部辅助函数，根据波次类型计算延迟
-//
-// 参数:
-//   - waveIndex: 波次索引（0-based）
-//
-// 返回:
-//   - int: 延迟时间（厘秒）
-func (s *WaveTimingSystem) calculateWaveDelayCs(waveIndex int) int {
-	totalWaves := len(s.levelConfig.Waves)
-
-	// 最后一波使用 FinalWaveDelayCs
-	if waveIndex == totalWaves-1 {
-		return FinalWaveDelayCs
-	}
-
-	// 检查是否是旗帜波前一波
-	for _, flagWaveIndex := range s.levelConfig.FlagWaves {
-		if waveIndex == flagWaveIndex-1 {
-			return FlagWavePrefixDelayCs
-		}
-	}
-
-	// 常规波次：基础延迟 + 随机延迟
-	return RegularWaveBaseDelayCs + rand.Intn(RegularWaveRandomDelayCs)
 }

@@ -199,6 +199,8 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 						armor.CurrentArmor -= config.PeaBulletDamage
 						// 播放击中护甲音效
 						ps.playArmorHitSound()
+						// 方案A+：护甲受击也添加闪烁效果
+						ps.addFlashEffect(zombieID)
 						// 注意：护甲可以降到负数，BehaviorSystem 会检查 <= 0 的情况并处理护甲破坏
 					} else {
 						// 护甲已破坏，扣除身体生命值

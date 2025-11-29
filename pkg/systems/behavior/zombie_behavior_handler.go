@@ -8,6 +8,7 @@ import (
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/utils"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaTime float64) {
@@ -723,8 +724,30 @@ func (s *BehaviorSystem) handleConeheadZombieBehavior(entityID ecs.EntityID, del
 					log.Printf("[BehaviorSystem] 路障僵尸 %d 隐藏 anim_cone 轨道", entityID)
 				}
 
-				// 3. 移除护甲组件（可选，但保留可能对调试有帮助）
-				// ecs.RemoveComponent[*components.ArmorComponent](s.entityManager, entityID)
+				// 3. 触发路障掉落粒子效果
+				position, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+				velocity, hasVel := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID)
+				if hasPos {
+					// 粒子发射角度调整
+					angleOffset := 180.0
+					if hasVel && velocity.VX > 0 {
+						angleOffset = 0.0
+					}
+
+					// 创建掉落粒子
+					_, err := entities.CreateParticleEffect(
+						s.entityManager,
+						s.resourceManager,
+						"ZombieTrafficCone", // 掉落粒子配置文件名
+						position.X, position.Y,
+						angleOffset,
+					)
+					if err != nil {
+						log.Printf("[BehaviorSystem] 警告：创建路障掉落粒子失败: %v", err)
+					} else {
+						log.Printf("[BehaviorSystem] 路障僵尸 %d 触发路障掉落效果", entityID)
+					}
+				}
 			}
 		}
 
@@ -733,12 +756,12 @@ func (s *BehaviorSystem) handleConeheadZombieBehavior(entityID ecs.EntityID, del
 		return
 	}
 
-	// 护甲完好，执行普通僵尸的基本行为（移动、碰撞检测、啃食植物）
+	// 护甲完好，更新外观状态（根据受损程度切换图片）
+	s.updateArmorVisualState(entityID, armor, "cone")
+
+	// 执行普通僵尸的基本行为（移动、碰撞检测、啃食植物）
 	s.handleZombieBasicBehavior(entityID, deltaTime)
 }
-
-// handleBucketheadZombieBehavior 处理铁桶僵尸的行为逻辑
-// 铁桶僵尸拥有更高的护甲层，护甲耗尽后切换为普通僵尸外观和行为
 
 func (s *BehaviorSystem) handleBucketheadZombieBehavior(entityID ecs.EntityID, deltaTime float64) {
 	// 检查僵尸是否已激活（开场动画期间僵尸未激活，不应移动）
@@ -780,8 +803,30 @@ func (s *BehaviorSystem) handleBucketheadZombieBehavior(entityID ecs.EntityID, d
 					log.Printf("[BehaviorSystem] 铁桶僵尸 %d 隐藏 anim_bucket 轨道", entityID)
 				}
 
-				// 3. 移除护甲组件（可选，但保留可能对调试有帮助）
-				// ecs.RemoveComponent[*components.ArmorComponent](s.entityManager, entityID)
+				// 3. 触发铁桶掉落粒子效果
+				position, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+				velocity, hasVel := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID)
+				if hasPos {
+					// 粒子发射角度调整
+					angleOffset := 180.0
+					if hasVel && velocity.VX > 0 {
+						angleOffset = 0.0
+					}
+
+					// 创建掉落粒子
+					_, err := entities.CreateParticleEffect(
+						s.entityManager,
+						s.resourceManager,
+						"ZombiePail", // 掉落粒子配置文件名
+						position.X, position.Y,
+						angleOffset,
+					)
+					if err != nil {
+						log.Printf("[BehaviorSystem] 警告：创建铁桶掉落粒子失败: %v", err)
+					} else {
+						log.Printf("[BehaviorSystem] 铁桶僵尸 %d 触发铁桶掉落效果", entityID)
+					}
+				}
 			}
 		}
 
@@ -790,7 +835,10 @@ func (s *BehaviorSystem) handleBucketheadZombieBehavior(entityID ecs.EntityID, d
 		return
 	}
 
-	// 护甲完好，执行普通僵尸的基本行为（移动、碰撞检测、啃食植物）
+	// 护甲完好，更新外观状态（根据受损程度切换图片）
+	s.updateArmorVisualState(entityID, armor, "bucket")
+
+	// 执行普通僵尸的基本行为（移动、碰撞检测、啃食植物）
 	s.handleZombieBasicBehavior(entityID, deltaTime)
 }
 
@@ -899,6 +947,74 @@ func (s *BehaviorSystem) handleZombieDyingExplosionBehavior(entityID ecs.EntityI
 
 		// 删除僵尸实体
 		s.entityManager.DestroyEntity(entityID)
+	}
+}
+
+// updateArmorVisualState 更新护甲僵尸的外观状态
+// 根据护甲的受损程度（剩余百分比）切换不同的护甲图片
+// 支持路障僵尸（cone）和铁桶僵尸（bucket）
+func (s *BehaviorSystem) updateArmorVisualState(entityID ecs.EntityID, armor *components.ArmorComponent, armorType string) {
+	reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !ok || reanim.PartImages == nil {
+		return
+	}
+
+	var targetImageName string
+	var imageKey string
+	maxArmor := float64(armor.MaxArmor)
+	currentArmor := float64(armor.CurrentArmor)
+	ratio := currentArmor / maxArmor
+
+	if armorType == "cone" {
+		imageKey = "IMAGE_REANIM_ZOMBIE_CONE1"
+		// 阶段1: 完整 (66% - 100%)
+		// 阶段2: 轻微受损 (33% - 66%)
+		// 阶段3: 严重受损 (0% - 33%)
+		if ratio > 0.66 {
+			targetImageName = "assets/reanim/Zombie_cone1.png"
+		} else if ratio > 0.33 {
+			targetImageName = "assets/reanim/Zombie_cone2.png"
+		} else {
+			targetImageName = "assets/reanim/Zombie_cone3.png"
+		}
+	} else if armorType == "bucket" {
+		imageKey = "IMAGE_REANIM_ZOMBIE_BUCKET1"
+		if ratio > 0.66 {
+			targetImageName = "assets/reanim/Zombie_bucket1.png"
+		} else if ratio > 0.33 {
+			targetImageName = "assets/reanim/Zombie_bucket2.png"
+		} else {
+			targetImageName = "assets/reanim/Zombie_bucket3.png"
+		}
+	} else {
+		return
+	}
+
+	// 加载目标图片
+	targetImage, err := s.resourceManager.LoadImage(targetImageName)
+	if err != nil {
+		// 降低日志频率，避免每帧刷屏
+		if s.logFrameCounter%100 == 0 {
+			log.Printf("[BehaviorSystem] 警告：无法加载受损护甲图片 %s: %v", targetImageName, err)
+		}
+		return
+	}
+
+	// 检查当前显示的图片是否已经是目标图片
+	if reanim.PartImages[imageKey] != targetImage {
+		// 确保 PartImages 是独立的副本
+		// 我们无法简单判断是否已经是独立副本，所以如果需要修改，就总是创建一个新的 map
+		// 这是一个浅拷贝，开销很小
+		newPartImages := make(map[string]*ebiten.Image)
+		for k, v := range reanim.PartImages {
+			newPartImages[k] = v
+		}
+		// 更新目标图片的映射
+		newPartImages[imageKey] = targetImage
+		// 替换组件中的 map
+		reanim.PartImages = newPartImages
+
+		log.Printf("[BehaviorSystem] 僵尸 %d 护甲外观更新: %s -> %s (HP ratio: %.2f)", entityID, imageKey, targetImageName, ratio)
 	}
 }
 

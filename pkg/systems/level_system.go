@@ -309,8 +309,8 @@ func (s *LevelSystem) checkAndSpawnWaves() {
 		}
 	}
 
-	// 调用 WaveSpawnSystem 激活僵尸（而不是生成）
-	zombieCount := s.waveSpawnSystem.ActivateWave(waveIndex)
+	// 调用 WaveSpawnSystem 实时生成并激活僵尸
+	zombieCount := s.waveSpawnSystem.SpawnWaveRealtime(waveIndex)
 
 	// 标记波次已激活
 	s.gameState.MarkWaveSpawned(waveIndex)
