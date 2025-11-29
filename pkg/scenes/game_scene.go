@@ -929,6 +929,12 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	// 传递 cameraX 以正确转换世界坐标到屏幕坐标
 	s.renderSystem.DrawGameWorld(screen, s.cameraX)
 
+	// 开场动画用户名显示（在游戏世界之后、其他UI之前）
+	// 显示 "{username}的房子" 文本，白色带黑色阴影
+	if s.openingSystem != nil {
+		s.openingSystem.Draw(screen)
+	}
+
 	// Layer 4.5: Draw lawn flash effect (Story 8.2 教学)
 	// 草坪闪烁效果，用于教学提示玩家可以种植
 	s.drawLawnFlash(screen)

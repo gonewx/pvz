@@ -1,6 +1,7 @@
 package systems
 
 import (
+	"image/color"
 	"log"
 	"math/rand"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
 const (
@@ -34,6 +36,7 @@ type OpeningAnimationSystem struct {
 	levelConfig     *config.LevelConfig
 	cameraSystem    *CameraSystem
 	openingEntity   ecs.EntityID
+	usernameFont    *text.GoTextFace // 用户名字体（24号）
 }
 
 // NewOpeningAnimationSystem 创建开场动画系统。
@@ -66,6 +69,18 @@ func NewOpeningAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *ga
 		levelConfig:     levelConfig,
 		cameraSystem:    cameraSystem,
 		openingEntity:   0,
+		usernameFont:    nil,
+	}
+
+	// 加载用户名显示字体
+	if rm != nil {
+		font, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.OpeningUsernameFontSize)
+		if err != nil {
+			log.Printf("[OpeningAnimationSystem] 警告: 加载用户名字体失败: %v", err)
+		} else {
+			oas.usernameFont = font
+			log.Printf("[OpeningAnimationSystem] 用户名字体加载成功 (size=%.0f)", config.OpeningUsernameFontSize)
+		}
 	}
 
 	// 创建开场动画实体
@@ -513,4 +528,65 @@ func (oas *OpeningAnimationSystem) GetEntity() ecs.EntityID {
 		return 0
 	}
 	return oas.openingEntity
+}
+
+// Draw 绘制开场动画UI元素。
+// 在开场动画期间，在屏幕下方居中显示 "{username}的房子" 文本。
+// 文本为白色，带黑色阴影。
+func (oas *OpeningAnimationSystem) Draw(screen *ebiten.Image) {
+	if oas == nil || oas.usernameFont == nil {
+		return
+	}
+
+	// 检查开场动画是否正在播放
+	openingComp, ok := ecs.GetComponent[*components.OpeningAnimationComponent](oas.entityManager, oas.openingEntity)
+	if !ok || openingComp.IsCompleted {
+		return
+	}
+
+	// 获取当前用户名
+	username := ""
+	if oas.gameState != nil {
+		sm := oas.gameState.GetSaveManager()
+		if sm != nil {
+			username = sm.GetCurrentUser()
+		}
+	}
+
+	// 如果没有用户名，不显示
+	if username == "" {
+		return
+	}
+
+	// 构建显示文本
+	displayText := username + "的房子"
+
+	// 计算文本宽度，用于居中
+	textWidth := text.Advance(displayText, oas.usernameFont)
+
+	// 计算位置：屏幕下方居中
+	screenWidth := config.ScreenWidth
+	screenHeight := config.ScreenHeight
+	x := (screenWidth - textWidth) / 2
+	y := screenHeight - config.OpeningUsernameOffsetFromBottom
+
+	// 阴影颜色（黑色）
+	shadowColor := color.RGBA{0, 0, 0, 255}
+	// 文本颜色（白色）
+	textColor := color.RGBA{255, 255, 255, 255}
+
+	// 绘制阴影（偏移）
+	shadowOp := &text.DrawOptions{}
+	shadowOp.GeoM.Translate(
+		x+config.OpeningUsernameShadowOffsetX,
+		y+config.OpeningUsernameShadowOffsetY,
+	)
+	shadowOp.ColorScale.ScaleWithColor(shadowColor)
+	text.Draw(screen, displayText, oas.usernameFont, shadowOp)
+
+	// 绘制白色文本
+	textOp := &text.DrawOptions{}
+	textOp.GeoM.Translate(x, y)
+	textOp.ColorScale.ScaleWithColor(textColor)
+	text.Draw(screen, displayText, oas.usernameFont, textOp)
 }

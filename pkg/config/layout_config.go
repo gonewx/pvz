@@ -336,4 +336,18 @@ const (
 	// 僵尸在除草车前后此范围内时视为碰撞
 	// 建议值范围：30.0 - 80.0
 	LawnmowerCollisionRange = 50.0
+
+	// ========== 开场动画用户名显示配置（可手工调节） ==========
+
+	// OpeningUsernameOffsetFromBottom 用户名文本距离屏幕底部的偏移（像素）
+	OpeningUsernameOffsetFromBottom = 100.0
+
+	// OpeningUsernameFontSize 用户名文本字体大小
+	OpeningUsernameFontSize = 32.0
+
+	// OpeningUsernameShadowOffsetX 用户名文本阴影X偏移（像素）
+	OpeningUsernameShadowOffsetX = 2.0
+
+	// OpeningUsernameShadowOffsetY 用户名文本阴影Y偏移（像素）
+	OpeningUsernameShadowOffsetY = 2.0
 )
