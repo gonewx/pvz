@@ -337,6 +337,24 @@ const (
 	// 建议值范围：30.0 - 80.0
 	LawnmowerCollisionRange = 50.0
 
+	// ========== 除草车入场动画配置参数（可手工调节） ==========
+
+	// LawnmowerEnterStartX 除草车入场动画起始X位置（世界坐标，像素）
+	// 除草车从屏幕左侧外开始移动，应该在摄像机视野左侧
+	// 世界坐标 = 屏幕坐标 + GameCameraX，屏幕左侧外 = 负值
+	// 设置为 100，使除草车从左侧约 120 像素外开始进入
+	LawnmowerEnterStartX = 100.0
+
+	// LawnmowerEnterSpeed 除草车入场动画移动速度（像素/秒）
+	// 除草车开出来的速度，建议比触发后速度慢一些
+	// 建议值范围：150.0 - 300.0
+	LawnmowerEnterSpeed = 200.0
+
+	// LawnmowerEnterDelayPerLane 每行除草车入场动画延迟间隔（秒）
+	// 用于实现错开入场效果，第 N 行延迟 = (N-1) * 此值
+	// 建议值范围：0.1 - 0.3
+	LawnmowerEnterDelayPerLane = 0.15
+
 	// ========== 开场动画用户名显示配置（可手工调节） ==========
 
 	// OpeningUsernameOffsetFromBottom 用户名文本距离屏幕底部的偏移（像素）

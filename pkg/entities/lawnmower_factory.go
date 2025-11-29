@@ -21,7 +21,7 @@ import (
 //   - ecs.EntityID: 创建的除草车实体ID，如果失败返回 0
 //   - error: 如果创建失败返回错误信息
 //
-// 注意：除草车默认创建时处于静止状态（未触发），需要通过 LawnmowerSystem 检测触发条件
+// 注意：除草车默认创建时处于入场动画状态，入场完成后切换为静止状态
 // ✅ Epic 14: 移除 ReanimSystem 依赖，动画通过 AnimationCommand 组件触发
 func NewLawnmowerEntity(
 	em *ecs.EntityManager,
@@ -38,20 +38,23 @@ func NewLawnmowerEntity(
 		return 0, fmt.Errorf("invalid lane %d, must be between 1 and 5", lane)
 	}
 
-	// 计算除草车位置（世界坐标）
+	// 计算除草车目标位置（世界坐标）- 入场动画完成后的最终位置
 	// X坐标：使用配置的起始X位置（左侧台阶）
-	posX := config.LawnmowerStartX
+	targetX := config.LawnmowerStartX
 
 	// Y坐标：对应行的中心Y坐标
 	// 行中心 = GridWorldStartY + (lane-1)*CellHeight + CellHeight/2.0
 	posY := config.GridWorldStartY + float64(lane-1)*config.CellHeight + config.CellHeight/2.0
 
+	// 入场动画起始位置（屏幕左侧外）
+	startX := config.LawnmowerEnterStartX
+
 	// 创建实体
 	entityID := em.CreateEntity()
 
-	// 添加位置组件（世界坐标）
+	// 添加位置组件（初始位置在屏幕左侧外）
 	em.AddComponent(entityID, &components.PositionComponent{
-		X: posX,
+		X: startX,
 		Y: posY,
 	})
 
@@ -69,8 +72,8 @@ func NewLawnmowerEntity(
 	em.AddComponent(entityID, &components.ReanimComponent{
 		ReanimXML:  reanimXML,
 		PartImages: partImages,
-		IsLooping:  true, // 除草车动画循环播放
-		IsPaused:   true, // ✅ 默认暂停，触发后恢复
+		IsLooping:  true,  // 除草车动画循环播放
+		IsPaused:   false, // 入场动画期间播放车轮滚动动画
 	})
 
 	// ✅ Epic 14: 使用 AnimationCommand 触发动画（替代直接调用 ReanimSystem）
@@ -80,16 +83,26 @@ func NewLawnmowerEntity(
 		Processed:     false,         // 标记为未处理，等待 ReanimSystem 处理
 	})
 
-	// 添加除草车组件
+	// 计算入场动画延迟（每行错开一定时间）
+	enterDelay := float64(lane-1) * config.LawnmowerEnterDelayPerLane
+
+	// 添加除草车组件（包含入场动画状态）
 	ecs.AddComponent(em, entityID, &components.LawnmowerComponent{
 		Lane:        lane,
 		IsTriggered: false,
 		IsMoving:    false,
 		Speed:       config.LawnmowerSpeed,
+		// 入场动画状态
+		IsEntering:   true,
+		EnterStartX:  startX,
+		EnterTargetX: targetX,
+		EnterSpeed:   config.LawnmowerEnterSpeed,
+		EnterDelay:   enterDelay,
+		EnterTimer:   0,
 	})
 
-	log.Printf("[LawnmowerFactory] Created lawnmower entity %d on lane %d at (%.1f, %.1f)",
-		entityID, lane, posX, posY)
+	log.Printf("[LawnmowerFactory] Created lawnmower entity %d on lane %d at (%.1f, %.1f) -> target (%.1f, %.1f), delay %.2fs",
+		entityID, lane, startX, posY, targetX, posY, enterDelay)
 
 	return entityID, nil
 }

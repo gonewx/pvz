@@ -53,6 +53,9 @@ func NewLawnmowerSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *gam
 // 参数:
 //   - deltaTime: 自上次更新以来的时间（秒）
 func (s *LawnmowerSystem) Update(deltaTime float64) {
+	// 0. 更新入场动画
+	s.updateEnterAnimations(deltaTime)
+
 	// 1. 检测触发条件
 	s.checkTriggerConditions()
 
@@ -67,6 +70,53 @@ func (s *LawnmowerSystem) Update(deltaTime float64) {
 
 	// 5. 检测除草车离开屏幕
 	s.checkLawnmowerCompletion()
+}
+
+// updateEnterAnimations 更新除草车入场动画
+// 除草车从屏幕左侧外开出来到达初始位置
+// 参数:
+//   - deltaTime: 自上次更新以来的时间（秒）
+func (s *LawnmowerSystem) updateEnterAnimations(deltaTime float64) {
+	lawnmowers := ecs.GetEntitiesWith2[
+		*components.LawnmowerComponent,
+		*components.PositionComponent,
+	](s.entityManager)
+
+	for _, lawnmowerID := range lawnmowers {
+		lawnmower, _ := ecs.GetComponent[*components.LawnmowerComponent](s.entityManager, lawnmowerID)
+		pos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, lawnmowerID)
+
+		// 只处理正在入场的除草车
+		if !lawnmower.IsEntering {
+			continue
+		}
+
+		// 累积入场计时器
+		lawnmower.EnterTimer += deltaTime
+
+		// 检查是否还在延迟期间
+		if lawnmower.EnterTimer < lawnmower.EnterDelay {
+			continue
+		}
+
+		// 向右移动到目标位置
+		pos.X += lawnmower.EnterSpeed * deltaTime
+
+		// 检查是否到达目标位置
+		if pos.X >= lawnmower.EnterTargetX {
+			// 到达目标位置，结束入场动画
+			pos.X = lawnmower.EnterTargetX
+			lawnmower.IsEntering = false
+
+			// 入场完成后暂停动画（静止等待触发）
+			if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, lawnmowerID); ok {
+				reanim.IsPaused = true
+			}
+
+			log.Printf("[LawnmowerSystem] Lawnmower on lane %d enter animation completed at X=%.1f",
+				lawnmower.Lane, pos.X)
+		}
+	}
 }
 
 // checkTriggerConditions 检测是否有僵尸到达左侧，触发除草车
@@ -110,6 +160,11 @@ func (s *LawnmowerSystem) triggerLawnmower(lane int) {
 
 	for _, lawnmowerID := range lawnmowers {
 		lawnmower, _ := ecs.GetComponent[*components.LawnmowerComponent](s.entityManager, lawnmowerID)
+
+		// 跳过入场中的除草车（入场完成后才能触发）
+		if lawnmower.IsEntering {
+			continue
+		}
 
 		if lawnmower.Lane == lane && !lawnmower.IsTriggered {
 			// 触发除草车
