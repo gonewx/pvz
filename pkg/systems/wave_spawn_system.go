@@ -70,9 +70,9 @@ func NewWaveSpawnSystem(em *ecs.EntityManager, rm *game.ResourceManager, lc *con
 	// Story 17.4: 创建并初始化行分配器
 	sys.laneAllocator = NewLaneAllocator(em)
 	// 冒险模式初始权重为 1，rowMax 根据场景类型确定（前院5行，后院6行）
-	rowMax := lc.RowMax
-	if rowMax == 0 {
-		rowMax = 5 // 默认值
+	rowMax := 5 // 默认值
+	if lc != nil && lc.RowMax > 0 {
+		rowMax = lc.RowMax
 	}
 	sys.laneAllocator.InitializeLanes(rowMax, 1.0)
 
