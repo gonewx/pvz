@@ -1,0 +1,57 @@
+schema: 1
+story: "18.3"
+story_title: "继续游戏对话框与场景恢复"
+gate: PASS
+status_reason: "所有验收标准已实现，代码质量优秀，测试覆盖充分，无阻塞问题"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-11-30T12:00:00+08:00"
+
+waiver: { active: false }
+
+top_issues: []
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
+  recommendations:
+    must_fix: []
+    monitor: []
+
+quality_score: 100
+expires: "2025-12-14T12:00:00+08:00"
+
+evidence:
+  tests_reviewed: 30
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "无外部输入验证风险，存档数据通过 BattleSerializer 安全加载"
+  performance:
+    status: PASS
+    notes: "恢复操作在场景初始化时一次性执行，对运行时无影响"
+  reliability:
+    status: PASS
+    notes: "完善的错误处理，单个实体恢复失败不影响整体流程"
+  maintainability:
+    status: PASS
+    notes: "代码结构清晰，注释完整，遵循 ECS 架构模式"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "考虑添加集成测试验证完整的保存/恢复流程"
+      refs: ["pkg/scenes/game_scene_save_test.go"]
+    - action: "扩展支持更多植物和僵尸类型"
+      refs: ["pkg/scenes/game_scene_init.go:restorePlants", "pkg/scenes/game_scene_init.go:restoreZombies"]
+
+files_reviewed:
+  - pkg/entities/dialog_factory.go
+  - pkg/entities/dialog_factory_test.go
+  - pkg/scenes/game_scene.go
+  - pkg/scenes/game_scene_init.go
+  - pkg/scenes/game_scene_save_test.go
+  - pkg/scenes/main_menu_dialogs.go

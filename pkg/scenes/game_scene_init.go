@@ -3,7 +3,9 @@ package scenes
 import (
 	"log"
 
+	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
+	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/modules"
@@ -282,16 +284,16 @@ func (s *GameScene) deleteBattleSave() {
 
 // restoreBattleState 从战斗存档恢复战斗状态
 //
-// Story 18.2: 战斗存档自动加载
+// Story 18.3: 继续游戏对话框与场景恢复
 //
 // 恢复流程：
 //  1. 获取当前用户的存档路径
 //  2. 使用 BattleSerializer.LoadBattle() 加载存档数据
 //  3. 恢复游戏状态（阳光、波次进度）
-//  4. 成功后删除存档（避免重复加载）
-//  5. 失败时记录日志，继续正常游戏
-//
-// 注意：实体恢复（植物、僵尸等）将在 Story 18.3 中实现
+//  4. 恢复所有实体（植物、僵尸、子弹、阳光、除草车）
+//  5. 恢复草坪网格占用状态
+//  6. 成功后删除存档（避免重复加载）
+//  7. 失败时记录日志，继续正常游戏
 func (s *GameScene) restoreBattleState() {
 	saveManager := s.gameState.GetSaveManager()
 	currentUser := saveManager.GetCurrentUser()
@@ -333,9 +335,16 @@ func (s *GameScene) restoreBattleState() {
 	log.Printf("[GameScene] 游戏状态已恢复: Sun=%d, Wave=%d, Time=%.1f",
 		s.gameState.Sun, s.gameState.CurrentWaveIndex, s.gameState.LevelTime)
 
-	// TODO: Story 18.3 将实现实体恢复（植物、僵尸等）
-	log.Printf("[GameScene] 实体恢复: Plants=%d, Zombies=%d (待 Story 18.3 实现)",
-		len(saveData.Plants), len(saveData.Zombies))
+	// Story 18.3: 恢复所有实体
+	s.restorePlants(saveData.Plants)
+	s.restoreZombies(saveData.Zombies)
+	s.restoreProjectiles(saveData.Projectiles)
+	s.restoreSuns(saveData.Suns)
+	s.restoreLawnmowers(saveData.Lawnmowers)
+
+	log.Printf("[GameScene] 实体恢复完成: Plants=%d, Zombies=%d, Projectiles=%d, Suns=%d, Lawnmowers=%d",
+		len(saveData.Plants), len(saveData.Zombies), len(saveData.Projectiles),
+		len(saveData.Suns), len(saveData.Lawnmowers))
 
 	// 跳过开场动画
 	s.isIntroAnimPlaying = false
@@ -355,4 +364,412 @@ func (s *GameScene) restoreBattleState() {
 	}
 
 	log.Printf("[GameScene] 战斗状态恢复完成!")
+}
+
+// restorePlants 恢复植物实体
+//
+// Story 18.3: 从存档数据重建植物实体
+//
+// 恢复内容：
+//   - 植物类型和位置（网格行列）
+//   - 生命值（当前/最大）
+//   - 攻击冷却时间
+//   - 草坪网格占用状态
+//
+// 简化处理：
+//   - 动画从 idle 状态开始
+//   - 眨眼计时器重置
+func (s *GameScene) restorePlants(plants []game.PlantData) {
+	for _, plantData := range plants {
+		// 将植物类型字符串转换为 PlantType
+		plantType := stringToPlantType(plantData.PlantType)
+		if plantType == components.PlantUnknown {
+			log.Printf("[GameScene] Warning: Unknown plant type '%s', skipping", plantData.PlantType)
+			continue
+		}
+
+		// 根据植物类型创建实体
+		var entityID ecs.EntityID
+		var err error
+
+		switch plantType {
+		case components.PlantSunflower, components.PlantPeashooter:
+			entityID, err = entities.NewPlantEntity(
+				s.entityManager,
+				s.resourceManager,
+				s.gameState,
+				s.reanimSystem,
+				plantType,
+				plantData.GridCol,
+				plantData.GridRow,
+			)
+		case components.PlantWallnut:
+			entityID, err = entities.NewWallnutEntity(
+				s.entityManager,
+				s.resourceManager,
+				s.gameState,
+				s.reanimSystem,
+				plantData.GridCol,
+				plantData.GridRow,
+			)
+		case components.PlantCherryBomb:
+			entityID, err = entities.NewCherryBombEntity(
+				s.entityManager,
+				s.resourceManager,
+				s.gameState,
+				plantData.GridCol,
+				plantData.GridRow,
+			)
+		default:
+			log.Printf("[GameScene] Warning: Unsupported plant type '%s', skipping", plantData.PlantType)
+			continue
+		}
+
+		if err != nil {
+			log.Printf("[GameScene] ERROR: Failed to restore plant %s at (%d,%d): %v",
+				plantData.PlantType, plantData.GridRow, plantData.GridCol, err)
+			continue
+		}
+
+		// 恢复生命值
+		if healthComp, ok := ecs.GetComponent[*components.HealthComponent](s.entityManager, entityID); ok {
+			healthComp.CurrentHealth = plantData.Health
+			healthComp.MaxHealth = plantData.MaxHealth
+		}
+
+		// 恢复攻击冷却（通过 TimerComponent）
+		if plantData.AttackCooldown > 0 {
+			if timerComp, ok := ecs.GetComponent[*components.TimerComponent](s.entityManager, entityID); ok {
+				timerComp.CurrentTime = timerComp.TargetTime - plantData.AttackCooldown
+				if timerComp.CurrentTime < 0 {
+					timerComp.CurrentTime = 0
+				}
+			}
+		}
+
+		// 更新草坪网格占用状态
+		if s.lawnGridSystem != nil && s.lawnGridEntityID != 0 {
+			if err := s.lawnGridSystem.OccupyCell(s.lawnGridEntityID, plantData.GridCol, plantData.GridRow, entityID); err != nil {
+				log.Printf("[GameScene] Warning: Failed to occupy grid cell (%d,%d): %v",
+					plantData.GridCol, plantData.GridRow, err)
+			}
+		}
+
+		log.Printf("[GameScene] Restored plant %s at (%d,%d), health=%d/%d",
+			plantData.PlantType, plantData.GridRow, plantData.GridCol, plantData.Health, plantData.MaxHealth)
+	}
+}
+
+// restoreZombies 恢复僵尸实体
+//
+// Story 18.3: 从存档数据重建僵尸实体
+//
+// 恢复内容：
+//   - 僵尸类型和位置（X, Y）
+//   - 生命值和护甲值
+//   - 速度
+//   - 行号
+//
+// 简化处理：
+//   - 行为状态简化为 walking（让系统重新判断）
+//   - 动画从 walk 状态开始
+func (s *GameScene) restoreZombies(zombies []game.ZombieData) {
+	for _, zombieData := range zombies {
+		// 跳过正在死亡的僵尸
+		if zombieData.BehaviorType == "dying" || zombieData.BehaviorType == "dying_explosion" {
+			log.Printf("[GameScene] Skipping dying zombie at (%.1f, %.1f)", zombieData.X, zombieData.Y)
+			continue
+		}
+
+		// 计算行号（从 Y 坐标推算，如果 Lane 未设置）
+		lane := zombieData.Lane
+		if lane == 0 {
+			// 从 Y 坐标推算行号
+			lane = int((zombieData.Y-config.GridWorldStartY)/config.CellHeight) + 1
+			if lane < 1 {
+				lane = 1
+			}
+			if lane > 5 {
+				lane = 5
+			}
+		}
+
+		// 根据僵尸类型创建实体
+		var entityID ecs.EntityID
+		var err error
+
+		switch zombieData.ZombieType {
+		case "basic":
+			entityID, err = entities.NewZombieEntity(s.entityManager, s.resourceManager, lane-1, zombieData.X)
+		case "conehead":
+			entityID, err = entities.NewConeheadZombieEntity(s.entityManager, s.resourceManager, lane-1, zombieData.X)
+		case "buckethead":
+			entityID, err = entities.NewBucketheadZombieEntity(s.entityManager, s.resourceManager, lane-1, zombieData.X)
+		default:
+			// 默认创建普通僵尸
+			entityID, err = entities.NewZombieEntity(s.entityManager, s.resourceManager, lane-1, zombieData.X)
+		}
+
+		if err != nil {
+			log.Printf("[GameScene] ERROR: Failed to restore zombie %s at (%.1f, %.1f): %v",
+				zombieData.ZombieType, zombieData.X, zombieData.Y, err)
+			continue
+		}
+
+		// 恢复位置（Y 坐标可能需要调整）
+		if posComp, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID); ok {
+			posComp.X = zombieData.X
+			posComp.Y = zombieData.Y
+		}
+
+		// 恢复生命值
+		if healthComp, ok := ecs.GetComponent[*components.HealthComponent](s.entityManager, entityID); ok {
+			healthComp.CurrentHealth = zombieData.Health
+			healthComp.MaxHealth = zombieData.MaxHealth
+		}
+
+		// 恢复护甲值（如果有）
+		if zombieData.ArmorHealth > 0 {
+			if armorComp, ok := ecs.GetComponent[*components.ArmorComponent](s.entityManager, entityID); ok {
+				armorComp.CurrentArmor = zombieData.ArmorHealth
+				armorComp.MaxArmor = zombieData.ArmorMax
+			}
+		}
+
+		// 恢复速度并激活僵尸
+		if velComp, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID); ok {
+			if zombieData.VelocityX != 0 {
+				velComp.VX = zombieData.VelocityX
+			} else {
+				// 如果没有保存速度，使用默认速度激活（僵尸标准移动速度）
+				velComp.VX = -23.0
+			}
+		}
+
+		// 设置行为状态为 walking（让 BehaviorSystem 重新判断是否需要切换到 eating）
+		if behaviorComp, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID); ok {
+			if zombieData.IsEating {
+				behaviorComp.ZombieAnimState = components.ZombieAnimEating
+			} else {
+				behaviorComp.ZombieAnimState = components.ZombieAnimWalking
+			}
+		}
+
+		// 添加目标行组件
+		ecs.AddComponent(s.entityManager, entityID, &components.ZombieTargetLaneComponent{
+			TargetRow: lane - 1,
+		})
+
+		log.Printf("[GameScene] Restored zombie %s at (%.1f, %.1f), lane=%d, health=%d/%d",
+			zombieData.ZombieType, zombieData.X, zombieData.Y, lane, zombieData.Health, zombieData.MaxHealth)
+	}
+}
+
+// restoreProjectiles 恢复子弹实体
+//
+// Story 18.3: 从存档数据重建子弹实体
+//
+// 恢复内容：
+//   - 子弹类型和位置
+//   - 速度
+//   - 伤害值
+//
+// 简化处理：
+//   - 只恢复豌豆子弹
+func (s *GameScene) restoreProjectiles(projectiles []game.ProjectileData) {
+	for _, projData := range projectiles {
+		// 目前只支持豌豆子弹
+		if projData.Type != "pea" {
+			log.Printf("[GameScene] Warning: Unsupported projectile type '%s', skipping", projData.Type)
+			continue
+		}
+
+		// 计算行号（从 Y 坐标推算）
+		row := int((projData.Y - config.GridWorldStartY) / config.CellHeight)
+		if row < 0 {
+			row = 0
+		}
+		if row > 4 {
+			row = 4
+		}
+
+		// 创建子弹实体
+		entityID := s.entityManager.CreateEntity()
+
+		// 添加位置组件
+		s.entityManager.AddComponent(entityID, &components.PositionComponent{
+			X: projData.X,
+			Y: projData.Y,
+		})
+
+		// 添加速度组件
+		velX := projData.VelocityX
+		if velX == 0 {
+			velX = config.PeaBulletSpeed // 默认速度
+		}
+		s.entityManager.AddComponent(entityID, &components.VelocityComponent{
+			VX: velX,
+			VY: 0,
+		})
+
+		// 添加行为组件
+		s.entityManager.AddComponent(entityID, &components.BehaviorComponent{
+			Type: components.BehaviorPeaProjectile,
+		})
+
+		// 添加碰撞组件
+		s.entityManager.AddComponent(entityID, &components.CollisionComponent{
+			Width:  config.PeaBulletWidth,
+			Height: config.PeaBulletHeight,
+		})
+
+		// 加载豌豆子弹图片
+		reanimXML := s.resourceManager.GetReanimXML("ProjectilePea")
+		partImages := s.resourceManager.GetReanimPartImages("ProjectilePea")
+		if reanimXML != nil && partImages != nil {
+			s.entityManager.AddComponent(entityID, &components.ReanimComponent{
+				ReanimName: "ProjectilePea",
+				ReanimXML:  reanimXML,
+				PartImages: partImages,
+			})
+			// 添加动画命令
+			ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
+				AnimationName: "anim_idle",
+				Processed:     false,
+			})
+		}
+
+		log.Printf("[GameScene] Restored projectile at (%.1f, %.1f), row=%d", projData.X, projData.Y, row)
+	}
+}
+
+// restoreSuns 恢复阳光实体
+//
+// Story 18.3: 从存档数据重建阳光实体
+//
+// 恢复内容：
+//   - 位置
+//   - 剩余生命周期
+//   - 收集状态
+//
+// 简化处理：
+//   - 收集动画状态重置（正在收集的阳光按已着陆处理）
+func (s *GameScene) restoreSuns(suns []game.SunData) {
+	for _, sunData := range suns {
+		// 跳过正在收集的阳光（简化处理）
+		if sunData.IsCollecting {
+			log.Printf("[GameScene] Skipping collecting sun at (%.1f, %.1f)", sunData.X, sunData.Y)
+			continue
+		}
+
+		// 创建静态阳光实体（已着陆状态）
+		entityID := entities.NewSunEntityStatic(s.entityManager, s.resourceManager, sunData.X, sunData.Y)
+
+		// 恢复剩余生命周期
+		if lifetimeComp, ok := ecs.GetComponent[*components.LifetimeComponent](s.entityManager, entityID); ok {
+			if sunData.Lifetime > 0 {
+				// 设置当前生命周期为 (最大 - 剩余)
+				lifetimeComp.CurrentLifetime = lifetimeComp.MaxLifetime - sunData.Lifetime
+				if lifetimeComp.CurrentLifetime < 0 {
+					lifetimeComp.CurrentLifetime = 0
+				}
+			}
+		}
+
+		// 确保阳光处于着陆状态
+		if sunComp, ok := ecs.GetComponent[*components.SunComponent](s.entityManager, entityID); ok {
+			sunComp.State = components.SunLanded
+		}
+
+		// 停止下落
+		if velComp, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID); ok {
+			velComp.VY = 0
+		}
+
+		log.Printf("[GameScene] Restored sun at (%.1f, %.1f), lifetime=%.1f", sunData.X, sunData.Y, sunData.Lifetime)
+	}
+}
+
+// restoreLawnmowers 恢复除草车实体
+//
+// Story 18.3: 从存档数据重建除草车实体
+//
+// 恢复内容：
+//   - 行号
+//   - 位置
+//   - 触发状态
+//   - 激活状态
+//
+// 注意：
+//   - 已触发且移出屏幕的除草车不恢复
+//   - 正在移动的除草车恢复位置和速度
+func (s *GameScene) restoreLawnmowers(lawnmowers []game.LawnmowerData) {
+	// 首先检查是否已经通过 initLawnmowers 创建了除草车
+	// 如果存档中有除草车数据，我们需要先清理默认创建的除草车
+	existingLawnmowers := ecs.GetEntitiesWith1[*components.LawnmowerComponent](s.entityManager)
+	for _, entityID := range existingLawnmowers {
+		s.entityManager.DestroyEntity(entityID)
+	}
+
+	for _, lmData := range lawnmowers {
+		// 跳过已触发且激活的除草车（已经移出屏幕）
+		if lmData.Triggered && lmData.Active && lmData.X > float64(WindowWidth)+100 {
+			log.Printf("[GameScene] Skipping lawnmower on lane %d (already moved off-screen)", lmData.Lane)
+			continue
+		}
+
+		// 创建除草车实体
+		entityID, err := entities.NewLawnmowerEntity(s.entityManager, s.resourceManager, lmData.Lane)
+		if err != nil {
+			log.Printf("[GameScene] ERROR: Failed to restore lawnmower on lane %d: %v", lmData.Lane, err)
+			continue
+		}
+
+		// 恢复位置
+		if posComp, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID); ok {
+			posComp.X = lmData.X
+		}
+
+		// 恢复状态
+		if lmComp, ok := ecs.GetComponent[*components.LawnmowerComponent](s.entityManager, entityID); ok {
+			lmComp.IsTriggered = lmData.Triggered
+			lmComp.IsMoving = lmData.Active
+
+			// 如果已触发，跳过入场动画
+			if lmData.Triggered || lmData.X >= config.LawnmowerStartX {
+				lmComp.IsEntering = false
+			}
+		}
+
+		// 如果正在移动，设置速度
+		if lmData.Active {
+			if velComp, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID); ok {
+				velComp.VX = config.LawnmowerSpeed
+			} else {
+				s.entityManager.AddComponent(entityID, &components.VelocityComponent{
+					VX: config.LawnmowerSpeed,
+					VY: 0,
+				})
+			}
+		}
+
+		log.Printf("[GameScene] Restored lawnmower on lane %d at X=%.1f, triggered=%v, active=%v",
+			lmData.Lane, lmData.X, lmData.Triggered, lmData.Active)
+	}
+}
+
+// stringToPlantType 将植物类型字符串转换为 PlantType
+func stringToPlantType(s string) components.PlantType {
+	switch s {
+	case "Sunflower", "sunflower":
+		return components.PlantSunflower
+	case "Peashooter", "peashooter":
+		return components.PlantPeashooter
+	case "Wallnut", "wallnut":
+		return components.PlantWallnut
+	case "CherryBomb", "cherrybomb":
+		return components.PlantCherryBomb
+	default:
+		return components.PlantUnknown
+	}
 }

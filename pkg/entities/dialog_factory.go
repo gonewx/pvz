@@ -361,3 +361,167 @@ func NewDialogEntityWithCallback(
 
 	return entity, nil
 }
+
+// NewContinueGameDialogEntity 创建继续游戏对话框实体
+//
+// Story 18.3: 继续游戏对话框与场景恢复
+//
+// 对话框布局：
+//
+//	┌─────────────────────────────────────────┐
+//	│              继续游戏?                   │
+//	│                                         │
+//	│   你想继续当前游戏还是重玩此关卡？         │
+//	│                                         │
+//	│      [继续]          [重玩关卡]          │ ← 第一行
+//	│               [取消]                    │ ← 第二行
+//	│                                         │
+//	└─────────────────────────────────────────┘
+//
+// 参数：
+//   - em: 实体管理器
+//   - rm: 资源管理器
+//   - info: 战斗存档信息（可选，用于显示详情）
+//   - windowWidth, windowHeight: 游戏窗口大小（用于居中）
+//   - onContinue: "继续"按钮回调
+//   - onRestart: "重玩关卡"按钮回调
+//   - onCancel: "取消"按钮回调
+//
+// 返回：
+//   - 对话框实体ID
+//   - 错误信息
+func NewContinueGameDialogEntity(
+	em *ecs.EntityManager,
+	rm *game.ResourceManager,
+	info *game.BattleSaveInfo,
+	windowWidth, windowHeight int,
+	onContinue, onRestart, onCancel func(),
+) (ecs.EntityID, error) {
+	// 加载九宫格资源
+	parts, err := loadDialogParts(rm)
+	if err != nil {
+		return 0, fmt.Errorf("加载对话框资源失败: %w", err)
+	}
+
+	// 加载按钮图片资源
+	btnLeftImg, err := rm.LoadImageByID("IMAGE_BUTTON_LEFT")
+	if err != nil {
+		return 0, fmt.Errorf("加载按钮左边图片失败: %w", err)
+	}
+
+	btnMiddleImg, err := rm.LoadImageByID("IMAGE_BUTTON_MIDDLE")
+	if err != nil {
+		return 0, fmt.Errorf("加载按钮中间图片失败: %w", err)
+	}
+
+	btnRightImg, err := rm.LoadImageByID("IMAGE_BUTTON_RIGHT")
+	if err != nil {
+		return 0, fmt.Errorf("加载按钮右边图片失败: %w", err)
+	}
+
+	// 构建对话框消息
+	message := "你想继续当前游戏还是重玩此关卡？"
+
+	// 固定对话框大小（适应两行按钮）
+	dialogWidth := 420.0
+	dialogHeight := 280.0 // 增加高度以容纳两行按钮
+
+	// 计算居中位置
+	x := float64(windowWidth)/2 - dialogWidth/2
+	y := float64(windowHeight)/2 - dialogHeight/2
+
+	// 创建对话框实体
+	entity := em.CreateEntity()
+
+	// 添加位置组件
+	ecs.AddComponent(em, entity, &components.PositionComponent{
+		X: x,
+		Y: y,
+	})
+
+	// 按钮尺寸常量
+	btnLeftWidth := float64(btnLeftImg.Bounds().Dx())
+	btnRightWidth := float64(btnRightImg.Bounds().Dx())
+	btnMiddleWidth := 80.0 // 按钮中间宽度（较小）
+	btnTotalWidth := btnLeftWidth + btnMiddleWidth + btnRightWidth
+	btnHeight := float64(btnLeftImg.Bounds().Dy())
+	btnSpacing := 20.0 // 按钮水平间距
+	rowSpacing := 10.0 // 行间距
+
+	// 避免编译警告
+	_ = btnRightWidth
+
+	// 第一行按钮位置计算（继续 + 重玩关卡）
+	row1ButtonCount := 2
+	row1TotalWidth := float64(row1ButtonCount)*btnTotalWidth + float64(row1ButtonCount-1)*btnSpacing
+	row1StartX := dialogWidth/2 - row1TotalWidth/2
+	row1Y := dialogHeight - 65.0 - btnHeight - rowSpacing // 第一行在第二行上方
+
+	// 第二行按钮位置计算（取消，居中）
+	row2Y := dialogHeight - 65.0 // 底部
+	row2StartX := dialogWidth/2 - btnTotalWidth/2
+
+	// 创建三个按钮
+	dialogButtons := []components.DialogButton{
+		// 按钮0: 继续（第一行左边）
+		{
+			Label:       "继续",
+			X:           row1StartX,
+			Y:           row1Y,
+			Width:       btnTotalWidth,
+			Height:      btnHeight,
+			LeftImage:   btnLeftImg,
+			MiddleImage: btnMiddleImg,
+			RightImage:  btnRightImg,
+			MiddleWidth: btnMiddleWidth,
+			OnClick:     onContinue,
+		},
+		// 按钮1: 重玩关卡（第一行右边）
+		{
+			Label:       "重玩关卡",
+			X:           row1StartX + btnTotalWidth + btnSpacing,
+			Y:           row1Y,
+			Width:       btnTotalWidth,
+			Height:      btnHeight,
+			LeftImage:   btnLeftImg,
+			MiddleImage: btnMiddleImg,
+			RightImage:  btnRightImg,
+			MiddleWidth: btnMiddleWidth,
+			OnClick:     onRestart,
+		},
+		// 按钮2: 取消（第二行居中）
+		{
+			Label:       "取消",
+			X:           row2StartX,
+			Y:           row2Y,
+			Width:       btnTotalWidth,
+			Height:      btnHeight,
+			LeftImage:   btnLeftImg,
+			MiddleImage: btnMiddleImg,
+			RightImage:  btnRightImg,
+			MiddleWidth: btnMiddleWidth,
+			OnClick:     onCancel,
+		},
+	}
+
+	// 添加对话框组件
+	ecs.AddComponent(em, entity, &components.DialogComponent{
+		Title:            "继续游戏?",
+		Message:          message,
+		Buttons:          dialogButtons,
+		Parts:            parts,
+		IsVisible:        true,
+		Width:            dialogWidth,
+		Height:           dialogHeight,
+		AutoClose:        true, // 点击后自动关闭
+		HoveredButtonIdx: -1,
+		PressedButtonIdx: -1,
+	})
+
+	// 添加 UI 组件标记
+	ecs.AddComponent(em, entity, &components.UIComponent{
+		State: components.UINormal,
+	})
+
+	return entity, nil
+}

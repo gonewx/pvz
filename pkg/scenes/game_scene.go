@@ -120,8 +120,8 @@ type GameScene struct {
 	soddingSystem *systems.SoddingSystem // 铺草皮动画系统（SodRoll 滚动动画）
 
 	// Story 8.3: Camera and Opening Animation Systems
-	cameraSystem       *systems.CameraSystem           // 镜头控制系统（镜头移动、缓动）
-	openingSystem      *systems.OpeningAnimationSystem // 开场动画系统（僵尸预告、跳过）
+	cameraSystem        *systems.CameraSystem           // 镜头控制系统（镜头移动、缓动）
+	openingSystem       *systems.OpeningAnimationSystem // 开场动画系统（僵尸预告、跳过）
 	readySetPlantSystem *systems.ReadySetPlantSystem    // ReadySetPlant 动画系统（铺草皮后播放）
 
 	// Story 8.3 + 8.4重构: Reward Animation System (完全封装奖励流程)
@@ -532,39 +532,7 @@ func NewGameSceneFromBattleSave(rm *game.ResourceManager, sm *game.SceneManager,
 // initPlantCardSystems initializes the plant selection module.
 // Story 3.1 架构优化：使用 PlantSelectionModule 统一管理所有选卡功能
 // Story 8.3: 使用 PlantUnlockManager 统一管理植物可用性
-//
-// 重构说明：
-//   - 旧方式：直接在 GameScene 中创建卡片实体和系统（分散）
-//   - 新方式：使用 PlantSelectionModule 统一封装（内聚）
-//
-// 优点：
-//   - 高内聚：所有选卡功能封装在单一模块中
-//   - 低耦合：GameScene 只通过模块接口交互
-//   - 可复用：模块可在不同场景（游戏中、选卡界面）使用
 
-// initMenuButton 初始化菜单按钮（ECS 架构）
-// 创建可复用的三段式按钮实体，文字自动居中
-
-// initPauseMenu 初始化暂停菜单（ECS 架构）
-// Story 10.1: 创建暂停菜单实体和三个按钮
-
-// initProgressBar 初始化关卡进度条（Story 11.2）
-// 创建进度条实体和渲染系统，关联到 LevelSystem
-
-// loadResources loads all UI images required for the game scene.
-// If a resource fails to load, it logs a warning but continues.
-// The Draw method will use fallback rendering for missing resources.
-
-// loadSoddingResources loads sodding animation resources after level config is loaded.
-// Story 8.2 QA改进：铺草皮动画资源加载
-// Story 8.3: 添加奖励面板资源加载
-//
-// This method must be called AFTER the level configuration is loaded,
-// because it depends on CurrentLevel.SodRowImage and CurrentLevel.ShowSoddingAnim.
-
-// Update updates the game scene logic.
-// deltaTime is the time elapsed since the last update in seconds.
-//
 // This method handles:
 //   - Intro animation (camera scrolling left → right → center)
 //   - ECS system updates (input, sun spawning, movement, collection, lifetime management)
