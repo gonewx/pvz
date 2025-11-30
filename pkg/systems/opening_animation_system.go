@@ -321,6 +321,7 @@ func (oas *OpeningAnimationSystem) updateGameStartState(openingComp *components.
 // Story 8.3.1: 预览僵尸是独立的展示实体，用于开场动画中的"情报侦察"功能。
 // 预览僵尸与实际关卡僵尸完全独立，不会参与游戏逻辑。
 // 每种类型的预览僵尸数量不超过关卡配置中该类型的实际数量。
+// 确保每种非普通僵尸类型至少显示一次（如果预览数量允许）。
 func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.OpeningAnimationComponent) {
 	// 获取每种僵尸类型在关卡配置中的数量
 	zombieTypeCounts := oas.getZombieTypeCounts()
@@ -330,29 +331,51 @@ func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.O
 		return
 	}
 
-	// 构建预览僵尸类型列表（每种类型的数量不超过配置中的数量）
-	var previewTypes []string
-	for zombieType, count := range zombieTypeCounts {
-		for i := 0; i < count; i++ {
-			previewTypes = append(previewTypes, zombieType)
-		}
-	}
-
-	// 计算实际预览数量（不超过可用僵尸总数）
+	// 计算实际预览数量
 	previewCount := oas.calculatePreviewZombieCount()
-	if previewCount > len(previewTypes) {
-		previewCount = len(previewTypes)
-	}
-
-	log.Printf("[OpeningAnimationSystem] Spawning %d preview zombies (available types: %v)", previewCount, zombieTypeCounts)
 
 	// 初始化随机数种子（使用当前时间）
 	rand.Seed(time.Now().UnixNano())
 
-	// 随机打乱预览类型列表
-	rand.Shuffle(len(previewTypes), func(i, j int) {
-		previewTypes[i], previewTypes[j] = previewTypes[j], previewTypes[i]
+	// 构建预览类型列表，确保非普通类型优先显示
+	// 1. 首先收集所有非 basic 类型（每种至少一个）
+	var priorityTypes []string   // 非普通类型（优先显示）
+	var remainingPool []string   // 剩余可用的僵尸池
+
+	for zombieType, count := range zombieTypeCounts {
+		if zombieType != "basic" {
+			// 非普通类型：第一个加入优先列表，其余加入池
+			priorityTypes = append(priorityTypes, zombieType)
+			for i := 1; i < count; i++ {
+				remainingPool = append(remainingPool, zombieType)
+			}
+		} else {
+			// basic 类型全部加入池
+			for i := 0; i < count; i++ {
+				remainingPool = append(remainingPool, zombieType)
+			}
+		}
+	}
+
+	// 2. 打乱优先列表和剩余池
+	rand.Shuffle(len(priorityTypes), func(i, j int) {
+		priorityTypes[i], priorityTypes[j] = priorityTypes[j], priorityTypes[i]
 	})
+	rand.Shuffle(len(remainingPool), func(i, j int) {
+		remainingPool[i], remainingPool[j] = remainingPool[j], remainingPool[i]
+	})
+
+	// 3. 构建最终预览列表：优先类型 + 剩余池
+	var previewTypes []string
+	previewTypes = append(previewTypes, priorityTypes...)
+	previewTypes = append(previewTypes, remainingPool...)
+
+	// 限制预览数量
+	if previewCount > len(previewTypes) {
+		previewCount = len(previewTypes)
+	}
+
+	log.Printf("[OpeningAnimationSystem] Spawning %d preview zombies (available types: %v, priority: %v)", previewCount, zombieTypeCounts, priorityTypes)
 
 	// 生成指定数量的预览僵尸
 	for i := 0; i < previewCount; i++ {
