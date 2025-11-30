@@ -9,6 +9,7 @@ import (
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/decker502/pvz/pkg/types"
 )
 
 // WaveSpawnSystem 波次生成系统
@@ -301,12 +302,12 @@ func (s *WaveSpawnSystem) ActivateWave(waveIndex int) int {
 				if behavior.ZombieAnimState == components.ZombieAnimIdle {
 					behavior.ZombieAnimState = components.ZombieAnimWalking
 					// Determine correct unit ID based on behavior type
-					unitID := "zombie"
+					unitID := types.UnitIDZombie
 					switch behavior.Type {
 					case components.BehaviorZombieConehead:
-						unitID = "zombie_conehead"
+						unitID = types.UnitIDZombieConehead
 					case components.BehaviorZombieBuckethead:
-						unitID = "zombie_buckethead"
+						unitID = types.UnitIDZombieBuckethead
 					}
 
 					ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
@@ -514,12 +515,12 @@ func (s *WaveSpawnSystem) spawnAndActivateZombie(zombieType string, lane int, wa
 	if behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID); ok {
 		behavior.ZombieAnimState = components.ZombieAnimWalking
 
-		unitID := "zombie"
+		unitID := types.UnitIDZombie
 		switch behavior.Type {
 		case components.BehaviorZombieConehead:
-			unitID = "zombie_conehead"
+			unitID = types.UnitIDZombieConehead
 		case components.BehaviorZombieBuckethead:
-			unitID = "zombie_buckethead"
+			unitID = types.UnitIDZombieBuckethead
 		}
 
 		ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
@@ -677,12 +678,12 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 		}
 
 		// Determine correct unit ID based on behavior type
-		unitID := "zombie"
+		unitID := types.UnitIDZombie
 		switch behavior.Type {
 		case components.BehaviorZombieConehead:
-			unitID = "zombie_conehead"
+			unitID = types.UnitIDZombieConehead
 		case components.BehaviorZombieBuckethead:
-			unitID = "zombie_buckethead"
+			unitID = types.UnitIDZombieBuckethead
 		}
 
 		// 使用组件通信替代直接调用

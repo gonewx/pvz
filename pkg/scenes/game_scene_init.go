@@ -737,9 +737,9 @@ func (s *GameScene) restoreZombies(zombies []game.ZombieData) {
 		}
 		switch zombieData.ZombieType {
 		case "conehead":
-			unitID = "zombie_cone"
+			unitID = "zombie_conehead"
 		case "buckethead":
-			unitID = "zombie_bucket"
+			unitID = "zombie_buckethead"
 		}
 		ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
 			UnitID:    unitID,

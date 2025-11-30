@@ -10,6 +10,7 @@ import (
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/decker502/pvz/pkg/types"
 )
 
 // LawnmowerSystem 除草车系统
@@ -468,7 +469,7 @@ func (s *LawnmowerSystem) triggerZombieDeathFallback(zombieID ecs.EntityID) {
 	// 3. 播放死亡动画（单次播放，不循环）
 	// 使用 AnimationCommand 组件播放配置的动画组合（自动隐藏装备轨道）
 	ecs.AddComponent(s.entityManager, zombieID, &components.AnimationCommandComponent{
-		UnitID:    "zombie",
+		UnitID:    types.UnitIDZombie,
 		ComboName: "death",
 		Processed: false,
 	})

@@ -6,6 +6,7 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/types"
 )
 
 // NewZombieEntity 创建普通僵尸实体
@@ -75,7 +76,7 @@ func NewZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spawnX f
 	// Story 17.10: 使用配置驱动的 ComboName 而不是直接指定 AnimationName
 	// 这样可以确保正确应用 hidden_tracks（例如隐藏路障/铁桶）
 	ecs.AddComponent(em, entityID, &components.AnimationCommandComponent{
-		UnitID:    "zombie",
+		UnitID:    types.UnitIDZombie,
 		ComboName: "idle",
 		Processed: false,
 	})
@@ -185,7 +186,7 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, 
 	// Story 17.10: 使用配置驱动的 ComboName 而不是直接指定 AnimationName
 	// 这样可以确保正确显示路障（不被隐藏）同时隐藏其他装备
 	ecs.AddComponent(em, entityID, &components.AnimationCommandComponent{
-		UnitID:    "zombie_conehead",
+		UnitID:    types.UnitIDZombieConehead,
 		ComboName: "idle",
 		Processed: false,
 	})
@@ -301,7 +302,7 @@ func NewBucketheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int
 	// Story 17.10: 使用配置驱动的 ComboName 而不是直接指定 AnimationName
 	// 这样可以确保正确显示铁桶（不被隐藏）同时隐藏其他装备
 	ecs.AddComponent(em, entityID, &components.AnimationCommandComponent{
-		UnitID:    "zombie_buckethead",
+		UnitID:    types.UnitIDZombieBuckethead,
 		ComboName: "idle",
 		Processed: false,
 	})

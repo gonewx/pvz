@@ -9,6 +9,7 @@ import (
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/decker502/pvz/pkg/types"
 )
 
 // 僵尸获胜流程常量
@@ -514,7 +515,7 @@ func (s *ZombiesWonPhaseSystem) createZombiesWonAnimation() {
 	// ✅ 使用配置文件播放动画 (data/reanim_config/zombieswon.yaml)
 	// combo "appear" 配置: loop=false, speed=1.0
 	ecs.AddComponent(s.entityManager, zombiesWonEntity, &components.AnimationCommandComponent{
-		UnitID:    "zombieswon",
+		UnitID:    types.UnitIDZombiesWon,
 		ComboName: "appear",
 		Processed: false,
 	})

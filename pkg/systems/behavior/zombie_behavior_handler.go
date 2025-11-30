@@ -7,6 +7,7 @@ import (
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/entities"
+	"github.com/decker502/pvz/pkg/types"
 	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -188,7 +189,7 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 	// 使用组件通信替代直接调用
 	// 使用配置驱动的动画组合（自动隐藏装备轨道）
 	ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
-		UnitID:    "zombie",
+		UnitID:    types.UnitIDZombie,
 		ComboName: "death",
 		Processed: false,
 	})
@@ -905,8 +906,8 @@ func (s *BehaviorSystem) triggerZombieExplosionDeath(entityID ecs.EntityID) {
 	//    Story 5.4.1: ReanimSystem.PlayCombo 现在支持单位切换
 	//    当 UnitID 与当前 ReanimName 不同时，自动重新加载 Reanim 数据
 	ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
-		UnitID:    "zombie_charred", // 指向 zombie_charred 配置
-		ComboName: "death",          // 配置中的 death 组合
+		UnitID:    types.UnitIDZombieCharred, // 指向 zombie_charred 配置
+		ComboName: "death",                   // 配置中的 death 组合
 		Processed: false,
 	})
 	log.Printf("[BehaviorSystem] 僵尸 %d 添加烧焦死亡动画命令 (zombie_charred/death)", entityID)

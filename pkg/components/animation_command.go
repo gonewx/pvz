@@ -18,9 +18,9 @@ package components
 //
 // 示例:
 //
-//	// 场景1: 僵尸死亡动画
+//	// 场景1: 僵尸死亡动画 (使用 types.UnitIDZombie 常量)
 //	ecs.AddComponent(em, zombieID, &AnimationCommandComponent{
-//	    UnitID:    "zombie",
+//	    UnitID:    types.UnitIDZombie,
 //	    ComboName: "death",
 //	})
 //

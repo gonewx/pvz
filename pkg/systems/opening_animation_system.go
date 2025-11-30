@@ -11,6 +11,7 @@ import (
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/decker502/pvz/pkg/types"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
@@ -406,7 +407,7 @@ func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.O
 		})
 
 		// 根据僵尸类型获取对应的 UnitID（用于显示正确的装备外观）
-		unitID := oas.zombieTypeToUnitID(zombieType)
+		unitID := types.ZombieTypeToUnitID(zombieType)
 
 		// 添加 ReanimComponent 播放 idle 动画
 		// 所有僵尸类型都使用基础 "Zombie" 动画资源，通过 UnitID 控制装备显示
@@ -466,28 +467,6 @@ func (oas *OpeningAnimationSystem) getZombieTypeCounts() map[string]int {
 	}
 
 	return counts
-}
-
-// zombieTypeToUnitID 将僵尸类型字符串转换为动画配置的 UnitID。
-// UnitID 用于 AnimationCommand 组件，以正确显示僵尸的装备外观（路障/铁桶等）。
-func (oas *OpeningAnimationSystem) zombieTypeToUnitID(zombieType string) string {
-	switch zombieType {
-	case "basic":
-		return "zombie"
-	case "conehead":
-		return "zombie_conehead"
-	case "buckethead":
-		return "zombie_buckethead"
-	case "flag":
-		return "zombie_flag"
-	case "newspaper":
-		return "zombie_newspaper"
-	case "polevaulter":
-		return "zombie_polevaulter"
-	default:
-		// 默认返回基础僵尸
-		return "zombie"
-	}
 }
 
 // calculatePreviewZombieCount 计算预览僵尸数量。
