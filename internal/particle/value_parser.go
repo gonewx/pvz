@@ -343,7 +343,9 @@ func ParseValue(s string) (min, max float64, keyframes []Keyframe, interpolation
 
 						// 检查是否是 PopCap 触发格式："value1,timePercent value2,timePercent"
 						// 用于 Flash 触发：在特定时间点从 value1 跳变到 value2
-						if val2 > 1 && i+1 < len(parts) && strings.Contains(parts[i+1], ",") && initialValue == nil {
+						// 触发格式的特征：timePercent 应该 > 10（表示百分比如 50%、95%）
+						// 排除标准 time,value 格式：如果 val2 <= 10，这更可能是秒或帧编号
+						if val2 > 10 && i+1 < len(parts) && strings.Contains(parts[i+1], ",") && initialValue == nil {
 							// 尝试解析下一个逗号对
 							nextParts := strings.Split(parts[i+1], ",")
 							if len(nextParts) == 2 {
@@ -372,8 +374,9 @@ func ParseValue(s string) (min, max float64, keyframes []Keyframe, interpolation
 						}
 
 						// 检查是否是 PopCap 保持-插值格式："initialValue,timePercent finalValue"
-						// 条件：val2 > 1，后面有值，但没有初始值（initialValue == nil）
-						if val2 > 1 && i+1 < len(parts) && !strings.Contains(parts[i+1], ",") && initialValue == nil {
+						// 条件：val2 > 10（表示百分比），后面有值，但没有初始值（initialValue == nil）
+						// 排除标准 time,value 格式：如果 val2 <= 10，这更可能是秒或帧编号
+						if val2 > 10 && i+1 < len(parts) && !strings.Contains(parts[i+1], ",") && initialValue == nil {
 							// 尝试解析后续值
 							nextVal, err := strconv.ParseFloat(parts[i+1], 64)
 							if err == nil {

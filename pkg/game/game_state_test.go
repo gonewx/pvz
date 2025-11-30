@@ -20,14 +20,14 @@ func TestGameStateSingleton(t *testing.T) {
 }
 
 // TestGameStateInitialValue 测试初始阳光值
-// 注意：当前为测试设置为500，原版游戏为50
+// 默认值为50，加载关卡后会被 levelConfig.InitialSun 覆盖
 func TestGameStateInitialValue(t *testing.T) {
 	// 重置全局状态以测试初始化
 	globalGameState = nil
 	gs := GetGameState()
 
-	if gs.Sun != 500 {
-		t.Errorf("Expected initial sun to be 500, got %d", gs.Sun)
+	if gs.Sun != 50 {
+		t.Errorf("Expected initial sun to be 50, got %d", gs.Sun)
 	}
 }
 

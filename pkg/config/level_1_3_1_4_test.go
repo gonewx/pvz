@@ -30,10 +30,10 @@ func TestLevel1_3_Configuration(t *testing.T) {
 		}
 	})
 
-	// 验证波次配置：1面旗帜（2个小波次 + 1个旗帜波）
+	// 验证波次配置：1面旗帜（8波：7个小波次 + 1个旗帜波）
 	t.Run("波次配置", func(t *testing.T) {
-		if len(config.Waves) != 3 {
-			t.Errorf("Expected 3 waves (2 small + 1 flag), got %d", len(config.Waves))
+		if len(config.Waves) != 8 {
+			t.Errorf("Expected 8 waves (7 small + 1 flag), got %d", len(config.Waves))
 		}
 
 		// 统计旗帜数量
@@ -126,10 +126,10 @@ func TestLevel1_4_Configuration(t *testing.T) {
 		}
 	})
 
-	// 验证波次配置：1面旗帜（3个小波次 + 1个旗帜波）
+	// 验证波次配置：1面旗帜（10波：9个小波次 + 1个旗帜波）
 	t.Run("波次配置", func(t *testing.T) {
-		if len(config.Waves) != 4 {
-			t.Errorf("Expected 4 waves (3 small + 1 flag), got %d", len(config.Waves))
+		if len(config.Waves) != 10 {
+			t.Errorf("Expected 10 waves (9 small + 1 flag), got %d", len(config.Waves))
 		}
 
 		// 统计旗帜数量
@@ -171,22 +171,22 @@ func TestLevel1_4_Configuration(t *testing.T) {
 		}
 	})
 
-	// 验证僵尸类型包含铁桶僵尸
+	// 验证僵尸类型包含路障僵尸（conehead）
 	t.Run("僵尸类型验证", func(t *testing.T) {
-		hasBuckethead := false
+		hasConehead := false
 		for _, wave := range config.Waves {
 			for _, zombieGroup := range wave.Zombies {
-				if zombieGroup.Type == "buckethead" {
-					hasBuckethead = true
+				if zombieGroup.Type == "conehead" {
+					hasConehead = true
 					break
 				}
 			}
-			if hasBuckethead {
+			if hasConehead {
 				break
 			}
 		}
-		if !hasBuckethead {
-			t.Error("Expected level 1-4 to include buckethead zombies")
+		if !hasConehead {
+			t.Error("Expected level 1-4 to include conehead zombies")
 		}
 	})
 }

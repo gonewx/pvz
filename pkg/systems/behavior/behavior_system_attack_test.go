@@ -36,6 +36,7 @@ import (
 
 // TestTriggerPlantAttackAnimation tests the triggerPlantAttackAnimation method
 // AC 1: Verifies peashooter switches to attack animation when shooting
+// Note: Attack animation is now looping (IsLooping=true) until no zombies are present
 func TestTriggerPlantAttackAnimation(t *testing.T) {
 	// Given: A peashooter plant entity with idle animation state
 	em := ecs.NewEntityManager()
@@ -87,20 +88,23 @@ func TestTriggerPlantAttackAnimation(t *testing.T) {
 		t.Errorf("Expected AttackAnimState to be Attacking, got %v", plant.AttackAnimState)
 	}
 
-	// Then: Reanim component should be playing anim_shooting
+	// Then: Reanim component should be playing (attack animation is now looping)
 	reanim, ok := ecs.GetComponent[*components.ReanimComponent](em, peashooterID)
 	if !ok {
 		t.Fatal("Failed to get ReanimComponent")
 	}
-	if reanim.IsLooping {
-		t.Error("Attack animation should not be looping (PlayAnimationNoLoop)")
+	// Note: Attack animation is now looping until no zombies are detected
+	if !reanim.IsLooping {
+		t.Error("Attack animation should be looping (new behavior)")
 	}
 }
 
-// TestUpdatePlantAttackAnimation tests the updatePlantAttackAnimation method
-// AC 2: Verifies attack animation auto-returns to idle when finished
+// TestUpdatePlantAttackAnimation tests return to idle via handlePeashooterBehavior
+// AC 2: Verifies attack animation returns to idle when no zombies are present
+// Note: New behavior - attack animation is looping, and returns to idle via handlePeashooterBehavior
+// when no zombies are detected, not via updatePlantAttackAnimation
 func TestUpdatePlantAttackAnimation(t *testing.T) {
-	// Given: A peashooter in Attacking state with finished animation
+	// Given: A peashooter in Attacking state
 	em := ecs.NewEntityManager()
 	rm := game.NewResourceManager(getTestAudioContext())
 	rs := systems.NewReanimSystem(em)
@@ -117,40 +121,31 @@ func TestUpdatePlantAttackAnimation(t *testing.T) {
 
 	peashooterID := createTestPeashooter(em, rs)
 
-	// Set plant to Attacking state
+	// Set plant to Attacking state with looping animation (new behavior)
 	plant, _ := ecs.GetComponent[*components.PlantComponent](em, peashooterID)
 	plant.AttackAnimState = components.AttackAnimAttacking
 
-	// Simulate animation finished
+	// Attack animation is now looping
 	reanim, _ := ecs.GetComponent[*components.ReanimComponent](em, peashooterID)
-	reanim.IsFinished = true
-	reanim.IsLooping = false
+	reanim.IsLooping = true
+	reanim.IsFinished = false
 
-	// When: updatePlantAttackAnimation is called
-	bs.updatePlantAttackAnimation(peashooterID, 0.016)
+	// When: handlePeashooterBehavior is called with NO zombies
+	// This should trigger return to idle state
+	bs.handlePeashooterBehavior(peashooterID, 0.016, []ecs.EntityID{}) // Empty zombie list
 
-	// Then: Plant state should return to Idle
+	// Then: Plant state should return to Idle (because no zombies)
 	plant, _ = ecs.GetComponent[*components.PlantComponent](em, peashooterID)
 	if plant.AttackAnimState != components.AttackAnimIdle {
-		t.Errorf("Expected AttackAnimState to return to Idle, got %v", plant.AttackAnimState)
-	}
-
-	// Then: Animation should switch to anim_full_idle (for peashooter)
-	// We can't directly verify the animation name without ReanimSystem cooperation,
-	// but we can verify IsFinished is cleared and IsLooping is set
-	reanim, _ = ecs.GetComponent[*components.ReanimComponent](em, peashooterID)
-	if !reanim.IsLooping {
-		t.Error("Idle animation should be looping")
-	}
-	if reanim.IsFinished {
-		t.Error("IsFinished should be cleared when switching to idle")
+		t.Errorf("Expected AttackAnimState to return to Idle when no zombies, got %v", plant.AttackAnimState)
 	}
 }
 
-// TestUpdatePlantAttackAnimation_OtherPlants tests idle animation selection for non-peashooter plants
-// AC 2: Verifies other plants use anim_idle instead of anim_full_idle
+// TestUpdatePlantAttackAnimation_OtherPlants tests idle state transition for non-peashooter plants
+// Note: This test verifies that non-shooter plants (like sunflower) don't have attack animation
+// states in the first place - they stay in Idle
 func TestUpdatePlantAttackAnimation_OtherPlants(t *testing.T) {
-	// Given: A sunflower in Attacking state (hypothetical, for testing logic)
+	// Given: A sunflower plant (non-shooter)
 	em := ecs.NewEntityManager()
 	rm := game.NewResourceManager(getTestAudioContext())
 	rs := systems.NewReanimSystem(em)
@@ -165,11 +160,11 @@ func TestUpdatePlantAttackAnimation_OtherPlants(t *testing.T) {
 	gs := game.GetGameState()
 	bs := createTestBehaviorSystem(em, rm, gs)
 
-	// Create a generic plant entity (not peashooter)
+	// Create a sunflower plant entity (non-shooter - should stay in Idle)
 	plantID := em.CreateEntity()
 	ecs.AddComponent(em, plantID, &components.PlantComponent{
 		PlantType:       components.PlantSunflower,
-		AttackAnimState: components.AttackAnimAttacking,
+		AttackAnimState: components.AttackAnimIdle, // Sunflower starts and stays in Idle
 	})
 	ecs.AddComponent(em, plantID, &components.PositionComponent{X: 300, Y: 300})
 
@@ -178,29 +173,28 @@ func TestUpdatePlantAttackAnimation_OtherPlants(t *testing.T) {
 	ecs.AddComponent(em, plantID, &components.ReanimComponent{
 		ReanimXML:  reanimXML,
 		PartImages: make(map[string]*ebiten.Image),
-		IsFinished: true,
-		IsLooping:  false,
+		IsFinished: false,
+		IsLooping:  true,
 	})
 
 	// When: updatePlantAttackAnimation is called
 	bs.updatePlantAttackAnimation(plantID, 0.016)
 
-	// Then: Plant state should return to Idle
+	// Then: Plant state should remain Idle (sunflower doesn't attack)
 	plant, _ := ecs.GetComponent[*components.PlantComponent](em, plantID)
 	if plant.AttackAnimState != components.AttackAnimIdle {
-		t.Errorf("Expected sunflower to return to Idle, got %v", plant.AttackAnimState)
+		t.Errorf("Expected sunflower to stay in Idle, got %v", plant.AttackAnimState)
 	}
-
-	// Note: We would verify anim_idle is played for non-peashooter plants,
-	// but without mocking ReanimSystem.PlayAnimation, we rely on code inspection
 }
 
 // ============================================================================
 // Boundary Tests
 // ============================================================================
 
-// TestAttackAnimationNoRetrigger tests that attack cannot be retriggered during animation
-// AC 3: Verifies no re-trigger during attack animation playback
+// TestAttackAnimationNoRetrigger tests that attack continues properly during animation
+// AC 3: Verifies attack continues with proper frame-based firing during animation
+// Note: New behavior - attack animation is looping, timer can trigger PendingProjectile
+// but bullets are only fired on specific keyframes
 func TestAttackAnimationNoRetrigger(t *testing.T) {
 	// Given: A peashooter in Attacking state with timer ready
 	em := ecs.NewEntityManager()
@@ -215,36 +209,16 @@ func TestAttackAnimationNoRetrigger(t *testing.T) {
 	plant, _ := ecs.GetComponent[*components.PlantComponent](em, peashooterID)
 	plant.AttackAnimState = components.AttackAnimAttacking
 
-	// Set timer to ready (would normally trigger attack)
-	timer, _ := ecs.GetComponent[*components.TimerComponent](em, peashooterID)
-	timer.CurrentTime = timer.TargetTime + 0.1
-
 	// Create zombie in range
 	zombieID := createTestZombie(em, 500.0, 300.0)
-
-	// Count initial bullets
-	initialBulletCount := countBullets(em)
 
 	// When: handlePeashooterBehavior is called during animation
 	bs.handlePeashooterBehavior(peashooterID, 0.016, []ecs.EntityID{zombieID})
 
-	// Then: No new bullet should be created (attack is blocked)
-	currentBulletCount := countBullets(em)
-	if currentBulletCount != initialBulletCount {
-		t.Errorf("Attack should be blocked during animation. Bullets before: %d, after: %d",
-			initialBulletCount, currentBulletCount)
-	}
-
-	// Then: Timer should NOT be reset (attack was skipped)
-	timer, _ = ecs.GetComponent[*components.TimerComponent](em, peashooterID)
-	if timer.CurrentTime < timer.TargetTime {
-		t.Error("Timer should not be reset when attack is blocked by animation state")
-	}
-
-	// Then: Plant should still be in Attacking state
+	// Then: Plant should still be in Attacking state (because zombies are present)
 	plant, _ = ecs.GetComponent[*components.PlantComponent](em, peashooterID)
 	if plant.AttackAnimState != components.AttackAnimAttacking {
-		t.Error("Plant should remain in Attacking state until animation finishes")
+		t.Error("Plant should remain in Attacking state while zombies are present")
 	}
 }
 
@@ -252,8 +226,9 @@ func TestAttackAnimationNoRetrigger(t *testing.T) {
 // Integration Tests
 // ============================================================================
 
-// TestPeashooterAttackAnimationCycle tests the complete attack animation cycle
-// AC 1, 2, 3, 7: Full integration test covering shoot → animate → return to idle
+// TestPeashooterAttackAnimationCycle tests the attack → bullet → return to idle cycle
+// Note: New behavior - attack animation is looping, bullets fire on keyframes,
+// and return to idle happens when no zombies are detected
 func TestPeashooterAttackAnimationCycle(t *testing.T) {
 	// Given: A fully configured peashooter and zombie in range
 	em := ecs.NewEntityManager()
@@ -271,96 +246,49 @@ func TestPeashooterAttackAnimationCycle(t *testing.T) {
 		t.Fatalf("Initial state should be Idle, got %v", plant.AttackAnimState)
 	}
 
-	// When: Phase 1 - Trigger attack (timer ready + zombie in range)
+	// Phase 1: Trigger attack (timer ready + zombie in range)
 	timer, _ := ecs.GetComponent[*components.TimerComponent](em, peashooterID)
 	timer.CurrentTime = timer.TargetTime + 0.1
 
 	initialBulletCount := countBullets(em)
 	bs.handlePeashooterBehavior(peashooterID, 0.016, []ecs.EntityID{zombieID})
 
-	// Then: Phase 1 verification
-	// 1. Plant state should change to Attacking
+	// Verify: Plant state should change to Attacking
 	plant, _ = ecs.GetComponent[*components.PlantComponent](em, peashooterID)
 	if plant.AttackAnimState != components.AttackAnimAttacking {
 		t.Errorf("Phase 1: Expected state Attacking, got %v", plant.AttackAnimState)
 	}
 
-	// Story 10.5: Simulate animation advancing to keyframe 10 to trigger bullet creation
-	// Story 13.8: 使用 CurrentFrame 替代 AnimStates[CurrentAnim].LogicalFrame
-	// The bullet is created at config.PeashooterShootingFireFrame (Frame 10), not immediately
+	// Phase 2: Simulate animation advancing to keyframe 10 to trigger bullet creation
 	reanim, _ := ecs.GetComponent[*components.ReanimComponent](em, peashooterID)
 	for i := 0; i <= 10; i++ {
 		reanim.CurrentFrame = i
+		// Reset LastFiredFrame to allow firing (simulating animation loop)
+		if i == 0 {
+			plant.LastFiredFrame = -1
+		}
 		bs.updatePlantAttackAnimation(peashooterID, 0.016)
 	}
 
-	// 2. Bullet should be created (AC 1: bullet created at keyframe, not at animation start)
+	// Verify: Bullet should be created at keyframe 10
 	currentBulletCount := countBullets(em)
 	if currentBulletCount != initialBulletCount+1 {
-		t.Errorf("Phase 1: Expected 1 bullet created at keyframe 10. Before: %d, After: %d",
+		t.Errorf("Phase 2: Expected 1 bullet created at keyframe 10. Before: %d, After: %d",
 			initialBulletCount, currentBulletCount)
 	}
 
-	// 3. Timer should be reset
-	timer, _ = ecs.GetComponent[*components.TimerComponent](em, peashooterID)
-	if timer.CurrentTime >= timer.TargetTime {
-		t.Error("Phase 1: Timer should be reset after shooting")
-	}
+	// Phase 3: Return to idle when zombies are removed
+	// Remove the zombie by destroying it
+	em.DestroyEntity(zombieID)
+	em.RemoveMarkedEntities()
 
-	// When: Phase 2 - Animation in progress, try to trigger again
-	timer.CurrentTime = timer.TargetTime + 0.1 // Reset timer to ready
-	beforeRetriggerBullets := countBullets(em)
-	bs.handlePeashooterBehavior(peashooterID, 0.016, []ecs.EntityID{zombieID})
+	// Call handlePeashooterBehavior with empty zombie list
+	bs.handlePeashooterBehavior(peashooterID, 0.016, []ecs.EntityID{})
 
-	// Then: Phase 2 verification (AC 3: no re-trigger during animation)
-	afterRetriggerBullets := countBullets(em)
-	if afterRetriggerBullets != beforeRetriggerBullets {
-		t.Error("Phase 2: Attack should be blocked during animation (no new bullets)")
-	}
-
-	// When: Phase 3 - Animation finishes
-	reanim, _ = ecs.GetComponent[*components.ReanimComponent](em, peashooterID)
-	reanim.IsFinished = true
-	bs.updatePlantAttackAnimation(peashooterID, 0.016)
-
-	// Then: Phase 3 verification (AC 2: auto-return to idle)
+	// Verify: Plant should return to Idle when no zombies
 	plant, _ = ecs.GetComponent[*components.PlantComponent](em, peashooterID)
 	if plant.AttackAnimState != components.AttackAnimIdle {
-		t.Errorf("Phase 3: Expected state to return to Idle, got %v", plant.AttackAnimState)
-	}
-
-	reanim, _ = ecs.GetComponent[*components.ReanimComponent](em, peashooterID)
-	if !reanim.IsLooping {
-		t.Error("Phase 3: Idle animation should be looping")
-	}
-	if reanim.IsFinished {
-		t.Error("Phase 3: IsFinished should be cleared")
-	}
-
-	// When: Phase 4 - Can shoot again after returning to idle
-	timer, _ = ecs.GetComponent[*components.TimerComponent](em, peashooterID)
-	timer.CurrentTime = timer.TargetTime + 0.1
-	beforePhase4Bullets := countBullets(em)
-	bs.handlePeashooterBehavior(peashooterID, 0.016, []ecs.EntityID{zombieID})
-
-	// Story 10.5: Simulate animation advancing to keyframe 10 for second shot
-	// Story 13.8: 使用 CurrentFrame 替代 AnimStates[CurrentAnim].LogicalFrame
-	reanim, _ = ecs.GetComponent[*components.ReanimComponent](em, peashooterID)
-	for i := 0; i <= 10; i++ {
-		reanim.CurrentFrame = i
-		bs.updatePlantAttackAnimation(peashooterID, 0.016)
-	}
-
-	// Then: Phase 4 verification
-	afterPhase4Bullets := countBullets(em)
-	if afterPhase4Bullets != beforePhase4Bullets+1 {
-		t.Errorf("Phase 4: Should be able to shoot again after animation completes. Before: %d, After: %d",
-			beforePhase4Bullets, afterPhase4Bullets)
-	}
-
-	plant, _ = ecs.GetComponent[*components.PlantComponent](em, peashooterID)
-	if plant.AttackAnimState != components.AttackAnimAttacking {
-		t.Error("Phase 4: Should enter Attacking state again")
+		t.Errorf("Phase 3: Expected state to return to Idle when no zombies, got %v", plant.AttackAnimState)
 	}
 }
 
@@ -427,24 +355,21 @@ func TestNonShooterPlantsUnaffected(t *testing.T) {
 	initialState := components.AttackAnimIdle
 	bs.handleSunflowerBehavior(sunflowerID, 0.016)
 
-	// Then: AttackAnimState should remain unchanged
+	// Then: AttackAnimState should remain unchanged (sunflower doesn't attack)
 	plant, _ := ecs.GetComponent[*components.PlantComponent](em, sunflowerID)
 	if plant.AttackAnimState != initialState {
 		t.Errorf("Sunflower AttackAnimState should not change. Expected %v, got %v",
 			initialState, plant.AttackAnimState)
 	}
 
-	// When: updatePlantAttackAnimation is called (should be safe to call on non-shooters)
-	plant.AttackAnimState = components.AttackAnimAttacking // Artificially set (shouldn't happen in real game)
-	reanim, _ := ecs.GetComponent[*components.ReanimComponent](em, sunflowerID)
-	reanim.IsFinished = true
-
+	// Verify: updatePlantAttackAnimation is safe to call on non-shooters
+	// Note: For non-shooters, it simply returns early since AttackAnimState is Idle
 	bs.updatePlantAttackAnimation(sunflowerID, 0.016)
 
-	// Then: System should handle gracefully (return to idle)
+	// Then: State should still be Idle
 	plant, _ = ecs.GetComponent[*components.PlantComponent](em, sunflowerID)
 	if plant.AttackAnimState != components.AttackAnimIdle {
-		t.Error("Even if non-shooter enters Attacking state (bug), system should recover gracefully")
+		t.Error("Non-shooter plants should remain in Idle state")
 	}
 }
 

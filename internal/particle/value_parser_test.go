@@ -133,10 +133,12 @@ func TestParseValue_Interpolation(t *testing.T) {
 		wantKeysCount int
 	}{
 		{
+			// PopCap 快速插值格式："initialValue finalValue,timePercent"
+			// 解析为 3 个关键帧：初始值、目标值、保持值
 			name:          "Linear interpolation",
 			input:         ".4 Linear 10,9.999999",
 			wantInterp:    "Linear",
-			wantKeysCount: 2,
+			wantKeysCount: 3,
 		},
 		{
 			name:          "EaseIn interpolation",
@@ -350,17 +352,21 @@ func TestRandomInRange(t *testing.T) {
 func TestParseValue_ZombieHeadFormats(t *testing.T) {
 	t.Run("SystemAlpha: PopCap format '1,95 0'", func(t *testing.T) {
 		// Format: "initialValue,timePercent finalValue"
-		// "1,95 0" means: start at 1, change to 0 at 95% time
+		// "1,95 0" means: start at 1, hold until 95% time, then fade to 0
+		// 解析为 3 个关键帧：初始值、保持值、最终值
 		_, _, keyframes, _ := ParseValue("1,95 0")
-		if len(keyframes) != 2 {
-			t.Errorf("Expected 2 keyframes, got %d", len(keyframes))
+		if len(keyframes) != 3 {
+			t.Errorf("Expected 3 keyframes, got %d", len(keyframes))
 		}
-		if len(keyframes) >= 2 {
+		if len(keyframes) >= 3 {
 			if keyframes[0].Time != 0 || keyframes[0].Value != 1 {
 				t.Errorf("First keyframe = {%v, %v}, want {0, 1}", keyframes[0].Time, keyframes[0].Value)
 			}
-			if math.Abs(keyframes[1].Time-0.95) > 0.001 || keyframes[1].Value != 0 {
-				t.Errorf("Second keyframe = {%v, %v}, want {0.95, 0}", keyframes[1].Time, keyframes[1].Value)
+			if math.Abs(keyframes[1].Time-0.95) > 0.001 || keyframes[1].Value != 1 {
+				t.Errorf("Second keyframe = {%v, %v}, want {0.95, 1} (hold)", keyframes[1].Time, keyframes[1].Value)
+			}
+			if keyframes[2].Time != 1 || keyframes[2].Value != 0 {
+				t.Errorf("Third keyframe = {%v, %v}, want {1, 0}", keyframes[2].Time, keyframes[2].Value)
 			}
 		}
 	})

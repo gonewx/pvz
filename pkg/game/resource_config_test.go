@@ -45,7 +45,7 @@ func TestLoadResourceConfig(t *testing.T) {
 	}
 
 	// Verify some groups exist
-	expectedGroups := []string{"init", "loadingimages", "loadingsounds"}
+	expectedGroups := []string{"DelayLoad_Almanac", "DelayLoad_Background1", "DelayLoad_Store"}
 	for _, groupName := range expectedGroups {
 		if _, exists := rm.config.Groups[groupName]; !exists {
 			t.Errorf("Expected group '%s' not found in config", groupName)
@@ -58,7 +58,7 @@ func TestLoadResourceConfig(t *testing.T) {
 	}
 
 	// Verify some specific resource IDs are mapped
-	expectedIDs := []string{"IMAGE_BLANK", "SOUND_BUTTONCLICK"}
+	expectedIDs := []string{"IMAGE_BLANK", "IMAGE_ALMANAC_INDEXBACK"}
 	for _, id := range expectedIDs {
 		if _, exists := rm.resourceMap[id]; !exists {
 			t.Errorf("Expected resource ID '%s' not found in resource map", id)

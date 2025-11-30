@@ -7,8 +7,9 @@ import (
 )
 
 // 测试用的摄像机位置常量
+// 注意：这应该与 config.GameCameraX (220.0) 匹配才能使屏幕坐标计算正确
 const (
-	testCameraX = 215.0 // 游戏默认摄像机位置
+	testCameraX = 220.0 // 与 config.GameCameraX 一致
 )
 
 // TestMouseToGridCoords 测试鼠标坐标到网格坐标的转换
@@ -24,8 +25,8 @@ func TestMouseToGridCoords(t *testing.T) {
 	}{
 		{
 			name:      "左上角第一个格子",
-			mouseX:    36, // 屏幕坐标
-			mouseY:    72, // 屏幕坐标
+			mouseX:    35, // 屏幕坐标：GridScreenStartX = 35
+			mouseY:    78, // 屏幕坐标：GridWorldStartY = 78
 			cameraX:   testCameraX,
 			wantCol:   0,
 			wantRow:   0,
@@ -33,8 +34,8 @@ func TestMouseToGridCoords(t *testing.T) {
 		},
 		{
 			name:      "右下角最后一个格子",
-			mouseX:    716, // 屏幕坐标：36 + 8*80 + 40（格子中心）
-			mouseY:    522, // 屏幕坐标：72 + 4*100 + 50（格子中心）
+			mouseX:    35 + 8*80 + 40, // 屏幕坐标：GridScreenStartX + 8*CellWidth + CellWidth/2
+			mouseY:    78 + 4*100 + 50, // 屏幕坐标：GridWorldStartY + 4*CellHeight + CellHeight/2
 			cameraX:   testCameraX,
 			wantCol:   8,
 			wantRow:   4,
@@ -42,8 +43,8 @@ func TestMouseToGridCoords(t *testing.T) {
 		},
 		{
 			name:      "中间格子 (col=4, row=2)",
-			mouseX:    356, // 屏幕坐标：36 + 4*80
-			mouseY:    272, // 屏幕坐标：72 + 2*100
+			mouseX:    35 + 4*80 + 40, // 屏幕坐标：GridScreenStartX + 4*CellWidth + CellWidth/2
+			mouseY:    78 + 2*100 + 50, // 屏幕坐标：GridWorldStartY + 2*CellHeight + CellHeight/2
 			cameraX:   testCameraX,
 			wantCol:   4,
 			wantRow:   2,
@@ -51,8 +52,8 @@ func TestMouseToGridCoords(t *testing.T) {
 		},
 		{
 			name:      "摄像机位置变化测试 - cameraX = 0",
-			mouseX:    251, // 世界坐标 = 屏幕坐标（当cameraX=0时）
-			mouseY:    72,
+			mouseX:    255, // 世界坐标 = 屏幕坐标（当cameraX=0时），GridWorldStartX = 255
+			mouseY:    78,
 			cameraX:   0,
 			wantCol:   0,
 			wantRow:   0,
@@ -60,8 +61,8 @@ func TestMouseToGridCoords(t *testing.T) {
 		},
 		{
 			name:      "摄像机位置变化测试 - cameraX = 300",
-			mouseX:    -49, // 屏幕坐标：251 - 300 = -49
-			mouseY:    72,
+			mouseX:    -45, // 屏幕坐标：255 - 300 = -45 (GridWorldStartX - cameraX)
+			mouseY:    78,
 			cameraX:   300,
 			wantCol:   0,
 			wantRow:   0,
@@ -152,41 +153,41 @@ func TestGridToScreenCoords(t *testing.T) {
 			name:      "第一个格子 (0,0) - 默认摄像机位置",
 			col:       0,
 			row:       0,
-			cameraX:   testCameraX,
-			wantCentX: 36.0 + 40.0, // (251 - 215) + CellWidth/2 = 36 + 40
-			wantCentY: 72.0 + 50.0, // GridWorldStartY + CellHeight/2
+			cameraX:   testCameraX, // 220
+			wantCentX: 35.0 + 40.0, // (255 - 220) + CellWidth/2 = 35 + 40 = 75
+			wantCentY: 78.0 + 50.0, // GridWorldStartY + CellHeight/2 = 78 + 50 = 128
 		},
 		{
 			name:      "最后一个格子 (8,4) - 默认摄像机位置",
 			col:       8,
 			row:       4,
 			cameraX:   testCameraX,
-			wantCentX: 36.0 + 8*80.0 + 40.0,
-			wantCentY: 72.0 + 4*100.0 + 50.0,
+			wantCentX: 35.0 + 8*80.0 + 40.0,  // 35 + 640 + 40 = 715
+			wantCentY: 78.0 + 4*100.0 + 50.0, // 78 + 400 + 50 = 528
 		},
 		{
 			name:      "中间格子 (4,2) - 默认摄像机位置",
 			col:       4,
 			row:       2,
 			cameraX:   testCameraX,
-			wantCentX: 36.0 + 4*80.0 + 40.0,
-			wantCentY: 72.0 + 2*100.0 + 50.0,
+			wantCentX: 35.0 + 4*80.0 + 40.0,  // 35 + 320 + 40 = 395
+			wantCentY: 78.0 + 2*100.0 + 50.0, // 78 + 200 + 50 = 328
 		},
 		{
 			name:      "第一个格子 (0,0) - cameraX = 0",
 			col:       0,
 			row:       0,
 			cameraX:   0,
-			wantCentX: 251.0 + 40.0, // GridWorldStartX + CellWidth/2
-			wantCentY: 72.0 + 50.0,
+			wantCentX: 255.0 + 40.0, // GridWorldStartX + CellWidth/2 = 255 + 40 = 295
+			wantCentY: 78.0 + 50.0,  // 128
 		},
 		{
 			name:      "第一个格子 (0,0) - cameraX = 300",
 			col:       0,
 			row:       0,
 			cameraX:   300,
-			wantCentX: -49.0 + 40.0, // (251 - 300) + CellWidth/2
-			wantCentY: 72.0 + 50.0,
+			wantCentX: -45.0 + 40.0, // (255 - 300) + CellWidth/2 = -45 + 40 = -5
+			wantCentY: 78.0 + 50.0,  // 128
 		},
 	}
 
@@ -210,7 +211,7 @@ func TestGridToScreenCoords(t *testing.T) {
 // TestRoundTripConversion 测试坐标转换的往返一致性
 func TestRoundTripConversion(t *testing.T) {
 	// 测试不同的摄像机位置
-	testCameraPositions := []float64{0, 100, 215, 300, 500}
+	testCameraPositions := []float64{0, 100, 220, 300, 500}
 
 	for _, cameraX := range testCameraPositions {
 		t.Run("CameraX="+string(rune(int(cameraX))), func(t *testing.T) {

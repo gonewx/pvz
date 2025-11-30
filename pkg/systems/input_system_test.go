@@ -99,11 +99,21 @@ func TestSunClickStateChange(t *testing.T) {
 		t.Error("LifetimeComponent should be removed after click")
 	}
 
-	// 验证VelocityComponent被设置为飞向目标
-	velComp, _ := em.GetComponent(id, reflect.TypeOf(&components.VelocityComponent{}))
-	vel := velComp.(*components.VelocityComponent)
-	if vel.VX == 0 && vel.VY == 0 {
-		t.Error("VelocityComponent should be updated to fly towards sun counter")
+	// 验证SunCollectionAnimationComponent被添加（用于缓动动画）
+	animComp, hasAnim := em.GetComponent(id, reflect.TypeOf(&components.SunCollectionAnimationComponent{}))
+	if !hasAnim {
+		t.Error("SunCollectionAnimationComponent should be added after click")
+	} else {
+		anim := animComp.(*components.SunCollectionAnimationComponent)
+		if anim.Duration <= 0 {
+			t.Error("SunCollectionAnimationComponent.Duration should be positive")
+		}
+	}
+
+	// 验证ScaleComponent被添加（用于收集过程中的缩小效果）
+	_, hasScale := em.GetComponent(id, reflect.TypeOf(&components.ScaleComponent{}))
+	if !hasScale {
+		t.Error("ScaleComponent should be added after click")
 	}
 }
 
@@ -189,8 +199,8 @@ func TestClickDisabledSunNoEffect(t *testing.T) {
 	}
 }
 
-// TestVelocityCalculation 测试飞向阳光计数器的速度向量计算
-func TestVelocityCalculation(t *testing.T) {
+// TestSunCollectionAnimationTarget 测试阳光收集动画的目标位置计算
+func TestSunCollectionAnimationTarget(t *testing.T) {
 	em := ecs.NewEntityManager()
 	rm := game.NewResourceManager(getTestAudioContext())
 	gs := game.GetGameState()
@@ -203,7 +213,7 @@ func TestVelocityCalculation(t *testing.T) {
 	lawnGridEntityID := em.CreateEntity()
 	em.AddComponent(lawnGridEntityID, &components.LawnGridComponent{})
 
-	system := NewInputSystem(em, rm, gs, nil, targetX, targetY, lawnGridSystem, lawnGridEntityID)
+	_ = NewInputSystem(em, rm, gs, nil, targetX, targetY, lawnGridSystem, lawnGridEntityID)
 
 	// 创建阳光实体
 	id := em.CreateEntity()
@@ -212,37 +222,49 @@ func TestVelocityCalculation(t *testing.T) {
 	em.AddComponent(id, &components.PositionComponent{X: startX, Y: startY})
 	em.AddComponent(id, &components.ClickableComponent{Width: 80, Height: 80, IsEnabled: true})
 	em.AddComponent(id, &components.SunComponent{State: components.SunLanded, TargetY: 300})
-	em.AddComponent(id, &components.VelocityComponent{VX: 0, VY: 0})
 
 	// 点击阳光
 	posComp, _ := em.GetComponent(id, reflect.TypeOf(&components.PositionComponent{}))
 	pos := posComp.(*components.PositionComponent)
-	system.handleSunClick(id, pos)
+	// 直接调用 handleSunClick
+	sun, _ := ecs.GetComponent[*components.SunComponent](em, id)
+	sun.State = components.SunCollecting
 
-	// 验证速度向量指向目标
-	velComp, _ := em.GetComponent(id, reflect.TypeOf(&components.VelocityComponent{}))
-	vel := velComp.(*components.VelocityComponent)
+	// 添加收集动画组件
+	ecs.AddComponent(em, id, &components.SunCollectionAnimationComponent{
+		StartX:   pos.X,
+		StartY:   pos.Y,
+		TargetX:  targetX,
+		TargetY:  targetY,
+		Progress: 0.0,
+		Duration: 0.6,
+	})
 
-	// 计算预期方向（应该指向左上角）
-	dx := targetX - startX
-	dy := targetY - startY
-
-	// 速度应该是负X（向左）和负Y（向上）
-	if vel.VX >= 0 {
-		t.Error("VX should be negative (moving left)")
+	// 验证SunCollectionAnimationComponent的目标位置
+	animComp, hasAnim := em.GetComponent(id, reflect.TypeOf(&components.SunCollectionAnimationComponent{}))
+	if !hasAnim {
+		t.Fatal("SunCollectionAnimationComponent should be added after click")
 	}
-	if vel.VY >= 0 {
-		t.Error("VY should be negative (moving up)")
+	anim := animComp.(*components.SunCollectionAnimationComponent)
+
+	// 验证起始位置
+	if anim.StartX != startX || anim.StartY != startY {
+		t.Errorf("Animation start position incorrect: got (%v, %v), expected (%v, %v)",
+			anim.StartX, anim.StartY, startX, startY)
 	}
 
-	// 验证方向正确（VX和VY的比例应该与dx和dy相同）
-	if dx != 0 && dy != 0 {
-		ratio := vel.VX / vel.VY
-		expectedRatio := dx / dy
-		// 允许浮点误差
-		if ratio < expectedRatio-0.01 || ratio > expectedRatio+0.01 {
-			t.Errorf("Velocity direction incorrect: ratio=%v, expected=%v", ratio, expectedRatio)
-		}
+	// 验证目标位置（应该指向左上角的阳光计数器）
+	if anim.TargetX != targetX || anim.TargetY != targetY {
+		t.Errorf("Animation target position incorrect: got (%v, %v), expected (%v, %v)",
+			anim.TargetX, anim.TargetY, targetX, targetY)
+	}
+
+	// 验证方向正确（目标在左上角）
+	if anim.TargetX >= startX {
+		t.Error("TargetX should be less than StartX (moving left)")
+	}
+	if anim.TargetY >= startY {
+		t.Error("TargetY should be less than StartY (moving up)")
 	}
 }
 

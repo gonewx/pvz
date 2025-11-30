@@ -242,7 +242,7 @@ func TestLevel1_1_SpawnCoordinates(t *testing.T) {
 // Task 3: 关卡 1-4 验证测试
 // ========================================
 
-// TestLevel1_4_WaveCount 验证 1-4 波次数量正确（4波，含1面旗帜）
+// TestLevel1_4_WaveCount 验证 1-4 波次数量正确（10波，含1面旗帜）
 func TestLevel1_4_WaveCount(t *testing.T) {
 	env, err := SetupTestEnvironment("1-4")
 	if err != nil {
@@ -250,7 +250,7 @@ func TestLevel1_4_WaveCount(t *testing.T) {
 	}
 	defer TeardownTestEnvironment(env)
 
-	expectedWaves := 4
+	expectedWaves := 10
 	actualWaves := len(env.LevelConfig.Waves)
 
 	if actualWaves != expectedWaves {
@@ -270,7 +270,7 @@ func TestLevel1_4_WaveCount(t *testing.T) {
 	}
 }
 
-// TestLevel1_4_FlagWave 验证 1-4 旗帜波在第4波触发
+// TestLevel1_4_FlagWave 验证 1-4 旗帜波在第10波触发
 func TestLevel1_4_FlagWave(t *testing.T) {
 	env, err := SetupTestEnvironment("1-4")
 	if err != nil {
@@ -287,9 +287,9 @@ func TestLevel1_4_FlagWave(t *testing.T) {
 		}
 	}
 
-	// 旗帜波应该在第4波（索引3）
-	if flagWaveIndex != 3 {
-		t.Errorf("Expected flag wave at index 3 (wave 4), got index %d", flagWaveIndex)
+	// 旗帜波应该在第10波（索引9）
+	if flagWaveIndex != 9 {
+		t.Errorf("Expected flag wave at index 9 (wave 10), got index %d", flagWaveIndex)
 	}
 
 	// 验证旗帜索引
@@ -320,7 +320,7 @@ func TestLevel1_4_MultiLane(t *testing.T) {
 	}
 }
 
-// TestLevel1_4_ZombieTypes 验证 1-4 僵尸类型（basic, conehead, buckethead）
+// TestLevel1_4_ZombieTypes 验证 1-4 僵尸类型（basic, conehead）
 func TestLevel1_4_ZombieTypes(t *testing.T) {
 	env, err := SetupTestEnvironment("1-4")
 	if err != nil {
@@ -337,7 +337,7 @@ func TestLevel1_4_ZombieTypes(t *testing.T) {
 	}
 
 	// 验证包含预期的僵尸类型
-	expectedTypes := []string{"basic", "conehead", "buckethead"}
+	expectedTypes := []string{"basic", "conehead"}
 	for _, expectedType := range expectedTypes {
 		if !zombieTypes[expectedType] {
 			t.Errorf("Expected zombie type '%s' not found in level 1-4", expectedType)
@@ -1078,8 +1078,8 @@ func TestRegression_Level1_4_Playable(t *testing.T) {
 		t.Errorf("Level ID should be '1-4', got '%s'", env.LevelConfig.ID)
 	}
 
-	if len(env.LevelConfig.Waves) != 4 {
-		t.Errorf("Level 1-4 should have 4 waves, got %d", len(env.LevelConfig.Waves))
+	if len(env.LevelConfig.Waves) != 10 {
+		t.Errorf("Level 1-4 should have 10 waves, got %d", len(env.LevelConfig.Waves))
 	}
 
 	// 验证有旗帜波

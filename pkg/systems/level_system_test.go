@@ -78,6 +78,11 @@ func TestCalculateTotalZombies(t *testing.T) {
 }
 
 // TestCalculateFlagPositions 测试旗帜位置计算逻辑
+// 使用双段式结构计算（原版机制）：
+// - 进度条总长 = 150 单位
+// - 红字波段 = 旗帜数 × 12
+// - 普通波段 = 150 - 红字波段（平均分配给普通波）
+// - 旗帜位置 = 1 - (已完成红字波数 × 12 + 已完成普通波数 × 每波普通进度) / 150
 func TestCalculateFlagPositions(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -92,7 +97,10 @@ func TestCalculateFlagPositions(t *testing.T) {
 				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 5}}},
 			},
 			flagWaves: []int{1}, // 第2波是旗帜波
-			expected:  []float64{0.5},
+			// totalWaves=2, flagCount=1, normalWaveCount=1
+			// normalSegment=150-12=138, progressPerNormalWave=138
+			// 波次0: normalWaves=1; 波次1(旗帜): position=(0+138)/150=0.92, reversed=0.08
+			expected: []float64{0.08},
 		},
 		{
 			name: "单旗帜在最后",
@@ -102,7 +110,10 @@ func TestCalculateFlagPositions(t *testing.T) {
 				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 5}}},
 			},
 			flagWaves: []int{2}, // 第3波是旗帜波
-			expected:  []float64{0.5},
+			// totalWaves=3, flagCount=1, normalWaveCount=2
+			// normalSegment=138, progressPerNormalWave=69
+			// 波次0: normalWaves=1; 波次1: normalWaves=2; 波次2(旗帜): position=(0+138)/150=0.92, reversed=0.08
+			expected: []float64{0.08},
 		},
 		{
 			name: "多旗帜",
@@ -113,7 +124,13 @@ func TestCalculateFlagPositions(t *testing.T) {
 				{OldZombies: []config.ZombieSpawn{{Type: "basic", Lane: 1, Count: 3}}},
 			},
 			flagWaves: []int{1, 3}, // 第2波和第4波是旗帜波
-			expected:  []float64{0.2, 0.7},
+			// totalWaves=4, flagCount=2, normalWaveCount=2
+			// normalSegment=150-24=126, progressPerNormalWave=63
+			// 波次0: normalWaves=1
+			// 波次1(旗帜): position=(0+63)/150=0.42, reversed=0.58
+			// 波次2: normalWaves=2
+			// 波次3(旗帜): position=(12+126)/150=0.92, reversed=0.08
+			expected: []float64{0.58, 0.08},
 		},
 		{
 			name: "无旗帜",

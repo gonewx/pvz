@@ -333,7 +333,7 @@ func TestDrawParticles_VertexArrayReuse(t *testing.T) {
 		t.Errorf("Expected particleIndices capacity 6000, got %d", cap(rs.particleIndices))
 	}
 
-	// 创建测试粒子实体
+	// 创建测试粒子实体（不带 UIComponent，作为游戏世界粒子）
 	testImage := ebiten.NewImage(32, 32)
 
 	for i := 0; i < 5; i++ {
@@ -355,8 +355,8 @@ func TestDrawParticles_VertexArrayReuse(t *testing.T) {
 	// 创建测试屏幕
 	screen := ebiten.NewImage(800, 600)
 
-	// 第一次渲染
-	rs.DrawParticles(screen, 0)
+	// 第一次渲染（使用 DrawGameWorldParticles，因为粒子没有 UIComponent）
+	rs.DrawGameWorldParticles(screen, 0)
 
 	// 验证顶点数量（5个粒子 * 4个顶点 = 20个顶点）
 	expectedVertexCount := 5 * 4
@@ -365,7 +365,7 @@ func TestDrawParticles_VertexArrayReuse(t *testing.T) {
 	}
 
 	// 第二次渲染（应该重置切片长度）
-	rs.DrawParticles(screen, 0)
+	rs.DrawGameWorldParticles(screen, 0)
 
 	// 验证顶点数量仍然正确（没有累积）
 	if len(rs.particleVertices) != expectedVertexCount {
@@ -386,7 +386,7 @@ func TestDrawParticles_BlendModeSelection(t *testing.T) {
 	// 创建测试图片
 	testImage := ebiten.NewImage(32, 32)
 
-	// 创建 Normal 混合模式粒子
+	// 创建 Normal 混合模式粒子（不带 UIComponent，作为游戏世界粒子）
 	entityNormal := em.CreateEntity()
 	em.AddComponent(entityNormal, &components.PositionComponent{X: 100, Y: 100})
 	em.AddComponent(entityNormal, &components.ParticleComponent{
@@ -419,8 +419,8 @@ func TestDrawParticles_BlendModeSelection(t *testing.T) {
 	// 创建测试屏幕
 	screen := ebiten.NewImage(800, 600)
 
-	// 执行渲染（不会崩溃即通过）
-	rs.DrawParticles(screen, 0)
+	// 执行渲染（使用 DrawGameWorldParticles，因为粒子没有 UIComponent）
+	rs.DrawGameWorldParticles(screen, 0)
 
 	// 注意：由于我们无法直接检查 DrawTrianglesOptions，
 	// 这个测试主要验证渲染不会崩溃，并且两种混合模式都能正常处理

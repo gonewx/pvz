@@ -13,18 +13,15 @@ func TestNewPlantUnlockManager(t *testing.T) {
 		t.Fatal("NewPlantUnlockManager() returned nil")
 	}
 
-	// 验证默认解锁植物数量
+	// 验证默认解锁植物数量（只有豌豆射手默认解锁）
 	unlockedPlants := manager.GetUnlockedPlants()
 	if len(unlockedPlants) == 0 {
 		t.Error("Expected default unlocked plants, got empty list")
 	}
 
-	// 验证第一章基础植物已解锁
-	expectedPlants := []string{"peashooter", "sunflower", "cherrybomb", "wallnut"}
-	for _, plantID := range expectedPlants {
-		if !manager.IsUnlocked(plantID) {
-			t.Errorf("Expected plant %s to be unlocked by default", plantID)
-		}
+	// 验证豌豆射手默认解锁（1-1 起始植物）
+	if !manager.IsUnlocked("peashooter") {
+		t.Error("Expected peashooter to be unlocked by default")
 	}
 }
 
@@ -43,9 +40,9 @@ func TestIsUnlocked(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "已解锁植物：向日葵",
+			name:     "未解锁植物：向日葵（需要通过1-1解锁）",
 			plantID:  "sunflower",
-			expected: true,
+			expected: false,
 		},
 		{
 			name:     "未解锁植物：不存在的ID",

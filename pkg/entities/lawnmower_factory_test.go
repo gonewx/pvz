@@ -59,12 +59,13 @@ func TestNewLawnmowerEntity(t *testing.T) {
 		t.Fatal("Expected non-zero entity ID")
 	}
 
-	// 验证位置组件
+	// 验证位置组件（入场动画初始位置）
 	pos, ok := ecs.GetComponent[*components.PositionComponent](em, entityID)
 	if !ok {
 		t.Fatal("Lawnmower entity should have PositionComponent")
 	}
-	expectedX := config.LawnmowerStartX
+	// 入场动画起始位置在屏幕左侧外
+	expectedX := config.LawnmowerEnterStartX
 	expectedY := config.GridWorldStartY + float64(lane-1)*config.CellHeight + config.CellHeight/2.0
 	if pos.X != expectedX {
 		t.Errorf("Expected X=%.1f, got %.1f", expectedX, pos.X)
