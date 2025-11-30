@@ -558,7 +558,7 @@ func (s *GameScene) Update(deltaTime float64) {
 		return // 等待对话框显示
 	}
 
-	// 如果对话框正在显示，只更新对话框系统
+	// 如果对话框正在显示，只更新对话框系统（所有元素保持静止）
 	if s.battleSaveDialogID != 0 {
 		if s.dialogInputSystem != nil {
 			s.dialogInputSystem.Update(deltaTime)
@@ -569,7 +569,7 @@ func (s *GameScene) Update(deltaTime float64) {
 			s.battleSaveDialogID = 0 // 对话框已关闭
 		}
 		s.updateMouseCursor()
-		return // 对话框打开时阻止其他更新
+		return // 对话框打开时阻止其他更新（类似暂停效果）
 	}
 
 	// DEBUG: Check for GameFreezeComponent on every frame to debug freeze issue
@@ -1054,4 +1054,49 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	if s.pauseMenuModule != nil {
 		s.pauseMenuModule.Draw(screen)
 	}
+}
+
+// SaveOnExit 实现 game.Saveable 接口
+//
+// Bug Fix: 游戏关闭时自动保存战斗存档
+//
+// 在以下情况下保存存档：
+//   - 游戏正在进行中（未结束、未暂停在对话框）
+//   - 有有效的用户登录
+//   - 游戏已经开始（有阳光、植物等）
+//
+// 返回：
+//   - true: 保存成功或无需保存
+//   - false: 保存失败
+func (s *GameScene) SaveOnExit() bool {
+	// 如果游戏已结束，不需要保存
+	if s.gameState.IsGameOver {
+		log.Printf("[GameScene] SaveOnExit: 游戏已结束，跳过存档")
+		return true
+	}
+
+	// 如果正在显示战斗存档对话框（即刚从存档恢复），不重复保存
+	if s.battleSaveDialogID != 0 {
+		log.Printf("[GameScene] SaveOnExit: 正在显示存档对话框，跳过存档")
+		return true
+	}
+
+	// 检查是否有有效用户
+	saveManager := s.gameState.GetSaveManager()
+	currentUser := saveManager.GetCurrentUser()
+	if currentUser == "" {
+		log.Printf("[GameScene] SaveOnExit: 无有效用户，跳过存档")
+		return true
+	}
+
+	// 检查游戏是否已经开始（有有效的关卡时间）
+	if s.gameState.LevelTime <= 0 {
+		log.Printf("[GameScene] SaveOnExit: 游戏未开始，跳过存档")
+		return true
+	}
+
+	// 保存战斗状态
+	log.Printf("[GameScene] SaveOnExit: 游戏关闭时自动保存战斗存档")
+	s.saveBattleState()
+	return true
 }

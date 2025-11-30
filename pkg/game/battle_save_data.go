@@ -59,14 +59,15 @@ type TutorialSaveData struct {
 // 包含植物实体的核心状态，用于恢复植物实体。
 // 字段与 PlantComponent、HealthComponent 等组件对应。
 type PlantData struct {
-	PlantType      string  // 植物类型ID，如 "peashooter", "sunflower"
-	GridRow        int     // 所在草坪行 (0-4, 从上到下)
-	GridCol        int     // 所在草坪列 (0-8, 从左到右)
-	Health         int     // 当前生命值
-	MaxHealth      int     // 最大生命值
-	AttackCooldown float64 // 攻击冷却剩余时间（秒）
-	BlinkTimer     float64 // 眨眼计时器（秒）
-	AttackAnimState int    // 攻击动画状态 (0=空闲, 1=攻击中)
+	PlantType        string  // 植物类型ID，如 "peashooter", "sunflower"
+	GridRow          int     // 所在草坪行 (0-4, 从上到下)
+	GridCol          int     // 所在草坪列 (0-8, 从左到右)
+	Health           int     // 当前生命值
+	MaxHealth        int     // 最大生命值
+	AttackCooldown   float64 // 攻击冷却剩余时间（秒）
+	TimerTargetTime  float64 // 计时器目标时间（秒），用于恢复向日葵等变周期植物
+	BlinkTimer       float64 // 眨眼计时器（秒）
+	AttackAnimState  int     // 攻击动画状态 (0=空闲, 1=攻击中)
 }
 
 // ZombieData 僵尸序列化数据

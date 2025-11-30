@@ -176,4 +176,15 @@ func main() {
 		}
 		os.Exit(1)
 	}
+
+	// Bug Fix: 游戏关闭时自动保存战斗存档
+	// 检查当前场景是否实现了 Saveable 接口，如果是则调用 SaveOnExit()
+	if currentScene := sceneManager.GetCurrentScene(); currentScene != nil {
+		if saveable, ok := currentScene.(game.Saveable); ok {
+			if *verboseFlag {
+				log.Printf("[main] 游戏关闭，检查是否需要保存存档...")
+			}
+			saveable.SaveOnExit()
+		}
+	}
 }

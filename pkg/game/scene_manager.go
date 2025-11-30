@@ -37,6 +37,16 @@ func (sm *SceneManager) SwitchTo(scene Scene) {
 	sm.currentScene = scene
 }
 
+// GetCurrentScene 返回当前活动的场景
+//
+// Bug Fix: 用于游戏关闭时检查当前场景是否需要保存状态
+//
+// 返回：
+//   - Scene: 当前场景，如果没有活动场景则返回 nil
+func (sm *SceneManager) GetCurrentScene() Scene {
+	return sm.currentScene
+}
+
 // LoadLevel 加载指定ID的关卡场景
 // levelID: 关卡ID，如 "1-1", "1-2"
 func (sm *SceneManager) LoadLevel(levelID string) {

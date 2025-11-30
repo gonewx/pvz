@@ -169,12 +169,19 @@ func (s *BattleSerializer) collectPlantData(em *ecs.EntityManager) []PlantData {
 
 		// 获取计时器组件（攻击冷却）
 		var attackCooldown float64
+		var timerTargetTime float64
 		if timerComp, ok := ecs.GetComponent[*components.TimerComponent](em, entity); ok {
 			// 剩余冷却时间 = 目标时间 - 当前时间
 			attackCooldown = timerComp.TargetTime - timerComp.CurrentTime
 			if attackCooldown < 0 {
 				attackCooldown = 0
 			}
+			// Bug Fix: 保存计时器的目标时间，用于恢复向日葵等变周期植物
+			// 向日葵首次周期是 7 秒，后续周期是 24 秒
+			timerTargetTime = timerComp.TargetTime
+			log.Printf("[BattleSerializer] Saving plant %s at (%d,%d): CurrentTime=%.2f, TargetTime=%.2f, AttackCooldown=%.2f",
+				plantComp.PlantType.String(), plantComp.GridRow, plantComp.GridCol,
+				timerComp.CurrentTime, timerComp.TargetTime, attackCooldown)
 		}
 
 		plants = append(plants, PlantData{
@@ -184,6 +191,7 @@ func (s *BattleSerializer) collectPlantData(em *ecs.EntityManager) []PlantData {
 			Health:          health,
 			MaxHealth:       maxHealth,
 			AttackCooldown:  attackCooldown,
+			TimerTargetTime: timerTargetTime,
 			BlinkTimer:      plantComp.BlinkTimer,
 			AttackAnimState: int(plantComp.AttackAnimState),
 		})

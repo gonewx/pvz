@@ -288,10 +288,11 @@ func (s *GameScene) deleteBattleSave() {
 //
 // 流程（修正版）：
 //  1. 立即恢复存档数据（植物、僵尸等已显示在场景中）
-//  2. 显示对话框让玩家选择
-//  3. "继续": 直接开始游戏（数据已恢复）
-//  4. "重玩关卡": 重新创建场景（清除已恢复的实体）
-//  5. "取消": 返回主菜单
+//  2. 处理一次动画命令（让实体能正确渲染），但保持静止状态
+//  3. 显示对话框让玩家选择
+//  4. "继续": 直接开始游戏（数据已恢复）
+//  5. "重玩关卡": 重新创建场景（清除已恢复的实体）
+//  6. "取消": 返回主菜单
 func (s *GameScene) showBattleSaveDialog() {
 	log.Printf("[GameScene] 检测到战斗存档，立即恢复场景数据")
 
@@ -299,9 +300,15 @@ func (s *GameScene) showBattleSaveDialog() {
 	s.restoreBattleState()
 	s.skipOpeningAnimation()
 
+	// 2. 立即处理一次动画命令（让实体能正确渲染），但不推进动画帧
+	// 使用 deltaTime=0 确保动画数据初始化，但保持静止状态
+	if s.reanimSystem != nil {
+		s.reanimSystem.Update(0)
+	}
+
 	log.Printf("[GameScene] 场景数据已恢复，显示对话框")
 
-	// 2. 显示对话框让玩家选择
+	// 3. 显示对话框让玩家选择
 	dialogEntity, err := entities.NewContinueGameDialogEntity(
 		s.entityManager,
 		s.resourceManager,
@@ -310,8 +317,10 @@ func (s *GameScene) showBattleSaveDialog() {
 		WindowHeight,
 		// "继续"按钮回调 - 数据已恢复，直接开始游戏
 		func() {
-			log.Printf("[GameScene] 用户选择继续游戏，直接开始")
+			log.Printf("[GameScene] 用户选择继续游戏，删除存档并开始")
 			s.battleSaveDialogID = 0
+			// Bug Fix: 用户确认继续后才删除存档
+			s.deleteBattleSave()
 			// 数据已在对话框显示前恢复，无需再加载
 			// 游戏将在下一帧正常更新
 		},
@@ -508,14 +517,12 @@ func (s *GameScene) restoreBattleState() {
 		}
 	}
 
-	// 恢复后删除存档
-	if err := saveManager.DeleteBattleSave(currentUser); err != nil {
-		log.Printf("[GameScene] Warning: Failed to delete battle save after restore: %v", err)
-	} else {
-		log.Printf("[GameScene] 存档已删除（恢复成功后）")
-	}
-
-	log.Printf("[GameScene] 战斗状态恢复完成!")
+	// Bug Fix: 不再在恢复后立即删除存档
+	// 存档删除应该在用户确认"继续"后才执行，这样：
+	// - 用户选择"取消"返回主菜单时，存档仍然保留
+	// - 用户选择"继续"时，在继续按钮回调中删除存档
+	// - 用户选择"重玩关卡"时，在重玩按钮回调中删除存档
+	log.Printf("[GameScene] 战斗状态恢复完成! (存档将在用户确认后删除)")
 }
 
 // restorePlants 恢复植物实体
@@ -589,14 +596,25 @@ func (s *GameScene) restorePlants(plants []game.PlantData) {
 			healthComp.MaxHealth = plantData.MaxHealth
 		}
 
-		// 恢复攻击冷却（通过 TimerComponent）
-		if plantData.AttackCooldown > 0 {
-			if timerComp, ok := ecs.GetComponent[*components.TimerComponent](s.entityManager, entityID); ok {
-				timerComp.CurrentTime = timerComp.TargetTime - plantData.AttackCooldown
-				if timerComp.CurrentTime < 0 {
-					timerComp.CurrentTime = 0
-				}
+		// Bug Fix: 恢复计时器状态（向日葵阳光生产、豌豆射手攻击冷却等）
+		// 必须同时恢复 TargetTime 和 CurrentTime，因为向日葵等植物有变周期机制
+		// 向日葵首次周期是 7 秒，后续周期是 24 秒
+		if timerComp, ok := ecs.GetComponent[*components.TimerComponent](s.entityManager, entityID); ok {
+			// 先恢复 TargetTime（如果保存了）
+			if plantData.TimerTargetTime > 0 {
+				timerComp.TargetTime = plantData.TimerTargetTime
 			}
+			// 再计算 CurrentTime
+			// 剩余冷却时间 = TargetTime - CurrentTime
+			// 所以 CurrentTime = TargetTime - AttackCooldown
+			timerComp.CurrentTime = timerComp.TargetTime - plantData.AttackCooldown
+			if timerComp.CurrentTime < 0 {
+				timerComp.CurrentTime = 0
+			}
+			// 如果冷却已完成（AttackCooldown <= 0），标记为就绪
+			timerComp.IsReady = plantData.AttackCooldown <= 0
+			log.Printf("[GameScene] Restored timer for %s: CurrentTime=%.2f, TargetTime=%.2f, IsReady=%v",
+				plantData.PlantType, timerComp.CurrentTime, timerComp.TargetTime, timerComp.IsReady)
 		}
 
 		// 更新草坪网格占用状态
@@ -715,7 +733,7 @@ func (s *GameScene) restoreZombies(zombies []game.ZombieData) {
 		unitID := "zombie"
 		comboName := "walk"
 		if zombieData.IsEating {
-			comboName = "eating"
+			comboName = "eat" // Bug Fix: 配置中的啃食动画 combo 名称是 "eat"，不是 "eating"
 		}
 		switch zombieData.ZombieType {
 		case "conehead":
