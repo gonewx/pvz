@@ -63,6 +63,9 @@ func (s *BattleSerializer) SaveBattle(em *ecs.EntityManager, gs *GameState, file
 	saveData.Suns = s.collectSunData(em)
 	saveData.Lawnmowers = s.collectLawnmowerData(em)
 
+	// 收集教学状态（如果是教学关卡）
+	saveData.Tutorial = s.collectTutorialData(em)
+
 	// 创建文件
 	file, err := os.Create(filePath)
 	if err != nil {
@@ -462,5 +465,53 @@ func behaviorTypeToString(behaviorType components.BehaviorType) string {
 		return "preview"
 	default:
 		return "unknown"
+	}
+}
+
+// collectTutorialData 从 EntityManager 收集教学状态数据
+//
+// 查找 TutorialComponent 并收集教学进度信息
+// 如果没有教学组件（非教学关卡），返回 nil
+func (s *BattleSerializer) collectTutorialData(em *ecs.EntityManager) *TutorialSaveData {
+	// 查询所有拥有 TutorialComponent 的实体
+	entities := ecs.GetEntitiesWith1[*components.TutorialComponent](em)
+
+	if len(entities) == 0 {
+		return nil // 非教学关卡
+	}
+
+	// 取第一个教学实体（通常只有一个）
+	entity := entities[0]
+	tutorialComp, ok := ecs.GetComponent[*components.TutorialComponent](em, entity)
+	if !ok {
+		return nil
+	}
+
+	// 复制 CompletedSteps map
+	completedSteps := make(map[string]bool)
+	for k, v := range tutorialComp.CompletedSteps {
+		completedSteps[k] = v
+	}
+
+	// 统计植物数量
+	plantEntities := ecs.GetEntitiesWith1[*components.PlantComponent](em)
+	plantCount := len(plantEntities)
+
+	// 统计向日葵数量
+	sunflowerCount := 0
+	for _, plantID := range plantEntities {
+		if plant, ok := ecs.GetComponent[*components.PlantComponent](em, plantID); ok {
+			if plant.PlantType == components.PlantSunflower {
+				sunflowerCount++
+			}
+		}
+	}
+
+	return &TutorialSaveData{
+		CurrentStepIndex: tutorialComp.CurrentStepIndex,
+		CompletedSteps:   completedSteps,
+		IsActive:         tutorialComp.IsActive,
+		PlantCount:       plantCount,
+		SunflowerCount:   sunflowerCount,
 	}
 }

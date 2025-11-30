@@ -93,7 +93,12 @@ func (s *DialogRenderSystem) Draw(screen *ebiten.Image) {
 			posComp.X, posComp.Y, dialogComp.Width, dialogComp.Height, dialogComp.Title, dialogComp.Message)
 
 		// 1. 绘制对话框背景（九宫格）
-		utils.RenderNinePatch(screen, dialogComp.Parts, posComp.X, posComp.Y, dialogComp.Width, dialogComp.Height)
+		// 根据 UseBigBottom 选择使用大底部区域或标准底部
+		if dialogComp.UseBigBottom {
+			utils.RenderNinePatchWithBigBottom(screen, dialogComp.Parts, posComp.X, posComp.Y, dialogComp.Width, dialogComp.Height)
+		} else {
+			utils.RenderNinePatch(screen, dialogComp.Parts, posComp.X, posComp.Y, dialogComp.Width, dialogComp.Height)
+		}
 
 		// 2. 绘制骷髅头装饰（顶部中央）
 		s.drawHeader(screen, dialogComp, posComp.X, posComp.Y)
@@ -225,14 +230,23 @@ func (s *DialogRenderSystem) drawMessage(screen *ebiten.Image, dialog *component
 	const maxLineWidth = 380.0 // 对话框宽度 - 左右边距
 	const lineHeight = 25.0    // 行高
 
+	// 对话框布局常量（与 dialog_factory.go 保持一致）
+	const titleAreaHeight = 60.0  // 标题区域高度（骷髅头装饰 + 标题文字）
+	const buttonAreaHeight = 70.0 // 按钮区域高度
+
 	// 将消息文本按 maxLineWidth 分割成多行
 	lines := s.wrapText(dialog.Message, maxLineWidth)
 
 	// 计算总高度（用于垂直居中）
 	totalHeight := float64(len(lines)) * lineHeight
 
-	// 起始Y坐标（垂直居中）
-	startY := dialogY + (dialog.Height-totalHeight)/2 + 10 // 稍微往上移
+	// 计算消息可用区域（在标题和按钮之间）
+	messageAreaTop := dialogY + titleAreaHeight
+	messageAreaBottom := dialogY + dialog.Height - buttonAreaHeight
+	messageAreaHeight := messageAreaBottom - messageAreaTop
+
+	// 在可用区域内垂直居中
+	startY := messageAreaTop + (messageAreaHeight-totalHeight)/2
 
 	log.Printf("[DialogRenderSystem] 绘制消息 (%d 行): '%s' at (%.0f, %.0f)", len(lines), dialog.Message, dialogX+dialog.Width/2, startY)
 
@@ -253,7 +267,7 @@ func (s *DialogRenderSystem) drawMessage(screen *ebiten.Image, dialog *component
 		shadowOp.ColorScale.ScaleWithColor(color.RGBA{0, 0, 0, 128}) // 半透明黑色
 		text.Draw(screen, line, s.messageFont, shadowOp)
 
-		// 2. 再���制主文字（橙黄色）
+		// 2. 再绘制主文字（橙黄色）
 		op := &text.DrawOptions{}
 		op.LayoutOptions.PrimaryAlign = text.AlignCenter
 		op.LayoutOptions.SecondaryAlign = text.AlignStart

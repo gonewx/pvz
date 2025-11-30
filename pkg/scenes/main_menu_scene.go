@@ -107,10 +107,6 @@ type MainMenuScene struct {
 	zombieHandEntity ecs.EntityID  // Zombie hand entity ID
 	menuState        MainMenuState // Main menu state
 	pendingScene     string        // Pending scene to switch to after animation
-
-	// Story 18.2: Battle save detection
-	hasBattleSave  bool                 // Whether current user has a battle save
-	battleSaveInfo *game.BattleSaveInfo // Battle save info (for dialog display)
 }
 
 // NewMainMenuScene creates and returns a new MainMenuScene instance.
@@ -174,19 +170,6 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 			}
 			scene.hasStartedGame = saveManager.GetHasStartedGame()
 			log.Printf("[MainMenuScene] Loaded highest level: %s, hasStartedGame: %v", scene.currentLevel, scene.hasStartedGame)
-
-			// Story 18.2: 检测战斗存档
-			currentUser := saveManager.GetCurrentUser()
-			if currentUser != "" && saveManager.HasBattleSave(currentUser) {
-				scene.hasBattleSave = true
-				scene.battleSaveInfo, _ = saveManager.GetBattleSaveInfo(currentUser)
-				if scene.battleSaveInfo != nil {
-					log.Printf("[MainMenuScene] 检测到战斗存档: 关卡=%s, 波次=%d, 阳光=%d",
-						scene.battleSaveInfo.LevelID,
-						scene.battleSaveInfo.WaveIndex+1,
-						scene.battleSaveInfo.Sun)
-				}
-			}
 		} else {
 			scene.currentLevel = "1-1"
 			scene.hasStartedGame = false

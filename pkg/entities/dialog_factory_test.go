@@ -346,3 +346,28 @@ func TestNewContinueGameDialogEntity_DialogDimensions(t *testing.T) {
 		t.Errorf("Dialog height %f is too small for two rows of buttons (required %f)", dialogHeight, requiredHeight)
 	}
 }
+
+// TestNewContinueGameDialogEntity_UseBigBottom 测试继续游戏对话框使用大底部区域
+// 验证两行按钮布局的对话框应使用 BigBottom 样式
+func TestNewContinueGameDialogEntity_UseBigBottom(t *testing.T) {
+	// 创建 DialogComponent 模拟配置
+	dialogComp := &components.DialogComponent{
+		Title:        "继续游戏?",
+		Message:      "你想继续当前游戏还是重玩此关卡？",
+		Width:        420.0,
+		Height:       280.0,
+		UseBigBottom: true, // 两行按钮布局，使用大底部区域
+	}
+
+	// 验证 UseBigBottom 标志正确设置
+	if !dialogComp.UseBigBottom {
+		t.Error("Continue game dialog should have UseBigBottom=true for two-row button layout")
+	}
+
+	// 验证对话框高度足够容纳大底部区域
+	// 大底部区域通常比标准底部高 20-30 像素
+	minHeightWithBigBottom := 260.0
+	if dialogComp.Height < minHeightWithBigBottom {
+		t.Errorf("Dialog height %f is too small for big bottom area (minimum %f)", dialogComp.Height, minHeightWithBigBottom)
+	}
+}

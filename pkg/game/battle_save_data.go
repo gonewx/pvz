@@ -24,7 +24,7 @@ type BattleSaveData struct {
 	SaveTime time.Time // 保存时间
 
 	// 关卡状态
-	LevelID             string // 关卡ID，如 "1-2"
+	LevelID             string  // 关卡ID，如 "1-2"
 	LevelTime           float64 // 关卡已进行时间（秒）
 	CurrentWaveIndex    int     // 当前波次索引（0表示第一波）
 	SpawnedWaves        []bool  // 已生成波次标记
@@ -32,12 +32,26 @@ type BattleSaveData struct {
 	ZombiesKilled       int     // 已消灭僵尸数
 	Sun                 int     // 当前阳光数量
 
+	// 教学状态
+	Tutorial *TutorialSaveData // 教学进度数据（可选，非教学关卡为 nil）
+
 	// 实体数据
 	Plants      []PlantData      // 植物数据
 	Zombies     []ZombieData     // 僵尸数据
 	Projectiles []ProjectileData // 子弹数据
 	Suns        []SunData        // 阳光数据
 	Lawnmowers  []LawnmowerData  // 除草车数据
+}
+
+// TutorialSaveData 教学进度序列化数据
+//
+// 包含教学系统的状态，用于正确恢复教学流程
+type TutorialSaveData struct {
+	CurrentStepIndex int             // 当前教学步骤索引
+	CompletedSteps   map[string]bool // 已完成的步骤（trigger -> completed）
+	IsActive         bool            // 教学是否激活
+	PlantCount       int             // 已种植的植物数量
+	SunflowerCount   int             // 已种植的向日葵数量
 }
 
 // PlantData 植物序列化数据

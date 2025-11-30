@@ -282,6 +282,133 @@ func (s *GameScene) deleteBattleSave() {
 	log.Printf("[GameScene] Battle save deleted for user: %s", currentUser)
 }
 
+// showBattleSaveDialog 显示战斗存档选择对话框
+//
+// Story 18.3: 进入游戏后显示对话框
+//
+// 流程（修正版）：
+//  1. 立即恢复存档数据（植物、僵尸等已显示在场景中）
+//  2. 显示对话框让玩家选择
+//  3. "继续": 直接开始游戏（数据已恢复）
+//  4. "重玩关卡": 重新创建场景（清除已恢复的实体）
+//  5. "取消": 返回主菜单
+func (s *GameScene) showBattleSaveDialog() {
+	log.Printf("[GameScene] 检测到战斗存档，立即恢复场景数据")
+
+	// 1. 立即恢复存档数据（场景完整显示）
+	s.restoreBattleState()
+	s.skipOpeningAnimation()
+
+	log.Printf("[GameScene] 场景数据已恢复，显示对话框")
+
+	// 2. 显示对话框让玩家选择
+	dialogEntity, err := entities.NewContinueGameDialogEntity(
+		s.entityManager,
+		s.resourceManager,
+		s.battleSaveInfo,
+		WindowWidth,
+		WindowHeight,
+		// "继续"按钮回调 - 数据已恢复，直接开始游戏
+		func() {
+			log.Printf("[GameScene] 用户选择继续游戏，直接开始")
+			s.battleSaveDialogID = 0
+			// 数据已在对话框显示前恢复，无需再加载
+			// 游戏将在下一帧正常更新
+		},
+		// "重玩关卡"按钮回调 - 重新创建场景
+		func() {
+			log.Printf("[GameScene] 用户选择重玩关卡，重新创建场景")
+			s.battleSaveDialogID = 0
+			// 删除存档
+			s.deleteBattleSave()
+			// 获取当前关卡ID
+			currentLevelID := "1-1"
+			if s.gameState.CurrentLevel != nil {
+				currentLevelID = s.gameState.CurrentLevel.ID
+			}
+			// 重新创建场景（清除所有已恢复的实体，正常开始游戏）
+			s.sceneManager.SwitchTo(NewGameScene(s.resourceManager, s.sceneManager, currentLevelID))
+		},
+		// "取消"按钮回调 - 返回主菜单
+		func() {
+			log.Printf("[GameScene] 用户选择取消，返回主菜单")
+			s.battleSaveDialogID = 0
+			// 返回主菜单（不删除存档，下次进入还会显示对话框）
+			s.sceneManager.SwitchTo(NewMainMenuScene(s.resourceManager, s.sceneManager))
+		},
+	)
+
+	if err != nil {
+		log.Printf("[GameScene] Warning: Failed to create continue game dialog: %v", err)
+		// 对话框创建失败，数据已恢复，直接继续游戏
+		return
+	}
+
+	s.battleSaveDialogID = dialogEntity
+	log.Printf("[GameScene] 继续游戏对话框已显示 (对话框ID: %d)", dialogEntity)
+}
+
+// skipOpeningAnimation 跳过开场动画
+//
+// Story 18.3: 从存档恢复时跳过开场动画
+//
+// 处理内容：
+//  1. 设置镜头到游戏位置
+//  2. 标记开场动画为完成
+//  3. 跳过铺草皮动画并正确设置草皮背景
+//  4. 通知教学系统铺草皮已完成（让教学可以继续进行）
+//  5. 启用自动阳光生成（存档恢复意味着玩家已开始游戏）
+func (s *GameScene) skipOpeningAnimation() {
+	// 设置镜头到游戏位置
+	s.cameraX = config.GameCameraX
+	s.isIntroAnimPlaying = false
+	if s.cameraSystem != nil {
+		s.gameState.CameraX = config.GameCameraX
+	}
+
+	// 标记开场动画为完成（使用 Skip 方法）
+	if s.openingSystem != nil {
+		s.openingSystem.Skip()
+	}
+
+	// 跳过铺草皮动画
+	s.soddingAnimStarted = true
+
+	// 处理草皮背景：直接合并草皮叠加层到背景
+	if s.soddedBackground != nil {
+		// Level 1-4: 有完整的已铺草皮背景，直接替换
+		log.Printf("[GameScene] 恢复存档: 替换底层背景为已铺草皮版本")
+		s.background = s.soddedBackground
+		s.soddedBackground = nil
+		s.preSoddedImage = nil
+	} else if s.preSoddedImage != nil || s.sodRowImage != nil {
+		// Level 1-1, 1-2: 需要将草皮叠加层合并到底层背景
+		log.Printf("[GameScene] 恢复存档: 合并草皮叠加层到底层背景")
+		mergedBg := s.createMergedBackground()
+		if mergedBg != nil {
+			s.background = mergedBg
+			s.preSoddedImage = nil
+			log.Printf("[GameScene] 草皮背景合并完成")
+		}
+	}
+
+	// 通知教学系统铺草皮已完成（让教学可以继续进行）
+	// 注意：教学进度会在 restoreTutorialState 中正确恢复
+	if s.tutorialSystem != nil {
+		s.tutorialSystem.OnSoddingComplete()
+		log.Printf("[GameScene] 恢复存档: 通知教学系统铺草皮已完成")
+	}
+
+	// 阳光生成：从存档恢复时直接启用
+	// 因为玩家已经开始游戏了（有存档数据），教学的初始阶段已过
+	if s.sunSpawnSystem != nil {
+		s.sunSpawnSystem.Enable()
+		log.Printf("[GameScene] 恢复存档: 启用自动阳光生成")
+	}
+
+	log.Printf("[GameScene] 跳过开场动画，直接进入游戏")
+}
+
 // restoreBattleState 从战斗存档恢复战斗状态
 //
 // Story 18.3: 继续游戏对话框与场景恢复
@@ -332,8 +459,10 @@ func (s *GameScene) restoreBattleState() {
 	s.gameState.TotalZombiesSpawned = saveData.TotalZombiesSpawned
 	s.gameState.ZombiesKilled = saveData.ZombiesKilled
 
-	log.Printf("[GameScene] 游戏状态已恢复: Sun=%d, Wave=%d, Time=%.1f",
-		s.gameState.Sun, s.gameState.CurrentWaveIndex, s.gameState.LevelTime)
+	log.Printf("[GameScene] 游戏状态已恢复: Sun=%d, Wave=%d, Time=%.1f, TotalZombiesInLevel=%d, ZombiesKilled=%d, TotalZombiesSpawned=%d, SpawnedWaves=%v",
+		s.gameState.Sun, s.gameState.CurrentWaveIndex, s.gameState.LevelTime,
+		s.gameState.TotalZombiesInLevel, s.gameState.ZombiesKilled,
+		s.gameState.TotalZombiesSpawned, s.gameState.SpawnedWaves)
 
 	// Story 18.3: 恢复所有实体
 	s.restorePlants(saveData.Plants)
@@ -346,6 +475,12 @@ func (s *GameScene) restoreBattleState() {
 		len(saveData.Plants), len(saveData.Zombies), len(saveData.Projectiles),
 		len(saveData.Suns), len(saveData.Lawnmowers))
 
+	// 显示调整后的击杀计数（可能因跳过死亡僵尸而增加）
+	log.Printf("[GameScene] 实体恢复后状态: ZombiesKilled=%d/%d, TotalZombiesSpawned=%d, OnField=%d",
+		s.gameState.ZombiesKilled, s.gameState.TotalZombiesInLevel,
+		s.gameState.TotalZombiesSpawned,
+		s.gameState.TotalZombiesSpawned-s.gameState.ZombiesKilled)
+
 	// 跳过开场动画
 	s.isIntroAnimPlaying = false
 	s.cameraX = config.GameCameraX
@@ -355,6 +490,23 @@ func (s *GameScene) restoreBattleState() {
 
 	// 跳过铺草皮动画
 	s.soddingAnimStarted = true
+
+	// Story 18.3: 恢复进度条数据
+	s.restoreProgressBar(saveData)
+
+	// Story 18.3: 恢复教学状态（如果是教学关卡）
+	if saveData.Tutorial != nil {
+		s.restoreTutorialState(saveData.Tutorial)
+	}
+
+	// Story 18.3: 恢复波次计时系统状态
+	// 这是关键：让 WaveTimingSystem 知道当前进度，以便正确触发后续波次
+	if s.levelSystem != nil {
+		waveTimingSystem := s.levelSystem.GetWaveTimingSystem()
+		if waveTimingSystem != nil {
+			waveTimingSystem.RestoreState(saveData.CurrentWaveIndex, saveData.LevelTime)
+		}
+	}
 
 	// 恢复后删除存档
 	if err := saveManager.DeleteBattleSave(currentUser); err != nil {
@@ -476,8 +628,11 @@ func (s *GameScene) restorePlants(plants []game.PlantData) {
 func (s *GameScene) restoreZombies(zombies []game.ZombieData) {
 	for _, zombieData := range zombies {
 		// 跳过正在死亡的僵尸
+		// 这些僵尸在存档时还在播放死亡动画，尚未被计入 ZombiesKilled
+		// 跳过恢复时需要增加击杀计数，否则会导致胜利条件计算错误
 		if zombieData.BehaviorType == "dying" || zombieData.BehaviorType == "dying_explosion" {
-			log.Printf("[GameScene] Skipping dying zombie at (%.1f, %.1f)", zombieData.X, zombieData.Y)
+			log.Printf("[GameScene] Skipping dying zombie at (%.1f, %.1f), incrementing ZombiesKilled", zombieData.X, zombieData.Y)
+			s.gameState.ZombiesKilled++
 			continue
 		}
 
@@ -555,6 +710,25 @@ func (s *GameScene) restoreZombies(zombies []game.ZombieData) {
 			}
 		}
 
+		// 触发走路动画（僵尸工厂默认创建的是 idle 动画）
+		// 根据僵尸类型选择正确的 unit ID
+		unitID := "zombie"
+		comboName := "walk"
+		if zombieData.IsEating {
+			comboName = "eating"
+		}
+		switch zombieData.ZombieType {
+		case "conehead":
+			unitID = "zombie_cone"
+		case "buckethead":
+			unitID = "zombie_bucket"
+		}
+		ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
+			UnitID:    unitID,
+			ComboName: comboName,
+			Processed: false,
+		})
+
 		// 添加目标行组件
 		ecs.AddComponent(s.entityManager, entityID, &components.ZombieTargetLaneComponent{
 			TargetRow: lane - 1,
@@ -584,62 +758,21 @@ func (s *GameScene) restoreProjectiles(projectiles []game.ProjectileData) {
 			continue
 		}
 
-		// 计算行号（从 Y 坐标推算）
-		row := int((projData.Y - config.GridWorldStartY) / config.CellHeight)
-		if row < 0 {
-			row = 0
-		}
-		if row > 4 {
-			row = 4
+		// 使用工厂函数创建子弹实体
+		entityID, err := entities.NewPeaProjectile(s.entityManager, s.resourceManager, projData.X, projData.Y)
+		if err != nil {
+			log.Printf("[GameScene] ERROR: Failed to restore projectile at (%.1f, %.1f): %v", projData.X, projData.Y, err)
+			continue
 		}
 
-		// 创建子弹实体
-		entityID := s.entityManager.CreateEntity()
-
-		// 添加位置组件
-		s.entityManager.AddComponent(entityID, &components.PositionComponent{
-			X: projData.X,
-			Y: projData.Y,
-		})
-
-		// 添加速度组件
-		velX := projData.VelocityX
-		if velX == 0 {
-			velX = config.PeaBulletSpeed // 默认速度
-		}
-		s.entityManager.AddComponent(entityID, &components.VelocityComponent{
-			VX: velX,
-			VY: 0,
-		})
-
-		// 添加行为组件
-		s.entityManager.AddComponent(entityID, &components.BehaviorComponent{
-			Type: components.BehaviorPeaProjectile,
-		})
-
-		// 添加碰撞组件
-		s.entityManager.AddComponent(entityID, &components.CollisionComponent{
-			Width:  config.PeaBulletWidth,
-			Height: config.PeaBulletHeight,
-		})
-
-		// 加载豌豆子弹图片
-		reanimXML := s.resourceManager.GetReanimXML("ProjectilePea")
-		partImages := s.resourceManager.GetReanimPartImages("ProjectilePea")
-		if reanimXML != nil && partImages != nil {
-			s.entityManager.AddComponent(entityID, &components.ReanimComponent{
-				ReanimName: "ProjectilePea",
-				ReanimXML:  reanimXML,
-				PartImages: partImages,
-			})
-			// 添加动画命令
-			ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
-				AnimationName: "anim_idle",
-				Processed:     false,
-			})
+		// 恢复速度（如果保存了不同的速度）
+		if projData.VelocityX != 0 {
+			if velComp, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID); ok {
+				velComp.VX = projData.VelocityX
+			}
 		}
 
-		log.Printf("[GameScene] Restored projectile at (%.1f, %.1f), row=%d", projData.X, projData.Y, row)
+		log.Printf("[GameScene] Restored projectile at (%.1f, %.1f)", projData.X, projData.Y)
 	}
 }
 
@@ -664,6 +797,13 @@ func (s *GameScene) restoreSuns(suns []game.SunData) {
 
 		// 创建静态阳光实体（已着陆状态）
 		entityID := entities.NewSunEntityStatic(s.entityManager, s.resourceManager, sunData.X, sunData.Y)
+
+		// 添加动画命令组件，让 ReanimSystem 初始化阳光动画
+		ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
+			UnitID:    "sun",
+			ComboName: "idle",
+			Processed: false,
+		})
 
 		// 恢复剩余生命周期
 		if lifetimeComp, ok := ecs.GetComponent[*components.LifetimeComponent](s.entityManager, entityID); ok {
@@ -735,9 +875,18 @@ func (s *GameScene) restoreLawnmowers(lawnmowers []game.LawnmowerData) {
 			lmComp.IsTriggered = lmData.Triggered
 			lmComp.IsMoving = lmData.Active
 
-			// 如果已触发，跳过入场动画
-			if lmData.Triggered || lmData.X >= config.LawnmowerStartX {
-				lmComp.IsEntering = false
+			// 恢复存档时跳过入场动画，直接进入静止状态
+			lmComp.IsEntering = false
+		}
+
+		// 设置动画状态：静止的除草车暂停动画，移动中的除草车播放动画
+		if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
+			if lmData.Active {
+				// 正在移动：播放动画
+				reanimComp.IsPaused = false
+			} else {
+				// 静止状态：暂停动画
+				reanimComp.IsPaused = true
 			}
 		}
 
@@ -772,4 +921,113 @@ func stringToPlantType(s string) components.PlantType {
 	default:
 		return components.PlantUnknown
 	}
+}
+
+// restoreProgressBar 恢复进度条数据
+//
+// Story 18.3: 从存档数据恢复进度条状态
+//
+// 恢复内容：
+//   - 已击杀僵尸数
+//   - 当前波次号
+//   - 进度百分比（直接设置，无动画过渡）
+//   - 显示状态（已有波次时显示进度条）
+func (s *GameScene) restoreProgressBar(saveData *game.BattleSaveData) {
+	if s.levelProgressBarEntity == 0 {
+		log.Printf("[GameScene] Warning: No progress bar entity, cannot restore progress bar data")
+		return
+	}
+
+	progressBar, ok := ecs.GetComponent[*components.LevelProgressBarComponent](s.entityManager, s.levelProgressBarEntity)
+	if !ok {
+		log.Printf("[GameScene] Warning: LevelProgressBarComponent not found for entity %d", s.levelProgressBarEntity)
+		return
+	}
+
+	// 恢复已击杀僵尸数
+	progressBar.KilledZombies = saveData.ZombiesKilled
+
+	// 恢复当前波次号（存档中是索引，从0开始；波次号从1开始）
+	progressBar.CurrentWaveNum = saveData.CurrentWaveIndex + 1
+
+	// 计算进度百分比
+	if progressBar.TotalZombies > 0 {
+		progressBar.ProgressPercent = float64(saveData.ZombiesKilled) / float64(progressBar.TotalZombies)
+		// 同步到虚拟/现实进度（两者相同，无动画过渡）
+		progressBar.VirtualProgress = progressBar.ProgressPercent
+		progressBar.RealProgress = progressBar.ProgressPercent
+
+		// 关键修复：设置 LastTrackUpdateCS 为一个足够大的值
+		// 这样 updateRealProgress 不会在恢复后立即开始平滑追踪动画
+		// 使用当前关卡时间转换为厘秒
+		progressBar.GameTickCS = int(saveData.LevelTime * 100)
+		progressBar.LastTrackUpdateCS = progressBar.GameTickCS
+	}
+
+	// 如果已经开始波次，显示进度条（而非仅显示关卡文本）
+	if saveData.CurrentWaveIndex > 0 || saveData.ZombiesKilled > 0 || len(saveData.Zombies) > 0 {
+		progressBar.ShowLevelTextOnly = false
+	}
+
+	log.Printf("[GameScene] 进度条已恢复: KilledZombies=%d/%d, Wave=%d, Progress=%.2f%% (无动画)",
+		progressBar.KilledZombies, progressBar.TotalZombies,
+		progressBar.CurrentWaveNum, progressBar.ProgressPercent*100)
+}
+
+// restoreTutorialState 恢复教学状态
+//
+// Story 18.3: 从存档数据恢复教学进度
+//
+// 恢复内容：
+//   - 当前教学步骤索引
+//   - 已完成的步骤
+//   - 激活状态
+//   - 植物和向日葵计数
+//
+// 注意：
+//   - 教学系统的内部状态需要通过 TutorialComponent 恢复
+//   - 草坪闪烁状态根据当前步骤自动调整
+func (s *GameScene) restoreTutorialState(tutorialData *game.TutorialSaveData) {
+	if tutorialData == nil {
+		return
+	}
+
+	// 查找教学组件
+	tutorialEntities := ecs.GetEntitiesWith1[*components.TutorialComponent](s.entityManager)
+	if len(tutorialEntities) == 0 {
+		log.Printf("[GameScene] Warning: No tutorial entity found, cannot restore tutorial state")
+		return
+	}
+
+	// 取第一个教学实体（通常只有一个）
+	tutorialEntity := tutorialEntities[0]
+	tutorial, ok := ecs.GetComponent[*components.TutorialComponent](s.entityManager, tutorialEntity)
+	if !ok {
+		log.Printf("[GameScene] Warning: TutorialComponent not found")
+		return
+	}
+
+	// 恢复教学状态
+	tutorial.CurrentStepIndex = tutorialData.CurrentStepIndex
+	tutorial.IsActive = tutorialData.IsActive
+
+	// 恢复已完成的步骤
+	if tutorialData.CompletedSteps != nil {
+		tutorial.CompletedSteps = make(map[string]bool)
+		for k, v := range tutorialData.CompletedSteps {
+			tutorial.CompletedSteps[k] = v
+		}
+	}
+
+	// 根据恢复的步骤调整游戏状态
+	// 如果已经过了 plantPlaced 步骤，禁用草坪闪烁
+	if tutorialData.CompletedSteps["plantPlaced"] || tutorialData.PlantCount > 0 {
+		if s.lawnGridSystem != nil {
+			s.lawnGridSystem.DisableFlash()
+		}
+	}
+
+	log.Printf("[GameScene] 教学状态已恢复: StepIndex=%d, IsActive=%v, CompletedSteps=%d, PlantCount=%d",
+		tutorial.CurrentStepIndex, tutorial.IsActive,
+		len(tutorial.CompletedSteps), tutorialData.PlantCount)
 }

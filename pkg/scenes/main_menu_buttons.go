@@ -436,15 +436,9 @@ func (m *MainMenuScene) onMenuButtonClicked(buttonType config.MenuButtonType) {
 	// Route to appropriate handler based on button type
 	switch buttonType {
 	case config.MenuButtonAdventure:
-		// Story 18.2: 检测是否有战斗存档
-		if m.hasBattleSave && m.battleSaveInfo != nil {
-			log.Printf("[MainMenuScene] 检测到战斗存档，显示继续/重新开始对话框")
-			m.showBattleSaveDialog()
-		} else {
-			// Story 12.6: Trigger zombie hand animation before starting adventure
-			log.Printf("[MainMenuScene] Adventure button clicked - triggering zombie hand animation")
-			m.triggerZombieHandAnimation()
-		}
+		// Story 12.6: Trigger zombie hand animation before starting adventure
+		log.Printf("[MainMenuScene] Adventure button clicked - triggering zombie hand animation")
+		m.triggerZombieHandAnimation()
 
 	case config.MenuButtonChallenges:
 		// TODO: Implement challenges/mini-games mode

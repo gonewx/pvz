@@ -984,3 +984,52 @@ func (s *WaveTimingSystem) GetNextWaveDelay() float64 {
 
 	return 0
 }
+
+// RestoreState 从存档恢复波次计时状态
+//
+// Story 18.3: 存档恢复时同步波次计时系统状态
+//
+// 参数：
+//   - currentWaveIndex: 当前波次索引（0-based，表示下一个要触发的波次）
+//   - levelTime: 关卡已进行时间（秒）
+//
+// 恢复内容：
+//   - 设置 CurrentWaveIndex 为 currentWaveIndex（这是下一个要触发的波次）
+//   - 设置下一波的倒计时
+//   - 取消暂停状态
+func (s *WaveTimingSystem) RestoreState(currentWaveIndex int, levelTime float64) {
+	timer := s.getTimerComponent()
+	if timer == nil {
+		log.Printf("[WaveTimingSystem] ERROR: Timer component not found during restore")
+		return
+	}
+
+	// currentWaveIndex 是"下一个要触发的波次索引"
+	// 例如：如果 currentWaveIndex=3，表示波次 0,1,2 已触发，下一波是波次 3
+
+	// 检查是否所有波次都已完成
+	if currentWaveIndex >= timer.TotalWaves {
+		// 所有波次已生成，不需要继续计时
+		timer.CurrentWaveIndex = timer.TotalWaves
+		timer.IsPaused = false
+		log.Printf("[WaveTimingSystem] Restore: All waves already spawned (index=%d, total=%d)",
+			currentWaveIndex, timer.TotalWaves)
+		return
+	}
+
+	// 设置当前波次索引（下一个要触发的波次）
+	timer.CurrentWaveIndex = currentWaveIndex
+	timer.IsFirstWave = false
+
+	// 设置已经过的时间（厘秒）
+	timer.AccumulatedCs = levelTime * 100
+
+	// 设置下一波倒计时
+	s.SetNextWaveCountdown()
+
+	// 取消暂停
+	timer.IsPaused = false
+
+	log.Printf("[WaveTimingSystem] Restore: Next wave=%d, countdown=%d cs, accumulated=%.0f cs",
+		currentWaveIndex+1, timer.CountdownCs, timer.AccumulatedCs)
+}

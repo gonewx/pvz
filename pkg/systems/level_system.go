@@ -337,6 +337,15 @@ func (s *LevelSystem) checkVictoryCondition() {
 		hasActiveLawnmowers = s.lawnmowerSystem.HasActiveLawnmowers()
 	}
 
+	// Story 18.3 调试：计算场上僵尸数量
+	zombiesOnField := s.gameState.TotalZombiesSpawned - s.gameState.ZombiesKilled
+	if zombiesOnField <= 0 && s.gameState.TotalZombiesSpawned > 0 {
+		// 场上没有僵尸了，输出详细状态
+		log.Printf("[LevelSystem] checkVictoryCondition: ZombiesOnField=%d, Killed=%d/%d, SpawnedWaves=%v, hasActiveLawnmowers=%v",
+			zombiesOnField, s.gameState.ZombiesKilled, s.gameState.TotalZombiesInLevel,
+			s.gameState.SpawnedWaves, hasActiveLawnmowers)
+	}
+
 	// 只有在没有活跃除草车的情况下才能胜利
 	if s.gameState.CheckVictory() && !hasActiveLawnmowers {
 		s.gameState.SetGameResult("win")

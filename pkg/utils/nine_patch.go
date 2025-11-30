@@ -101,3 +101,108 @@ func drawImage(screen *ebiten.Image, img *ebiten.Image, x, y, scaleX, scaleY flo
 	op.GeoM.Translate(x, y)
 	screen.DrawImage(img, op)
 }
+
+// RenderNinePatchWithBigBottom 使用九宫格拉伸渲染对话框（使用大底部区域）
+// 当对话框需要更大的按钮区域时（如两行按钮），使用 BigBottom* 资源
+//
+// 参数：
+//   - screen: 目标绘制表面
+//   - parts: 九宫格图片资源（包含 BigBottom* 资源）
+//   - x, y: 对话框左上角位置
+//   - width, height: 对话框总大小
+func RenderNinePatchWithBigBottom(screen *ebiten.Image, parts *components.DialogParts, x, y, width, height float64) {
+	if parts == nil {
+		return
+	}
+
+	// 检查是否有大底部资源
+	if parts.BigBottomLeft == nil || parts.BigBottomMiddle == nil || parts.BigBottomRight == nil {
+		// 没有大底部资源，回退到标准渲染
+		RenderNinePatch(screen, parts, x, y, width, height)
+		return
+	}
+
+	// 1. 获取边角大小（从图片获取）
+	var cornerWidth, cornerHeight float64
+	if parts.TopLeft != nil {
+		tlBounds := parts.TopLeft.Bounds()
+		cornerWidth = float64(tlBounds.Dx())
+		cornerHeight = float64(tlBounds.Dy())
+	}
+
+	// 如果没有边角图片，无法渲染
+	if cornerWidth == 0 || cornerHeight == 0 {
+		return
+	}
+
+	// 获取大底部高度
+	var bigBottomHeight float64
+	if parts.BigBottomLeft != nil {
+		bigBottomHeight = float64(parts.BigBottomLeft.Bounds().Dy())
+	}
+
+	// 2. 计算拉伸区域大小
+	stretchWidth := width - cornerWidth*2                       // 中间区域宽度
+	stretchHeight := height - cornerHeight - bigBottomHeight   // 中间区域高度（使用大底部高度）
+
+	// 确保拉伸区域不为负数
+	if stretchWidth < 0 {
+		stretchWidth = 0
+	}
+	if stretchHeight < 0 {
+		stretchHeight = 0
+	}
+
+	// 3. 绘制顶部边角（固定位置，不拉伸）
+	if parts.TopLeft != nil {
+		drawImage(screen, parts.TopLeft, x, y, 1.0, 1.0)
+	}
+
+	if parts.TopRight != nil {
+		drawImage(screen, parts.TopRight, x+width-cornerWidth, y, 1.0, 1.0)
+	}
+
+	// 4. 绘制顶部边缘（水平拉伸）
+	if parts.TopMiddle != nil && stretchWidth > 0 {
+		tmBounds := parts.TopMiddle.Bounds()
+		scaleX := stretchWidth / float64(tmBounds.Dx())
+		drawImage(screen, parts.TopMiddle, x+cornerWidth, y, scaleX, 1.0)
+	}
+
+	// 5. 绘制左右边缘（垂直拉伸）
+	if parts.CenterLeft != nil && stretchHeight > 0 {
+		clBounds := parts.CenterLeft.Bounds()
+		scaleY := stretchHeight / float64(clBounds.Dy())
+		drawImage(screen, parts.CenterLeft, x, y+cornerHeight, 1.0, scaleY)
+	}
+
+	if parts.CenterRight != nil && stretchHeight > 0 {
+		crBounds := parts.CenterRight.Bounds()
+		scaleY := stretchHeight / float64(crBounds.Dy())
+		drawImage(screen, parts.CenterRight, x+width-cornerWidth, y+cornerHeight, 1.0, scaleY)
+	}
+
+	// 6. 绘制中心区域（双向拉伸）
+	if parts.CenterMiddle != nil && stretchWidth > 0 && stretchHeight > 0 {
+		cmBounds := parts.CenterMiddle.Bounds()
+		scaleXCenter := stretchWidth / float64(cmBounds.Dx())
+		scaleYCenter := stretchHeight / float64(cmBounds.Dy())
+		drawImage(screen, parts.CenterMiddle, x+cornerWidth, y+cornerHeight, scaleXCenter, scaleYCenter)
+	}
+
+	// 7. 绘制大底部区域
+	bottomY := y + height - bigBottomHeight
+
+	// 大底部左边角
+	drawImage(screen, parts.BigBottomLeft, x, bottomY, 1.0, 1.0)
+
+	// 大底部中间（水平拉伸）
+	if stretchWidth > 0 {
+		bmBounds := parts.BigBottomMiddle.Bounds()
+		scaleX := stretchWidth / float64(bmBounds.Dx())
+		drawImage(screen, parts.BigBottomMiddle, x+cornerWidth, bottomY, scaleX, 1.0)
+	}
+
+	// 大底部右边角
+	drawImage(screen, parts.BigBottomRight, x+width-cornerWidth, bottomY, 1.0, 1.0)
+}

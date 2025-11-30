@@ -19,6 +19,7 @@ type DialogComponent struct {
 	AutoClose        bool           // 点击按钮后是否自动关闭对话框（默认 true，新用户对话框设为 false）
 	HoveredButtonIdx int            // 当前悬停的按钮索引（-1 表示没有悬停）- ECS 架构重构
 	PressedButtonIdx int            // 当前按下的按钮索引（-1 表示没有按下）- 用于按下效果
+	UseBigBottom     bool           // 是否使用大底部区域（用于两行按钮布局）
 }
 
 // DialogButton 对话框按钮

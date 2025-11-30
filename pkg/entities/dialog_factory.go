@@ -516,6 +516,7 @@ func NewContinueGameDialogEntity(
 		AutoClose:        true, // 点击后自动关闭
 		HoveredButtonIdx: -1,
 		PressedButtonIdx: -1,
+		UseBigBottom:     true, // 两行按钮布局，使用大底部区域
 	})
 
 	// 添加 UI 组件标记

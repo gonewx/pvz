@@ -160,8 +160,11 @@ type GameScene struct {
 	// 实际关卡僵尸在开场动画完成后才预生成，与预览僵尸完全独立
 	zombiesPreSpawned bool
 
-	// Story 18.2: 战斗存档加载标志
-	loadFromBattleSave bool // 是否从战斗存档恢复
+	// Story 18.3: 战斗存档对话框
+	hasBattleSave         bool                 // 是否有战斗存档
+	battleSaveInfo        *game.BattleSaveInfo // 战斗存档信息
+	battleSaveDialogShown bool                 // 对话框是否已显示
+	battleSaveDialogID    ecs.EntityID         // 对话框实体ID
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -194,6 +197,20 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	scene.gameState.SetPaused(false)
 	scene.gameState.IsGameOver = false
 	scene.gameState.GameResult = ""
+
+	// Story 18.3: 检测战斗存档（进入游戏后立即检测）
+	saveManager := scene.gameState.GetSaveManager()
+	currentUser := saveManager.GetCurrentUser()
+	if currentUser != "" && saveManager.HasBattleSave(currentUser) {
+		scene.hasBattleSave = true
+		scene.battleSaveInfo, _ = saveManager.GetBattleSaveInfo(currentUser)
+		if scene.battleSaveInfo != nil {
+			log.Printf("[GameScene] 检测到战斗存档: 关卡=%s, 波次=%d, 阳光=%d",
+				scene.battleSaveInfo.LevelID,
+				scene.battleSaveInfo.WaveIndex+1,
+				scene.battleSaveInfo.Sun)
+		}
+	}
 
 	// Load all UI resources
 	scene.loadResources()
@@ -503,12 +520,12 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 
 // NewGameSceneFromBattleSave 创建从战斗存档恢复的游戏场景
 //
-// Story 18.2: 战斗存档自动加载
+// Story 18.3: 简化实现
 //
-// 与 NewGameScene 的区别：
-//   - 设置 loadFromBattleSave = true
-//   - 跳过开场动画和教学
-//   - 在初始化完成后调用 restoreBattleState() 恢复战斗状态
+// 说明：
+//
+//	现在 NewGameScene 会自动检测战斗存档并处理，
+//	此函数仅作为别名保留以保持向后兼容性。
 //
 // 参数：
 //   - rm: 资源管理器
@@ -516,17 +533,11 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 //   - levelID: 关卡ID（从存档中获取）
 //
 // 返回：
-//   - 配置为从存档恢复的 GameScene 实例
+//   - GameScene 实例（会自动检测存档并显示对话框）
 func NewGameSceneFromBattleSave(rm *game.ResourceManager, sm *game.SceneManager, levelID string) *GameScene {
-	// 使用标准构造函数创建场景
-	scene := NewGameScene(rm, sm, levelID)
-
-	// 标记为从存档加载
-	scene.loadFromBattleSave = true
-
-	log.Printf("[GameScene] 创建从战斗存档恢复的场景: level=%s", levelID)
-
-	return scene
+	log.Printf("[GameScene] NewGameSceneFromBattleSave 调用，将使用标准构造函数: level=%s", levelID)
+	// 直接使用标准构造函数，它会自动检测存档并处理
+	return NewGameScene(rm, sm, levelID)
 }
 
 // initPlantCardSystems initializes the plant selection module.
@@ -539,10 +550,26 @@ func NewGameSceneFromBattleSave(rm *game.ResourceManager, sm *game.SceneManager,
 //   - System execution order ensures correct game logic flow
 //   - Story 10.1: Pause menu (只更新 UI 系统，跳过游戏逻辑)
 func (s *GameScene) Update(deltaTime float64) {
-	// Story 18.2: 从战斗存档恢复（只执行一次）
-	if s.loadFromBattleSave {
-		s.loadFromBattleSave = false // 标记为已处理
-		s.restoreBattleState()
+	// Story 18.3: 战斗存档对话框优先于所有其他逻辑
+	// 如果有战斗存档且对话框未显示，先显示对话框
+	if s.hasBattleSave && !s.battleSaveDialogShown {
+		s.showBattleSaveDialog()
+		s.battleSaveDialogShown = true
+		return // 等待对话框显示
+	}
+
+	// 如果对话框正在显示，只更新对话框系统
+	if s.battleSaveDialogID != 0 {
+		if s.dialogInputSystem != nil {
+			s.dialogInputSystem.Update(deltaTime)
+			s.entityManager.RemoveMarkedEntities()
+		}
+		// 检查对话框是否已关闭
+		if _, ok := ecs.GetComponent[*components.DialogComponent](s.entityManager, s.battleSaveDialogID); !ok {
+			s.battleSaveDialogID = 0 // 对话框已关闭
+		}
+		s.updateMouseCursor()
+		return // 对话框打开时阻止其他更新
 	}
 
 	// DEBUG: Check for GameFreezeComponent on every frame to debug freeze issue
