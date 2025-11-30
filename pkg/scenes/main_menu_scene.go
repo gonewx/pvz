@@ -1,12 +1,16 @@
 package scenes
 
+// 主菜单场景核心逻辑
+// 拆分文件：
+// - main_menu_buttons.go: 按钮系统 (高亮、可见性、点击处理、底部按钮栏)
+// - main_menu_user_ui.go: 用户管理UI (用户名木牌、用户管理对话框)
+// - main_menu_dialogs.go: 对话框系统 (解锁对话框、帮助/选项面板、错误提示、战斗存档对话框)
+// - main_menu_zombie_hand.go: 僵尸手动画
+
 import (
-	"fmt"
 	"image/color"
 	"log"
-	"os"
 
-	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
@@ -16,7 +20,6 @@ import (
 	"github.com/decker502/pvz/pkg/systems"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
-	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
 const (
@@ -106,7 +109,7 @@ type MainMenuScene struct {
 	pendingScene     string        // Pending scene to switch to after animation
 
 	// Story 18.2: Battle save detection
-	hasBattleSave  bool                // Whether current user has a battle save
+	hasBattleSave  bool                 // Whether current user has a battle save
 	battleSaveInfo *game.BattleSaveInfo // Battle save info (for dialog display)
 }
 
@@ -200,15 +203,12 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	} else {
 		scene.selectorScreenEntity = selectorEntity
 
-		// ✅ Epic 14: 移除 AnalyzeTrackTypes 调用（已私有化，由 ReanimSystem 内部处理）
-		// PlayAnimation/AddAnimation 会自动调用 analyzeTrackTypes
-
 		// Story 12.4 AC8: **关键修复**：在播放动画之前先设置 HiddenTracks
 		// 这样首次渲染就不会显示木牌和草叶子
 		reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](scene.entityManager, selectorEntity)
 		if ok && scene.isFirstLaunch {
 			reanimComp.HiddenTracks = make(map[string]bool)
-			// 隐��木牌轨道
+			// 隐藏木牌轨道
 			reanimComp.HiddenTracks["woodsign1"] = true
 			reanimComp.HiddenTracks["woodsign2"] = true
 			reanimComp.HiddenTracks["woodsign3"] = true
@@ -243,19 +243,6 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 
 		// 处理 AnimationCommand（立即初始化动画）
 		scene.reanimSystem.Update(0)
-
-		// 3. 云朵和草动画在开场完成后才添加（见 Update() 中的 cloudAnimsResumed 逻辑）
-
-		// 4. ✅ Epic 14: 移除 FinalizeAnimations 调用（已私有化，由 PlayAnimation/AddAnimation 内部处理）
-
-		// 处理 AnimationCommand（立即初始化动画）
-		scene.reanimSystem.Update(0)
-
-		// ✅ ReanimSystem.PlayCombo() 已自动从配置文件加载并设置:
-		//   - AnimationFPSOverrides (available_animations.fps)
-		//   - AnimationSpeedOverrides (available_animations.speed)
-		//   - AnimationLoopStates (animation_combos.animation_loop_states)
-		//   - IsLooping (animation_combos.loop)
 
 		// 修复：SelectorScreen 是全屏 UI，应该使用左上角对齐（Reanim 原始坐标）
 		// 而不是中心对齐。禁用 CenterOffset 功能。
@@ -293,18 +280,7 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 		scene.initUserSign()
 	}
 
-	// Load background image (fallback if SelectorScreen fails)
-	// img, err := rm.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_BG")
-	// if err != nil {
-	// 	log.Printf("Warning: Failed to load main menu background: %v", err)
-	// 	log.Printf("The game will use a fallback solid color background")
-	// 	// Fallback: keep backgroundImage as nil, will use solid color in Draw()
-	// } else {
-	// 	scene.backgroundImage = img
-	// }
-
 	// Load background music (using titlescreen music from loaderbar group)
-	// Note: Need to ensure loaderbar group is loaded before this
 	player, err := rm.LoadSoundEffect("assets/sounds/titlescreen.ogg")
 	if err != nil {
 		log.Printf("Warning: Failed to load main menu music: %v", err)
@@ -313,24 +289,18 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 		scene.bgmPlayer = player
 	}
 
-	// Initialize buttons
-	// scene.initButtons()
-
 	// Story 12.3: Initialize dialog systems
 	// 加载不同大小的字体用于对话框渲染
-	// 标题字体（大）
 	titleFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 22)
 	if err != nil {
 		log.Printf("[MainMenuScene] Warning: Failed to load dialog title font: %v", err)
 	}
 
-	// 消息字体（中）
 	messageFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 18)
 	if err != nil {
 		log.Printf("[MainMenuScene] Warning: Failed to load dialog message font: %v", err)
 	}
 
-	// 按钮字体（与奖励面板按钮字体一致）
 	buttonFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 20)
 	if err != nil {
 		log.Printf("[MainMenuScene] Warning: Failed to load dialog button font: %v", err)
@@ -384,7 +354,6 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 
 	// Story 12.4: Initialize text input systems (for user management dialogs)
 	scene.textInputSystem = systems.NewTextInputSystem(scene.entityManager)
-	// 加载输入框字体（与消息字体一致）
 	inputFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 20)
 	if err != nil {
 		log.Printf("[MainMenuScene] Warning: Failed to load input font: %v", err)
@@ -393,14 +362,10 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	log.Printf("[MainMenuScene] Text input systems initialized")
 
 	// ✅ Story 12.4: 设置 DialogRenderSystem 的 TextInputRenderSystem 引用
-	// 这样 DialogRenderSystem 可以在渲染对话框后立即渲染其子实体（输入框）
 	scene.dialogRenderSystem.SetTextInputRenderSystem(scene.textInputRenderSystem)
 	log.Printf("[MainMenuScene] Set TextInputRenderSystem reference in DialogRenderSystem")
 
 	// Story 12.6: Create zombie hand entity (initially paused, for transition animation)
-	// Position: 使用配置的偏移量调整位置
-	// Zombie_hand.reanim 中的坐标是绝对屏幕坐标（如 arm 轨道 x=381.6）
-	// 通过 config.ZombieHandOffsetX/Y 可以微调整体位置
 	zombieHandEntity, err := entities.NewZombieHandEntity(
 		scene.entityManager,
 		rm,
@@ -463,27 +428,6 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 			reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
 			if ok && reanimComp.IsFinished {
 				// 开场动画已完成，添加循环动画
-				// 策略：
-				//   1. 保留 anim_open（停留在最后一帧，提供背景）
-				//   2. 添加 anim_idle（提供按钮动画）
-				//   3. 添加云朵动画（在上层）
-				//   4. Story 12.4 AC8: 仅在非首次启动时添加草动画
-				// 原因：anim_idle 从物理帧 41 开始，但背景轨道在帧 41 被隐藏了（f=-1）
-				//       anim_open（帧 0-12）提供背景，anim_idle（帧 41+）提供按钮动画
-
-				// ✅ 不移除、不暂停 anim_open，让它自然停留在最后一帧（非循环动画完成后不更新）
-
-				// ✅ 渲染顺序说明：
-				//   在 Reanim 系统中，动画的添加顺序影响 CachedRenderData 的顺序
-				//   但最终的视觉图层由每个轨道/图片本身的绘制顺序决定
-				//
-				//   理论顺序（从底到顶）：
-				//   1. anim_open (背景)
-				//   2. 云朵动画 (中间层)
-				//   3. anim_grass (草) - 仅非首次启动
-				//   4. anim_idle (按钮，最上层)
-
-				// 1. 先添加云朵动画
 				cloudAnims := []string{"anim_cloud1", "anim_cloud2", "anim_cloud4",
 					"anim_cloud5", "anim_cloud6", "anim_cloud7"}
 
@@ -494,8 +438,7 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 					reanimComp.AnimationLoopStates[animName] = true
 				}
 
-				// 2. Story 12.4 AC8: 仅在非首次启动时添加 anim_grass
-				// 首次启动时，草动画会在用户创建成功后手动添加
+				// Story 12.4 AC8: 仅在非首次启动时添加 anim_grass
 				if !m.isFirstLaunch {
 					if err := m.reanimSystem.AddAnimation(m.selectorScreenEntity, "anim_grass"); err != nil {
 						log.Printf("[MainMenuScene] Warning: Failed to add anim_grass: %v", err)
@@ -506,12 +449,10 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 					log.Printf("[MainMenuScene] Skipped anim_grass (first launch, will add after user creation)")
 				}
 
-				// 3. 最后添加 anim_idle（按钮应该在最上层）
+				// 最后添加 anim_idle（按钮应该在最上层）
 				if err := m.reanimSystem.AddAnimation(m.selectorScreenEntity, "anim_idle"); err != nil {
 					log.Printf("[MainMenuScene] Warning: Failed to add anim_idle: %v", err)
 				}
-
-				// 3. ✅ Epic 14: FinalizeAnimations 已集成到 AddAnimation 内部
 
 				m.cloudAnimsResumed = true
 				log.Printf("[MainMenuScene] ✅ 开场动画完成，已切换到循环模式（保留 anim_open 背景 + anim_idle + 云朵）")
@@ -543,18 +484,11 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 
 	// Story 12.2: 键盘快捷键触发面板（临时验证方案）
 	// 检查是否有面板或对话框打开
-	// ✅ Story 12.4: 同时检查 currentDialog, currentUserDialogID 和 currentErrorDialogID
 	panelOpen := (m.helpPanelModule != nil && m.helpPanelModule.IsActive()) ||
 		(m.optionsPanelModule != nil && m.optionsPanelModule.IsActive()) ||
 		m.currentDialog != 0 ||
 		m.currentUserDialogID != 0 ||
 		m.currentErrorDialogID != 0
-
-	// ✅ Story 12.4: 调试日志 - 跟踪对话框状态
-	if m.currentUserDialogID != 0 || m.currentErrorDialogID != 0 {
-		log.Printf("[MainMenuScene] Dialog state: panelOpen=%v, currentDialog=%d, currentUserDialogID=%d, currentErrorDialogID=%d",
-			panelOpen, m.currentDialog, m.currentUserDialogID, m.currentErrorDialogID)
-	}
 
 	// 检测按键状态（用于边缘检测）
 	isF1Pressed := ebiten.IsKeyPressed(ebiten.KeyF1)
@@ -584,7 +518,6 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 		m.wasMousePressed = isMousePressed
 
 		// ✅ ECS 架构修复: 对所有对话框都调用 DialogInputSystem.Update()
-		// 无论是 currentDialog, currentUserDialogID 还是 currentErrorDialogID
 		if m.currentDialog != 0 || m.currentUserDialogID != 0 || m.currentErrorDialogID != 0 {
 			m.dialogInputSystem.Update(deltaTime)
 			m.entityManager.RemoveMarkedEntities()
@@ -606,7 +539,6 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 					m.currentDialog = 0
 					// 如果是错误对话框被关闭，也清除 currentErrorDialogID
 					if m.currentErrorDialogID != 0 {
-						// 检查错误对话框是否还存在
 						errorDialogExists := false
 						for _, entityID := range dialogEntities {
 							if entityID == m.currentErrorDialogID {
@@ -622,7 +554,6 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 
 					// ✅ Story 12.4: 如果还有其他对话框，将 currentDialog 设置为最上层对话框
 					if len(dialogEntities) > 0 {
-						// 找到 ID 最大的对话框（最上层）
 						var maxDialogID ecs.EntityID = 0
 						for _, entityID := range dialogEntities {
 							if entityID > maxDialogID {
@@ -684,17 +615,6 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 		// 使用四边形点击检测（支持旋转/倾斜按钮）
 		inHitbox := config.IsPointInQuadrilateral(float64(mouseX), float64(mouseY), &hitbox)
 
-		// 调试日志：显示每个按钮的 hitbox 信息和鼠标位置
-		if hitbox.TrackName == "SelectorScreen_Challenges_button" && (inHitbox || isMouseReleased) {
-			log.Printf("[MainMenuScene] 解谜按钮检测: 鼠标=(%.1f, %.1f), 四边形=[(%.1f,%.1f)-(%.1f,%.1f)-(%.1f,%.1f)-(%.1f,%.1f)], 命中=%v",
-				float64(mouseX), float64(mouseY),
-				hitbox.TopLeft.X, hitbox.TopLeft.Y,
-				hitbox.TopRight.X, hitbox.TopRight.Y,
-				hitbox.BottomRight.X, hitbox.BottomRight.Y,
-				hitbox.BottomLeft.X, hitbox.BottomLeft.Y,
-				inHitbox)
-		}
-
 		// Check if mouse is in hitbox
 		if inHitbox {
 			m.hoveredButton = hitbox.TrackName
@@ -741,7 +661,6 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 	m.updateButtonHighlight()
 
 	// Story 12.4 Task 2.3: Update user sign hover state
-	// ✅ 修复：对话框打开时禁用木牌悬停检测（避免遮罩层下的木牌被误判为悬停）
 	hasOpenDialog := m.currentUserDialogID != 0 || m.currentDialog != 0 || m.currentErrorDialogID != 0
 	if !hasOpenDialog {
 		m.updateUserSignHover(mouseX, mouseY, isMouseReleased)
@@ -761,284 +680,6 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 	m.entityManager.RemoveMarkedEntities()
 }
 
-// loadButtonImages loads normal and highlight images for all menu buttons.
-//
-// This method extracts normal button images from the SelectorScreen ReanimComponent
-// and loads the corresponding highlight images from the resource manager.
-//
-// Story 12.1 Task 5: Button Highlight Effect
-func (m *MainMenuScene) loadButtonImages(rm *game.ResourceManager) {
-	// Get ReanimComponent from SelectorScreen entity
-	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
-	if !ok || reanimComp == nil {
-		log.Printf("[MainMenuScene] Warning: Failed to get ReanimComponent for button image loading")
-		return
-	}
-
-	// Define button track name to resource ID mappings
-	// Note: Track names don't match actual game modes (see menu_config.go for details)
-	buttonMappings := map[string]struct {
-		normalImageRef      string // Image reference in PartImages (from .reanim file)
-		highlightResourceID string // Resource ID for highlight image
-	}{
-		"SelectorScreen_Adventure_button": {
-			normalImageRef:      "IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_BUTTON",
-			highlightResourceID: "IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_HIGHLIGHT",
-		},
-		"SelectorScreen_StartAdventure_button": {
-			normalImageRef:      "IMAGE_REANIM_SELECTORSCREEN_STARTADVENTURE_BUTTON1",
-			highlightResourceID: "IMAGE_REANIM_SELECTORSCREEN_STARTADVENTURE_HIGHLIGHT",
-		},
-		"SelectorScreen_Survival_button": {
-			normalImageRef:      "IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_BUTTON",
-			highlightResourceID: "IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_HIGHLIGHT",
-		},
-		"SelectorScreen_Challenges_button": {
-			normalImageRef:      "IMAGE_REANIM_SELECTORSCREEN_CHALLENGES_BUTTON",
-			highlightResourceID: "IMAGE_REANIM_SELECTORSCREEN_CHALLENGES_HIGHLIGHT",
-		},
-		"SelectorScreen_ZenGarden_button": {
-			normalImageRef:      "IMAGE_REANIM_SELECTORSCREEN_VASEBREAKER_BUTTON",
-			highlightResourceID: "IMAGE_REANIM_SELECTORSCREEN_VASEBREAKER_HIGHLIGHT",
-		},
-	}
-
-	// Load images for each button
-	for trackName, mapping := range buttonMappings {
-		// Get normal image from PartImages (already loaded by ReanimSystem)
-		if normalImg, exists := reanimComp.PartImages[mapping.normalImageRef]; exists {
-			m.buttonNormalImages[trackName] = normalImg
-			log.Printf("[MainMenuScene] Loaded normal image for %s", trackName)
-		} else {
-			log.Printf("[MainMenuScene] Warning: Normal image not found for %s (ref: %s)", trackName, mapping.normalImageRef)
-		}
-
-		// Load highlight image from resource manager
-		highlightImg, err := rm.LoadImageByID(mapping.highlightResourceID)
-		if err != nil {
-			log.Printf("[MainMenuScene] Warning: Failed to load highlight image for %s: %v", trackName, err)
-		} else {
-			m.buttonHighlightImages[trackName] = highlightImg
-			log.Printf("[MainMenuScene] Loaded highlight image for %s", trackName)
-		}
-	}
-
-	log.Printf("[MainMenuScene] Button image loading complete: %d normal, %d highlight",
-		len(m.buttonNormalImages), len(m.buttonHighlightImages))
-}
-
-// updateButtonHighlight updates the button appearance based on hover state.
-//
-// When the mouse hovers over an unlocked button, this method:
-// 1. Replaces the button image with its highlight version in the ReanimComponent
-// 2. Plays the stone grinding sound effect (SOUND_GRAVEBUTTON) once
-//
-// When the mouse leaves a button, it restores the normal image.
-//
-// Story 12.1 Task 5: Button Highlight Effect
-func (m *MainMenuScene) updateButtonHighlight() {
-	// Get ReanimComponent from SelectorScreen entity
-	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
-	if !ok || reanimComp == nil {
-		return
-	}
-
-	// Step 1: Restore the previously highlighted button (if any)
-	if m.lastHoveredButton != "" && m.lastHoveredButton != m.hoveredButton {
-		// Restore the old button to normal
-		if normalImg, exists := m.buttonNormalImages[m.lastHoveredButton]; exists {
-			// Find the correct image reference for this button and restore it
-			var imageRef string
-			switch m.lastHoveredButton {
-			case "SelectorScreen_Adventure_button":
-				imageRef = "IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_BUTTON"
-				reanimComp.PartImages[imageRef] = normalImg
-			case "SelectorScreen_StartAdventure_button":
-				imageRef = "IMAGE_REANIM_SELECTORSCREEN_STARTADVENTURE_BUTTON1"
-				reanimComp.PartImages[imageRef] = normalImg
-			case "SelectorScreen_Survival_button":
-				imageRef = "IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_BUTTON"
-				reanimComp.PartImages[imageRef] = normalImg
-			case "SelectorScreen_Challenges_button":
-				imageRef = "IMAGE_REANIM_SELECTORSCREEN_CHALLENGES_BUTTON"
-				reanimComp.PartImages[imageRef] = normalImg
-			case "SelectorScreen_ZenGarden_button":
-				imageRef = "IMAGE_REANIM_SELECTORSCREEN_VASEBREAKER_BUTTON"
-				reanimComp.PartImages[imageRef] = normalImg
-			}
-
-			// 强制重建渲染缓存（修改 LastRenderFrame 触发缓存失效）
-			reanimComp.LastRenderFrame = -1
-		}
-	}
-
-	// Step 2: Apply highlight to the currently hovered button (if any and unlocked)
-	if m.hoveredButton != "" {
-		// 检查轨道是否被隐藏（如果被隐藏则不需要高亮）
-		if reanimComp.HiddenTracks != nil && reanimComp.HiddenTracks[m.hoveredButton] {
-			m.lastHoveredButton = ""
-			return
-		}
-
-		// Find the button type for unlock check
-		var buttonType config.MenuButtonType
-		var found bool
-		for _, hitbox := range m.buttonHitboxes {
-			if hitbox.TrackName == m.hoveredButton {
-				buttonType = hitbox.ButtonType
-				found = true
-				break
-			}
-		}
-
-		// Only apply highlight to unlocked buttons
-		// 未解锁的按钮不高亮（阴影覆盖在上面，高亮也看不到）
-		if found && config.IsMenuModeUnlocked(buttonType, m.currentLevel) {
-			// Apply highlight image if available
-			if highlightImg, exists := m.buttonHighlightImages[m.hoveredButton]; exists {
-				// Find the correct image reference for this button and apply highlight
-				var imageRef string
-				switch m.hoveredButton {
-				case "SelectorScreen_Adventure_button":
-					imageRef = "IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_BUTTON"
-					reanimComp.PartImages[imageRef] = highlightImg
-				case "SelectorScreen_StartAdventure_button":
-					imageRef = "IMAGE_REANIM_SELECTORSCREEN_STARTADVENTURE_BUTTON1"
-					reanimComp.PartImages[imageRef] = highlightImg
-				case "SelectorScreen_Survival_button":
-					imageRef = "IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_BUTTON"
-					reanimComp.PartImages[imageRef] = highlightImg
-				case "SelectorScreen_Challenges_button":
-					imageRef = "IMAGE_REANIM_SELECTORSCREEN_CHALLENGES_BUTTON"
-					reanimComp.PartImages[imageRef] = highlightImg
-				case "SelectorScreen_ZenGarden_button":
-					imageRef = "IMAGE_REANIM_SELECTORSCREEN_VASEBREAKER_BUTTON"
-					reanimComp.PartImages[imageRef] = highlightImg
-				}
-
-				// 强制重建渲染缓存（修改 LastRenderFrame 触发缓存失效）
-				reanimComp.LastRenderFrame = -1
-			}
-
-			// Play sound effect once when entering a new button
-			if m.lastHoveredButton != m.hoveredButton {
-				m.playGraveButtonSound()
-			}
-
-			// Update last hovered button
-			m.lastHoveredButton = m.hoveredButton
-			return
-		}
-	}
-
-	// Step 3: If no button is hovered (or button is locked), clear last hovered
-	m.lastHoveredButton = ""
-}
-
-// updateMouseCursor updates the mouse cursor shape based on hover state.
-//
-// When the mouse hovers over an unlocked button, bottom function button, or panel button,
-// the cursor changes to a pointer hand. Otherwise, the cursor is set to the default arrow shape.
-//
-// Only updates the cursor when the shape actually changes to avoid unnecessary API calls.
-//
-// Story 12.1 Task 5: Button Highlight Effect
-// Story 12.2: 底部功能栏 - 手形光标
-// Story 12.3: 面板按钮光标管理
-func (m *MainMenuScene) updateMouseCursor() {
-	// Default cursor shape
-	cursorShape := ebiten.CursorShapeDefault
-
-	// ✅ 核心修复：对话框打开时，只检查对话框的悬停状态，忽略所有底层 UI
-	hasOpenDialog := m.currentUserDialogID != 0 || m.currentDialog != 0 || m.currentErrorDialogID != 0
-
-	if !hasOpenDialog {
-		// 只有在没有对话框时才检查底层 UI 元素
-
-		// Check if hovering over a grave button
-		if m.hoveredButton != "" {
-			// ✅ 修复：所有可见的按钮（包括未解锁的）都显示手形鼠标
-			// 未解锁的按钮也可以点击，点击后会提示未解锁
-			cursorShape = ebiten.CursorShapePointer
-		}
-
-		// Check if hovering over a bottom function button
-		if m.hoveredBottomButton != components.BottomButtonNone {
-			cursorShape = ebiten.CursorShapePointer
-		}
-
-		// Story 12.4 AC2: Check if hovering over user sign
-		if m.userSignEntity != 0 {
-			if userSignComp, ok := ecs.GetComponent[*components.UserSignComponent](m.entityManager, m.userSignEntity); ok {
-				if userSignComp.IsHovered {
-					cursorShape = ebiten.CursorShapePointer
-				}
-			}
-		}
-
-		// Check if hovering over any panel button (help/options panel)
-		panelButtons := ecs.GetEntitiesWith1[*components.ButtonComponent](m.entityManager)
-		for _, entityID := range panelButtons {
-			button, ok := ecs.GetComponent[*components.ButtonComponent](m.entityManager, entityID)
-			if ok && button.State == components.UIHovered {
-				cursorShape = ebiten.CursorShapePointer
-				break
-			}
-		}
-	}
-
-	// ✅ ECS 架构重构: 只读取组件状态,不进行碰撞检测
-	// DialogInputSystem 负责更新 DialogComponent.HoveredButtonIdx 和 UserListComponent.HoveredIndex
-	// 这里只根据状态设置光标
-
-	// 检查所有对话框（用户管理对话框、错误对话框、通用对话框）
-	dialogIDs := []ecs.EntityID{m.currentUserDialogID, m.currentDialog, m.currentErrorDialogID}
-	for _, dialogID := range dialogIDs {
-		if dialogID != 0 {
-			dialogComp, ok := ecs.GetComponent[*components.DialogComponent](m.entityManager, dialogID)
-			if ok && dialogComp.IsVisible {
-				// 检查对话框按钮是否悬停（只读取状态）
-				if dialogComp.HoveredButtonIdx >= 0 {
-					cursorShape = ebiten.CursorShapePointer
-					break
-				}
-
-				// 检查用户列表是否有悬停项（只读取状态）
-				if userList, ok := ecs.GetComponent[*components.UserListComponent](m.entityManager, dialogID); ok {
-					if userList.HoveredIndex >= 0 {
-						cursorShape = ebiten.CursorShapePointer
-						break
-					}
-				}
-			}
-		}
-	}
-
-	// Only update cursor if shape changed (避免闪烁)
-	if cursorShape != m.lastCursorShape {
-		ebiten.SetCursorShape(cursorShape)
-		m.lastCursorShape = cursorShape
-	}
-}
-
-// playGraveButtonSound plays the stone grinding sound effect for button hover.
-//
-// Story 12.1 Task 5: Button Highlight Effect
-func (m *MainMenuScene) playGraveButtonSound() {
-	// Check if resource manager is available (nil in unit tests)
-	if m.resourceManager == nil {
-		return
-	}
-
-	player, err := m.resourceManager.LoadSoundEffect("assets/sounds/gravebutton.ogg")
-	if err != nil {
-		log.Printf("[MainMenuScene] Warning: Failed to load grave button sound: %v", err)
-		return
-	}
-	player.Rewind()
-	player.Play()
-}
-
 // Draw renders the main menu scene to the screen.
 // If a background image is loaded, it draws the image.
 // Otherwise, it uses a dark blue fallback background.
@@ -1051,23 +692,18 @@ func (m *MainMenuScene) Draw(screen *ebiten.Image) {
 	// Story 12.1: Draw SelectorScreen Reanim (contains background, buttons, decorations)
 	if m.selectorScreenEntity != 0 {
 		// 主菜单使用 Reanim 渲染，直接调用 DrawEntity
-		// 使用 cameraX = 0（主菜单没有摄像机偏移）
 		m.renderSystem.DrawEntity(screen, m.selectorScreenEntity, 0)
 
-		// Story 12.1 Task 6: 渲染关卡进度数字（在冒险模式按钮上，随动画一起移动）
-		// 只在已开始游戏的用户显示关卡数字（新用户显示 StartAdventure 按钮，不需要数字）
+		// Story 12.1 Task 6: 渲染关卡进度数字
 		if m.hasStartedGame && m.currentLevel != "" {
 			log.Printf("[MainMenuScene] 🔢 准备渲染关卡数字: %s", m.currentLevel)
 
-			// 获取 ReanimComponent 以访问按钮的实时变换
 			reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
 			if ok {
-				// 获取冒险按钮轨道的当前帧数据
 				buttonTrackName := "SelectorScreen_Adventure_button"
 				frames, trackExists := reanimComp.MergedTracks[buttonTrackName]
 
 				if trackExists && len(frames) > 0 {
-					// 获取当前动画的帧索引
 					currentFrameIdx := reanimComp.CurrentFrame
 					if currentFrameIdx < 0 {
 						currentFrameIdx = 0
@@ -1076,27 +712,8 @@ func (m *MainMenuScene) Draw(screen *ebiten.Image) {
 						currentFrameIdx = len(frames) - 1
 					}
 
-					if !m.levelNumbersDebugLogged {
-						log.Printf("[MainMenuScene] 🔍 按钮轨道信息: 轨道=%s, 总帧数=%d, 当前帧=%d", buttonTrackName, len(frames), currentFrameIdx)
-					}
-
-					// 获取按钮当前帧的变换数据
 					buttonFrame := frames[currentFrameIdx]
 
-					// 打印帧数据（仅一次）
-					frameX := 0.0
-					frameY := 0.0
-					if buttonFrame.X != nil {
-						frameX = *buttonFrame.X
-					}
-					if buttonFrame.Y != nil {
-						frameY = *buttonFrame.Y
-					}
-					if !m.levelNumbersDebugLogged {
-						log.Printf("[MainMenuScene] 🔍 按钮帧数据: X=%.1f, Y=%.1f", frameX, frameY)
-					}
-
-					// 获取 PositionComponent 的基础位置
 					posComp, hasPosComp := ecs.GetComponent[*components.PositionComponent](m.entityManager, m.selectorScreenEntity)
 					baseX := 0.0
 					baseY := 0.0
@@ -1105,19 +722,11 @@ func (m *MainMenuScene) Draw(screen *ebiten.Image) {
 						baseY = posComp.Y
 					}
 
-					if !m.levelNumbersDebugLogged {
-						log.Printf("[MainMenuScene] 🔍 基础位置: baseX=%.1f, baseY=%.1f, CenterOffsetX=%.1f, CenterOffsetY=%.1f",
-							baseX, baseY, reanimComp.CenterOffsetX, reanimComp.CenterOffsetY)
-					}
-
-					// 计算数字渲染位置（按钮中心下方）
-					// 按钮尺寸：宽 330, 高 120
 					const buttonWidth = 330.0
 					const buttonHeight = 120.0
 					const numberOffsetX = 0.0
 					const numberOffsetY = 38.0
 
-					// 安全获取按钮位置（检查指针）
 					buttonX := 0.0
 					buttonY := 0.0
 					if buttonFrame.X != nil {
@@ -1127,70 +736,40 @@ func (m *MainMenuScene) Draw(screen *ebiten.Image) {
 						buttonY = *buttonFrame.Y
 					}
 
-					// 按钮中心位置 = 基础位置 + 帧位置（左边缘） + 宽度的一半 - 偏移
-					// buttonFrame.X 是按钮左边缘，需要加上宽度的一半得到中心
 					buttonCenterX := baseX + buttonX + buttonWidth/2 - reanimComp.CenterOffsetX + numberOffsetX
 					buttonCenterY := baseY + buttonY - reanimComp.CenterOffsetY + buttonHeight/2 + numberOffsetY
 
-					// 获取按钮的倾斜角度（转换为弧度）
-					// Reanim 的 SkewY 单位是度，需要转换为弧度
-					// SkewY 是 Y 轴倾斜，影响左右高度（负值表示左高右低）
 					angleRadians := 0.0
 					if buttonFrame.SkewY != nil && *buttonFrame.SkewY != 0 {
 						angleRadians = *buttonFrame.SkewY * 3.14159265359 / 180.0
-						if !m.levelNumbersDebugLogged {
-							log.Printf("[MainMenuScene] 🔍 使用 SkewY=%.3f度, angleRadians=%.3f弧度", *buttonFrame.SkewY, angleRadians)
-						}
 					} else if buttonFrame.SkewX != nil && *buttonFrame.SkewX != 0 {
-						// 如果 SkewY 为 0，尝试使用 SkewX
 						angleRadians = *buttonFrame.SkewX * 3.14159265359 / 180.0
-						if !m.levelNumbersDebugLogged {
-							log.Printf("[MainMenuScene] 🔍 使用 SkewX=%.3f度, angleRadians=%.3f弧度", *buttonFrame.SkewX, angleRadians)
-						}
 					} else {
-						// Reanim 中无倾斜角度，使用固定倾斜（左高右低，约 5 度）
 						angleRadians = 5.0 * 3.14159265359 / 180.0
-						if !m.levelNumbersDebugLogged {
-							log.Printf("[MainMenuScene] 🔍 Reanim 无倾斜，使用固定角度 -3 度, angleRadians=%.3f弧度", angleRadians)
-						}
 					}
 					if !m.levelNumbersDebugLogged {
 						m.levelNumbersDebugLogged = true
 					}
 
-					// 渲染关卡进度数字（应用倾斜角度）
 					renderLevelNumbers(screen, m.resourceManager, m.currentLevel, buttonCenterX, buttonCenterY, angleRadians)
-				} else {
-					log.Printf("[MainMenuScene] ⚠️ 未找到按钮轨道或帧数据: %s", buttonTrackName)
 				}
-			} else {
-				log.Println("[MainMenuScene] ⚠️ 未找到 ReanimComponent")
 			}
-		} else {
-			log.Println("[MainMenuScene] ⚠️ currentLevel 为空，不渲染数字")
 		}
 
 		// Story 12.4 Task 2.4: 渲染木牌上的用户名文本
 		m.renderUserSignText(screen)
-
-		// Note: Old m.buttons drawing removed - SelectorScreen Reanim handles all button rendering
 	} else {
 		// Fallback: Draw background image if SelectorScreen failed to load
 		if m.backgroundImage != nil {
-			// Scale background image to fit window size if needed
 			bounds := m.backgroundImage.Bounds()
 			bgWidth := float64(bounds.Dx())
 			bgHeight := float64(bounds.Dy())
 
-			// Calculate scale factors
 			scaleX := WindowWidth / bgWidth
 			scaleY := WindowHeight / bgHeight
 
-			// Create draw options with scaling
 			op := &ebiten.DrawImageOptions{}
 			op.GeoM.Scale(scaleX, scaleY)
-
-			// Draw the background image
 			screen.DrawImage(m.backgroundImage, op)
 		} else {
 			// Fallback: Fill the screen with a dark blue color (midnight blue)
@@ -1199,34 +778,24 @@ func (m *MainMenuScene) Draw(screen *ebiten.Image) {
 
 		// Fallback: Draw old-style buttons only if Reanim failed to load
 		for _, btn := range m.buttons {
-			// Skip drawing if button has no image
 			if btn.NormalImage == nil {
 				continue
 			}
 
-			// Select which image to draw based on button state
 			var img *ebiten.Image
 			if btn.State == components.UIHovered && btn.HoverImage != nil {
-				// Use hover image if available
 				img = btn.HoverImage
 			} else {
-				// Use normal image
 				img = btn.NormalImage
 			}
 
-			// Create draw options
 			op := &ebiten.DrawImageOptions{}
 
-			// Apply visual effects for hovered state (if no hover image available)
 			if btn.State == components.UIHovered && btn.HoverImage == nil {
-				// Make button brighter when hovered
-				op.ColorM.Scale(1.2, 1.2, 1.2, 1.0)
+				op.ColorScale.Scale(1.2, 1.2, 1.2, 1.0)
 			}
 
-			// Position the button
 			op.GeoM.Translate(btn.X, btn.Y)
-
-			// Draw the button
 			screen.DrawImage(img, op)
 		}
 	}
@@ -1239,7 +808,6 @@ func (m *MainMenuScene) Draw(screen *ebiten.Image) {
 		log.Printf("[MainMenuScene] 🧟 Drawing zombie hand entity (ID=%d)", m.zombieHandEntity)
 		m.renderSystem.DrawEntity(screen, m.zombieHandEntity, 0)
 	} else {
-		// Debug: Log why zombie hand is not drawn
 		if m.zombieHandEntity != 0 {
 			log.Printf("[MainMenuScene] 🧟 NOT drawing zombie hand: menuState=%d (expected %d)",
 				m.menuState, MainMenuStateZombieHandPlaying)
@@ -1247,8 +815,6 @@ func (m *MainMenuScene) Draw(screen *ebiten.Image) {
 	}
 
 	// Story 12.3: Draw dialogs (last, on top of everything)
-	// ✅ Story 12.4: DialogRenderSystem 现在也负责渲染对话框的子实体（输入框）
-	// 这样确保输入框跟随父对话框的z-order，不会总是显示在最上层
 	if m.dialogRenderSystem != nil {
 		m.dialogRenderSystem.Draw(screen)
 	}
@@ -1260,1839 +826,4 @@ func (m *MainMenuScene) Draw(screen *ebiten.Image) {
 	if m.optionsPanelModule != nil {
 		m.optionsPanelModule.Draw(screen)
 	}
-}
-
-// initButtons initializes the menu buttons with their positions, images, and click handlers.
-func (m *MainMenuScene) initButtons() {
-	// Load button images using resource IDs
-	adventureNormal, err := m.resourceManager.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_BUTTON")
-	if err != nil {
-		log.Printf("Warning: Failed to load adventure button normal image: %v", err)
-		adventureNormal = nil
-	}
-
-	adventureHover, err := m.resourceManager.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_HIGHLIGHT")
-	if err != nil {
-		log.Printf("Warning: Failed to load adventure button hover image: %v", err)
-		adventureHover = nil
-	}
-
-	// For exit button, we'll use a simple button image
-	exitNormal, err := m.resourceManager.LoadImageByID("IMAGE_BUTTON_MIDDLE")
-	if err != nil {
-		log.Printf("Warning: Failed to load exit button image: %v", err)
-		exitNormal = nil
-	}
-
-	// Calculate button positions (centered on screen)
-	// Adventure button dimensions (estimate based on typical asset size)
-	var adventureWidth, adventureHeight float64 = 200, 80
-	if adventureNormal != nil {
-		bounds := adventureNormal.Bounds()
-		adventureWidth = float64(bounds.Dx())
-		adventureHeight = float64(bounds.Dy())
-	}
-
-	// Exit button dimensions
-	var exitWidth, exitHeight float64 = 150, 60
-	if exitNormal != nil {
-		bounds := exitNormal.Bounds()
-		exitWidth = float64(bounds.Dx())
-		exitHeight = float64(bounds.Dy())
-	}
-
-	// Position buttons vertically centered with spacing
-	const buttonSpacing = 30.0
-	adventureX := (WindowWidth - adventureWidth) / 2
-	adventureY := WindowHeight/2 - adventureHeight - buttonSpacing/2
-
-	exitX := (WindowWidth - exitWidth) / 2
-	exitY := WindowHeight/2 + buttonSpacing/2
-
-	// Initialize button array
-	m.buttons = []components.Button{
-		{
-			X:           adventureX,
-			Y:           adventureY,
-			Width:       adventureWidth,
-			Height:      adventureHeight,
-			NormalImage: adventureNormal,
-			HoverImage:  adventureHover,
-			State:       components.UINormal,
-			OnClick:     m.onStartAdventureClicked,
-		},
-		{
-			X:           exitX,
-			Y:           exitY,
-			Width:       exitWidth,
-			Height:      exitHeight,
-			NormalImage: exitNormal,
-			HoverImage:  nil, // Will use color/scale effects instead
-			State:       components.UINormal,
-			OnClick:     m.onExitClicked,
-		},
-	}
-}
-
-// onStartAdventureClicked handles the "Start Adventure" button click.
-// It switches the current scene to the GameScene.
-func (m *MainMenuScene) onStartAdventureClicked() {
-	log.Println("Start Adventure button clicked")
-
-	// Story 12.1 Task 6: 首次点击"开始冒险吧"时，标记用户已开始游戏
-	gameState := game.GetGameState()
-	saveManager := gameState.GetSaveManager()
-	if err := saveManager.Load(); err == nil {
-		if !saveManager.GetHasStartedGame() {
-			log.Println("[MainMenuScene] 首次开始游戏，设置 hasStartedGame = true")
-			saveManager.SetHasStartedGame()
-			if err := saveManager.Save(); err != nil {
-				log.Printf("[MainMenuScene] ⚠️ 保存 hasStartedGame 失败: %v", err)
-			}
-		}
-	}
-
-	// Story 8.6: Load level from save file or default to 1-1
-	levelToLoad := "1-1" // Default to first level
-	if err := saveManager.Load(); err == nil {
-		// Save file exists, get highest level
-		highestLevel := saveManager.GetHighestLevel()
-		if highestLevel != "" {
-			levelToLoad = highestLevel
-			log.Printf("[MainMenu] Loading from save: highest level = %s", highestLevel)
-		}
-	}
-
-	// Story 18.2: 检查是否需要从战斗存档加载
-	if m.pendingScene == "GameSceneFromSave" {
-		// 从存档加载，使用存档中的关卡ID
-		if m.battleSaveInfo != nil {
-			levelToLoad = m.battleSaveInfo.LevelID
-			log.Printf("[MainMenuScene] 从战斗存档加载: level=%s", levelToLoad)
-		}
-		// 创建 GameScene 并标记需要从存档恢复
-		gameScene := NewGameSceneFromBattleSave(m.resourceManager, m.sceneManager, levelToLoad)
-		m.sceneManager.SwitchTo(gameScene)
-		return
-	}
-
-	// Pass ResourceManager, SceneManager, and levelID to GameScene
-	gameScene := NewGameScene(m.resourceManager, m.sceneManager, levelToLoad)
-	m.sceneManager.SwitchTo(gameScene)
-}
-
-// showBattleSaveDialog 显示战斗存档选择对话框
-//
-// Story 18.2: 战斗存档自动加载
-//
-// 当检测到未完成的战斗存档时，显示对话框让玩家选择：
-//   - "继续游戏": 从存档恢复战斗状态
-//   - "重新开始": 删除存档并开始新游戏
-//
-// 对话框显示信息：
-//   - 关卡ID
-//   - 波次进度
-//   - 阳光数量
-func (m *MainMenuScene) showBattleSaveDialog() {
-	// 关闭现有对话框
-	if m.currentDialog != 0 {
-		m.entityManager.DestroyEntity(m.currentDialog)
-		m.currentDialog = 0
-	}
-
-	// 构建对话框消息
-	var message string
-	if m.battleSaveInfo != nil {
-		message = fmt.Sprintf(
-			"检测到未完成的战斗存档：\n\n关卡: %s\n波次: %d\n阳光: %d\n\n是否继续上次的游戏？",
-			m.battleSaveInfo.LevelID,
-			m.battleSaveInfo.WaveIndex+1,
-			m.battleSaveInfo.Sun,
-		)
-	} else {
-		message = "检测到未完成的战斗存档。\n\n是否继续上次的游戏？"
-	}
-
-	// 创建带两个按钮的对话框
-	dialogEntity, err := entities.NewDialogEntityWithCallback(
-		m.entityManager,
-		m.resourceManager,
-		"战斗存档",
-		message,
-		[]string{"继续游戏", "重新开始"},
-		WindowWidth,
-		WindowHeight,
-		func(buttonIndex int) {
-			// 关闭对话框
-			m.currentDialog = 0
-
-			if buttonIndex == 0 {
-				// "继续游戏": 从存档加载
-				log.Printf("[MainMenuScene] 用户选择继续游戏，从存档加载")
-				m.startGameFromBattleSave()
-			} else {
-				// "重新开始": 删除存档并开始新游戏
-				log.Printf("[MainMenuScene] 用户选择重新开始，删除存档")
-				m.deleteBattleSaveAndStartNew()
-			}
-		},
-	)
-
-	if err != nil {
-		log.Printf("[MainMenuScene] Warning: Failed to create battle save dialog: %v", err)
-		// 如果创建对话框失败，直接进入游戏
-		m.triggerZombieHandAnimation()
-		return
-	}
-
-	m.currentDialog = dialogEntity
-	log.Printf("[MainMenuScene] 战斗存档对话框已显示")
-}
-
-// startGameFromBattleSave 从战斗存档开始游戏
-//
-// Story 18.2: 从存档恢复战斗
-//
-// 步骤：
-//  1. 触发僵尸手动画
-//  2. 动画完成后创建 GameScene，传入 fromBattleSave=true
-func (m *MainMenuScene) startGameFromBattleSave() {
-	// 设置标记，表示需要从存档加载
-	m.pendingScene = "GameSceneFromSave"
-	// 触发僵尸手动画
-	m.triggerZombieHandAnimation()
-}
-
-// deleteBattleSaveAndStartNew 删除战斗存档并开始新游戏
-//
-// Story 18.2: 删除存档开始新游戏
-//
-// 步骤：
-//  1. 删除当前用户的战斗存档
-//  2. 清除本地存档状态
-//  3. 触发僵尸手动画进入新游戏
-func (m *MainMenuScene) deleteBattleSaveAndStartNew() {
-	// 删除战斗存档
-	currentUser := m.saveManager.GetCurrentUser()
-	if currentUser != "" {
-		if err := m.saveManager.DeleteBattleSave(currentUser); err != nil {
-			log.Printf("[MainMenuScene] Warning: Failed to delete battle save: %v", err)
-		} else {
-			log.Printf("[MainMenuScene] 战斗存档已删除: user=%s", currentUser)
-		}
-	}
-
-	// 清除本地存档状态
-	m.hasBattleSave = false
-	m.battleSaveInfo = nil
-
-	// 触发僵尸手动画进入新游戏
-	m.triggerZombieHandAnimation()
-}
-
-// onExitClicked handles the "Exit Game" button click.
-// It terminates the application.
-func (m *MainMenuScene) onExitClicked() {
-	log.Println("Exit Game button clicked")
-	os.Exit(0)
-}
-
-// isPointInRect checks if a point (px, py) is inside a rectangle defined by (x, y, width, height).
-// Returns true if the point is within the rectangle bounds (inclusive), false otherwise.
-func isPointInRect(px, py, x, y, width, height float64) bool {
-	return px >= x && px <= x+width && py >= y && py <= y+height
-}
-
-// updateButtonVisibility updates the visibility of SelectorScreen buttons based on unlock status.
-// This method controls which buttons are visible in the Reanim animation by setting the HiddenTracks whitelist.
-//
-// Unlock rules:
-//   - Adventure mode: Always visible
-//   - Challenges mode: Visible if level >= 3-2
-//   - Vasebreaker mode: Visible if level >= 5-10
-//   - Survival mode: Visible if level >= 5-10
-//
-// Story 12.1: Main Menu Tombstone System Enhancement
-func (m *MainMenuScene) updateButtonVisibility() {
-	if m.selectorScreenEntity == 0 {
-		return // SelectorScreen entity not created, skip
-	}
-
-	// Get ReanimComponent from SelectorScreen entity
-	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
-	if !ok {
-		log.Printf("[MainMenuScene] Warning: SelectorScreen entity has no ReanimComponent")
-		return
-	}
-
-	// Step 1: Load hidden tracks from config file (static baseline)
-	hiddenTracks := make(map[string]bool)
-
-	if configManager := m.resourceManager.GetReanimConfigManager(); configManager != nil {
-		unitConfig, err := configManager.GetUnit("selectorscreen")
-		if err == nil {
-			// Find "opening" combo and load its hidden_tracks
-			for _, combo := range unitConfig.AnimationCombos {
-				if combo.Name == "opening" {
-					for _, track := range combo.HiddenTracks {
-						hiddenTracks[track] = true
-						log.Printf("[MainMenuScene] Config hidden track: %s", track)
-					}
-					break
-				}
-			}
-		} else {
-			log.Printf("[MainMenuScene] Warning: Failed to load selectorscreen config: %v", err)
-		}
-	}
-
-	// Step 2: Merge with code logic (dynamic control based on progress)
-
-	// 2.1 Hide adventure mode button based on whether user has started game
-	// New user (!hasStartedGame): Hide "Adventure" button, show "Start Adventure" button
-	// Has started game (hasStartedGame): Hide "Start Adventure" button, show "Adventure" button
-	// Adventure mode is always unlocked, so both buttons hide their shadows
-	if !m.hasStartedGame {
-		// 新用户：显示 StartAdventure 按钮
-		hiddenTracks["SelectorScreen_Adventure_button"] = true
-		hiddenTracks["SelectorScreen_Adventure_shadow"] = true
-		hiddenTracks["SelectorScreen_StartAdventure_shadow"] = true // ✅ Adventure 总是解锁，隐藏 StartAdventure 阴影
-	} else {
-		// 已开始游戏：显示 Adventure 按钮
-		hiddenTracks["SelectorScreen_StartAdventure_button"] = true
-		hiddenTracks["SelectorScreen_StartAdventure_shadow"] = true
-		hiddenTracks["SelectorScreen_Adventure_shadow"] = true // ✅ Adventure 总是解锁，隐藏 Adventure 阴影
-	}
-
-	// 2.2 Hide/show other mode buttons based on unlock status
-
-	// Challenges mode (unlocked at 3-2)
-	// Note: SelectorScreen_Survival_button track corresponds to Challenges mode
-	if config.IsMenuModeUnlocked(config.MenuButtonChallenges, m.currentLevel) {
-		hiddenTracks["SelectorScreen_Survival_shadow"] = true
-	}
-	// 未解锁时：不隐藏按钮和阴影（显示墓碑状态）
-
-	// Vasebreaker mode (unlocked at 5-10)
-	// Note: SelectorScreen_Challenges_button track corresponds to Vasebreaker mode
-	if config.IsMenuModeUnlocked(config.MenuButtonVasebreaker, m.currentLevel) {
-		hiddenTracks["SelectorScreen_Challenges_shadow"] = true
-	}
-	// 未解锁时：不隐藏按钮和阴影（显示墓碑状态）
-
-	// Survival mode (unlocked at 5-10)
-	// Note: SelectorScreen_ZenGarden_button track corresponds to Survival mode
-	if config.IsMenuModeUnlocked(config.MenuButtonSurvival, m.currentLevel) {
-		hiddenTracks["SelectorScreen_ZenGarden_shadow"] = true
-	}
-	// 未解锁时：不隐藏按钮和阴影（显示墓碑状态）
-
-	// Step 3: Apply merged HiddenTracks to ReanimComponent
-	// Story 12.4: 首次启动时需要保留 leaf 轨道的隐藏状态
-	if m.isFirstLaunch && reanimComp.HiddenTracks != nil {
-		// 保留首次启动时设置的 leaf 轨道隐藏
-		for trackName := range reanimComp.HiddenTracks {
-			if !hiddenTracks[trackName] {
-				log.Printf("[MainMenuScene] Preserving first-launch hidden track: %s", trackName)
-				hiddenTracks[trackName] = true
-			}
-		}
-	}
-	reanimComp.HiddenTracks = hiddenTracks
-
-	log.Printf("[MainMenuScene] Updated button visibility (level=%s, %d hidden tracks): Adventure=%v, Challenges=%v, Vasebreaker=%v, Survival=%v",
-		m.currentLevel,
-		len(hiddenTracks),
-		config.IsMenuModeUnlocked(config.MenuButtonAdventure, m.currentLevel),
-		config.IsMenuModeUnlocked(config.MenuButtonChallenges, m.currentLevel),
-		config.IsMenuModeUnlocked(config.MenuButtonVasebreaker, m.currentLevel),
-		config.IsMenuModeUnlocked(config.MenuButtonSurvival, m.currentLevel))
-}
-
-// onMenuButtonClicked handles clicks on SelectorScreen menu buttons.
-// Checks unlock status and routes to appropriate handler.
-//
-// Parameters:
-//   - buttonType: The type of button that was clicked
-//
-// Story 12.1: Main Menu Tombstone System Enhancement
-func (m *MainMenuScene) onMenuButtonClicked(buttonType config.MenuButtonType) {
-	log.Printf("[MainMenuScene] Button clicked: %v", buttonType)
-
-	// Check if button is unlocked
-	if !config.IsMenuModeUnlocked(buttonType, m.currentLevel) {
-		log.Printf("[MainMenuScene] Button is locked (requires higher level)")
-
-		// Play button click sound (shadow buttons also have click feedback)
-		player, err := m.resourceManager.LoadSoundEffect("assets/sounds/buttonclick.ogg")
-		if err != nil {
-			log.Printf("[MainMenuScene] Warning: Failed to load button click sound: %v", err)
-		} else {
-			player.Rewind()
-			player.Play()
-		}
-
-		// Story 12.3: Show unlock dialog
-		message := getUnlockMessage(buttonType)
-		m.showUnlockDialog("未解锁！", message)
-		return
-	}
-
-	// Play button click sound
-	// Note: SOUND_BUTTONCLICK should be loaded in initialization
-	player, err := m.resourceManager.LoadSoundEffect("assets/sounds/buttonclick.ogg")
-	if err != nil {
-		log.Printf("[MainMenuScene] Warning: Failed to load button click sound: %v", err)
-	} else {
-		player.Rewind()
-		player.Play()
-	}
-
-	// Route to appropriate handler based on button type
-	switch buttonType {
-	case config.MenuButtonAdventure:
-		// Story 18.2: 检测是否有战斗存档
-		if m.hasBattleSave && m.battleSaveInfo != nil {
-			log.Printf("[MainMenuScene] 检测到战斗存档，显示继续/重新开始对话框")
-			m.showBattleSaveDialog()
-		} else {
-			// Story 12.6: Trigger zombie hand animation before starting adventure
-			log.Printf("[MainMenuScene] Adventure button clicked - triggering zombie hand animation")
-			m.triggerZombieHandAnimation()
-		}
-
-	case config.MenuButtonChallenges:
-		// TODO: Implement challenges/mini-games mode
-		log.Printf("[MainMenuScene] Challenges mode - Not yet implemented")
-
-	case config.MenuButtonVasebreaker:
-		// TODO: Implement vasebreaker/puzzle mode
-		log.Printf("[MainMenuScene] Vasebreaker mode - Not yet implemented")
-
-	case config.MenuButtonSurvival:
-		// TODO: Implement survival mode
-		log.Printf("[MainMenuScene] Survival mode - Not yet implemented")
-
-	default:
-		log.Printf("[MainMenuScene] Warning: Unknown button type: %v", buttonType)
-	}
-}
-
-// showUnlockDialog displays a dialog with a title and message
-// Story 12.3: Dialog System Implementation
-func (m *MainMenuScene) showUnlockDialog(title, message string) {
-	// Close existing dialog (if any)
-	if m.currentDialog != 0 {
-		m.entityManager.DestroyEntity(m.currentDialog)
-		m.currentDialog = 0
-	}
-
-	// Create new dialog
-	dialogEntity, err := entities.NewDialogEntity(
-		m.entityManager,
-		m.resourceManager,
-		title,
-		message,
-		[]string{"确定"},
-		WindowWidth,
-		WindowHeight,
-	)
-
-	if err != nil {
-		log.Printf("[MainMenuScene] Warning: Failed to create dialog: %v", err)
-		return
-	}
-
-	m.currentDialog = dialogEntity
-	log.Printf("[MainMenuScene] Dialog created: %s - %s", title, message)
-}
-
-// getUnlockMessage returns the unlock message for a button type
-// Story 12.3: Dialog System Implementation
-func getUnlockMessage(buttonType config.MenuButtonType) string {
-	switch buttonType {
-	case config.MenuButtonChallenges:
-		return "进行更多新冒险来解锁玩玩小游戏。"
-	case config.MenuButtonVasebreaker:
-		return "进行更多新冒险来解锁解谜模式。"
-	case config.MenuButtonSurvival:
-		return "进行更多新冒险来解锁生存模式。"
-	default:
-		return "此功能尚未解锁。"
-	}
-}
-
-// showHelpDialog 显示帮助面板
-// Story 12.3: 使用帮助面板模块（便笺背景 + 帮助文本）
-func (m *MainMenuScene) showHelpDialog() {
-	if m.helpPanelModule != nil {
-		m.helpPanelModule.Show()
-		log.Printf("[MainMenuScene] Help panel shown")
-	}
-}
-
-// showOptionsDialog 显示选项面板
-// Story 12.3: 使用选项面板模块（复用游戏场景的暂停菜单样式）
-func (m *MainMenuScene) showOptionsDialog() {
-	if m.optionsPanelModule != nil {
-		m.optionsPanelModule.Show()
-		log.Printf("[MainMenuScene] Options panel shown")
-	}
-}
-
-// ========== Story 12.2: Bottom Function Bar Implementation ==========
-
-// loadBottomButtonImages loads the normal and hover images for bottom function buttons.
-//
-// This method loads images but does NOT create entities. Buttons are rendered dynamically
-// in the Draw method, following the SelectorScreen animation transform.
-//
-// Story 12.2: 底部功能栏重构（动画跟随版本）
-func (m *MainMenuScene) loadBottomButtonImages() {
-	m.bottomButtonImages = make(map[components.BottomButtonType][2]*ebiten.Image)
-	m.hoveredBottomButton = components.BottomButtonNone // No hover initially
-
-	// Resource ID mapping
-	buttonResources := map[components.BottomButtonType][2]string{
-		components.BottomButtonOptions: {"IMAGE_SELECTORSCREEN_OPTIONS1", "IMAGE_SELECTORSCREEN_OPTIONS2"},
-		components.BottomButtonHelp:    {"IMAGE_SELECTORSCREEN_HELP1", "IMAGE_SELECTORSCREEN_HELP2"},
-		components.BottomButtonQuit:    {"IMAGE_SELECTORSCREEN_QUIT1", "IMAGE_SELECTORSCREEN_QUIT2"},
-	}
-
-	// Load images for each button
-	for btnType, resIDs := range buttonResources {
-		normalImg, err := m.resourceManager.LoadImageByID(resIDs[0])
-		if err != nil {
-			log.Printf("[MainMenuScene] Warning: Failed to load normal image for button %d: %v", btnType, err)
-			continue
-		}
-
-		hoverImg, err := m.resourceManager.LoadImageByID(resIDs[1])
-		if err != nil {
-			log.Printf("[MainMenuScene] Warning: Failed to load hover image for button %d: %v", btnType, err)
-			continue
-		}
-
-		m.bottomButtonImages[btnType] = [2]*ebiten.Image{normalImg, hoverImg}
-	}
-
-	log.Printf("[MainMenuScene] Loaded bottom button images (count=%d)", len(m.bottomButtonImages))
-}
-
-// calculateBottomButtonScreenPos calculates the screen position of a bottom button,
-// following the SelectorScreen animation transform.
-//
-// This follows the same logic as level numbers, using the background right section to follow animation.
-//
-// Returns: (screenX, screenY, width, height, ok)
-//
-// Story 12.2: 底部功能栏重构（动画跟随版本）
-func (m *MainMenuScene) calculateBottomButtonScreenPos(buttonType components.BottomButtonType) (float64, float64, float64, float64, bool) {
-	// Get SelectorScreen ReanimComponent
-	if m.selectorScreenEntity == 0 {
-		return 0, 0, 0, 0, false
-	}
-
-	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
-	if !ok {
-		return 0, 0, 0, 0, false
-	}
-
-	posComp, ok := ecs.GetComponent[*components.PositionComponent](m.entityManager, m.selectorScreenEntity)
-	if !ok {
-		return 0, 0, 0, 0, false
-	}
-
-	// Get button images to calculate size
-	images, ok := m.bottomButtonImages[buttonType]
-	if !ok || images[0] == nil {
-		return 0, 0, 0, 0, false
-	}
-
-	btnWidth := float64(images[0].Bounds().Dx())
-	btnHeight := float64(images[0].Bounds().Dy())
-
-	// 底部按钮跟随背景右侧动画移动（与关卡数字类似）
-	// 使用 SelectorScreen_BG_Right 轨道的偏移量
-	referenceTrackName := "SelectorScreen_BG_Right"
-	frames, trackExists := reanimComp.MergedTracks[referenceTrackName]
-
-	// 背景右侧的最终位置（开场动画完成后）
-	const finalBgRightX = 71.0
-	const finalBgRightY = 41.0
-
-	// 计算按钮的基础位置
-	buttonIndex := int(buttonType)
-	baseX, baseY := config.CalculateBottomButtonPosition(buttonIndex)
-
-	// 默认使用最终位置（无动画或轨道不存在时）
-	screenX := posComp.X + baseX - reanimComp.CenterOffsetX
-	screenY := posComp.Y + baseY - reanimComp.CenterOffsetY
-
-	if trackExists && len(frames) > 0 {
-		// 获取当前帧索引
-		currentFrameIdx := reanimComp.CurrentFrame
-		if currentFrameIdx < 0 {
-			currentFrameIdx = 0
-		}
-		if currentFrameIdx >= len(frames) {
-			currentFrameIdx = len(frames) - 1
-		}
-
-		// 获取当前帧数据
-		frame := frames[currentFrameIdx]
-
-		// 获取背景当前的 X 和 Y 坐标
-		frameX := finalBgRightX // 默认值
-		if frame.X != nil {
-			frameX = *frame.X
-		}
-
-		frameY := 0.0
-		if frame.Y != nil {
-			frameY = *frame.Y
-		}
-
-		// 计算背景相对于最终位置的偏移
-		bgOffsetX := frameX - finalBgRightX
-		bgOffsetY := frameY - finalBgRightY
-
-		// 按钮跟随背景的偏移
-		screenX = posComp.X + baseX + bgOffsetX - reanimComp.CenterOffsetX
-		screenY = posComp.Y + baseY + bgOffsetY - reanimComp.CenterOffsetY
-	}
-
-	return screenX, screenY, btnWidth, btnHeight, true
-}
-
-// updateBottomButtons updates the hover and click states of bottom buttons
-// based on mouse position and input.
-//
-// Story 12.2: 底部功能栏重构（动画跟随版本）
-func (m *MainMenuScene) updateBottomButtons(mouseX, mouseY int, isMouseReleased bool) {
-	m.hoveredBottomButton = components.BottomButtonNone // Reset hover state
-
-	// Check each button in order (Options, Help, Quit)
-	buttonTypes := []components.BottomButtonType{
-		components.BottomButtonOptions,
-		components.BottomButtonHelp,
-		components.BottomButtonQuit,
-	}
-
-	for _, btnType := range buttonTypes {
-		// Calculate button's current screen position (dynamic, follows animation)
-		screenX, screenY, btnWidth, btnHeight, ok := m.calculateBottomButtonScreenPos(btnType)
-		if !ok {
-			continue
-		}
-
-		// Skip detection if button is off-screen (still animating in)
-		// 只检测屏幕内的按钮，避免动画过程中的不稳定检测
-		if screenY > 600 || screenY+btnHeight < 0 || screenX > 800 || screenX+btnWidth < 0 {
-			continue
-		}
-
-		// Expand clickable area with padding for easier clicking
-		padding := config.BottomButtonClickPadding
-		expandedX := screenX - padding
-		expandedY := screenY - padding
-		expandedWidth := btnWidth + padding*2
-		expandedHeight := btnHeight + padding*2
-
-		// Check if mouse is over this button (using expanded area)
-		if isPointInRect(float64(mouseX), float64(mouseY), expandedX, expandedY, expandedWidth, expandedHeight) {
-			// Mouse is over button
-			if isMouseReleased {
-				// Button clicked
-				m.onBottomButtonClicked(btnType)
-			} else {
-				// Button hovered
-				m.hoveredBottomButton = btnType
-			}
-			break // Only one button can be hovered at a time
-		}
-	}
-}
-
-// drawBottomButtons renders the 3 bottom function buttons to the screen.
-//
-// Buttons follow the SelectorScreen animation transform, similar to level numbers.
-//
-// Story 12.2: 底部功能栏重构（动画跟随版本）
-func (m *MainMenuScene) drawBottomButtons(screen *ebiten.Image) {
-	// Draw each button in order (Options, Help, Quit)
-	buttonTypes := []components.BottomButtonType{
-		components.BottomButtonOptions,
-		components.BottomButtonHelp,
-		components.BottomButtonQuit,
-	}
-
-	for _, btnType := range buttonTypes {
-		// Get button images
-		images, ok := m.bottomButtonImages[btnType]
-		if !ok {
-			continue
-		}
-
-		// Select image based on hover state
-		img := images[0] // Normal image
-		if m.hoveredBottomButton == btnType && images[1] != nil {
-			img = images[1] // Hover image
-		}
-
-		if img == nil {
-			continue
-		}
-
-		// Calculate button's current screen position (dynamic, follows animation)
-		screenX, screenY, _, _, ok := m.calculateBottomButtonScreenPos(btnType)
-		if !ok {
-			continue
-		}
-
-		// Draw button
-		op := &ebiten.DrawImageOptions{}
-		op.GeoM.Translate(screenX, screenY)
-		screen.DrawImage(img, op)
-	}
-}
-
-// onBottomButtonClicked handles bottom button click events
-//
-// Actions:
-//   - Options: Opens the options panel
-//   - Help: Opens the help panel
-//   - Quit: Exits the game
-//
-// Story 12.2: 底部功能栏重构
-func (m *MainMenuScene) onBottomButtonClicked(btnType components.BottomButtonType) {
-	// Play click sound effect
-	if player, err := m.resourceManager.LoadSoundEffect("assets/sounds/buttonclick.ogg"); err == nil {
-		player.Play()
-	}
-
-	switch btnType {
-	case components.BottomButtonOptions:
-		// Show options panel (Story 12.3)
-		log.Printf("[MainMenuScene] Options button clicked")
-		m.showOptionsDialog()
-
-	case components.BottomButtonHelp:
-		// Show help panel (Story 12.3)
-		log.Printf("[MainMenuScene] Help button clicked")
-		m.showHelpDialog()
-
-	case components.BottomButtonQuit:
-		// Exit game
-		log.Printf("[MainMenuScene] Quit button clicked - exiting game")
-		os.Exit(0)
-	}
-}
-
-// showNewUserDialogForFirstLaunch 显示首次启动的新建用户对话框
-//
-// Story 12.4: 首次启动用户创建流程
-//
-// 当游戏首次启动（无任何用户）时，自动弹出新建用户对话框
-// 用户必须创建用户才能继续游戏（不可跳过）
-func (m *MainMenuScene) showNewUserDialogForFirstLaunch() {
-	log.Printf("[MainMenuScene] Showing new user dialog for first launch")
-
-	// 创建新建用户对话框
-	dialogID, inputBoxID, err := entities.NewNewUserDialogEntity(
-		m.entityManager,
-		m.resourceManager,
-		WindowWidth,
-		WindowHeight,
-		func(result entities.NewUserDialogResult) {
-			if result.Confirmed {
-				// 用户点击"好"按钮（无论用户名是否为空）
-				// onNewUserCreated 内部会验证用户名
-				// 验证失败时会显示错误对话框，但���关闭新用户对话框
-				m.onNewUserCreated(result.Username)
-			} else {
-				// 用户点击"取消"按钮
-				// 首次启动不允许取消，显示错误提示对话框
-				log.Printf("[MainMenuScene] First launch: cannot cancel user creation, showing error dialog")
-				m.showErrorDialog("输入你的名字", "请输入你的名字，以创建新的用户档案。档案用于保存游戏积分和进度。")
-			}
-		},
-	)
-
-	if err != nil {
-		log.Printf("[MainMenuScene] Error: Failed to create new user dialog: %v", err)
-		return
-	}
-
-	m.currentUserDialogID = dialogID
-	m.currentInputBoxID = inputBoxID
-	m.currentDialog = dialogID // 设置 currentDialog 以触发背景交互阻止
-	log.Printf("[MainMenuScene] New user dialog created (entity ID: %d)", dialogID)
-}
-
-// onNewUserCreated 处理新用户创建成功的回调
-func (m *MainMenuScene) onNewUserCreated(username string) {
-	log.Printf("[MainMenuScene] Creating new user: %s", username)
-
-	gameState := game.GetGameState()
-	saveManager := gameState.GetSaveManager()
-
-	// 验证用户名
-	if err := saveManager.ValidateUsername(username); err != nil {
-		log.Printf("[MainMenuScene] Invalid username: %v", err)
-		// 显示错误提示对话框
-		m.showErrorDialog("无效的用户名", err.Error())
-		return
-	}
-
-	// 创建用户
-	if err := saveManager.CreateUser(username); err != nil {
-		log.Printf("[MainMenuScene] Failed to create user: %v", err)
-		m.showErrorDialog("创建用户失败", err.Error())
-		return
-	}
-
-	log.Printf("[MainMenuScene] User created successfully: %s", username)
-
-	// 关闭对话框
-	m.closeCurrentDialog()
-
-	// 重新加载存档数据
-	if err := saveManager.Load(); err == nil {
-		m.currentLevel = saveManager.GetHighestLevel()
-		if m.currentLevel == "" {
-			m.currentLevel = "1-1"
-		}
-		m.hasStartedGame = saveManager.GetHasStartedGame()
-	}
-
-	// ✅ 修复：先记录是否首次启动，然后立即设置为 false
-	// 这样 updateButtonVisibility() 就不会保留首次启动的隐藏轨道
-	wasFirstLaunch := m.isFirstLaunch
-	m.isFirstLaunch = false
-
-	// Story 12.4 AC8: 创建成功后，首先取消隐藏木牌和草叶子轨道
-	if wasFirstLaunch && m.selectorScreenEntity != 0 {
-		// 首次启动时，取消隐藏木牌和草叶子轨道
-		reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
-		if ok && reanimComp.HiddenTracks != nil {
-			// 取消隐藏木牌轨道
-			delete(reanimComp.HiddenTracks, "woodsign1")
-			delete(reanimComp.HiddenTracks, "woodsign2")
-			delete(reanimComp.HiddenTracks, "woodsign3")
-			// 取消隐藏草叶子轨道
-			delete(reanimComp.HiddenTracks, "leaf1")
-			delete(reanimComp.HiddenTracks, "leaf2")
-			delete(reanimComp.HiddenTracks, "leaf3")
-			delete(reanimComp.HiddenTracks, "leaf4")
-			delete(reanimComp.HiddenTracks, "leaf5")
-			delete(reanimComp.HiddenTracks, "leaf22")
-			delete(reanimComp.HiddenTracks, "leaf_SelectorScreen_Leaves")
-			log.Printf("[MainMenuScene] First launch: unhidden woodsign and leaf tracks")
-
-			// ✅ 设置动画循环状态
-			reanimComp.AnimationLoopStates["anim_sign"] = false // 木牌动画非循环
-			reanimComp.AnimationLoopStates["anim_grass"] = true // 草动画循环
-		}
-
-		// ✅ 修复：直接调用 AddAnimation() 添加到现有动画列表
-		// 此时应该已经有：anim_open（背景）、anim_idle（按钮）、云朵动画
-		// 现在添加：anim_sign（木牌）、anim_grass（草）
-		if err := m.reanimSystem.AddAnimation(m.selectorScreenEntity, "anim_sign"); err != nil {
-			log.Printf("[MainMenuScene] Warning: Failed to add anim_sign: %v", err)
-		}
-		if err := m.reanimSystem.AddAnimation(m.selectorScreenEntity, "anim_grass"); err != nil {
-			log.Printf("[MainMenuScene] Warning: Failed to add anim_grass: %v", err)
-		}
-		log.Printf("[MainMenuScene] First launch: added anim_sign + anim_grass to existing animations")
-	}
-
-	// ✅ 修复：在取消隐藏轨道后再更新按钮可见性
-	// 这样 updateButtonVisibility() 就不会重新隐藏 woodsign2
-	m.updateButtonVisibility()
-
-	// Story 12.4: 初始化木牌（显示用户名）
-	m.initUserSign()
-
-	log.Printf("[MainMenuScene] First launch setup completed")
-}
-
-// closeCurrentDialog 关闭当前打开的对话框
-func (m *MainMenuScene) closeCurrentDialog() {
-	if m.currentUserDialogID != 0 {
-		m.entityManager.DestroyEntity(m.currentUserDialogID)
-		m.currentUserDialogID = 0
-	}
-	if m.currentInputBoxID != 0 {
-		m.entityManager.DestroyEntity(m.currentInputBoxID)
-		m.currentInputBoxID = 0
-	}
-	// 清除 currentDialog 以允许背景交互
-	m.currentDialog = 0
-}
-
-// showErrorDialog 显示错误提示对话框
-// 注意：错误对话框不会影响 currentDialog/currentUserDialogID 的跟踪
-// 这样错误对话框关闭后，新用户对话框仍然保持打开状态
-// Story 12.4: 防止错误对话框叠加 - 同一时间只能有一个错误对话框
-func (m *MainMenuScene) showErrorDialog(title, message string) {
-	// ✅ 如果已有错误对话框，先销毁旧的
-	if m.currentErrorDialogID != 0 {
-		log.Printf("[MainMenuScene] Destroying old error dialog (entity ID: %d)", m.currentErrorDialogID)
-		// 如果 currentDialog 指向错误对话框，也清除
-		if m.currentDialog == m.currentErrorDialogID {
-			m.currentDialog = 0
-		}
-		m.entityManager.DestroyEntity(m.currentErrorDialogID)
-		m.currentErrorDialogID = 0
-	}
-
-	dialogID, err := entities.NewDialogEntity(
-		m.entityManager,
-		m.resourceManager,
-		title,
-		message,
-		[]string{"确定"},
-		WindowWidth,
-		WindowHeight,
-	)
-
-	if err != nil {
-		log.Printf("[MainMenuScene] Error: Failed to create error dialog: %v", err)
-		return
-	}
-
-	// ✅ 记录错误对话框ID，用于下次创建时销毁
-	m.currentErrorDialogID = dialogID
-	m.currentDialog = dialogID // 设置为当前对话框，触发背景交互阻止
-	log.Printf("[MainMenuScene] Error dialog created (entity ID: %d)", dialogID)
-}
-
-// initUserSign 初始化木牌UI实体（显示用户名）
-// Story 12.4 Task 2.2
-func (m *MainMenuScene) initUserSign() {
-	// 获取当前用户名
-	currentUser := m.saveManager.GetCurrentUser()
-	if currentUser == "" {
-		log.Printf("[MainMenuScene] Warning: No current user, skipping user sign initialization")
-		return
-	}
-
-	// 加载木牌按下状态图片
-	signPressImage, err := m.resourceManager.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_WOODSIGN2_PRESS")
-	if err != nil {
-		log.Printf("[MainMenuScene] Warning: Failed to load sign press image: %v", err)
-		signPressImage = nil
-	}
-
-	// Story 12.4 新方案：将用户名预先绘制到木牌图片上
-	// 这样用户名会自然跟随木牌动画，不需要单独处理动画同步
-	if m.selectorScreenEntity != 0 {
-		reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
-		if ok {
-			// 加载原始木牌图片
-			originalSignImage, err := m.resourceManager.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_WOODSIGN1")
-			if err != nil {
-				log.Printf("[MainMenuScene] Warning: Failed to load woodsign1 image: %v", err)
-				return
-			}
-
-			// 创建新图片，将用户名绘制在木牌上
-			signWithText := m.createSignWithUsername(originalSignImage, currentUser)
-			if signWithText != nil {
-				// 替换 PartImages 中的木牌图片
-				reanimComp.PartImages["IMAGE_REANIM_SELECTORSCREEN_WOODSIGN1"] = signWithText
-				log.Printf("[MainMenuScene] Replaced woodsign1 image with username: %s", currentUser)
-			}
-		}
-
-		// 添加 UserSignComponent（用于悬停和点击检测）
-		ecs.AddComponent(m.entityManager, m.selectorScreenEntity, &components.UserSignComponent{
-			CurrentUsername: currentUser,
-			IsHovered:       false,
-			SignPressImage:  signPressImage,
-		})
-		m.userSignEntity = m.selectorScreenEntity
-		log.Printf("[MainMenuScene] User sign initialized for user: %s", currentUser)
-	} else {
-		log.Printf("[MainMenuScene] Warning: SelectorScreen entity not found, cannot initialize user sign")
-	}
-}
-
-// createSignWithUsername 创建带用户名的木牌图片
-// 在原始木牌图片上绘制用户名文本（白色泛黄，无描边，26号字体）
-func (m *MainMenuScene) createSignWithUsername(originalImage *ebiten.Image, username string) *ebiten.Image {
-	if originalImage == nil {
-		return nil
-	}
-
-	// 获取原始图片尺寸
-	bounds := originalImage.Bounds()
-	width := bounds.Dx()
-	height := bounds.Dy()
-
-	// 创建新图片
-	newImage := ebiten.NewImage(width, height)
-
-	// 先绘制原始木牌图片
-	newImage.DrawImage(originalImage, nil)
-
-	// 加载字体
-	usernameFont, err := m.resourceManager.LoadFont("assets/fonts/fzse_gbk.ttf", 26)
-	if err != nil {
-		log.Printf("[MainMenuScene] Warning: Failed to load username font: %v", err)
-		return originalImage
-	}
-
-	// 计算用户名位置（木牌中下部分，居中，70% 高度）
-	centerX := float64(width) * 0.5
-	centerY := float64(height) * 0.60
-
-	// 绘制白色泛黄文本（无描边）
-	yellowishWhiteColor := color.RGBA{R: 255, G: 255, B: 200, A: 255}
-	drawCenteredTextOnImage(newImage, username, centerX, centerY, usernameFont, yellowishWhiteColor)
-
-	return newImage
-}
-
-// drawCenteredTextOnImage 在图片上居中绘制文本
-func drawCenteredTextOnImage(img *ebiten.Image, textStr string, centerX, centerY float64, fontFace *text.GoTextFace, clr color.Color) {
-	textWidth, _ := text.Measure(textStr, fontFace, 0)
-	x := centerX - textWidth/2
-	y := centerY
-
-	op := &text.DrawOptions{}
-	op.GeoM.Translate(x, y)
-	op.ColorScale.ScaleWithColor(clr)
-	text.Draw(img, textStr, fontFace, op)
-}
-
-// drawTextOutlineOnImage 在图片上绘制文本描边
-func drawTextOutlineOnImage(img *ebiten.Image, textStr string, centerX, centerY float64, fontFace *text.GoTextFace, outlineColor color.Color, thickness int) {
-	textWidth, _ := text.Measure(textStr, fontFace, 0)
-	baseX := centerX - textWidth/2
-	baseY := centerY
-
-	// 绘制描边：在 8 个方向偏移绘制
-	offsets := []struct{ dx, dy float64 }{
-		{-1, -1}, {0, -1}, {1, -1},
-		{-1, 0}, {1, 0},
-		{-1, 1}, {0, 1}, {1, 1},
-	}
-
-	for _, offset := range offsets {
-		for t := 1; t <= thickness; t++ {
-			op := &text.DrawOptions{}
-			op.GeoM.Translate(baseX+offset.dx*float64(t), baseY+offset.dy*float64(t))
-			op.ColorScale.ScaleWithColor(outlineColor)
-			text.Draw(img, textStr, fontFace, op)
-		}
-	}
-}
-
-// updateUserSignHover 更新木牌悬停状态和点击检测
-// Story 12.4 Task 2.3
-func (m *MainMenuScene) updateUserSignHover(mouseX, mouseY int, isMouseReleased bool) {
-	// 如果没有木牌实体，跳过
-	if m.userSignEntity == 0 {
-		return
-	}
-
-	// 获取 UserSignComponent
-	userSignComp, ok := ecs.GetComponent[*components.UserSignComponent](m.entityManager, m.userSignEntity)
-	if !ok {
-		return
-	}
-
-	// 获取 ReanimComponent 以获取木牌轨道的位置
-	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.userSignEntity)
-	if !ok {
-		return
-	}
-
-	// Story 12.4 AC2: woodsign2 是 "如果这不是你的存档，请点我" 的木板
-	signTrackName := "woodsign2"
-
-	// 检查轨道是否被隐藏
-	if reanimComp.HiddenTracks != nil && reanimComp.HiddenTracks[signTrackName] {
-		userSignComp.IsHovered = false
-		return
-	}
-
-	// 获取轨道的当前帧数据
-	frames, trackExists := reanimComp.MergedTracks[signTrackName]
-	if !trackExists || len(frames) == 0 {
-		userSignComp.IsHovered = false
-		return
-	}
-
-	// ✅ 修复：使用与渲染系统相同的逻辑来获取当前帧
-	// 遍历所有动画，找到最后一个有效的 woodsign2 数据
-	var selectedFrame *reanim.Frame
-	for _, animName := range reanimComp.CurrentAnimations {
-		// 获取该动画的当前逻辑帧（支持独立帧索引）
-		var logicalFrame float64
-		if reanimComp.AnimationFrameIndices != nil {
-			if frame, exists := reanimComp.AnimationFrameIndices[animName]; exists {
-				logicalFrame = frame
-			} else {
-				logicalFrame = float64(reanimComp.CurrentFrame)
-			}
-		} else {
-			logicalFrame = float64(reanimComp.CurrentFrame)
-		}
-
-		// 获取动画的可见性数组
-		animVisibles, ok := reanimComp.AnimVisiblesMap[animName]
-		if !ok {
-			continue
-		}
-
-		// 映射逻辑帧到物理帧
-		physicalFrame := systems.MapLogicalToPhysical(int(logicalFrame), animVisibles)
-		if physicalFrame < 0 || physicalFrame >= len(frames) {
-			continue
-		}
-
-		// 检查动画定义轨道是否可见（f != -1）
-		animDefTrack, ok := reanimComp.MergedTracks[animName]
-		if !ok || physicalFrame >= len(animDefTrack) {
-			continue
-		}
-
-		defFrame := animDefTrack[physicalFrame]
-		if defFrame.FrameNum != nil && *defFrame.FrameNum == -1 {
-			// 动画隐藏，跳过
-			continue
-		}
-
-		// 获取该帧的数据（后面的动画会覆盖前面的）
-		selectedFrame = &frames[physicalFrame]
-	}
-
-	// 如果没有找到有效的帧数据，跳过
-	if selectedFrame == nil {
-		userSignComp.IsHovered = false
-		return
-	}
-
-	// 获取当前帧的变换数据
-	frame := *selectedFrame
-
-	// 获取 PositionComponent 的基础位置
-	posComp, hasPosComp := ecs.GetComponent[*components.PositionComponent](m.entityManager, m.userSignEntity)
-	baseX := 0.0
-	baseY := 0.0
-	if hasPosComp {
-		baseX = posComp.X
-		baseY = posComp.Y
-	}
-
-	// 计算木牌的屏幕位置（左上角）
-	frameX := 0.0
-	frameY := 0.0
-	if frame.X != nil {
-		frameX = *frame.X
-	}
-	if frame.Y != nil {
-		frameY = *frame.Y
-	}
-
-	signX := baseX + frameX - reanimComp.CenterOffsetX
-	signY := baseY + frameY - reanimComp.CenterOffsetY
-
-	// 从 PartImages 获取木牌图片以确定尺寸
-	signImage, hasImage := reanimComp.PartImages[frame.ImagePath]
-	if !hasImage || signImage == nil {
-		userSignComp.IsHovered = false
-		return
-	}
-
-	bounds := signImage.Bounds()
-	signWidth := float64(bounds.Dx())
-	signHeight := float64(bounds.Dy())
-
-	// Story 12.4 AC2: woodsign2 木板的点击检测区域
-	// "如果这不是你的存档，请点我" 整个木板都可点击
-	clickableTop := signY + signHeight*0.1    // 木板顶部预留 10% 边距
-	clickableBottom := signY + signHeight*0.9 // 木板底部预留 10% 边距
-	clickableLeft := signX + signWidth*0.05   // 木板左侧预留 5% 边距
-	clickableRight := signX + signWidth*0.95  // 木板右侧预留 5% 边距
-
-	// 检查鼠标是否在可点击区域内
-	mouseInSign := float64(mouseX) >= clickableLeft &&
-		float64(mouseX) <= clickableRight &&
-		float64(mouseY) >= clickableTop &&
-		float64(mouseY) <= clickableBottom
-
-	// 更新悬停状态，并动态替换木牌图片
-	if userSignComp.IsHovered != mouseInSign {
-		userSignComp.IsHovered = mouseInSign
-
-		// Story 12.4 AC2: 悬停时切换 woodsign2 为 SignPressImage
-		if mouseInSign && userSignComp.SignPressImage != nil {
-			// 直接使用按下状态图片（不需要绘制用户名，woodsign2 是纯木板）
-			reanimComp.PartImages["IMAGE_REANIM_SELECTORSCREEN_WOODSIGN2"] = userSignComp.SignPressImage
-			log.Printf("[MainMenuScene] User sign (woodsign2) hovered, switched to press image")
-		} else {
-			// 恢复正常状态木牌图片
-			originalSignImage, err := m.resourceManager.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_WOODSIGN2")
-			if err == nil {
-				reanimComp.PartImages["IMAGE_REANIM_SELECTORSCREEN_WOODSIGN2"] = originalSignImage
-				log.Printf("[MainMenuScene] User sign (woodsign2) unhovered, switched to normal image")
-			}
-		}
-	}
-
-	// 如果点击木牌，打开用户管理对话框
-	if mouseInSign && isMouseReleased {
-		log.Printf("[MainMenuScene] User sign clicked, showing user management dialog")
-		m.showUserManagementDialog()
-	}
-}
-
-// showUserManagementDialog 显示用户管理对话框
-// Story 12.4 AC3, AC4
-func (m *MainMenuScene) showUserManagementDialog() {
-	// 如果已有对话框打开，先关闭
-	if m.currentUserDialogID != 0 {
-		m.closeCurrentDialog()
-	}
-
-	// 获取用户列表
-	users, err := m.saveManager.LoadUserList()
-	if err != nil {
-		log.Printf("[MainMenuScene] Error: Failed to load user list: %v", err)
-		m.showErrorDialog("加载失败", "无法加载用户列表")
-		return
-	}
-
-	// 获取当前用户
-	currentUser := m.saveManager.GetCurrentUser()
-
-	// 创建用户管理对话框
-	dialogID, err := entities.NewUserManagementDialogEntity(
-		m.entityManager,
-		m.resourceManager,
-		users,
-		currentUser,
-		WindowWidth,
-		WindowHeight,
-		m.onUserManagementAction,
-	)
-
-	if err != nil {
-		log.Printf("[MainMenuScene] Error: Failed to create user management dialog: %v", err)
-		return
-	}
-
-	m.currentUserDialogID = dialogID
-	m.currentDialog = dialogID
-	log.Printf("[MainMenuScene] User management dialog opened (currentUser=%s)", currentUser)
-}
-
-// onUserManagementAction 用户管理对话框的操作回调
-// Story 12.4 AC4, AC9
-func (m *MainMenuScene) onUserManagementAction(result entities.UserManagementDialogResult) {
-	// 从 UserListComponent 读取选中的用户
-	var selectedUser string
-	var isNewUserSelected bool
-
-	if m.currentUserDialogID != 0 {
-		userList, ok := ecs.GetComponent[*components.UserListComponent](m.entityManager, m.currentUserDialogID)
-		if ok {
-			selectedUser = userList.GetSelectedUsername()
-			isNewUserSelected = userList.IsNewUserSelected()
-			log.Printf("[MainMenuScene] UserList: selectedUser=%s, isNewUserSelected=%v", selectedUser, isNewUserSelected)
-		}
-	}
-
-	switch result.Action {
-	case entities.UserActionSwitch:
-		// "好"按钮：切换用户或新建用户
-		if isNewUserSelected {
-			// 点击了"建立一位新用户"，然后点击"好"按钮
-			m.closeCurrentDialog()
-			m.showNewUserDialog(false) // force=false，可以关闭
-		} else if selectedUser != "" {
-			// 切换到选中的用户
-			currentUser := m.saveManager.GetCurrentUser()
-			if selectedUser == currentUser {
-				// 选中的是当前用户，直接关闭对话框
-				log.Printf("[MainMenuScene] Selected current user, just close dialog")
-				m.closeCurrentDialog()
-			} else {
-				// 切换用户
-				if err := m.saveManager.SwitchUser(selectedUser); err != nil {
-					log.Printf("[MainMenuScene] Error: Failed to switch user: %v", err)
-					m.showErrorDialog("切换失败", "无法切换到用户: "+selectedUser)
-					return
-				}
-				log.Printf("[MainMenuScene] Switched to user: %s", selectedUser)
-				// 重新加载主菜单数据
-				m.reloadMainMenuData()
-				// 关闭对话框
-				m.closeCurrentDialog()
-			}
-		}
-
-	case entities.UserActionCreateNew:
-		// 这个 case 已经不需要了，因为"建立一位新用户"现在在列表中，通过 UserActionSwitch 处理
-		// 保留以防万一
-		m.closeCurrentDialog()
-		m.showNewUserDialog(false) // force=false，可以关闭
-
-	case entities.UserActionRename:
-		// 显示重命名对话框（不关闭用户管理对话框，直接叠加）
-		if selectedUser != "" && !isNewUserSelected {
-			m.showRenameUserDialog(selectedUser)
-		} else {
-			log.Printf("[MainMenuScene] Warning: Cannot rename when no user selected or new user selected")
-		}
-
-	case entities.UserActionDelete:
-		// 显示删除确认对话框（不关闭用户管理对话框，直接叠加）
-		if selectedUser != "" && !isNewUserSelected {
-			m.showDeleteUserDialog(selectedUser)
-		} else {
-			log.Printf("[MainMenuScene] Warning: Cannot delete when no user selected or new user selected")
-		}
-
-	case entities.UserActionNone:
-		// 取消，关闭对话框
-		m.closeCurrentDialog()
-	}
-}
-
-// reloadMainMenuData 重新加载主菜单数据（用户切换后）
-// Story 12.4 Task 8.2
-func (m *MainMenuScene) reloadMainMenuData() {
-	// 重新加载存档数据
-	if err := m.saveManager.Load(); err != nil {
-		log.Printf("[MainMenuScene] Error: Failed to load save after user switch: %v", err)
-		m.currentLevel = "1-1"
-		m.hasStartedGame = false
-	} else {
-		m.currentLevel = m.saveManager.GetHighestLevel()
-		if m.currentLevel == "" {
-			m.currentLevel = "1-1"
-		}
-		m.hasStartedGame = m.saveManager.GetHasStartedGame()
-		log.Printf("[MainMenuScene] Reloaded save: level=%s, hasStartedGame=%v", m.currentLevel, m.hasStartedGame)
-	}
-
-	// 更新按钮可见性
-	m.updateButtonVisibility()
-
-	// 更新木牌显示的用户名（重新生成木牌图片）
-	m.initUserSign()
-}
-
-// showNewUserDialog 显示新建用户对话框
-// Story 12.4 AC5
-func (m *MainMenuScene) showNewUserDialog(force bool) {
-	// 关闭现有对话框
-	if m.currentUserDialogID != 0 {
-		m.closeCurrentDialog()
-	}
-
-	// 创建新建用户对话框的回调
-	callback := func(result entities.NewUserDialogResult) {
-		if result.Confirmed {
-			m.onNewUserCreated(result.Username)
-		} else if !force {
-			// 非强制模式可以取消
-			m.closeCurrentDialog()
-		}
-	}
-
-	// 创建新建用户对话框
-	dialogID, inputBoxID, err := entities.NewNewUserDialogEntity(
-		m.entityManager,
-		m.resourceManager,
-		WindowWidth,
-		WindowHeight,
-		callback,
-	)
-
-	if err != nil {
-		log.Printf("[MainMenuScene] Error: Failed to create new user dialog: %v", err)
-		return
-	}
-
-	m.currentUserDialogID = dialogID
-	m.currentInputBoxID = inputBoxID
-	m.currentDialog = dialogID
-	log.Printf("[MainMenuScene] New user dialog opened (force=%v)", force)
-}
-
-// showRenameUserDialog 显示重命名用户对话框
-// Story 12.4 AC6
-func (m *MainMenuScene) showRenameUserDialog(oldUsername string) {
-	// 用于存储对话框 ID 的变量
-	var renameDialogID ecs.EntityID
-	var renameInputBoxID ecs.EntityID
-
-	// 创建重命名对话框的回调
-	callback := func(result entities.RenameUserDialogResult) {
-		if result.Confirmed && result.NewName != "" {
-			// 执行重命名
-			if err := m.saveManager.RenameUser(oldUsername, result.NewName); err != nil {
-				log.Printf("[MainMenuScene] Error: Failed to rename user: %v", err)
-				m.showErrorDialog("重命名失败", err.Error())
-				return
-			}
-			log.Printf("[MainMenuScene] User renamed: %s -> %s", oldUsername, result.NewName)
-			// 重新加载数据
-			m.reloadMainMenuData()
-			// 刷新用户管理对话框的列表数据
-			m.refreshUserManagementDialog()
-		}
-		// 无论确认还是取消，都手动销毁重命名对话框
-		if renameDialogID != 0 {
-			m.entityManager.DestroyEntity(renameDialogID)
-			log.Printf("[MainMenuScene] Destroyed rename dialog (ID: %d)", renameDialogID)
-		}
-		if renameInputBoxID != 0 {
-			m.entityManager.DestroyEntity(renameInputBoxID)
-			log.Printf("[MainMenuScene] Destroyed rename input box (ID: %d)", renameInputBoxID)
-		}
-		// 恢复 currentDialog 为用户管理对话框
-		m.currentDialog = m.currentUserDialogID
-		m.currentInputBoxID = 0
-	}
-
-	// 创建重命名对话框
-	dialogID, inputBoxID, err := entities.NewRenameUserDialogEntity(
-		m.entityManager,
-		m.resourceManager,
-		oldUsername,
-		WindowWidth,
-		WindowHeight,
-		callback,
-	)
-
-	if err != nil {
-		log.Printf("[MainMenuScene] Error: Failed to create rename user dialog: %v", err)
-		return
-	}
-
-	// 保存到闭包变量中
-	renameDialogID = dialogID
-	renameInputBoxID = inputBoxID
-
-	// ✅ 重命名对话框不覆盖 currentUserDialogID
-	// 只更新 currentDialog 和 currentInputBoxID
-	m.currentInputBoxID = inputBoxID
-	m.currentDialog = dialogID
-	log.Printf("[MainMenuScene] Rename user dialog opened for: %s (dialogID=%d, keeping userDialogID=%d)",
-		oldUsername, dialogID, m.currentUserDialogID)
-}
-
-// showDeleteUserDialog 显示删除用户确认对话框
-// Story 12.4 AC7
-func (m *MainMenuScene) showDeleteUserDialog(username string) {
-	// 用于存储对话框 ID 的变量
-	var deleteDialogID ecs.EntityID
-
-	// 创建删除确认对话框的回调
-	callback := func(result entities.DeleteUserDialogResult) {
-		if result.Confirmed {
-			// 执行删除
-			if err := m.saveManager.DeleteUser(username); err != nil {
-				log.Printf("[MainMenuScene] Error: Failed to delete user: %v", err)
-				m.showErrorDialog("删除失败", err.Error())
-				return
-			}
-			log.Printf("[MainMenuScene] User deleted: %s", username)
-
-			// 检查是否还有用户
-			users, err := m.saveManager.LoadUserList()
-			if err != nil || len(users) == 0 {
-				// 没有用户了，清空木板显示并进入强制新建用户流程
-				m.isFirstLaunch = true
-
-				// 清空木板显示：移除 UserSignComponent，恢复原始木牌图片
-				if m.userSignEntity != 0 {
-					// 移除 UserSignComponent
-					if _, ok := ecs.GetComponent[*components.UserSignComponent](m.entityManager, m.userSignEntity); ok {
-						ecs.RemoveComponent[*components.UserSignComponent](m.entityManager, m.userSignEntity)
-						log.Printf("[MainMenuScene] Removed UserSignComponent from entity %d", m.userSignEntity)
-					}
-
-					// 恢复原始木牌图片（不带用户名）
-					if reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.userSignEntity); ok {
-						originalSignImage, err := m.resourceManager.LoadImageByID("IMAGE_REANIM_SELECTORSCREEN_WOODSIGN1")
-						if err == nil {
-							reanimComp.PartImages["IMAGE_REANIM_SELECTORSCREEN_WOODSIGN1"] = originalSignImage
-							log.Printf("[MainMenuScene] Restored original woodsign1 image (no username)")
-						}
-					}
-
-					m.userSignEntity = 0
-				}
-
-				// 先销毁删除确认对话框
-				if deleteDialogID != 0 {
-					m.entityManager.DestroyEntity(deleteDialogID)
-					log.Printf("[MainMenuScene] Destroyed delete dialog (ID: %d)", deleteDialogID)
-				}
-				m.currentDialog = m.currentUserDialogID
-				// 然后打开新建用户对话框
-				m.showNewUserDialogAfterDeleteAll()
-				return
-			}
-
-			// 重新加载数据
-			m.reloadMainMenuData()
-			// 刷新用户管理对话框的列表数据
-			m.refreshUserManagementDialog()
-		}
-		// 无论确认还是取消，都手动销毁删除确认对话框
-		if deleteDialogID != 0 {
-			m.entityManager.DestroyEntity(deleteDialogID)
-			log.Printf("[MainMenuScene] Destroyed delete dialog (ID: %d)", deleteDialogID)
-		}
-		// 恢复 currentDialog 为用户管理对话框
-		m.currentDialog = m.currentUserDialogID
-	}
-
-	// 创建删除确认对话框
-	dialogID, err := entities.NewDeleteUserDialogEntity(
-		m.entityManager,
-		m.resourceManager,
-		username,
-		WindowWidth,
-		WindowHeight,
-		callback,
-	)
-
-	if err != nil {
-		log.Printf("[MainMenuScene] Error: Failed to create delete user dialog: %v", err)
-		return
-	}
-
-	// 保存到闭包变量中
-	deleteDialogID = dialogID
-
-	// ✅ 删除确认对话框不覆盖 currentUserDialogID
-	// 只更新 currentDialog
-	m.currentDialog = dialogID
-	log.Printf("[MainMenuScene] Delete user dialog opened for: %s (dialogID=%d, keeping userDialogID=%d)",
-		username, dialogID, m.currentUserDialogID)
-}
-
-// showNewUserDialogAfterDeleteAll 删除所有用户后显示新建用户对话框
-// Story 12.4: 删除最后一个用户后的特殊流程
-// 新建用户成功后，关闭两个对话框（新建用户对话框 + 用户管理对话框）
-func (m *MainMenuScene) showNewUserDialogAfterDeleteAll() {
-	// 创建新建用户对话框的回调
-	callback := func(result entities.NewUserDialogResult) {
-		if result.Confirmed {
-			// 用户点击"好"按钮
-			m.onNewUserCreated(result.Username)
-			// 新建用户成功后，关闭用户管理对话框
-			if m.currentUserDialogID != 0 {
-				m.entityManager.DestroyEntity(m.currentUserDialogID)
-				m.currentUserDialogID = 0
-				m.currentDialog = 0
-				log.Printf("[MainMenuScene] Closed user management dialog after creating new user")
-			}
-		} else {
-			// 用户点击"取消"按钮 - 强制创建，显示错误提示
-			log.Printf("[MainMenuScene] Cannot cancel: must create a user")
-			m.showErrorDialog("输入你的名字", "请输入你的名字，以创建新的用户档案。档案用于保存游戏积分和进度。")
-		}
-	}
-
-	// 创建新建用户对话框
-	dialogID, inputBoxID, err := entities.NewNewUserDialogEntity(
-		m.entityManager,
-		m.resourceManager,
-		WindowWidth,
-		WindowHeight,
-		callback,
-	)
-
-	if err != nil {
-		log.Printf("[MainMenuScene] Error: Failed to create new user dialog: %v", err)
-		return
-	}
-
-	m.currentInputBoxID = inputBoxID
-	m.currentDialog = dialogID // 设置 currentDialog，但不覆盖 currentUserDialogID
-	log.Printf("[MainMenuScene] New user dialog opened after deleting all users (entity ID: %d)", dialogID)
-}
-
-// refreshUserManagementDialog 刷新用户管理对话框的列表数据
-// Story 12.4: 重命名/删除后不重新创建对话框，只刷���数据
-func (m *MainMenuScene) refreshUserManagementDialog() {
-	if m.currentUserDialogID == 0 {
-		log.Printf("[MainMenuScene] Warning: No user management dialog to refresh")
-		return
-	}
-
-	// 获取 UserListComponent
-	userList, ok := ecs.GetComponent[*components.UserListComponent](m.entityManager, m.currentUserDialogID)
-	if !ok {
-		log.Printf("[MainMenuScene] Warning: User management dialog has no UserListComponent")
-		return
-	}
-
-	// 保存原来的选中索引
-	oldSelectedIndex := userList.SelectedIndex
-	oldUserCount := len(userList.Users)
-
-	// 重新加载用户列表
-	users, err := m.saveManager.LoadUserList()
-	if err != nil {
-		log.Printf("[MainMenuScene] Error: Failed to load user list: %v", err)
-		return
-	}
-
-	// 更新 UserListComponent 的数据
-	userList.Users = make([]components.UserInfo, len(users))
-	for i, user := range users {
-		userList.Users[i] = components.UserInfo{
-			Username:    user.Username,
-			CreatedAt:   user.CreatedAt,
-			LastLoginAt: user.LastLoginAt,
-		}
-	}
-
-	// 更新当前用户
-	userList.CurrentUser = m.saveManager.GetCurrentUser()
-
-	// ✅ 智能更新选中索引
-	// 场景 1: 重命名（用户数量不变） - 保持原索引
-	// 场景 2: 删除（用户数量减少） - 调整索引
-	if len(users) == oldUserCount {
-		// 重命名场景：保持原来的选中索引
-		userList.SelectedIndex = oldSelectedIndex
-		log.Printf("[MainMenuScene] Refreshed (rename): kept selectedIndex=%d", oldSelectedIndex)
-	} else {
-		// 删除场景：调整索引
-		if oldSelectedIndex >= len(users) {
-			// 原索引超出范围，选中最后一个用户
-			userList.SelectedIndex = len(users) - 1
-			if userList.SelectedIndex < 0 {
-				userList.SelectedIndex = 0
-			}
-			log.Printf("[MainMenuScene] Refreshed (delete): adjusted selectedIndex from %d to %d", oldSelectedIndex, userList.SelectedIndex)
-		} else {
-			// 原索引仍然有效，保持不变
-			userList.SelectedIndex = oldSelectedIndex
-			log.Printf("[MainMenuScene] Refreshed (delete): kept selectedIndex=%d", oldSelectedIndex)
-		}
-	}
-
-	log.Printf("[MainMenuScene] Refreshed user list: %d users, currentUser=%s, selectedIndex=%d",
-		len(userList.Users), userList.CurrentUser, userList.SelectedIndex)
-}
-
-// renderUserSignText 渲染木牌上的用户名文本
-// Story 12.4 Task 2.4
-// 新方案：用户名已预先绘制到木牌图片上，这里不需要单独渲染
-// 保留此函数用于未来可能的悬停效果（如更换图片）
-func (m *MainMenuScene) renderUserSignText(screen *ebiten.Image) {
-	// 用户名已预先绘制到木牌图片上（通过 initUserSign），随 Reanim 动画自然移动
-	// 此函数暂时为空，保留用于未来扩展
-}
-
-// drawCenteredText 在指定位置居中绘制文本
-func drawCenteredText(screen *ebiten.Image, textStr string, centerX, centerY float64, fontFace *text.GoTextFace, clr color.Color) {
-	// 使用 text.Measure 计算文本宽度
-	textWidth, _ := text.Measure(textStr, fontFace, 0)
-
-	x := centerX - textWidth/2
-	y := centerY
-
-	op := &text.DrawOptions{}
-	op.GeoM.Translate(x, y)
-	op.ColorScale.ScaleWithColor(clr)
-	text.Draw(screen, textStr, fontFace, op)
-}
-
-// drawTextOutline 绘制文本描边（用于白字黄边效果）
-func drawTextOutline(screen *ebiten.Image, textStr string, centerX, centerY float64, fontFace *text.GoTextFace, outlineColor color.Color, thickness int) {
-	// 使用 text.Measure 计算文本宽度
-	textWidth, _ := text.Measure(textStr, fontFace, 0)
-	baseX := centerX - textWidth/2
-	baseY := centerY
-
-	// 绘制描边：在 8 个方向偏移绘制
-	offsets := []struct{ dx, dy float64 }{
-		{-1, -1}, {0, -1}, {1, -1},
-		{-1, 0}, {1, 0},
-		{-1, 1}, {0, 1}, {1, 1},
-	}
-
-	for _, offset := range offsets {
-		for t := 1; t <= thickness; t++ {
-			op := &text.DrawOptions{}
-			op.GeoM.Translate(baseX+offset.dx*float64(t), baseY+offset.dy*float64(t))
-			op.ColorScale.ScaleWithColor(outlineColor)
-			text.Draw(screen, textStr, fontFace, op)
-		}
-	}
-}
-
-// getTrackNames 获取 MergedTracks 中的所有轨道名称（用于调试）
-func getTrackNames(tracks map[string][]reanim.Frame) []string {
-	names := make([]string, 0, len(tracks))
-	for name := range tracks {
-		names = append(names, name)
-	}
-	return names
-}
-
-// getPartImageKeys 获取 PartImages 中的所有键（用于调试）
-func getPartImageKeys(images map[string]*ebiten.Image) []string {
-	keys := make([]string, 0, len(images))
-	for key := range images {
-		keys = append(keys, key)
-	}
-	return keys
-}
-
-// triggerZombieHandAnimation triggers the zombie hand rising animation and blocks interaction.
-// Story 12.6 Task 2.3: Trigger zombie hand animation on Adventure button click
-func (m *MainMenuScene) triggerZombieHandAnimation() {
-	if m.zombieHandEntity == 0 {
-		// Zombie hand entity not created, fall back to直接跳转
-		log.Printf("[MainMenuScene] Warning: Zombie hand entity not found, skipping animation")
-		m.onStartAdventureClicked()
-		return
-	}
-
-	// Get ReanimComponent
-	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.zombieHandEntity)
-	if !ok {
-		log.Printf("[MainMenuScene] Warning: Zombie hand entity has no ReanimComponent, skipping animation")
-		m.onStartAdventureClicked()
-		return
-	}
-
-	// Debug: Print animation info
-	log.Printf("[MainMenuScene] 🧟 Zombie hand animation info:")
-	log.Printf("  - CurrentAnimations: %v", reanimComp.CurrentAnimations)
-	log.Printf("  - AnimVisiblesMap keys: %v", getMapKeys(reanimComp.AnimVisiblesMap))
-	if visibles, ok := reanimComp.AnimVisiblesMap["_root"]; ok {
-		log.Printf("  - _root visibles length: %d", len(visibles))
-		if len(visibles) > 0 {
-			log.Printf("  - _root visibles first 5: %v", visibles[:min(5, len(visibles))])
-		}
-	}
-	log.Printf("  - FPS: %.1f", reanimComp.AnimationFPS)
-	log.Printf("  - IsLooping: %v", reanimComp.IsLooping)
-	log.Printf("  - IsPaused: %v", reanimComp.IsPaused)
-	log.Printf("  - IsFinished: %v", reanimComp.IsFinished)
-
-	// Unpause the animation
-	reanimComp.IsPaused = false
-	reanimComp.CurrentFrame = 0       // Reset to first frame
-	reanimComp.FrameAccumulator = 0.0 // Reset accumulator
-	reanimComp.IsFinished = false     // Reset finished flag
-
-	// ✅ 修复：重置所有动画的帧索引，确保动画能从头播放
-	if reanimComp.AnimationFrameIndices != nil {
-		for k := range reanimComp.AnimationFrameIndices {
-			reanimComp.AnimationFrameIndices[k] = 0.0
-		}
-	}
-
-	// Set menu state to block interaction
-	log.Printf("[MainMenuScene] 🧟 Setting menuState from %d to %d", m.menuState, MainMenuStateZombieHandPlaying)
-	m.menuState = MainMenuStateZombieHandPlaying
-	m.pendingScene = "GameScene"
-	log.Printf("[MainMenuScene] 🧟 menuState is now: %d", m.menuState)
-
-	// Disable all buttons to prevent clicks during animation
-	m.disableAllButtons()
-
-	log.Printf("[MainMenuScene] Zombie hand animation started (FPS=%.1f, total frames≈25)",
-		reanimComp.AnimationFPS)
-}
-
-// getMapKeys returns the keys of a map (helper for debugging)
-func getMapKeys(m map[string][]int) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	return keys
-}
-
-// disableAllButtons disables all menu buttons during zombie hand animation.
-// Story 12.6 Task 2.3 & 2.6
-//
-// Note: This function is called when zombie hand animation starts.
-// The actual button blocking logic is implemented in Update() by checking
-// menuState == MainMenuStateZombieHandPlaying and returning early.
-func (m *MainMenuScene) disableAllButtons() {
-	// Clear hover states
-	m.hoveredButton = ""
-	m.hoveredBottomButton = components.BottomButtonNone
-	log.Printf("[MainMenuScene] 🚫 Disabled all buttons (zombie hand animation playing)")
-}
-
-// checkZombieHandAnimationFinished checks if zombie hand animation has finished and switches scene.
-// Story 12.6 Task 2.4 & 2.5: Detect animation completion and switch to game scene
-func (m *MainMenuScene) checkZombieHandAnimationFinished() {
-	if m.zombieHandEntity == 0 {
-		return
-	}
-
-	// Get ReanimComponent
-	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.zombieHandEntity)
-	if !ok {
-		log.Printf("[MainMenuScene] Warning: Zombie hand entity has no ReanimComponent")
-		return
-	}
-
-	// Debug: Print animation state every frame
-	log.Printf("[MainMenuScene] 🧟 Checking animation: CurrentFrame=%d, IsFinished=%v, IsPaused=%v",
-		reanimComp.CurrentFrame, reanimComp.IsFinished, reanimComp.IsPaused)
-	if reanimComp.AnimationFrameIndices != nil {
-		if frameIdx, ok := reanimComp.AnimationFrameIndices["_root"]; ok {
-			log.Printf("[MainMenuScene] 🧟   _root frame index: %.2f", frameIdx)
-		}
-	}
-
-	// Check if animation finished
-	if !reanimComp.IsFinished {
-		return
-	}
-
-	// Animation finished, switch to game scene
-	log.Printf("[MainMenuScene] Zombie hand animation finished, switching to game scene")
-
-	// Story 8.6: Load level from save file or default to 1-1
-	gameState := game.GetGameState()
-	saveManager := gameState.GetSaveManager()
-
-	// Story 12.1 Task 6: 首次点击"开始冒险吧"时，标记用户已开始游戏
-	if err := saveManager.Load(); err == nil {
-		if !saveManager.GetHasStartedGame() {
-			log.Println("[MainMenuScene] 首次开始游戏，设置 hasStartedGame = true")
-			saveManager.SetHasStartedGame()
-			if err := saveManager.Save(); err != nil {
-				log.Printf("[MainMenuScene] ⚠️ 保存 hasStartedGame 失败: %v", err)
-			}
-		}
-	}
-
-	levelToLoad := "1-1" // Default to first level
-	if err := saveManager.Load(); err == nil {
-		// Save file exists, get highest level
-		highestLevel := saveManager.GetHighestLevel()
-		if highestLevel != "" {
-			levelToLoad = highestLevel
-			log.Printf("[MainMenu] Loading from save: highest level = %s", highestLevel)
-		}
-	}
-
-	// Pass ResourceManager, SceneManager, and levelID to GameScene
-	gameScene := NewGameScene(m.resourceManager, m.sceneManager, levelToLoad)
-	m.sceneManager.SwitchTo(gameScene)
 }
