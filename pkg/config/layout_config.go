@@ -178,11 +178,16 @@ const (
 	PlantCardSpacing = 60
 
 	// ShovelX 铲子X坐标（屏幕坐标，像素）
-	// 位于种子栏右侧（bar5.png width=612 + small gap）
+	// 已废弃：现在铲子位置根据选择栏图片宽度动态计算
+	// 保留此常量作为备用值（当选择栏图片未加载时使用）
 	ShovelX = 620
 
 	// ShovelY 铲子Y坐标（屏幕坐标，像素）
 	ShovelY = 8
+
+	// ShovelGapFromSeedBank 铲子与选择栏之间的间距（像素）
+	// 铲子紧挨选择栏右侧，无间距
+	ShovelGapFromSeedBank = 0
 
 	// ShovelWidth 铲子宽度（像素）
 	ShovelWidth = 70

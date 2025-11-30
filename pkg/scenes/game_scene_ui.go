@@ -116,6 +116,7 @@ func (s *GameScene) drawSunCounter(screen *ebiten.Image) {
 // The shovel will be used in future stories for removing plants.
 // Story 8.5: 1-1关（教学关卡）不显示铲子
 // Story 8.6: 检查铲子是否已解锁（1-4关完成后才解锁）
+// 铲子位置紧挨选择栏右侧，与选择栏上对齐
 func (s *GameScene) drawShovel(screen *ebiten.Image) {
 	// 教学关卡不显示铲子（玩家还不需要学习移除植物）
 	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.OpeningType == "tutorial" {
@@ -128,22 +129,33 @@ func (s *GameScene) drawShovel(screen *ebiten.Image) {
 		return
 	}
 
+	// 计算铲子 X 位置：紧挨选择栏右侧
+	shovelX := float64(config.ShovelX) // 默认值
+	if s.seedBank != nil {
+		// 根据选择栏图片宽度动态计算
+		seedBankWidth := float64(s.seedBank.Bounds().Dx())
+		shovelX = float64(config.SeedBankX) + seedBankWidth + float64(config.ShovelGapFromSeedBank)
+	}
+
+	// 铲子 Y 位置：与选择栏上对齐
+	shovelY := float64(config.SeedBankY)
+
 	// Draw shovel slot background first
 	if s.shovelSlot != nil {
 		op := &ebiten.DrawImageOptions{}
-		op.GeoM.Translate(config.ShovelX, config.ShovelY)
+		op.GeoM.Translate(shovelX, shovelY)
 		screen.DrawImage(s.shovelSlot, op)
 	}
 
 	// Draw shovel icon on top of the slot
 	if s.shovel != nil {
 		op := &ebiten.DrawImageOptions{}
-		op.GeoM.Translate(config.ShovelX, config.ShovelY)
+		op.GeoM.Translate(shovelX, shovelY)
 		screen.DrawImage(s.shovel, op)
 	} else if s.shovelSlot == nil {
 		// Fallback: Draw a gray rectangle if both images are missing
 		ebitenutil.DrawRect(screen,
-			config.ShovelX, config.ShovelY,
+			shovelX, shovelY,
 			config.ShovelWidth, config.ShovelHeight,
 			color.RGBA{R: 128, G: 128, B: 128, A: 255}) // Gray
 	}
