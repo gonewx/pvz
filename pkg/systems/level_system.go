@@ -588,9 +588,11 @@ func (s *LevelSystem) getEntityLane(y float64) int {
 	return lane
 }
 
-// isZombieType 判断行为类型是否是僵尸
+// isZombieType 判断行为类型是否是僵尸（包括各种活跃状态）
+// 返回 true 的状态会被除草车消灭
 func isZombieType(behaviorType components.BehaviorType) bool {
 	return behaviorType == components.BehaviorZombieBasic ||
+		behaviorType == components.BehaviorZombieEating ||
 		behaviorType == components.BehaviorZombieConehead ||
 		behaviorType == components.BehaviorZombieBuckethead
 }
