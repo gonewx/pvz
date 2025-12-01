@@ -563,20 +563,28 @@ func (c *AnimationCell) findControllingAnimation(trackName string) (string, int)
 		animVisibles := c.animVisiblesMap[animName]
 		visibleCount := countVisibleFrames(animVisibles)
 
-		// 特殊情况：只有1个可见帧，说明这是"门控动画"（如 ZombiesWon 的 anim_screen）
-		// 不应该用它映射视觉轨道，而应该直接播放所有帧
-		if visibleCount == 1 {
+		// 特殊情况：
+		// - visibleCount == 0：简单动画（没有动画定义轨道），直接播放所有帧
+		// - visibleCount == 1：门控动画（如 ZombiesWon 的 anim_screen），直接播放所有帧
+		if visibleCount <= 1 {
 			// 回退到直接使用当前帧播放
 			mergedFrames, ok := c.mergedTracks[trackName]
 			if ok && len(mergedFrames) > 0 {
 				physicalFrame := c.currentFrame % len(mergedFrames)
 				return "", physicalFrame
 			}
-		} else if visibleCount > 0 {
+		} else {
 			animLogicalFrame := c.currentFrame % visibleCount
 			physicalFrame := mapLogicalToPhysical(animLogicalFrame, animVisibles)
 			return animName, physicalFrame
 		}
+	}
+
+	// 最后的回退：直接使用当前帧播放
+	mergedFrames, ok := c.mergedTracks[trackName]
+	if ok && len(mergedFrames) > 0 {
+		physicalFrame := c.currentFrame % len(mergedFrames)
+		return "", physicalFrame
 	}
 
 	return "", -1
