@@ -33,11 +33,14 @@ func (s *BehaviorSystem) handleSunflowerBehavior(entityID ecs.EntityID, deltaTim
 		_, hasGlow := ecs.GetComponent[*components.SunflowerGlowComponent](s.entityManager, entityID)
 		if !hasGlow {
 			ecs.AddComponent(s.entityManager, entityID, &components.SunflowerGlowComponent{
-				Intensity: 1.0,
-				FadeSpeed: config.SunflowerGlowFadeSpeed,
-				ColorR:    config.SunflowerGlowColorR,
-				ColorG:    config.SunflowerGlowColorG,
-				ColorB:    config.SunflowerGlowColorB,
+				Intensity:    0.0,           // 从 0 开始，逐渐亮起
+				MaxIntensity: 1.0,           // 最大强度
+				IsRising:     true,          // 开始亮起阶段
+				RiseSpeed:    config.SunflowerGlowRiseSpeed,
+				FadeSpeed:    config.SunflowerGlowFadeSpeed,
+				ColorR:       config.SunflowerGlowColorR,
+				ColorG:       config.SunflowerGlowColorG,
+				ColorB:       config.SunflowerGlowColorB,
 			})
 			log.Printf("[BehaviorSystem] 向日葵 %d 预热发光效果（阳光即将生产）", entityID)
 		}
@@ -709,7 +712,8 @@ func (s *BehaviorSystem) updatePlantAttackAnimation(entityID ecs.EntityID, delta
 }
 
 // updateSunflowerGlowEffects 更新所有向日葵脸部发光效果
-// 每帧降低发光强度，实现渐变效果
+// 亮起阶段：每帧增加发光强度，直到达到最大值
+// 衰减阶段：每帧降低发光强度，直到归零
 // 当强度归零时，移除发光组件
 func (s *BehaviorSystem) updateSunflowerGlowEffects(deltaTime float64) {
 	// 查询所有拥有向日葵发光组件的实体
@@ -721,12 +725,21 @@ func (s *BehaviorSystem) updateSunflowerGlowEffects(deltaTime float64) {
 			continue
 		}
 
-		// 降低发光强度
-		glowComp.Intensity -= glowComp.FadeSpeed * deltaTime
+		if glowComp.IsRising {
+			// 亮起阶段：增加强度
+			glowComp.Intensity += glowComp.RiseSpeed * deltaTime
+			if glowComp.Intensity >= glowComp.MaxIntensity {
+				glowComp.Intensity = glowComp.MaxIntensity
+				glowComp.IsRising = false // 切换到衰减阶段
+			}
+		} else {
+			// 衰减阶段：降低强度
+			glowComp.Intensity -= glowComp.FadeSpeed * deltaTime
 
-		// 如果强度归零，移除组件
-		if glowComp.Intensity <= 0 {
-			ecs.RemoveComponent[*components.SunflowerGlowComponent](s.entityManager, entityID)
+			// 如果强度归零，移除组件
+			if glowComp.Intensity <= 0 {
+				ecs.RemoveComponent[*components.SunflowerGlowComponent](s.entityManager, entityID)
+			}
 		}
 	}
 }

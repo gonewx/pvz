@@ -173,6 +173,12 @@ const (
 	// SunflowerGlowColorB 向日葵发光效果的蓝色通道（叠加值）
 	SunflowerGlowColorB = 0.3
 
+	// SunflowerGlowRiseSpeed 向日葵发光效果的亮起速度（每秒）
+	// 0.5 表示 2 秒内从最暗到最亮
+	// 值越小，亮起越缓慢
+	// 建议值：0.3-1.0
+	SunflowerGlowRiseSpeed = 1.0
+
 	// SunflowerGlowFadeSpeed 向日葵发光效果的衰减速度（每秒）
 	// 0.2 表示 5 秒内从最亮完全衰减
 	// 建议值：0.2-0.5
@@ -181,5 +187,5 @@ const (
 	// SunflowerGlowPrewarmTime 向日葵发光效果提前触发时间（秒）
 	// 发光效果在阳光生产前多少秒开始亮起
 	// 建议值：0.3-0.8
-	SunflowerGlowPrewarmTime = 0.5
+	SunflowerGlowPrewarmTime = 1.0
 )
