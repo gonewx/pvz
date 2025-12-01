@@ -24,6 +24,19 @@ images:
     IMAGE_REANIM_ZOMBIE_OUTERLEG_UPPER: assets/reanim/Zombie_outerleg_upper.png
     IMAGE_REANIM_ZOMBIE_TIE: assets/reanim/Zombie_tie.png
     IMAGE_REANIM_ZOMBIE_TONGUE: assets/reanim/Zombie_tongue.png
+
+# 共享隐藏轨道配置（旗帜僵尸专用）
+shared:
+    flag_zombie_hidden_tracks: &flag_zombie_hidden_tracks
+        - anim_bucket
+        - anim_cone
+        - anim_screendoor
+        - Zombie_innerarm_screendoor_hand
+        - Zombie_outerarm_screendoor
+        - Zombie_duckytube
+        - Zombie_mustache
+        - anim_innerarm3
+
 available_animations:
     - name: anim_idle
       display_name: idle
@@ -35,62 +48,30 @@ available_animations:
       display_name: death
 
 # 动画组合配置：旗帜僵尸需要显示旗帜手，隐藏普通右臂（innerarm）
+# 注意：不隐藏 Zombie_flaghand（旗帜僵尸需要显示旗帜手）
+# 注意：不隐藏 Zombie_outerarm*（左臂需要正常显示）
+# 注意：不隐藏 anim_innerarm1/2（旗帜手只替换手部，保留上臂和下臂）
 animation_combos:
     - name: idle
       display_name: 待机
       animations:
           - anim_idle
       binding_strategy: auto
-      hidden_tracks:
-          - anim_bucket       # 隐藏铁桶
-          - anim_cone         # 隐藏路障
-          - anim_screendoor   # 隐藏铁门
-          - Zombie_innerarm_screendoor
-          - Zombie_innerarm_screendoor_hand
-          - Zombie_outerarm_screendoor
-          - Zombie_duckytube
-          - Zombie_mustache
-          # - anim_innerarm1    # 不隐藏普通右臂上臂（旗帜手只替换手部）
-          # - anim_innerarm2    # 不隐藏普通右臂下臂
-          - anim_innerarm3    # 隐藏普通右臂手掌（被旗帜手替代）
-          # 注意：不隐藏 Zombie_flaghand（旗帜僵尸需要显示旗帜手）
-          # 注意：不隐藏 Zombie_outerarm*（左臂需要正常显示）
+      hidden_tracks: *flag_zombie_hidden_tracks
 
     - name: walk
       display_name: 行走
       animations:
           - anim_walk
       binding_strategy: auto
-      hidden_tracks:
-          - anim_bucket
-          - anim_cone
-          - anim_screendoor
-          # - Zombie_innerarm_screendoor
-          - Zombie_innerarm_screendoor_hand
-          - Zombie_outerarm_screendoor
-          - Zombie_duckytube
-          - Zombie_mustache
-          # - anim_innerarm1
-          # - anim_innerarm2
-          - anim_innerarm3
+      hidden_tracks: *flag_zombie_hidden_tracks
 
     - name: eat
       display_name: 啃食
       animations:
           - anim_eat
       binding_strategy: auto
-      hidden_tracks:
-          - anim_bucket
-          - anim_cone
-          - anim_screendoor
-          - Zombie_innerarm_screendoor
-          - Zombie_innerarm_screendoor_hand
-          - Zombie_outerarm_screendoor
-          - Zombie_duckytube
-          - Zombie_mustache
-          # - anim_innerarm1
-          # - anim_innerarm2
-          - anim_innerarm3
+      hidden_tracks: *flag_zombie_hidden_tracks
 
     - name: death
       display_name: 死亡
@@ -98,15 +79,4 @@ animation_combos:
           - anim_death
       loop: false
       binding_strategy: auto
-      hidden_tracks:
-          - anim_bucket
-          - anim_cone
-          - anim_screendoor
-          - Zombie_innerarm_screendoor
-          - Zombie_innerarm_screendoor_hand
-          - Zombie_outerarm_screendoor
-          - Zombie_duckytube
-          - Zombie_mustache
-          # - anim_innerarm1
-          # - anim_innerarm2
-          - anim_innerarm3
+      hidden_tracks: *flag_zombie_hidden_tracks
