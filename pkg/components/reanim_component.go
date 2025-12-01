@@ -255,4 +255,10 @@ type ReanimComponent struct {
 
 	// OverlayFrameAccumulator 叠加动画帧累加器
 	OverlayFrameAccumulator float64
+
+	// OverlayBindTrack 叠加动画绑定的父轨道名称
+	// 叠加动画会作为整体绑定到此轨道上，应用该轨道的所有变换（位置、旋转、缩放）
+	// 例如：旗帜僵尸的旗杆动画绑定到 "Zombie_flaghand" 轨道
+	// 如果为空字符串，表示叠加动画独立渲染，不绑定到任何父轨道
+	OverlayBindTrack string
 }

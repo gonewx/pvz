@@ -65,7 +65,7 @@ animation_combos:
           - anim_bucket
           - anim_cone
           - anim_screendoor
-          - Zombie_innerarm_screendoor
+          # - Zombie_innerarm_screendoor
           - Zombie_innerarm_screendoor_hand
           - Zombie_outerarm_screendoor
           - Zombie_duckytube

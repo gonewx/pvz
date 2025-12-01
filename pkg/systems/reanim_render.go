@@ -2,6 +2,7 @@ package systems
 
 import (
 	"log"
+	"math"
 	"strings"
 
 	"github.com/decker502/pvz/internal/reanim"
@@ -33,6 +34,9 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 	}
 	// 重用切片避免分配
 	comp.CachedRenderData = comp.CachedRenderData[:0]
+
+	// 先渲染叠加动画（如旗帜僵尸的旗杆），使其在主动画后面
+	s.renderOverlayAnimation(comp)
 
 	visibleCount := 0
 	skippedHidden := 0
@@ -271,9 +275,6 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 		log.Printf("[ReanimSystem] prepareRenderCache: %s frame %d → %d visible parts (skipped: hidden=%d, paused=%d, noFrames=%d, noImage=%d)",
 			comp.ReanimName, comp.CurrentFrame, visibleCount, skippedHidden, skippedPaused, skippedNoFrames, skippedNoImage)
 	}
-
-	// 渲染叠加动画（如旗帜僵尸的旗杆）
-	s.renderOverlayAnimation(comp)
 }
 
 // GetRenderData 获取渲染数据（供 RenderSystem 使用）
@@ -600,9 +601,10 @@ func (s *ReanimSystem) RenderToTexture(entityID ecs.EntityID, target *ebiten.Ima
 // 叠加动画会在主动画轨道之上渲染，用于实现复合角色效果
 //
 // 旗帜僵尸实现说明：
-// - Zombie_FlagPole.reanim 的坐标是相对于僵尸原点设计的
-// - 不需要额外添加 Zombie_flaghand 的位置偏移
-// - 旗杆动画独立播放，帧数可能与主动画不同
+// - Zombie_FlagPole.reanim 包含旗杆和旗帜的动画
+// - 通过 OverlayBindTrack 绑定到 Zombie_flaghand 轨道
+// - 叠加动画应用 Zombie_flaghand 轨道的增量变换（相对于初始帧的变化）
+// - 旋转以手部位置为中心，使旗杆顶端的位移大于底端
 func (s *ReanimSystem) renderOverlayAnimation(comp *components.ReanimComponent) {
 	// 检查是否有叠加动画
 	if comp.OverlayReanimXML == nil {
@@ -612,6 +614,13 @@ func (s *ReanimSystem) renderOverlayAnimation(comp *components.ReanimComponent) 
 	// 初始化叠加动画的合并轨道（如果还没有）
 	if comp.OverlayMergedTracks == nil {
 		comp.OverlayMergedTracks = reanim.BuildMergedTracks(comp.OverlayReanimXML)
+	}
+
+	// 获取父轨道的增量变换数据（如果设置了绑定轨道）
+	var deltaX, deltaY, deltaKx, deltaKy, pivotX, pivotY float64
+	var hasParentTransform bool
+	if comp.OverlayBindTrack != "" {
+		deltaX, deltaY, deltaKx, deltaKy, pivotX, pivotY, hasParentTransform = s.getBindTrackDeltaTransform(comp)
 	}
 
 	// 计算叠加动画的当前帧
@@ -645,15 +654,143 @@ func (s *ReanimSystem) renderOverlayAnimation(comp *components.ReanimComponent) 
 			continue
 		}
 
-		// 叠加动画直接使用其自身坐标渲染（不添加额外偏移）
-		// Zombie_FlagPole.reanim 的坐标已经是相对于僵尸原点设计的
+		// 复制 frame，避免修改原始数据
+		renderFrame := frame
+
+		// 如果有父轨道变换，应用增量变换到叠加动画
+		if hasParentTransform && (deltaX != 0 || deltaY != 0 || deltaKx != 0 || deltaKy != 0) {
+			// 获取叠加动画部件的原始坐标
+			childX := getFloat(renderFrame.X)
+			childY := getFloat(renderFrame.Y)
+			childKx := getFloat(renderFrame.SkewX)
+			childKy := getFloat(renderFrame.SkewY)
+
+			// 应用增量旋转（绕手部位置 pivotX, pivotY 旋转）
+			if deltaKx != 0 {
+				deltaRotRad := deltaKx * math.Pi / 180.0
+				cosD := math.Cos(deltaRotRad)
+				sinD := math.Sin(deltaRotRad)
+
+				// 将位置相对于旋转中心（手部位置）
+				relX := childX - pivotX
+				relY := childY - pivotY
+
+				// 绕旋转中心旋转
+				rotX := relX*cosD - relY*sinD
+				rotY := relX*sinD + relY*cosD
+
+				// 转换回绝对坐标
+				childX = rotX + pivotX
+				childY = rotY + pivotY
+			}
+
+			// 应用增量位置偏移
+			finalX := childX + deltaX
+			finalY := childY + deltaY
+
+			// 应用增量旋转角度
+			finalKx := childKx + deltaKx
+			finalKy := childKy + deltaKy
+
+			// 更新 frame 的变换数据
+			renderFrame.X = &finalX
+			renderFrame.Y = &finalY
+			renderFrame.SkewX = &finalKx
+			renderFrame.SkewY = &finalKy
+		}
+
 		comp.CachedRenderData = append(comp.CachedRenderData, components.RenderPartData{
 			Img:     img,
-			Frame:   frame,
+			Frame:   renderFrame,
 			OffsetX: 0,
 			OffsetY: 0,
 		})
 	}
+}
+
+// getBindTrackDeltaTransform 获取绑定轨道相对于初始帧的增量变换
+// 返回：deltaX, deltaY, deltaKx, deltaKy, pivotX, pivotY, 是否成功
+// pivotX, pivotY 是旋转中心点（手部初始位置）
+func (s *ReanimSystem) getBindTrackDeltaTransform(comp *components.ReanimComponent) (float64, float64, float64, float64, float64, float64, bool) {
+	bindTrack := comp.OverlayBindTrack
+	if bindTrack == "" {
+		return 0, 0, 0, 0, 0, 0, false
+	}
+
+	// 获取绑定轨道的帧数据
+	bindFrames, ok := comp.MergedTracks[bindTrack]
+	if !ok || len(bindFrames) == 0 {
+		return 0, 0, 0, 0, 0, 0, false
+	}
+
+	// 获取当前动画名称和逻辑帧
+	var animName string
+	var logicalFrame float64
+	if len(comp.CurrentAnimations) > 0 {
+		animName = comp.CurrentAnimations[0]
+		if comp.AnimationFrameIndices != nil {
+			if frame, exists := comp.AnimationFrameIndices[animName]; exists {
+				logicalFrame = frame
+			} else {
+				logicalFrame = float64(comp.CurrentFrame)
+			}
+		} else {
+			logicalFrame = float64(comp.CurrentFrame)
+		}
+	} else {
+		logicalFrame = float64(comp.CurrentFrame)
+	}
+
+	// 使用当前动画的可见性数组来映射帧（而不是绑定轨道的）
+	// 这确保了绑定轨道的帧与主动画同步
+	animVisibles, ok := comp.AnimVisiblesMap[animName]
+	if !ok || len(animVisibles) == 0 {
+		// 后备：直接使用物理帧
+		frameIdx := int(logicalFrame)
+		if frameIdx < 0 {
+			frameIdx = 0
+		}
+		if frameIdx >= len(bindFrames) {
+			frameIdx = len(bindFrames) - 1
+		}
+
+		// 获取初始帧和当前帧
+		initFrame := bindFrames[0]
+		currFrame := bindFrames[frameIdx]
+
+		initX := getFloat(initFrame.X)
+		initY := getFloat(initFrame.Y)
+
+		return getFloat(currFrame.X) - initX,
+			getFloat(currFrame.Y) - initY,
+			getFloat(currFrame.SkewX) - getFloat(initFrame.SkewX),
+			getFloat(currFrame.SkewY) - getFloat(initFrame.SkewY),
+			initX, initY,
+			true
+	}
+
+	// 获取初始帧（逻辑帧 0 对应的物理帧）
+	initPhysicalFrame := MapLogicalToPhysical(0, animVisibles)
+	if initPhysicalFrame < 0 || initPhysicalFrame >= len(bindFrames) {
+		initPhysicalFrame = 0
+	}
+	initFrame := bindFrames[initPhysicalFrame]
+
+	// 使用插值获取更平滑的当前帧数据
+	currFrame := s.getInterpolatedFrame(bindTrack, logicalFrame, animVisibles, bindFrames)
+
+	// 计算增量和旋转中心
+	initX := getFloat(initFrame.X)
+	initY := getFloat(initFrame.Y)
+	initKx := getFloat(initFrame.SkewX)
+	initKy := getFloat(initFrame.SkewY)
+
+	currX := getFloat(currFrame.X)
+	currY := getFloat(currFrame.Y)
+	currKx := getFloat(currFrame.SkewX)
+	currKy := getFloat(currFrame.SkewY)
+
+	return currX - initX, currY - initY, currKx - initKx, currKy - initKy, initX, initY, true
 }
 
 // ==================================================================

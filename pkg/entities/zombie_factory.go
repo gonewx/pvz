@@ -424,6 +424,8 @@ func NewFlagZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spaw
 		// 将旗杆动画的轨道合并到主动画（稍后由 ReanimSystem 处理）
 		// 存储在自定义字段或通过配置传递
 		reanimComp.OverlayReanimXML = flagPoleReanimXML
+		// 绑定到 Zombie_flaghand 轨道，使旗杆随手臂摆动
+		reanimComp.OverlayBindTrack = "Zombie_flaghand"
 	}
 
 	ecs.AddComponent(em, entityID, reanimComp)
