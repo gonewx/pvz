@@ -11,12 +11,6 @@ const (
 	// 当前使用 CellHeight/2 (50.0) 使僵尸在格子中心
 	ZombieVerticalOffset = -25.0
 
-	// ZombieWalkAnimationFrames 普通僵尸走路动画的总帧数
-	ZombieWalkAnimationFrames = 22
-
-	// ZombieWalkFrameSpeed 僵尸走路动画的帧速率（秒/帧）
-	ZombieWalkFrameSpeed = 0.1
-
 	// ZombieWalkSpeed 普通僵尸的移动速度（像素/秒）
 	// 负值表示从右向左移动
 	ZombieWalkSpeed = -30.0
