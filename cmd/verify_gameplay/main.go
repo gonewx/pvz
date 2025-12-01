@@ -31,7 +31,7 @@ var (
 
 // 每行对应的僵尸类型（可配置）
 var zombieTypesByRow = []string{
-	"basic",      // 行0: 普通僵尸
+	"flag",       // 行0: 旗帜僵尸
 	"basic",      // 行1: 普通僵尸
 	"conehead",   // 行2: 路障僵尸
 	"conehead",   // 行3: 路障僵尸
@@ -208,7 +208,7 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 	log.Println("【功能说明】")
 	log.Println("  - 植物选择栏：显示所有可用植物")
 	log.Println("  - 僵尸生成：每行固定类型，每2秒生成一个")
-	log.Println("  - 行0: 普通僵尸  行1: 普通僵尸")
+	log.Println("  - 行0: 旗帜僵尸  行1: 普通僵尸")
 	log.Println("  - 行2: 路障僵尸  行3: 路障僵尸")
 	log.Println("  - 行4: 铁桶僵尸")
 	log.Println()
@@ -332,6 +332,8 @@ func (vg *VerifyGameplayGame) spawnZombie(row int) {
 		zombieID, err = entities.NewConeheadZombieEntity(vg.entityManager, vg.resourceManager, row, spawnX)
 	case "buckethead":
 		zombieID, err = entities.NewBucketheadZombieEntity(vg.entityManager, vg.resourceManager, row, spawnX)
+	case "flag":
+		zombieID, err = entities.NewFlagZombieEntity(vg.entityManager, vg.resourceManager, row, spawnX)
 	default:
 		zombieID, err = entities.NewZombieEntity(vg.entityManager, vg.resourceManager, row, spawnX)
 	}
@@ -355,10 +357,13 @@ func (vg *VerifyGameplayGame) spawnZombie(row int) {
 
 	// 播放行走动画
 	unitID := "zombie"
-	if zombieType == "conehead" {
+	switch zombieType {
+	case "conehead":
 		unitID = "zombie_conehead"
-	} else if zombieType == "buckethead" {
+	case "buckethead":
 		unitID = "zombie_buckethead"
+	case "flag":
+		unitID = "zombie_flag"
 	}
 	ecs.AddComponent(vg.entityManager, zombieID, &components.AnimationCommandComponent{
 		UnitID:    unitID,
