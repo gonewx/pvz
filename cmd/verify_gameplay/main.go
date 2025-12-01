@@ -268,6 +268,10 @@ func (vg *VerifyGameplayGame) setupScene() {
 
 	// 创建除草车（每行一台）
 	vg.createLawnmowers()
+
+	// 自动生成一个旗帜僵尸用于测试（在第0行）
+	log.Println("[VerifyGameplay] 自动生成旗帜僵尸进行测试...")
+	vg.spawnZombie(0)
 }
 
 // createPlantCards 创建所有植物卡片
@@ -414,7 +418,8 @@ func (vg *VerifyGameplayGame) clearAllZombies() {
 		behavior, _ := ecs.GetComponent[*components.BehaviorComponent](vg.entityManager, entityID)
 		if behavior.Type == components.BehaviorZombieBasic ||
 			behavior.Type == components.BehaviorZombieConehead ||
-			behavior.Type == components.BehaviorZombieBuckethead {
+			behavior.Type == components.BehaviorZombieBuckethead ||
+			behavior.Type == components.BehaviorZombieFlag {
 			vg.entityManager.DestroyEntity(entityID)
 			count++
 		}

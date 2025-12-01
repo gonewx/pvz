@@ -527,6 +527,7 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 			behavior.Type != components.BehaviorZombieEating &&
 			behavior.Type != components.BehaviorZombieConehead &&
 			behavior.Type != components.BehaviorZombieBuckethead &&
+			behavior.Type != components.BehaviorZombieFlag &&
 			behavior.Type != components.BehaviorZombieDying {
 			continue
 		}

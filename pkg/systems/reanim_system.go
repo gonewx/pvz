@@ -1013,6 +1013,35 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 				log.Printf("[ReanimSystem] 非循环动画完成: entity=%d, ReanimName=%s, CurrentFrame=%d", id, comp.ReanimName, comp.CurrentFrame)
 			}
 		}
+
+		// 更新叠加动画帧（如旗帜僵尸的旗杆动画）
+		if comp.OverlayReanimXML != nil {
+			overlayFPS := float64(comp.OverlayReanimXML.FPS)
+			if overlayFPS <= 0 {
+				overlayFPS = 12.0
+			}
+
+			// 推进叠加动画帧
+			comp.OverlayFrameAccumulator += deltaTime
+			frameTime := 1.0 / overlayFPS
+			if comp.OverlayFrameAccumulator >= frameTime {
+				comp.OverlayCurrentFrame++
+				comp.OverlayFrameAccumulator -= frameTime
+
+				// 循环播���
+				if comp.OverlayMergedTracks != nil {
+					// 获取第一个轨道的帧数作为总帧数
+					for _, track := range comp.OverlayReanimXML.Tracks {
+						if frames, ok := comp.OverlayMergedTracks[track.Name]; ok && len(frames) > 0 {
+							if comp.OverlayCurrentFrame >= len(frames) {
+								comp.OverlayCurrentFrame = 0
+							}
+							break
+						}
+					}
+				}
+			}
+		}
 	}
 
 	s.cleanupProcessedCommands(deltaTime)
@@ -1320,6 +1349,9 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 		log.Printf("[ReanimSystem] prepareRenderCache: %s frame %d → %d visible parts (skipped: hidden=%d, paused=%d, noFrames=%d, noImage=%d)",
 			comp.ReanimName, comp.CurrentFrame, visibleCount, skippedHidden, skippedPaused, skippedNoFrames, skippedNoImage)
 	}
+
+	// 渲染叠加动画（如旗帜僵尸的旗杆）
+	s.renderOverlayAnimation(comp)
 }
 
 // GetRenderData 获取渲染数据（供 RenderSystem 使用）
@@ -1788,4 +1820,64 @@ func getMapKeysStr(m map[string][]int) []string {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+// renderOverlayAnimation 渲染叠加动画（如旗帜僵尸的旗杆）
+// 叠加动画会在主动画轨道之上渲染，用于实现复合角色效果
+//
+// 旗帜僵尸实现说明：
+// - Zombie_FlagPole.reanim 的坐标是相对于僵尸原点设计的
+// - 不需要额外添加 Zombie_flaghand 的位置偏移
+// - 旗杆动画独立播放，帧数可能与主动画不同
+func (s *ReanimSystem) renderOverlayAnimation(comp *components.ReanimComponent) {
+	// 检查是否有叠加动画
+	if comp.OverlayReanimXML == nil {
+		return
+	}
+
+	// 初始化叠加动画的合并轨道（如果还没有）
+	if comp.OverlayMergedTracks == nil {
+		comp.OverlayMergedTracks = reanim.BuildMergedTracks(comp.OverlayReanimXML)
+	}
+
+	// 计算叠加动画的当前帧
+	overlayFrame := comp.OverlayCurrentFrame
+
+	// 渲染叠加动画的所有轨道
+	for _, track := range comp.OverlayReanimXML.Tracks {
+		trackName := track.Name
+		mergedFrames, ok := comp.OverlayMergedTracks[trackName]
+		if !ok || len(mergedFrames) == 0 {
+			continue
+		}
+
+		// 获取当前帧数据
+		frameIdx := overlayFrame
+		if frameIdx < 0 {
+			frameIdx = 0
+		}
+		if frameIdx >= len(mergedFrames) {
+			frameIdx = len(mergedFrames) - 1
+		}
+		frame := mergedFrames[frameIdx]
+
+		// 获取图片
+		imgName := frame.ImagePath
+		if imgName == "" {
+			continue
+		}
+		img, ok := comp.PartImages[imgName]
+		if !ok || img == nil {
+			continue
+		}
+
+		// 叠加动画直接使用其自身坐标渲染（不添加额外偏移）
+		// Zombie_FlagPole.reanim 的坐标已经是相对于僵尸原点设计的
+		comp.CachedRenderData = append(comp.CachedRenderData, components.RenderPartData{
+			Img:     img,
+			Frame:   frame,
+			OffsetX: 0,
+			OffsetY: 0,
+		})
+	}
 }

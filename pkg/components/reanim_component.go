@@ -236,4 +236,23 @@ type ReanimComponent struct {
 
 	// AccumulatedDeltaY 存储每游戏帧固定的 Y 位移
 	AccumulatedDeltaY float64
+
+	// ==========================================================================
+	// 叠加动画 (Overlay Animation) - 用于旗帜僵尸等复合动画
+	// ==========================================================================
+
+	// OverlayReanimXML 叠加动画数据（如旗帜僵尸的旗杆动画）
+	// 叠加动画会在主动画之上渲染，通常绑定到特定轨道（如 Zombie_flaghand）
+	// 如果为 nil，表示没有叠加动画
+	OverlayReanimXML *reanim.ReanimXML
+
+	// OverlayMergedTracks 叠加动画的合并轨道数据
+	// 由 ReanimSystem 在初始化时构建
+	OverlayMergedTracks map[string][]reanim.Frame
+
+	// OverlayCurrentFrame 叠加动画当前帧
+	OverlayCurrentFrame int
+
+	// OverlayFrameAccumulator 叠加动画帧累加器
+	OverlayFrameAccumulator float64
 }

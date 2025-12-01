@@ -827,6 +827,13 @@ func (s *BehaviorSystem) handleBucketheadZombieBehavior(entityID ecs.EntityID, d
 	s.handleZombieBasicBehavior(entityID, deltaTime)
 }
 
+// handleZombieFlagBehavior 处理旗帜僵尸的行为逻辑
+// 旗帜僵尸与普通僵尸行为完全相同，只是外观不同（显示旗帜手）
+func (s *BehaviorSystem) handleZombieFlagBehavior(entityID ecs.EntityID, deltaTime float64) {
+	// 旗帜僵尸的行为与普通僵尸相同
+	s.handleZombieBasicBehavior(entityID, deltaTime)
+}
+
 // updateTriggerZombieMovement 更新触发僵尸的移动（游戏冻结期间）
 // Story 8.8: 简化的移动逻辑，只更新位置，不检测碰撞和啃食
 // 用于 Phase 2 期间让触发僵尸继续走出屏幕

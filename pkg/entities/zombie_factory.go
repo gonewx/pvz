@@ -350,3 +350,124 @@ func NewBucketheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int
 
 	return entityID, nil
 }
+
+// NewFlagZombieEntity 创建旗帜僵尸实体
+// 旗帜僵尸与普通僵尸生命值相同（270），但外观不同（显示旗帜手+旗杆+旗子）
+// 旗帜僵尸通常在旗帜波出现，标志着大量僵尸即将来袭
+//
+// 实现方式：通过轨道合并，将 Zombie.reanim 和 Zombie_FlagPole.reanim 合并渲染
+//
+// 参数:
+//   - em: 实体管理器
+//   - rm: 资源管理器（用于加载僵尸 Reanim 资源）
+//   - row: 生成行索引 (0-4)
+//   - spawnX: 生成的世界坐标X位置（通常在屏幕右侧外）
+//
+// 返回:
+//   - ecs.EntityID: 创建的旗帜僵尸实体ID，如果失败返回 0
+//   - error: 如果创建失败返回错误信息
+func NewFlagZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spawnX float64) (ecs.EntityID, error) {
+	if em == nil {
+		return 0, fmt.Errorf("entity manager cannot be nil")
+	}
+	if rm == nil {
+		return 0, fmt.Errorf("resource manager cannot be nil")
+	}
+
+	// 计算僵尸Y坐标（世界坐标，基于行）
+	// 行中心 = GridWorldStartY + row*CellHeight + CellHeight/2.0
+	// 使用 config.ZombieVerticalOffset 以便手工调整
+	spawnY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2.0 + config.ZombieVerticalOffset
+
+	// 创建实体
+	entityID := em.CreateEntity()
+
+	// 添加位置组件（世界坐标）
+	ecs.AddComponent(em, entityID, &components.PositionComponent{
+		X: spawnX,
+		Y: spawnY,
+	})
+
+	// 从 ResourceManager 获取僵尸的 Reanim 数据和部件图片
+	reanimXML := rm.GetReanimXML("Zombie")
+	partImages := rm.GetReanimPartImages("Zombie")
+
+	if reanimXML == nil || partImages == nil {
+		return 0, fmt.Errorf("failed to load Zombie Reanim resources for Flag Zombie")
+	}
+
+	// 获取旗杆动画数据（用于轨道合并）
+	flagPoleReanimXML := rm.GetReanimXML("Zombie_FlagPole")
+	flagPolePartImages := rm.GetReanimPartImages("Zombie_FlagPole")
+
+	// 合并旗杆图片到主图片映射
+	if flagPolePartImages != nil {
+		for k, v := range flagPolePartImages {
+			partImages[k] = v
+		}
+	}
+
+	// 添加 ReanimComponent（旗帜僵尸：基础部件 + 旗帜手）
+	reanimComp := &components.ReanimComponent{
+		ReanimName:        "Zombie",
+		ReanimXML:         reanimXML,
+		PartImages:        partImages,
+		LastGroundX:       0.0,
+		LastGroundY:       0.0,
+		LastAnimFrame:     -1,
+		AccumulatedDeltaX: 0.0,
+		AccumulatedDeltaY: 0.0,
+	}
+
+	// 如果旗杆动画数据可用，合并轨道
+	if flagPoleReanimXML != nil {
+		// 将旗杆动画的轨道合并到主动画（稍后由 ReanimSystem 处理）
+		// 存储在自定义字段或通过配置传递
+		reanimComp.OverlayReanimXML = flagPoleReanimXML
+	}
+
+	ecs.AddComponent(em, entityID, reanimComp)
+
+	// 使用 AnimationCommand 触发动画
+	// 使用 zombie_flag 配置，会自动显示旗帜手并隐藏普通手掌
+	ecs.AddComponent(em, entityID, &components.AnimationCommandComponent{
+		UnitID:    types.UnitIDZombieFlag,
+		ComboName: "idle",
+		Processed: false,
+	})
+
+	// 添加速度组件（初始速度为0，待命状态）
+	ecs.AddComponent(em, entityID, &components.VelocityComponent{
+		VX: 0.0,
+		VY: 0.0,
+	})
+
+	// 添加行为组件（标识为旗帜僵尸，初始为 idle 状态）
+	ecs.AddComponent(em, entityID, &components.BehaviorComponent{
+		Type:            components.BehaviorZombieFlag,
+		ZombieAnimState: components.ZombieAnimIdle,
+	})
+
+	// 添加生命值组件（与普通僵尸相同）
+	ecs.AddComponent(em, entityID, &components.HealthComponent{
+		CurrentHealth: config.ZombieDefaultHealth,
+		MaxHealth:     config.ZombieDefaultHealth,
+	})
+
+	// 添加碰撞组件（用于检测子弹碰撞）
+	ecs.AddComponent(em, entityID, &components.CollisionComponent{
+		Width:  config.ZombieCollisionWidth,
+		Height: config.ZombieCollisionHeight,
+	})
+
+	// 为旗帜僵尸添加阴影组件
+	shadowSize := config.GetShadowSize("zombie")
+	ecs.AddComponent(em, entityID, &components.ShadowComponent{
+		Width:   shadowSize.Width,
+		Height:  shadowSize.Height,
+		Alpha:   config.DefaultShadowAlpha,
+		OffsetY: 0,
+	})
+
+	return entityID, nil
+}

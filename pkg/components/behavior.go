@@ -45,6 +45,9 @@ const (
 	// BehaviorZombieBuckethead 铁桶僵尸行为：带高强度护甲的僵尸(1100护甲值)
 	// 当护甲被完全破坏后，外观切换为普通僵尸，行为转变为 BehaviorZombieBasic
 	BehaviorZombieBuckethead
+	// BehaviorZombieFlag 旗帜僵尸行为：与普通僵尸行为相同，但外观不同
+	// 旗帜僵尸在旗帜波出现，标志着大量僵尸即将来袭
+	BehaviorZombieFlag
 	// BehaviorFallingPart 掉落部件效果：僵尸手臂或头部掉落的动画效果
 	// 部件以抛物线轨迹飞出，一段时间后消失
 	BehaviorFallingPart

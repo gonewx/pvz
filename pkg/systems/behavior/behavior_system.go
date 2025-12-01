@@ -156,6 +156,8 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 			s.handleConeheadZombieBehavior(entityID, deltaTime)
 		case components.BehaviorZombieBuckethead:
 			s.handleBucketheadZombieBehavior(entityID, deltaTime)
+		case components.BehaviorZombieFlag:
+			s.handleZombieFlagBehavior(entityID, deltaTime)
 		default:
 			// 未知僵尸类型，忽略
 		}
@@ -405,6 +407,7 @@ func (s *BehaviorSystem) isZombieBehaviorType(behaviorType components.BehaviorTy
 	case components.BehaviorZombieBasic,
 		components.BehaviorZombieConehead,
 		components.BehaviorZombieBuckethead,
+		components.BehaviorZombieFlag,
 		components.BehaviorZombieEating,
 		components.BehaviorZombieDying:
 		return true
