@@ -46,6 +46,9 @@ const (
 	DisplayModeSingle                    // 单个单元模式
 )
 
+// 轨道分页配置
+const tracksPerPage = 10 // 每页显示10个轨道（对应数字键1-9和0）
+
 // Game 主游戏结构
 type Game struct {
 	config *ShowcaseConfig
@@ -61,6 +64,9 @@ type Game struct {
 	currentPage    int                   // 当前页码（从0开始）
 	totalPages     int                   // 总页数
 	cellsPerPage   int                   // 每页单元数
+
+	// 轨道分页（单个模式下）
+	trackPage int // 当前轨道页码（从0开始）
 
 	// 字体
 	textFont *text.GoTextFace // 中文字体
@@ -280,6 +286,7 @@ func (g *Game) Update() error {
 			cell := g.layout.GetCell(selectedIndex)
 			if cell != nil {
 				cell.NextAnimation()
+				g.trackPage = 0 // 切换动画时重置轨道页码
 				if *verbose {
 					log.Printf("→ 切换动画: %s -> %s", cell.GetName(), cell.GetCurrentAnimationName())
 				}
@@ -293,6 +300,7 @@ func (g *Game) Update() error {
 			cell := g.layout.GetCell(selectedIndex)
 			if cell != nil {
 				cell.PrevAnimation()
+				g.trackPage = 0 // 切换动画时重置轨道页码
 				if *verbose {
 					log.Printf("← 切换动画: %s -> %s", cell.GetName(), cell.GetCurrentAnimationName())
 				}
@@ -300,7 +308,7 @@ func (g *Game) Update() error {
 		}
 	}
 
-	// 在单个模式下，处理轨道切换（F1-F12）
+	// 在单个模式下，处理轨道切换（数字键1-9/0 + 翻页键[/]）
 	if g.displayMode == DisplayModeSingle {
 		selectedIndex := g.layout.GetSelectedIndex()
 		if selectedIndex >= 0 {
@@ -519,20 +527,39 @@ func (g *Game) drawSingleCell(screen *ebiten.Image) {
 	g.drawTrackList(screen, cell)
 }
 
-// drawTrackList 绘制轨道列表及状态
+// drawTrackList 绘制轨道列表及状态（支持分页）
 func (g *Game) drawTrackList(screen *ebiten.Image, cell *AnimationCell) {
 	tracks := cell.GetVisualTracks()
 	if len(tracks) == 0 {
 		return
 	}
 
+	// 计算总页数
+	totalTrackPages := (len(tracks) + tracksPerPage - 1) / tracksPerPage
+
+	// 确保当前页在有效范围内
+	if g.trackPage >= totalTrackPages {
+		g.trackPage = totalTrackPages - 1
+	}
+	if g.trackPage < 0 {
+		g.trackPage = 0
+	}
+
+	// 计算当前页显示的轨道范围
+	startIdx := g.trackPage * tracksPerPage
+	endIdx := startIdx + tracksPerPage
+	if endIdx > len(tracks) {
+		endIdx = len(tracks)
+	}
+	currentPageTracks := tracks[startIdx:endIdx]
+
 	// 计算面板位置和大小
 	panelX := 10
 	panelY := 50
 	panelWidth := 300
 	lineHeight := 18
-	headerHeight := 20
-	panelHeight := headerHeight + len(tracks)*lineHeight + 10
+	headerHeight := 40 // 增加高度以容纳分页信息
+	panelHeight := headerHeight + len(currentPageTracks)*lineHeight + 10
 
 	// 绘制半透明背景
 	bgImage := ebiten.NewImage(panelWidth, panelHeight)
@@ -541,24 +568,29 @@ func (g *Game) drawTrackList(screen *ebiten.Image, cell *AnimationCell) {
 	opts.GeoM.Translate(float64(panelX), float64(panelY))
 	screen.DrawImage(bgImage, opts)
 
-	// 绘制标题
-	title := "轨道列表 (F1-F12 切换, R 重置):"
+	// 绘制标题（包含分页信息）
+	title := fmt.Sprintf("轨道列表 [%d/%d] (共%d个)", g.trackPage+1, totalTrackPages, len(tracks))
+	subtitle := "[/] 翻页, 1-9/0 切换, R 重置"
+
 	if g.textFont != nil {
 		g.textDrawOpts.GeoM.Reset()
 		g.textDrawOpts.GeoM.Translate(float64(panelX+10), float64(panelY+10))
 		g.textDrawOpts.ColorScale.Reset()
 		g.textDrawOpts.ColorScale.ScaleWithColor(color.White)
 		text.Draw(screen, title, g.textFont, &g.textDrawOpts)
+
+		g.textDrawOpts.GeoM.Reset()
+		g.textDrawOpts.GeoM.Translate(float64(panelX+10), float64(panelY+26))
+		g.textDrawOpts.ColorScale.Reset()
+		g.textDrawOpts.ColorScale.ScaleWithColor(color.RGBA{180, 180, 180, 255})
+		text.Draw(screen, subtitle, g.textFont, &g.textDrawOpts)
 	} else {
 		ebitenutil.DebugPrintAt(screen, title, panelX+10, panelY+10)
+		ebitenutil.DebugPrintAt(screen, subtitle, panelX+10, panelY+26)
 	}
 
-	// 绘制轨道列表
-	for i, trackName := range tracks {
-		if i >= 12 { // 最多显示 12 个（F1-F12）
-			break
-		}
-
+	// 绘制当前页的轨道列表
+	for i, trackName := range currentPageTracks {
 		y := panelY + headerHeight + i*lineHeight
 
 		// 确定状态文本和颜色
@@ -570,32 +602,33 @@ func (g *Game) drawTrackList(screen *ebiten.Image, cell *AnimationCell) {
 			statusColor = color.RGBA{255, 0, 0, 255} // 红色
 		}
 
-		// 绘制 F 键标签
-		fKeyLabel := fmt.Sprintf("F%-2d", i+1)
-		line := fmt.Sprintf("%s %s %s", fKeyLabel, status, trackName)
+		// 数字键标签：1-9 对应索引 0-8，0 对应索引 9
+		keyLabel := fmt.Sprintf("%-2d", (i+1)%10)
 
 		if g.textFont != nil {
 			g.textDrawOpts.GeoM.Reset()
 			g.textDrawOpts.GeoM.Translate(float64(panelX+10), float64(y))
 			g.textDrawOpts.ColorScale.Reset()
+			g.textDrawOpts.ColorScale.ScaleWithColor(color.RGBA{255, 255, 0, 255}) // 黄色数字键
 
-			// F 键标签用白色
-			text.Draw(screen, fKeyLabel, g.textFont, &g.textDrawOpts)
+			// 数字键标签
+			text.Draw(screen, keyLabel, g.textFont, &g.textDrawOpts)
 
 			// 状态符号用对应颜色
 			g.textDrawOpts.GeoM.Reset()
-			g.textDrawOpts.GeoM.Translate(float64(panelX+50), float64(y))
+			g.textDrawOpts.GeoM.Translate(float64(panelX+35), float64(y))
 			g.textDrawOpts.ColorScale.Reset()
 			g.textDrawOpts.ColorScale.ScaleWithColor(statusColor)
 			text.Draw(screen, status, g.textFont, &g.textDrawOpts)
 
 			// 轨道名称用白色
 			g.textDrawOpts.GeoM.Reset()
-			g.textDrawOpts.GeoM.Translate(float64(panelX+70), float64(y))
+			g.textDrawOpts.GeoM.Translate(float64(panelX+55), float64(y))
 			g.textDrawOpts.ColorScale.Reset()
 			g.textDrawOpts.ColorScale.ScaleWithColor(color.White)
 			text.Draw(screen, trackName, g.textFont, &g.textDrawOpts)
 		} else {
+			line := fmt.Sprintf("%s %s %s", keyLabel, status, trackName)
 			ebitenutil.DebugPrintAt(screen, line, panelX+10, y)
 		}
 	}
@@ -624,7 +657,8 @@ func (g *Game) drawHelp(screen *ebiten.Image) {
 		helpLines = []string{
 			"操作说明 (单个模式):",
 			"  →/← 方向键  - 切换动画",
-			"  F1-F12     - 切换轨道显示/隐藏",
+			"  1-9, 0     - 切换当前页轨道显示/隐藏",
+			"  [ / ]      - 轨道列表上/下翻页",
 			"  R          - 重置所有轨道可见性",
 			"  Enter       - 返回网格模式",
 			"  H          - 显示/隐藏帮助",
@@ -686,21 +720,49 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 	return g.config.Global.Window.Width, g.config.Global.Window.Height
 }
 
-// handleTrackToggle 处理轨道切换快捷键（F1-F12）
+// handleTrackToggle 处理轨道切换快捷键（数字键 1-9/0 + 翻页键 [/]）
 func (g *Game) handleTrackToggle(cell *AnimationCell) {
-	// F 键映射到 ebiten.KeyF1 到 ebiten.KeyF12
-	fKeys := []ebiten.Key{
-		ebiten.KeyF1, ebiten.KeyF2, ebiten.KeyF3, ebiten.KeyF4,
-		ebiten.KeyF5, ebiten.KeyF6, ebiten.KeyF7, ebiten.KeyF8,
-		ebiten.KeyF9, ebiten.KeyF10, ebiten.KeyF11, ebiten.KeyF12,
+	tracks := cell.GetVisualTracks()
+	if len(tracks) == 0 {
+		return
 	}
 
-	tracks := cell.GetVisualTracks()
+	// 计算总页数
+	totalTrackPages := (len(tracks) + tracksPerPage - 1) / tracksPerPage
 
-	for i, key := range fKeys {
+	// [ 键：上一页轨道
+	if inpututil.IsKeyJustPressed(ebiten.KeyLeftBracket) {
+		if g.trackPage > 0 {
+			g.trackPage--
+			if *verbose {
+				log.Printf("轨道翻页: 第 %d/%d 页", g.trackPage+1, totalTrackPages)
+			}
+		}
+	}
+
+	// ] 键：下一页轨道
+	if inpututil.IsKeyJustPressed(ebiten.KeyRightBracket) {
+		if g.trackPage < totalTrackPages-1 {
+			g.trackPage++
+			if *verbose {
+				log.Printf("轨道翻页: 第 %d/%d 页", g.trackPage+1, totalTrackPages)
+			}
+		}
+	}
+
+	// 数字键 1-9 和 0 切换当前页的轨道
+	// 1-9 对应索引 0-8，0 对应索引 9
+	numKeys := []ebiten.Key{
+		ebiten.Key1, ebiten.Key2, ebiten.Key3, ebiten.Key4, ebiten.Key5,
+		ebiten.Key6, ebiten.Key7, ebiten.Key8, ebiten.Key9, ebiten.Key0,
+	}
+
+	for i, key := range numKeys {
 		if inpututil.IsKeyJustPressed(key) {
-			if i < len(tracks) {
-				trackName := tracks[i]
+			// 计算实际轨道索引
+			trackIndex := g.trackPage*tracksPerPage + i
+			if trackIndex < len(tracks) {
+				trackName := tracks[trackIndex]
 				cell.ToggleTrackVisibility(trackName)
 				if *verbose {
 					visible := cell.IsTrackVisible(trackName)
