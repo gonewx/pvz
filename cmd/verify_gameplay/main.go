@@ -324,7 +324,8 @@ func (vg *VerifyGameplayGame) spawnZombie(row int) {
 	}
 
 	zombieType := zombieTypesByRow[row]
-	spawnX := config.ZombieSpawnMinX + 50.0
+	// 僵尸出生在屏幕可视范围最右端（世界坐标 = 相机X + 屏幕宽度 - 边距）
+	spawnX := config.GameCameraX + float64(screenWidth) - 30.0
 
 	var zombieID ecs.EntityID
 	var err error
