@@ -528,14 +528,6 @@ func (s *RenderSystem) renderSpriteEntity(screen *ebiten.Image, id ecs.EntityID,
 	screen.DrawImage(sprite.Image, op)
 }
 
-// getFloat 辅助函数：安全获取 float 指针的值
-func getFloat(p *float64) float64 {
-	if p == nil {
-		return 0.0
-	}
-	return *p
-}
-
 // findPhysicalFrameIndex 将逻辑帧号映射到物理帧索引
 // 逻辑帧是可见帧的序号（0, 1, 2, ...），物理帧是 AnimVisibles 数组中的索引
 //

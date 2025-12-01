@@ -6,7 +6,45 @@ import (
 
 	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/types"
 )
+
+// ==================================================================
+// 错误辅助函数 (Error Helper Functions)
+// ==================================================================
+
+func errEntityNoReanimComponent(entityID ecs.EntityID) error {
+	return fmt.Errorf("entity %d does not have ReanimComponent", entityID)
+}
+
+func errNoPlantConfig(plantType types.PlantType) error {
+	return fmt.Errorf("no config found for plant type %d", plantType)
+}
+
+func errPlayDefaultAnimation(err error) error {
+	return fmt.Errorf("failed to play default animation: %w", err)
+}
+
+func errMissingComponentsForRendering(entityID ecs.EntityID) error {
+	return fmt.Errorf("entity %d missing required components for rendering", entityID)
+}
+
+func errNoRenderData(entityID ecs.EntityID) error {
+	return fmt.Errorf("entity %d has no render data", entityID)
+}
+
+// ==================================================================
+// 通用辅助函数 (General Helper Functions)
+// ==================================================================
+
+// getFloat 安全地获取浮点值指针的值
+func getFloat(p *float64) float64 {
+	if p == nil {
+		return 0
+	}
+	return *p
+}
 
 // ==================================================================
 // ReanimSystem 辅助方法 (Helper Methods)
