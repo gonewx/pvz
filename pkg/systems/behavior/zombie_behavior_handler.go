@@ -487,22 +487,6 @@ func (s *BehaviorSystem) stopEatingAndResume(zombieID ecs.EntityID) {
 		VY: 0,
 	})
 
-	// 待迁移到 ReanimComponent
-	// 4. 加载僵尸走路动画帧序列
-	// walkFrames := utils.LoadZombieWalkAnimation(s.resourceManager)
-
-	// 待迁移到 ReanimComponent
-	// 5. 替换 AnimationComponent 为走路动画
-	// animComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.AnimationComponent{}))
-	// if ok {
-	// 	anim := animComp.(*components.AnimationComponent)
-	// 	anim.Frames = walkFrames
-	// 	anim.FrameSpeed = config.ZombieWalkFrameSpeed
-	// 	anim.CurrentFrame = 0
-	// 	anim.FrameCounter = 0
-	// 	anim.IsLooping = true
-	// 	anim.IsFinished = false
-	// }
 }
 
 // handleZombieEatingBehavior 处理僵尸啃食植物的行为
