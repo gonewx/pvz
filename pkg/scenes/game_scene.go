@@ -2,6 +2,7 @@ package scenes
 
 import (
 	"fmt"
+	"image"
 	"log"
 
 	"github.com/decker502/pvz/pkg/components"
@@ -12,6 +13,7 @@ import (
 	"github.com/decker502/pvz/pkg/systems"
 	"github.com/decker502/pvz/pkg/systems/behavior"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
@@ -165,6 +167,10 @@ type GameScene struct {
 	battleSaveInfo        *game.BattleSaveInfo // 战斗存档信息
 	battleSaveDialogShown bool                 // 对话框是否已显示
 	battleSaveDialogID    ecs.EntityID         // 对话框实体ID
+
+	// Story 19.2: 铲子交互系统
+	shovelSelected           bool                           // 铲子是否被选中
+	shovelInteractionSystem  *systems.ShovelInteractionSystem // 铲子交互系统
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -515,6 +521,11 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	// Story 11.2: 初始化关卡进度条系统
 	scene.initProgressBar(rm)
 
+	// Story 19.2: 初始化铲子交互系统
+	scene.shovelInteractionSystem = systems.NewShovelInteractionSystem(scene.entityManager, scene.gameState, rm)
+	systems.SetShovelStateProvider(scene)
+	log.Printf("[GameScene] Initialized shovel interaction system")
+
 	return scene
 }
 
@@ -854,6 +865,14 @@ func (s *GameScene) Update(deltaTime float64) {
 		s.plantSelectionModule.Update(deltaTime) // 1. Update plant card states (before input)
 	}
 
+	// Story 19.2: 铲子槽位点击检测（在输入系统之前，优先处理铲子模式切换）
+	s.updateShovelSlotClick()
+
+	// Story 19.2: 如果处于铲子模式，更新铲子交互系统
+	if s.shovelInteractionSystem != nil && s.shovelSelected {
+		s.shovelInteractionSystem.Update(deltaTime, s.cameraX)
+	}
+
 	s.inputSystem.Update(deltaTime, s.cameraX) // 2. Process player input (highest priority, 传递摄像机位置)
 
 	// 3. Generate new suns
@@ -991,6 +1010,12 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	// 拖拽预览在所有内容上方
 	s.plantPreviewRenderSystem.Draw(screen, s.cameraX)
 
+	// Layer 7.5: Draw shovel interaction (Story 19.2)
+	// 铲子光标和植物高亮效果
+	if s.shovelInteractionSystem != nil && s.shovelSelected {
+		s.shovelInteractionSystem.Draw(screen, s.cameraX)
+	}
+
 	// Layer 8: Draw suns (阳光) - 最顶层
 	// 阳光在最顶层以确保始终可点击
 	s.renderSystem.DrawSuns(screen, s.cameraX)
@@ -1099,4 +1124,88 @@ func (s *GameScene) SaveOnExit() bool {
 	log.Printf("[GameScene] SaveOnExit: 游戏关闭时自动保存战斗存档")
 	s.saveBattleState()
 	return true
+}
+
+// ============================================================================
+// Story 19.2: ShovelStateProvider 接口实现
+// ============================================================================
+
+// IsShovelSelected 返回铲子是否被选中
+// 实现 systems.ShovelStateProvider 接口
+func (s *GameScene) IsShovelSelected() bool {
+	return s.shovelSelected
+}
+
+// SetShovelSelected 设置铲子选中状态
+// 实现 systems.ShovelStateProvider 接口
+func (s *GameScene) SetShovelSelected(selected bool) {
+	s.shovelSelected = selected
+	// 如果取消铲子模式，同时取消种植模式（避免状态冲突）
+	if !selected && s.gameState.IsPlantingMode {
+		// 不需要操作，铲子模式和种植模式互斥
+	}
+	// 如果选中铲子，取消种植模式
+	if selected && s.gameState.IsPlantingMode {
+		s.gameState.ExitPlantingMode()
+		log.Printf("[GameScene] 铲子模式激活，取消种植模式")
+	}
+}
+
+// GetShovelSlotBounds 获取铲子槽位边界（屏幕坐标）
+// 实现 systems.ShovelStateProvider 接口
+func (s *GameScene) GetShovelSlotBounds() image.Rectangle {
+	// 计算铲子 X 位置：紧挨选择栏右侧
+	shovelX := config.ShovelX // 默认值
+	if s.seedBank != nil {
+		seedBankWidth := s.seedBank.Bounds().Dx()
+		shovelX = config.SeedBankX + seedBankWidth + config.ShovelGapFromSeedBank
+	}
+
+	// 铲子 Y 位置：与选择栏上对齐
+	shovelY := config.SeedBankY
+
+	return image.Rect(
+		shovelX,
+		shovelY,
+		shovelX+config.ShovelWidth,
+		shovelY+config.ShovelHeight,
+	)
+}
+
+// updateShovelSlotClick 检测铲子槽位点击
+// Story 19.2: 点击铲子槽位切换铲子模式
+func (s *GameScene) updateShovelSlotClick() {
+	// 检查铲子是否可用（教学关卡不显示、未解锁时不显示）
+	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.OpeningType == "tutorial" {
+		return
+	}
+	if !s.gameState.IsToolUnlocked("shovel") {
+		return
+	}
+
+	// 检测左键点击
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+		mouseX, mouseY := ebiten.CursorPosition()
+		bounds := s.GetShovelSlotBounds()
+
+		// 检查是否点击了铲子槽位
+		if mouseX >= bounds.Min.X && mouseX <= bounds.Max.X &&
+			mouseY >= bounds.Min.Y && mouseY <= bounds.Max.Y {
+			// 切换铲子选中状态
+			s.SetShovelSelected(!s.shovelSelected)
+			if s.shovelSelected {
+				log.Printf("[GameScene] 铲子模式激活")
+			} else {
+				log.Printf("[GameScene] 铲子模式取消")
+			}
+		}
+	}
+
+	// 检测右键取消铲子模式
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight) {
+		if s.shovelSelected {
+			s.SetShovelSelected(false)
+			log.Printf("[GameScene] 右键取消铲子模式")
+		}
+	}
 }

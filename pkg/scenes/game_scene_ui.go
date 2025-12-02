@@ -159,6 +159,28 @@ func (s *GameScene) drawShovel(screen *ebiten.Image) {
 			config.ShovelWidth, config.ShovelHeight,
 			color.RGBA{R: 128, G: 128, B: 128, A: 255}) // Gray
 	}
+
+	// Story 19.2: 铲子选中状态高亮效果
+	if s.shovelSelected {
+		// 绘制半透明黄色叠加层
+		highlightColor := color.RGBA{R: 255, G: 255, B: 0, A: 80} // 半透明黄色
+		ebitenutil.DrawRect(screen,
+			shovelX, shovelY,
+			float64(config.ShovelWidth), float64(config.ShovelHeight),
+			highlightColor)
+
+		// 绘制金色边框
+		borderColor := color.RGBA{R: 255, G: 215, B: 0, A: 200} // 金色
+		borderWidth := 2.0
+		// 上边框
+		ebitenutil.DrawRect(screen, shovelX, shovelY, float64(config.ShovelWidth), borderWidth, borderColor)
+		// 下边框
+		ebitenutil.DrawRect(screen, shovelX, shovelY+float64(config.ShovelHeight)-borderWidth, float64(config.ShovelWidth), borderWidth, borderColor)
+		// 左边框
+		ebitenutil.DrawRect(screen, shovelX, shovelY, borderWidth, float64(config.ShovelHeight), borderColor)
+		// 右边框
+		ebitenutil.DrawRect(screen, shovelX+float64(config.ShovelWidth)-borderWidth, shovelY, borderWidth, float64(config.ShovelHeight), borderColor)
+	}
 }
 
 // drawProgressBar 渲染右下角的进度条（使用原版资源）
