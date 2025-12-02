@@ -481,4 +481,27 @@ const (
 	// ConveyorBeltRowCount 传送带纹理行数
 	// ConveyorBelt.png 有 6 行交错纹理
 	ConveyorBeltRowCount = 6
+
+	// ========== 保龄球坚果配置参数（Story 19.6）（可手工调节） ==========
+
+	// BowlingNutSpeed 保龄球坚果滚动速度（像素/秒）
+	// 坚果向右滚动的恒定速度
+	// 建议值范围：200.0 - 300.0
+	BowlingNutSpeed = 250.0
+
+	// BowlingNutCollisionWidth 保龄球坚果碰撞盒宽度（像素）
+	// 用于 Story 19.7 碰撞检测
+	BowlingNutCollisionWidth = 60.0
+
+	// BowlingNutCollisionHeight 保龄球坚果碰撞盒高度（像素）
+	// 用于 Story 19.7 碰撞检测
+	BowlingNutCollisionHeight = 60.0
+
+	// ConveyorCardSelectedOverlayAlpha 选中卡片遮罩透明度（0-255）
+	// 选中状态的传送带卡片添加的半透明灰色遮罩
+	ConveyorCardSelectedOverlayAlpha = 128
+
+	// BowlingNutPreviewAlpha 草坪预览透明度（0-255）
+	// 悬停在草坪网格时显示的半透明坚果预览
+	BowlingNutPreviewAlpha = 150
 )

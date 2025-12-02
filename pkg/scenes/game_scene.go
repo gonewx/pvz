@@ -187,6 +187,9 @@ type GameScene struct {
 
 	// Story 19.5: 传送带系统
 	conveyorBeltSystem *systems.ConveyorBeltSystem // 传送带系统（卡片生成与管理）
+
+	// Story 19.6: 保龄球坚果滚动系统
+	bowlingNutSystem *systems.BowlingNutSystem // 保龄球坚果滚动系统
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -555,6 +558,10 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	// Story 19.5: 初始化传送带系统
 	scene.conveyorBeltSystem = systems.NewConveyorBeltSystem(scene.entityManager, scene.gameState, rm)
 	log.Printf("[GameScene] Initialized conveyor belt system")
+
+	// Story 19.6: 初始化保龄球坚果滚动系统
+	scene.bowlingNutSystem = systems.NewBowlingNutSystem(scene.entityManager, rm)
+	log.Printf("[GameScene] Initialized bowling nut system")
 
 	// Story 19.5: 根据关卡配置初始化传送带参数
 	if scene.gameState.CurrentLevel != nil && scene.gameState.CurrentLevel.ConveyorBelt != nil {
@@ -1003,6 +1010,10 @@ func (s *GameScene) Update(deltaTime float64) {
 	// Story 19.5: Conveyor belt system (card generation)
 	if s.conveyorBeltSystem != nil {
 		s.conveyorBeltSystem.Update(deltaTime) // 9.8. Update conveyor belt
+	}
+	// Story 19.6: Bowling nut system (rolling movement)
+	if s.bowlingNutSystem != nil {
+		s.bowlingNutSystem.Update(deltaTime) // 9.9. Update bowling nut rolling
 	}
 	// Story 3.2: 植物预览系统 - 更新预览位置（双图像支持）
 	s.plantPreviewSystem.Update(deltaTime) // 10. Update plant preview position (dual-image support)

@@ -298,4 +298,8 @@ const (
 
 	// CherryBombExplodeSoundPath 樱桃炸弹爆炸音效路径
 	CherryBombExplodeSoundPath = "assets/audio/Sound/cherrybomb.ogg"
+
+	// BowlingRollSoundPath 保龄球坚果滚动音效路径
+	// Story 19.6: 坚果滚动时循环播放
+	BowlingRollSoundPath = "assets/sounds/bowling.ogg"
 )

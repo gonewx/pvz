@@ -3,11 +3,13 @@ package scenes
 import (
 	"image"
 	"image/color"
+	"log"
 	"math"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/entities"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -213,6 +215,7 @@ func (s *GameScene) drawConveyorCards(screen *ebiten.Image, conveyorX, conveyorY
 }
 
 // drawConveyorCard 绘制单张卡片
+// Story 19.6: 增强选中卡片遮罩效果
 func (s *GameScene) drawConveyorCard(screen *ebiten.Image, cardType string, x, y, width, height float64, isSelected bool) {
 	// 卡片背景颜色（根据类型）
 	var bgColor color.RGBA
@@ -249,9 +252,6 @@ func (s *GameScene) drawConveyorCard(screen *ebiten.Image, cardType string, x, y
 	// 右
 	ebitenutil.DrawRect(screen, x+width-borderWidth, y, borderWidth, height, borderColor)
 
-	// TODO(Story 19.6): 绘制卡片图标（坚果/爆炸坚果图片）
-	// 当前使用颜色区分，后续添加真实图标
-
 	// 绘制卡片类型标识（临时文字）
 	// 使用简单的首字母标识
 	var label string
@@ -266,6 +266,17 @@ func (s *GameScene) drawConveyorCard(screen *ebiten.Image, cardType string, x, y
 	labelX := x + width/2 - 4
 	labelY := y + height/2 - 8
 	ebitenutil.DebugPrintAt(screen, label, int(labelX), int(labelY))
+
+	// Story 19.6: 选中状态添加半透明遮罩（禁用效果）
+	if isSelected {
+		overlayColor := color.RGBA{
+			R: 128,
+			G: 128,
+			B: 128,
+			A: uint8(config.ConveyorCardSelectedOverlayAlpha),
+		}
+		ebitenutil.DrawRect(screen, x, y, width, height, overlayColor)
+	}
 }
 
 // getConveyorBeltBounds 获取传送带边界（屏幕坐标）
@@ -364,10 +375,26 @@ func (s *GameScene) handleConveyorCardPlacement(worldX, worldY float64) bool {
 		return false
 	}
 
-	// TODO(Story 19.6): 创建保龄球坚果实体
-	// 当前使用日志占位
-	// log.Printf("[GameScene] Placed %s at row=%d, col=%d (worldX=%.1f, worldY=%.1f)",
-	// 	removedCardType, row+1, col+1, worldX, worldY)
+	// Story 19.6: 创建保龄球坚果实体
+	isExplosive := removedCardType == components.CardTypeExplodeONut
+
+	entityID, err := entities.NewBowlingNutEntity(
+		s.entityManager,
+		s.resourceManager,
+		row,
+		col,
+		isExplosive,
+	)
+
+	if err != nil {
+		log.Printf("[GameScene] 创建保龄球坚果失败: %v", err)
+		// 取消选中状态
+		s.conveyorBeltSystem.DeselectCard()
+		return false
+	}
+
+	log.Printf("[GameScene] 放置保龄球坚果: entityID=%d, type=%s, row=%d, col=%d (worldX=%.1f, worldY=%.1f)",
+		entityID, removedCardType, row+1, col+1, worldX, worldY)
 
 	// 取消选中状态
 	s.conveyorBeltSystem.DeselectCard()
@@ -429,6 +456,7 @@ func (s *GameScene) updateConveyorBeltClick() {
 
 // drawConveyorCardPreview 绘制选中卡片的拖拽预览
 // Story 19.5: 在鼠标位置显示选中的卡片
+// Story 19.6: 增强预览效果（鼠标光标预览 + 草坪网格预览）
 func (s *GameScene) drawConveyorCardPreview(screen *ebiten.Image) {
 	if !s.isConveyorCardSelected() {
 		return
@@ -442,15 +470,16 @@ func (s *GameScene) drawConveyorCardPreview(screen *ebiten.Image) {
 	// 获取鼠标位置
 	mouseX, mouseY := ebiten.CursorPosition()
 
-	// 绘制卡片预览（半透明）
+	// 检查放置位置是否有效
+	worldX := float64(mouseX) + s.cameraX
+	worldY := float64(mouseY)
+	isValid := s.conveyorBeltSystem.IsPlacementValid(worldX)
+
+	// 1. 绘制鼠标光标预览（半透明坚果图标）
 	previewWidth := config.ConveyorCardWidth * 1.5
 	previewHeight := config.ConveyorCardHeight * 1.5
 	previewX := float64(mouseX) - previewWidth/2
 	previewY := float64(mouseY) - previewHeight/2
-
-	// 检查放置位置是否有效
-	worldX := float64(mouseX) + s.cameraX
-	isValid := s.conveyorBeltSystem.IsPlacementValid(worldX)
 
 	// 绘制预览（有效为绿色边框，无效为红色边框）
 	var borderColor color.RGBA
@@ -479,4 +508,52 @@ func (s *GameScene) drawConveyorCardPreview(screen *ebiten.Image) {
 	ebitenutil.DrawRect(screen, previewX, previewY+previewHeight-borderWidth, previewWidth, borderWidth, borderColor)
 	ebitenutil.DrawRect(screen, previewX, previewY, borderWidth, previewHeight, borderColor)
 	ebitenutil.DrawRect(screen, previewX+previewWidth-borderWidth, previewY, borderWidth, previewHeight, borderColor)
+
+	// 2. 绘制草坪网格预览
+	// 计算鼠标悬停的网格位置
+	if worldY >= config.GridWorldStartY && worldY < config.GridWorldStartY+float64(config.GridRows)*config.CellHeight {
+		col := int((worldX - config.GridWorldStartX) / config.CellWidth)
+		row := int((worldY - config.GridWorldStartY) / config.CellHeight)
+
+		// 验证行列有效性
+		if row >= 0 && row < config.GridRows && col >= 0 && col < config.GridColumns {
+			// 计算网格屏幕坐标
+			gridWorldX := config.GridWorldStartX + float64(col)*config.CellWidth
+			gridWorldY := config.GridWorldStartY + float64(row)*config.CellHeight
+			gridScreenX := gridWorldX - s.cameraX
+			gridScreenY := gridWorldY
+
+			// 网格预览颜色
+			var gridPreviewColor color.RGBA
+			if isValid {
+				// 有效区域：绘制半透明坚果预览
+				switch cardType {
+				case components.CardTypeWallnutBowling:
+					gridPreviewColor = color.RGBA{R: 160, G: 120, B: 80, A: uint8(config.BowlingNutPreviewAlpha)}
+				case components.CardTypeExplodeONut:
+					gridPreviewColor = color.RGBA{R: 200, G: 80, B: 80, A: uint8(config.BowlingNutPreviewAlpha)}
+				default:
+					gridPreviewColor = color.RGBA{R: 128, G: 128, B: 128, A: uint8(config.BowlingNutPreviewAlpha)}
+				}
+			} else {
+				// 无效区域：红色边框提示
+				gridPreviewColor = color.RGBA{R: 255, G: 0, B: 0, A: 80}
+			}
+
+			// 绘制网格填充
+			ebitenutil.DrawRect(screen, gridScreenX, gridScreenY, config.CellWidth, config.CellHeight, gridPreviewColor)
+
+			// 绘制网格边框
+			gridBorderWidth := 2.0
+			gridBorderColor := borderColor
+			// 上
+			ebitenutil.DrawRect(screen, gridScreenX, gridScreenY, config.CellWidth, gridBorderWidth, gridBorderColor)
+			// 下
+			ebitenutil.DrawRect(screen, gridScreenX, gridScreenY+config.CellHeight-gridBorderWidth, config.CellWidth, gridBorderWidth, gridBorderColor)
+			// 左
+			ebitenutil.DrawRect(screen, gridScreenX, gridScreenY, gridBorderWidth, config.CellHeight, gridBorderColor)
+			// 右
+			ebitenutil.DrawRect(screen, gridScreenX+config.CellWidth-gridBorderWidth, gridScreenY, gridBorderWidth, config.CellHeight, gridBorderColor)
+		}
+	}
 }
