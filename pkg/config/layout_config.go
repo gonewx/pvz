@@ -518,4 +518,9 @@ const (
 	// BowlingNutCollisionCooldown 碰撞冷却时间（秒）
 	// 碰撞后短暂时间内不再检测碰撞，防止重复碰撞
 	BowlingNutCollisionCooldown = 0.1
+
+	// ExplosiveNutExplosionRadius 爆炸坚果爆炸范围半径（格子数）
+	// Story 19.8: 1.5 格子距离覆盖 3x3 范围内的所有僵尸
+	// 实际像素半径 = ExplosiveNutExplosionRadius * CellWidth = 1.5 * 80 = 120 像素
+	ExplosiveNutExplosionRadius = 1.5
 )

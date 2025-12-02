@@ -310,4 +310,16 @@ const (
 	// BowlingImpact2SoundPath 保龄球坚果碰撞撞击音效路径（变体）
 	// Story 19.7: 随机选择以增加变化
 	BowlingImpact2SoundPath = "assets/sounds/bowlingimpact2.ogg"
+
+	// ExplosiveNutDamage 爆炸坚果爆炸伤害值
+	// Story 19.8: 与樱桃炸弹相同（1800），足以秒杀所有僵尸
+	ExplosiveNutDamage = 1800
+
+	// ExplosiveNutExplosionSoundPath 爆炸坚果爆炸音效路径
+	// Story 19.8: 爆炸坚果爆炸时播放
+	ExplosiveNutExplosionSoundPath = "assets/sounds/explosion.ogg"
+
+	// ExplosiveNutParticleEffect 爆炸坚果粒子效果名称
+	// Story 19.8: 使用 Powie.xml 粒子配置（3个发射器）
+	ExplosiveNutParticleEffect = "Powie"
 )

@@ -114,6 +114,12 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		wallnutHitGlow = glowComp
 	}
 
+	// Story 19.8: 检查是否是爆炸坚果（需要红色调色）
+	isExplosiveNut := false
+	if nutComp, hasNut := ecs.GetComponent[*components.BowlingNutComponent](s.entityManager, id); hasNut && nutComp.IsExplosive {
+		isExplosiveNut = true
+	}
+
 	// 使用坐标转换工具库计算屏幕坐标
 	baseScreenX, baseScreenY, err := utils.GetRenderScreenOrigin(s.entityManager, id, pos, cameraX)
 	if err != nil {
@@ -345,6 +351,13 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		colorG := float32(1.0 + flashIntensity)
 		colorB := float32(1.0 + flashIntensity)
 		colorA := float32(1.0)
+
+		// Story 19.8: 爆炸坚果红色调色
+		// 应用 ColorM.Scale(1.0, 0.3, 0.3, 1.0) 效果
+		if isExplosiveNut {
+			colorG *= 0.3
+			colorB *= 0.3
+		}
 
 		// 应用透明度（Alpha）值
 		if frame.Alpha != nil {

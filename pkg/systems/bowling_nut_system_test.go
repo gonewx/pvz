@@ -695,3 +695,332 @@ func TestBowlingNutSystem_CalculateRowCenterY(t *testing.T) {
 	}
 }
 
+// ========== Story 19.8 Tests: 爆炸坚果机制 ==========
+
+// TestBowlingNutSystem_ExplosiveNut_AreaDamage 测试爆炸坚果 3x3 范围伤害
+func TestBowlingNutSystem_ExplosiveNut_AreaDamage(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	// 创建爆炸坚果实体（行 2，X=500）
+	row := 2
+	nutY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2 // 328.0
+	nutID := em.CreateEntity()
+	em.AddComponent(nutID, &components.PositionComponent{X: 500.0, Y: nutY})
+	em.AddComponent(nutID, &components.BowlingNutComponent{
+		VelocityX:   250.0,
+		Row:         row,
+		IsRolling:   true,
+		IsExplosive: true,
+	})
+
+	// 创建目标僵尸（同行，触发碰撞）
+	targetY := nutY
+	targetID := em.CreateEntity()
+	em.AddComponent(targetID, &components.PositionComponent{X: 510.0, Y: targetY})
+	em.AddComponent(targetID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	em.AddComponent(targetID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
+	em.AddComponent(targetID, &components.CollisionComponent{Width: 40, Height: 115})
+
+	// 创建相邻行僵尸（行 1，范围内）
+	row1Y := config.GridWorldStartY + float64(1)*config.CellHeight + config.CellHeight/2 // 228.0
+	adjacentID := em.CreateEntity()
+	em.AddComponent(adjacentID, &components.PositionComponent{X: 520.0, Y: row1Y})
+	em.AddComponent(adjacentID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	em.AddComponent(adjacentID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
+	em.AddComponent(adjacentID, &components.CollisionComponent{Width: 40, Height: 115})
+
+	// 创建远距离僵尸（同行但远离，范围外）
+	farID := em.CreateEntity()
+	em.AddComponent(farID, &components.PositionComponent{X: 800.0, Y: nutY}) // 距离 300 像素
+	em.AddComponent(farID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	em.AddComponent(farID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
+	em.AddComponent(farID, &components.CollisionComponent{Width: 40, Height: 115})
+
+	// 更新系统
+	system.Update(0.016)
+
+	// 验证范围内僵尸受伤
+	targetHealth, _ := ecs.GetComponent[*components.HealthComponent](em, targetID)
+	if targetHealth.CurrentHealth > 0 {
+		t.Errorf("Target zombie should be killed, got health %d", targetHealth.CurrentHealth)
+	}
+
+	adjacentHealth, _ := ecs.GetComponent[*components.HealthComponent](em, adjacentID)
+	if adjacentHealth.CurrentHealth > 0 {
+		t.Errorf("Adjacent zombie in range should be killed, got health %d", adjacentHealth.CurrentHealth)
+	}
+
+	// 验证范围外僵尸未受伤
+	farHealth, _ := ecs.GetComponent[*components.HealthComponent](em, farID)
+	if farHealth.CurrentHealth != 270 {
+		t.Errorf("Far zombie should not be damaged, got health %d, want 270", farHealth.CurrentHealth)
+	}
+}
+
+// TestBowlingNutSystem_ExplosiveNut_NoBounce 测试爆炸坚果不弹射
+func TestBowlingNutSystem_ExplosiveNut_NoBounce(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	// 创建爆炸坚果实体
+	row := 2
+	nutY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+	nutID := em.CreateEntity()
+	em.AddComponent(nutID, &components.PositionComponent{X: 500.0, Y: nutY})
+	nutComp := &components.BowlingNutComponent{
+		VelocityX:   250.0,
+		Row:         row,
+		IsRolling:   true,
+		IsExplosive: true,
+		BounceCount: 0,
+	}
+	em.AddComponent(nutID, nutComp)
+
+	// 创建僵尸触发碰撞
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY})
+	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270})
+	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+
+	// 更新系统
+	system.Update(0.016)
+
+	// 清理标记的实体
+	em.RemoveMarkedEntities()
+
+	// 验证坚果被销毁（实体不存在）
+	_, ok := ecs.GetComponent[*components.BowlingNutComponent](em, nutID)
+	if ok {
+		t.Error("Explosive nut should be destroyed after explosion")
+	}
+}
+
+// TestBowlingNutSystem_ExplosiveNut_Damage1800 测试爆炸坚果伤害值为 1800
+func TestBowlingNutSystem_ExplosiveNut_Damage1800(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	// 创建爆炸坚果实体
+	row := 2
+	nutY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+	nutID := em.CreateEntity()
+	em.AddComponent(nutID, &components.PositionComponent{X: 500.0, Y: nutY})
+	em.AddComponent(nutID, &components.BowlingNutComponent{
+		VelocityX:   250.0,
+		Row:         row,
+		IsRolling:   true,
+		IsExplosive: true,
+	})
+
+	// 创建铁桶僵尸（1100护甲 + 270身体 = 1370总HP）
+	// 1800 伤害应该秒杀
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY})
+	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBuckethead})
+	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
+	em.AddComponent(zombieID, &components.ArmorComponent{CurrentArmor: 1100, MaxArmor: 1100})
+	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+
+	// 更新系统
+	system.Update(0.016)
+
+	// 验证护甲被破坏
+	armor, _ := ecs.GetComponent[*components.ArmorComponent](em, zombieID)
+	if armor.CurrentArmor > 0 {
+		t.Errorf("Armor should be destroyed, got %d", armor.CurrentArmor)
+	}
+
+	// 验证铁桶僵尸被秒杀
+	// 1800 - 1100 = 700 溢出伤害，270 - 700 = -430
+	health, _ := ecs.GetComponent[*components.HealthComponent](em, zombieID)
+	if health.CurrentHealth > 0 {
+		t.Errorf("Buckethead zombie should be killed by 1800 damage, got health %d", health.CurrentHealth)
+	}
+}
+
+// TestBowlingNutSystem_ExplosiveNut_BounceCountNotIncreased 测试爆炸坚果碰撞后 BounceCount 不增加
+func TestBowlingNutSystem_ExplosiveNut_BounceCountNotIncreased(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	// 创建爆炸坚果实体
+	row := 2
+	nutY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+	nutID := em.CreateEntity()
+	em.AddComponent(nutID, &components.PositionComponent{X: 500.0, Y: nutY})
+	nutComp := &components.BowlingNutComponent{
+		VelocityX:   250.0,
+		Row:         row,
+		IsRolling:   true,
+		IsExplosive: true,
+		BounceCount: 0,
+	}
+	em.AddComponent(nutID, nutComp)
+
+	// 保存初始弹射次数
+	initialBounceCount := nutComp.BounceCount
+
+	// 创建僵尸触发碰撞
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY})
+	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270})
+	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+
+	// 更新系统
+	system.Update(0.016)
+
+	// 验证弹射次数未增加（爆炸坚果不弹射）
+	// 注意：由于坚果已被销毁，无法直接检查，但可以通过检查坚果是否被销毁来间接验证
+	em.RemoveMarkedEntities()
+	_, exists := ecs.GetComponent[*components.BowlingNutComponent](em, nutID)
+	if exists {
+		// 如果坚果还存在，检查弹射次数
+		if nutComp.BounceCount != initialBounceCount {
+			t.Errorf("Explosive nut BounceCount should not increase, got %d, want %d",
+				nutComp.BounceCount, initialBounceCount)
+		}
+	}
+	// 坚果已销毁是预期行为，测试通过
+}
+
+// TestBowlingNutSystem_ExplosiveNut_ArmorPriority 测试爆炸伤害护甲优先规则
+func TestBowlingNutSystem_ExplosiveNut_ArmorPriority(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	// 创建爆炸坚果实体
+	row := 2
+	nutY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+	nutID := em.CreateEntity()
+	em.AddComponent(nutID, &components.PositionComponent{X: 500.0, Y: nutY})
+	em.AddComponent(nutID, &components.BowlingNutComponent{
+		VelocityX:   250.0,
+		Row:         row,
+		IsRolling:   true,
+		IsExplosive: true,
+	})
+
+	// 创建路障僵尸（370护甲 + 270身体）
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY})
+	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieConehead})
+	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
+	em.AddComponent(zombieID, &components.ArmorComponent{CurrentArmor: 370, MaxArmor: 370})
+	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+
+	// 更新系统
+	system.Update(0.016)
+
+	// 验证护甲被完全破坏
+	armor, _ := ecs.GetComponent[*components.ArmorComponent](em, zombieID)
+	if armor.CurrentArmor != 0 {
+		t.Errorf("Armor should be 0, got %d", armor.CurrentArmor)
+	}
+
+	// 验证溢出伤害应用到身体
+	// 1800 - 370 = 1430 溢出伤害
+	// 270 - 1430 = -1160（秒杀）
+	health, _ := ecs.GetComponent[*components.HealthComponent](em, zombieID)
+	if health.CurrentHealth > 0 {
+		t.Errorf("Zombie should be killed by overflow damage, got health %d", health.CurrentHealth)
+	}
+}
+
+// TestBowlingNutSystem_ExplosiveNut_FlashEffect 测试爆炸伤害添加闪烁效果
+func TestBowlingNutSystem_ExplosiveNut_FlashEffect(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	// 创建爆炸坚果实体
+	row := 2
+	nutY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+	nutID := em.CreateEntity()
+	em.AddComponent(nutID, &components.PositionComponent{X: 500.0, Y: nutY})
+	em.AddComponent(nutID, &components.BowlingNutComponent{
+		VelocityX:   250.0,
+		Row:         row,
+		IsRolling:   true,
+		IsExplosive: true,
+	})
+
+	// 创建僵尸
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY})
+	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270})
+	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+
+	// 更新系统
+	system.Update(0.016)
+
+	// 验证僵尸添加了闪烁效果
+	flashComp, hasFlash := ecs.GetComponent[*components.FlashEffectComponent](em, zombieID)
+	if !hasFlash {
+		t.Error("FlashEffectComponent should be added after explosion")
+	}
+	if !flashComp.IsActive {
+		t.Error("FlashEffectComponent should be active")
+	}
+}
+
+// TestBowlingNutSystem_ExplosiveNut_MultipleZombiesInRange 测试爆炸范围内多个僵尸
+func TestBowlingNutSystem_ExplosiveNut_MultipleZombiesInRange(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	// 创建爆炸坚果实体
+	row := 2
+	nutY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+	nutID := em.CreateEntity()
+	em.AddComponent(nutID, &components.PositionComponent{X: 500.0, Y: nutY})
+	em.AddComponent(nutID, &components.BowlingNutComponent{
+		VelocityX:   250.0,
+		Row:         row,
+		IsRolling:   true,
+		IsExplosive: true,
+	})
+
+	// 创建多个范围内僵尸
+	zombieIDs := make([]ecs.EntityID, 3)
+
+	// 僵尸1：同行，近距离
+	zombieIDs[0] = em.CreateEntity()
+	em.AddComponent(zombieIDs[0], &components.PositionComponent{X: 510.0, Y: nutY})
+	em.AddComponent(zombieIDs[0], &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	em.AddComponent(zombieIDs[0], &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
+	em.AddComponent(zombieIDs[0], &components.CollisionComponent{Width: 40, Height: 115})
+
+	// 僵尸2：上行（行1）
+	row1Y := config.GridWorldStartY + float64(1)*config.CellHeight + config.CellHeight/2
+	zombieIDs[1] = em.CreateEntity()
+	em.AddComponent(zombieIDs[1], &components.PositionComponent{X: 500.0, Y: row1Y})
+	em.AddComponent(zombieIDs[1], &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	em.AddComponent(zombieIDs[1], &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
+	em.AddComponent(zombieIDs[1], &components.CollisionComponent{Width: 40, Height: 115})
+
+	// 僵尸3：下行（行3）
+	row3Y := config.GridWorldStartY + float64(3)*config.CellHeight + config.CellHeight/2
+	zombieIDs[2] = em.CreateEntity()
+	em.AddComponent(zombieIDs[2], &components.PositionComponent{X: 500.0, Y: row3Y})
+	em.AddComponent(zombieIDs[2], &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	em.AddComponent(zombieIDs[2], &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
+	em.AddComponent(zombieIDs[2], &components.CollisionComponent{Width: 40, Height: 115})
+
+	// 更新系统
+	system.Update(0.016)
+
+	// 验证所有范围内僵尸都受到伤害
+	for i, zombieID := range zombieIDs {
+		health, ok := ecs.GetComponent[*components.HealthComponent](em, zombieID)
+		if !ok {
+			t.Fatalf("Zombie %d HealthComponent not found", i)
+		}
+		if health.CurrentHealth > 0 {
+			t.Errorf("Zombie %d should be killed, got health %d", i, health.CurrentHealth)
+		}
+	}
+}
+

@@ -8,6 +8,7 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 )
@@ -113,15 +114,13 @@ func (s *BowlingNutSystem) Update(dt float64) {
 					s.applyDamageToZombie(zombieID)
 				}
 
-				// 处理碰撞后的行为
-				if nutComp.IsExplosive {
-					// 爆炸坚果：标记销毁，Story 19.8 处理爆炸逻辑
-					// 不播放撞击音效（爆炸音效由 Story 19.8 处理）
-					log.Printf("[BowlingNutSystem] 爆炸坚果碰撞，标记销毁: entityID=%d", entityID)
-					s.stopRollingSound(entityID)
-					s.entityManager.DestroyEntity(entityID)
-					continue
-				} else {
+			// 处理碰撞后的行为
+			if nutComp.IsExplosive {
+				// Story 19.8: 爆炸坚果触发 3x3 范围爆炸
+				log.Printf("[BowlingNutSystem] 爆炸坚果碰撞，触发爆炸: entityID=%d", entityID)
+				s.triggerExplosion(entityID, posComp)
+				continue
+			} else {
 					// 普通坚果：播放撞击音效，计算弹射方向，开始弹射
 					s.playImpactSound()
 					targetRow := s.calculateBounceDirection(nutComp.Row, posComp.X)
@@ -271,6 +270,152 @@ func (s *BowlingNutSystem) addFlashEffect(zombieID ecs.EntityID) {
 			IsActive:  true,
 		})
 	}
+}
+
+// triggerExplosion 触发爆炸坚果的 3x3 范围爆炸
+// Story 19.8: 爆炸坚果碰撞时调用
+//
+// 参数:
+//   - entityID: 爆炸坚果实体ID
+//   - posComp: 爆炸坚果位置组件
+//
+// 处理逻辑:
+//  1. 计算爆炸中心位置
+//  2. 查询范围内所有僵尸
+//  3. 对范围内僵尸造成 1800 伤害
+//  4. 播放爆炸粒子特效
+//  5. 播放爆炸音效
+//  6. 停止滚动音效并销毁坚果实体
+func (s *BowlingNutSystem) triggerExplosion(entityID ecs.EntityID, posComp *components.PositionComponent) {
+	// 计算爆炸范围半径（像素）
+	explosionRadius := config.ExplosiveNutExplosionRadius * config.CellWidth
+	explosionRadiusSq := explosionRadius * explosionRadius
+
+	log.Printf("[BowlingNutSystem] 爆炸坚果爆炸: entityID=%d, 位置=(%.1f, %.1f), 半径=%.1f像素",
+		entityID, posComp.X, posComp.Y, explosionRadius)
+
+	// 查询所有僵尸实体
+	zombieEntities := ecs.GetEntitiesWith2[
+		*components.BehaviorComponent,
+		*components.PositionComponent,
+	](s.entityManager)
+
+	damageCount := 0
+	for _, zombieID := range zombieEntities {
+		behavior, _ := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
+
+		// 检查是否是僵尸类型
+		if !s.isZombieType(behavior.Type) {
+			continue
+		}
+
+		zombiePos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
+
+		// 计算距离（使用距离平方优化性能）
+		dx := zombiePos.X - posComp.X
+		dy := zombiePos.Y - posComp.Y
+		distSq := dx*dx + dy*dy
+
+		// 检查是否在爆炸范围内
+		if distSq <= explosionRadiusSq {
+			s.applyExplosionDamageToZombie(zombieID)
+			damageCount++
+			log.Printf("[BowlingNutSystem] 僵尸在爆炸范围内: zombieID=%d, 距离=%.1f像素",
+				zombieID, math.Sqrt(distSq))
+		}
+	}
+
+	log.Printf("[BowlingNutSystem] 爆炸造成伤害: %d 个僵尸", damageCount)
+
+	// 播放爆炸粒子特效
+	s.playExplosionParticle(posComp.X, posComp.Y)
+
+	// 播放爆炸音效
+	s.playExplosionSound()
+
+	// 停止滚动音效
+	s.stopRollingSound(entityID)
+
+	// 销毁坚果实体
+	s.entityManager.DestroyEntity(entityID)
+}
+
+// applyExplosionDamageToZombie 对僵尸造成爆炸伤害
+// Story 19.8: 爆炸伤害 1800，与樱桃炸弹相同
+//
+// 参数:
+//   - zombieID: 僵尸实体ID
+//
+// 处理逻辑：
+// - 有护甲：优先扣除护甲，溢出伤害扣身体
+// - 无护甲：直接扣除身体生命值
+// - 添加闪烁效果
+func (s *BowlingNutSystem) applyExplosionDamageToZombie(zombieID ecs.EntityID) {
+	damage := config.ExplosiveNutDamage
+
+	// 检查是否有护甲
+	armor, hasArmor := ecs.GetComponent[*components.ArmorComponent](s.entityManager, zombieID)
+	health, hasHealth := ecs.GetComponent[*components.HealthComponent](s.entityManager, zombieID)
+
+	if hasArmor && armor.CurrentArmor > 0 {
+		// 有护甲且护甲未破坏
+		overflowDamage := damage - armor.CurrentArmor
+		armor.CurrentArmor = 0 // 护甲完全破坏
+
+		// 溢出伤害扣除身体生命值
+		if overflowDamage > 0 && hasHealth {
+			health.CurrentHealth -= overflowDamage
+		}
+		log.Printf("[BowlingNutSystem] 爆炸伤害破坏护甲: zombieID=%d, 溢出伤害=%d", zombieID, overflowDamage)
+	} else if hasHealth {
+		// 没有护甲或护甲已破坏，直接扣除身体生命值
+		health.CurrentHealth -= damage
+		log.Printf("[BowlingNutSystem] 爆炸伤害: zombieID=%d, 伤害=%d, 剩余血量=%d",
+			zombieID, damage, health.CurrentHealth)
+	}
+
+	// 添加闪烁效果
+	s.addFlashEffect(zombieID)
+}
+
+// playExplosionParticle 播放爆炸粒子特效
+// Story 19.8: 使用 Powie.xml 粒子配置
+//
+// 参数:
+//   - x, y: 爆炸位置（世界坐标）
+func (s *BowlingNutSystem) playExplosionParticle(x, y float64) {
+	if s.resourceManager == nil {
+		return
+	}
+
+	_, err := entities.CreateParticleEffect(
+		s.entityManager,
+		s.resourceManager,
+		config.ExplosiveNutParticleEffect, // "Powie"
+		x, y,
+	)
+	if err != nil {
+		log.Printf("[BowlingNutSystem] 创建爆炸粒子特效失败: %v", err)
+	} else {
+		log.Printf("[BowlingNutSystem] 爆炸粒子特效创建成功: 位置=(%.1f, %.1f)", x, y)
+	}
+}
+
+// playExplosionSound 播放爆炸音效
+// Story 19.8: 使用 explosion.ogg 音效
+func (s *BowlingNutSystem) playExplosionSound() {
+	if s.resourceManager == nil {
+		return
+	}
+
+	player, err := s.resourceManager.LoadSoundEffect(config.ExplosiveNutExplosionSoundPath)
+	if err != nil {
+		log.Printf("[BowlingNutSystem] 加载爆炸音效失败: %v", err)
+		return
+	}
+	player.Rewind()
+	player.Play()
+	log.Printf("[BowlingNutSystem] 爆炸音效播放")
 }
 
 // findNearestZombieDistance 查找指定行最近僵尸的 X 轴距离
