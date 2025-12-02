@@ -456,7 +456,15 @@ func (s *BehaviorSystem) isPlantBeingEaten(row, col int) bool {
 			continue
 		}
 
-		zombieCol := int((pos.X - config.GridWorldStartX) / config.CellWidth)
+		// 获取碰撞组件，用于计算碰撞盒中心
+		collision, hasCollisionComp := ecs.GetComponent[*components.CollisionComponent](s.entityManager, zombieID)
+		collisionOffsetX := 0.0
+		if hasCollisionComp {
+			collisionOffsetX = collision.OffsetX
+		}
+
+		// 计算僵尸碰撞盒中心所在格子
+		zombieCol := int((pos.X + collisionOffsetX - config.GridWorldStartX) / config.CellWidth)
 		zombieRow := int((pos.Y - config.GridWorldStartY - config.ZombieVerticalOffset - config.CellHeight/2.0) / config.CellHeight)
 
 		if zombieRow == row && zombieCol == col {

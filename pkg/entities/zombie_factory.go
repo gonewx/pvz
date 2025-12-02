@@ -461,9 +461,11 @@ func NewFlagZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spaw
 	})
 
 	// 添加碰撞组件（用于检测子弹碰撞）
+	// 旗帜僵尸使用偏移量，使碰撞盒只检测身体部分而非旗子手
 	ecs.AddComponent(em, entityID, &components.CollisionComponent{
-		Width:  config.ZombieCollisionWidth,
-		Height: config.ZombieCollisionHeight,
+		Width:   config.ZombieCollisionWidth,
+		Height:  config.ZombieCollisionHeight,
+		OffsetX: config.ZombieFlagCollisionOffsetX,
 	})
 
 	// 为旗帜僵尸添加阴影组件

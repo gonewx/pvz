@@ -43,10 +43,17 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 		return
 	}
 
+	// 获取碰撞组件，用于计算碰撞盒中心
+	collision, hasCollision := ecs.GetComponent[*components.CollisionComponent](s.entityManager, entityID)
+	collisionOffsetX := 0.0
+	if hasCollision {
+		collisionOffsetX = collision.OffsetX
+	}
+
 	// 检测植物碰撞（在移动之前）
-	// 计算僵尸所在格子
-	// 注意：需要减去 ZombieVerticalOffset，因为僵尸Y坐标包含了偏移
-	zombieCol := int((position.X - config.GridWorldStartX) / config.CellWidth)
+	// 计算僵尸碰撞盒中心所在格子
+	// 使用碰撞盒中心而非实体位置，确保旗帜僵尸等有偏移的僵尸正确检测
+	zombieCol := int((position.X + collisionOffsetX - config.GridWorldStartX) / config.CellWidth)
 	zombieRow := int((position.Y - config.GridWorldStartY - config.ZombieVerticalOffset - config.CellHeight/2.0) / config.CellHeight)
 
 	// 检测是否与植物在同一格子
@@ -621,9 +628,16 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 			return
 		}
 
-		// 计算僵尸所在格子
-		// 注意：需要减去 ZombieVerticalOffset，因为僵尸Y坐标包含了偏移
-		zombieCol := int((pos.X - config.GridWorldStartX) / config.CellWidth)
+		// 获取碰撞组件，用于计算碰撞盒中心
+		collision, hasCollisionComp := ecs.GetComponent[*components.CollisionComponent](s.entityManager, entityID)
+		collisionOffsetX := 0.0
+		if hasCollisionComp {
+			collisionOffsetX = collision.OffsetX
+		}
+
+		// 计算僵尸碰撞盒中心所在格子
+		// 使用碰撞盒中心而非实体位置，确保旗帜僵尸等有偏移的僵尸正确检测
+		zombieCol := int((pos.X + collisionOffsetX - config.GridWorldStartX) / config.CellWidth)
 		zombieRow := int((pos.Y - config.GridWorldStartY - config.ZombieVerticalOffset - config.CellHeight/2.0) / config.CellHeight)
 
 		// 检测植物

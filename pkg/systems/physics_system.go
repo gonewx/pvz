@@ -33,7 +33,7 @@ func NewPhysicsSystem(em *ecs.EntityManager, rm *game.ResourceManager) *PhysicsS
 }
 
 // checkAABBCollision 检查两个实体的AABB（轴对齐边界框）是否发生碰撞
-// 假设碰撞盒中心对齐实体位置
+// 碰撞盒中心 = 实体位置 + 碰撞组件偏移量
 //
 // 参数:
 //   - pos1: 第一个实体的位置组件
@@ -47,17 +47,25 @@ func (ps *PhysicsSystem) checkAABBCollision(
 	pos1 *components.PositionComponent, col1 *components.CollisionComponent,
 	pos2 *components.PositionComponent, col2 *components.CollisionComponent) bool {
 
-	// 计算第一个碰撞盒的边界（中心对齐）
-	left1 := pos1.X - col1.Width/2
-	right1 := pos1.X + col1.Width/2
-	top1 := pos1.Y - col1.Height/2
-	bottom1 := pos1.Y + col1.Height/2
+	// 计算第一个碰撞盒的中心（应用偏移量）
+	center1X := pos1.X + col1.OffsetX
+	center1Y := pos1.Y + col1.OffsetY
 
-	// 计算第二个碰撞盒的边界（中心对齐）
-	left2 := pos2.X - col2.Width/2
-	right2 := pos2.X + col2.Width/2
-	top2 := pos2.Y - col2.Height/2
-	bottom2 := pos2.Y + col2.Height/2
+	// 计算第一个碰撞盒的边界
+	left1 := center1X - col1.Width/2
+	right1 := center1X + col1.Width/2
+	top1 := center1Y - col1.Height/2
+	bottom1 := center1Y + col1.Height/2
+
+	// 计算第二个碰撞盒的中心（应用偏移量）
+	center2X := pos2.X + col2.OffsetX
+	center2Y := pos2.Y + col2.OffsetY
+
+	// 计算第二个碰撞盒的边界
+	left2 := center2X - col2.Width/2
+	right2 := center2X + col2.Width/2
+	top2 := center2Y - col2.Height/2
+	bottom2 := center2Y + col2.Height/2
 
 	// AABB碰撞检测：检查两个矩形是否重叠
 	// 如果任一轴上没有重叠，则没有碰撞

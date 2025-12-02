@@ -24,6 +24,11 @@ const (
 	// ZombieCollisionHeight 普通僵尸碰撞盒高度（像素）
 	ZombieCollisionHeight = 115.0
 
+	// ZombieFlagCollisionOffsetX 旗帜僵尸碰撞盒X偏移量（像素）
+	// 正值向右偏移，使碰撞盒只检测身体部分而非旗子手
+	// 旗子手向前伸出约40像素，偏移量设可使碰撞盒居中于身体
+	ZombieFlagCollisionOffsetX = 30.0
+
 	// ZombieDeletionBoundary 僵尸删除边界（世界坐标X）
 	// 僵尸移出此边界后将被删除
 	ZombieDeletionBoundary = -100.0
