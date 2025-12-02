@@ -373,4 +373,51 @@ const (
 
 	// OpeningUsernameShadowOffsetY 用户名文本阴影Y偏移（像素）
 	OpeningUsernameShadowOffsetY = 2.0
+
+	// ========== 疯狂戴夫对话系统配置参数（Story 19.1）（可手工调节） ==========
+
+	// DaveTargetX Dave 目标位置X坐标（屏幕坐标，像素）
+	// Dave 从屏幕左侧滑入后的停留位置
+	// 建议值范围：50.0 - 150.0
+	DaveTargetX = 80.0
+
+	// DaveTargetY Dave 目标位置Y坐标（屏幕坐标，像素）
+	// Dave 在屏幕下方，略高于底部
+	// 建议值范围：400.0 - 500.0
+	DaveTargetY = 420.0
+
+	// DaveEnterStartX Dave 入场动画起始X坐标（屏幕坐标，像素）
+	// 负值表示在屏幕左侧外
+	DaveEnterStartX = -200.0
+
+	// DaveEnterSpeed Dave 入场/离场动画移动速度（像素/秒）
+	// 建议值范围：200.0 - 400.0
+	DaveEnterSpeed = 300.0
+
+	// DaveBubbleOffsetX 对话气泡相对于 Dave 位置的X偏移（像素）
+	// 正值向右偏移
+	DaveBubbleOffsetX = 180.0
+
+	// DaveBubbleOffsetY 对话气泡相对于 Dave 位置的Y偏移（像素）
+	// 负值向上偏移（气泡在 Dave 头顶上方）
+	DaveBubbleOffsetY = -300.0
+
+	// DaveBubblePaddingX 对话气泡内部水平内边距（像素）
+	DaveBubblePaddingX = 20.0
+
+	// DaveBubblePaddingY 对话气泡内部垂直内边距（像素）
+	DaveBubblePaddingY = 15.0
+
+	// DaveDialogueFontSize 对话文本字体大小
+	DaveDialogueFontSize = 18.0
+
+	// DaveDialogueLineHeight 对话文本行高（像素）
+	DaveDialogueLineHeight = 24.0
+
+	// DaveDialogueMaxWidth 对话文本最大宽度（像素，用于自动换行）
+	// 应小于气泡宽度减去两侧内边距
+	DaveDialogueMaxWidth = 240.0
+
+	// DaveContinueTextOffsetY 「点击继续」文字距气泡底部的偏移（像素）
+	DaveContinueTextOffsetY = 10.0
 )
