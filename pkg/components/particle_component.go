@@ -36,6 +36,15 @@ type ParticleComponent struct {
 	Green float64 // Green channel multiplier
 	Blue  float64 // Blue channel multiplier
 
+	// Color keyframes (颜色关键帧动画)
+	// 支持颜色随时间变化，如 Powie 爆炸从橙色渐变到红色
+	RedKeyframes   []particle.Keyframe // Red channel keyframes
+	GreenKeyframes []particle.Keyframe // Green channel keyframes
+	BlueKeyframes  []particle.Keyframe // Blue channel keyframes
+	RedInterp      string              // Red interpolation mode
+	GreenInterp    string              // Green interpolation mode
+	BlueInterp     string              // Blue interpolation mode
+
 	// Brightness (亮度乘数)
 	Brightness float64 // Brightness multiplier applied to final color
 
@@ -62,9 +71,20 @@ type ParticleComponent struct {
 	FrameNum    int           // Current frame number (0-based index, used for sprite sheets)
 	Additive    bool          // Use additive blending when rendering
 
+	// Animation properties (Animated 字段支持)
+	Animated      bool    // 是否启用帧动画（当 Animated="1" 时为 true）
+	AnimationRate float64 // 动画帧率（帧/秒），0 表示使用默认值（基于生命周期自动计算）
+	FrameTime     float64 // 当前帧已播放时间（秒）
+
 	// Force fields (力场效果)
 	// Copied from emitter config at spawn time for performance
 	Fields []particle.Field // Force fields affecting this particle
+
+	// Circle 和 Away 力场的预解析参数（在生成时随机确定）
+	// Circle 力场：让粒子围绕发射点做圆周运动
+	CircleAngularVelocity float64 // Circle 力场的角速度（度/秒），负值为顺时针
+	// Away 力场：让粒子远离发射点移动
+	AwaySpeed float64 // Away 力场的径向速度（像素/秒）
 
 	// Collision properties (Story 7.5: ZombieHead 弹跳效果)
 	CollisionReflectX     float64             // X轴反弹系数（速度乘数）

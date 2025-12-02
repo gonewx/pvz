@@ -391,10 +391,15 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 	speed := particlePkg.RandomInRange(speedMin, speedMax)
 	angle := particlePkg.RandomInRange(angleMin, angleMax)
 
-	// Story 7.4 修复：如果 LaunchAngle 未定义且发射器类型是 Circle，使用随机 360° 角度
-	if angleMin == 0 && angleMax == 0 && config.LaunchAngle == "" && config.EmitterType == "Circle" {
-		angle = rand.Float64() * 360.0 // 0-360 度随机
-		log.Printf("[LaunchAngle] 检测到 Circle 类型，使用360°随机: %.1f°", angle)
+	// 修复：如果 LaunchAngle 未配置，对于以下情况使用 360° 随机角度：
+	// 1. EmitterType="Circle" - 圆形发射器
+	// 2. 有 EmitterRadius - 圆形发射区域（如 Powie 爆炸效果）
+	// 这样粒子会向四面八方散开，而不是全部向右（0°）
+	if angleMin == 0 && angleMax == 0 && config.LaunchAngle == "" {
+		if config.EmitterType == "Circle" || emitter.EmitterRadiusMax > 0 {
+			angle = rand.Float64() * 360.0 // 0-360 度随机
+			log.Printf("[LaunchAngle] 圆形发射区域，使用360°随机: %.1f°", angle)
+		}
 	}
 
 	// DEBUG: 输出最终使用的角度
@@ -480,6 +485,9 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 
 	// Color channels
 	var red, green, blue float64
+	var redKeyframes, greenKeyframes, blueKeyframes []particlePkg.Keyframe
+	var redInterp, greenInterp, blueInterp string
+
 	if emitter.ColorOverrideEnabled {
 		// 使用发射器的颜色覆盖值
 		red = emitter.ColorOverrideR
@@ -487,15 +495,43 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 		blue = emitter.ColorOverrideB
 		log.Printf("[ParticleSystem] 使用颜色覆盖: RGB=(%.2f, %.2f, %.2f)", red, green, blue)
 	} else {
-		// 从配置解析颜色
-		redMin, redMax, _, _ := particlePkg.ParseValue(config.ParticleRed)
-		greenMin, greenMax, _, _ := particlePkg.ParseValue(config.ParticleGreen)
-		blueMin, blueMax, _, _ := particlePkg.ParseValue(config.ParticleBlue)
-		red = particlePkg.RandomInRange(redMin, redMax)
-		green = particlePkg.RandomInRange(greenMin, greenMax)
-		blue = particlePkg.RandomInRange(blueMin, blueMax)
-		if red == 0 && green == 0 && blue == 0 {
-			red, green, blue = 1.0, 1.0, 1.0 // Default white (显示原始纹理颜色)
+		// 从配置解析颜色（支持关键帧格式，如 ".7 0" 表示从0.7渐变到0）
+		redMin, redMax, redKf, redInt := particlePkg.ParseValue(config.ParticleRed)
+		greenMin, greenMax, greenKf, greenInt := particlePkg.ParseValue(config.ParticleGreen)
+		blueMin, blueMax, blueKf, blueInt := particlePkg.ParseValue(config.ParticleBlue)
+
+		// 保存关键帧和插值模式
+		redKeyframes = redKf
+		greenKeyframes = greenKf
+		blueKeyframes = blueKf
+		redInterp = redInt
+		greenInterp = greenInt
+		blueInterp = blueInt
+
+		// 计算初始颜色值
+		if len(redKeyframes) > 0 {
+			// 有关键帧：使用第一个关键帧的值作为初始值
+			red = redKeyframes[0].Value
+		} else {
+			red = particlePkg.RandomInRange(redMin, redMax)
+		}
+
+		if len(greenKeyframes) > 0 {
+			green = greenKeyframes[0].Value
+		} else {
+			green = particlePkg.RandomInRange(greenMin, greenMax)
+		}
+
+		if len(blueKeyframes) > 0 {
+			blue = blueKeyframes[0].Value
+		} else {
+			blue = particlePkg.RandomInRange(blueMin, blueMax)
+		}
+
+		// 默认颜色：白色（显示原始纹理颜色）
+		if red == 0 && green == 0 && blue == 0 &&
+			len(redKeyframes) == 0 && len(greenKeyframes) == 0 && len(blueKeyframes) == 0 {
+			red, green, blue = 1.0, 1.0, 1.0
 		}
 	}
 
@@ -568,22 +604,28 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 	}
 
 	if emitter.EmitterRadiusMax > 0 {
-		// 修复：EmitterRadius 支持范围格式 [min max]
-		// 每个粒子随机选择 min-max 之间的半径
-		// 例如：Planting.xml 的 "[0 10]" → 粒子在半径 0-10 之间随机分布
-		radius := particlePkg.RandomInRange(emitter.EmitterRadiusMin, emitter.EmitterRadiusMax)
+		// EmitterRadius 范围格式 [min max] 的正确处理
+		// 粒子应该在半径 min-max 的环形区域内均匀分布
+		// 例如：Powie.xml 的 "[10 50]" → 粒子在半径 10-50 的环形区域内生成
+		//
+		// 环形区域均匀分布公式：r = sqrt(rand * (max² - min²) + min²)
+		// 原理：面积与半径平方成正比，所以需要在 r² 空间内均匀采样
+		rMin := emitter.EmitterRadiusMin
+		rMax := emitter.EmitterRadiusMax
 
-		// 均匀分布在圆形区域内：半径使用 sqrt 随机，角度均匀
-		// 使用 sqrt 确保粒子在圆内均匀分布（而不是聚集在中心）
-		r := math.Sqrt(rand.Float64()) * radius
+		// 在 [rMin², rMax²] 范围内均匀采样，然后开方得到半径
+		rSquared := rand.Float64()*(rMax*rMax-rMin*rMin) + rMin*rMin
+		r := math.Sqrt(rSquared)
+
+		// 角度均匀分布 [0, 2π]
 		ang := rand.Float64() * 2 * math.Pi
 		offsetX := r * math.Cos(ang)
 		offsetY := r * math.Sin(ang)
 
 		// DEBUG: 输出前3个粒子的圆形分布参数
 		if emitter.TotalLaunched < 3 {
-			log.Printf("[DEBUG EmitterRadius] 粒子#%d: radius=%.2f, r=%.2f, angle=%.2f°, offset=(%.2f, %.2f)",
-				emitter.TotalLaunched+1, radius, r, ang*180/math.Pi, offsetX, offsetY)
+			log.Printf("[DEBUG EmitterRadius] 粒子#%d: range=[%.1f,%.1f], r=%.2f, angle=%.2f°, offset=(%.2f, %.2f)",
+				emitter.TotalLaunched+1, rMin, rMax, r, ang*180/math.Pi, offsetX, offsetY)
 		}
 
 		spawnX += offsetX
@@ -604,6 +646,18 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 	additive := false
 	if config.Additive == "1" {
 		additive = true
+	}
+
+	// 解析 Animated 字段（帧动画支持）
+	// Animated="1" 表示粒子应该播放帧动画，而不是停留在单帧
+	animated := config.Animated == "1"
+
+	// 解析 AnimationRate（动画帧率，帧/秒）
+	// 如果未配置，默认值 0 表示根据粒子生命周期自动计算帧率
+	var animationRate float64
+	if config.AnimationRate != "" {
+		rateMin, rateMax, _, _ := particlePkg.ParseValue(config.AnimationRate)
+		animationRate = particlePkg.RandomInRange(rateMin, rateMax)
 	}
 
 	// Load particle image from ResourceManager (Story 7.4 修复)
@@ -755,6 +809,29 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 		}
 	}
 
+	// 预解析 Circle 和 Away 力场参数（在粒子生成时随机确定）
+	var circleAngularVelocity float64
+	var awaySpeed float64
+
+	for _, field := range config.Fields {
+		switch field.FieldType {
+		case "Circle":
+			// Circle 力场：让粒子围绕发射点做圆周运动
+			// X 值表示角速度（度/秒），负值为顺时针
+			// 例如：ImitaterMorph 的 X="[-140 -70]" 表示顺时针旋转，角速度 70-140 度/秒
+			xMin, xMax, _, _ := particlePkg.ParseValue(field.X)
+			circleAngularVelocity = particlePkg.RandomInRange(xMin, xMax)
+			log.Printf("[DEBUG] Circle 力场预解析: 角速度=%.1f 度/秒", circleAngularVelocity)
+		case "Away":
+			// Away 力场：让粒子远离发射点移动
+			// X 值表示径向速度（像素/秒）
+			// 例如：ImitaterMorph 的 X="[100 150]" 表示向外扩散速度 100-150 像素/秒
+			xMin, xMax, _, _ := particlePkg.ParseValue(field.X)
+			awaySpeed = particlePkg.RandomInRange(xMin, xMax)
+			log.Printf("[DEBUG] Away 力场预解析: 径向速度=%.1f 像素/秒", awaySpeed)
+		}
+	}
+
 	// DEBUG: 粒子创建日志
 	log.Printf("[DEBUG] 创建粒子: pos=(%.1f,%.1f), velocity=(%.1f,%.1f), angle=%.1f°, speed=%.1f, scale=%.2f, groundY=%.1f, image=%v",
 		spawnX, spawnY, velocityX, velocityY, angle, speed, initialScale, groundY, particleImage != nil)
@@ -782,12 +859,30 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 		ScaleInterpolation: scaleInterp,
 		SpinInterpolation:  spinInterp,
 
+		// Color keyframes (颜色渐变支持，如 Powie 爆炸)
+		RedKeyframes:   redKeyframes,
+		GreenKeyframes: greenKeyframes,
+		BlueKeyframes:  blueKeyframes,
+		RedInterp:      redInterp,
+		GreenInterp:    greenInterp,
+		BlueInterp:     blueInterp,
+
 		Image:       particleImage, // Loaded from ResourceManager
 		ImageFrames: imageFrames,   // 精灵图帧数（列数）
 		ImageRows:   imageRows,     // BUG修复：精灵图行数（用于正确计算单帧高度）
 		FrameNum:    frameNum,      // 当前帧编号
 		Additive:    additive,
-		Fields:      config.Fields, // Copy force fields from config
+
+		// Animation properties (Animated 字段支持)
+		Animated:      animated,      // 是否启用帧动画
+		AnimationRate: animationRate, // 动画帧率（0 表示自动计算）
+		FrameTime:     0,             // 初始帧时间
+
+		Fields: config.Fields, // Copy force fields from config
+
+		// Circle 和 Away 力场的预解析参数
+		CircleAngularVelocity: circleAngularVelocity,
+		AwaySpeed:             awaySpeed,
 
 		// Collision properties
 		CollisionReflectX:     collisionReflectX,

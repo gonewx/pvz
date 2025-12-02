@@ -2,6 +2,7 @@ package systems
 
 import (
 	"log"
+	"math"
 
 	particlePkg "github.com/decker502/pvz/internal/particle"
 	"github.com/decker502/pvz/pkg/components"
@@ -158,6 +159,28 @@ func (ps *ParticleSystem) updateParticles(dt float64) {
 		// Apply rotation
 		particle.Rotation += particle.RotationSpeed * dt
 
+		// Update frame animation (Animated 字段支持)
+		// 当 Animated=true 且有多帧时，根据时间更新当前帧
+		if particle.Animated && particle.ImageFrames > 1 {
+			particle.FrameTime += dt
+
+			// 计算每帧持续时间
+			var frameDuration float64
+			if particle.AnimationRate > 0 {
+				// 使用配置的帧率
+				frameDuration = 1.0 / particle.AnimationRate
+			} else {
+				// 自动计算：在粒子生命周期内播放完所有帧
+				frameDuration = particle.Lifetime / float64(particle.ImageFrames)
+			}
+
+			// 如果超过当前帧持续时间，切换到下一帧
+			if frameDuration > 0 && particle.FrameTime >= frameDuration {
+				particle.FrameTime -= frameDuration
+				particle.FrameNum = (particle.FrameNum + 1) % particle.ImageFrames
+			}
+		}
+
 		// Apply force fields (acceleration, friction, etc.)
 		ps.applyFields(particle, dt)
 
@@ -188,6 +211,17 @@ func (ps *ParticleSystem) applyInterpolation(p *components.ParticleComponent) {
 	// Apply spin keyframes (updates rotation speed)
 	if len(p.SpinKeyframes) > 0 {
 		p.RotationSpeed = particlePkg.EvaluateKeyframes(p.SpinKeyframes, t, p.SpinInterpolation)
+	}
+
+	// Apply color keyframes (颜色渐变，如 Powie 爆炸从橙色变红色)
+	if len(p.RedKeyframes) > 0 {
+		p.Red = particlePkg.EvaluateKeyframes(p.RedKeyframes, t, p.RedInterp)
+	}
+	if len(p.GreenKeyframes) > 0 {
+		p.Green = particlePkg.EvaluateKeyframes(p.GreenKeyframes, t, p.GreenInterp)
+	}
+	if len(p.BlueKeyframes) > 0 {
+		p.Blue = particlePkg.EvaluateKeyframes(p.BlueKeyframes, t, p.BlueInterp)
 	}
 
 	// Apply SystemAlpha (ZombieHead 系统级淡出)
@@ -320,9 +354,55 @@ func (ps *ParticleSystem) applyFields(p *components.ParticleComponent, dt float6
 				p.PositionOffsetY = particlePkg.EvaluateKeyframes(p.PositionFieldYKeyframes, t, p.PositionFieldYInterp)
 			}
 
-			// Additional field types can be added here
-			// case "Attractor":
-			//     ...
+		case "Circle":
+			// Circle 力场：让粒子围绕发射点做圆周运动
+			// 通过给速度添加垂直分量实现旋转效果
+			//
+			// 原理：对于圆周运动，需要将速度向量旋转一个角度
+			// 每帧旋转的角度 = 角速度 * dt
+			//
+			// 角速度已在 spawnParticle 时解析并存储在 p.CircleAngularVelocity
+			if p.CircleAngularVelocity != 0 {
+				// 角速度转换：度/秒 → 弧度/帧
+				angularVelocityRad := p.CircleAngularVelocity * math.Pi / 180.0
+
+				// 计算旋转角度
+				rotationAngle := angularVelocityRad * dt
+
+				// 旋转速度向量
+				// 新 Vx = Vx * cos(θ) - Vy * sin(θ)
+				// 新 Vy = Vx * sin(θ) + Vy * cos(θ)
+				cosA := math.Cos(rotationAngle)
+				sinA := math.Sin(rotationAngle)
+				newVx := p.VelocityX*cosA - p.VelocityY*sinA
+				newVy := p.VelocityX*sinA + p.VelocityY*cosA
+				p.VelocityX = newVx
+				p.VelocityY = newVy
+			}
+
+		case "Away":
+			// Away 力场：让粒子远离发射点移动
+			// 给速度添加从初始位置指向当前位置的径向分量
+			//
+			// 径向速度已在 spawnParticle 时解析并存储在 p.AwaySpeed
+			if p.AwaySpeed != 0 {
+				// 获取当前相对于初始位置的位移
+				// 注意：需要从当前速度反推位置偏移，或直接添加径向加速度
+				//
+				// 简化实现：Away 效果是让粒子向外扩散
+				// 如果粒子有速度，增强其径向分量
+				// 如果粒子静止，给它一个随机向外的速度
+				currentSpeed := math.Sqrt(p.VelocityX*p.VelocityX + p.VelocityY*p.VelocityY)
+				if currentSpeed > 0.1 {
+					// 沿当前运动方向添加速度
+					dirX := p.VelocityX / currentSpeed
+					dirY := p.VelocityY / currentSpeed
+					// 转换单位：配置值基于 0.01s/tick
+					awayAccel := p.AwaySpeed / OriginalTimeStep
+					p.VelocityX += dirX * awayAccel * dt
+					p.VelocityY += dirY * awayAccel * dt
+				}
+			}
 		}
 	}
 }
