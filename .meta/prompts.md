@@ -52,6 +52,10 @@
 
 日志(文件很大): /tmp/pvz.log 
 
+ cmd/animation_showcase 中渲染的zombie_flagpole 动画 ,旗子和旗杆位置是正确的, 但游戏中旗帜僵尸使用子动画的方式渲染的。 旗子在旗杆偏左一个旗杆宽度的位置.看起来 就是没有装在旗杆上的感觉 . 日志(文件很大): /tmp/pvz.log 
+
+请在cmd/verify_gameplay 中添加旗帜僵尸,以便快速验证动画效果. 旗帜僵尸是通过 `data/reanim/Zombie.reanim`  `data/reanim/Zombie_FlagPole.reanim` 这2个动画定义,采用轨道合并的方式实现旗帜僵尸的. 
+
 - [x] 请设计用户游戏存档系统，游戏过程中可随时存储当前进度，退出游戏后，重新进入后，可恢复游戏进度，继续游戏。游戏存档数据是否更适合使用二进制数据序列化? 
   暂停菜单不需要改,点击暂停菜单中的主菜单按钮时,就是保存进度.
   加载逻辑也是进入游戏后,点击冒险模式按钮,自动加载存档信息.因为并不能任意切换关卡。 
@@ -109,6 +113,10 @@
 | | **外观破损** | `assets/reanim/Wallnut_cracked1.png`<br>`assets/reanim/Wallnut_cracked2.png` | 根据生命值降低，外观会呈现轻微破损和严重破损状态。 |
 
 在啃食时， 坚果墙就切换到 anim_blink_twitch动画，不摇摆了。 而且啃食时颜色要发亮，造成一闪一闪的效果。隔一小会儿就播放一次眨眼动画 anim_blink_twice 或anim_blink_thrice  随机选择
+
+- `一大波僵尸正在接近!`的动画效果和`最后一波`的虽然效果一样，但实现完全 不同， 前者是通过下面2个资源文件，找到相应的文字 ，并为文字应用红色后实现类似于后者的动画效果。动画定义文件应该是复用的，只是替换轨道图片。
+  - assets/data/HouseofTerror28.txt
+  - assets/data/HouseofTerror28.png
 
 ## 粒子效果
 
