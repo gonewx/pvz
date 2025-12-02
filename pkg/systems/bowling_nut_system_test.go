@@ -256,3 +256,442 @@ func TestBowlingNutSystem_SmallDeltaTime(t *testing.T) {
 	}
 }
 
+// ========== Story 19.7 Tests: 碰撞检测与弹射系统 ==========
+
+// TestBowlingNutSystem_CollisionDetection 测试碰撞检测
+func TestBowlingNutSystem_CollisionDetection(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	// 创建坚果实体（行2中心，X=500）
+	row := 2
+	nutY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2 // 328.0
+	nutID := em.CreateEntity()
+	em.AddComponent(nutID, &components.PositionComponent{X: 500.0, Y: nutY})
+	em.AddComponent(nutID, &components.BowlingNutComponent{
+		VelocityX: 250.0,
+		Row:       row,
+		IsRolling: true,
+	})
+
+	// 创建僵尸实体（同行，X=510，应该碰撞）
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY})
+	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
+	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+
+	// 更新系统
+	system.Update(0.016)
+
+	// 验证僵尸受到伤害（1800 伤害应该将 270 HP 僵尸秒杀）
+	health, ok := ecs.GetComponent[*components.HealthComponent](em, zombieID)
+	if !ok {
+		t.Fatal("HealthComponent not found")
+	}
+	if health.CurrentHealth > 0 {
+		t.Errorf("Zombie should be killed, got health %d", health.CurrentHealth)
+	}
+}
+
+// TestBowlingNutSystem_ArmorDamage 测试护甲伤害处理
+func TestBowlingNutSystem_ArmorDamage(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	// 创建坚果实体
+	row := 2
+	nutY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+	nutID := em.CreateEntity()
+	em.AddComponent(nutID, &components.PositionComponent{X: 500.0, Y: nutY})
+	em.AddComponent(nutID, &components.BowlingNutComponent{
+		VelocityX: 250.0,
+		Row:       row,
+		IsRolling: true,
+	})
+
+	// 创建路障僵尸（370护甲 + 270身体 = 640总HP）
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY})
+	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieConehead})
+	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
+	em.AddComponent(zombieID, &components.ArmorComponent{CurrentArmor: 370, MaxArmor: 370})
+	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+
+	// 更新系统
+	system.Update(0.016)
+
+	// 验证护甲被破坏
+	armor, _ := ecs.GetComponent[*components.ArmorComponent](em, zombieID)
+	if armor.CurrentArmor > 0 {
+		t.Errorf("Armor should be destroyed, got %d", armor.CurrentArmor)
+	}
+
+	// 验证溢出伤害：1800 - 370 = 1430 溢出，270 - 1430 = -1160
+	health, _ := ecs.GetComponent[*components.HealthComponent](em, zombieID)
+	if health.CurrentHealth > 0 {
+		t.Errorf("Zombie should be killed by overflow damage, got health %d", health.CurrentHealth)
+	}
+}
+
+// TestBowlingNutSystem_BucketheadZombieArmorDamage 测试铁桶僵尸护甲伤害
+func TestBowlingNutSystem_BucketheadZombieArmorDamage(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	// 创建坚果实体
+	row := 2
+	nutY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+	nutID := em.CreateEntity()
+	em.AddComponent(nutID, &components.PositionComponent{X: 500.0, Y: nutY})
+	em.AddComponent(nutID, &components.BowlingNutComponent{
+		VelocityX: 250.0,
+		Row:       row,
+		IsRolling: true,
+	})
+
+	// 创建铁桶僵尸（1100护甲 + 270身体 = 1370总HP）
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY})
+	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBuckethead})
+	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
+	em.AddComponent(zombieID, &components.ArmorComponent{CurrentArmor: 1100, MaxArmor: 1100})
+	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+
+	// 更新系统
+	system.Update(0.016)
+
+	// 验证护甲被破坏
+	armor, _ := ecs.GetComponent[*components.ArmorComponent](em, zombieID)
+	if armor.CurrentArmor > 0 {
+		t.Errorf("Armor should be destroyed, got %d", armor.CurrentArmor)
+	}
+
+	// 验证溢出伤害：1800 - 1100 = 700 溢出，270 - 700 = -430
+	health, _ := ecs.GetComponent[*components.HealthComponent](em, zombieID)
+	if health.CurrentHealth > 0 {
+		t.Errorf("Buckethead zombie should be killed, got health %d", health.CurrentHealth)
+	}
+}
+
+// TestBowlingNutSystem_BounceDirection_NearestZombie 测试弹射方向优先X轴距离最近的僵尸
+func TestBowlingNutSystem_BounceDirection_NearestZombie(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	nutX := 500.0
+
+	// 行 1 有僵尸，X = 900（距离 400）
+	row1 := 1
+	row1Y := config.GridWorldStartY + float64(row1)*config.CellHeight + config.CellHeight/2
+	zombie1ID := em.CreateEntity()
+	em.AddComponent(zombie1ID, &components.PositionComponent{X: 900.0, Y: row1Y})
+	em.AddComponent(zombie1ID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	em.AddComponent(zombie1ID, &components.HealthComponent{CurrentHealth: 270})
+	em.AddComponent(zombie1ID, &components.CollisionComponent{Width: 40, Height: 115})
+
+	// 行 3 有僵尸，X = 600（距离 100）- 更近！
+	row3 := 3
+	row3Y := config.GridWorldStartY + float64(row3)*config.CellHeight + config.CellHeight/2
+	zombie3ID := em.CreateEntity()
+	em.AddComponent(zombie3ID, &components.PositionComponent{X: 600.0, Y: row3Y})
+	em.AddComponent(zombie3ID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	em.AddComponent(zombie3ID, &components.HealthComponent{CurrentHealth: 270})
+	em.AddComponent(zombie3ID, &components.CollisionComponent{Width: 40, Height: 115})
+
+	// 测试当前在行 2 时的弹射方向
+	currentRow := 2
+	targetRow := system.calculateBounceDirection(currentRow, nutX)
+
+	// 应该弹向行 3（X轴距离更近：100 < 400）
+	if targetRow != 3 {
+		t.Errorf("Should bounce to row 3 (nearest zombie), got row %d", targetRow)
+	}
+}
+
+// TestBowlingNutSystem_EdgeRowBounce_Row0 测试边缘行反弹（第0行只能向下）
+func TestBowlingNutSystem_EdgeRowBounce_Row0(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	// 测试第 0 行只能向下弹射
+	currentRow := 0
+	nutX := 500.0
+	targetRow := system.calculateBounceDirection(currentRow, nutX)
+
+	if targetRow != 1 {
+		t.Errorf("Row 0 should bounce down to row 1, got row %d", targetRow)
+	}
+}
+
+// TestBowlingNutSystem_EdgeRowBounce_Row4 测试边缘行反弹（第4行只能向上）
+func TestBowlingNutSystem_EdgeRowBounce_Row4(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	// 测试第 4 行只能向上弹射
+	currentRow := 4
+	nutX := 500.0
+	targetRow := system.calculateBounceDirection(currentRow, nutX)
+
+	if targetRow != 3 {
+		t.Errorf("Row 4 should bounce up to row 3, got row %d", targetRow)
+	}
+}
+
+// TestBowlingNutSystem_BounceCountIncrement 测试弹射次数递增
+func TestBowlingNutSystem_BounceCountIncrement(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	// 创建坚果实体
+	row := 2
+	nutY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+	nutID := em.CreateEntity()
+	posComp := &components.PositionComponent{X: 500.0, Y: nutY}
+	nutComp := &components.BowlingNutComponent{
+		VelocityX:   250.0,
+		Row:         row,
+		IsRolling:   true,
+		BounceCount: 0,
+	}
+	em.AddComponent(nutID, posComp)
+	em.AddComponent(nutID, nutComp)
+
+	// 创建僵尸触发碰撞
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY})
+	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270})
+	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+
+	// 更新系统
+	system.Update(0.016)
+
+	// 验证弹射次数递增
+	if nutComp.BounceCount != 1 {
+		t.Errorf("BounceCount should be 1, got %d", nutComp.BounceCount)
+	}
+}
+
+// TestBowlingNutSystem_CollisionCooldown 测试碰撞冷却机制
+func TestBowlingNutSystem_CollisionCooldown(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	// 创建坚果实体（已经在弹射后，有冷却时间）
+	row := 2
+	nutY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+	nutID := em.CreateEntity()
+	em.AddComponent(nutID, &components.PositionComponent{X: 500.0, Y: nutY})
+	nutComp := &components.BowlingNutComponent{
+		VelocityX:         250.0,
+		Row:               row,
+		IsRolling:         true,
+		CollisionCooldown: 0.1, // 设置冷却时间
+	}
+	em.AddComponent(nutID, nutComp)
+
+	// 创建僵尸
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY})
+	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
+	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+
+	// 更新系统（冷却期间不应检测碰撞）
+	system.Update(0.016)
+
+	// 验证僵尸未受伤（冷却期间跳过碰撞）
+	health, _ := ecs.GetComponent[*components.HealthComponent](em, zombieID)
+	if health.CurrentHealth != 270 {
+		t.Errorf("Zombie should not be damaged during cooldown, got health %d", health.CurrentHealth)
+	}
+}
+
+// TestBowlingNutSystem_BouncingMovement 测试弹射移动
+func TestBowlingNutSystem_BouncingMovement(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	// 创建正在弹射的坚果实体
+	currentRow := 2
+	targetRow := 3
+	currentY := config.GridWorldStartY + float64(currentRow)*config.CellHeight + config.CellHeight/2
+	targetY := config.GridWorldStartY + float64(targetRow)*config.CellHeight + config.CellHeight/2
+
+	nutID := em.CreateEntity()
+	posComp := &components.PositionComponent{X: 500.0, Y: currentY}
+	nutComp := &components.BowlingNutComponent{
+		VelocityX:  250.0,
+		VelocityY:  config.BowlingNutBounceSpeed, // 向下弹射
+		Row:        currentRow,
+		IsRolling:  true,
+		IsBouncing: true,
+		TargetRow:  targetRow,
+	}
+	em.AddComponent(nutID, posComp)
+	em.AddComponent(nutID, nutComp)
+
+	// 更新直到到达目标行
+	for i := 0; i < 100 && nutComp.IsBouncing; i++ {
+		system.Update(0.016)
+	}
+
+	// 验证到达目标行
+	if nutComp.IsBouncing {
+		t.Error("Should have finished bouncing")
+	}
+	if nutComp.Row != targetRow {
+		t.Errorf("Row should be %d, got %d", targetRow, nutComp.Row)
+	}
+	if posComp.Y != targetY {
+		t.Errorf("Y position should be %f, got %f", targetY, posComp.Y)
+	}
+}
+
+// TestBowlingNutSystem_ExplosiveNut_DestroyedOnCollision 测试爆炸坚果碰撞后销毁
+func TestBowlingNutSystem_ExplosiveNut_DestroyedOnCollision(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	// 创建爆炸坚果实体
+	row := 2
+	nutY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+	nutID := em.CreateEntity()
+	em.AddComponent(nutID, &components.PositionComponent{X: 500.0, Y: nutY})
+	em.AddComponent(nutID, &components.BowlingNutComponent{
+		VelocityX:   250.0,
+		Row:         row,
+		IsRolling:   true,
+		IsExplosive: true, // 爆炸坚果
+	})
+
+	// 创建僵尸触发碰撞
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY})
+	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270})
+	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+
+	// 更新系统
+	system.Update(0.016)
+
+	// 清理标记的实体
+	em.RemoveMarkedEntities()
+
+	// 验证爆炸坚果被销毁（不弹射）
+	_, exists := ecs.GetComponent[*components.BowlingNutComponent](em, nutID)
+	if exists {
+		t.Error("Explosive nut should be destroyed after collision, not bounce")
+	}
+}
+
+// TestBowlingNutSystem_FlashEffectAdded 测试闪烁效果添加
+func TestBowlingNutSystem_FlashEffectAdded(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	// 创建坚果实体
+	row := 2
+	nutY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+	nutID := em.CreateEntity()
+	em.AddComponent(nutID, &components.PositionComponent{X: 500.0, Y: nutY})
+	em.AddComponent(nutID, &components.BowlingNutComponent{
+		VelocityX: 250.0,
+		Row:       row,
+		IsRolling: true,
+	})
+
+	// 创建僵尸
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY})
+	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270})
+	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+
+	// 更新系统
+	system.Update(0.016)
+
+	// 验证僵尸添加了闪烁效果
+	flashComp, hasFlash := ecs.GetComponent[*components.FlashEffectComponent](em, zombieID)
+	if !hasFlash {
+		t.Error("FlashEffectComponent should be added after collision")
+	}
+	if !flashComp.IsActive {
+		t.Error("FlashEffectComponent should be active")
+	}
+}
+
+// TestBowlingNutSystem_IsZombieType 测试僵尸类型检测
+func TestBowlingNutSystem_IsZombieType(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	tests := []struct {
+		behaviorType components.BehaviorType
+		expected     bool
+	}{
+		{components.BehaviorZombieBasic, true},
+		{components.BehaviorZombieEating, true},
+		{components.BehaviorZombieDying, true},
+		{components.BehaviorZombieConehead, true},
+		{components.BehaviorZombieBuckethead, true},
+		{components.BehaviorZombieFlag, true},
+		{components.BehaviorPeaProjectile, false},
+		{components.BehaviorPeashooter, false},
+	}
+
+	for _, test := range tests {
+		result := system.isZombieType(test.behaviorType)
+		if result != test.expected {
+			t.Errorf("isZombieType(%v) = %v, want %v", test.behaviorType, result, test.expected)
+		}
+	}
+}
+
+// TestBowlingNutSystem_CalculateRowFromY 测试从Y坐标计算行号
+func TestBowlingNutSystem_CalculateRowFromY(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	// 测试行中心Y坐标
+	for row := 0; row <= 4; row++ {
+		centerY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+		result := system.calculateRowFromY(centerY)
+		if result != row {
+			t.Errorf("calculateRowFromY(%f) = %d, want %d", centerY, result, row)
+		}
+	}
+
+	// 测试边界情况
+	if system.calculateRowFromY(-100) != 0 {
+		t.Error("Y < GridWorldStartY should return 0")
+	}
+	if system.calculateRowFromY(1000) != 4 {
+		t.Error("Y > max row should return 4")
+	}
+}
+
+// TestBowlingNutSystem_CalculateRowCenterY 测试计算行中心Y坐标
+func TestBowlingNutSystem_CalculateRowCenterY(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	// 测试每行的中心Y坐标
+	expectedCenters := []float64{
+		config.GridWorldStartY + 0*config.CellHeight + config.CellHeight/2, // 行 0: 128.0
+		config.GridWorldStartY + 1*config.CellHeight + config.CellHeight/2, // 行 1: 228.0
+		config.GridWorldStartY + 2*config.CellHeight + config.CellHeight/2, // 行 2: 328.0
+		config.GridWorldStartY + 3*config.CellHeight + config.CellHeight/2, // 行 3: 428.0
+		config.GridWorldStartY + 4*config.CellHeight + config.CellHeight/2, // 行 4: 528.0
+	}
+
+	for row := 0; row <= 4; row++ {
+		result := system.calculateRowCenterY(row)
+		if result != expectedCenters[row] {
+			t.Errorf("calculateRowCenterY(%d) = %f, want %f", row, result, expectedCenters[row])
+		}
+	}
+}
+

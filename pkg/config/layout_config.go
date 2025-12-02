@@ -504,4 +504,18 @@ const (
 	// BowlingNutPreviewAlpha 草坪预览透明度（0-255）
 	// 悬停在草坪网格时显示的半透明坚果预览
 	BowlingNutPreviewAlpha = 150
+
+	// ========== 保龄球坚果碰撞与弹射配置参数（Story 19.7）（可手工调节） ==========
+
+	// BowlingNutDamage 保龄球坚果碰撞伤害
+	// 与樱桃炸弹相同，足以秒杀所有僵尸
+	BowlingNutDamage = 1800
+
+	// BowlingNutBounceSpeed 弹射时的垂直移动速度（像素/秒）
+	// 建议值范围：200.0 - 400.0
+	BowlingNutBounceSpeed = 300.0
+
+	// BowlingNutCollisionCooldown 碰撞冷却时间（秒）
+	// 碰撞后短暂时间内不再检测碰撞，防止重复碰撞
+	BowlingNutCollisionCooldown = 0.1
 )

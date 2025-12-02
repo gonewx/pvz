@@ -2,6 +2,8 @@ package systems
 
 import (
 	"log"
+	"math"
+	"math/rand"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
@@ -12,11 +14,14 @@ import (
 
 // BowlingNutSystem 保龄球坚果滚动系统
 // Story 19.6: 处理保龄球坚果的滚动移动和边界销毁
+// Story 19.7: 处理碰撞检测、伤害处理和弹射逻辑
 //
 // 职责：
 // - 更新坚果的水平位置
 // - 检测边界并销毁越界坚果
 // - 管理滚动音效播放
+// - 检测与僵尸的碰撞并造成伤害
+// - 计算弹射方向并执行弹射移动
 type BowlingNutSystem struct {
 	entityManager   *ecs.EntityManager
 	resourceManager *game.ResourceManager
@@ -41,16 +46,19 @@ func NewBowlingNutSystem(em *ecs.EntityManager, rm *game.ResourceManager) *Bowli
 	}
 }
 
-// Update 更新所有保龄球坚果的位置
+// Update 更新所有保龄球坚果的位置和碰撞检测
 //
 // 参数:
 //   - dt: 帧间隔时间（秒）
 //
 // 处理逻辑：
 // 1. 查询所有 BowlingNutComponent 实体
-// 2. 如果正在滚动，更新 X 位置
-// 3. 检查是否超出边界，超出则销毁
-// 4. 管理滚动音效
+// 2. 更新碰撞冷却时间
+// 3. 如果正在滚动，更新 X 位置
+// 4. 如果正在弹射，更新 Y 位置
+// 5. 检测碰撞并处理伤害和弹射
+// 6. 检查是否超出边界，超出则销毁
+// 7. 管理滚动音效
 func (s *BowlingNutSystem) Update(dt float64) {
 	// 查询所有保龄球坚果实体
 	entities := ecs.GetEntitiesWith2[*components.BowlingNutComponent, *components.PositionComponent](s.entityManager)
@@ -63,15 +71,62 @@ func (s *BowlingNutSystem) Update(dt float64) {
 			continue
 		}
 
-		// 如果正在滚动，更新位置
+		// 更新碰撞冷却时间
+		if nutComp.CollisionCooldown > 0 {
+			nutComp.CollisionCooldown -= dt
+		}
+
+		// 如果正在滚动，更新水平位置
 		if nutComp.IsRolling {
-			// 更新 X 位置
 			posComp.X += nutComp.VelocityX * dt
 
 			// 开始播放滚动音效（如果还没播放）
 			if !nutComp.SoundPlaying {
 				s.startRollingSound(entityID)
 				nutComp.SoundPlaying = true
+			}
+		}
+
+		// 如果正在弹射，更新垂直位置
+		if nutComp.IsBouncing {
+			posComp.Y += nutComp.VelocityY * dt
+
+			// 检测是否到达目标行
+			targetY := s.calculateRowCenterY(nutComp.TargetRow)
+			if (nutComp.VelocityY > 0 && posComp.Y >= targetY) ||
+				(nutComp.VelocityY < 0 && posComp.Y <= targetY) {
+				// 到达目标行
+				posComp.Y = targetY
+				nutComp.Row = nutComp.TargetRow
+				nutComp.IsBouncing = false
+				nutComp.VelocityY = 0
+				log.Printf("[BowlingNutSystem] 坚果到达目标行: entityID=%d, row=%d", entityID, nutComp.Row)
+			}
+		}
+
+		// 不在弹射中且冷却结束时检测碰撞
+		if !nutComp.IsBouncing && nutComp.CollisionCooldown <= 0 {
+			collidedZombies := s.checkCollisionWithZombies(entityID, posComp, nutComp)
+			if len(collidedZombies) > 0 {
+				// 对所有碰撞的僵尸造成伤害
+				for _, zombieID := range collidedZombies {
+					s.applyDamageToZombie(zombieID)
+				}
+
+				// 处理碰撞后的行为
+				if nutComp.IsExplosive {
+					// 爆炸坚果：标记销毁，Story 19.8 处理爆炸逻辑
+					// 不播放撞击音效（爆炸音效由 Story 19.8 处理）
+					log.Printf("[BowlingNutSystem] 爆炸坚果碰撞，标记销毁: entityID=%d", entityID)
+					s.stopRollingSound(entityID)
+					s.entityManager.DestroyEntity(entityID)
+					continue
+				} else {
+					// 普通坚果：播放撞击音效，计算弹射方向，开始弹射
+					s.playImpactSound()
+					targetRow := s.calculateBounceDirection(nutComp.Row, posComp.X)
+					s.startBounce(entityID, nutComp, posComp, targetRow)
+				}
 			}
 		}
 
@@ -89,6 +144,285 @@ func (s *BowlingNutSystem) Update(dt float64) {
 
 	// 清理已销毁实体的音效播放器
 	s.cleanupSoundPlayers()
+}
+
+// checkCollisionWithZombies 检测坚果与同行僵尸的碰撞
+//
+// 参数:
+//   - nutEntityID: 坚果实体ID
+//   - nutPos: 坚果位置组件
+//   - nutComp: 坚果组件
+//
+// 返回:
+//   - []ecs.EntityID: 碰撞的僵尸实体ID列表
+func (s *BowlingNutSystem) checkCollisionWithZombies(
+	nutEntityID ecs.EntityID,
+	nutPos *components.PositionComponent,
+	nutComp *components.BowlingNutComponent,
+) []ecs.EntityID {
+	var collidedZombies []ecs.EntityID
+
+	// 计算坚果碰撞盒
+	nutLeft := nutPos.X - config.BowlingNutCollisionWidth/2
+	nutRight := nutPos.X + config.BowlingNutCollisionWidth/2
+	nutTop := nutPos.Y - config.BowlingNutCollisionHeight/2
+	nutBottom := nutPos.Y + config.BowlingNutCollisionHeight/2
+
+	// 查询所有僵尸实体
+	zombieEntities := ecs.GetEntitiesWith3[
+		*components.BehaviorComponent,
+		*components.PositionComponent,
+		*components.CollisionComponent,
+	](s.entityManager)
+
+	for _, zombieID := range zombieEntities {
+		behavior, _ := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
+
+		// 检查是否是僵尸类型
+		if !s.isZombieType(behavior.Type) {
+			continue
+		}
+
+		zombiePos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
+		zombieCol, _ := ecs.GetComponent[*components.CollisionComponent](s.entityManager, zombieID)
+
+		// 计算僵尸碰撞盒
+		zombieLeft := zombiePos.X + zombieCol.OffsetX - zombieCol.Width/2
+		zombieRight := zombiePos.X + zombieCol.OffsetX + zombieCol.Width/2
+		zombieTop := zombiePos.Y + zombieCol.OffsetY - zombieCol.Height/2
+		zombieBottom := zombiePos.Y + zombieCol.OffsetY + zombieCol.Height/2
+
+		// AABB 碰撞检测
+		if nutRight >= zombieLeft && nutLeft <= zombieRight &&
+			nutBottom >= zombieTop && nutTop <= zombieBottom {
+			collidedZombies = append(collidedZombies, zombieID)
+			log.Printf("[BowlingNutSystem] 坚果碰撞僵尸: nutID=%d, zombieID=%d", nutEntityID, zombieID)
+		}
+	}
+
+	return collidedZombies
+}
+
+// isZombieType 检查行为类型是否是僵尸
+func (s *BowlingNutSystem) isZombieType(behaviorType components.BehaviorType) bool {
+	switch behaviorType {
+	case components.BehaviorZombieBasic,
+		components.BehaviorZombieEating,
+		components.BehaviorZombieDying,
+		components.BehaviorZombieConehead,
+		components.BehaviorZombieBuckethead,
+		components.BehaviorZombieFlag:
+		return true
+	default:
+		return false
+	}
+}
+
+// applyDamageToZombie 对僵尸造成伤害
+//
+// 参数:
+//   - zombieID: 僵尸实体ID
+//
+// 处理逻辑：
+// - 有护甲：优先扣除护甲，溢出伤害扣身体
+// - 无护甲：直接扣除身体生命值
+// - 添加闪烁效果
+func (s *BowlingNutSystem) applyDamageToZombie(zombieID ecs.EntityID) {
+	damage := config.BowlingNutDamage
+
+	// 检查是否有护甲
+	armor, hasArmor := ecs.GetComponent[*components.ArmorComponent](s.entityManager, zombieID)
+	health, hasHealth := ecs.GetComponent[*components.HealthComponent](s.entityManager, zombieID)
+
+	if hasArmor && armor.CurrentArmor > 0 {
+		// 有护甲且护甲未破坏
+		overflowDamage := damage - armor.CurrentArmor
+		armor.CurrentArmor = 0 // 护甲完全破坏
+
+		// 溢出伤害扣除身体生命值
+		if overflowDamage > 0 && hasHealth {
+			health.CurrentHealth -= overflowDamage
+		}
+		log.Printf("[BowlingNutSystem] 僵尸护甲破坏: zombieID=%d, overflowDamage=%d", zombieID, overflowDamage)
+	} else if hasHealth {
+		// 没有护甲或护甲已破坏，直接扣除身体生命值
+		health.CurrentHealth -= damage
+		log.Printf("[BowlingNutSystem] 僵尸受到伤害: zombieID=%d, damage=%d, remainingHealth=%d", zombieID, damage, health.CurrentHealth)
+	}
+
+	// 添加闪烁效果
+	s.addFlashEffect(zombieID)
+}
+
+// addFlashEffect 为僵尸添加受击闪烁效果
+func (s *BowlingNutSystem) addFlashEffect(zombieID ecs.EntityID) {
+	flashComp, hasFlash := ecs.GetComponent[*components.FlashEffectComponent](s.entityManager, zombieID)
+
+	if hasFlash {
+		// 已有闪烁组件，重置时间
+		flashComp.Elapsed = 0
+		flashComp.IsActive = true
+	} else {
+		// 没有闪烁组件，创建新的
+		ecs.AddComponent(s.entityManager, zombieID, &components.FlashEffectComponent{
+			Duration:  0.1,
+			Elapsed:   0,
+			Intensity: 0.8,
+			IsActive:  true,
+		})
+	}
+}
+
+// findNearestZombieDistance 查找指定行最近僵尸的 X 轴距离
+//
+// 参数:
+//   - row: 要查找的行号
+//   - nutX: 坚果的 X 坐标
+//
+// 返回:
+//   - float64: 最近僵尸的 X 轴距离，无僵尸返回 math.MaxFloat64
+func (s *BowlingNutSystem) findNearestZombieDistance(row int, nutX float64) float64 {
+	minDist := math.MaxFloat64
+
+	zombieEntities := ecs.GetEntitiesWith2[
+		*components.BehaviorComponent,
+		*components.PositionComponent,
+	](s.entityManager)
+
+	for _, zombieID := range zombieEntities {
+		behavior, _ := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
+
+		if !s.isZombieType(behavior.Type) {
+			continue
+		}
+
+		pos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
+		zombieRow := s.calculateRowFromY(pos.Y)
+
+		if zombieRow == row {
+			dist := math.Abs(pos.X - nutX)
+			if dist < minDist {
+				minDist = dist
+			}
+		}
+	}
+
+	return minDist
+}
+
+// calculateRowFromY 从 Y 坐标计算行号
+func (s *BowlingNutSystem) calculateRowFromY(y float64) int {
+	row := int((y - config.GridWorldStartY) / config.CellHeight)
+	if row < 0 {
+		row = 0
+	}
+	if row > 4 {
+		row = 4
+	}
+	return row
+}
+
+// calculateRowCenterY 计算行中心 Y 坐标
+func (s *BowlingNutSystem) calculateRowCenterY(row int) float64 {
+	return config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+}
+
+// calculateBounceDirection 计算弹射目标行
+//
+// 参数:
+//   - currentRow: 当前行号
+//   - nutX: 坚果的 X 坐标
+//
+// 返回:
+//   - int: 目标行号 (0-4)
+//
+// 逻辑：
+// 1. 边缘行处理：第 0 行只能向下，第 4 行只能向上
+// 2. 计算上下行最近僵尸的 X 轴距离
+// 3. 优先弹向 X 轴距离最近的僵尸所在行
+// 4. 距离相等或都没有僵尸：随机选择
+func (s *BowlingNutSystem) calculateBounceDirection(currentRow int, nutX float64) int {
+	upRow := currentRow - 1
+	downRow := currentRow + 1
+
+	// 边缘行处理
+	if currentRow == 0 {
+		return downRow // 顶部边缘只能向下
+	}
+	if currentRow == 4 {
+		return upRow // 底部边缘只能向上
+	}
+
+	// 计算上下行最近僵尸的 X 轴距离
+	distUp := s.findNearestZombieDistance(upRow, nutX)
+	distDown := s.findNearestZombieDistance(downRow, nutX)
+
+	// 优先弹向 X 轴距离最近的僵尸所在行
+	if distUp < distDown {
+		return upRow
+	}
+	if distDown < distUp {
+		return downRow
+	}
+
+	// 距离相等或都没有僵尸：随机选择
+	if rand.Float32() < 0.5 {
+		return upRow
+	}
+	return downRow
+}
+
+// startBounce 开始弹射
+//
+// 参数:
+//   - entityID: 坚果实体ID
+//   - nutComp: 坚果组件
+//   - posComp: 位置组件
+//   - targetRow: 目标行号
+func (s *BowlingNutSystem) startBounce(
+	entityID ecs.EntityID,
+	nutComp *components.BowlingNutComponent,
+	posComp *components.PositionComponent,
+	targetRow int,
+) {
+	nutComp.IsBouncing = true
+	nutComp.TargetRow = targetRow
+	nutComp.BounceCount++
+	nutComp.CollisionCooldown = config.BowlingNutCollisionCooldown
+
+	// 计算垂直速度方向
+	targetY := s.calculateRowCenterY(targetRow)
+	if targetY > posComp.Y {
+		nutComp.VelocityY = config.BowlingNutBounceSpeed // 向下
+	} else {
+		nutComp.VelocityY = -config.BowlingNutBounceSpeed // 向上
+	}
+
+	log.Printf("[BowlingNutSystem] 开始弹射: entityID=%d, fromRow=%d, toRow=%d, bounceCount=%d",
+		entityID, nutComp.Row, targetRow, nutComp.BounceCount)
+}
+
+// playImpactSound 播放撞击音效
+func (s *BowlingNutSystem) playImpactSound() {
+	if s.resourceManager == nil {
+		return
+	}
+
+	// 随机选择音效
+	var soundPath string
+	if rand.Float32() < 0.5 {
+		soundPath = config.BowlingImpactSoundPath
+	} else {
+		soundPath = config.BowlingImpact2SoundPath
+	}
+
+	player, err := s.resourceManager.LoadSoundEffect(soundPath)
+	if err != nil {
+		log.Printf("[BowlingNutSystem] 加载撞击音效失败: %v", err)
+		return
+	}
+	player.Rewind()
+	player.Play()
 }
 
 // startRollingSound 开始播放滚动音效
@@ -155,4 +489,3 @@ func (s *BowlingNutSystem) StopAllSounds() {
 	}
 	log.Printf("[BowlingNutSystem] 停止所有滚动音效")
 }
-

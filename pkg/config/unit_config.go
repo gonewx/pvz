@@ -302,4 +302,12 @@ const (
 	// BowlingRollSoundPath 保龄球坚果滚动音效路径
 	// Story 19.6: 坚果滚动时循环播放
 	BowlingRollSoundPath = "assets/sounds/bowling.ogg"
+
+	// BowlingImpactSoundPath 保龄球坚果碰撞撞击音效路径
+	// Story 19.7: 坚果碰撞僵尸时播放
+	BowlingImpactSoundPath = "assets/sounds/bowlingimpact.ogg"
+
+	// BowlingImpact2SoundPath 保龄球坚果碰撞撞击音效路径（变体）
+	// Story 19.7: 随机选择以增加变化
+	BowlingImpact2SoundPath = "assets/sounds/bowlingimpact2.ogg"
 )
