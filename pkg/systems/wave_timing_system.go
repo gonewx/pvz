@@ -372,6 +372,87 @@ func (s *WaveTimingSystem) IsHugeWaveWarningActive() bool {
 	return timer.FlagWaveCountdownPhase > 0
 }
 
+// ========== Bug Fix: 警告队列管理方法 ==========
+
+// GetCurrentWarning 获取当前待显示的警告类型
+//
+// 返回：
+//   - string: 当前警告类型 ("huge_wave", "final_wave", 或 "" 表示无警告)
+func (s *WaveTimingSystem) GetCurrentWarning() string {
+	timer := s.getTimerComponent()
+	if timer == nil {
+		return ""
+	}
+
+	if timer.CurrentWarningIndex >= len(timer.PendingWarnings) {
+		return ""
+	}
+
+	return timer.PendingWarnings[timer.CurrentWarningIndex]
+}
+
+// AdvanceWarningQueue 推进警告队列到下一个警告
+//
+// 当一个警告动画播放完成后调用，将队列索引+1
+func (s *WaveTimingSystem) AdvanceWarningQueue() {
+	timer := s.getTimerComponent()
+	if timer == nil {
+		return
+	}
+
+	if timer.CurrentWarningIndex < len(timer.PendingWarnings) {
+		oldWarning := timer.PendingWarnings[timer.CurrentWarningIndex]
+		timer.CurrentWarningIndex++
+		log.Printf("[WaveTimingSystem] Warning queue advanced: %s completed (index %d -> %d)",
+			oldWarning, timer.CurrentWarningIndex-1, timer.CurrentWarningIndex)
+	}
+}
+
+// HasPendingWarnings 检查是否还有待显示的警告
+//
+// 返回：
+//   - bool: true 表示还有警告需要显示
+func (s *WaveTimingSystem) HasPendingWarnings() bool {
+	timer := s.getTimerComponent()
+	if timer == nil {
+		return false
+	}
+
+	return timer.CurrentWarningIndex < len(timer.PendingWarnings)
+}
+
+// GetPendingWarnings 获取待显示的警告列表（用于调试）
+//
+// 返回：
+//   - []string: 所有待显示的警告类型
+//   - int: 当前警告索引
+func (s *WaveTimingSystem) GetPendingWarnings() ([]string, int) {
+	timer := s.getTimerComponent()
+	if timer == nil {
+		return nil, 0
+	}
+
+	return timer.PendingWarnings, timer.CurrentWarningIndex
+}
+
+// IsFinalWaveWarningPending 检查是否有最终波警告待显示
+//
+// 返回：
+//   - bool: true 表示最终波警告待显示
+func (s *WaveTimingSystem) IsFinalWaveWarningPending() bool {
+	timer := s.getTimerComponent()
+	if timer == nil {
+		return false
+	}
+
+	for i := timer.CurrentWarningIndex; i < len(timer.PendingWarnings); i++ {
+		if timer.PendingWarnings[i] == "final_wave" {
+			return true
+		}
+	}
+	return false
+}
+
 // CheckAcceleratedRefresh 检查并执行加速刷新
 //
 // Story 17.7: 旗帜波前一波的加速刷新逻辑（消灭触发）
@@ -573,6 +654,11 @@ func (s *WaveTimingSystem) triggerNextWave() {
 //   - 旗帜波前一波：4500cs（45秒）
 //   - 最终波：5500cs（55秒）
 //   - 常规波：2500 + rand(600) 厘秒（25-31秒）
+//
+// Bug Fix: 旗帜波和最终波独立判断
+//   - 如果某波既是旗帜波又是最终波，两个标志都会设置为 true
+//   - 倒计时取两者的最大值（5500cs）
+//   - 警告队列会同时添加 "huge_wave" 和 "final_wave"
 func (s *WaveTimingSystem) SetNextWaveCountdown() {
 	timer := s.getTimerComponent()
 	if timer == nil {
@@ -582,36 +668,60 @@ func (s *WaveTimingSystem) SetNextWaveCountdown() {
 	// 重置波次已过时间（用于加速刷新判定）
 	timer.WaveElapsedCs = 0
 
-	// Story 17.7: 根据下一波类型设置倒计时
+	// 清空警告队列和索引
+	timer.PendingWarnings = nil
+	timer.CurrentWarningIndex = 0
+
+	// Story 17.7 + Bug Fix: 独立判断旗帜波和最终波
 	nextWaveIndex := timer.CurrentWaveIndex
 	var countdown int
-	var waveType string
+	var waveTypes []string
 
-	if s.isNextWaveFlagWave(nextWaveIndex) {
-		// 旗帜波前一波：4500cs
-		countdown = FlagWavePrefixDelayCs
-		timer.IsFlagWaveApproaching = true
+	isFlagWave := s.isNextWaveFlagWave(nextWaveIndex)
+	isFinal := s.isFinalWave(nextWaveIndex)
+
+	// 设置标志位（独立判断，可以同时为 true）
+	timer.IsFlagWaveApproaching = isFlagWave
+	timer.IsFinalWave = isFinal
+
+	if isFlagWave {
 		timer.HugeWaveWarningTriggered = false
-		waveType = "flag wave prefix"
-	} else if s.isFinalWave(nextWaveIndex) {
-		// 最终波：5500cs
-		countdown = FinalWaveDelayCs
-		timer.IsFinalWave = true
-		waveType = "final wave"
-	} else {
-		// 常规波：2500 + rand(600)
+		timer.PendingWarnings = append(timer.PendingWarnings, "huge_wave")
+		waveTypes = append(waveTypes, "flag wave prefix")
+		countdown = FlagWavePrefixDelayCs // 4500cs
+	}
+
+	if isFinal {
+		timer.FinalWaveWarningTriggered = false
+		timer.PendingWarnings = append(timer.PendingWarnings, "final_wave")
+		waveTypes = append(waveTypes, "final wave")
+		// 最终波倒计时 5500cs，如果同时是旗帜波取最大值
+		if countdown < FinalWaveDelayCs {
+			countdown = FinalWaveDelayCs
+		}
+	}
+
+	// 如果既不是旗帜波也不是最终波，则为常规波
+	if !isFlagWave && !isFinal {
 		countdown = RegularWaveBaseDelayCs + rand.Intn(RegularWaveRandomDelayCs)
-		timer.IsFlagWaveApproaching = false
-		timer.IsFinalWave = false
-		waveType = "regular wave"
+		waveTypes = append(waveTypes, "regular wave")
 	}
 
 	timer.CountdownCs = countdown
 	timer.LastRefreshTimeCs = countdown
 	timer.AccumulatedCs = 0
 
-	log.Printf("[WaveTimingSystem] Next wave countdown set: %d cs (%.2fs) [%s, wave %d]",
-		countdown, float64(countdown)/100, waveType, nextWaveIndex+1)
+	// 构建日志中的类型字符串
+	waveTypeStr := "regular wave"
+	if len(waveTypes) > 0 {
+		waveTypeStr = waveTypes[0]
+		for i := 1; i < len(waveTypes); i++ {
+			waveTypeStr += " + " + waveTypes[i]
+		}
+	}
+
+	log.Printf("[WaveTimingSystem] Next wave countdown set: %d cs (%.2fs) [%s, wave %d], pending warnings: %v",
+		countdown, float64(countdown)/100, waveTypeStr, nextWaveIndex+1, timer.PendingWarnings)
 }
 
 // isNextWaveFlagWave 判断下一波是否为旗帜波

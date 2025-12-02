@@ -8,6 +8,7 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -37,6 +38,7 @@ const (
 //   - Phase 5 时使用 HouseofTerror28 位图字体生成红色警告文字
 //   - 播放警告音效
 //   - Phase 完成后销毁实体
+//   - Bug Fix: 支持警告队列，顺序显示「一大波僵尸」和「最后一波」
 //
 // 架构说明：
 //   - 遵循 ECS 架构：系统只处理逻辑，不存储状态
@@ -49,6 +51,10 @@ type FlagWaveWarningSystem struct {
 
 	// warningEntityID 当前红字警告实体ID（0 表示无）
 	warningEntityID ecs.EntityID
+
+	// finalWaveEntityID 当前最终波警告实体ID（0 表示无）
+	// Bug Fix: 用于支持旗帜波+最终波的顺序显示
+	finalWaveEntityID ecs.EntityID
 
 	// bitmapFont HouseofTerror28 位图字体（缓存）
 	// Story 17.7 补充任务：用于渲染「一大波僵尸正在接近!」红色文字
@@ -69,12 +75,13 @@ type FlagWaveWarningSystem struct {
 //   - *FlagWaveWarningSystem: 新创建的系统实例
 func NewFlagWaveWarningSystem(em *ecs.EntityManager, wts *WaveTimingSystem, rm *game.ResourceManager) *FlagWaveWarningSystem {
 	return &FlagWaveWarningSystem{
-		entityManager:    em,
-		waveTimingSystem: wts,
-		resourceManager:  rm,
-		warningEntityID:  0,
-		bitmapFont:       nil,
-		bitmapFontLoaded: false,
+		entityManager:     em,
+		waveTimingSystem:  wts,
+		resourceManager:   rm,
+		warningEntityID:   0,
+		finalWaveEntityID: 0,
+		bitmapFont:        nil,
+		bitmapFontLoaded:  false,
 	}
 }
 
@@ -85,6 +92,7 @@ func NewFlagWaveWarningSystem(em *ecs.EntityManager, wts *WaveTimingSystem, rm *
 //  2. Phase 5 时创建警告实体（如果不存在）
 //  3. 更新动画状态（缩放、闪烁）
 //  4. Phase 结束后销毁实体
+//  5. Bug Fix: 检查警告队列，如有「最后一波」则继续显示
 //
 // 参数：
 //   - deltaTime: 自上一帧以来经过的时间（秒）
@@ -93,22 +101,121 @@ func (s *FlagWaveWarningSystem) Update(deltaTime float64) {
 		return
 	}
 
+	// 先处理最终波警告实体的更新
+	if s.finalWaveEntityID != 0 {
+		s.updateFinalWaveWarning(deltaTime)
+	}
+
 	phase := s.waveTimingSystem.GetFlagWaveWarningPhase()
 
-	// 检查是否需要创建警告实体
+	// 检查是否需要创建红字警告实体
 	if phase > 0 && s.warningEntityID == 0 {
 		s.createWarningEntity()
 	}
 
-	// 检查是否需要销毁警告实体
+	// 检查是否需要销毁红字警告实体
 	if phase == 0 && s.warningEntityID != 0 {
 		s.destroyWarningEntity()
+
+		// Bug Fix: 红字警告完成后，检查是否还有「最后一波」待显示
+		s.checkAndTriggerFinalWaveWarning()
 		return
 	}
 
-	// 更新现有警告实体的动画
+	// 更新现有红字警告实体的动画
 	if s.warningEntityID != 0 {
 		s.updateWarningAnimation(deltaTime)
+	}
+}
+
+// checkAndTriggerFinalWaveWarning 检查并触发最终波白字警告
+//
+// Bug Fix: 当红字警告完成后，检查警告队列中是否有「最后一波」
+// 如果有，推进队列并创建最终波警告实体
+func (s *FlagWaveWarningSystem) checkAndTriggerFinalWaveWarning() {
+	// 推进警告队列（刚完成的是 huge_wave）
+	s.waveTimingSystem.AdvanceWarningQueue()
+
+	// 检查下一个警告是否为 final_wave
+	currentWarning := s.waveTimingSystem.GetCurrentWarning()
+	if currentWarning != "final_wave" {
+		return
+	}
+
+	// 创建最终波警告实体
+	s.createFinalWaveWarningEntity()
+}
+
+// createFinalWaveWarningEntity 创建最终波白字警告实体
+//
+// Bug Fix: 使用 NewFinalWaveWarningEntity 创建「最后一波」提示
+func (s *FlagWaveWarningSystem) createFinalWaveWarningEntity() {
+	if s.resourceManager == nil {
+		log.Printf("[FlagWaveWarningSystem] Cannot create final wave warning: no resource manager")
+		return
+	}
+
+	centerX := float64(config.ScreenWidth) / 2
+	centerY := float64(config.ScreenHeight) / 2
+
+	entityID, err := entities.NewFinalWaveWarningEntity(
+		s.entityManager,
+		s.resourceManager,
+		centerX,
+		centerY,
+	)
+
+	if err != nil {
+		log.Printf("[FlagWaveWarningSystem] ERROR: Failed to create FinalWave warning entity: %v", err)
+		return
+	}
+
+	s.finalWaveEntityID = entityID
+
+	// 添加动画命令组件，播放 warning combo
+	ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
+		UnitID:    "finalwave",
+		ComboName: "warning",
+		Processed: false,
+	})
+
+	// 播放音效：SOUND_AWOOGA（僵尸来袭音效）
+	if audioPlayer := s.resourceManager.GetAudioPlayer("SOUND_AWOOGA"); audioPlayer != nil {
+		audioPlayer.Rewind()
+		audioPlayer.Play()
+		log.Printf("[FlagWaveWarningSystem] Playing SOUND_AWOOGA for final wave")
+	}
+
+	log.Printf("[FlagWaveWarningSystem] Created final wave warning entity (ID: %d) - queued after huge wave",
+		entityID)
+}
+
+// updateFinalWaveWarning 更新最终波警告动画
+//
+// Bug Fix: 检查 FinalWaveWarningComponent 的显示时间，超时则销毁
+func (s *FlagWaveWarningSystem) updateFinalWaveWarning(deltaTime float64) {
+	if s.finalWaveEntityID == 0 {
+		return
+	}
+
+	warningComp, ok := ecs.GetComponent[*components.FinalWaveWarningComponent](s.entityManager, s.finalWaveEntityID)
+	if !ok {
+		// 组件不存在，可能已被其他系统销毁
+		s.finalWaveEntityID = 0
+		return
+	}
+
+	// 更新已显示时间
+	warningComp.ElapsedTime += deltaTime
+
+	// 检查是否超过显示时长
+	if warningComp.ElapsedTime >= warningComp.DisplayTime {
+		s.entityManager.DestroyEntity(s.finalWaveEntityID)
+		log.Printf("[FlagWaveWarningSystem] Final wave warning completed, entity %d destroyed", s.finalWaveEntityID)
+		s.finalWaveEntityID = 0
+
+		// 推进警告队列
+		s.waveTimingSystem.AdvanceWarningQueue()
 	}
 }
 
@@ -360,9 +467,24 @@ func (s *FlagWaveWarningSystem) GetWarningEntityID() ecs.EntityID {
 	return s.warningEntityID
 }
 
-// IsWarningActive 检查警告是否激活
+// GetFinalWaveEntityID 获取当前最终波警告实体ID（用于测试）
+func (s *FlagWaveWarningSystem) GetFinalWaveEntityID() ecs.EntityID {
+	return s.finalWaveEntityID
+}
+
+// IsWarningActive 检查警告是否激活（包括红字和白字警告）
 func (s *FlagWaveWarningSystem) IsWarningActive() bool {
+	return s.warningEntityID != 0 || s.finalWaveEntityID != 0
+}
+
+// IsHugeWaveWarningEntityActive 检查红字警告实体是否激活
+func (s *FlagWaveWarningSystem) IsHugeWaveWarningEntityActive() bool {
 	return s.warningEntityID != 0
+}
+
+// IsFinalWaveWarningEntityActive 检查最终波白字警告实体是否激活
+func (s *FlagWaveWarningSystem) IsFinalWaveWarningEntityActive() bool {
+	return s.finalWaveEntityID != 0
 }
 
 // TriggerWarning 手动触发警告动画

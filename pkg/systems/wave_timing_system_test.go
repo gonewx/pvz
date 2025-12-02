@@ -488,11 +488,15 @@ func createTestLevelConfigWithFlagWave(waveCount int, flagWaveIndex int) *config
 }
 
 // TestWaveTimingSystem_FlagWavePrefixDelay 测试旗帜波前一波倒计时（4500cs）
+//
+// 注意：如果旗帜波同时是最终波，倒计时会取最大值（5500cs）
+// 此测试验证旗帜波不是最终波的情况
 func TestWaveTimingSystem_FlagWavePrefixDelay(t *testing.T) {
 	em := ecs.NewEntityManager()
 	gs := createTestGameState()
-	// 创建 10 波配置，第 10 波为旗帜波（索引 9）
-	levelConfig := createTestLevelConfigWithFlagWave(10, 9)
+	// Bug Fix: 使用 11 波配置，第 10 波为旗帜波（索引 9）但不是最后一波
+	// 这样才能测试纯旗帜波（非最终波）的倒计时
+	levelConfig := createTestLevelConfigWithFlagWave(11, 9)
 	resetGameState(gs, levelConfig)
 
 	system := NewWaveTimingSystem(em, gs, levelConfig)
@@ -502,10 +506,10 @@ func TestWaveTimingSystem_FlagWavePrefixDelay(t *testing.T) {
 	timer.CurrentWaveIndex = 8 // 触发后会变成 9
 
 	// 模拟触发第 8 波后设置下一波倒计时
-	timer.CurrentWaveIndex = 9 // 下一波（第 10 波）是旗帜波
+	timer.CurrentWaveIndex = 9 // 下一波（第 10 波）是旗帜波，但不是最终波
 	system.SetNextWaveCountdown()
 
-	// 检查倒计时是否为 4500cs
+	// 检查倒计时是否为 4500cs（旗帜波倒计时）
 	if timer.CountdownCs != FlagWavePrefixDelayCs {
 		t.Errorf("Expected CountdownCs = %d for flag wave prefix, got %d", FlagWavePrefixDelayCs, timer.CountdownCs)
 	}
@@ -513,6 +517,11 @@ func TestWaveTimingSystem_FlagWavePrefixDelay(t *testing.T) {
 	// 检查旗帜波接近标志
 	if !timer.IsFlagWaveApproaching {
 		t.Error("Expected IsFlagWaveApproaching = true")
+	}
+
+	// Bug Fix: 检查最终波标志应该为 false（因为第 10 波不是最后一波）
+	if timer.IsFinalWave {
+		t.Error("Expected IsFinalWave = false (wave 10 is not the last wave in 11-wave config)")
 	}
 }
 
@@ -1156,5 +1165,266 @@ func TestWaveTimingSystem_UpdateWaveCurrentHealth(t *testing.T) {
 	if timer.WaveCurrentHealthCs != 500 {
 		t.Errorf("Expected WaveCurrentHealthCs = 500, got %d", timer.WaveCurrentHealthCs)
 	}
+}
+
+// ========== Bug Fix: 旗帜波和最终波独立判断测试 ==========
+
+// TestWaveTimingSystem_FlagWaveAndFinalWave_Independent 测试旗帜波和最终波独立判断
+//
+// 场景：某波既是旗帜波（IsFlag=true）又是最终波（最后一波）
+// 预期：
+//  1. IsFlagWaveApproaching 和 IsFinalWave 都为 true
+//  2. 倒计时取最大值（5500cs）
+//  3. 警告队列包含 ["huge_wave", "final_wave"]
+func TestWaveTimingSystem_FlagWaveAndFinalWave_Independent(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := createTestGameState()
+
+	// 创建只有 2 波的关卡，最后一波是旗帜波
+	levelConfig := &config.LevelConfig{
+		ID: "test-flag-final",
+		Waves: []config.WaveConfig{
+			{
+				Zombies: []config.ZombieGroup{
+					{Type: "basic", Count: 2, Lanes: []int{1, 2, 3}},
+				},
+			},
+			{
+				IsFlag: true, // 旗帜波
+				Zombies: []config.ZombieGroup{
+					{Type: "basic", Count: 5, Lanes: []int{1, 2, 3}},
+				},
+			},
+		},
+	}
+	resetGameState(gs, levelConfig)
+
+	system := NewWaveTimingSystem(em, gs, levelConfig)
+	system.InitializeTimerWithDelay(false, levelConfig)
+
+	timer := system.getTimerComponent()
+
+	// 触发第一波
+	timer.CountdownCs = 1
+	system.Update(0.01)
+	system.ClearWaveTriggered()
+
+	// 现在应该在等待第二波（索引 1）
+	// 第二波既是旗帜波又是最终波
+	if timer.CurrentWaveIndex != 1 {
+		t.Fatalf("Expected CurrentWaveIndex = 1, got %d", timer.CurrentWaveIndex)
+	}
+
+	// 检查 IsFlagWaveApproaching 和 IsFinalWave 都为 true
+	if !timer.IsFlagWaveApproaching {
+		t.Error("Expected IsFlagWaveApproaching = true")
+	}
+	if !timer.IsFinalWave {
+		t.Error("Expected IsFinalWave = true")
+	}
+
+	// 检查倒��时是最大值（FinalWaveDelayCs = 5500）
+	if timer.CountdownCs != FinalWaveDelayCs {
+		t.Errorf("Expected CountdownCs = %d (final wave delay), got %d", FinalWaveDelayCs, timer.CountdownCs)
+	}
+
+	// 检查警告队列
+	warnings, index := system.GetPendingWarnings()
+	if len(warnings) != 2 {
+		t.Errorf("Expected 2 pending warnings, got %d", len(warnings))
+	}
+	if len(warnings) >= 2 {
+		if warnings[0] != "huge_wave" {
+			t.Errorf("Expected warnings[0] = 'huge_wave', got '%s'", warnings[0])
+		}
+		if warnings[1] != "final_wave" {
+			t.Errorf("Expected warnings[1] = 'final_wave', got '%s'", warnings[1])
+		}
+	}
+	if index != 0 {
+		t.Errorf("Expected CurrentWarningIndex = 0, got %d", index)
+	}
+
+	t.Logf("✓ 旗帜波+最终波独立判断正确: IsFlagWaveApproaching=%v, IsFinalWave=%v, countdown=%d, warnings=%v",
+		timer.IsFlagWaveApproaching, timer.IsFinalWave, timer.CountdownCs, warnings)
+}
+
+// TestWaveTimingSystem_OnlyFlagWave 测试仅旗帜波（不是最终波）
+//
+// 场景：中间某波是旗帜波，但不是最终波
+// 预期：
+//  1. IsFlagWaveApproaching = true, IsFinalWave = false
+//  2. 倒计时为 4500cs
+//  3. 警告队列只包含 ["huge_wave"]
+func TestWaveTimingSystem_OnlyFlagWave(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := createTestGameState()
+
+	// 创建 4 波的关卡，第 2 波是旗帜波
+	levelConfig := &config.LevelConfig{
+		ID: "test-only-flag",
+		Waves: []config.WaveConfig{
+			{Zombies: []config.ZombieGroup{{Type: "basic", Count: 2, Lanes: []int{1, 2, 3}}}},
+			{IsFlag: true, Zombies: []config.ZombieGroup{{Type: "basic", Count: 5, Lanes: []int{1, 2, 3}}}}, // 旗帜波
+			{Zombies: []config.ZombieGroup{{Type: "basic", Count: 3, Lanes: []int{1, 2, 3}}}},
+			{Zombies: []config.ZombieGroup{{Type: "basic", Count: 4, Lanes: []int{1, 2, 3}}}},
+		},
+	}
+	resetGameState(gs, levelConfig)
+
+	system := NewWaveTimingSystem(em, gs, levelConfig)
+	system.InitializeTimerWithDelay(false, levelConfig)
+
+	timer := system.getTimerComponent()
+
+	// 触发第一波
+	timer.CountdownCs = 1
+	system.Update(0.01)
+	system.ClearWaveTriggered()
+
+	// 现在应该在等待第二波（索引 1，旗帜波但不是最终波）
+	if timer.CurrentWaveIndex != 1 {
+		t.Fatalf("Expected CurrentWaveIndex = 1, got %d", timer.CurrentWaveIndex)
+	}
+
+	// 检查标志
+	if !timer.IsFlagWaveApproaching {
+		t.Error("Expected IsFlagWaveApproaching = true")
+	}
+	if timer.IsFinalWave {
+		t.Error("Expected IsFinalWave = false (not the last wave)")
+	}
+
+	// 检查倒计时是旗帜波倒计时（4500）
+	if timer.CountdownCs != FlagWavePrefixDelayCs {
+		t.Errorf("Expected CountdownCs = %d (flag wave prefix delay), got %d", FlagWavePrefixDelayCs, timer.CountdownCs)
+	}
+
+	// 检查警告队列只有 huge_wave
+	warnings, _ := system.GetPendingWarnings()
+	if len(warnings) != 1 {
+		t.Errorf("Expected 1 pending warning, got %d", len(warnings))
+	}
+	if len(warnings) >= 1 && warnings[0] != "huge_wave" {
+		t.Errorf("Expected warnings[0] = 'huge_wave', got '%s'", warnings[0])
+	}
+
+	t.Logf("✓ 仅旗帜波判断正确: IsFlagWaveApproaching=%v, IsFinalWave=%v, countdown=%d",
+		timer.IsFlagWaveApproaching, timer.IsFinalWave, timer.CountdownCs)
+}
+
+// TestWaveTimingSystem_OnlyFinalWave 测试仅最终波（不是旗帜波）
+//
+// 场景：最后一波���是旗帜波
+// 预期：
+//  1. IsFlagWaveApproaching = false, IsFinalWave = true
+//  2. 倒计时为 5500cs
+//  3. 警告队列只包含 ["final_wave"]
+func TestWaveTimingSystem_OnlyFinalWave(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := createTestGameState()
+
+	// 创建 2 波的关卡，最后一波不是旗帜波
+	levelConfig := &config.LevelConfig{
+		ID: "test-only-final",
+		Waves: []config.WaveConfig{
+			{Zombies: []config.ZombieGroup{{Type: "basic", Count: 2, Lanes: []int{1, 2, 3}}}},
+			{IsFlag: false, Zombies: []config.ZombieGroup{{Type: "basic", Count: 5, Lanes: []int{1, 2, 3}}}}, // 最终波但不是旗帜波
+		},
+	}
+	resetGameState(gs, levelConfig)
+
+	system := NewWaveTimingSystem(em, gs, levelConfig)
+	system.InitializeTimerWithDelay(false, levelConfig)
+
+	timer := system.getTimerComponent()
+
+	// 触发第一波
+	timer.CountdownCs = 1
+	system.Update(0.01)
+	system.ClearWaveTriggered()
+
+	// 现在应该在等待第二波（索引 1，最终波但不是旗帜波）
+	if timer.CurrentWaveIndex != 1 {
+		t.Fatalf("Expected CurrentWaveIndex = 1, got %d", timer.CurrentWaveIndex)
+	}
+
+	// 检查标志
+	if timer.IsFlagWaveApproaching {
+		t.Error("Expected IsFlagWaveApproaching = false (not a flag wave)")
+	}
+	if !timer.IsFinalWave {
+		t.Error("Expected IsFinalWave = true")
+	}
+
+	// 检查倒计时是最终波倒计时（5500）
+	if timer.CountdownCs != FinalWaveDelayCs {
+		t.Errorf("Expected CountdownCs = %d (final wave delay), got %d", FinalWaveDelayCs, timer.CountdownCs)
+	}
+
+	// 检查警告队列只有 final_wave
+	warnings, _ := system.GetPendingWarnings()
+	if len(warnings) != 1 {
+		t.Errorf("Expected 1 pending warning, got %d", len(warnings))
+	}
+	if len(warnings) >= 1 && warnings[0] != "final_wave" {
+		t.Errorf("Expected warnings[0] = 'final_wave', got '%s'", warnings[0])
+	}
+
+	t.Logf("✓ 仅最终波判断正确: IsFlagWaveApproaching=%v, IsFinalWave=%v, countdown=%d",
+		timer.IsFlagWaveApproaching, timer.IsFinalWave, timer.CountdownCs)
+}
+
+// TestWaveTimingSystem_WarningQueueAdvance 测试警告队列推进
+func TestWaveTimingSystem_WarningQueueAdvance(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := createTestGameState()
+
+	// 创建只有 2 波的关卡，最后一波是旗帜波
+	levelConfig := &config.LevelConfig{
+		ID: "test-queue-advance",
+		Waves: []config.WaveConfig{
+			{Zombies: []config.ZombieGroup{{Type: "basic", Count: 2, Lanes: []int{1, 2, 3}}}},
+			{IsFlag: true, Zombies: []config.ZombieGroup{{Type: "basic", Count: 5, Lanes: []int{1, 2, 3}}}},
+		},
+	}
+	resetGameState(gs, levelConfig)
+
+	system := NewWaveTimingSystem(em, gs, levelConfig)
+	system.InitializeTimerWithDelay(false, levelConfig)
+
+	timer := system.getTimerComponent()
+
+	// 触发第一波
+	timer.CountdownCs = 1
+	system.Update(0.01)
+	system.ClearWaveTriggered()
+
+	// 确认警告队列初始状态
+	if system.GetCurrentWarning() != "huge_wave" {
+		t.Fatalf("Expected current warning = 'huge_wave', got '%s'", system.GetCurrentWarning())
+	}
+
+	// 推进队列
+	system.AdvanceWarningQueue()
+
+	// 检查当前警告是 final_wave
+	if system.GetCurrentWarning() != "final_wave" {
+		t.Errorf("Expected current warning = 'final_wave' after advance, got '%s'", system.GetCurrentWarning())
+	}
+
+	// 再次推进
+	system.AdvanceWarningQueue()
+
+	// 检查队列已空
+	if system.GetCurrentWarning() != "" {
+		t.Errorf("Expected current warning = '' (empty) after second advance, got '%s'", system.GetCurrentWarning())
+	}
+
+	if system.HasPendingWarnings() {
+		t.Error("Expected HasPendingWarnings = false after all warnings processed")
+	}
+
+	t.Logf("✓ 警告队列推进正确")
 }
 

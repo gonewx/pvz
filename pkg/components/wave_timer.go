@@ -76,6 +76,23 @@ type WaveTimerComponent struct {
 	// 防止重复触发警告
 	HugeWaveWarningTriggered bool
 
+	// ========== Bug Fix: 旗帜波+最终波独立判断 ==========
+
+	// PendingWarnings 待显示的警告队列
+	// 当一波既是旗帜波又是最终波时，需要顺序显示两个动画：
+	// 1. 先显示「一大波僵尸正在接近!」（红字）
+	// 2. 再显示「最后一波」（白字）
+	// 类型: "huge_wave" = 一大波僵尸, "final_wave" = 最后一波
+	PendingWarnings []string
+
+	// CurrentWarningIndex 当前正在显示的警告索引
+	// 从 PendingWarnings[0] 开始，显示完成后递增
+	CurrentWarningIndex int
+
+	// FinalWaveWarningTriggered 最终波警告是否已触发
+	// 防止重复触发最终波警告
+	FinalWaveWarningTriggered bool
+
 	// ========== Story 17.8: 血量触发加速刷新字段 ==========
 
 	// WaveInitialHealthCs 本波僵尸初始总血量（加权有效血量）
