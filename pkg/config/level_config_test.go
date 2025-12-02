@@ -1488,3 +1488,122 @@ func TestPresetPlant_Struct(t *testing.T) {
 		}
 	})
 }
+
+// ========== Story 19.9: 保龄球关卡配置测试 ==========
+
+// TestLoadLevelConfig_Bowling_RealFile 测试加载实际的 level-1-5.yaml 配置
+func TestLoadLevelConfig_Bowling_RealFile(t *testing.T) {
+	config, err := LoadLevelConfig("../../data/levels/level-1-5.yaml")
+	if err != nil {
+		t.Fatalf("LoadLevelConfig() failed: %v", err)
+	}
+
+	// 验证关卡 ID
+	if config.ID != "1-5" {
+		t.Errorf("Expected ID '1-5', got '%s'", config.ID)
+	}
+
+	// 验证无旗帜（flags: 0）
+	if config.Flags != 0 {
+		t.Errorf("Expected Flags 0 (bowling level has no flags), got %d", config.Flags)
+	}
+
+	// 验证 FlagWaves 为空（无旗帜波）
+	if len(config.FlagWaves) != 0 {
+		t.Errorf("Expected empty FlagWaves (bowling level has no flags), got %v", config.FlagWaves)
+	}
+
+	// 验证波次数量（应该有 16 波）
+	if len(config.Waves) < 16 {
+		t.Errorf("Expected at least 16 waves, got %d", len(config.Waves))
+	}
+
+	// 验证最终波类型为 "Final"
+	if len(config.Waves) > 0 {
+		lastWave := config.Waves[len(config.Waves)-1]
+		if lastWave.Type != "Final" {
+			t.Errorf("Expected last wave type 'Final', got '%s'", lastWave.Type)
+		}
+	}
+
+	// 验证所有波次的 IsFlag 都为 false
+	for i, wave := range config.Waves {
+		if wave.IsFlag {
+			t.Errorf("Wave %d should have IsFlag=false (bowling level has no flags), got true", i+1)
+		}
+	}
+
+	// 验证僵尸类型限制（只有 basic 和 conehead）
+	validTypes := map[string]bool{"basic": true, "conehead": true}
+	for i, wave := range config.Waves {
+		for j, zombie := range wave.Zombies {
+			if !validTypes[zombie.Type] {
+				t.Errorf("Wave %d zombie %d has invalid type '%s', expected 'basic' or 'conehead'",
+					i+1, j+1, zombie.Type)
+			}
+		}
+	}
+
+	// 验证特殊规则为 bowling
+	if config.SpecialRules != "bowling" {
+		t.Errorf("Expected SpecialRules 'bowling', got '%s'", config.SpecialRules)
+	}
+
+	// 验证 openingType 为 special
+	if config.OpeningType != "special" {
+		t.Errorf("Expected OpeningType 'special', got '%s'", config.OpeningType)
+	}
+
+	// 验证奖励植物为 potato_mine
+	if config.RewardPlant != "potato_mine" {
+		t.Errorf("Expected RewardPlant 'potato_mine', got '%s'", config.RewardPlant)
+	}
+}
+
+// TestLoadLevelConfig_Bowling_WavePhases 测试保龄球关卡的四阶段波次结构
+func TestLoadLevelConfig_Bowling_WavePhases(t *testing.T) {
+	config, err := LoadLevelConfig("../../data/levels/level-1-5.yaml")
+	if err != nil {
+		t.Fatalf("LoadLevelConfig() failed: %v", err)
+	}
+
+	// 验证阶段一（热身）：波次 1-3，仅普通僵尸
+	for i := 0; i < 3 && i < len(config.Waves); i++ {
+		wave := config.Waves[i]
+		for j, zombie := range wave.Zombies {
+			if zombie.Type != "basic" {
+				t.Errorf("Phase 1 (Warm Up) wave %d zombie %d should be 'basic', got '%s'",
+					i+1, j+1, zombie.Type)
+			}
+		}
+	}
+
+	// 验证阶段二开始引入路障僵尸（波次 4 及之后）
+	hasConeheadInPhase2 := false
+	for i := 3; i < 8 && i < len(config.Waves); i++ {
+		for _, zombie := range config.Waves[i].Zombies {
+			if zombie.Type == "conehead" {
+				hasConeheadInPhase2 = true
+				break
+			}
+		}
+		if hasConeheadInPhase2 {
+			break
+		}
+	}
+	if !hasConeheadInPhase2 {
+		t.Error("Phase 2 (Conehead Phase) should include conehead zombies")
+	}
+
+	// 验证最终波（波次 16）有大量僵尸
+	if len(config.Waves) >= 16 {
+		finalWave := config.Waves[15]
+		totalZombies := 0
+		for _, zombie := range finalWave.Zombies {
+			totalZombies += zombie.Count
+		}
+		if totalZombies < 8 {
+			t.Errorf("Final wave should have at least 8 zombies, got %d", totalZombies)
+		}
+	}
+}

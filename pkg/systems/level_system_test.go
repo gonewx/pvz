@@ -963,3 +963,117 @@ func TestUpdateRealProgress_FrameSkipping(t *testing.T) {
 		})
 	}
 }
+
+// ========== Story 19.9: 保龄球关卡波次测试 ==========
+
+// TestNewLevelSystem_SpecialLevel_PausedWaveTiming 测试特殊关卡初始化时暂停波次计时
+func TestNewLevelSystem_SpecialLevel_PausedWaveTiming(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := &game.GameState{}
+
+	// 创建保龄球关卡配置
+	levelConfig := &config.LevelConfig{
+		ID:          "1-5",
+		OpeningType: "special", // 特殊开场类型
+		Waves: []config.WaveConfig{
+			{Zombies: []config.ZombieGroup{{Type: "basic", Count: 1, Lanes: []int{1}}}},
+		},
+	}
+	gs.CurrentLevel = levelConfig
+
+	// 创建 LevelSystem
+	ls := NewLevelSystem(em, gs, nil, nil, nil, nil)
+
+	// 验证 WaveTimingSystem 存在
+	if ls.waveTimingSystem == nil {
+		t.Fatal("WaveTimingSystem should be created for special level")
+	}
+
+	// 获取计时器组件验证暂停状态
+	timer, ok := ecs.GetComponent[*components.WaveTimerComponent](em, ls.waveTimingSystem.GetTimerEntityID())
+	if !ok {
+		t.Fatal("WaveTimerComponent not found")
+	}
+
+	// 验证计时器暂停
+	if !timer.IsPaused {
+		t.Error("Wave timer should be paused for special level (openingType='special')")
+	}
+
+	// 验证计时器未初始化（首波延迟为 0）
+	if timer.CountdownCs != 0 {
+		t.Errorf("Wave timer CountdownCs should be 0 (not initialized), got %d", timer.CountdownCs)
+	}
+}
+
+// TestResumeWaveTiming_InitializesTimer 测试恢复波次计时时自动初始化计时器
+func TestResumeWaveTiming_InitializesTimer(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := &game.GameState{}
+
+	// 创建保龄球关卡配置
+	levelConfig := &config.LevelConfig{
+		ID:          "1-5",
+		OpeningType: "special",
+		Waves: []config.WaveConfig{
+			{Zombies: []config.ZombieGroup{{Type: "basic", Count: 1, Lanes: []int{1}}}},
+		},
+	}
+	gs.CurrentLevel = levelConfig
+
+	// 创建 LevelSystem（特殊关卡，计时器暂停）
+	ls := NewLevelSystem(em, gs, nil, nil, nil, nil)
+
+	// 获取计时器组件
+	timer, _ := ecs.GetComponent[*components.WaveTimerComponent](em, ls.waveTimingSystem.GetTimerEntityID())
+
+	// 验证初始状态：暂停且未初始化
+	if !timer.IsPaused {
+		t.Error("Timer should be paused initially")
+	}
+	if timer.CountdownCs != 0 {
+		t.Error("Timer CountdownCs should be 0 initially")
+	}
+
+	// 恢复波次计时（模拟阶段转场完成）
+	ls.ResumeWaveTiming()
+
+	// 重新获取计时器组件（可能已更新）
+	timer, _ = ecs.GetComponent[*components.WaveTimerComponent](em, ls.waveTimingSystem.GetTimerEntityID())
+
+	// 验证计时器已初始化并恢复
+	if timer.IsPaused {
+		t.Error("Timer should not be paused after ResumeWaveTiming")
+	}
+	if timer.CountdownCs <= 0 {
+		t.Errorf("Timer CountdownCs should be > 0 after initialization, got %d", timer.CountdownCs)
+	}
+}
+
+// TestLevelSystem_BowlingNoFlagWaveWarning 测试保龄球关卡不触发旗帜波警告
+func TestLevelSystem_BowlingNoFlagWaveWarning(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := &game.GameState{}
+
+	// 创建无旗帜的保龄球关卡配置
+	levelConfig := &config.LevelConfig{
+		ID:          "1-5",
+		OpeningType: "special",
+		Flags:       0,     // 无旗帜
+		FlagWaves:   nil,   // 无旗帜波
+		Waves: []config.WaveConfig{
+			{IsFlag: false, Zombies: []config.ZombieGroup{{Type: "basic", Count: 1, Lanes: []int{1}}}},
+			{IsFlag: false, Zombies: []config.ZombieGroup{{Type: "basic", Count: 1, Lanes: []int{2}}}},
+			{IsFlag: false, Type: "Final", Zombies: []config.ZombieGroup{{Type: "basic", Count: 3, Lanes: []int{1, 2, 3}}}},
+		},
+	}
+	gs.CurrentLevel = levelConfig
+
+	// 创建 LevelSystem
+	ls := NewLevelSystem(em, gs, nil, nil, nil, nil)
+
+	// 验证无旗帜波接近
+	if ls.waveTimingSystem.IsFlagWaveApproaching() {
+		t.Error("Should not have flag wave approaching for bowling level (flags=0)")
+	}
+}

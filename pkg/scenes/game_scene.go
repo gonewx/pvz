@@ -606,6 +606,12 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 		if scene.conveyorBeltSystem != nil {
 			scene.conveyorBeltSystem.Activate()
 		}
+		// Story 19.9: 恢复波次计时系统
+		// 特殊关卡在 LevelSystem 初始化时暂停了波次计时，现在需要初始化并恢复
+		if scene.levelSystem != nil {
+			scene.levelSystem.ResumeWaveTiming()
+			log.Printf("[GameScene] Wave timing resumed for bowling phase")
+		}
 	})
 
 	// Story 19.4: 生成预设植物

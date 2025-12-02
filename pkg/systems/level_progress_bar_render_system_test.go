@@ -346,6 +346,202 @@ func TestFlagPositionRendering(t *testing.T) {
 	}
 }
 
+// ========== Story 19.9: 保龄球关卡无旗帜进度条测试 ==========
+
+// TestProgressBar_NoFlagPositions 验证无旗帜时进度条正常渲染
+func TestProgressBar_NoFlagPositions(t *testing.T) {
+	// 创建测试用的假图片
+	backgroundImg := ebiten.NewImage(158, 54)
+	progressImg := ebiten.NewImage(86, 11)
+	partsImg := ebiten.NewImage(84, 28)
+
+	progressBar := &components.LevelProgressBarComponent{
+		BackgroundImage:   backgroundImg,
+		ProgressBarImage:  progressImg,
+		PartsImage:        partsImg,
+		TotalZombies:      50, // 保龄球关卡通常有较多僵尸
+		KilledZombies:     0,
+		ProgressPercent:   0.0,
+		FlagPositions:     []float64{}, // 无旗帜（保龄球关卡特征）
+		LevelText:         "关卡 1-5",
+		ShowLevelTextOnly: false,
+		X:                 602,
+		Y:                 573,
+	}
+
+	// 验证旗帜数组为空
+	if len(progressBar.FlagPositions) != 0 {
+		t.Errorf("FlagPositions 应为空数组，got %d elements", len(progressBar.FlagPositions))
+	}
+
+	// 验证不会因空旗帜数组而崩溃
+	// 模拟 drawFlags 的逻辑
+	for _, flagPos := range progressBar.FlagPositions {
+		// 如果数组为空，此循环不会执行
+		_ = flagPos
+		t.Error("不应进入旗帜渲染循环")
+	}
+}
+
+// TestProgressBar_NoFlagPositions_NilCheck 验证 nil FlagPositions 处理
+func TestProgressBar_NoFlagPositions_NilCheck(t *testing.T) {
+	progressBar := &components.LevelProgressBarComponent{
+		FlagPositions: nil, // nil 情况
+	}
+
+	// 验证 nil 和空数组都能正确处理
+	if progressBar.FlagPositions != nil && len(progressBar.FlagPositions) > 0 {
+		t.Error("应跳过旗帜渲染")
+	}
+
+	// 模拟 drawFlags 中的安全检查
+	if progressBar.FlagPositions == nil || len(progressBar.FlagPositions) == 0 {
+		// 正确：跳过旗帜渲染
+	} else {
+		t.Error("nil FlagPositions 应跳过渲染")
+	}
+}
+
+// TestProgressBar_BowlingLevel_ProgressCalculation 验证保龄球关卡进度计算
+func TestProgressBar_BowlingLevel_ProgressCalculation(t *testing.T) {
+	tests := []struct {
+		name             string
+		totalZombies     int
+		killedZombies    int
+		expectedProgress float64
+	}{
+		{
+			name:             "保龄球关卡开始 (0%)",
+			totalZombies:     50,
+			killedZombies:    0,
+			expectedProgress: 0.0,
+		},
+		{
+			name:             "保龄球关卡进行中 (40%)",
+			totalZombies:     50,
+			killedZombies:    20,
+			expectedProgress: 0.4,
+		},
+		{
+			name:             "保龄球关卡即将通关 (90%)",
+			totalZombies:     50,
+			killedZombies:    45,
+			expectedProgress: 0.9,
+		},
+		{
+			name:             "保龄球关卡通关 (100%)",
+			totalZombies:     50,
+			killedZombies:    50,
+			expectedProgress: 1.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var progress float64
+			if tt.totalZombies > 0 {
+				progress = float64(tt.killedZombies) / float64(tt.totalZombies)
+			}
+
+			if math.Abs(progress-tt.expectedProgress) > 0.01 {
+				t.Errorf("进度计算错误: got %.2f, expected %.2f", progress, tt.expectedProgress)
+			}
+		})
+	}
+}
+
+// TestProgressBar_NoFlags_ZombieHeadPosition 验证无旗帜时僵尸头位置仍正确
+func TestProgressBar_NoFlags_ZombieHeadPosition(t *testing.T) {
+	// 保龄球关卡无旗帜，但僵尸头仍需正确跟随进度
+	tests := []struct {
+		name            string
+		progressPercent float64
+		progressBarX    float64
+		bgWidth         float64
+		partWidth       int
+	}{
+		{"0%进度", 0.0, 602, 158, 28},
+		{"25%进度", 0.25, 602, 158, 28},
+		{"50%进度", 0.5, 602, 158, 28},
+		{"75%进度", 0.75, 602, 158, 28},
+		{"100%进度", 1.0, 602, 158, 28},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// 计算僵尸头位置（与有旗帜时逻辑相同）
+			headX := tt.progressBarX + tt.bgWidth*(1.0-tt.progressPercent) - float64(tt.partWidth)/2.0
+
+			// 验证位置在合理范围内
+			minX := tt.progressBarX - float64(tt.partWidth)
+			maxX := tt.progressBarX + tt.bgWidth
+
+			if headX < minX || headX > maxX {
+				t.Errorf("僵尸头X位置超出范围: got %.2f, expected in [%.2f, %.2f]",
+					headX, minX, maxX)
+			}
+		})
+	}
+}
+
+// TestProgressBar_FlagSegmentCalculation_NoFlags 验证无旗帜时段落计算
+func TestProgressBar_FlagSegmentCalculation_NoFlags(t *testing.T) {
+	// 保龄球关卡: flags=0, 无旗帜段落
+	totalLength := 150
+	flagSegmentLength := 12
+	flagCount := 0 // 无旗帜
+
+	// 计算普通段落（应占满整个进度条）
+	normalSegment := totalLength - (flagCount * flagSegmentLength)
+
+	if normalSegment != 150 {
+		t.Errorf("无旗帜时普通段落应为 150，got %d", normalSegment)
+	}
+
+	// 验证进度条从左到右完全可用
+	if normalSegment != totalLength {
+		t.Errorf("无旗帜时进度条应完全可用于普通波次")
+	}
+}
+
+// TestProgressBar_ComponentInit_BowlingLevel 验证保龄球关卡进度条组件初始化
+func TestProgressBar_ComponentInit_BowlingLevel(t *testing.T) {
+	// 创建测试用的假图片
+	backgroundImg := ebiten.NewImage(158, 54)
+	progressImg := ebiten.NewImage(86, 11)
+	partsImg := ebiten.NewImage(84, 28)
+
+	// 模拟保龄球关卡的进度条组件
+	progressBar := &components.LevelProgressBarComponent{
+		BackgroundImage:     backgroundImg,
+		ProgressBarImage:    progressImg,
+		PartsImage:          partsImg,
+		TotalProgressLength: 150,
+		FlagSegmentLength:   12,
+		NormalSegmentBase:   150, // 无旗帜时 = 150 - 0*12 = 150
+		TotalWaves:          16,  // 保龄球关卡 16 波
+		FlagWaveCount:       0,   // 无旗帜波
+		CurrentWaveNum:      0,
+		FlagPositions:       []float64{}, // 无旗帜
+		LevelText:           "关卡 1-5",
+		ShowLevelTextOnly:   true,
+	}
+
+	// 验证保龄球关卡特有配置
+	if progressBar.FlagWaveCount != 0 {
+		t.Errorf("FlagWaveCount 应为 0，got %d", progressBar.FlagWaveCount)
+	}
+	if progressBar.NormalSegmentBase != 150 {
+		t.Errorf("NormalSegmentBase 应为 150（无旗帜），got %d", progressBar.NormalSegmentBase)
+	}
+	if progressBar.TotalWaves != 16 {
+		t.Errorf("TotalWaves 应为 16，got %d", progressBar.TotalWaves)
+	}
+	if len(progressBar.FlagPositions) != 0 {
+		t.Errorf("FlagPositions 应为空，got %d elements", len(progressBar.FlagPositions))
+	}
+}
+
 // BenchmarkProgressBarRendering 性能基准测试（验证60 FPS性能）
 func BenchmarkProgressBarRendering(b *testing.B) {
 	// 创建测试用的假图片

@@ -78,6 +78,8 @@ type LevelSystem struct {
 // Removed ReanimSystem dependency, using AnimationCommand component
 func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *WaveSpawnSystem, rm *game.ResourceManager, rewardSystem *RewardAnimationSystem, lawnmowerSystem *LawnmowerSystem) *LevelSystem {
 	isTutorialLevel := gs.CurrentLevel != nil && gs.CurrentLevel.OpeningType == "tutorial"
+	// Story 19.9: 特殊开场关卡（如保龄球 Level 1-5）也需要暂停波次，等待阶段转场完成
+	isSpecialLevel := gs.CurrentLevel != nil && gs.CurrentLevel.OpeningType == "special"
 
 	ls := &LevelSystem{
 		entityManager:             em,
@@ -94,7 +96,8 @@ func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *
 
 	// Story 17.6+统一: 所有关卡都创建 WaveTimingSystem
 	// 教学关卡：初始暂停，等待 TutorialSystem 触发第一波后恢复
-	// 非教学关卡：自动开始计时
+	// 特殊开场关卡（如保龄球）：初始暂停，等待阶段转场完成后恢复
+	// 普通关卡：自动开始计时
 	if gs.CurrentLevel != nil {
 		ls.waveTimingSystem = NewWaveTimingSystem(em, gs, gs.CurrentLevel)
 
@@ -105,8 +108,12 @@ func NewLevelSystem(em *ecs.EntityManager, gs *game.GameState, waveSpawnSystem *
 			// 教学关卡：暂停计时器，等待 TutorialSystem 触发第一波
 			ls.waveTimingSystem.Pause()
 			log.Printf("[LevelSystem] Tutorial level: WaveTimingSystem created in paused state")
+		} else if isSpecialLevel {
+			// Story 19.9: 特殊开场关卡（如保龄球）：暂停计时器，等待 LevelPhaseSystem 触发
+			ls.waveTimingSystem.Pause()
+			log.Printf("[LevelSystem] Special level: WaveTimingSystem created in paused state, waiting for phase transition")
 		} else {
-			// 非教学关卡：自动初始化计时器
+			// 普通关卡：自动初始化计时器
 			ls.waveTimingSystem.InitializeTimerWithDelay(true, gs.CurrentLevel)
 		}
 	}
@@ -928,10 +935,22 @@ func (s *LevelSystem) PauseWaveTiming() {
 // ResumeWaveTiming 恢复波次计时
 //
 // Story 17.6: 在游戏恢复时调用
+// Story 19.9: 特殊关卡（如保龄球）在阶段转场后调用，会自动初始化计时器
 func (s *LevelSystem) ResumeWaveTiming() {
-	if s.waveTimingSystem != nil {
-		s.waveTimingSystem.Resume()
+	if s.waveTimingSystem == nil {
+		return
 	}
+
+	// Story 19.9: 检查计时器是否需要初始化
+	// 特殊关卡在初始化时暂停了计时器但没有设置首波延迟
+	timer, ok := ecs.GetComponent[*components.WaveTimerComponent](s.entityManager, s.waveTimingSystem.GetTimerEntityID())
+	if ok && timer.CountdownCs == 0 && timer.CurrentWaveIndex == 0 && timer.IsFirstWave {
+		// 计时器未初始化，需要先设置首波延迟
+		log.Printf("[LevelSystem] Initializing wave timer before resume (special level)")
+		s.waveTimingSystem.InitializeTimerWithDelay(true, s.gameState.CurrentLevel)
+	}
+
+	s.waveTimingSystem.Resume()
 }
 
 // GetWaveTimingSystem 获取波次计时系统（用于测试）
