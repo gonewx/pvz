@@ -37,6 +37,20 @@ shared:
         - Zombie_mustache
         - anim_innerarm3
 
+    # 受损状态：额外隐藏左手（outerarm）轨道
+    flag_zombie_damaged_hidden_tracks: &flag_zombie_damaged_hidden_tracks
+        - anim_bucket
+        - anim_cone
+        - anim_screendoor
+        - Zombie_innerarm_screendoor_hand
+        - Zombie_outerarm_screendoor
+        - Zombie_duckytube
+        - Zombie_mustache
+        - anim_innerarm3
+        - Zombie_outerarm_hand   # 左手掉落
+        - Zombie_outerarm_upper  # 左上臂掉落
+        - Zombie_outerarm_lower  # 左下臂掉落
+
 available_animations:
     - name: anim_idle
       display_name: idle
@@ -67,11 +81,11 @@ animation_combos:
       hidden_tracks: *flag_zombie_hidden_tracks
 
     - name: walk_damaged
-      display_name: 行走（旗帜受损）
+      display_name: 行走（受损，左手掉落）
       animations:
           - anim_walk
       binding_strategy: auto
-      hidden_tracks: *flag_zombie_hidden_tracks
+      hidden_tracks: *flag_zombie_damaged_hidden_tracks
       # 使用损坏的旗帜图片（覆盖叠加动画中的旗帜）
       image_overrides:
           IMAGE_REANIM_ZOMBIE_FLAG1: assets/reanim/Zombie_flag3.png
@@ -89,11 +103,11 @@ animation_combos:
           - anim_innerarm2
 
     - name: eat_damaged
-      display_name: 啃食（旗帜受损）
+      display_name: 啃食（受损，左手掉落）
       animations:
           - anim_eat
       binding_strategy: auto
-      hidden_tracks: *flag_zombie_hidden_tracks
+      hidden_tracks: *flag_zombie_damaged_hidden_tracks
       frozen_tracks:
           - Zombie_flaghand
           - anim_innerarm1
@@ -120,7 +134,7 @@ animation_combos:
           - Zombie_flaghand  # 死亡时旗帜掉落，隐藏旗帜手
 
     - name: death_damaged
-      display_name: 死亡（旗帜受损）
+      display_name: 死亡（受损，左手掉落）
       animations:
           - anim_death
       loop: false
@@ -134,7 +148,10 @@ animation_combos:
           - Zombie_duckytube
           - Zombie_mustache
           - anim_innerarm3
-          - Zombie_flaghand  # 死亡时旗帜掉落，隐藏旗帜手
+          - Zombie_flaghand        # 死亡时旗帜掉落，隐藏旗帜手
+          - Zombie_outerarm_hand   # 左手掉落
+          - Zombie_outerarm_upper  # 左上臂掉落
+          - Zombie_outerarm_lower  # 左下臂掉落
       # 使用损坏的旗帜图片（覆盖叠加动画中的旗帜）
       image_overrides:
           IMAGE_REANIM_ZOMBIE_FLAG1: assets/reanim/Zombie_flag3.png
