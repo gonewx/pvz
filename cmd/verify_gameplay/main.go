@@ -57,6 +57,9 @@ type VerifyGameplayGame struct {
 	sunMovementSystem   *systems.SunMovementSystem
 	flashEffectSystem   *systems.FlashEffectSystem
 
+	// 红字警告系统（一大波僵尸正在接近）
+	flagWaveWarningSystem *systems.FlagWaveWarningSystem
+
 	// 植物预览系统
 	plantPreviewSystem       *systems.PlantPreviewSystem
 	plantPreviewRenderSystem *systems.PlantPreviewRenderSystem
@@ -172,6 +175,10 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 	// 创建闪烁效果系统
 	flashEffectSystem := systems.NewFlashEffectSystem(em)
 
+	// 创建红字警告系统（一大波僵尸正在接近）
+	// 传入 nil 作为 WaveTimingSystem，使用手动触发模式
+	flagWaveWarningSystem := systems.NewFlagWaveWarningSystem(em, nil, rm)
+
 	// 加载字体
 	sunCounterFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.SunCounterFontSize)
 	if err != nil {
@@ -216,6 +223,7 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 	log.Println("  1-5       - 触发对应行的除草车")
 	log.Println("  Shift+1-5 - 在对应行生成一个僵尸")
 	log.Println("  R         - 触发奖励动画")
+	log.Println("  H         - 触发「一大波僵尸正在接近」提示")
 	log.Println("  P         - 开启/关闭自动生成僵尸")
 	log.Println("  C         - 清除所有僵尸")
 	log.Println("  Q         - 退出程序")
@@ -241,6 +249,7 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 		sunCollectionSystem:      sunCollectionSystem,
 		sunMovementSystem:        sunMovementSystem,
 		flashEffectSystem:        flashEffectSystem,
+		flagWaveWarningSystem:    flagWaveWarningSystem,
 		plantPreviewSystem:       plantPreviewSystem,
 		plantPreviewRenderSystem: plantPreviewRenderSystem,
 		plantCardRenderSystem:    plantCardRenderSystem,
@@ -460,6 +469,17 @@ func (vg *VerifyGameplayGame) Update() error {
 	if inpututil.IsKeyJustPressed(ebiten.KeyR) {
 		log.Println("[VerifyGameplay] Triggering reward animation...")
 		vg.rewardSystem.TriggerReward("plant", "sunflower")
+	}
+
+	// H 触发「一大波僵尸正在接近」提示
+	if inpututil.IsKeyJustPressed(ebiten.KeyH) {
+		if vg.flagWaveWarningSystem.IsWarningActive() {
+			log.Println("[VerifyGameplay] Dismissing huge wave warning...")
+			vg.flagWaveWarningSystem.DismissWarning()
+		} else {
+			log.Println("[VerifyGameplay] Triggering huge wave warning...")
+			vg.flagWaveWarningSystem.TriggerWarning()
+		}
 	}
 
 	// P 暂停/继续僵尸生成
@@ -773,6 +793,12 @@ func (vg *VerifyGameplayGame) Draw(screen *ebiten.Image) {
 	// 绘制 UI 元素
 	vg.drawUI(screen)
 
+	// 绘制 UI 层的 Reanim 实体
+	vg.renderSystem.DrawUIElements(screen)
+
+	// 绘制红字警告（一大波僵尸正在接近）
+	vg.drawHugeWaveWarning(screen)
+
 	// 绘制植物预览（选择植物后跟随鼠标的预览图像）
 	vg.plantPreviewRenderSystem.Draw(screen, vg.gameState.CameraX)
 
@@ -781,6 +807,91 @@ func (vg *VerifyGameplayGame) Draw(screen *ebiten.Image) {
 
 	// 绘制调试信息
 	vg.drawDebugInfo(screen)
+}
+
+// drawHugeWaveWarning 渲染红字警告 "A Huge Wave of Zombies is Approaching!"
+func (vg *VerifyGameplayGame) drawHugeWaveWarning(screen *ebiten.Image) {
+	// 查询红字警告实体
+	warningEntities := ecs.GetEntitiesWith1[*components.FlagWaveWarningComponent](vg.entityManager)
+	if len(warningEntities) == 0 {
+		return
+	}
+
+	// 获取警告组件
+	warningComp, ok := ecs.GetComponent[*components.FlagWaveWarningComponent](vg.entityManager, warningEntities[0])
+	if !ok || !warningComp.IsActive {
+		return
+	}
+
+	// 闪烁效果：不可见时跳过渲染
+	if !warningComp.FlashVisible {
+		return
+	}
+
+	// 优先使用预渲染的位图字体图片
+	if warningComp.TextImage != nil {
+		vg.drawHugeWaveWarningBitmap(screen, warningComp)
+		return
+	}
+
+	// 回退：使用 debugFont 渲染文本
+	vg.drawHugeWaveWarningText(screen, warningComp)
+}
+
+// drawHugeWaveWarningBitmap 使用预渲染的位图字体图片绘制警告
+func (vg *VerifyGameplayGame) drawHugeWaveWarningBitmap(screen *ebiten.Image, warningComp *components.FlagWaveWarningComponent) {
+	textImage := warningComp.TextImage
+	imgWidth := float64(textImage.Bounds().Dx())
+	imgHeight := float64(textImage.Bounds().Dy())
+
+	// 计算缩放后的尺寸
+	scaledWidth := imgWidth * warningComp.Scale
+	scaledHeight := imgHeight * warningComp.Scale
+
+	// 绘制半透明黑色背景（提高可读性）
+	bgPadding := 15.0 * warningComp.Scale
+	bgX := warningComp.X - scaledWidth/2 - bgPadding
+	bgY := warningComp.Y - scaledHeight/2 - bgPadding
+	bgW := scaledWidth + bgPadding*2
+	bgH := scaledHeight + bgPadding*2
+
+	bgImage := ebiten.NewImage(int(bgW), int(bgH))
+	bgImage.Fill(color.RGBA{R: 0, G: 0, B: 0, A: 128})
+	bgOp := &ebiten.DrawImageOptions{}
+	bgOp.GeoM.Translate(bgX, bgY)
+	screen.DrawImage(bgImage, bgOp)
+
+	// 绘制文字图片
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Scale(warningComp.Scale, warningComp.Scale)
+	op.GeoM.Translate(-scaledWidth/2, -scaledHeight/2)
+	op.GeoM.Translate(warningComp.X, warningComp.Y)
+
+	// 应用透明度
+	op.ColorScale.ScaleAlpha(float32(warningComp.Alpha))
+
+	screen.DrawImage(textImage, op)
+}
+
+// drawHugeWaveWarningText 使用系统字体绘制警告（回退方案）
+func (vg *VerifyGameplayGame) drawHugeWaveWarningText(screen *ebiten.Image, warningComp *components.FlagWaveWarningComponent) {
+	if vg.debugFont == nil {
+		return
+	}
+
+	warningText := warningComp.Text
+
+	// 测量文本宽度以便居中
+	textWidth := text.Advance(warningText, vg.debugFont)
+
+	// 居中绘制
+	x := warningComp.X - textWidth/2
+	y := warningComp.Y
+
+	op := &text.DrawOptions{}
+	op.GeoM.Translate(x, y)
+	op.ColorScale.ScaleWithColor(color.RGBA{R: 255, G: 0, B: 0, A: 255}) // 红色
+	text.Draw(screen, warningText, vg.debugFont, op)
 }
 
 // drawUI 绘制 UI 元素
@@ -816,7 +927,7 @@ func (vg *VerifyGameplayGame) drawDebugInfo(screen *ebiten.Image) {
 
 	// 快捷键提示
 	hints := []string{
-		"1-5=除草车 | Shift+1-5=生成僵尸 | R=奖励 | P=自动生成 | C=清除 | Q=退出 | 右键=取消",
+		"1-5=除草车 | Shift+1-5=生成僵尸 | R=奖励 | H=一大波僵尸 | P=自动生成 | C=清除 | Q=退出 | 右键=取消",
 	}
 
 	if vg.selectedPlantType != components.PlantUnknown {

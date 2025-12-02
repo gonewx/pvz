@@ -1,6 +1,7 @@
 package systems
 
 import (
+	"image/color"
 	"log"
 
 	"github.com/decker502/pvz/internal/reanim"
@@ -8,6 +9,8 @@ import (
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/decker502/pvz/pkg/utils"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // 红字警告动画常量
@@ -31,13 +34,13 @@ const (
 //
 // 职责：
 //   - 监控 WaveTimerComponent.FlagWaveCountdownPhase
-//   - Phase 5 时创建 FinalWave.reanim 动画实体
+//   - Phase 5 时使用 HouseofTerror28 位图字体生成红色警告文字
 //   - 播放警告音效
 //   - Phase 完成后销毁实体
 //
 // 架构说明：
 //   - 遵循 ECS 架构：系统只处理逻辑，不存储状态
-//   - 复用 Story 11.3 的 FinalWaveWarningComponent 和动画资源
+//   - Story 17.7 补充任务：使用 HouseofTerror28 位图字体动态渲染红色文字
 //   - 零耦合：通过读取 WaveTimerComponent 获取状态
 type FlagWaveWarningSystem struct {
 	entityManager    *ecs.EntityManager
@@ -46,6 +49,13 @@ type FlagWaveWarningSystem struct {
 
 	// warningEntityID 当前红字警告实体ID（0 表示无）
 	warningEntityID ecs.EntityID
+
+	// bitmapFont HouseofTerror28 位图字体（缓存）
+	// Story 17.7 补充任务：用于渲染「一大波僵尸正在接近!」红色文字
+	bitmapFont *utils.BitmapFont
+
+	// bitmapFontLoaded 标记是否已尝试加载位图字体
+	bitmapFontLoaded bool
 }
 
 // NewFlagWaveWarningSystem 创建红字警告动画系统
@@ -63,6 +73,8 @@ func NewFlagWaveWarningSystem(em *ecs.EntityManager, wts *WaveTimingSystem, rm *
 		waveTimingSystem: wts,
 		resourceManager:  rm,
 		warningEntityID:  0,
+		bitmapFont:       nil,
+		bitmapFontLoaded: false,
 	}
 }
 
@@ -102,17 +114,19 @@ func (s *FlagWaveWarningSystem) Update(deltaTime float64) {
 
 // createWarningEntity 创建红字警告实体
 //
-// 使用 FinalWave.reanim 动画（复用 Story 11.3 的资源）
-// 不添加 FinalWaveWarningComponent，避免被 FinalWaveWarningSystem 干扰
-// 如果资源管理器为 nil 或动画加载失败，使用纯文本回退方案
+// Story 17.7 补充任务：复用 FinalWave.reanim 动画定义，替换图片为位图字体渲染的红色文字
+// 1. 加载 FinalWave.reanim 动画参数（缩放、位移、透明度变化）
+// 2. 用 HouseofTerror28 位图字体渲染「一大波僵尸正在接近!」红色文字
+// 3. 替换 IMAGE_REANIM_FINALWAVE 为动态生成的红色文字图片
+// 4. 创建带 ReanimComponent 的实体，让 ReanimSystem 播放动画
 func (s *FlagWaveWarningSystem) createWarningEntity() {
-	// 如果没有资源管理器，直接使用纯文本回退方案
+	// 如果没有资源管理器，使用纯文本回退方案
 	if s.resourceManager == nil {
 		s.createTextWarningEntity()
 		return
 	}
 
-	// 尝试加载 FinalWave.reanim 资源
+	// 加载 FinalWave.reanim 动画定义
 	reanimXML := s.resourceManager.GetReanimXML("FinalWave")
 	if reanimXML == nil {
 		log.Printf("[FlagWaveWarningSystem] WARNING: FinalWave.reanim not found, using text fallback")
@@ -120,16 +134,27 @@ func (s *FlagWaveWarningSystem) createWarningEntity() {
 		return
 	}
 
-	partImages := s.resourceManager.GetReanimPartImages("FinalWave")
-	if len(partImages) == 0 {
-		log.Printf("[FlagWaveWarningSystem] WARNING: FinalWave images not found, using text fallback")
+	// 渲染红色警告文字图片
+	textImage := s.renderWarningTextImage()
+	if textImage == nil {
+		log.Printf("[FlagWaveWarningSystem] WARNING: Failed to render text image, using text fallback")
 		s.createTextWarningEntity()
 		return
 	}
 
-	// 计算屏幕中心位置
-	centerX := float64(config.ScreenWidth) / 2
-	centerY := float64(config.ScreenHeight) / 2
+	// 创建 partImages，用红色文字图片替换 IMAGE_REANIM_FINALWAVE
+	partImages := map[string]*ebiten.Image{
+		"IMAGE_REANIM_FINALWAVE": textImage,
+	}
+
+	// 计算实体位置
+	// FinalWave.reanim 动画最终帧的相对位置是 (220.1, 260.1)
+	// 为了让动画最终帧居中显示在屏幕中心，需要补偿这个偏移
+	// 同时考虑图片尺寸（图片锚点在左上角，需要偏移半个图片尺寸）
+	imgWidth := float64(textImage.Bounds().Dx())
+	imgHeight := float64(textImage.Bounds().Dy())
+	centerX := float64(config.ScreenWidth)/2 - imgWidth/2
+	centerY := float64(config.ScreenHeight)/2 - imgHeight/2
 
 	// 创建实体
 	entityID := s.entityManager.CreateEntity()
@@ -173,7 +198,7 @@ func (s *FlagWaveWarningSystem) createWarningEntity() {
 		State: components.UINormal,
 	}
 
-	// 添加所有组件（不添加 FinalWaveWarningComponent！）
+	// 添加所有组件
 	ecs.AddComponent(s.entityManager, entityID, reanimComp)
 	ecs.AddComponent(s.entityManager, entityID, posComp)
 	ecs.AddComponent(s.entityManager, entityID, uiComp)
@@ -194,23 +219,30 @@ func (s *FlagWaveWarningSystem) createWarningEntity() {
 		log.Printf("[FlagWaveWarningSystem] WARNING: SOUND_AWOOGA not loaded")
 	}
 
-	log.Printf("[FlagWaveWarningSystem] Created FinalWave reanim entity (ID: %d) at (%.0f, %.0f)", entityID, centerX, centerY)
+	log.Printf("[FlagWaveWarningSystem] Created huge wave warning entity (ID: %d) at (%.0f, %.0f) with custom text image",
+		entityID, centerX, centerY)
 }
 
 // createTextWarningEntity 创建纯文本警告实体（回退方案）
 //
+// Story 17.7 补充任务：使用 HouseofTerror28 位图字体渲染红色文字
 // 当 FinalWave.reanim 加载失败时使用
 func (s *FlagWaveWarningSystem) createTextWarningEntity() {
 	entityID := s.entityManager.CreateEntity()
 	s.warningEntityID = entityID
 
-	// 计算屏幕中心位置
+	// 计算屏幕中心位置（水平和垂直居中）
 	centerX := float64(config.ScreenWidth) / 2
-	centerY := float64(config.ScreenHeight) / 3 // 上方 1/3 处
+	centerY := float64(config.ScreenHeight) / 2
+
+	// 尝试使用位图字体渲染红色文字图片
+	var textImage *ebiten.Image
+	textImage = s.renderWarningTextImage()
 
 	// 添加警告组件
 	warningComp := &components.FlagWaveWarningComponent{
 		Text:            components.FlagWaveWarningText,
+		TextImage:       textImage,
 		Phase:           5,
 		ElapsedTimeCs:   0,
 		TotalDurationCs: FlagWarningTotalDurationCs,
@@ -225,7 +257,60 @@ func (s *FlagWaveWarningSystem) createTextWarningEntity() {
 
 	ecs.AddComponent(s.entityManager, entityID, warningComp)
 
-	log.Printf("[FlagWaveWarningSystem] Created text warning entity (ID: %d) at (%.0f, %.0f) [fallback]", entityID, centerX, centerY)
+	if textImage != nil {
+		log.Printf("[FlagWaveWarningSystem] Created text warning entity (ID: %d) with bitmap font at (%.0f, %.0f)", entityID, centerX, centerY)
+	} else {
+		log.Printf("[FlagWaveWarningSystem] Created text warning entity (ID: %d) at (%.0f, %.0f) [text fallback]", entityID, centerX, centerY)
+	}
+}
+
+// renderWarningTextImage 获取预渲染的红色警告文字图片
+//
+// Story 17.7 补充任务：使用 HouseofTerror28 字体图集中预渲染的
+// 「一大波僵尸正在接近!」中文文字，并应用红色着色
+//
+// 返回：
+//   - *ebiten.Image: 渲染的文字图片，失败时返回 nil
+func (s *FlagWaveWarningSystem) renderWarningTextImage() *ebiten.Image {
+	// 懒加载位图字体（只尝试一次）
+	if !s.bitmapFontLoaded {
+		s.loadBitmapFont()
+	}
+
+	if s.bitmapFont == nil {
+		return nil
+	}
+
+	// 使用红色提取预渲染的中文警告文字
+	redColor := color.RGBA{R: 255, G: 0, B: 0, A: 255}
+	textImage, err := s.bitmapFont.GetHugeWaveWarningImage(redColor)
+	if err != nil {
+		log.Printf("[FlagWaveWarningSystem] Failed to get huge wave warning image: %v", err)
+		return nil
+	}
+
+	log.Printf("[FlagWaveWarningSystem] Got pre-rendered warning text image: %dx%d",
+		textImage.Bounds().Dx(), textImage.Bounds().Dy())
+	return textImage
+}
+
+// loadBitmapFont 加载 HouseofTerror28 位图字体
+//
+// Story 17.7 补充任务：懒加载位图字体，只尝试一次
+func (s *FlagWaveWarningSystem) loadBitmapFont() {
+	s.bitmapFontLoaded = true
+
+	font, err := utils.LoadBitmapFont(
+		"assets/data/HouseofTerror28.png",
+		"assets/data/HouseofTerror28.txt",
+	)
+	if err != nil {
+		log.Printf("[FlagWaveWarningSystem] Failed to load HouseofTerror28 font: %v", err)
+		return
+	}
+
+	s.bitmapFont = font
+	log.Printf("[FlagWaveWarningSystem] Loaded HouseofTerror28 bitmap font (%d characters)", len(font.CharMap))
 }
 
 // destroyWarningEntity 销毁红字警告实体
@@ -280,5 +365,31 @@ func (s *FlagWaveWarningSystem) IsWarningActive() bool {
 	return s.warningEntityID != 0
 }
 
+// TriggerWarning 手动触发警告动画
+//
+// 用于调试和验证程序，直接创建警告实体而不依赖 WaveTimingSystem 状态
+// 警告将显示约 4 秒后自动消失
+//
+// 返回：
+//   - bool: true 表示成功触发，false 表示警告已存在
+func (s *FlagWaveWarningSystem) TriggerWarning() bool {
+	if s.warningEntityID != 0 {
+		log.Printf("[FlagWaveWarningSystem] Warning already active, skipping trigger")
+		return false
+	}
 
+	log.Printf("[FlagWaveWarningSystem] Manual warning trigger")
+	s.createWarningEntity()
+	return true
+}
 
+// DismissWarning 手动关闭警告动画
+//
+// 用于调试和验证程序，立即销毁警告实体
+func (s *FlagWaveWarningSystem) DismissWarning() {
+	if s.warningEntityID == 0 {
+		return
+	}
+
+	s.destroyWarningEntity()
+}

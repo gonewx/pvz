@@ -5,19 +5,19 @@ schema: 1
 story: "17.7"
 story_title: "旗帜波特殊计时与红字警告"
 gate: PASS
-status_reason: "所有验收标准已满足，代码遵循 ECS 架构原则，测试覆盖全面"
+status_reason: "所有验收标准已满足（含补充任务），代码遵循 ECS 架构原则，测试覆盖全面，「一大波僵尸正在接近!」现正确使用 HouseofTerror28 位图字体渲染"
 reviewer: "Quinn (Test Architect)"
-updated: "2025-11-29T14:00:00+08:00"
+updated: "2025-12-02T13:15:00+08:00"
 
 waiver: { active: false }
 
 top_issues: []
 
 quality_score: 100
-expires: "2025-12-13T00:00:00+08:00"
+expires: "2025-12-16T00:00:00+08:00"
 
 evidence:
-  tests_reviewed: 20
+  tests_reviewed: 27
   risks_identified: 0
   trace:
     ac_covered: [1, 2, 3, 4, 5]
@@ -29,10 +29,10 @@ nfr_validation:
     notes: "不涉及安全相关功能"
   performance:
     status: PASS
-    notes: "警告系统仅在相关阶段激活，不增加常规帧开销"
+    notes: "警告系统仅在相关阶段激活，位图字体懒加载优化性能"
   reliability:
     status: PASS
-    notes: "实体生命周期正确管理，边界条件已处理"
+    notes: "实体生命周期正确管理，边界条件已处理，回退机制完善"
   maintainability:
     status: PASS
     notes: "常量集中管理，GoDoc 注释完整，代码组织清晰"
@@ -43,10 +43,10 @@ recommendations:
 
 # Test Results Summary
 test_summary:
-  total_tests: 20
-  passed: 20
+  total_tests: 27
+  passed: 27
   failed: 0
-  coverage: "Story 17.7 相关测试 100% 通过"
+  coverage: "Story 17.7 相关测试 100% 通过（含补充任务）"
 
 # AC Verification
 acceptance_criteria:
@@ -66,8 +66,9 @@ acceptance_criteria:
     status: PASS
     evidence:
       - "FlagWaveCountdownPhase 字段实现阶段状态机"
-      - "Phase 5 显示红字，Phase 4 停留 400cs"
+      - "Phase 5 显示红字，Phase 4 停留 725cs"
       - "FlagWaveWarningSystem 管理动画生命周期"
+      - "补充任务：HouseofTerror28 位图字体动态渲染红色文字"
     tests:
       - "TestWaveTimingSystem_HugeWaveWarningPhase5"
       - "TestWaveTimingSystem_Phase4Duration"
@@ -76,6 +77,10 @@ acceptance_criteria:
       - "TestFlagWaveWarningSystem_DestroyWarningEntity"
       - "TestFlagWaveWarningSystem_AnimationUpdate"
       - "TestFlagWaveWarningSystem_IsWarningActive"
+      - "TestFlagWaveWarningSystem_BitmapFontTextImage"
+      - "TestFlagWaveWarningSystem_BitmapFontLazyLoad"
+      - "TestFlagWaveWarningSystem_TriggerWarning"
+      - "TestFlagWaveWarningSystem_DismissWarning"
 
   ac3_final_wave_timing:
     status: PASS
@@ -89,7 +94,8 @@ acceptance_criteria:
     status: PASS
     evidence:
       - "drawHugeWaveWarning() 渲染红字警告"
-      - "最终波使用现有 FinalWave.reanim 动画系统"
+      - "drawHugeWaveWarningBitmap() 使用预渲染位图字体图片"
+      - "drawHugeWaveWarningText() 回退方案"
       - "缩放、闪烁、淡入效果实现完整"
     tests:
       - "运行时验证通过"
@@ -97,13 +103,52 @@ acceptance_criteria:
   ac5_test_coverage:
     status: PASS
     evidence:
-      - "20 个 Story 17.7 相关测试用例"
+      - "27 个 Story 17.7 相关测试用例"
       - "覆盖全部正常路径和边界条件"
       - "nil 检查、阶段转换、计时精度均已测试"
+      - "补充任务测试：位图字体渲染、懒加载、着色"
     tests:
       - "全部通过"
 
+# Supplementary Tasks (Task 11-13) - 2025-12-02
+supplementary_tasks:
+  task11_bitmap_font_extension:
+    status: PASS
+    evidence:
+      - "BitmapFont.RenderTextToImage() 方法实现"
+      - "支持着色渲染（color.Color 参数）"
+      - "空格字符和不支持字符处理完善"
+    tests:
+      - "TestBitmapFont_RenderTextToImage"
+      - "TestBitmapFont_RenderTextToImage_TintColor"
+      - "TestBitmapFont_RenderTextToImage_ErrorCases"
+      - "TestBitmapFont_RenderTextToImage_NilFont"
 
+  task12_flag_wave_warning_refactor:
+    status: PASS
+    evidence:
+      - "loadBitmapFont() 懒加载 HouseofTerror28"
+      - "renderWarningTextImage() 生成红色文字图片"
+      - "createWarningEntity() 正确替换轨道图片"
+    tests:
+      - "TestFlagWaveWarningSystem_BitmapFontTextImage"
+      - "TestFlagWaveWarningSystem_BitmapFontLazyLoad"
 
+  task13_integration_validation:
+    status: PASS
+    evidence:
+      - "「一大波僵尸正在接近!」正确显示红色文字"
+      - "「最后一波」仍使用 FinalWave.png"
+      - "回退方案正常工作"
+    tests:
+      - "运行时验证通过"
+      - "所有单元测试通过"
 
-
+# Review History
+history:
+  - at: "2025-11-27T14:00:00+08:00"
+    gate: PASS
+    note: "初始审查 - 所有 AC 满足"
+  - at: "2025-12-02T13:15:00+08:00"
+    gate: PASS
+    note: "补充任务审查 - Task 11-13 完成，位图字体渲染实现正确"

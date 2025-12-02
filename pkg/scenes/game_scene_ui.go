@@ -343,6 +343,7 @@ func (s *GameScene) drawLastWaveWarning(screen *ebiten.Image) {
 
 // drawHugeWaveWarning 渲染红字警告 "A Huge Wave of Zombies is Approaching!"
 // Story 17.7: 旗帜波前的红字警告动画
+// Story 17.7 补充任务：优先使用 HouseofTerror28 位图字体预渲染的红色文字图片
 func (s *GameScene) drawHugeWaveWarning(screen *ebiten.Image) {
 	// 查询红字警告实体
 	warningEntities := ecs.GetEntitiesWith1[*components.FlagWaveWarningComponent](s.entityManager)
@@ -361,6 +362,56 @@ func (s *GameScene) drawHugeWaveWarning(screen *ebiten.Image) {
 		return
 	}
 
+	// 优先使用预渲染的位图字体图片
+	if warningComp.TextImage != nil {
+		s.drawHugeWaveWarningBitmap(screen, warningComp)
+		return
+	}
+
+	// 回退：使用 sunCounterFont 渲染文本
+	s.drawHugeWaveWarningText(screen, warningComp)
+}
+
+// drawHugeWaveWarningBitmap 使用预渲染的位图字体图片绘制警告
+// Story 17.7 补充任务：使用 HouseofTerror28 位图字体渲染的红色文字
+func (s *GameScene) drawHugeWaveWarningBitmap(screen *ebiten.Image, warningComp *components.FlagWaveWarningComponent) {
+	textImage := warningComp.TextImage
+	imgWidth := float64(textImage.Bounds().Dx())
+	imgHeight := float64(textImage.Bounds().Dy())
+
+	// 计算缩放后的尺寸
+	scaledWidth := imgWidth * warningComp.Scale
+	scaledHeight := imgHeight * warningComp.Scale
+
+	// 绘制半透明黑色背景（提高可读性）
+	bgPadding := 15.0 * warningComp.Scale
+	x := warningComp.X - scaledWidth/2
+	y := warningComp.Y
+	ebitenutil.DrawRect(screen,
+		x-bgPadding,
+		y-bgPadding,
+		scaledWidth+bgPadding*2,
+		scaledHeight+bgPadding*2,
+		color.RGBA{R: 0, G: 0, B: 0, A: 180})
+
+	// 绘制预渲染的红色文字图片
+	op := &ebiten.DrawImageOptions{}
+	// 先移动到原点（图片左上角）
+	op.GeoM.Translate(-imgWidth/2, 0)
+	// 应用缩放
+	op.GeoM.Scale(warningComp.Scale, warningComp.Scale)
+	// 移动到目标位置
+	op.GeoM.Translate(warningComp.X, warningComp.Y)
+
+	// 应用透明度
+	op.ColorScale.ScaleAlpha(float32(warningComp.Alpha))
+
+	screen.DrawImage(textImage, op)
+}
+
+// drawHugeWaveWarningText 使用系统字体绘制警告（回退方案）
+// Story 17.7: 当位图字体不可用时使用 sunCounterFont
+func (s *GameScene) drawHugeWaveWarningText(screen *ebiten.Image, warningComp *components.FlagWaveWarningComponent) {
 	// 使用阳光计数器字体
 	if s.sunCounterFont == nil {
 		return

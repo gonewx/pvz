@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"image/color"
 	"testing"
 )
 
@@ -99,5 +100,177 @@ func TestBitmapFont_CharacterSupport(t *testing.T) {
 		if _, ok := font.CharMap[char]; !ok {
 			t.Logf("Note: Font does not support optional character: %q", char)
 		}
+	}
+}
+
+// TestBitmapFont_RenderTextToImage 测试文本渲染为图像
+func TestBitmapFont_RenderTextToImage(t *testing.T) {
+	font, err := LoadBitmapFont(
+		"../../assets/data/HouseofTerror28.png",
+		"../../assets/data/HouseofTerror28.txt",
+	)
+	if err != nil {
+		t.Skipf("Skipping test: font not available: %v", err)
+	}
+
+	tests := []struct {
+		name      string
+		text      string
+		tintColor color.Color
+		wantErr   bool
+	}{
+		{
+			name:      "英文文本无着色",
+			text:      "Hello World!",
+			tintColor: nil,
+			wantErr:   false,
+		},
+		{
+			name:      "英文文本红色着色",
+			text:      "A Huge Wave of Zombies is Approaching!",
+			tintColor: color.RGBA{255, 0, 0, 255},
+			wantErr:   false,
+		},
+		{
+			name:      "数字文本",
+			text:      "12345",
+			tintColor: nil,
+			wantErr:   false,
+		},
+		{
+			name:      "空文本应报错",
+			text:      "",
+			tintColor: nil,
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			img, err := font.RenderTextToImage(tt.text, tt.tintColor)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+
+			if img == nil {
+				t.Error("Expected non-nil image")
+				return
+			}
+
+			// 验证图像尺寸
+			bounds := img.Bounds()
+			expectedWidth := font.MeasureText(tt.text)
+			expectedHeight := font.LineHeight
+
+			if bounds.Dx() != expectedWidth {
+				t.Errorf("Expected width %d, got %d", expectedWidth, bounds.Dx())
+			}
+
+			if bounds.Dy() != expectedHeight {
+				t.Errorf("Expected height %d, got %d", expectedHeight, bounds.Dy())
+			}
+
+			t.Logf("Rendered image size: %dx%d", bounds.Dx(), bounds.Dy())
+		})
+	}
+}
+
+// TestBitmapFont_RenderTextToImage_TintColor 测试着色功能
+func TestBitmapFont_RenderTextToImage_TintColor(t *testing.T) {
+	font, err := LoadBitmapFont(
+		"../../assets/data/HouseofTerror28.png",
+		"../../assets/data/HouseofTerror28.txt",
+	)
+	if err != nil {
+		t.Skipf("Skipping test: font not available: %v", err)
+	}
+
+	// 测试不同颜色
+	colors := []struct {
+		name  string
+		color color.Color
+	}{
+		{"红色", color.RGBA{255, 0, 0, 255}},
+		{"绿色", color.RGBA{0, 255, 0, 255}},
+		{"蓝色", color.RGBA{0, 0, 255, 255}},
+		{"半透明白色", color.RGBA{255, 255, 255, 128}},
+	}
+
+	for _, c := range colors {
+		t.Run(c.name, func(t *testing.T) {
+			img, err := font.RenderTextToImage("Test", c.color)
+			if err != nil {
+				t.Errorf("Failed to render with %s: %v", c.name, err)
+				return
+			}
+
+			if img == nil {
+				t.Error("Expected non-nil image")
+			}
+		})
+	}
+}
+
+// TestBitmapFont_RenderTextToImage_ErrorCases 测试错误情况
+func TestBitmapFont_RenderTextToImage_ErrorCases(t *testing.T) {
+	font, err := LoadBitmapFont(
+		"../../assets/data/HouseofTerror28.png",
+		"../../assets/data/HouseofTerror28.txt",
+	)
+	if err != nil {
+		t.Skipf("Skipping test: font not available: %v", err)
+	}
+
+	tests := []struct {
+		name    string
+		text    string
+		wantErr bool
+	}{
+		{
+			name:    "空文本",
+			text:    "",
+			wantErr: true,
+		},
+		{
+			name:    "全部不支持的字符",
+			text:    "中文字符",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := font.RenderTextToImage(tt.text, nil)
+			if tt.wantErr && err == nil {
+				t.Error("Expected error, got nil")
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// TestBitmapFont_RenderTextToImage_NilFont 测试未加载图像的情况
+func TestBitmapFont_RenderTextToImage_NilFont(t *testing.T) {
+	// 创建一个没有图像的字体对象
+	font := &BitmapFont{
+		Image:      nil,
+		CharMap:    make(map[rune]CharInfo),
+		LineHeight: 54,
+	}
+
+	_, err := font.RenderTextToImage("Test", nil)
+	if err == nil {
+		t.Error("Expected error for nil font image, got nil")
 	}
 }

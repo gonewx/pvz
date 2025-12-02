@@ -1,5 +1,7 @@
 package components
 
+import "github.com/hajimehoshi/ebiten/v2"
+
 // FlagWaveWarningComponent 红字警告组件
 //
 // Story 17.7: 用于标记和管理旗帜波来袭时的红字警告动画实体
@@ -10,6 +12,11 @@ type FlagWaveWarningComponent struct {
 	// Text 显示的警告文本
 	// 默认: "A Huge Wave of Zombies is Approaching!"
 	Text string
+
+	// TextImage 预渲染的文字图片
+	// Story 17.7 补充任务: 使用 HouseofTerror28 位图字体渲染的红色文字图片
+	// nil 表示使用回退渲染（sunCounterFont）
+	TextImage *ebiten.Image
 
 	// Phase 当前警告阶段
 	// 5 = 初始显示（从大缩小）

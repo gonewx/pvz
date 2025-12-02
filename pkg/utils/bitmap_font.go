@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"log"
 	"os"
 	"regexp"
@@ -18,6 +19,10 @@ type BitmapFont struct {
 	Image      *ebiten.Image     // 字体图集
 	CharMap    map[rune]CharInfo // 字符 → 字符信息映射
 	LineHeight int               // 行高（像素）
+
+	// HugeWaveRect 预渲染的中文警告文字「一大波僵尸正在接近!」的矩形区域
+	// 这段文字作为整体预渲染在字体图集中（HouseofTerror28 的第二行）
+	HugeWaveRect image.Rectangle
 }
 
 // CharInfo 单个字符的信息
@@ -41,6 +46,13 @@ func LoadBitmapFont(imagePath, metaPath string) (*BitmapFont, error) {
 		return nil, fmt.Errorf("failed to load font image: %w", err)
 	}
 
+	// 读取元数据文件内容
+	data, err := os.ReadFile(metaPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read meta file: %w", err)
+	}
+	content := string(data)
+
 	// 解析元数据
 	charList, widthList, rectList, err := parseFontMeta(metaPath)
 	if err != nil {
@@ -48,7 +60,7 @@ func LoadBitmapFont(imagePath, metaPath string) (*BitmapFont, error) {
 	}
 
 	// 验证数据一致性
-	// 注意：WidthList 和 RectList 的第一个元素对应空字符，可能比 CharList 多一个
+	// 注意：WidthList 和 RectList 的第一个元素对应空字符占位符，比 CharList 多一个
 	// 如果 widthList 比 charList 多 1个，删除第一个元素
 	if len(widthList) == len(charList)+1 && len(rectList) == len(charList)+1 {
 		widthList = widthList[1:]
@@ -69,16 +81,43 @@ func LoadBitmapFont(imagePath, metaPath string) (*BitmapFont, error) {
 		}
 	}
 
-	// 计算行高（使用第一个非空字符的高度）
+	// 解析空格字符的宽度
+	// 格式: LayerSetCharWidths Main (' ') (width);
+	spaceWidthRe := regexp.MustCompile(`LayerSetCharWidths\s+\w+\s+\(' '\)\s+\((\d+)\)`)
+	if matches := spaceWidthRe.FindStringSubmatch(content); len(matches) >= 2 {
+		spaceWidth, _ := strconv.Atoi(matches[1])
+		// 空格没有图形，使用空矩形，只有宽度
+		charMap[' '] = CharInfo{
+			Rect:  image.Rect(0, 0, 0, 0),
+			Width: spaceWidth,
+		}
+	}
+
+	// 计算行高（使用第一个字符的高度）
 	lineHeight := 54 // 默认值
-	if len(rectList) > 1 {
-		lineHeight = rectList[1].Dy()
+	if len(rectList) > 0 {
+		lineHeight = rectList[0].Dy()
+	}
+
+	// 提取预渲染的中文警告文字区域「一大波僵尸正在接近!」
+	// RectList 的第一个元素（占位符位置）通常包含这段预渲染文字
+	// 位于 HouseofTerror28.png 的第二行 (y=55, 288x39)
+	var hugeWaveRect image.Rectangle
+	fullRectList, err := parseRectList(content)
+	if err == nil && len(fullRectList) > 0 {
+		// 第一个矩形是预渲染的中文警告文字
+		firstRect := fullRectList[0]
+		// 验证这是预渲染文字区域（y > 0 表示在第二行）
+		if firstRect.Min.Y > 0 {
+			hugeWaveRect = firstRect
+		}
 	}
 
 	return &BitmapFont{
-		Image:      img,
-		CharMap:    charMap,
-		LineHeight: lineHeight,
+		Image:        img,
+		CharMap:      charMap,
+		LineHeight:   lineHeight,
+		HugeWaveRect: hugeWaveRect,
 	}, nil
 }
 
@@ -150,6 +189,126 @@ func (bf *BitmapFont) MeasureText(text string) int {
 	return totalWidth
 }
 
+// GetHugeWaveWarningImage 获取预渲染的中文警告文字图片「一大波僵尸正在接近!」
+//
+// HouseofTerror28 字体图集中包含预渲染的中文警告文字，位于图片第二行。
+// 此方法提取该预渲染文字并可选地应用着色。
+//
+// 参数：
+//   - tintColor: 着色颜色（nil 表示使用原始颜色）
+//
+// 返回：
+//   - *ebiten.Image: 预渲染的警告文字图片
+//   - error: 如果预渲染文字不存在则返回错误
+func (bf *BitmapFont) GetHugeWaveWarningImage(tintColor color.Color) (*ebiten.Image, error) {
+	if bf.Image == nil {
+		return nil, fmt.Errorf("font image not loaded")
+	}
+
+	if bf.HugeWaveRect.Empty() {
+		return nil, fmt.Errorf("huge wave warning text not found in font")
+	}
+
+	// 从图集中提取预渲染的警告文字
+	subImg := bf.Image.SubImage(bf.HugeWaveRect).(*ebiten.Image)
+
+	// 创建新图像并绘制（应用着色）
+	width := bf.HugeWaveRect.Dx()
+	height := bf.HugeWaveRect.Dy()
+	resultImg := ebiten.NewImage(width, height)
+
+	op := &ebiten.DrawImageOptions{}
+	if tintColor != nil {
+		op.ColorScale.ScaleWithColor(tintColor)
+	}
+
+	resultImg.DrawImage(subImg, op)
+
+	log.Printf("[BitmapFont] GetHugeWaveWarningImage: Extracted pre-rendered text, size: %dx%d", width, height)
+	return resultImg, nil
+}
+
+// RenderTextToImage 将文本渲染为带颜色的 Ebitengine 图像
+//
+// 该方法将文本渲染到一个新的图像上，并可选地对字符进行着色。
+// 原版 PvZ 使用此方式动态生成「A Huge Wave of Zombies is Approaching!」等警告文字。
+//
+// 参数：
+//   - text: 要渲染的文本内容
+//   - tintColor: 着色颜色（nil 表示使用原始颜色）
+//
+// 返回：
+//   - *ebiten.Image: 渲染后的图像（调用者负责管理生命周期）
+//   - error: 渲染失败时返回错误
+//
+// 使用示例：
+//
+//	font, _ := LoadBitmapFont("HouseofTerror28.png", "HouseofTerror28.txt")
+//	redText, _ := font.RenderTextToImage("A Huge Wave!", color.RGBA{255, 0, 0, 255})
+func (bf *BitmapFont) RenderTextToImage(text string, tintColor color.Color) (*ebiten.Image, error) {
+	if bf.Image == nil {
+		return nil, fmt.Errorf("font image not loaded")
+	}
+
+	if text == "" {
+		return nil, fmt.Errorf("empty text")
+	}
+
+	// 计算文本尺寸
+	width := bf.MeasureText(text)
+	if width <= 0 {
+		return nil, fmt.Errorf("text has no renderable characters: %q", text)
+	}
+	height := bf.LineHeight
+
+	// 创建目标图像（默认透明背景）
+	resultImg := ebiten.NewImage(width, height)
+
+	// 逐字符渲染
+	currentX := 0
+	renderedCount := 0
+	for _, char := range text {
+		charInfo, ok := bf.CharMap[char]
+		if !ok {
+			log.Printf("[BitmapFont] RenderTextToImage: Character '%c' (U+%04X) not found, skipping", char, char)
+			continue
+		}
+
+		// 空格字符只需要移动位置，不需要绘制
+		if char == ' ' || charInfo.Rect.Empty() {
+			currentX += charInfo.Width
+			renderedCount++
+			continue
+		}
+
+		// 从图集中提取字符图像
+		charImg := bf.Image.SubImage(charInfo.Rect).(*ebiten.Image)
+
+		// 绘制字符
+		op := &ebiten.DrawImageOptions{}
+		op.GeoM.Translate(float64(currentX), 0)
+
+		// 应用着色：使用 ScaleWithColor 保持原始 alpha 通道
+		// 这样字体的透明部分仍然保持透明
+		if tintColor != nil {
+			op.ColorScale.ScaleWithColor(tintColor)
+		}
+
+		resultImg.DrawImage(charImg, op)
+
+		currentX += charInfo.Width
+		renderedCount++
+	}
+
+	if renderedCount == 0 {
+		return nil, fmt.Errorf("no characters were rendered for text: %q", text)
+	}
+
+	log.Printf("[BitmapFont] RenderTextToImage: Rendered %d characters, size: %dx%d", renderedCount, width, height)
+
+	return resultImg, nil
+}
+
 // loadImage 加载图像文件
 func loadImage(path string) (*ebiten.Image, error) {
 	file, err := os.Open(path)
@@ -198,6 +357,10 @@ func parseFontMeta(path string) ([]rune, []int, []image.Rectangle, error) {
 
 // parseCharList 解析字符列表
 // 格式：('A', 'B', 'C', ...)
+//
+// 注意：字体文件中第一个字符通常是空字符 ''，代表占位符而非空格。
+// 空格字符通过 LayerSetCharWidths Main (' ') (9) 单独设置。
+// 我们跳过空字符，只解析实际的字符。
 func parseCharList(content string) ([]rune, error) {
 	// 查找 Define CharList 部分（使用 (?s) 开启单行模式，. 匹配换行符）
 	re := regexp.MustCompile(`(?s)Define CharList\s*\(\s*(.+?)\);`)
@@ -216,14 +379,14 @@ func parseCharList(content string) ([]rune, error) {
 	for _, match := range charMatches {
 		charStr := match[1]
 		if charStr == "" {
-			// 空字符（空格）
-			chars = append(chars, ' ')
-		} else {
-			// 取第一个字符
-			for _, r := range charStr {
-				chars = append(chars, r)
-				break
-			}
+			// 空字符 '' 是占位符，跳过它
+			// 空格字符由 LayerSetCharWidths 单独定义
+			continue
+		}
+		// 取第一个字符
+		for _, r := range charStr {
+			chars = append(chars, r)
+			break
 		}
 	}
 
