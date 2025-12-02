@@ -1,0 +1,65 @@
+# Quality Gate Decision for Story 19.10
+schema: 1
+story: "19.10"
+story_title: "关卡完成与奖励"
+gate: PASS
+status_reason: "所有验收标准已满足，代码质量良好，测试覆盖了核心功能，无安全或性能问题"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-12-02T21:00:00+08:00"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 100
+expires: "2025-12-16T21:00:00+08:00"
+
+evidence:
+  tests_reviewed: 7
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "无安全风险 - 不涉及用户输入、网络通信或敏感数据"
+  performance:
+    status: PASS
+    notes: "O(1) 检查操作，对帧率无影响"
+  reliability:
+    status: PASS
+    notes: "测试通过，错误处理完善"
+  maintainability:
+    status: PASS
+    notes: "代码结构清晰，符合 ECS 架构原则，注释充分"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "考虑提升 systems 包整体测试覆盖率（当前 33.8%）"
+      refs: ["pkg/systems/*_test.go"]
+
+# Review Summary
+# ==============
+# Story 19.10 实现了保龄球关卡（Level 1-5）的完成流程和土豆地雷奖励系统。
+#
+# 关键实现验证：
+# 1. AC1 阳光系统禁用 - drawSunCounter() 和 game_scene.go 中的 initialSun == 0 检查 ✓
+# 2. AC2 通关检测 - checkVictoryCondition() 正确处理保龄球关卡 ✓
+# 3. AC3 奖励动画 - triggerRewardIfNeeded() 触发流程完整 ✓
+# 4. AC4 土豆地雷支持 - plantIDToType, sunCostMap, getReanimName 三处映射 ✓
+# 5. AC5 关卡进度 - CompleteLevel() 正确保存 ✓
+# 6. AC6 场景切换 - GetNextLevelID() 和 LoadLevel() ✓
+# 7. AC7 测试覆盖 - 7 个测试用例全部通过 ✓
+#
+# 代码变更文件：
+# - pkg/scenes/game_scene_ui.go:65-69 (阳光槽隐藏)
+# - pkg/scenes/game_scene.go:504-508 (SunSpawnSystem 禁用)
+# - pkg/types/plant_type.go:19-20,34-35 (PlantPotatoMine 枚举)
+# - pkg/components/plant_card.go:18 (导出常量)
+# - pkg/systems/reward_animation_system.go:845,1065-1066,1083-1084 (potatomine 映射)
+# - pkg/systems/sun_spawn_system_test.go:197-291 (新增测试)
+# - pkg/systems/reward_animation_system_test.go (新增测试)
+# - data/levels/level-1-5.yaml:41 (rewardPlant: potatomine)

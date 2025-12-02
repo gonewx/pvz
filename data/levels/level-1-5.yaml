@@ -38,7 +38,7 @@ sodRowImage: ""                 # 无草皮叠加
 showSoddingAnim: false          # 无铺草皮动画
 
 # === 通关奖励 ===
-rewardPlant: "potato_mine"      # 完成后奖励土豆地雷
+rewardPlant: "potatomine"       # 完成后奖励土豆地雷（注意：无下划线，与其他关卡保持一致）
 
 # === 传送带配置（Story 19.5）===
 conveyorBelt:
@@ -53,12 +53,209 @@ conveyorBelt:
 
 # === 波次配置 (保龄球阶段) ===
 # 注意：保龄球阶段的波次会在转场完成后才开始生效
-# 此处先放置占位波次，完整的保龄球波次配置在 Story 19.5 中实现
+# 保龄球关卡：连续高压进攻，无旗帜休息时间
+# 僵尸池：basic（普通僵尸）、conehead（路障僵尸）
 waves:
+  # === 阶段一：热身 (Warm Up) 0%-15% 进度 ===
+  # 目的：让玩家熟悉"瞄准-射击"和"弹射"手感
   - waveNum: 1
     type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [2, 3, 4]
+        count: 1
+        spawnInterval: 4.0
+
+  - waveNum: 2
+    type: "Fixed"
+    isFlag: false
     zombies:
       - type: "basic"
         lanes: [1, 2, 3, 4, 5]
-        count: 1
+        count: 2
+        spawnInterval: 3.5
+
+  - waveNum: 3
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 2
         spawnInterval: 3.0
+
+  # === 阶段二：路障引入 (Conehead Phase) 15%-40% 进度 ===
+  # 引入路障僵尸，开始出现 2-3 只的小队
+  - waveNum: 4
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 2
+        spawnInterval: 2.5
+      - type: "conehead"
+        lanes: [2, 3, 4]
+        count: 1
+        spawnInterval: 2.5
+
+  - waveNum: 5
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 2
+        spawnInterval: 2.5
+      - type: "conehead"
+        lanes: [1, 3, 5]
+        count: 1
+        spawnInterval: 2.5
+
+  - waveNum: 6
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 2
+        spawnInterval: 2.0
+      - type: "conehead"
+        lanes: [2, 4]
+        count: 2
+        spawnInterval: 2.0
+
+  - waveNum: 7
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 3, 5]
+        count: 2
+        spawnInterval: 2.0
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 2
+        spawnInterval: 2.0
+
+  - waveNum: 8
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 3
+        spawnInterval: 2.0
+      - type: "conehead"
+        lanes: [2, 3, 4]
+        count: 2
+        spawnInterval: 2.0
+
+  # === 阶段三：高压 (Heavy Phase) 40%-90% 进度 ===
+  # 怪群密度增大，间隔缩短
+  - waveNum: 9
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 3
+        spawnInterval: 1.8
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 2
+        spawnInterval: 1.8
+
+  - waveNum: 10
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 3
+        spawnInterval: 1.5
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 3
+        spawnInterval: 1.5
+
+  - waveNum: 11
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 4
+        spawnInterval: 1.5
+      - type: "conehead"
+        lanes: [2, 3, 4]
+        count: 2
+        spawnInterval: 1.5
+
+  - waveNum: 12
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 3
+        spawnInterval: 1.3
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 3
+        spawnInterval: 1.3
+
+  - waveNum: 13
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 3, 5]
+        count: 3
+        spawnInterval: 1.2
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 4
+        spawnInterval: 1.2
+
+  - waveNum: 14
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 4
+        spawnInterval: 1.2
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 3
+        spawnInterval: 1.2
+
+  - waveNum: 15
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 4
+        spawnInterval: 1.0
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 4
+        spawnInterval: 1.0
+
+  # === 阶段四：最终波 (Final Wave) 100% 进度 ===
+  # 大量普通和路障僵尸，短间隔快速生成
+  - waveNum: 16
+    type: "Final"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 5
+        spawnInterval: 1.0
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 4
+        spawnInterval: 1.2

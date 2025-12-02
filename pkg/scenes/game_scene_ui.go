@@ -61,7 +61,13 @@ func (s *GameScene) drawSeedBank(screen *ebiten.Image) {
 // so we don't need to draw them separately. This method displays the sun count number.
 // The text is horizontally centered to accommodate dynamic value lengths (e.g., 50, 150, 9990).
 // Story 10.8: 添加阳光不足时的闪烁效果（红黑闪烁）
+// Story 19.10: 保龄球关卡（initialSun == 0）不显示阳光槽
 func (s *GameScene) drawSunCounter(screen *ebiten.Image) {
+	// Story 19.10: 保龄球关卡（initialSun == 0）不显示阳光槽
+	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.InitialSun == 0 {
+		return
+	}
+
 	// Story 8.8: 游戏冻结时隐藏阳光计数器
 	freezeEntities := ecs.GetEntitiesWith1[*components.GameFreezeComponent](s.entityManager)
 	if len(freezeEntities) > 0 {

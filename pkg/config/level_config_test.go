@@ -1554,9 +1554,9 @@ func TestLoadLevelConfig_Bowling_RealFile(t *testing.T) {
 		t.Errorf("Expected OpeningType 'special', got '%s'", config.OpeningType)
 	}
 
-	// 验证奖励植物为 potato_mine
-	if config.RewardPlant != "potato_mine" {
-		t.Errorf("Expected RewardPlant 'potato_mine', got '%s'", config.RewardPlant)
+	// 验证奖励植物为 potatomine（Story 19.10 修正：使用无下划线命名约定）
+	if config.RewardPlant != "potatomine" {
+		t.Errorf("Expected RewardPlant 'potatomine', got '%s'", config.RewardPlant)
 	}
 }
 

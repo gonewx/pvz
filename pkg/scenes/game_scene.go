@@ -501,6 +501,12 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 		}
 	}
 
+	// Story 19.10: 保龄球关卡（initialSun == 0）禁用阳光生成
+	if scene.gameState.CurrentLevel != nil && scene.gameState.CurrentLevel.InitialSun == 0 {
+		scene.sunSpawnSystem.Disable()
+		log.Printf("[GameScene] Bowling level (initialSun=0): sun spawn system DISABLED")
+	}
+
 	// Story 8.2 QA改进：初始化铺草皮动画系统
 	scene.soddingSystem = systems.NewSoddingSystem(scene.entityManager, scene.resourceManager)
 	log.Printf("[GameScene] Initialized sodding animation system")

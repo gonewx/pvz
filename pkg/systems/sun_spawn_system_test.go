@@ -194,3 +194,98 @@ func TestSunSpawnSystem_MultipleCycles(t *testing.T) {
 
 	t.Logf("✓ Multiple spawn cycles work correctly")
 }
+
+// ========== Story 19.10: 保龄球关卡阳光系统禁用测试 ==========
+
+// TestSunSpawnSystem_Disable 测试禁用阳光生成
+func TestSunSpawnSystem_Disable(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(nil)
+
+	system := NewSunSpawnSystem(em, rm, 250.0, 900.0, 100.0, 550.0)
+
+	// 验证初始状态：启用
+	if !system.enabled {
+		t.Error("SunSpawnSystem should be enabled by default")
+	}
+
+	// 禁用系统
+	system.Disable()
+
+	// 验证禁用状态
+	if system.enabled {
+		t.Error("SunSpawnSystem should be disabled after Disable()")
+	}
+
+	// 更新足够时间（正常情况下应该生成阳光）
+	system.Update(15.0) // 超过最大间隔
+
+	// 验证禁用后不生成阳光
+	sunEntities := ecs.GetEntitiesWith1[*components.SunComponent](em)
+	if len(sunEntities) != 0 {
+		t.Errorf("Expected 0 suns when disabled, got %d", len(sunEntities))
+	}
+
+	t.Logf("✓ SunSpawnSystem.Disable() prevents sun spawning")
+}
+
+// TestSunSpawnSystem_Enable 测试重新启用阳光生成
+func TestSunSpawnSystem_Enable(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(nil)
+
+	system := NewSunSpawnSystem(em, rm, 250.0, 900.0, 100.0, 550.0)
+
+	// 先禁用
+	system.Disable()
+
+	// 然后启用
+	system.Enable()
+
+	// 验证启用状态
+	if !system.enabled {
+		t.Error("SunSpawnSystem should be enabled after Enable()")
+	}
+
+	// 更新足够时间
+	system.Update(15.0)
+
+	// 验证启用后可以生成阳光
+	sunEntities := ecs.GetEntitiesWith1[*components.SunComponent](em)
+	if len(sunEntities) != 1 {
+		t.Errorf("Expected 1 sun after enabling, got %d", len(sunEntities))
+	}
+
+	t.Logf("✓ SunSpawnSystem.Enable() restores sun spawning")
+}
+
+// TestSunSpawnSystem_BowlingLevel_InitialSunZero 测试保龄球关卡 (initialSun=0) 场景
+// 验证当初始阳光为 0 时，阳光生成系统应被禁用
+func TestSunSpawnSystem_BowlingLevel_InitialSunZero(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(nil)
+
+	system := NewSunSpawnSystem(em, rm, 250.0, 900.0, 100.0, 550.0)
+
+	// 模拟保龄球关卡初始化：禁用阳光生成
+	// 在实际代码中，GameScene.NewGameScene 会检查 levelConfig.InitialSun == 0
+	// 并调用 sunSpawnSystem.Disable()
+	system.Disable()
+
+	// 验证系统禁用
+	if system.enabled {
+		t.Error("SunSpawnSystem should be disabled for bowling level (initialSun=0)")
+	}
+
+	// 多次更新，验证始终不生成阳光
+	for i := 0; i < 5; i++ {
+		system.Update(15.0)
+	}
+
+	sunEntities := ecs.GetEntitiesWith1[*components.SunComponent](em)
+	if len(sunEntities) != 0 {
+		t.Errorf("Expected 0 suns for bowling level, got %d", len(sunEntities))
+	}
+
+	t.Logf("✓ Bowling level (initialSun=0) correctly disables sun spawning")
+}

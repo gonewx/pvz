@@ -842,6 +842,7 @@ func (ras *RewardAnimationSystem) createRewardPanel(rewardType string, plantID s
 			"peashooter": 100,
 			"cherrybomb": 150,
 			"wallnut":    50,
+			"potatomine": 25,
 		}
 		sunCost = sunCostMap[plantID]
 	}
@@ -1062,6 +1063,8 @@ func (ras *RewardAnimationSystem) plantIDToType(plantID string) components.Plant
 		return components.PlantCherryBomb
 	case "wallnut":
 		return components.PlantWallnut
+	case "potatomine":
+		return components.PlantPotatoMine
 	default:
 		return components.PlantUnknown
 	}
@@ -1078,6 +1081,8 @@ func (ras *RewardAnimationSystem) getReanimName(plantID string) string {
 		return "CherryBomb"
 	case "wallnut":
 		return "Wallnut"
+	case "potatomine":
+		return "PotatoMine"
 	default:
 		return ""
 	}
