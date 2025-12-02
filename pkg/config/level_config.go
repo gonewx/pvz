@@ -79,6 +79,10 @@ type LevelConfig struct {
 	// Story 19.4: 预设植物配置
 	// 关卡加载时自动生成的植物��表（如铲子教学关卡中的预设豌豆射手）
 	PresetPlants []PresetPlant `yaml:"presetPlants"`
+
+	// Story 19.5: 传送带配置
+	// 传送带系统参数（保龄球关卡等）
+	ConveyorBelt *ConveyorBeltConfig `yaml:"conveyorBelt"`
 }
 
 // PresetPlant 预设植物配置（Story 19.4）
@@ -87,6 +91,22 @@ type PresetPlant struct {
 	Type string `yaml:"type"` // 植物类型，如 "peashooter"
 	Row  int    `yaml:"row"`  // 行号 (1-based，1-5)
 	Col  int    `yaml:"col"`  // 列号 (1-based，1-9)
+}
+
+// ConveyorBeltConfig 传送带配置（Story 19.5）
+// 定义传送带系统的参数
+type ConveyorBeltConfig struct {
+	Enabled            bool            `yaml:"enabled"`            // 是否启用传送带
+	Capacity           int             `yaml:"capacity"`           // 传送带容量（默认 10）
+	CardPool           []CardPoolEntry `yaml:"cardPool"`           // 卡片池配置
+	GenerationInterval float64         `yaml:"generationInterval"` // 卡片生成间隔（秒，默认 3.0）
+}
+
+// CardPoolEntry 卡片池条目（Story 19.5）
+// 定义卡片类型和生成权重
+type CardPoolEntry struct {
+	Type   string `yaml:"type"`   // 卡片类型: "wallnut_bowling", "explode_o_nut"
+	Weight int    `yaml:"weight"` // 权重值（越大越容易生成）
 }
 
 // TutorialStep 教学步骤配置（Story 8.2）

@@ -39,6 +39,10 @@ type GameScene struct {
 	// Story 19.4: Bowling red line image (保龄球红线图片)
 	bowlingRedLine *ebiten.Image // Red line between column 3 and 4 (保龄球关卡红线)
 
+	// Story 19.5: Conveyor belt images (传送带图片)
+	conveyorBeltBackdrop *ebiten.Image // Conveyor belt backdrop (传送带背景)
+	conveyorBelt         *ebiten.Image // Conveyor belt animation (传送带传动动画，6行纹理)
+
 	// Story 8.2 QA改进：草皮叠加层（随动画进度渐进显示）
 	sodRowImage        *ebiten.Image // 草皮叠加图片（sod1row.jpg 或 sod3row.jpg）
 	soddedBackground   *ebiten.Image // 已铺草皮完整背景（IMAGE_BACKGROUND1），用于 Level 1-4 双背景叠加
@@ -180,6 +184,9 @@ type GameScene struct {
 
 	// Story 19.4: 阶段转场系统
 	levelPhaseSystem *systems.LevelPhaseSystem // 阶段转场系统（铲子教学 → 保龄球）
+
+	// Story 19.5: 传送带系统
+	conveyorBeltSystem *systems.ConveyorBeltSystem // 传送带系统（卡片生成与管理）
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -545,6 +552,34 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	scene.levelPhaseSystem = systems.NewLevelPhaseSystem(scene.entityManager, scene.gameState, rm)
 	log.Printf("[GameScene] Initialized level phase system")
 
+	// Story 19.5: 初始化传送带系统
+	scene.conveyorBeltSystem = systems.NewConveyorBeltSystem(scene.entityManager, scene.gameState, rm)
+	log.Printf("[GameScene] Initialized conveyor belt system")
+
+	// Story 19.5: 根据关卡配置初始化传送带参数
+	if scene.gameState.CurrentLevel != nil && scene.gameState.CurrentLevel.ConveyorBelt != nil {
+		conveyorConfig := scene.gameState.CurrentLevel.ConveyorBelt
+		if conveyorConfig.Enabled {
+			// 设置卡片生成间隔
+			if conveyorConfig.GenerationInterval > 0 {
+				scene.conveyorBeltSystem.SetGenerationInterval(conveyorConfig.GenerationInterval)
+			}
+			// 设置卡片池
+			if len(conveyorConfig.CardPool) > 0 {
+				cardPool := make([]systems.CardPoolEntry, len(conveyorConfig.CardPool))
+				for i, entry := range conveyorConfig.CardPool {
+					cardPool[i] = systems.CardPoolEntry{
+						Type:   entry.Type,
+						Weight: entry.Weight,
+					}
+				}
+				scene.conveyorBeltSystem.SetCardPool(cardPool)
+			}
+			log.Printf("[GameScene] Conveyor belt configured from level config: interval=%.1fs, pool=%d entries",
+				conveyorConfig.GenerationInterval, len(conveyorConfig.CardPool))
+		}
+	}
+
 	// Story 19.4: 设置转场回调
 	// 当 GuidedTutorialSystem 检测到所有预设植物被移除时，触发转场
 	scene.guidedTutorialSystem.SetTransitionCallback(func() {
@@ -559,8 +594,11 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	})
 
 	scene.levelPhaseSystem.SetOnActivateBowling(func() {
-		log.Printf("[GameScene] Activating bowling phase - TODO: implement conveyor belt activation")
-		// TODO(Story 19.5): 激活传送带系统
+		log.Printf("[GameScene] Activating bowling phase")
+		// Story 19.5: 激活传送带系统
+		if scene.conveyorBeltSystem != nil {
+			scene.conveyorBeltSystem.Activate()
+		}
 	})
 
 	// Story 19.4: 生成预设植物
@@ -915,6 +953,9 @@ func (s *GameScene) Update(deltaTime float64) {
 	// Story 19.2: 铲子槽位点击检测（在输入系统之前，优先处理铲子模式切换）
 	s.updateShovelSlotClick()
 
+	// Story 19.5: 传送带卡片点击检测
+	s.updateConveyorBeltClick()
+
 	// Story 19.2: 如果处于铲子模式，更新铲子交互系统
 	if s.shovelInteractionSystem != nil && s.shovelSelected {
 		s.shovelInteractionSystem.Update(deltaTime, s.cameraX)
@@ -958,6 +999,10 @@ func (s *GameScene) Update(deltaTime float64) {
 	// Story 19.4: Level phase system (phase transitions)
 	if s.levelPhaseSystem != nil {
 		s.levelPhaseSystem.Update(deltaTime) // 9.7. Update phase transition state
+	}
+	// Story 19.5: Conveyor belt system (card generation)
+	if s.conveyorBeltSystem != nil {
+		s.conveyorBeltSystem.Update(deltaTime) // 9.8. Update conveyor belt
 	}
 	// Story 3.2: 植物预览系统 - 更新预览位置（双图像支持）
 	s.plantPreviewSystem.Update(deltaTime) // 10. Update plant preview position (dual-image support)
@@ -1022,6 +1067,9 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 		s.drawSeedBank(screen)
 		s.drawShovel(screen)
 
+		// Story 19.5: 绘制传送带（在铲子和植物卡片之间）
+		s.drawConveyorBelt(screen)
+
 		// 使用 ECS 按钮系统渲染菜单按钮
 		if s.buttonRenderSystem != nil {
 			s.buttonRenderSystem.Draw(screen)
@@ -1074,6 +1122,10 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	if s.shovelInteractionSystem != nil && s.shovelSelected {
 		s.shovelInteractionSystem.Draw(screen, s.cameraX)
 	}
+
+	// Layer 7.6: Draw conveyor card preview (Story 19.5)
+	// 传送带卡片拖拽预览
+	s.drawConveyorCardPreview(screen)
 
 	// Layer 8: Draw suns (阳光) - 最顶层
 	// 阳光在最顶层以确保始终可点击

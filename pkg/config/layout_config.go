@@ -452,4 +452,33 @@ const (
 	// BowlingRedLineOffsetY 红线 Y 偏移（相对于网格起点）
 	// 用于调整红线垂直��置
 	BowlingRedLineOffsetY = 0.0
+
+	// ========== 传送带配置参数（Story 19.5）（可手工调节） ==========
+
+	// ConveyorBeltWidth 传送带宽度（像素）
+	// 容纳 10 张卡片 + 边框
+	ConveyorBeltWidth = 450.0
+
+	// ConveyorCardWidth 传送带卡片宽度（像素）
+	ConveyorCardWidth = 40.0
+
+	// ConveyorCardHeight 传送带卡片高度（像素）
+	ConveyorCardHeight = 60.0
+
+	// ConveyorCardSpacing 卡片间距（像素）
+	ConveyorCardSpacing = 5.0
+
+	// ConveyorBeltAnimSpeed 传动动画速度（像素/秒）
+	ConveyorBeltAnimSpeed = 50.0
+
+	// ConveyorCardGenerationInterval 默认卡片生成间隔（秒）
+	ConveyorCardGenerationInterval = 3.0
+
+	// ConveyorBeltPadding 传送带内边距（像素）
+	// 卡片距离传送带边缘的距离
+	ConveyorBeltPadding = 5.0
+
+	// ConveyorBeltRowCount 传送带纹理行数
+	// ConveyorBelt.png 有 6 行交错纹理
+	ConveyorBeltRowCount = 6
 )

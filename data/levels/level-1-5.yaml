@@ -40,6 +40,17 @@ showSoddingAnim: false          # 无铺草皮动画
 # === 通关奖励 ===
 rewardPlant: "potato_mine"      # 完成后奖励土豆地雷
 
+# === 传送带配置（Story 19.5）===
+conveyorBelt:
+  enabled: true
+  capacity: 10
+  generationInterval: 3.0
+  cardPool:
+    - type: "wallnut_bowling"
+      weight: 85
+    - type: "explode_o_nut"
+      weight: 15
+
 # === 波次配置 (保龄球阶段) ===
 # 注意：保龄球阶段的波次会在转场完成后才开始生效
 # 此处先放置占位波次，完整的保龄球波次配置在 Story 19.5 中实现

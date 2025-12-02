@@ -108,6 +108,23 @@ func (s *GameScene) loadResources() {
 		log.Printf("[GameScene] Loaded bowling red line image")
 	}
 
+	// Story 19.5: Load conveyor belt images (传送带图片)
+	conveyorBackdrop, err := s.resourceManager.LoadImageByID("IMAGE_CONVEYORBELT_BACKDROP")
+	if err != nil {
+		log.Printf("Warning: Failed to load conveyor belt backdrop: %v", err)
+	} else {
+		s.conveyorBeltBackdrop = conveyorBackdrop
+		log.Printf("[GameScene] Loaded conveyor belt backdrop")
+	}
+
+	conveyorBelt, err := s.resourceManager.LoadImageByID("IMAGE_CONVEYORBELT")
+	if err != nil {
+		log.Printf("Warning: Failed to load conveyor belt animation: %v", err)
+	} else {
+		s.conveyorBelt = conveyorBelt
+		log.Printf("[GameScene] Loaded conveyor belt animation (6 rows)")
+	}
+
 	// Note: Sun counter background is drawn procedurally for now
 	// A dedicated image can be loaded here in the future if needed
 	// Menu button resources are now loaded via ButtonFactory (ECS architecture)
