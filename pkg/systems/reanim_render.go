@@ -627,6 +627,14 @@ func (s *ReanimSystem) renderOverlayAnimation(comp *components.ReanimComponent) 
 		return
 	}
 
+	// 检查绑定轨道是否被隐藏（如旗帜僵尸死亡时旗帜掉落，隐藏 Zombie_flaghand）
+	// 如果绑定轨道被隐藏，则不渲染叠加动画
+	if comp.OverlayBindTrack != "" && comp.HiddenTracks != nil {
+		if comp.HiddenTracks[comp.OverlayBindTrack] {
+			return
+		}
+	}
+
 	// 初始化叠加动画的合并轨道（如果还没有）
 	if comp.OverlayMergedTracks == nil {
 		comp.OverlayMergedTracks = reanim.BuildMergedTracks(comp.OverlayReanimXML)
@@ -660,13 +668,23 @@ func (s *ReanimSystem) renderOverlayAnimation(comp *components.ReanimComponent) 
 		}
 		frame := mergedFrames[frameIdx]
 
-		// 获取图片
+		// 获取图片（优先使用 ImageOverrides，用于旗帜损坏等效果）
 		imgName := frame.ImagePath
 		if imgName == "" {
 			continue
 		}
-		img, ok := comp.PartImages[imgName]
-		if !ok || img == nil {
+		var img *ebiten.Image
+		var imgOk bool
+		if comp.ImageOverrides != nil {
+			if overrideImg, hasOverride := comp.ImageOverrides[imgName]; hasOverride && overrideImg != nil {
+				img = overrideImg
+				imgOk = true
+			}
+		}
+		if !imgOk {
+			img, imgOk = comp.PartImages[imgName]
+		}
+		if !imgOk || img == nil {
 			continue
 		}
 

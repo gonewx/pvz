@@ -66,6 +66,16 @@ animation_combos:
       binding_strategy: auto
       hidden_tracks: *flag_zombie_hidden_tracks
 
+    - name: walk_damaged
+      display_name: 行走（旗帜受损）
+      animations:
+          - anim_walk
+      binding_strategy: auto
+      hidden_tracks: *flag_zombie_hidden_tracks
+      # 使用损坏的旗帜图片（覆盖叠加动画中的旗帜）
+      image_overrides:
+          IMAGE_REANIM_ZOMBIE_FLAG1: assets/reanim/Zombie_flag3.png
+
     - name: eat
       display_name: 啃食
       animations:
@@ -88,9 +98,9 @@ animation_combos:
           - Zombie_flaghand
           - anim_innerarm1
           - anim_innerarm2
-      # 使用损坏的旗帜图片
+      # 使用损坏的旗帜图片（覆盖叠加动画中的旗帜）
       image_overrides:
-          IMAGE_REANIM_ZOMBIE_FLAGHAND: assets/reanim/Zombie_flag3.png
+          IMAGE_REANIM_ZOMBIE_FLAG1: assets/reanim/Zombie_flag3.png
 
     - name: death
       display_name: 死亡
@@ -98,7 +108,16 @@ animation_combos:
           - anim_death
       loop: false
       binding_strategy: auto
-      hidden_tracks: *flag_zombie_hidden_tracks
+      hidden_tracks:
+          - anim_bucket
+          - anim_cone
+          - anim_screendoor
+          - Zombie_innerarm_screendoor_hand
+          - Zombie_outerarm_screendoor
+          - Zombie_duckytube
+          - Zombie_mustache
+          - anim_innerarm3
+          - Zombie_flaghand  # 死亡时旗帜掉落，隐藏旗帜手
 
     - name: death_damaged
       display_name: 死亡（旗帜受损）
@@ -106,7 +125,16 @@ animation_combos:
           - anim_death
       loop: false
       binding_strategy: auto
-      hidden_tracks: *flag_zombie_hidden_tracks
-      # 使用损坏的旗帜图片
+      hidden_tracks:
+          - anim_bucket
+          - anim_cone
+          - anim_screendoor
+          - Zombie_innerarm_screendoor_hand
+          - Zombie_outerarm_screendoor
+          - Zombie_duckytube
+          - Zombie_mustache
+          - anim_innerarm3
+          - Zombie_flaghand  # 死亡时旗帜掉落，隐藏旗帜手
+      # 使用损坏的旗帜图片（覆盖叠加动画中的旗帜）
       image_overrides:
-          IMAGE_REANIM_ZOMBIE_FLAGHAND: assets/reanim/Zombie_flag3.png
+          IMAGE_REANIM_ZOMBIE_FLAG1: assets/reanim/Zombie_flag3.png

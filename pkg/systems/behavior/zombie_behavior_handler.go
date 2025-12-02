@@ -165,10 +165,27 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 		} else {
 			log.Printf("[BehaviorSystem] 僵尸 %d 触发头部掉落粒子效果，位置: (%.1f, %.1f)", entityID, position.X, position.Y)
 		}
+
+		// 旗帜僵尸特殊处理：触发旗帜掉落粒子效果
+		if behavior.UnitID == "zombie_flag" {
+			_, err := entities.CreateParticleEffect(
+				s.entityManager,
+				s.resourceManager,
+				"ZombieFlag", // 旗帜掉落粒子效果
+				position.X, position.Y,
+				angleOffset, // 与头部掉落方向一致
+			)
+			if err != nil {
+				log.Printf("[BehaviorSystem] 警告：创建旗帜掉落粒子效果失败: %v", err)
+			} else {
+				log.Printf("[BehaviorSystem] 旗帜僵尸 %d 触发旗帜掉落粒子效果，位置: (%.1f, %.1f)", entityID, position.X, position.Y)
+			}
+		}
 	}
 
 	// 2. 隐藏头部轨道（头掉落效果）
 	// 直接修改 HiddenTracks 字段而不调用废弃的 HideTrack API
+	// 注意：旗帜僵尸的旗帜隐藏在 zombie_flag.yaml 的 death/death_damaged 配置中处理
 	if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
 		if reanim.HiddenTracks == nil {
 			reanim.HiddenTracks = make(map[string]bool)
@@ -188,12 +205,26 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 	// 4. 使用 AnimationCommand 组件播放死亡动画（不循环）
 	// 使用组件通信替代直接调用
 	// 使用配置驱动的动画组合（自动隐藏装备轨道）
+	// 旗帜僵尸特殊处理：根据 ArmLost 选择死亡动画
+	deathComboName := "death"
+	unitID := behavior.UnitID
+	if unitID == "" {
+		unitID = types.UnitIDZombie // 后备默认值
+	}
+	if unitID == "zombie_flag" {
+		if health, ok := ecs.GetComponent[*components.HealthComponent](s.entityManager, entityID); ok {
+			if health.ArmLost {
+				deathComboName = "death_damaged"
+				log.Printf("[BehaviorSystem] 旗帜僵尸 %d 使用受损死亡动画 (death_damaged)", entityID)
+			}
+		}
+	}
 	ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
-		UnitID:    types.UnitIDZombie,
-		ComboName: "death",
+		UnitID:    unitID,
+		ComboName: deathComboName,
 		Processed: false,
 	})
-	log.Printf("[BehaviorSystem] 僵尸 %d 添加死亡动画命令", entityID)
+	log.Printf("[BehaviorSystem] 僵尸 %d 添加死亡动画命令 (%s/%s)", entityID, unitID, deathComboName)
 
 	// 设置为不循环
 	if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
@@ -245,6 +276,9 @@ func (s *BehaviorSystem) updateZombieDamageState(entityID ecs.EntityID, health *
 		// 标记手臂已掉落，防止重复触发
 		health.ArmLost = true
 
+		// 获取行为组件，检查僵尸类型
+		behavior, hasBehavior := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
+
 		// 隐藏手臂轨道（手臂掉落效果）
 		// 直接修改 HiddenTracks 字段而不调用废弃的 HideTrack API
 		if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
@@ -260,6 +294,25 @@ func (s *BehaviorSystem) updateZombieDamageState(entityID ecs.EntityID, health *
 
 		log.Printf("[BehaviorSystem] 僵尸 %d 手臂掉落 (HP=%d/%d)",
 			entityID, health.CurrentHealth, health.MaxHealth)
+
+		// 旗帜僵尸特殊处理：根据当前状态切换到对应的受损动画
+		if hasBehavior && behavior.UnitID == "zombie_flag" {
+			var damagedComboName string
+			switch behavior.Type {
+			case components.BehaviorZombieEating:
+				damagedComboName = "eat_damaged"
+			case components.BehaviorZombieBasic, components.BehaviorZombieFlag:
+				damagedComboName = "walk_damaged"
+			}
+			if damagedComboName != "" {
+				ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
+					UnitID:    "zombie_flag",
+					ComboName: damagedComboName,
+					Processed: false,
+				})
+				log.Printf("[BehaviorSystem] 旗帜僵尸 %d 受损，切换到 %s 动画", entityID, damagedComboName)
+			}
+		}
 
 		// 获取僵尸位置，用于触发粒子效果
 		position, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
@@ -340,6 +393,14 @@ func (s *BehaviorSystem) changeZombieAnimation(zombieID ecs.EntityID, newState c
 	// 更新状态
 	behavior.ZombieAnimState = newState
 
+	// 检查是否为旗帜僵尸且旗帜已受损（用于选择受损动画）
+	isFlagZombieDamaged := false
+	if behavior.UnitID == "zombie_flag" {
+		if health, ok := ecs.GetComponent[*components.HealthComponent](s.entityManager, zombieID); ok {
+			isFlagZombieDamaged = health.ArmLost
+		}
+	}
+
 	// 根据状态确定组合名称
 	// 使用配置驱动的动画播放
 	var comboName string
@@ -347,9 +408,19 @@ func (s *BehaviorSystem) changeZombieAnimation(zombieID ecs.EntityID, newState c
 	case components.ZombieAnimIdle:
 		comboName = "idle"
 	case components.ZombieAnimWalking:
-		comboName = "walk"
+		// 旗帜僵尸受损时使用 walk_damaged 动画
+		if isFlagZombieDamaged {
+			comboName = "walk_damaged"
+		} else {
+			comboName = "walk"
+		}
 	case components.ZombieAnimEating:
-		comboName = "eat"
+		// 旗帜僵尸受损时使用 eat_damaged 动画
+		if isFlagZombieDamaged {
+			comboName = "eat_damaged"
+		} else {
+			comboName = "eat"
+		}
 	case components.ZombieAnimDying:
 		// 使用 BehaviorComponent 中存储的 UnitID
 		unitID := behavior.UnitID
