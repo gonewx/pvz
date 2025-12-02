@@ -89,6 +89,12 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 				logicalFrame = float64(comp.CurrentFrame)
 			}
 
+			// 检查轨道是否被冻结（FrozenTracks）
+			// 冻结的轨道始终使用第一帧，不随动画更新
+			if comp.FrozenTracks != nil && comp.FrozenTracks[trackName] {
+				logicalFrame = 0
+			}
+
 			// 获取动画的可见性数组
 			animVisibles, ok := comp.AnimVisiblesMap[animName]
 			if !ok {
@@ -198,9 +204,19 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 				continue
 			}
 
-			// 获取图片
-			img, ok := comp.PartImages[frame.ImagePath]
-			if !ok || img == nil {
+			// 获取图片（优先使用 ImageOverrides）
+			var img *ebiten.Image
+			var imgOk bool
+			if comp.ImageOverrides != nil {
+				if overrideImg, hasOverride := comp.ImageOverrides[frame.ImagePath]; hasOverride && overrideImg != nil {
+					img = overrideImg
+					imgOk = true
+				}
+			}
+			if !imgOk {
+				img, imgOk = comp.PartImages[frame.ImagePath]
+			}
+			if !imgOk || img == nil {
 				if comp.ReanimName == "simple_pea" {
 					partImagesKeys := make([]string, 0, len(comp.PartImages))
 					for k := range comp.PartImages {

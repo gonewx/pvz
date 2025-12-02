@@ -93,6 +93,7 @@ func NewZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spawnX f
 	em.AddComponent(entityID, &components.BehaviorComponent{
 		Type:            components.BehaviorZombieBasic,
 		ZombieAnimState: components.ZombieAnimIdle,
+		UnitID:          types.UnitIDZombie,
 	})
 
 	// 添加生命值组件（本Story定义但不使用，为Story 4.4准备）
@@ -203,6 +204,7 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, 
 	em.AddComponent(entityID, &components.BehaviorComponent{
 		Type:            components.BehaviorZombieConehead,
 		ZombieAnimState: components.ZombieAnimIdle,
+		UnitID:          types.UnitIDZombieConehead,
 	})
 
 	// 添加护甲组件（路障僵尸的关键特性）
@@ -319,6 +321,7 @@ func NewBucketheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int
 	em.AddComponent(entityID, &components.BehaviorComponent{
 		Type:            components.BehaviorZombieBuckethead,
 		ZombieAnimState: components.ZombieAnimIdle,
+		UnitID:          types.UnitIDZombieBuckethead,
 	})
 
 	// 添加护甲组件（铁桶僵尸的关键特性）
@@ -448,6 +451,7 @@ func NewFlagZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spaw
 	ecs.AddComponent(em, entityID, &components.BehaviorComponent{
 		Type:            components.BehaviorZombieFlag,
 		ZombieAnimState: components.ZombieAnimIdle,
+		UnitID:          types.UnitIDZombieFlag,
 	})
 
 	// 添加生命值组件（与普通僵尸相同）

@@ -9,6 +9,7 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // ==================================================================
@@ -462,7 +463,34 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 		comp.HiddenTracks = nil
 	}
 
-	// 4. 重建动画数据
+	// 4. 应用冻结轨道
+	if len(combo.FrozenTracks) > 0 {
+		comp.FrozenTracks = make(map[string]bool)
+		for _, track := range combo.FrozenTracks {
+			comp.FrozenTracks[track] = true
+		}
+		log.Printf("[ReanimSystem] PlayCombo: freezing %d tracks: %v", len(combo.FrozenTracks), combo.FrozenTracks)
+	} else {
+		comp.FrozenTracks = nil
+	}
+
+	// 5. 应用图片覆盖
+	if len(combo.ImageOverrides) > 0 && s.resourceLoader != nil {
+		comp.ImageOverrides = make(map[string]*ebiten.Image)
+		for imgRef, imgPath := range combo.ImageOverrides {
+			img, err := s.resourceLoader.LoadImage(imgPath)
+			if err == nil && img != nil {
+				comp.ImageOverrides[imgRef] = img
+				log.Printf("[ReanimSystem] PlayCombo: 图片覆盖 %s -> %s", imgRef, imgPath)
+			} else {
+				log.Printf("[ReanimSystem] PlayCombo: 警告：无法加载覆盖图片 %s: %v", imgPath, err)
+			}
+		}
+	} else {
+		comp.ImageOverrides = nil
+	}
+
+	// 6. 重建动画数据
 	s.rebuildAnimationData(comp)
 
 	// 新的渲染逻辑直接从动画遍历到轨道，无需绑定关系

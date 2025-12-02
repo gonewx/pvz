@@ -72,6 +72,25 @@ animation_combos:
           - anim_eat
       binding_strategy: auto
       hidden_tracks: *flag_zombie_hidden_tracks
+      # 啃食时冻结右手（拿旗手）相关轨道，保持拿旗姿势
+      frozen_tracks:
+          - Zombie_flaghand
+          - anim_innerarm1
+          - anim_innerarm2
+
+    - name: eat_damaged
+      display_name: 啃食（旗帜受损）
+      animations:
+          - anim_eat
+      binding_strategy: auto
+      hidden_tracks: *flag_zombie_hidden_tracks
+      frozen_tracks:
+          - Zombie_flaghand
+          - anim_innerarm1
+          - anim_innerarm2
+      # 使用损坏的旗帜图片
+      image_overrides:
+          IMAGE_REANIM_ZOMBIE_FLAGHAND: assets/reanim/Zombie_flag3.png
 
     - name: death
       display_name: 死亡
@@ -80,3 +99,14 @@ animation_combos:
       loop: false
       binding_strategy: auto
       hidden_tracks: *flag_zombie_hidden_tracks
+
+    - name: death_damaged
+      display_name: 死亡（旗帜受损）
+      animations:
+          - anim_death
+      loop: false
+      binding_strategy: auto
+      hidden_tracks: *flag_zombie_hidden_tracks
+      # 使用损坏的旗帜图片
+      image_overrides:
+          IMAGE_REANIM_ZOMBIE_FLAGHAND: assets/reanim/Zombie_flag3.png

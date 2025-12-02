@@ -19,6 +19,8 @@ type ReanimResourceLoader interface {
 	GetReanimXML(unitName string) *reanim.ReanimXML
 	// GetReanimPartImages 获取指定单位的部件图片
 	GetReanimPartImages(unitName string) map[string]*ebiten.Image
+	// LoadImage 加载指定路径的图片（用于 ImageOverrides）
+	LoadImage(path string) (*ebiten.Image, error)
 }
 
 // ReanimSystem 是 Reanim 动画系统

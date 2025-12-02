@@ -63,6 +63,18 @@ type AnimationComboConfig struct {
 
 	// HiddenTracks 隐藏轨道列表（可选）
 	HiddenTracks []string `yaml:"hidden_tracks,omitempty"`
+
+	// FrozenTracks 冻结轨道配置（可选）
+	// 这些轨道在此动画组合中会保持在第一帧，不随动画更新
+	// 用于旗帜僵尸啃食时保持右手拿旗的效果
+	// 格式：轨道名列表
+	FrozenTracks []string `yaml:"frozen_tracks,omitempty"`
+
+	// ImageOverrides 图片覆盖配置（可选）
+	// 用于动态替换轨道的图片资源
+	// 格式：图片引用名 -> 新图片路径
+	// 例如：IMAGE_REANIM_ZOMBIE_FLAGHAND -> assets/reanim/Zombie_flag3.png
+	ImageOverrides map[string]string `yaml:"image_overrides,omitempty"`
 }
 
 // LoadReanimConfig 从 YAML 文件加载 Reanim 配置

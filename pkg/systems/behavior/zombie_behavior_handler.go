@@ -351,15 +351,10 @@ func (s *BehaviorSystem) changeZombieAnimation(zombieID ecs.EntityID, newState c
 	case components.ZombieAnimEating:
 		comboName = "eat"
 	case components.ZombieAnimDying:
-		// 根据僵尸类型使用不同的 unitID
-		var unitID string
-		switch behavior.Type {
-		case components.BehaviorZombieConehead:
-			unitID = "zombie_conehead"
-		case components.BehaviorZombieBuckethead:
-			unitID = "zombie_buckethead"
-		default:
-			unitID = "zombie"
+		// 使用 BehaviorComponent 中存储的 UnitID
+		unitID := behavior.UnitID
+		if unitID == "" {
+			unitID = "zombie" // 后备默认值
 		}
 
 		// 使用组件通信替代直接调用
@@ -374,15 +369,10 @@ func (s *BehaviorSystem) changeZombieAnimation(zombieID ecs.EntityID, newState c
 		return
 	}
 
-	// 根据僵尸类型选择正确的 unitID
-	var unitID string
-	switch behavior.Type {
-	case components.BehaviorZombieConehead:
-		unitID = "zombie_conehead"
-	case components.BehaviorZombieBuckethead:
-		unitID = "zombie_buckethead"
-	default:
-		unitID = "zombie"
+	// 使用 BehaviorComponent 中存储的 UnitID
+	unitID := behavior.UnitID
+	if unitID == "" {
+		unitID = "zombie" // 后备默认值
 	}
 
 	// 使用组件通信替代直接调用

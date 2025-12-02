@@ -78,4 +78,5 @@ const (
 type BehaviorComponent struct {
 	Type            BehaviorType    // 行为类型（向日葵、豌豆射手等）
 	ZombieAnimState ZombieAnimState // 僵尸当前动画状态（仅用于僵尸）
+	UnitID          string          // 动画配置 ID（僵尸专用，如 "zombie_flag"）
 }

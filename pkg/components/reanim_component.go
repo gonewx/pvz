@@ -156,6 +156,18 @@ type ReanimComponent struct {
 	// 渲染时会在轨道的原始位置上叠加此偏移
 	TrackOffsets map[string][2]float64
 
+	// FrozenTracks 冻结的轨道
+	// Key: 轨道名
+	// Value: true 表示冻结（保持第一帧），false 或不存在表示正常播放
+	// 用于旗帜僵尸啃食时保持右手拿旗的效果
+	FrozenTracks map[string]bool
+
+	// ImageOverrides 图片覆盖
+	// Key: 图片引用名（如 "IMAGE_REANIM_ZOMBIE_FLAGHAND"）
+	// Value: 覆盖后的图片对象
+	// 用于动态替换轨道图片（如损坏的旗帜）
+	ImageOverrides map[string]*ebiten.Image
+
 	// CenterOffsetX/Y 是 bounding box 中心的坐标（相对于 Reanim 原点）
 	// 用于渲染时居中对齐：screenPos = worldPos - CenterOffset
 	// 在动画初始化时计算一次并缓存，避免每帧重新计算导致位置抖动
