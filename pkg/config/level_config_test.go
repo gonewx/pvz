@@ -1287,3 +1287,204 @@ func TestApplyDefaults_ZeroRowMax(t *testing.T) {
 		t.Errorf("Expected default RowMax 5, got %d", config.RowMax)
 	}
 }
+
+// ============================================================================
+// Story 19.4: PresetPlant Tests
+// ============================================================================
+
+// TestPresetPlant_Validation 测试预设植物验证
+func TestPresetPlant_Validation(t *testing.T) {
+	t.Run("valid preset plant config", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:   "1-5",
+			Name: "Bowling Level",
+			PresetPlants: []PresetPlant{
+				{Type: "peashooter", Row: 2, Col: 6},
+				{Type: "peashooter", Row: 3, Col: 8},
+				{Type: "peashooter", Row: 4, Col: 7},
+			},
+			Waves: []WaveConfig{
+				{Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+			},
+		}
+		err := validateLevelConfig(config)
+		if err != nil {
+			t.Errorf("Expected no error for valid preset plants, got: %v", err)
+		}
+	})
+
+	t.Run("invalid preset plant - missing type", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:   "1-5",
+			Name: "Test",
+			PresetPlants: []PresetPlant{
+				{Type: "", Row: 2, Col: 6}, // 缺少类型
+			},
+			Waves: []WaveConfig{
+				{Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+			},
+		}
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for preset plant missing type")
+		}
+	})
+
+	t.Run("invalid preset plant - row out of range", func(t *testing.T) {
+		testCases := []struct {
+			row int
+		}{
+			{row: 0},
+			{row: 6},
+			{row: -1},
+		}
+
+		for _, tc := range testCases {
+			config := &LevelConfig{
+				ID:   "1-5",
+				Name: "Test",
+				PresetPlants: []PresetPlant{
+					{Type: "peashooter", Row: tc.row, Col: 5},
+				},
+				Waves: []WaveConfig{
+					{Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+				},
+			}
+			err := validateLevelConfig(config)
+			if err == nil {
+				t.Errorf("Expected error for preset plant row %d, got nil", tc.row)
+			}
+		}
+	})
+
+	t.Run("invalid preset plant - col out of range", func(t *testing.T) {
+		testCases := []struct {
+			col int
+		}{
+			{col: 0},
+			{col: 10},
+			{col: -1},
+		}
+
+		for _, tc := range testCases {
+			config := &LevelConfig{
+				ID:   "1-5",
+				Name: "Test",
+				PresetPlants: []PresetPlant{
+					{Type: "peashooter", Row: 3, Col: tc.col},
+				},
+				Waves: []WaveConfig{
+					{Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+				},
+			}
+			err := validateLevelConfig(config)
+			if err == nil {
+				t.Errorf("Expected error for preset plant col %d, got nil", tc.col)
+			}
+		}
+	})
+
+	t.Run("empty preset plants is valid", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:           "1-5",
+			Name:         "Test",
+			PresetPlants: []PresetPlant{},
+			Waves: []WaveConfig{
+				{Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+			},
+		}
+		err := validateLevelConfig(config)
+		if err != nil {
+			t.Errorf("Expected no error for empty preset plants, got: %v", err)
+		}
+	})
+}
+
+// TestLoadLevelConfig_WithPresetPlants 测试加载包含预设植物的配置
+func TestLoadLevelConfig_WithPresetPlants(t *testing.T) {
+	tempDir := t.TempDir()
+	testFile := filepath.Join(tempDir, "level-1-5.yaml")
+
+	yamlContent := `id: "1-5"
+name: "Wall-nut Bowling"
+description: "Shovel tutorial + bowling"
+presetPlants:
+  - type: "peashooter"
+    row: 2
+    col: 6
+  - type: "peashooter"
+    row: 3
+    col: 8
+  - type: "peashooter"
+    row: 4
+    col: 7
+specialRules: "bowling"
+waves:
+  - zombies:
+      - type: basic
+        lanes: [3]
+        count: 1
+`
+	if err := os.WriteFile(testFile, []byte(yamlContent), 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	config, err := LoadLevelConfig(testFile)
+	if err != nil {
+		t.Fatalf("LoadLevelConfig() failed: %v", err)
+	}
+
+	// 验证预设植物数量
+	if len(config.PresetPlants) != 3 {
+		t.Errorf("Expected 3 preset plants, got %d", len(config.PresetPlants))
+	}
+
+	// 验证第一个预设植物
+	if config.PresetPlants[0].Type != "peashooter" {
+		t.Errorf("Expected preset plant type 'peashooter', got '%s'", config.PresetPlants[0].Type)
+	}
+	if config.PresetPlants[0].Row != 2 {
+		t.Errorf("Expected preset plant row 2, got %d", config.PresetPlants[0].Row)
+	}
+	if config.PresetPlants[0].Col != 6 {
+		t.Errorf("Expected preset plant col 6, got %d", config.PresetPlants[0].Col)
+	}
+
+	// 验证特殊规则
+	if config.SpecialRules != "bowling" {
+		t.Errorf("Expected specialRules 'bowling', got '%s'", config.SpecialRules)
+	}
+}
+
+// TestPresetPlant_Struct 测试 PresetPlant 结构体
+func TestPresetPlant_Struct(t *testing.T) {
+	t.Run("zero value", func(t *testing.T) {
+		plant := PresetPlant{}
+		if plant.Type != "" {
+			t.Errorf("Expected empty Type, got '%s'", plant.Type)
+		}
+		if plant.Row != 0 {
+			t.Errorf("Expected Row 0, got %d", plant.Row)
+		}
+		if plant.Col != 0 {
+			t.Errorf("Expected Col 0, got %d", plant.Col)
+		}
+	})
+
+	t.Run("with values", func(t *testing.T) {
+		plant := PresetPlant{
+			Type: "sunflower",
+			Row:  3,
+			Col:  5,
+		}
+		if plant.Type != "sunflower" {
+			t.Errorf("Expected Type 'sunflower', got '%s'", plant.Type)
+		}
+		if plant.Row != 3 {
+			t.Errorf("Expected Row 3, got %d", plant.Row)
+		}
+		if plant.Col != 5 {
+			t.Errorf("Expected Col 5, got %d", plant.Col)
+		}
+	})
+}

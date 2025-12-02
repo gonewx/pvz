@@ -223,6 +223,109 @@ func (s *GameScene) initLawnmowers() {
 	log.Printf("[GameScene] Initialized %d lawnmowers for enabled lanes: %v", len(enabledLanes), enabledLanes)
 }
 
+// spawnPresetPlants 生成预设植物
+// Story 19.4: 在关卡加载时根据配置生成预设植物
+//
+// 预设植物用于：
+// - 铲子教学关卡 (Level 1-5) 中的初始植物
+// - 特殊关卡的预设场景
+//
+// 处理内容：
+// - 遍历 LevelConfig.PresetPlants 配置
+// - 调用植物工厂函数创建实体
+// - 更新草坪网格占用状态
+// - 记录生成日志
+func (s *GameScene) spawnPresetPlants() {
+	if s.gameState.CurrentLevel == nil {
+		log.Printf("[GameScene] spawnPresetPlants: No current level, skipping")
+		return
+	}
+
+	presetPlants := s.gameState.CurrentLevel.PresetPlants
+	if len(presetPlants) == 0 {
+		log.Printf("[GameScene] spawnPresetPlants: No preset plants configured")
+		return
+	}
+
+	log.Printf("[GameScene] Spawning %d preset plants...", len(presetPlants))
+
+	spawnedCount := 0
+	for i, preset := range presetPlants {
+		// 将 1-based 配置坐标转换为 0-based 代码坐标
+		col := preset.Col - 1
+		row := preset.Row - 1
+
+		// 验证坐标范围
+		if row < 0 || row >= config.GridRows || col < 0 || col >= config.GridColumns {
+			log.Printf("[GameScene] ERROR: Invalid preset plant position at index %d: row=%d, col=%d",
+				i, preset.Row, preset.Col)
+			continue
+		}
+
+		// 根据植物类型创建实体
+		var entityID ecs.EntityID
+		var err error
+
+		switch preset.Type {
+		case "peashooter":
+			entityID, err = entities.NewPlantEntity(
+				s.entityManager,
+				s.resourceManager,
+				s.gameState,
+				s.reanimSystem,
+				components.PlantPeashooter,
+				col, row,
+			)
+		case "sunflower":
+			entityID, err = entities.NewPlantEntity(
+				s.entityManager,
+				s.resourceManager,
+				s.gameState,
+				s.reanimSystem,
+				components.PlantSunflower,
+				col, row,
+			)
+		case "wallnut":
+			entityID, err = entities.NewWallnutEntity(
+				s.entityManager,
+				s.resourceManager,
+				s.gameState,
+				s.reanimSystem,
+				col, row,
+			)
+		case "cherrybomb":
+			entityID, err = entities.NewCherryBombEntity(
+				s.entityManager,
+				s.resourceManager,
+				s.gameState,
+				col, row,
+			)
+		default:
+			log.Printf("[GameScene] ERROR: Unknown preset plant type '%s' at index %d", preset.Type, i)
+			continue
+		}
+
+		if err != nil {
+			log.Printf("[GameScene] ERROR: Failed to create preset plant '%s' at (%d,%d): %v",
+				preset.Type, preset.Row, preset.Col, err)
+			continue
+		}
+
+		// 更新草坪网格占用状态
+		if s.lawnGridSystem != nil && s.lawnGridEntityID != 0 {
+			if err := s.lawnGridSystem.OccupyCell(s.lawnGridEntityID, col, row, entityID); err != nil {
+				log.Printf("[GameScene] Warning: Failed to occupy grid cell (%d,%d): %v", col, row, err)
+			}
+		}
+
+		spawnedCount++
+		log.Printf("[GameScene] Spawned preset plant '%s' at row=%d, col=%d (Entity ID: %d)",
+			preset.Type, preset.Row, preset.Col, entityID)
+	}
+
+	log.Printf("[GameScene] Preset plants spawned: %d/%d", spawnedCount, len(presetPlants))
+}
+
 // saveBattleState 保存当前战斗状态
 //
 // Story 18.2: 战斗存档保存触发

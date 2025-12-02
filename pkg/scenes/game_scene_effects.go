@@ -6,6 +6,7 @@ import (
 	"math"
 
 	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -128,4 +129,61 @@ func (s *GameScene) drawCardFlash(screen *ebiten.Image) {
 	op := &ebiten.DrawImageOptions{}
 	op.GeoM.Translate(pos.X, pos.Y)
 	screen.DrawImage(flashImage, op)
+}
+
+// drawBowlingRedLine 绘制保龄球关卡红线（Story 19.4）
+// 在第 3 列和第 4 列之间绘制红色条纹，用于保龄球阶段视觉提示
+//
+// 渲染层级：在草坪背景之上、植物之下
+// 红线位置：config.GridWorldStartX + config.BowlingRedLineColumn * config.CellWidth
+//
+// 条件：只有当 LevelPhaseSystem.ShouldShowRedLine() 返回 true 时才绘制
+func (s *GameScene) drawBowlingRedLine(screen *ebiten.Image) {
+	// 检查 LevelPhaseSystem 是否存在
+	if s.levelPhaseSystem == nil {
+		return
+	}
+
+	// 检查是否应该显示红线
+	if !s.levelPhaseSystem.ShouldShowRedLine() {
+		return
+	}
+
+	// 检查红线图片是否已加载
+	if s.bowlingRedLine == nil {
+		log.Printf("[GameScene] Warning: Bowling red line image not loaded")
+		return
+	}
+
+	// 计算红线位置（世界坐标）
+	// 红线位于第 3 列和第 4 列之间
+	redLineWorldX := config.GridWorldStartX + float64(config.BowlingRedLineColumn)*config.CellWidth
+
+	// 获取红线图片尺寸
+	redLineBounds := s.bowlingRedLine.Bounds()
+	redLineWidth := float64(redLineBounds.Dx())
+	redLineHeight := float64(redLineBounds.Dy())
+
+	// 红线 Y 位置：从草坪顶部开始，覆盖整个草坪高度
+	redLineWorldY := config.GridWorldStartY + config.BowlingRedLineOffsetY
+
+	// 如果红线图片高度不够覆盖整个草坪，需要拉伸
+	// 否则直接使用原始图片
+	totalLawnHeight := float64(config.GridRows) * config.CellHeight
+
+	// 转换为屏幕坐标
+	screenX := redLineWorldX - s.cameraX - redLineWidth/2 // 居中对齐到列线
+	screenY := redLineWorldY
+
+	// 绘制红线
+	op := &ebiten.DrawImageOptions{}
+
+	// 如果需要拉伸高度
+	if redLineHeight < totalLawnHeight {
+		scaleY := totalLawnHeight / redLineHeight
+		op.GeoM.Scale(1, scaleY)
+	}
+
+	op.GeoM.Translate(screenX, screenY)
+	screen.DrawImage(s.bowlingRedLine, op)
 }

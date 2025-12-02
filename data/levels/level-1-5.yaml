@@ -1,0 +1,53 @@
+# Level 1-5: 坚果保龄球 (Story 19.4)
+# 铲子教学阶段 + 保龄球迷你游戏
+id: "1-5"
+name: "坚果保龄球"
+description: "铲子教学 + 保龄球迷你游戏"
+
+# === Story 17.2: 顶层字段 ===
+flags: 0                        # 保龄球关卡没有旗帜概念
+sceneType: "day"                # 场景类型: 白天前院
+rowMax: 5                       # 最大行数: 前院 5 行
+
+# === 开场配置 ===
+openingType: "special"          # 特殊开场（Dave 对话驱动）
+enabledLanes: [1, 2, 3, 4, 5]
+availablePlants: []             # 保龄球模式不使用植物卡片
+skipOpening: true               # 跳过标准开场动画（由 Dave 对话替代）
+initialSun: 0                   # 保龄球模式不使用阳光
+
+# === 特殊规则 ===
+specialRules: "bowling"         # 保龄球模式
+
+# === 预设植物（铲子教学阶段）===
+# Story 19.4: 关卡加载时自动生成的植物
+presetPlants:
+  - type: "peashooter"
+    row: 2                      # 1-based 行号
+    col: 6                      # 1-based 列号
+  - type: "peashooter"
+    row: 3
+    col: 8
+  - type: "peashooter"
+    row: 4
+    col: 7
+
+# === 草皮配置（全行）===
+backgroundImage: "IMAGE_BACKGROUND1"
+sodRowImage: ""                 # 无草皮叠加
+showSoddingAnim: false          # 无铺草皮动画
+
+# === 通关奖励 ===
+rewardPlant: "potato_mine"      # 完成后奖励土豆地雷
+
+# === 波次配置 (保龄球阶段) ===
+# 注意：保龄球阶段的波次会在转场完成后才开始生效
+# 此处先放置占位波次，完整的保龄球波次配置在 Story 19.5 中实现
+waves:
+  - waveNum: 1
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 3.0

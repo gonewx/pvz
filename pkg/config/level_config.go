@@ -75,6 +75,18 @@ type LevelConfig struct {
 	// 原版设计：只在 level 1-3 播放（玩家首次进入全3行草地关卡时的引导）
 	// 默认 false
 	ShowReadySetPlant bool `yaml:"showReadySetPlant"`
+
+	// Story 19.4: 预设植物配置
+	// 关卡加载时自动生成的植物��表（如铲子教学关卡中的预设豌豆射手）
+	PresetPlants []PresetPlant `yaml:"presetPlants"`
+}
+
+// PresetPlant 预设植物配置（Story 19.4）
+// 定义关卡加载时自动生成的植物
+type PresetPlant struct {
+	Type string `yaml:"type"` // 植物类型，如 "peashooter"
+	Row  int    `yaml:"row"`  // 行号 (1-based，1-5)
+	Col  int    `yaml:"col"`  // 列号 (1-based，1-9)
 }
 
 // TutorialStep 教学步骤配置（Story 8.2）
@@ -414,6 +426,28 @@ func validateLevelConfig(config *LevelConfig) error {
 			if lane < 1 || lane > 5 {
 				return fmt.Errorf("invalid pre-sodded lane %d (must be 1-5)", lane)
 			}
+		}
+	}
+
+	// Story 19.4: 验证预设植物配置
+	for i, plant := range config.PresetPlants {
+		// 验证植物类型
+		if plant.Type == "" {
+			return fmt.Errorf("presetPlants[%d]: type is required", i)
+		}
+
+		// 验证行号（1-based，必须在 1-RowMax 范围内）
+		maxRow := config.RowMax
+		if maxRow == 0 {
+			maxRow = 5
+		}
+		if plant.Row < 1 || plant.Row > maxRow {
+			return fmt.Errorf("presetPlants[%d]: row must be between 1 and %d, got %d", i, maxRow, plant.Row)
+		}
+
+		// 验证列号（1-based，必须在 1-9 范围内）
+		if plant.Col < 1 || plant.Col > GridColumns {
+			return fmt.Errorf("presetPlants[%d]: col must be between 1 and %d, got %d", i, GridColumns, plant.Col)
 		}
 	}
 

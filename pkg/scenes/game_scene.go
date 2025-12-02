@@ -36,6 +36,9 @@ type GameScene struct {
 	flagMeterProg *ebiten.Image // Flag meter progress bar (进度条填充)
 	flagMeterFlag *ebiten.Image // Flag meter flags/parts (进度条标志，3列切片)
 
+	// Story 19.4: Bowling red line image (保龄球红线图片)
+	bowlingRedLine *ebiten.Image // Red line between column 3 and 4 (保龄球关卡红线)
+
 	// Story 8.2 QA改进：草皮叠加层（随动画进度渐进显示）
 	sodRowImage        *ebiten.Image // 草皮叠加图片（sod1row.jpg 或 sod3row.jpg）
 	soddedBackground   *ebiten.Image // 已铺草皮完整背景（IMAGE_BACKGROUND1），用于 Level 1-4 双背景叠加
@@ -174,6 +177,9 @@ type GameScene struct {
 
 	// Story 19.3: 强引导教学系统
 	guidedTutorialSystem *systems.GuidedTutorialSystem // 强引导教学系统（Level 1-5 铲子教学）
+
+	// Story 19.4: 阶段转场系统
+	levelPhaseSystem *systems.LevelPhaseSystem // 阶段转场系统（铲子教学 → 保龄球）
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -534,6 +540,38 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	systems.SetGuidedTutorialShovelProvider(scene)
 	systems.SetGuidedTutorialStateProvider(scene)
 	log.Printf("[GameScene] Initialized guided tutorial system")
+
+	// Story 19.4: 初始化阶段转场���统
+	scene.levelPhaseSystem = systems.NewLevelPhaseSystem(scene.entityManager, scene.gameState, rm)
+	log.Printf("[GameScene] Initialized level phase system")
+
+	// Story 19.4: 设置转场回调
+	// 当 GuidedTutorialSystem 检测到所有预设植物被移除时，触发转场
+	scene.guidedTutorialSystem.SetTransitionCallback(func() {
+		log.Printf("[GameScene] GuidedTutorial transition callback triggered, starting phase transition")
+		scene.levelPhaseSystem.StartPhaseTransition(1, 2)
+	})
+
+	// 设置 LevelPhaseSystem 的回调
+	scene.levelPhaseSystem.SetOnDisableGuidedTutorial(func() {
+		log.Printf("[GameScene] Disabling guided tutorial mode")
+		scene.guidedTutorialSystem.SetActive(false)
+	})
+
+	scene.levelPhaseSystem.SetOnActivateBowling(func() {
+		log.Printf("[GameScene] Activating bowling phase - TODO: implement conveyor belt activation")
+		// TODO(Story 19.5): 激活传送带系统
+	})
+
+	// Story 19.4: 生成预设植物
+	// 必须在 GuidedTutorialSystem 初始化之后调用，这样系统才能正确追踪植物数量
+	scene.spawnPresetPlants()
+
+	// Story 19.4: 检查是否需要激活强引导模式（Level 1-5）
+	if scene.gameState.CurrentLevel != nil && len(scene.gameState.CurrentLevel.PresetPlants) > 0 {
+		log.Printf("[GameScene] Level has preset plants, activating guided tutorial mode")
+		scene.guidedTutorialSystem.SetActive(true)
+	}
 
 	return scene
 }
@@ -917,6 +955,10 @@ func (s *GameScene) Update(deltaTime float64) {
 	if s.guidedTutorialSystem != nil {
 		s.guidedTutorialSystem.Update(deltaTime) // 9.6. Update guided tutorial state
 	}
+	// Story 19.4: Level phase system (phase transitions)
+	if s.levelPhaseSystem != nil {
+		s.levelPhaseSystem.Update(deltaTime) // 9.7. Update phase transition state
+	}
 	// Story 3.2: 植物预览系统 - 更新预览位置（双图像支持）
 	s.plantPreviewSystem.Update(deltaTime) // 10. Update plant preview position (dual-image support)
 	s.lawnGridSystem.Update(deltaTime)     // 10.5. Update lawn flash animation (Story 8.2)
@@ -961,6 +1003,10 @@ func (s *GameScene) Update(deltaTime float64) {
 func (s *GameScene) Draw(screen *ebiten.Image) {
 	// Layer 1: Draw lawn background
 	s.drawBackground(screen)
+
+	// Story 19.4: Draw bowling red line (保龄球红线)
+	// 红线在背景之上、植物之下渲染
+	s.drawBowlingRedLine(screen)
 
 	// Story 8.3.1: 开场动画或铺草皮动画期间隐藏 UI 元素
 	// 注意：需要检查 soddingAnimStarted 来避免开场动画完成和铺草皮动画开始之间的闪现

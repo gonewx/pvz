@@ -99,6 +99,15 @@ func (s *GameScene) loadResources() {
 		s.flagMeterFlag = flagMeterFlag
 	}
 
+	// Story 19.4: Load bowling red line image (保龄球红线图片)
+	bowlingRedLine, err := s.resourceManager.LoadImage("assets/images/Wallnut_bowlingstripe.png")
+	if err != nil {
+		log.Printf("Warning: Failed to load bowling red line image: %v", err)
+	} else {
+		s.bowlingRedLine = bowlingRedLine
+		log.Printf("[GameScene] Loaded bowling red line image")
+	}
+
 	// Note: Sun counter background is drawn procedurally for now
 	// A dedicated image can be loaded here in the future if needed
 	// Menu button resources are now loaded via ButtonFactory (ECS architecture)

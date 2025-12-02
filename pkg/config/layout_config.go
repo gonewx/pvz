@@ -432,4 +432,24 @@ const (
 	// 箭头位置 Y = 铲子槽位底部 + 此偏移量
 	// 建议值范围：5.0 - 20.0
 	GuidedTutorialArrowOffsetY = 10.0
+
+	// ========== 阶段转场配置参数（Story 19.4）（可手工调节） ==========
+
+	// PhaseTransitionConveyorSlideDuration 传送带滑入时长（秒）
+	PhaseTransitionConveyorSlideDuration = 0.5
+
+	// ConveyorBeltStartY 传送带起始 Y 位置（屏幕外）
+	ConveyorBeltStartY = -100.0
+
+	// ConveyorBeltTargetY 传送带目标 Y 位置
+	// 与种子栏上对齐
+	ConveyorBeltTargetY = 10.0
+
+	// BowlingRedLineColumn 红线位置（第 3 列和第 4 列之间）
+	// 红线 X 坐标 = GridWorldStartX + BowlingRedLineColumn * CellWidth
+	BowlingRedLineColumn = 3
+
+	// BowlingRedLineOffsetY 红线 Y 偏移（相对于网格起点）
+	// 用于调整红线垂直��置
+	BowlingRedLineOffsetY = 0.0
 )
