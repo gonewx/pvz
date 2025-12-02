@@ -169,8 +169,11 @@ type GameScene struct {
 	battleSaveDialogID    ecs.EntityID         // 对话框实体ID
 
 	// Story 19.2: 铲子交互系统
-	shovelSelected           bool                           // 铲子是否被选中
-	shovelInteractionSystem  *systems.ShovelInteractionSystem // 铲子交互系统
+	shovelSelected          bool                             // 铲子是否被选中
+	shovelInteractionSystem *systems.ShovelInteractionSystem // 铲子交互系统
+
+	// Story 19.3: 强引导教学系统
+	guidedTutorialSystem *systems.GuidedTutorialSystem // 强引导教学系统（Level 1-5 铲子教学）
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -525,6 +528,12 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	scene.shovelInteractionSystem = systems.NewShovelInteractionSystem(scene.entityManager, scene.gameState, rm)
 	systems.SetShovelStateProvider(scene)
 	log.Printf("[GameScene] Initialized shovel interaction system")
+
+	// Story 19.3: 初始化强引导教学系统
+	scene.guidedTutorialSystem = systems.NewGuidedTutorialSystem(scene.entityManager, scene.gameState, rm)
+	systems.SetGuidedTutorialShovelProvider(scene)
+	systems.SetGuidedTutorialStateProvider(scene)
+	log.Printf("[GameScene] Initialized guided tutorial system")
 
 	return scene
 }
@@ -904,6 +913,10 @@ func (s *GameScene) Update(deltaTime float64) {
 	if s.tutorialSystem != nil {
 		s.tutorialSystem.Update(deltaTime) // 9.5. Update tutorial text display
 	}
+	// Story 19.3: Guided tutorial system (Level 1-5 shovel teaching)
+	if s.guidedTutorialSystem != nil {
+		s.guidedTutorialSystem.Update(deltaTime) // 9.6. Update guided tutorial state
+	}
 	// Story 3.2: 植物预览系统 - 更新预览位置（双图像支持）
 	s.plantPreviewSystem.Update(deltaTime) // 10. Update plant preview position (dual-image support)
 	s.lawnGridSystem.Update(deltaTime)     // 10.5. Update lawn flash animation (Story 8.2)
@@ -1172,12 +1185,48 @@ func (s *GameScene) GetShovelSlotBounds() image.Rectangle {
 	)
 }
 
+// ============================================================================
+// Story 19.3: GuidedTutorialStateProvider 接口实现
+// ============================================================================
+
+// IsGuidedTutorialActive 返回强引导模式是否激活
+// 实现 systems.GuidedTutorialStateProvider 接口
+func (s *GameScene) IsGuidedTutorialActive() bool {
+	if s.guidedTutorialSystem == nil {
+		return false
+	}
+	return s.guidedTutorialSystem.IsActive()
+}
+
+// IsOperationAllowed 检查操作是否在强引导白名单中
+// 实现 systems.GuidedTutorialStateProvider 接口
+func (s *GameScene) IsOperationAllowed(operation string) bool {
+	if s.guidedTutorialSystem == nil {
+		return true // 系统不存在，允许所有操作
+	}
+	return s.guidedTutorialSystem.IsOperationAllowed(operation)
+}
+
+// NotifyOperation 通知强引导系统发生了某个操作
+// 实现 systems.GuidedTutorialStateProvider 接口
+func (s *GameScene) NotifyOperation(operation string) {
+	if s.guidedTutorialSystem == nil {
+		return
+	}
+	s.guidedTutorialSystem.NotifyOperation(operation)
+}
+
 // updateShovelSlotClick 检测铲子槽位点击
 // Story 19.2: 点击铲子槽位切换铲子模式
+// Story 19.3: 强引导模式下检查操作限制
 func (s *GameScene) updateShovelSlotClick() {
 	// 检查铲子是否可用（教学关卡不显示、未解锁时不显示）
+	// Story 19.3: 强引导模式下始终显示铲子（不受 tutorial 类型限制）
 	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.OpeningType == "tutorial" {
-		return
+		// Story 19.3: 如果强引导模式激活，不跳过铲子检测
+		if !s.IsGuidedTutorialActive() {
+			return
+		}
 	}
 	if !s.gameState.IsToolUnlocked("shovel") {
 		return
@@ -1191,6 +1240,14 @@ func (s *GameScene) updateShovelSlotClick() {
 		// 检查是否点击了铲子槽位
 		if mouseX >= bounds.Min.X && mouseX <= bounds.Max.X &&
 			mouseY >= bounds.Min.Y && mouseY <= bounds.Max.Y {
+			// Story 19.3: 检查操作是否被允许
+			if !s.IsOperationAllowed("click_shovel") {
+				return // 静默忽略
+			}
+
+			// Story 19.3: 通知系统操作发生
+			s.NotifyOperation("click_shovel")
+
 			// 切换铲子选中状态
 			s.SetShovelSelected(!s.shovelSelected)
 			if s.shovelSelected {

@@ -420,4 +420,16 @@ const (
 
 	// DaveContinueTextOffsetY 「点击继续」文字距气泡底部的偏移（像素）
 	DaveContinueTextOffsetY = 10.0
+
+	// ========== 强引导教学系统配置参数（Story 19.3）（可手工调节） ==========
+
+	// GuidedTutorialIdleThreshold 空闲触发阈值（秒）
+	// 玩家无操作超过此时间后显示浮动箭头提示
+	// 建议值范围：3.0 - 10.0
+	GuidedTutorialIdleThreshold = 5.0
+
+	// GuidedTutorialArrowOffsetY 箭头与铲子槽位底部的垂直距离（像素）
+	// 箭头位置 Y = 铲子槽位底部 + 此偏移量
+	// 建议值范围：5.0 - 20.0
+	GuidedTutorialArrowOffsetY = 10.0
 )

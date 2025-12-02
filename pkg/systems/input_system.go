@@ -326,7 +326,12 @@ func (s *InputSystem) handleSunClick(sunID ecs.EntityID, pos *components.Positio
 
 // handlePlantCardClick 处理植物卡片点击逻辑
 // 返回 true 表示处理了点击，false 表示未处理
+// Story 19.3: 强引导模式下阻止卡片点击
 func (s *InputSystem) handlePlantCardClick(mouseX, mouseY int, cameraX float64) bool {
+	// Story 19.3: 检查强引导模式是否阻止卡片点击
+	if IsGuidedTutorialBlocking("click_plant_card") {
+		return false // 静默忽略，不处理卡片点击
+	}
 	// 查询所有植物卡片实体
 	entities := ecs.GetEntitiesWith4[
 		*components.PlantCardComponent,
@@ -485,7 +490,13 @@ func (s *InputSystem) destroyPlantPreview() {
 
 // handleLawnClick 处理草坪点击种植逻辑
 // 返回 true 表示处理了点击，false 表示未处理
+// Story 19.3: 强引导模式下阻止草坪种植
 func (s *InputSystem) handleLawnClick(mouseX, mouseY int) bool {
+	// Story 19.3: 检查强引导模式是否阻止草坪点击（种植）
+	if IsGuidedTutorialBlocking("click_lawn_empty") {
+		return false // 静默忽略，不处理草坪点击
+	}
+
 	// 检查当前是否在种植模式
 	isPlanting, plantType := s.gameState.GetPlantingMode()
 	if !isPlanting {

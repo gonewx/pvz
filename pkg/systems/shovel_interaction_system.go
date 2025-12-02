@@ -26,11 +26,11 @@ type ShovelInteractionSystem struct {
 	entityManager     *ecs.EntityManager
 	gameState         *game.GameState
 	resourceManager   *game.ResourceManager
-	shovelSoundPlayer *audio.Player  // 铲土音效播放器
-	cursorImage       *ebiten.Image  // 铲子光标图片
-	cursorAnchorX     float64        // 光标锚点X偏移
-	cursorAnchorY     float64        // 光标锚点Y偏移
-	shovelEntity      ecs.EntityID   // 铲子交互实体ID
+	shovelSoundPlayer *audio.Player         // 铲土音效播放器
+	cursorImage       *ebiten.Image         // 铲子光标图片
+	cursorAnchorX     float64               // 光标锚点X偏移
+	cursorAnchorY     float64               // 光标锚点Y偏移
+	shovelEntity      ecs.EntityID          // 铲子交互实体ID
 	lastCursorMode    ebiten.CursorModeType // 上一次的光标模式
 }
 
@@ -230,7 +230,11 @@ func (s *ShovelInteractionSystem) detectPlantUnderMouse(worldX, worldY float64) 
 //
 // 参数：
 //   - entityID: 要移除的植物实体ID
+//
+// Story 19.3: 强引导模式下通知系统植物被移除
 func (s *ShovelInteractionSystem) removePlant(entityID ecs.EntityID) {
+	// Story 19.3: 通知强引导系统发生了植物点击操作
+	NotifyGuidedTutorialOperation("click_plant")
 	// 获取植物信息（用于日志和网格更新）
 	plantComp, hasPlant := ecs.GetComponent[*components.PlantComponent](s.entityManager, entityID)
 	posComp, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
