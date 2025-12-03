@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/decker502/pvz/pkg/config"
+	"github.com/decker502/pvz/pkg/embedded"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/scenes"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -61,6 +62,9 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 }
 
 func main() {
+	// 初始化 embedded 包（必须在任何资源加载之前）
+	embedded.Init(assetsFS, dataFS)
+
 	// Flags
 	verboseFlag := flag.Bool("verbose", false, "Enable verbose logging (default off)")
 	levelFlag := flag.String("level", "", "Specify which level to load (e.g., '1-2', '1-3'). If not set, loads from save or defaults to 1-1")

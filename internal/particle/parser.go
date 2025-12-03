@@ -3,7 +3,8 @@ package particle
 import (
 	"encoding/xml"
 	"fmt"
-	"os"
+
+	"github.com/decker502/pvz/pkg/embedded"
 )
 
 // ParseParticleXML parses a particle configuration XML file and returns the parsed configuration.
@@ -26,8 +27,8 @@ import (
 //	}
 //	fmt.Printf("Loaded %d emitters\n", len(config.Emitters))
 func ParseParticleXML(path string) (*ParticleConfig, error) {
-	// Read the entire XML file
-	data, err := os.ReadFile(path)
+	// 从 embedded FS 读取 XML 文件
+	data, err := embedded.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read particle XML file %s: %w", path, err)
 	}

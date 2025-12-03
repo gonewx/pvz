@@ -2,8 +2,8 @@ package config
 
 import (
 	"fmt"
-	"os"
 
+	"github.com/decker502/pvz/pkg/embedded"
 	"gopkg.in/yaml.v3"
 )
 
@@ -66,7 +66,7 @@ type SpawnRange struct {
 //   - *ZombiePhysicsConfig: 加载成功后的配置结构
 //   - error: 加载失败时返回错误
 func LoadZombiePhysicsConfig(path string) (*ZombiePhysicsConfig, error) {
-	data, err := os.ReadFile(path)
+	data, err := embedded.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read zombie physics config: %w", err)
 	}

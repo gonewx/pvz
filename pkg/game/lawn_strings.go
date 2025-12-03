@@ -3,8 +3,9 @@ package game
 import (
 	"bufio"
 	"fmt"
-	"os"
 	"strings"
+
+	"github.com/decker502/pvz/pkg/embedded"
 )
 
 // LawnStrings 游戏文本字符串管理器
@@ -31,8 +32,8 @@ type LawnStrings struct {
 //	[ADVICE_CLICK_ON_SUN]
 //	点击收集掉落的阳光！
 func NewLawnStrings(filePath string) (*LawnStrings, error) {
-	// 打开文件
-	file, err := os.Open(filePath)
+	// 从 embedded FS 打开文件
+	file, err := embedded.Open(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open LawnStrings file %s: %w", filePath, err)
 	}

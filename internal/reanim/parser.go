@@ -3,8 +3,9 @@ package reanim
 import (
 	"encoding/xml"
 	"fmt"
-	"os"
 	"strings"
+
+	"github.com/decker502/pvz/pkg/embedded"
 )
 
 // ParseReanimFile parses a Reanim XML file and returns the animation data.
@@ -26,8 +27,8 @@ import (
 //	}
 //	fmt.Printf("Animation FPS: %d\n", reanim.FPS)
 func ParseReanimFile(path string) (*ReanimXML, error) {
-	// Read the file
-	data, err := os.ReadFile(path)
+	// 从 embedded FS 读取文件
+	data, err := embedded.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read reanim file '%s': %w", path, err)
 	}

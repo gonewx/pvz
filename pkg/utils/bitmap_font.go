@@ -5,11 +5,11 @@ import (
 	"image"
 	"image/color"
 	"log"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/decker502/pvz/pkg/embedded"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -46,8 +46,8 @@ func LoadBitmapFont(imagePath, metaPath string) (*BitmapFont, error) {
 		return nil, fmt.Errorf("failed to load font image: %w", err)
 	}
 
-	// 读取元数据文件内容
-	data, err := os.ReadFile(metaPath)
+	// 从 embedded FS 读取元数据文件内容
+	data, err := embedded.ReadFile(metaPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read meta file: %w", err)
 	}
@@ -309,9 +309,9 @@ func (bf *BitmapFont) RenderTextToImage(text string, tintColor color.Color) (*eb
 	return resultImg, nil
 }
 
-// loadImage 加载图像文件
+// loadImage 从 embedded FS 加载图像文件
 func loadImage(path string) (*ebiten.Image, error) {
-	file, err := os.Open(path)
+	file, err := embedded.Open(path)
 	if err != nil {
 		return nil, err
 	}
@@ -327,7 +327,7 @@ func loadImage(path string) (*ebiten.Image, error) {
 
 // parseFontMeta 解析字体元数据文件
 func parseFontMeta(path string) ([]rune, []int, []image.Rectangle, error) {
-	data, err := os.ReadFile(path)
+	data, err := embedded.ReadFile(path)
 	if err != nil {
 		return nil, nil, nil, err
 	}

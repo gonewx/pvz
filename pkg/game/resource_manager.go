@@ -10,7 +10,6 @@ import (
 	_ "image/png"  // Register PNG decoder
 	"io"
 	"log"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -18,6 +17,7 @@ import (
 	"github.com/decker502/pvz/internal/particle"
 	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/config"
+	"github.com/decker502/pvz/pkg/embedded"
 	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
@@ -136,8 +136,8 @@ func (rm *ResourceManager) LoadImage(path string) (*ebiten.Image, error) {
 		return cachedImage, nil
 	}
 
-	// Open the image file
-	file, err := os.Open(path)
+	// Open the image file from embedded FS
+	file, err := embedded.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open image file %s: %w", path, err)
 	}
@@ -188,8 +188,8 @@ func (rm *ResourceManager) LoadImageWithAlphaMask(rgbPath, alphaPath string) (*e
 		return cachedImage, nil
 	}
 
-	// Load RGB image
-	rgbFile, err := os.Open(rgbPath)
+	// Load RGB image from embedded FS
+	rgbFile, err := embedded.Open(rgbPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open RGB image %s: %w", rgbPath, err)
 	}
@@ -200,8 +200,8 @@ func (rm *ResourceManager) LoadImageWithAlphaMask(rgbPath, alphaPath string) (*e
 		return nil, fmt.Errorf("failed to decode RGB image %s: %w", rgbPath, err)
 	}
 
-	// Load alpha mask image
-	alphaFile, err := os.Open(alphaPath)
+	// Load alpha mask image from embedded FS
+	alphaFile, err := embedded.Open(alphaPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open alpha mask %s: %w", alphaPath, err)
 	}
@@ -307,16 +307,8 @@ func (rm *ResourceManager) LoadAudio(path string) (*audio.Player, error) {
 		return cachedPlayer, nil
 	}
 
-	// Open the audio file
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open audio file %s: %w", path, err)
-	}
-	defer file.Close()
-
-	// Read the entire file into memory to avoid file handle issues
-	// This allows the audio stream to seek without keeping the file open
-	audioData, err := io.ReadAll(file)
+	// Read the audio file from embedded FS
+	audioData, err := embedded.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read audio file %s: %w", path, err)
 	}
@@ -397,15 +389,8 @@ func (rm *ResourceManager) LoadSoundEffect(path string) (*audio.Player, error) {
 		return cachedPlayer, nil
 	}
 
-	// Open the audio file
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open sound effect file %s: %w", path, err)
-	}
-	defer file.Close()
-
-	// Read the entire file into memory
-	audioData, err := io.ReadAll(file)
+	// Read the sound effect file from embedded FS
+	audioData, err := embedded.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read sound effect file %s: %w", path, err)
 	}
@@ -502,8 +487,8 @@ func (rm *ResourceManager) LoadFont(path string, size float64) (*text.GoTextFace
 		return cachedFace, nil
 	}
 
-	// Read font file
-	fontData, err := os.ReadFile(path)
+	// Read font file from embedded FS
+	fontData, err := embedded.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read font file %s: %w", path, err)
 	}
@@ -555,8 +540,8 @@ func (rm *ResourceManager) LoadReanimResources() error {
 	// - 避免遗漏资源（如之前的 SelectorScreen.reanim）
 
 	reanimDir := "data/reanim"
-	pattern := filepath.Join(reanimDir, "*.reanim")
-	files, err := filepath.Glob(pattern)
+	pattern := reanimDir + "/*.reanim"
+	files, err := embedded.Glob(pattern)
 	if err != nil {
 		return fmt.Errorf("failed to scan reanim directory: %w", err)
 	}
@@ -817,8 +802,8 @@ func (rm *ResourceManager) loadReanimPartImages(unitName string, reanimXML *rean
 //	    log.Fatal("Failed to load resource config:", err)
 //	}
 func (rm *ResourceManager) LoadResourceConfig(configPath string) error {
-	// Read the YAML file
-	data, err := os.ReadFile(configPath)
+	// Read the YAML file from embedded FS
+	data, err := embedded.ReadFile(configPath)
 	if err != nil {
 		return fmt.Errorf("failed to read resource config %s: %w", configPath, err)
 	}
@@ -869,7 +854,7 @@ func (rm *ResourceManager) buildResourceMap() {
 				found := false
 				for _, ext := range extensions {
 					testPath := fullPath + ext
-					if _, err := os.Stat(testPath); err == nil {
+					if embedded.Exists(testPath) {
 						fullPath = testPath
 						found = true
 						break
@@ -1038,8 +1023,8 @@ func (rm *ResourceManager) LoadCompositedImage(baseResourceID, maskResourceID st
 	// resourceMap already contains the full path with BasePath prepended
 	// (constructed by buildResourceMap), so we can use it directly
 
-	// Load base image file
-	baseFile, err := os.Open(basePath)
+	// Load base image file from embedded FS
+	baseFile, err := embedded.Open(basePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open base image file %s: %w", basePath, err)
 	}
@@ -1050,8 +1035,8 @@ func (rm *ResourceManager) LoadCompositedImage(baseResourceID, maskResourceID st
 		return nil, fmt.Errorf("failed to decode base image %s: %w", basePath, err)
 	}
 
-	// Load mask image file
-	maskFile, err := os.Open(maskPath)
+	// Load mask image file from embedded FS
+	maskFile, err := embedded.Open(maskPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open mask image file %s: %w", maskPath, err)
 	}

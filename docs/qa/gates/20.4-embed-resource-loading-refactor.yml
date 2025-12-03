@@ -1,0 +1,82 @@
+# Quality Gate Decision
+# Story 20.4: Embed 实现 (资源加载重构)
+
+schema: 1
+story: "20.4"
+story_title: "Embed 实现 (资源加载重构)"
+gate: PASS
+status_reason: "所有 10 个验收标准完全满足。实现质量优秀，测试覆盖率 93.2%，构建验证通过。"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-12-03T18:31:00+08:00"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 100
+expires: "2025-12-17T00:00:00+08:00"
+
+evidence:
+  tests_reviewed: 25
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "embed.FS 是只读的，不会引入文件系统注入风险"
+  performance:
+    status: PASS
+    notes: "运行时性能与文件系统读取相当或更优（无磁盘 I/O）"
+  reliability:
+    status: PASS
+    notes: "嵌入资源不会丢失，提高了部署可靠性"
+  maintainability:
+    status: PASS
+    notes: "统一的 embedded 包接口简化了资源访问代码"
+
+recommendations:
+  immediate: []
+  future: []
+
+verification_summary:
+  embed_go:
+    location: "项目根目录"
+    assets_embedding: "all:assets (44MB)"
+    data_embedding: "选择性嵌入 (reanim, reanim_config, levels, particles, 配置文件)"
+    saves_excluded: true
+
+  embedded_package:
+    functions:
+      - "Init(assets, data embed.FS)"
+      - "IsInitialized() bool"
+      - "Open(path string) (fs.File, error)"
+      - "ReadFile(path string) ([]byte, error)"
+      - "Exists(path string) bool"
+      - "Glob(pattern string) ([]string, error)"
+      - "ReadDir(path string) ([]fs.DirEntry, error)"
+      - "Sub(dir string) (fs.FS, error)"
+      - "Stat(path string) (fs.FileInfo, error)"
+    test_coverage: "93.2%"
+    all_tests_pass: true
+
+  refactored_files:
+    - "pkg/game/resource_manager.go"
+    - "pkg/game/lawn_strings.go"
+    - "pkg/config/level_config.go"
+    - "pkg/config/spawn_rules.go"
+    - "pkg/config/reanim_config.go"
+    - "pkg/config/reanim_config_manager.go"
+    - "pkg/config/zombie_physics.go"
+    - "pkg/config/zombie_stats.go"
+    - "pkg/utils/bitmap_font.go"
+    - "internal/reanim/parser.go"
+    - "internal/particle/parser.go"
+
+  build_verification:
+    executable_size: "69MB"
+    expected_range: "55-70MB"
+    build_success: true
+    main_initialization: "embedded.Init(assetsFS, dataFS) at line 66"
