@@ -143,6 +143,10 @@ type GameScene struct {
 	buttonRenderSystem *systems.ButtonRenderSystem // 按钮渲染系统
 	menuButtonEntity   ecs.EntityID                // 菜单按钮实体ID
 
+	// Story 20.5: Slider and Checkbox Systems (滑块和复选框系统)
+	sliderSystem   *systems.SliderSystem   // 滑块交互系统
+	checkboxSystem *systems.CheckboxSystem // 复选框交互系统
+
 	// Story 10.1: Pause Menu Systems (暂停菜单系统)
 	pauseMenuModule *modules.PauseMenuModule // 暂停菜单模块（Story 10.1）
 
@@ -520,6 +524,11 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	scene.buttonRenderSystem = systems.NewButtonRenderSystem(scene.entityManager)
 	log.Printf("[GameScene] Initialized button systems")
 
+	// Story 20.5: 滑块和复选框系统初始化
+	scene.sliderSystem = systems.NewSliderSystem(scene.entityManager)
+	scene.checkboxSystem = systems.NewCheckboxSystem(scene.entityManager)
+	log.Printf("[GameScene] Initialized slider and checkbox systems")
+
 	// 对话框系统初始化（ECS 架构）
 	// Story 8.8: Load dialog fonts for DialogRenderSystem
 	titleFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 24)
@@ -742,9 +751,16 @@ func (s *GameScene) Update(deltaTime float64) {
 
 	// Story 10.1: Check if game is paused
 	if s.gameState.IsPaused {
-		// 暂停时只更新 UI 系统（按钮交互、暂停菜单、对话框）
+		// 暂停时只更新 UI 系统（按钮交互、暂停菜单、对话框、滑块、复选框）
 		if s.buttonSystem != nil {
 			s.buttonSystem.Update(deltaTime)
+		}
+		// Story 20.5: 暂停菜单中的滑块和复选框交互
+		if s.sliderSystem != nil {
+			s.sliderSystem.Update(deltaTime)
+		}
+		if s.checkboxSystem != nil {
+			s.checkboxSystem.Update(deltaTime)
 		}
 		// ✅ ECS 架构修复: 更新对话框输入系统（暂停菜单可能包含对话框）
 		if s.dialogInputSystem != nil {

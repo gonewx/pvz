@@ -31,10 +31,14 @@ import (
 //   - ChallengeScene: 挑战模式中的暂停菜单（未来扩展）
 //
 // Story 10.1: 暂停菜单系统
+// Story 20.5: 添加 SettingsManager 集成，退出时自动保存设置
 // 重构：使用组合模式消除代码重复
 type PauseMenuModule struct {
 	// ECS 框架
 	entityManager *ecs.EntityManager
+
+	// Story 20.5: 设置管理器（用于保存设置）
+	settingsManager *game.SettingsManager
 
 	// 组合：通用设置面板（复用）
 	settingsPanelModule *SettingsPanelModule
@@ -83,6 +87,7 @@ type PauseMenuCallbacks struct {
 //   - rm: ResourceManager 实例（用于加载资源）
 //   - buttonSystem: 按钮交互系统（引用，不拥有）
 //   - buttonRenderSystem: 按钮渲染系统（引用，不拥有）
+//   - settingsManager: 设置管理器（用于保存设置，可为 nil）
 //   - windowWidth, windowHeight: 游戏窗口尺寸
 //   - callbacks: 暂停菜单回调函数集合
 //
@@ -91,6 +96,7 @@ type PauseMenuCallbacks struct {
 //   - error: 如果初始化失败
 //
 // Story 10.1: 暂停菜单系统
+// Story 20.5: 添加 settingsManager 参数
 // 重构：使用 SettingsPanelModule 组合模式
 func NewPauseMenuModule(
 	em *ecs.EntityManager,
@@ -98,12 +104,14 @@ func NewPauseMenuModule(
 	rm *game.ResourceManager,
 	buttonSystem *systems.ButtonSystem,
 	buttonRenderSystem *systems.ButtonRenderSystem,
+	settingsManager *game.SettingsManager,
 	windowWidth, windowHeight int,
 	callbacks PauseMenuCallbacks,
 ) (*PauseMenuModule, error) {
 	module := &PauseMenuModule{
 		entityManager:      em,
 		gameState:          gs,
+		settingsManager:    settingsManager,
 		buttonSystem:       buttonSystem,
 		buttonRenderSystem: buttonRenderSystem,
 		onContinue:         callbacks.OnContinue,
@@ -118,25 +126,34 @@ func NewPauseMenuModule(
 	}
 
 	// 1. 创建通用设置面板模块（组合）
+	// Story 20.5: 传递 settingsManager
 	// PauseMenuModule 不需要底部按钮，因为它自己管理 3 个按钮
 	settingsPanelModule, err := NewSettingsPanelModule(
 		em,
 		rm,
 		buttonRenderSystem, // 传递按钮渲染系统（虽然不需要底部按钮，但保持接口统一）
+		settingsManager,    // Story 20.5: 传递 SettingsManager
 		windowWidth,
 		windowHeight,
 		SettingsPanelCallbacks{
 			OnMusicVolumeChange: func(volume float64) {
-				// TODO: 实际控制音乐音量
+				// 日志/通知回调（实际音量应用由 Apply 回调处理）
 			},
 			OnSoundVolumeChange: func(volume float64) {
-				// TODO: 实际控制音效音量
+				// 日志/通知回调（实际音量应用由 Apply 回调处理）
 			},
 			On3DToggle: func(enabled bool) {
 				// TODO: 实际控制3D加速
 			},
 			OnFullscreenToggle: func(enabled bool) {
-				// TODO: 实际切换全屏
+				// 全屏切换由 SettingsPanelModule 内部通过 ebiten.SetFullscreen 处理
+			},
+			// Story 20.5: 音量实际应用回调（TODO: 连接到音频系统）
+			OnMusicVolumeApply: func(volume float64) {
+				log.Printf("[PauseMenuModule] Applying music volume: %.2f (TODO: connect to audio system)", volume)
+			},
+			OnSoundVolumeApply: func(volume float64) {
+				log.Printf("[PauseMenuModule] Applying sound volume: %.2f (TODO: connect to audio system)", volume)
 			},
 		},
 		nil, // 不需要底部按钮
@@ -429,10 +446,21 @@ func (m *PauseMenuModule) Show() {
 // 效果:
 //   - 设置 GameState.IsPaused = false
 //   - 更新 wasActive 状态
+//   - Story 20.5: 自动保存设置
 //   - 恢复 BGM
 func (m *PauseMenuModule) Hide() {
 	m.gameState.SetPaused(false)
 	m.wasActive = false
+
+	// Story 20.5: 退出暂停菜单时自动保存设置
+	if m.settingsManager != nil {
+		if err := m.settingsManager.Save(); err != nil {
+			log.Printf("[PauseMenuModule] Warning: Failed to save settings: %v", err)
+		} else {
+			log.Printf("[PauseMenuModule] Settings saved successfully")
+		}
+	}
+
 	if m.onResumeMusic != nil {
 		m.onResumeMusic()
 	}

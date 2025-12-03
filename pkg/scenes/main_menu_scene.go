@@ -323,11 +323,13 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	}
 
 	// Story 12.3: Initialize options panel module
+	// Story 20.5: 传递 nil 作为 settingsManager（主菜单场景暂无 GameState）
 	optionsPanel, err := modules.NewOptionsPanelModule(
 		scene.entityManager,
 		rm,
 		scene.buttonSystem,
 		scene.buttonRenderSystem,
+		nil, // settingsManager（主菜单场景暂无 GameState，使用降级模式）
 		WindowWidth,
 		WindowHeight,
 		nil, // onClose callback (no special action needed)

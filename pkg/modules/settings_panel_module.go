@@ -32,9 +32,13 @@ import (
 //   - 其他需要设置 UI 的场景
 //
 // Epic: 架构重构 - 消除代码重复
+// Story 20.5: 添加 SettingsManager 集成
 type SettingsPanelModule struct {
 	// ECS 框架
 	entityManager *ecs.EntityManager
+
+	// Story 20.5: 设置管理器（用于读取/保存设置）
+	settingsManager *game.SettingsManager
 
 	// 系统（用于渲染墓碑背景和遮罩）
 	pauseMenuRenderSystem *systems.PauseMenuRenderSystem // 墓碑背景渲染
@@ -57,10 +61,14 @@ type SettingsPanelModule struct {
 	settingsPanelEntity ecs.EntityID
 
 	// 回调函数（可选）
-	onMusicVolumeChange func(volume float64) // 音乐音量变化回调
-	onSoundVolumeChange func(volume float64) // 音效音量变化回调
+	onMusicVolumeChange func(volume float64) // 音乐音量变化回调（日志/通知）
+	onSoundVolumeChange func(volume float64) // 音效音量变化回调（日志/通知）
 	on3DToggle          func(enabled bool)   // 3D加速切换回调
 	onFullscreenToggle  func(enabled bool)   // 全屏切换回调
+
+	// Story 20.5: 音量实际应用回调
+	onMusicVolumeApply func(volume float64) // 音乐音量实际应用回调
+	onSoundVolumeApply func(volume float64) // 音效音量实际应用回调
 
 	// 屏幕尺寸
 	windowWidth  int
@@ -69,10 +77,14 @@ type SettingsPanelModule struct {
 
 // SettingsPanelCallbacks 设置面板回调函数集合
 type SettingsPanelCallbacks struct {
-	OnMusicVolumeChange func(volume float64) // 音乐音量变化回调（可选）
-	OnSoundVolumeChange func(volume float64) // 音效音量变化回调（可选）
+	OnMusicVolumeChange func(volume float64) // 音乐音量变化回调（可选，用于日志/通知）
+	OnSoundVolumeChange func(volume float64) // 音效音量变化回调（可选，用于日志/通知）
 	On3DToggle          func(enabled bool)   // 3D加速切换回调（可选）
 	OnFullscreenToggle  func(enabled bool)   // 全屏切换回调（可选）
+
+	// Story 20.5: 音量实际应用回调（用于将音量应用到音频系统）
+	OnMusicVolumeApply func(volume float64) // 音乐音量实际应用回调（可选）
+	OnSoundVolumeApply func(volume float64) // 音效音量实际应用回调（可选）
 }
 
 // BottomButtonConfig 底部按钮配置
@@ -87,6 +99,7 @@ type BottomButtonConfig struct {
 //   - em: EntityManager 实例
 //   - rm: ResourceManager 实例（用于加载资源）
 //   - buttonRenderSystem: 按钮渲染系统（用于渲染底部按钮）
+//   - settingsManager: 设置管理器（可选，用于读取/保存设置）
 //   - windowWidth, windowHeight: 游戏窗口尺寸
 //   - callbacks: 设置面板回调函数集合（可选）
 //   - bottomButtonConfig: 底部按钮配置（可选，传 nil 表示不创建底部按钮）
@@ -95,11 +108,13 @@ type BottomButtonConfig struct {
 //   - *SettingsPanelModule: 新创建的模块实例
 //   - error: 如果初始化失败
 //
+// Story 20.5: 添加 settingsManager 参数用于读取当前设置值
 // 架构重构：提取自 PauseMenuModule 和 OptionsPanelModule 的通用逻辑
 func NewSettingsPanelModule(
 	em *ecs.EntityManager,
 	rm *game.ResourceManager,
 	buttonRenderSystem *systems.ButtonRenderSystem,
+	settingsManager *game.SettingsManager,
 	windowWidth, windowHeight int,
 	callbacks SettingsPanelCallbacks,
 	bottomButtonConfig *BottomButtonConfig,
@@ -107,12 +122,15 @@ func NewSettingsPanelModule(
 	module := &SettingsPanelModule{
 		entityManager:       em,
 		buttonRenderSystem:  buttonRenderSystem,
+		settingsManager:     settingsManager,
 		windowWidth:         windowWidth,
 		windowHeight:        windowHeight,
 		onMusicVolumeChange: callbacks.OnMusicVolumeChange,
 		onSoundVolumeChange: callbacks.OnSoundVolumeChange,
 		on3DToggle:          callbacks.On3DToggle,
 		onFullscreenToggle:  callbacks.OnFullscreenToggle,
+		onMusicVolumeApply:  callbacks.OnMusicVolumeApply,
+		onSoundVolumeApply:  callbacks.OnSoundVolumeApply,
 	}
 
 	// 1. 加载暂停菜单背景图（原版墓碑背景，双图层）
@@ -169,10 +187,30 @@ func NewSettingsPanelModule(
 }
 
 // createUIElements 创建UI元素（滑动条和复选框）
+//
+// Story 20.5: 从 SettingsManager 加载当前设置值，如果为 nil 则使用默认值
 func (m *SettingsPanelModule) createUIElements(rm *game.ResourceManager) error {
 	// 初始位置：屏幕外（隐藏）
 	hiddenX := -1000.0
 	hiddenY := -1000.0
+
+	// Story 20.5: 从 SettingsManager 读取当前设置值
+	// 如果 settingsManager 为 nil，使用默认值（降级处理）
+	musicVolume := 0.8
+	soundVolume := 0.8
+	fullscreen := false
+
+	if m.settingsManager != nil {
+		settings := m.settingsManager.GetSettings()
+		musicVolume = settings.MusicVolume
+		soundVolume = settings.SoundVolume
+		fullscreen = settings.Fullscreen
+		log.Printf("[SettingsPanelModule] Loaded settings from SettingsManager: music=%.2f, sound=%.2f, fullscreen=%v",
+			musicVolume, soundVolume, fullscreen)
+	} else {
+		log.Printf("[SettingsPanelModule] SettingsManager is nil, using default values: music=%.2f, sound=%.2f, fullscreen=%v",
+			musicVolume, soundVolume, fullscreen)
+	}
 
 	// 1. 创建音乐滑动条
 	m.musicSliderEntity = m.entityManager.CreateEntity()
@@ -188,12 +226,21 @@ func (m *SettingsPanelModule) createUIElements(rm *game.ResourceManager) error {
 	ecs.AddComponent(m.entityManager, m.musicSliderEntity, &components.SliderComponent{
 		SlotImage: slotImage,
 		KnobImage: knobImage,
-		Value:     0.8, // 默认80%音量
+		Value:     musicVolume, // Story 20.5: 从设置加载
 		Label:     "音乐",
 		OnValueChange: func(value float64) {
 			log.Printf("[SettingsPanelModule] Music volume changed: %.2f", value)
+			// Story 20.5: 更新 SettingsManager
+			if m.settingsManager != nil {
+				m.settingsManager.SetMusicVolume(value)
+			}
+			// 触发变化回调（日志/通知）
 			if m.onMusicVolumeChange != nil {
 				m.onMusicVolumeChange(value)
+			}
+			// Story 20.5: 触发实际应用回调
+			if m.onMusicVolumeApply != nil {
+				m.onMusicVolumeApply(value)
 			}
 		},
 	})
@@ -207,12 +254,21 @@ func (m *SettingsPanelModule) createUIElements(rm *game.ResourceManager) error {
 	ecs.AddComponent(m.entityManager, m.soundSliderEntity, &components.SliderComponent{
 		SlotImage: slotImage,
 		KnobImage: knobImage,
-		Value:     0.8, // 默认80%音量
+		Value:     soundVolume, // Story 20.5: 从设置加载
 		Label:     "音效",
 		OnValueChange: func(value float64) {
 			log.Printf("[SettingsPanelModule] Sound volume changed: %.2f", value)
+			// Story 20.5: 更新 SettingsManager
+			if m.settingsManager != nil {
+				m.settingsManager.SetSoundVolume(value)
+			}
+			// 触发变化回调（日志/通知）
 			if m.onSoundVolumeChange != nil {
 				m.onSoundVolumeChange(value)
+			}
+			// Story 20.5: 触发实际应用回调
+			if m.onSoundVolumeApply != nil {
+				m.onSoundVolumeApply(value)
 			}
 		},
 	})
@@ -249,10 +305,17 @@ func (m *SettingsPanelModule) createUIElements(rm *game.ResourceManager) error {
 	ecs.AddComponent(m.entityManager, m.fullscreenEntity, &components.CheckboxComponent{
 		UncheckedImage: checkboxUnchecked,
 		CheckedImage:   checkboxChecked,
-		IsChecked:      false, // 默认窗口模式
+		IsChecked:      fullscreen, // Story 20.5: 从设置加载
 		Label:          "全屏",
 		OnToggle: func(isChecked bool) {
 			log.Printf("[SettingsPanelModule] Fullscreen toggled: %v", isChecked)
+			// Story 20.5: 更新 SettingsManager 并立即切换全屏
+			if m.settingsManager != nil {
+				m.settingsManager.SetFullscreen(isChecked)
+			}
+			// Story 20.5: 立即切换全屏状态
+			ebiten.SetFullscreen(isChecked)
+			// 触发回调（如果有）
 			if m.onFullscreenToggle != nil {
 				m.onFullscreenToggle(isChecked)
 			}

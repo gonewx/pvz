@@ -96,7 +96,14 @@ func (s *GameScene) initMenuButton(rm *game.ResourceManager) {
 // initPauseMenuModule 初始化暂停菜单（ECS 架构）
 // Story 10.1: 创建暂停菜单实体和三个按钮
 // Story 18.2: 添加战斗存档保存回调
+// Story 20.5: 传递 SettingsManager 到暂停菜单
 func (s *GameScene) initPauseMenuModule(rm *game.ResourceManager) {
+	// Story 20.5: 从 GameState 获取 SettingsManager
+	var settingsManager *game.SettingsManager
+	if s.gameState != nil {
+		settingsManager = s.gameState.GetSettingsManager()
+	}
+
 	var err error
 	s.pauseMenuModule, err = modules.NewPauseMenuModule(
 		s.entityManager,
@@ -104,6 +111,7 @@ func (s *GameScene) initPauseMenuModule(rm *game.ResourceManager) {
 		rm,
 		s.buttonSystem,
 		s.buttonRenderSystem,
+		settingsManager, // Story 20.5: 传递 SettingsManager
 		WindowWidth,
 		WindowHeight,
 		modules.PauseMenuCallbacks{
