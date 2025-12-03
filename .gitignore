@@ -1,8 +1,6 @@
 # BMAD (local only)
 .bmad-core/
 .bmad-*/
-/docs/prd
-/docs/architecture
 
 .claude/settings.local.json
 
