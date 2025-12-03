@@ -200,9 +200,17 @@ func (s *GameScene) drawConveyorCards(screen *ebiten.Image, conveyorX, conveyorY
 		return
 	}
 
-	// 卡片布局参数
+	// 卡片布局参数 - 优先使用关卡配置，否则使用全局默认值
 	cardWidth := config.ConveyorCardWidth
 	cardHeight := config.ConveyorCardHeight
+	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.ConveyorBelt != nil {
+		if s.gameState.CurrentLevel.ConveyorBelt.CardWidth > 0 {
+			cardWidth = s.gameState.CurrentLevel.ConveyorBelt.CardWidth
+		}
+		if s.gameState.CurrentLevel.ConveyorBelt.CardHeight > 0 {
+			cardHeight = s.gameState.CurrentLevel.ConveyorBelt.CardHeight
+		}
+	}
 	cardSpacing := config.ConveyorCardSpacing
 	padding := config.ConveyorBeltPadding
 
@@ -367,11 +375,24 @@ func (s *GameScene) handleConveyorBeltClick(mouseX, mouseY int) bool {
 		return false
 	}
 
+	// 获取关卡配置的卡片尺寸
+	cardWidth := config.ConveyorCardWidth
+	cardHeight := config.ConveyorCardHeight
+	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.ConveyorBelt != nil {
+		if s.gameState.CurrentLevel.ConveyorBelt.CardWidth > 0 {
+			cardWidth = s.gameState.CurrentLevel.ConveyorBelt.CardWidth
+		}
+		if s.gameState.CurrentLevel.ConveyorBelt.CardHeight > 0 {
+			cardHeight = s.gameState.CurrentLevel.ConveyorBelt.CardHeight
+		}
+	}
+
 	// 检查点击是否在传送带卡片上
 	cardIndex := s.conveyorBeltSystem.GetCardAtPosition(
 		float64(mouseX), float64(mouseY),
 		conveyorX+config.ConveyorBeltPadding,
 		conveyorY+config.ConveyorBeltPadding+10,
+		cardWidth, cardHeight,
 	)
 
 	if cardIndex >= 0 {
@@ -493,12 +514,14 @@ func (s *GameScene) createConveyorCardPreview() {
 		return
 	}
 
+	// 判断是否为爆炸坚果
+	isExplosive := cardType == components.CardTypeExplodeONut
+
 	// 获取坚果图标
 	var previewIcon *ebiten.Image
-	switch cardType {
-	case components.CardTypeExplodeONut:
+	if isExplosive {
 		previewIcon = s.conveyorExplodeNutIcon
-	default:
+	} else {
 		previewIcon = s.conveyorWallnutIcon
 	}
 
@@ -528,11 +551,12 @@ func (s *GameScene) createConveyorCardPreview() {
 
 	// 添加植物预览组件
 	ecs.AddComponent(s.entityManager, entityID, &components.PlantPreviewComponent{
-		PlantType: components.PlantWallnut, // 坚果类型
-		Alpha:     0.5,
+		PlantType:   components.PlantWallnut, // 坚果类型
+		Alpha:       0.5,
+		IsExplosive: isExplosive, // 爆炸坚果需要红色染色
 	})
 
-	log.Printf("[GameScene] Created conveyor card preview entity (ID: %d)", entityID)
+	log.Printf("[GameScene] Created conveyor card preview entity (ID: %d, explosive: %v)", entityID, isExplosive)
 }
 
 // destroyConveyorCardPreview 销毁传送带卡片预览实体

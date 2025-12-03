@@ -80,6 +80,13 @@ type ReanimComponent struct {
 	// 用于支持不同动画以不同速度播放（如开场动画 2 FPS + 云朵动画 12 FPS）
 	AnimationFrameIndices map[string]float64
 
+	// AnimationStartFrames 存储每个动画的起始帧（用于循环时正确回到起点）
+	// Key: 动画名称
+	// Value: 起始逻辑帧索引
+	// 当动画循环时，会回到此帧而不是帧 0
+	// 用于保龄球坚果跳过摇摆动画只循环播放滚动部分
+	AnimationStartFrames map[string]int
+
 	// FrameAccumulator 帧累加器，用于精确 FPS 控制
 	// 累加 deltaTime 直到达到一帧的时间 (1.0/fps)
 	FrameAccumulator float64

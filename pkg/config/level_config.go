@@ -100,6 +100,8 @@ type ConveyorBeltConfig struct {
 	Capacity           int             `yaml:"capacity"`           // 传送带容量（默认 10）
 	CardPool           []CardPoolEntry `yaml:"cardPool"`           // 卡片池配置
 	GenerationInterval float64         `yaml:"generationInterval"` // 卡片生成间隔（秒，默认 3.0）
+	CardWidth          float64         `yaml:"cardWidth"`          // 卡片宽度（像素），可选，默认使用 ConveyorCardWidth
+	CardHeight         float64         `yaml:"cardHeight"`         // 卡片高度（像素），可选，默认使用 ConveyorCardHeight
 }
 
 // CardPoolEntry 卡片池条目（Story 19.5）

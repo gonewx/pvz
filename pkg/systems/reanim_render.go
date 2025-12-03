@@ -128,6 +128,19 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 					comp.CurrentFrame, trackName, animName, logicalFrame, physicalFrame, isSyntheticAnim)
 			}
 
+			// Debug: Wallnut 帧映射
+			if comp.ReanimName == "Wallnut" && trackName == "anim_face" {
+				// 获取物理帧的 SkewX 值
+				physicalSkewX := 0.0
+				if physicalFrame >= 0 && physicalFrame < len(mergedFrames) {
+					if mergedFrames[physicalFrame].SkewX != nil {
+						physicalSkewX = *mergedFrames[physicalFrame].SkewX
+					}
+				}
+				log.Printf("[ReanimSystem] 🥜 Wallnut: logicalFrame=%.2f → physicalFrame=%d, skewX=%.1f°",
+					logicalFrame, physicalFrame, physicalSkewX)
+			}
+
 			if physicalFrame < 0 || physicalFrame >= len(mergedFrames) {
 				if comp.ReanimName == "ZombiesWon" {
 					log.Printf("[ReanimSystem] 🧟 ZombiesWon: ❌ physicalFrame 越界 (physicalFrame=%d, mergedFrames=%d)",

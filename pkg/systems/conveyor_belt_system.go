@@ -254,19 +254,24 @@ func (s *ConveyorBeltSystem) insertCardToFront(beltComp *components.ConveyorBelt
 // 参数：
 //   - x, y: 屏幕坐标
 //   - conveyorX, conveyorY: 传送带左上角位置
+//   - cardWidth, cardHeight: 卡片尺寸（用于点击检测），0表示使用默认值
 //
 // 返回：
 //   - 卡片索引，-1 表示没有卡片
-func (s *ConveyorBeltSystem) GetCardAtPosition(x, y float64, conveyorX, conveyorY float64) int {
+func (s *ConveyorBeltSystem) GetCardAtPosition(x, y float64, conveyorX, conveyorY float64, cardWidth, cardHeight float64) int {
 	beltComp, ok := ecs.GetComponent[*components.ConveyorBeltComponent](s.entityManager, s.beltEntity)
 	if !ok {
 		return -1
 	}
 
-	// 计算卡片区域参数
-	cardWidth := config.ConveyorCardWidth
+	// 计算卡片区域参数 - 使用传入的参数，如果为0则使用默认值
+	if cardWidth <= 0 {
+		cardWidth = config.ConveyorCardWidth
+	}
+	if cardHeight <= 0 {
+		cardHeight = config.ConveyorCardHeight
+	}
 	cardSpacing := config.ConveyorCardSpacing
-	cardHeight := config.ConveyorCardHeight
 
 	// 检查 Y 坐标是否在传送带范围内
 	if y < conveyorY || y > conveyorY+cardHeight {

@@ -88,4 +88,10 @@ type AnimationCommandComponent struct {
 	// false: 新动画从头开始播放(默认行为)
 	// 使用场景:植物从空闲状态切换到攻击状态时，保持身体摇摆的连续性
 	PreserveProgress bool
+
+	// StartFrame 动画起始帧（逻辑帧索引）
+	// 0: 从头开始播放（默认）
+	// >0: 从指定的逻辑帧开始播放
+	// 使用场景: 跳过动画的某些部分，如保龄球坚果跳过摇摆部分直接播放滚动部分
+	StartFrame int
 }

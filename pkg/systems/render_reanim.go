@@ -231,6 +231,12 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 				reanimComp.CurrentFrame, i, scaleX, scaleY, skewX, skewY)
 		}
 
+		// Debug: Wallnut (保龄球坚果) 变换数据
+		if reanimComp.ReanimName == "Wallnut" && frame.ImagePath == "IMAGE_REANIM_WALLNUT_BODY" {
+			log.Printf("[RenderReanim] 🥜 Wallnut Frame %d Part[%d]: x=%.1f, y=%.1f, skewX=%.1f°, skewY=%.1f°",
+				reanimComp.CurrentFrame, i, getFloat(frame.X), getFloat(frame.Y), skewX, skewY)
+		}
+
 		// 构建变换矩阵
 		// a, b 控制 X 方向的变换
 		// c, d 控制 Y 方向的变换

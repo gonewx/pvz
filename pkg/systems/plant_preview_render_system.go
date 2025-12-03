@@ -48,17 +48,22 @@ func (s *PlantPreviewRenderSystem) Draw(screen *ebiten.Image, cameraX float64) {
 
 	for _, entityID := range entities {
 		// 获取组件
+		preview, ok := ecs.GetComponent[*components.PlantPreviewComponent](s.entityManager, entityID)
+		if !ok {
+			continue
+		}
+
 		sprite, ok := ecs.GetComponent[*components.SpriteComponent](s.entityManager, entityID)
 		if !ok || sprite.Image == nil {
 			continue
 		}
 
 		// 1️⃣ 渲染鼠标光标处的不透明图像（Alpha=1.0）
-		s.drawStaticPreview(screen, sprite.Image, mouseX, mouseY, 1.0, cameraX)
+		s.drawStaticPreview(screen, sprite.Image, mouseX, mouseY, 1.0, cameraX, preview.IsExplosive)
 
 		// 2️⃣ 如果在网格内，渲染格子中心的半透明预览图像（Alpha=0.5）
 		if isInGrid {
-			s.drawStaticPreview(screen, sprite.Image, gridX, gridY, 0.5, cameraX)
+			s.drawStaticPreview(screen, sprite.Image, gridX, gridY, 0.5, cameraX, preview.IsExplosive)
 		}
 	}
 }
@@ -68,6 +73,7 @@ func (s *PlantPreviewRenderSystem) drawStaticPreview(
 	screen *ebiten.Image,
 	img *ebiten.Image,
 	worldX, worldY, alpha, cameraX float64,
+	isExplosive bool,
 ) {
 	// 转换为屏幕坐标
 	screenX := worldX - cameraX
@@ -78,10 +84,17 @@ func (s *PlantPreviewRenderSystem) drawStaticPreview(
 	drawX := screenX - float64(w)/2
 	drawY := screenY - float64(h)/2
 
-	// 应用透明度
+	// 应用透明度和颜色
 	opts := &ebiten.DrawImageOptions{}
 	opts.GeoM.Translate(drawX, drawY)
-	opts.ColorM.Scale(1, 1, 1, alpha)
+
+	// 爆炸坚果使用红色染色
+	if isExplosive {
+		// 红色染色：增加红色通道，降低绿蓝通道
+		opts.ColorM.Scale(1.0, 0.6, 0.6, alpha)
+	} else {
+		opts.ColorM.Scale(1, 1, 1, alpha)
+	}
 
 	screen.DrawImage(img, opts)
 }

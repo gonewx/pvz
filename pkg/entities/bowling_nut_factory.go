@@ -70,10 +70,16 @@ func NewBowlingNutEntity(em *ecs.EntityManager, rm ResourceLoader, row, col int,
 	})
 
 	// 添加 AnimationCommandComponent 触发滚动动画
-	// 使用 anim_face 动画（360度旋转效果）
+	// 使用 anim_face 动画（包含摇摆和滚动两部分）
+	// 帧结构分析：
+	//   - 逻辑帧 0-16 → 物理帧 0-16（摇摆动画）
+	//   - 逻辑帧 17 → 物理帧 43（起始帧，kx=0°）
+	//   - 逻辑帧 18-29 → 物理帧 44-55（kx=27.6°→360°）
+	// StartFrame=17 确保完整的360°循环：0° → 360° → 循环回0°
 	ecs.AddComponent(em, entityID, &components.AnimationCommandComponent{
 		AnimationName: "anim_face",
 		Processed:     false,
+		StartFrame:    17, // 从0°开始，确保360°→0°循环连续
 	})
 
 	// 添加 CollisionComponent（为 Story 19.7 预留）

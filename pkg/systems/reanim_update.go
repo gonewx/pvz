@@ -83,6 +83,31 @@ func (s *ReanimSystem) processAnimationCommands() {
 			errorCount++
 		} else {
 			processedCount++
+
+			// 应用起始帧设置（如果指定）
+			if cmd.StartFrame > 0 {
+				comp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id)
+				if ok {
+					// 初始化 AnimationFrameIndices（如果还未初始化）
+					if comp.AnimationFrameIndices == nil {
+						comp.AnimationFrameIndices = make(map[string]float64)
+					}
+					// 初始化 AnimationStartFrames（如果还未初始化）
+					if comp.AnimationStartFrames == nil {
+						comp.AnimationStartFrames = make(map[string]int)
+					}
+					// 设置所有当前动画的起始帧和当前帧
+					for _, animName := range comp.CurrentAnimations {
+						comp.AnimationFrameIndices[animName] = float64(cmd.StartFrame)
+						comp.AnimationStartFrames[animName] = cmd.StartFrame
+					}
+					// 同步 CurrentFrame（渲染系统使用此字段）
+					comp.CurrentFrame = cmd.StartFrame
+					// 标记缓存失效，强制重新渲染
+					comp.LastRenderFrame = -1
+					log.Printf("[ReanimSystem] 设置动画起始帧: entity=%d, startFrame=%d", id, cmd.StartFrame)
+				}
+			}
 		}
 
 		// 标记为已处理（即使失败也标记，避免无限重试）
@@ -257,8 +282,32 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 				if animVisibles, exists := comp.AnimVisiblesMap[animName]; exists {
 					visibleCount := countVisibleFrames(animVisibles)
 					if visibleCount > 0 && comp.AnimationFrameIndices[animName] >= float64(visibleCount) {
-						// 对循环动画取模，保持在有效范围内
-						comp.AnimationFrameIndices[animName] = float64(int(comp.AnimationFrameIndices[animName]) % visibleCount)
+						// 获取起始帧（如果设置了 AnimationStartFrames）
+						startFrame := 0
+						if comp.AnimationStartFrames != nil {
+							if sf, ok := comp.AnimationStartFrames[animName]; ok {
+								startFrame = sf
+							}
+						}
+
+						// 计算有效帧范围（从起始帧到最后帧）
+						effectiveFrameCount := visibleCount - startFrame
+						if effectiveFrameCount > 0 {
+							// 循环回到起始帧
+							currentOffset := int(comp.AnimationFrameIndices[animName]) - startFrame
+							newOffset := currentOffset % effectiveFrameCount
+							oldFrame := comp.AnimationFrameIndices[animName]
+							comp.AnimationFrameIndices[animName] = float64(startFrame + newOffset)
+
+							// Debug: Wallnut 循环重置
+							if comp.ReanimName == "Wallnut" {
+								log.Printf("[ReanimSystem] 🥜 Wallnut 循环: %.2f → %.2f (startFrame=%d, effectiveCount=%d)",
+									oldFrame, comp.AnimationFrameIndices[animName], startFrame, effectiveFrameCount)
+							}
+						} else {
+							// 后备：如果有效帧数为0，回到起始帧
+							comp.AnimationFrameIndices[animName] = float64(startFrame)
+						}
 
 						// 🔍 调试：记录循环重置
 						if comp.ReanimName == "SelectorScreen" && (animName == "anim_idle" || animName == "anim_grass") {

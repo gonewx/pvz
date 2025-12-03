@@ -240,6 +240,10 @@ func TestNewBowlingNutEntity_AnimationCommand(t *testing.T) {
 	if animCmd.Processed {
 		t.Error("Processed should be false initially")
 	}
+	// 验证起始帧为 17（从0°开始，确保360°循环连续）
+	if animCmd.StartFrame != 17 {
+		t.Errorf("StartFrame = %d, want 17 (start from 0° for continuous 360° loop)", animCmd.StartFrame)
+	}
 }
 
 // TestNewBowlingNutEntity_FailsWithNilReanimData 测试缺少资源时失败
