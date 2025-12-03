@@ -55,6 +55,12 @@ Dave 从屏幕左侧滑入和滑出
     *   Dave: *CRAZY_DAVE_2410* （ 好的，干得不错，现在给你个惊
 喜…… ）
     *   Dave: *CRAZY_DAVE_2411* （ 我们去玩保龄球！{MOUTH_SMALL_SMILE} ）同时绘制红线
+    *   Dave: *[CRAZY_DAVE_2412] {SHOW_WALLNUT}* （ 嘿，拿好这个坚果墙！ ）
+    *   Dave: *CRAZY_DAVE_2413* （ 为什么我要给你坚果墙？{MOUTH_SMALL_OH} ）
+    *   Dave: *[CRAZY_DAVE_2414] {SHAKE}* （ 因为我发~~~疯了！！！！！{MOUTH_BIG_SMILE} ）
+        文字部分要出现抖动的效果，类似于僵尸胜利时，动画中文字部分的抖动
+    *   Dave: *CRAZY_DAVE_2415* （ 现在出发！给我赢个冠军回来！{MOUTH_BIG_SMILE}
+ {SCREAM} ）
     *   **动作**:
         1.  Dave 消失。
         2.  **铲子槽保持显示**（保龄球模式下仍可使用铲子）。

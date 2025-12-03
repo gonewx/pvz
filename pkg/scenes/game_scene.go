@@ -44,6 +44,11 @@ type GameScene struct {
 	conveyorBeltBackdrop *ebiten.Image // Conveyor belt backdrop (传送带背景)
 	conveyorBelt         *ebiten.Image // Conveyor belt animation (传送带传动动画，6行纹理)
 
+	// 传送带卡片渲染资源（复用植物卡片渲染逻辑）
+	conveyorCardBackground  *ebiten.Image // 卡片背景框（SeedPacket_Larger）
+	conveyorWallnutIcon     *ebiten.Image // 普通坚果图标
+	conveyorExplodeNutIcon  *ebiten.Image // 爆炸坚果图标（红色版本）
+
 	// Story 8.2 QA改进：草皮叠加层（随动画进度渐进显示）
 	sodRowImage        *ebiten.Image // 草皮叠加图片（sod1row.jpg 或 sod3row.jpg）
 	soddedBackground   *ebiten.Image // 已铺草皮完整背景（IMAGE_BACKGROUND1），用于 Level 1-4 双背景叠加
@@ -608,6 +613,9 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 			}
 			log.Printf("[GameScene] Conveyor belt configured from level config: interval=%.1fs, pool=%d entries",
 				conveyorConfig.GenerationInterval, len(conveyorConfig.CardPool))
+
+			// 加载传送带卡片渲染资源（需要在 reanimSystem 初始化后）
+			scene.loadConveyorCardResources()
 		}
 	}
 

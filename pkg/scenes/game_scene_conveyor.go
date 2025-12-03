@@ -229,64 +229,109 @@ func (s *GameScene) drawConveyorCards(screen *ebiten.Image, conveyorX, conveyorY
 }
 
 // drawConveyorCard 绘制单张卡片
-// Story 19.6: 增强选中卡片遮罩效果
+// 复用植物卡片的渲染逻辑（背景 + 植物图标 + 选中遮罩）
 func (s *GameScene) drawConveyorCard(screen *ebiten.Image, cardType string, x, y, width, height float64, isSelected bool) {
+	// 使用真实卡片图像渲染
+	if s.conveyorCardBackground != nil && s.conveyorWallnutIcon != nil {
+		s.drawConveyorCardWithImages(screen, cardType, x, y, width, height, isSelected)
+		return
+	}
+
+	// 回退：使用简单矩形绘制（资源未加载时）
+	s.drawConveyorCardFallback(screen, cardType, x, y, width, height, isSelected)
+}
+
+// drawConveyorCardWithImages 使用真实图像绘制传送带卡片
+// 复用植物卡片的多层渲染：背景框 + 植物图标 + 选中遮罩
+func (s *GameScene) drawConveyorCardWithImages(screen *ebiten.Image, cardType string, x, y, width, height float64, isSelected bool) {
+	// 计算卡片缩放因子
+	// 原始卡片背景尺寸约 100x140，传送带卡片目标尺寸由 width/height 决定
+	bgBounds := s.conveyorCardBackground.Bounds()
+	bgWidth := float64(bgBounds.Dx())
+	bgHeight := float64(bgBounds.Dy())
+
+	// 使用宽度计算缩放因子，保持比例
+	cardScale := width / bgWidth
+
+	// 1. 绘制卡片背景框
+	bgOp := &ebiten.DrawImageOptions{}
+	bgOp.GeoM.Scale(cardScale, cardScale)
+	bgOp.GeoM.Translate(x, y)
+	screen.DrawImage(s.conveyorCardBackground, bgOp)
+
+	// 2. 绘制植物图标
+	var plantIcon *ebiten.Image
+	switch cardType {
+	case components.CardTypeExplodeONut:
+		plantIcon = s.conveyorExplodeNutIcon
+	default:
+		plantIcon = s.conveyorWallnutIcon
+	}
+
+	if plantIcon != nil {
+		iconScale := config.PlantCardIconScale * cardScale
+		iconOffsetY := config.PlantCardIconOffsetY * cardScale
+
+		iconWidth := float64(plantIcon.Bounds().Dx()) * iconScale
+		scaledBgWidth := bgWidth * cardScale
+
+		// 图标水平居中
+		iconOffsetX := (scaledBgWidth - iconWidth) / 2.0
+
+		iconOp := &ebiten.DrawImageOptions{}
+		iconOp.GeoM.Scale(iconScale, iconScale)
+		iconOp.GeoM.Translate(x+iconOffsetX, y+iconOffsetY)
+
+		// 爆炸坚果添加红色染色
+		if cardType == components.CardTypeExplodeONut {
+			// 红色染色：增加红色通道，降低绿蓝通道
+			iconOp.ColorScale.Scale(1.0, 0.6, 0.6, 1.0)
+		}
+
+		screen.DrawImage(plantIcon, iconOp)
+	}
+
+	// 3. 选中状态：绘制禁用遮罩
+	if isSelected {
+		scaledWidth := bgWidth * cardScale
+		scaledHeight := bgHeight * cardScale
+		intWidth := int(scaledWidth)
+		intHeight := int(scaledHeight)
+
+		if intWidth > 0 && intHeight > 0 {
+			mask := ebiten.NewImage(intWidth, intHeight)
+			mask.Fill(color.RGBA{R: 0, G: 0, B: 0, A: uint8(config.ConveyorCardSelectedOverlayAlpha)})
+
+			maskOp := &ebiten.DrawImageOptions{}
+			maskOp.GeoM.Translate(x, y)
+			screen.DrawImage(mask, maskOp)
+		}
+	}
+}
+
+// drawConveyorCardFallback 使用简单矩形绘制卡片（回退方案）
+func (s *GameScene) drawConveyorCardFallback(screen *ebiten.Image, cardType string, x, y, width, height float64, isSelected bool) {
 	// 卡片背景颜色（根据类型）
 	var bgColor color.RGBA
-	var borderColor color.RGBA
 
 	switch cardType {
 	case components.CardTypeWallnutBowling:
-		bgColor = color.RGBA{R: 160, G: 120, B: 80, A: 255}   // 棕色（坚果色）
-		borderColor = color.RGBA{R: 100, G: 70, B: 40, A: 255}
+		bgColor = color.RGBA{R: 160, G: 120, B: 80, A: 255} // 棕色
 	case components.CardTypeExplodeONut:
-		bgColor = color.RGBA{R: 200, G: 80, B: 80, A: 255}    // 红色（爆炸坚果）
-		borderColor = color.RGBA{R: 150, G: 50, B: 50, A: 255}
+		bgColor = color.RGBA{R: 200, G: 80, B: 80, A: 255} // 红色
 	default:
-		bgColor = color.RGBA{R: 128, G: 128, B: 128, A: 255}  // 灰色
-		borderColor = color.RGBA{R: 80, G: 80, B: 80, A: 255}
-	}
-
-	// 选中状态：高亮边框
-	if isSelected {
-		borderColor = color.RGBA{R: 255, G: 215, B: 0, A: 255} // 金色
+		bgColor = color.RGBA{R: 128, G: 128, B: 128, A: 255} // 灰色
 	}
 
 	// 绘制卡片背景
 	ebitenutil.DrawRect(screen, x, y, width, height, bgColor)
 
-	// 绘制边框
-	borderWidth := 2.0
-	// 上
-	ebitenutil.DrawRect(screen, x, y, width, borderWidth, borderColor)
-	// 下
-	ebitenutil.DrawRect(screen, x, y+height-borderWidth, width, borderWidth, borderColor)
-	// 左
-	ebitenutil.DrawRect(screen, x, y, borderWidth, height, borderColor)
-	// 右
-	ebitenutil.DrawRect(screen, x+width-borderWidth, y, borderWidth, height, borderColor)
-
-	// 绘制卡片类型标识（临时文字）
-	// 使用简单的首字母标识
-	var label string
-	switch cardType {
-	case components.CardTypeWallnutBowling:
-		label = "W"
-	case components.CardTypeExplodeONut:
-		label = "E"
-	}
-
-	// 简单文字标识（居中）
-	labelX := x + width/2 - 4
-	labelY := y + height/2 - 8
-	ebitenutil.DebugPrintAt(screen, label, int(labelX), int(labelY))
-
-	// Story 19.6: 选中状态添加半透明遮罩（禁用效果）
+	// 选中状态添加禁用遮罩
 	if isSelected {
 		overlayColor := color.RGBA{
-			R: 128,
-			G: 128,
-			B: 128,
+			R: 0,
+			G: 0,
+			B: 0,
 			A: uint8(config.ConveyorCardSelectedOverlayAlpha),
 		}
 		ebitenutil.DrawRect(screen, x, y, width, height, overlayColor)
@@ -363,6 +408,7 @@ func (s *GameScene) handleConveyorCardPlacement(worldX, worldY float64) bool {
 		s.showPlacementHint()
 		// 取消选中，卡片返回传送带
 		s.conveyorBeltSystem.DeselectCard()
+		s.destroyConveyorCardPreview()
 		return false
 	}
 
@@ -373,6 +419,7 @@ func (s *GameScene) handleConveyorCardPlacement(worldX, worldY float64) bool {
 	// 验证行列有效性
 	if row < 0 || row >= config.GridRows || col < 0 || col >= config.GridColumns {
 		s.conveyorBeltSystem.DeselectCard()
+		s.destroyConveyorCardPreview()
 		return false
 	}
 
@@ -404,14 +451,16 @@ func (s *GameScene) handleConveyorCardPlacement(worldX, worldY float64) bool {
 		log.Printf("[GameScene] 创建保龄球坚果失败: %v", err)
 		// 取消选中状态
 		s.conveyorBeltSystem.DeselectCard()
+		s.destroyConveyorCardPreview()
 		return false
 	}
 
 	log.Printf("[GameScene] 放置保龄球坚果: entityID=%d, type=%s, row=%d, col=%d (worldX=%.1f, worldY=%.1f)",
 		entityID, removedCardType, row+1, col+1, worldX, worldY)
 
-	// 取消选中状态
+	// 取消选中状态并销毁预览
 	s.conveyorBeltSystem.DeselectCard()
+	s.destroyConveyorCardPreview()
 
 	return true
 }
@@ -430,6 +479,74 @@ func (s *GameScene) isConveyorCardSelected() bool {
 		return false
 	}
 	return s.conveyorBeltSystem.GetSelectedCard() != ""
+}
+
+// createConveyorCardPreview 创建传送带卡片预览实体
+// 复用 PlantPreviewComponent，由 PlantPreviewRenderSystem 渲染
+func (s *GameScene) createConveyorCardPreview() {
+	// 先销毁已存在的预览
+	s.destroyConveyorCardPreview()
+
+	// 获取选中的卡片类型
+	cardType := s.conveyorBeltSystem.GetSelectedCard()
+	if cardType == "" {
+		return
+	}
+
+	// 获取坚果图标
+	var previewIcon *ebiten.Image
+	switch cardType {
+	case components.CardTypeExplodeONut:
+		previewIcon = s.conveyorExplodeNutIcon
+	default:
+		previewIcon = s.conveyorWallnutIcon
+	}
+
+	if previewIcon == nil {
+		log.Printf("[GameScene] No preview icon available for conveyor card")
+		return
+	}
+
+	// 获取鼠标位置（世界坐标）
+	mouseX, mouseY := ebiten.CursorPosition()
+	worldX := float64(mouseX) + s.cameraX
+	worldY := float64(mouseY)
+
+	// 创建预览实体
+	entityID := s.entityManager.CreateEntity()
+
+	// 添加位置组件
+	ecs.AddComponent(s.entityManager, entityID, &components.PositionComponent{
+		X: worldX,
+		Y: worldY,
+	})
+
+	// 添加精灵组件
+	ecs.AddComponent(s.entityManager, entityID, &components.SpriteComponent{
+		Image: previewIcon,
+	})
+
+	// 添加植物预览组件
+	ecs.AddComponent(s.entityManager, entityID, &components.PlantPreviewComponent{
+		PlantType: components.PlantWallnut, // 坚果类型
+		Alpha:     0.5,
+	})
+
+	log.Printf("[GameScene] Created conveyor card preview entity (ID: %d)", entityID)
+}
+
+// destroyConveyorCardPreview 销毁传送带卡片预览实体
+func (s *GameScene) destroyConveyorCardPreview() {
+	// 查询所有植物预览实体
+	entities := ecs.GetEntitiesWith1[*components.PlantPreviewComponent](s.entityManager)
+
+	for _, entityID := range entities {
+		s.entityManager.DestroyEntity(entityID)
+	}
+
+	if len(entities) > 0 {
+		s.entityManager.RemoveMarkedEntities()
+	}
 }
 
 // updateConveyorBeltClick 处理传送带点击和卡片放置
@@ -456,118 +573,29 @@ func (s *GameScene) updateConveyorBeltClick() {
 		// 检查是否点击在草坪区域
 		if worldY >= config.GridWorldStartY && worldY < config.GridWorldStartY+float64(config.GridRows)*config.CellHeight {
 			s.handleConveyorCardPlacement(worldX, worldY)
+			// 放置后销毁预览
+			s.destroyConveyorCardPreview()
 			return
 		}
 
 		// 点击在草坪外，取消选中
 		s.conveyorBeltSystem.DeselectCard()
+		s.destroyConveyorCardPreview()
 		return
 	}
 
 	// 未选中卡片，检测是否点击传送带卡片
-	s.handleConveyorBeltClick(mouseX, mouseY)
+	if s.handleConveyorBeltClick(mouseX, mouseY) {
+		// 选中了卡片，创建预览
+		s.createConveyorCardPreview()
+	}
 }
 
 // drawConveyorCardPreview 绘制选中卡片的拖拽预览
-// Story 19.5: 在鼠标位置显示选中的卡片
-// Story 19.6: 增强预览效果（鼠标光标预览 + 草坪网格预览）
+// 注意：预览图像由 PlantPreviewRenderSystem 统一渲染（光标处 + 网格处）
+// 此函数仅保留作为渲染层的占位，预览逻辑已整合到 PlantPreviewComponent 实体中
 func (s *GameScene) drawConveyorCardPreview(screen *ebiten.Image) {
-	if !s.isConveyorCardSelected() {
-		return
-	}
-
-	cardType := s.conveyorBeltSystem.GetSelectedCard()
-	if cardType == "" {
-		return
-	}
-
-	// 获取鼠标位置
-	mouseX, mouseY := ebiten.CursorPosition()
-
-	// 检查放置位置是否有效
-	worldX := float64(mouseX) + s.cameraX
-	worldY := float64(mouseY)
-	isValid := s.conveyorBeltSystem.IsPlacementValid(worldX)
-
-	// 1. 绘制鼠标光标预览（半透明坚果图标）
-	previewWidth := config.ConveyorCardWidth * 1.5
-	previewHeight := config.ConveyorCardHeight * 1.5
-	previewX := float64(mouseX) - previewWidth/2
-	previewY := float64(mouseY) - previewHeight/2
-
-	// 绘制预览（有效为绿色边框，无效为红色边框）
-	var borderColor color.RGBA
-	if isValid {
-		borderColor = color.RGBA{R: 0, G: 255, B: 0, A: 200} // 绿色
-	} else {
-		borderColor = color.RGBA{R: 255, G: 0, B: 0, A: 200} // 红色
-	}
-
-	// 卡片背景（半透明）
-	var bgColor color.RGBA
-	switch cardType {
-	case components.CardTypeWallnutBowling:
-		bgColor = color.RGBA{R: 160, G: 120, B: 80, A: 180}
-	case components.CardTypeExplodeONut:
-		bgColor = color.RGBA{R: 200, G: 80, B: 80, A: 180}
-	default:
-		bgColor = color.RGBA{R: 128, G: 128, B: 128, A: 180}
-	}
-
-	ebitenutil.DrawRect(screen, previewX, previewY, previewWidth, previewHeight, bgColor)
-
-	// 绘制边框
-	borderWidth := 3.0
-	ebitenutil.DrawRect(screen, previewX, previewY, previewWidth, borderWidth, borderColor)
-	ebitenutil.DrawRect(screen, previewX, previewY+previewHeight-borderWidth, previewWidth, borderWidth, borderColor)
-	ebitenutil.DrawRect(screen, previewX, previewY, borderWidth, previewHeight, borderColor)
-	ebitenutil.DrawRect(screen, previewX+previewWidth-borderWidth, previewY, borderWidth, previewHeight, borderColor)
-
-	// 2. 绘制草坪网格预览
-	// 计算鼠标悬停的网格位置
-	if worldY >= config.GridWorldStartY && worldY < config.GridWorldStartY+float64(config.GridRows)*config.CellHeight {
-		col := int((worldX - config.GridWorldStartX) / config.CellWidth)
-		row := int((worldY - config.GridWorldStartY) / config.CellHeight)
-
-		// 验证行列有效性
-		if row >= 0 && row < config.GridRows && col >= 0 && col < config.GridColumns {
-			// 计算网格屏幕坐标
-			gridWorldX := config.GridWorldStartX + float64(col)*config.CellWidth
-			gridWorldY := config.GridWorldStartY + float64(row)*config.CellHeight
-			gridScreenX := gridWorldX - s.cameraX
-			gridScreenY := gridWorldY
-
-			// 网格预览颜色
-			var gridPreviewColor color.RGBA
-			if isValid {
-				// 有效区域：绘制半透明坚果预览
-				switch cardType {
-				case components.CardTypeWallnutBowling:
-					gridPreviewColor = color.RGBA{R: 160, G: 120, B: 80, A: uint8(config.BowlingNutPreviewAlpha)}
-				case components.CardTypeExplodeONut:
-					gridPreviewColor = color.RGBA{R: 200, G: 80, B: 80, A: uint8(config.BowlingNutPreviewAlpha)}
-				default:
-					gridPreviewColor = color.RGBA{R: 128, G: 128, B: 128, A: uint8(config.BowlingNutPreviewAlpha)}
-				}
-			} else {
-				// 无效区域：红色边框提示
-				gridPreviewColor = color.RGBA{R: 255, G: 0, B: 0, A: 80}
-			}
-
-			// 绘制网格填充
-			ebitenutil.DrawRect(screen, gridScreenX, gridScreenY, config.CellWidth, config.CellHeight, gridPreviewColor)
-
-			// 绘制网格边框
-			gridBorderWidth := 2.0
-			gridBorderColor := borderColor
-			// 上
-			ebitenutil.DrawRect(screen, gridScreenX, gridScreenY, config.CellWidth, gridBorderWidth, gridBorderColor)
-			// 下
-			ebitenutil.DrawRect(screen, gridScreenX, gridScreenY+config.CellHeight-gridBorderWidth, config.CellWidth, gridBorderWidth, gridBorderColor)
-			// 左
-			ebitenutil.DrawRect(screen, gridScreenX, gridScreenY, gridBorderWidth, config.CellHeight, gridBorderColor)
-			// 右
-			ebitenutil.DrawRect(screen, gridScreenX+config.CellWidth-gridBorderWidth, gridScreenY, gridBorderWidth, config.CellHeight, gridBorderColor)
-		}
-	}
+	// PlantPreviewRenderSystem 会自动渲染所有 PlantPreviewComponent 实体
+	// 包括：鼠标光标处的不透明图像 + 网格格子中心的半透明预览图像
+	// 无需在此重复渲染
 }

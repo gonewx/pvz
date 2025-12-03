@@ -3,7 +3,9 @@ package scenes
 import (
 	"log"
 
+	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
+	"github.com/decker502/pvz/pkg/entities"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -128,6 +130,38 @@ func (s *GameScene) loadResources() {
 	// Note: Sun counter background is drawn procedurally for now
 	// A dedicated image can be loaded here in the future if needed
 	// Menu button resources are now loaded via ButtonFactory (ECS architecture)
+}
+
+// loadConveyorCardResources 加载传送带卡片渲染资源
+// 必须在 ReanimSystem 初始化后调用（需要使用 RenderPlantIcon）
+func (s *GameScene) loadConveyorCardResources() {
+	// 加载卡片背景框
+	cardBg, err := s.resourceManager.LoadImageByID(config.PlantCardBackgroundID)
+	if err != nil {
+		log.Printf("Warning: Failed to load conveyor card background: %v", err)
+	} else {
+		s.conveyorCardBackground = cardBg
+		log.Printf("[GameScene] Loaded conveyor card background")
+	}
+
+	// 使用 RenderPlantIcon 渲染坚果图标
+	wallnutIcon, err := entities.RenderPlantIcon(
+		s.entityManager,
+		s.resourceManager,
+		s.reanimSystem,
+		components.PlantWallnut,
+	)
+	if err != nil {
+		log.Printf("Warning: Failed to render wallnut icon for conveyor: %v", err)
+	} else {
+		s.conveyorWallnutIcon = wallnutIcon
+		log.Printf("[GameScene] Rendered wallnut icon for conveyor cards")
+	}
+
+	// 爆炸坚果使用相同的图标（后续可以添加红色染色）
+	// 暂时复用普通坚果图标
+	s.conveyorExplodeNutIcon = s.conveyorWallnutIcon
+	log.Printf("[GameScene] Conveyor card resources loaded")
 }
 
 // loadSoddingResources loads sodding animation resources after level config is loaded.
