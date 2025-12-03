@@ -62,6 +62,11 @@ type GameState struct {
 	// 使用 gdata 库实现跨平台数据存储（桌面端、移动端、WASM）
 	// 如果初始化失败，gdataManager 为 nil，游戏仍可运行但无法持久化数据
 	gdataManager *gdata.Manager
+
+	// Story 20.2: 设置管理器
+	// 管理游戏设置（音量、全屏等），使用 gdata 进行跨平台存储
+	// 如果初始化失败，settingsManager 为 nil，游戏使用默认设置
+	settingsManager *SettingsManager
 }
 
 // 全局单例实例（这是架构规范允许的唯一全局变量）
@@ -97,6 +102,15 @@ func GetGameState() *GameState {
 			gdataManager = nil
 		}
 
+		// Story 20.2: 初始化 SettingsManager（必须在 gdataManager 之后）
+		var settingsManager *SettingsManager
+		settingsManager, err = NewSettingsManager(gdataManager)
+		if err != nil {
+			log.Printf("[GameState] Warning: Failed to initialize SettingsManager: %v", err)
+			// 降级方案：settingsManager 为 nil，游戏使用默认设置
+			settingsManager = nil
+		}
+
 		globalGameState = &GameState{
 			Sun:                50, // 默认阳光值（加载关卡后会被 levelConfig.InitialSun 覆盖）
 			plantUnlockManager: NewPlantUnlockManager(),
@@ -111,6 +125,8 @@ func GetGameState() *GameState {
 			WavesPerRound:       20, // 默认每轮20波
 			// Story 20.1: 跨平台存储管理器
 			gdataManager: gdataManager,
+			// Story 20.2: 设置管理器
+			settingsManager: settingsManager,
 		}
 	}
 	return globalGameState
@@ -432,6 +448,17 @@ func (gs *GameState) GetSaveManager() *SaveManager {
 //   - *gdata.Manager: gdata 管理器实例，如果未初始化返回 nil
 func (gs *GameState) GetGdataManager() *gdata.Manager {
 	return gs.gdataManager
+}
+
+// GetSettingsManager 获取设置管理器
+//
+// Story 20.2: 返回 SettingsManager 实例，用于管理游戏设置
+// 如果初始化失败，返回 nil（调用方需检查）
+//
+// 返回：
+//   - *SettingsManager: 设置管理器实例，如果未初始化返回 nil
+func (gs *GameState) GetSettingsManager() *SettingsManager {
+	return gs.settingsManager
 }
 
 // SaveProgress 保存当前游戏进度
