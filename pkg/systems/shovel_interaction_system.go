@@ -63,8 +63,8 @@ func NewShovelInteractionSystem(em *ecs.EntityManager, gs *game.GameState, rm *g
 		entityManager:   em,
 		gameState:       gs,
 		resourceManager: rm,
-		cursorAnchorX:   20.0, // 铲子尖端X偏移
-		cursorAnchorY:   5.0,  // 铲子尖端Y偏移
+		cursorAnchorX:   10.0, // 铲子尖端X偏移（左下角附近）
+		cursorAnchorY:   70.0, // 铲子尖端Y偏移（左下角附近，图片高度80）
 		lastCursorMode:  ebiten.CursorModeVisible,
 	}
 
