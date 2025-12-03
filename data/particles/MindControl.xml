@@ -1,0 +1,17 @@
+<Emitter>
+  <SpawnMinActive>20</SpawnMinActive>
+  <ParticleDuration>40</ParticleDuration>
+  <ParticleSpinAngle>180</ParticleSpinAngle>
+  <ParticleScale>[.3 .6] [.4 .8],50 [.3 .6]</ParticleScale>
+  <EmitterRadius>30</EmitterRadius>
+  <EmitterType>CircleEvenSpacing</EmitterType>
+  <Image>IMAGE_MINDCONTROL</Image>
+  <Field>
+    <FieldType>Friction</FieldType>
+    <X>0,39.999996 .1</X>
+    <Y>0,39.999996 .1</Y>
+  </Field>
+  <AlignLaunchSpin>1</AlignLaunchSpin>
+  <SystemAlpha>0 .7,9.999999 .7,85 0</SystemAlpha>
+  <LaunchSpeed>[100 110]</LaunchSpeed>
+</Emitter>

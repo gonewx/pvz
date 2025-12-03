@@ -1,5 +1,5 @@
 
-File: assets/effect/particles/ZombieHead.xml
+File: data/particles/ZombieHead.xml
 
 好的，非常抱歉之前的误解。完全明白，您需要的是对这个特定 `<Emitter>` 代码块的独立、详细的分析和解释。
 

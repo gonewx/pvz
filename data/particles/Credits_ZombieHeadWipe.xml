@@ -1,0 +1,40 @@
+<Emitter>
+  <SpawnMinActive>10 10,9.999999 20,9.999999 20,19.999998 30,19.999998</SpawnMinActive>
+  <SpawnMaxLaunched>30</SpawnMaxLaunched>
+  <ParticleDuration>80</ParticleDuration>
+  <ParticleAlpha>0 1,19.999998 1,90 0</ParticleAlpha>
+  <ParticleScale>.5 Linear 8</ParticleScale>
+  <EmitterRadius>10</EmitterRadius>
+  <EmitterType>CircleEvenSpacing</EmitterType>
+  <SystemDuration>200</SystemDuration>
+  <Image>IMAGE_ZOMBIEHEAD</Image>
+  <Field>
+    <FieldType>Away</FieldType>
+    <X>200 1500</X>
+  </Field>
+  <Field>
+    <FieldType>Circle</FieldType>
+    <X>200</X>
+  </Field>
+  <SystemAlpha>0 1,9.999999 1,45 0,55</SystemAlpha>
+</Emitter>
+<Emitter>
+  <SpawnMinActive>0,4.9999995 11,4.9999995 11,14.999999 27,14.999999 27,25 38,25</SpawnMinActive>
+  <SpawnMaxLaunched>38</SpawnMaxLaunched>
+  <ParticleDuration>80</ParticleDuration>
+  <ParticleAlpha>0 1,19.999998 1,90 0</ParticleAlpha>
+  <ParticleScale>.5 Linear 8</ParticleScale>
+  <EmitterRadius>10</EmitterRadius>
+  <EmitterType>CircleEvenSpacing</EmitterType>
+  <SystemDuration>200</SystemDuration>
+  <Image>IMAGE_ZOMBIEHEAD</Image>
+  <Field>
+    <FieldType>Away</FieldType>
+    <X>200 1500</X>
+  </Field>
+  <Field>
+    <FieldType>Circle</FieldType>
+    <X>300</X>
+  </Field>
+  <SystemAlpha>0 1,9.999999 1,45 0,55</SystemAlpha>
+</Emitter>

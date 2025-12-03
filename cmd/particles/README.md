@@ -123,7 +123,7 @@ SEARCH: pea_                               [搜索模式指示器]
 pwd  # 应该显示 .../pvz3
 
 # 检查资源文件是否存在
-ls assets/effect/particles/*.xml | wc -l  # 应该显示 106
+ls data/particles/*.xml | wc -l  # 应该显示 106
 
 # 检查配置文件
 ls assets/config/resources.yaml

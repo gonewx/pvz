@@ -1,0 +1,23 @@
+<Emitter>
+  <SpawnMinActive>20</SpawnMinActive>
+  <ParticleDuration>40</ParticleDuration>
+  <ParticleAlpha>1 [.6 .9],79.99999 0</ParticleAlpha>
+  <ParticleSpinAngle>60</ParticleSpinAngle>
+  <ParticleScale>.3 [.4 1.5],9.999999 [.6 2]</ParticleScale>
+  <EmitterRadius>[0 20]</EmitterRadius>
+  <EmitterType>Circle</EmitterType>
+  <SystemDuration>40</SystemDuration>
+  <ImageFrames>2</ImageFrames>
+  <Image>IMAGE_ZOMBIE_BOSS_FIREBALL_PARTICLES</Image>
+  <Field>
+    <FieldType>Circle</FieldType>
+    <X>100 [400 800]</X>
+  </Field>
+  <Field>
+    <FieldType>Away</FieldType>
+    <X>[50 100] [100 300]</X>
+  </Field>
+  <ParticleSpinSpeed>-300</ParticleSpinSpeed>
+  <AlignLaunchSpin>1</AlignLaunchSpin>
+  <LaunchSpeed>[200]</LaunchSpeed>
+</Emitter>

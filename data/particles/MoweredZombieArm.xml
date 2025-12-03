@@ -1,0 +1,23 @@
+<Emitter>
+  <Name>MoweredArm</Name>
+  <SpawnMinActive>1</SpawnMinActive>
+  <ParticleSpinAngle>-90</ParticleSpinAngle>
+  <ParticleScale>.8</ParticleScale>
+  <SystemDuration>60</SystemDuration>
+  <EmitterOffsetX>30</EmitterOffsetX>
+  <Image>IMAGE_ZOMBIEARM</Image>
+  <Field>
+    <FieldType>Acceleration</FieldType>
+    <Y>15</Y>
+  </Field>
+  <Field>
+    <FieldType>GroundConstraint</FieldType>
+    <Y>0</Y>
+  </Field>
+  <ParticleSpinSpeed>[-180 -360] 0,39.999996</ParticleSpinSpeed>
+  <SystemAlpha>1,90 0</SystemAlpha>
+  <LaunchSpeed>340</LaunchSpeed>
+  <LaunchAngle>[190 220]</LaunchAngle>
+  <CollisionReflect>.5</CollisionReflect>
+  <CollisionSpin>15</CollisionSpin>
+</Emitter>

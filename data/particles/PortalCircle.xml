@@ -1,0 +1,20 @@
+<Emitter>
+  <Name>PortalCircle</Name>
+  <ParticleDuration>[50 100]</ParticleDuration>
+  <ParticleAlpha>0 1,33.333336 1,66.66667 0</ParticleAlpha>
+  <ParticleScale>[.1 EaseIn .5]</ParticleScale>
+  <ParticleStretch>[.5 1]</ParticleStretch>
+  <EmitterRadius>[0 30]</EmitterRadius>
+  <EmitterType>Circle</EmitterType>
+  <EmitterOffsetX>30</EmitterOffsetX>
+  <EmitterOffsetY>[40 100]</EmitterOffsetY>
+  <Image>IMAGE_WHITEELLIPSE</Image>
+  <Field>
+    <FieldType>Position</FieldType>
+    <X>0 Linear 10</X>
+    <Y>0 [-5 5]</Y>
+  </Field>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <SystemLoops>1</SystemLoops>
+  <SpawnRate>20</SpawnRate>
+</Emitter>

@@ -1,0 +1,52 @@
+<Emitter>
+  <Name>PowieSmallClouds</Name>
+  <SpawnMaxLaunched>14</SpawnMaxLaunched>
+  <ParticleDuration>[40 60]</ParticleDuration>
+  <ParticleRed>1</ParticleRed>
+  <ParticleGreen>.7 0</ParticleGreen>
+  <ParticleBlue>0</ParticleBlue>
+  <ParticleAlpha>1,70 0</ParticleAlpha>
+  <ParticleScale>.5,59.999996 0</ParticleScale>
+  <EmitterRadius>[10 50]</EmitterRadius>
+  <SystemDuration>200</SystemDuration>
+  <Image>IMAGE_EXPLOSIONCLOUD</Image>
+  <Field>
+    <FieldType>Friction</FieldType>
+    <X>.15,39.999996 1</X>
+    <Y>.18,39.999996 1</Y>
+  </Field>
+  <ParticleSpinSpeed>[-200 200]</ParticleSpinSpeed>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <SpawnRate>150</SpawnRate>
+  <SystemAlpha>1,79.99999 0</SystemAlpha>
+  <LaunchSpeed>[2000 2500]</LaunchSpeed>
+</Emitter>
+<Emitter>
+  <Name>PowieBigClouds</Name>
+  <SpawnMaxLaunched>14</SpawnMaxLaunched>
+  <ParticleDuration>[40 60]</ParticleDuration>
+  <ParticleRed>1</ParticleRed>
+  <ParticleGreen>.9 .4</ParticleGreen>
+  <ParticleBlue>0</ParticleBlue>
+  <ParticleAlpha>1,70 0</ParticleAlpha>
+  <ParticleScale>[1.2 1.6],59.999996 0</ParticleScale>
+  <EmitterRadius>[10 50]</EmitterRadius>
+  <SystemDuration>200</SystemDuration>
+  <Image>IMAGE_EXPLOSIONCLOUD</Image>
+  <Field>
+    <FieldType>Friction</FieldType>
+    <X>.12,39.999996 1</X>
+    <Y>.18,39.999996 1</Y>
+  </Field>
+  <ParticleSpinSpeed>[-200 200]</ParticleSpinSpeed>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <SpawnRate>150</SpawnRate>
+  <SystemAlpha>1,79.99999 0</SystemAlpha>
+  <LaunchSpeed>[500 1200]</LaunchSpeed>
+</Emitter>
+<Emitter>
+  <Name>PowieWord</Name>
+  <SpawnMinActive>1</SpawnMinActive>
+  <SystemDuration>50</SystemDuration>
+  <Image>IMAGE_EXPLOSIONPOWIE</Image>
+</Emitter>

@@ -178,7 +178,7 @@ go run cmd/particles/main.go --filter=Pea --verbose
 
 ### 配置文件
 
-- **PeaSplat 配置**：`assets/effect/particles/PeaSplat.xml`
+- **PeaSplat 配置**：`data/particles/PeaSplat.xml`
 - **资源配置**：`assets/config/resources.yaml` (粒子图片映射)
 
 ## 移除测试功能

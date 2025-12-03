@@ -1,0 +1,36 @@
+<Emitter>
+  <Name>SquashRight</Name>
+  <SpawnMinActive>12</SpawnMinActive>
+  <ParticleDuration>30</ParticleDuration>
+  <ParticleAlpha>[.3 .8],19.999998 0</ParticleAlpha>
+  <ParticleScale>[.2 .3] [.6 .8],70</ParticleScale>
+  <ImageFrames>3</ImageFrames>
+  <EmitterBoxX>[-5 35]</EmitterBoxX>
+  <EmitterBoxY>[0 4]</EmitterBoxY>
+  <Image>IMAGE_DUST_PUFFS</Image>
+  <Field>
+    <FieldType>Position</FieldType>
+    <X>0 Linear [10 40]</X>
+    <Y>0,19.999998 Linear [-10 0]</Y>
+  </Field>
+  <ParticleSpinSpeed>[-200 200]</ParticleSpinSpeed>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+</Emitter>
+<Emitter>
+  <Name>SquashLeft</Name>
+  <SpawnMinActive>12</SpawnMinActive>
+  <ParticleDuration>30</ParticleDuration>
+  <ParticleAlpha>[.3 .8],19.999998 0</ParticleAlpha>
+  <ParticleScale>[.2 .3] [.6 .8],70</ParticleScale>
+  <ImageFrames>3</ImageFrames>
+  <EmitterBoxX>[-35 5]</EmitterBoxX>
+  <EmitterBoxY>[0 4]</EmitterBoxY>
+  <Image>IMAGE_DUST_PUFFS</Image>
+  <Field>
+    <FieldType>Position</FieldType>
+    <X>0 Linear [-10 -40]</X>
+    <Y>0,19.999998 Linear [-10 0]</Y>
+  </Field>
+  <ParticleSpinSpeed>[-200 200]</ParticleSpinSpeed>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+</Emitter>

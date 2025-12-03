@@ -1,0 +1,250 @@
+<Emitter>
+  <Name>DoomStem</Name>
+  <SpawnMinActive>1</SpawnMinActive>
+  <SpawnMaxLaunched>1</SpawnMaxLaunched>
+  <ParticleDuration>150</ParticleDuration>
+  <ParticleAlpha>1,90 0</ParticleAlpha>
+  <ParticleScale>1.15 .9</ParticleScale>
+  <ParticleStretch>.6 1</ParticleStretch>
+  <SystemDuration>400</SystemDuration>
+  <EmitterOffsetY>-75</EmitterOffsetY>
+  <Image>IMAGE_DOOMSHROOM_EXPLOSION_STEM</Image>
+  <Field>
+    <FieldType>Shake</FieldType>
+    <X>2 0</X>
+    <Y>2 0</Y>
+  </Field>
+  <Field>
+    <FieldType>Position</FieldType>
+    <Y>35 15</Y>
+  </Field>
+</Emitter>
+<Emitter>
+  <Name>DoomBase</Name>
+  <SpawnMinActive>1</SpawnMinActive>
+  <SpawnMaxLaunched>1</SpawnMaxLaunched>
+  <ParticleDuration>150</ParticleDuration>
+  <ParticleAlpha>1,90 0</ParticleAlpha>
+  <SystemDuration>400</SystemDuration>
+  <AnimationRate>5</AnimationRate>
+  <ImageFrames>3</ImageFrames>
+  <EmitterOffsetX>-4</EmitterOffsetX>
+  <EmitterOffsetY>10</EmitterOffsetY>
+  <Image>IMAGE_DOOMSHROOM_EXPLOSION_BASE</Image>
+  <Field>
+    <FieldType>Shake</FieldType>
+    <X>2 0</X>
+    <Y>2 0</Y>
+  </Field>
+</Emitter>
+<Emitter>
+  <Name>DoomMushroomUnderCap</Name>
+  <SpawnMinActive>8</SpawnMinActive>
+  <SpawnMaxLaunched>8</SpawnMaxLaunched>
+  <ParticleDuration>150</ParticleDuration>
+  <ParticleAlpha>1,90 0</ParticleAlpha>
+  <ParticleBrightness>[.7 1]</ParticleBrightness>
+  <ParticleScale>[.3 .4]</ParticleScale>
+  <SystemDuration>400</SystemDuration>
+  <EmitterBoxX>[-70 70]</EmitterBoxX>
+  <EmitterBoxY>[0 10]</EmitterBoxY>
+  <Image>IMAGE_DOOMSHROOM_EXPLOSION_TOP</Image>
+  <Field>
+    <FieldType>Position</FieldType>
+    <X>0</X>
+    <Y>0 -130</Y>
+  </Field>
+  <SystemField>
+    <FieldType>SystemPosition</FieldType>
+    <X>0</X>
+    <Y>-60</Y>
+  </SystemField>
+  <ParticleSpinSpeed>[200 300]</ParticleSpinSpeed>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <LaunchSpeed>0</LaunchSpeed>
+</Emitter>
+<Emitter>
+  <Name>DoomMushroomLeft</Name>
+  <SpawnMinActive>2</SpawnMinActive>
+  <SpawnMaxLaunched>2</SpawnMaxLaunched>
+  <ParticleDuration>150</ParticleDuration>
+  <ParticleAlpha>1,90 0</ParticleAlpha>
+  <ParticleBrightness>[.3 .6]</ParticleBrightness>
+  <ParticleScale>[.5 .6]</ParticleScale>
+  <EmitterRadius>[1 20]</EmitterRadius>
+  <EmitterType>Circle</EmitterType>
+  <SystemDuration>400</SystemDuration>
+  <Image>IMAGE_DOOMSHROOM_EXPLOSION_TOP</Image>
+  <Field>
+    <FieldType>Position</FieldType>
+    <X>0</X>
+    <Y>0 -60</Y>
+  </Field>
+  <SystemField>
+    <FieldType>SystemPosition</FieldType>
+    <X>-90</X>
+    <Y>-120</Y>
+  </SystemField>
+  <ParticleSpinSpeed>[200 300]</ParticleSpinSpeed>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <LaunchSpeed>0</LaunchSpeed>
+</Emitter>
+<Emitter>
+  <Name>DoomMushroomRight</Name>
+  <SpawnMinActive>2</SpawnMinActive>
+  <SpawnMaxLaunched>2</SpawnMaxLaunched>
+  <ParticleDuration>150</ParticleDuration>
+  <ParticleAlpha>1,90 0</ParticleAlpha>
+  <ParticleBrightness>[.3 .6]</ParticleBrightness>
+  <ParticleScale>[.5 .6]</ParticleScale>
+  <EmitterRadius>[1 30]</EmitterRadius>
+  <EmitterType>Circle</EmitterType>
+  <SystemDuration>400</SystemDuration>
+  <Image>IMAGE_DOOMSHROOM_EXPLOSION_TOP</Image>
+  <Field>
+    <FieldType>Position</FieldType>
+    <X>0</X>
+    <Y>0 -60</Y>
+  </Field>
+  <SystemField>
+    <FieldType>SystemPosition</FieldType>
+    <X>90</X>
+    <Y>-120</Y>
+  </SystemField>
+  <ParticleSpinSpeed>[-200 -300]</ParticleSpinSpeed>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <LaunchSpeed>0</LaunchSpeed>
+</Emitter>
+<Emitter>
+  <Name>DoomMushroomCenterLeft</Name>
+  <SpawnMinActive>2</SpawnMinActive>
+  <SpawnMaxLaunched>2</SpawnMaxLaunched>
+  <ParticleDuration>150</ParticleDuration>
+  <ParticleAlpha>1,90 0</ParticleAlpha>
+  <ParticleBrightness>[.3 .6]</ParticleBrightness>
+  <ParticleScale>[.6 .7]</ParticleScale>
+  <EmitterRadius>[1 30]</EmitterRadius>
+  <EmitterType>Circle</EmitterType>
+  <SystemDuration>400</SystemDuration>
+  <Image>IMAGE_DOOMSHROOM_EXPLOSION_TOP</Image>
+  <Field>
+    <FieldType>Position</FieldType>
+    <X>0</X>
+    <Y>0 -60</Y>
+  </Field>
+  <SystemField>
+    <FieldType>SystemPosition</FieldType>
+    <X>-40</X>
+    <Y>-140</Y>
+  </SystemField>
+  <ParticleSpinSpeed>[200 300]</ParticleSpinSpeed>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <LaunchSpeed>0</LaunchSpeed>
+</Emitter>
+<Emitter>
+  <Name>DoomMushroomCenterRight</Name>
+  <SpawnMinActive>2</SpawnMinActive>
+  <SpawnMaxLaunched>2</SpawnMaxLaunched>
+  <ParticleDuration>150</ParticleDuration>
+  <ParticleAlpha>1,90 0</ParticleAlpha>
+  <ParticleBrightness>[.3 .6]</ParticleBrightness>
+  <ParticleScale>[.6 .7]</ParticleScale>
+  <EmitterRadius>[1 20]</EmitterRadius>
+  <EmitterType>Circle</EmitterType>
+  <SystemDuration>400</SystemDuration>
+  <Image>IMAGE_DOOMSHROOM_EXPLOSION_TOP</Image>
+  <Field>
+    <FieldType>Position</FieldType>
+    <X>0</X>
+    <Y>0 -60</Y>
+  </Field>
+  <SystemField>
+    <FieldType>SystemPosition</FieldType>
+    <X>40</X>
+    <Y>-140</Y>
+  </SystemField>
+  <ParticleSpinSpeed>[-200 -300]</ParticleSpinSpeed>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <LaunchSpeed>0</LaunchSpeed>
+</Emitter>
+<Emitter>
+  <Name>DoomMushroomTopCenter</Name>
+  <SpawnMinActive>2</SpawnMinActive>
+  <SpawnMaxLaunched>2</SpawnMaxLaunched>
+  <ParticleDuration>150</ParticleDuration>
+  <ParticleAlpha>1,90 0</ParticleAlpha>
+  <ParticleBrightness>[.3 .6]</ParticleBrightness>
+  <ParticleScale>[.6 .8]</ParticleScale>
+  <EmitterRadius>[0 10]</EmitterRadius>
+  <EmitterType>Circle</EmitterType>
+  <SystemDuration>400</SystemDuration>
+  <Image>IMAGE_DOOMSHROOM_EXPLOSION_TOP</Image>
+  <Field>
+    <FieldType>Position</FieldType>
+    <X>0</X>
+    <Y>0 -60</Y>
+  </Field>
+  <SystemField>
+    <FieldType>SystemPosition</FieldType>
+    <X>0</X>
+    <Y>-160</Y>
+  </SystemField>
+  <ParticleSpinSpeed>[100 200]</ParticleSpinSpeed>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <LaunchSpeed>0</LaunchSpeed>
+</Emitter>
+<Emitter>
+  <Name>DoomMushroomMiddleCenter</Name>
+  <SpawnMinActive>1</SpawnMinActive>
+  <SpawnMaxLaunched>1</SpawnMaxLaunched>
+  <ParticleDuration>150</ParticleDuration>
+  <ParticleAlpha>1,90 0</ParticleAlpha>
+  <ParticleBrightness>[.3 .6]</ParticleBrightness>
+  <ParticleScale>[.6 .8]</ParticleScale>
+  <EmitterRadius>[0 10]</EmitterRadius>
+  <EmitterType>Circle</EmitterType>
+  <SystemDuration>400</SystemDuration>
+  <Image>IMAGE_DOOMSHROOM_EXPLOSION_TOP</Image>
+  <Field>
+    <FieldType>Position</FieldType>
+    <X>0</X>
+    <Y>0 -60</Y>
+  </Field>
+  <SystemField>
+    <FieldType>SystemPosition</FieldType>
+    <X>0</X>
+    <Y>-100</Y>
+  </SystemField>
+  <ParticleSpinSpeed>[-100 -200]</ParticleSpinSpeed>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <LaunchSpeed>0</LaunchSpeed>
+</Emitter>
+<Emitter>
+  <Name>DoomWord</Name>
+  <SpawnMinActive>1</SpawnMinActive>
+  <SpawnMaxLaunched>1</SpawnMaxLaunched>
+  <ParticleDuration>150</ParticleDuration>
+  <ParticleAlpha>1,79.99999 0</ParticleAlpha>
+  <SystemDuration>400</SystemDuration>
+  <EmitterOffsetY>-20</EmitterOffsetY>
+  <Image>IMAGE_DOOM</Image>
+  <Field>
+    <FieldType>Shake</FieldType>
+    <X>2</X>
+    <Y>2</Y>
+  </Field>
+</Emitter>
+<Emitter>
+  <Name>DoomFlash</Name>
+  <SpawnMinActive>1</SpawnMinActive>
+  <SpawnMaxLaunched>1</SpawnMaxLaunched>
+  <ParticleDuration>50</ParticleDuration>
+  <ParticleRed>1 .6</ParticleRed>
+  <ParticleGreen>1 0</ParticleGreen>
+  <ParticleBlue>1 .4</ParticleBlue>
+  <ParticleAlpha>1 0</ParticleAlpha>
+  <ParticleScale>1600</ParticleScale>
+  <SystemDuration>400</SystemDuration>
+  <Image>IMAGE_WHITEPIXEL</Image>
+  <FullScreen>1</FullScreen>
+</Emitter>

@@ -257,7 +257,7 @@ func TestLoadParticleConfig_Success(t *testing.T) {
 	rm := NewResourceManager(testAudioContext)
 
 	// Test: Load a real particle configuration file
-	config, err := rm.LoadParticleConfig("../../assets/effect/particles/BlastMark")
+	config, err := rm.LoadParticleConfig("../../data/particles/BlastMark")
 	if err != nil {
 		t.Fatalf("LoadParticleConfig failed: %v", err)
 	}
@@ -281,7 +281,7 @@ func TestLoadParticleConfig_Success(t *testing.T) {
 func TestLoadParticleConfig_Caching(t *testing.T) {
 	rm := NewResourceManager(testAudioContext)
 
-	configName := "../../assets/effect/particles/BlastMark"
+	configName := "../../data/particles/BlastMark"
 
 	// Load the same configuration twice
 	config1, err1 := rm.LoadParticleConfig(configName)
@@ -315,7 +315,7 @@ func TestLoadParticleConfig_FileNotFound(t *testing.T) {
 func TestGetParticleConfig(t *testing.T) {
 	rm := NewResourceManager(testAudioContext)
 
-	configName := "../../assets/effect/particles/BlastMark"
+	configName := "../../data/particles/BlastMark"
 
 	// Test: Get config before loading - should be nil
 	config := rm.GetParticleConfig(configName)
@@ -366,7 +366,7 @@ func TestLoadParticleConfig_MultipleEmitters(t *testing.T) {
 	rm := NewResourceManager(testAudioContext)
 
 	// Test: Load Award.xml which has 13 emitters
-	config, err := rm.LoadParticleConfig("../../assets/effect/particles/Award")
+	config, err := rm.LoadParticleConfig("../../data/particles/Award")
 	if err != nil {
 		t.Fatalf("LoadParticleConfig failed for Award: %v", err)
 	}

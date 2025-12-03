@@ -133,7 +133,7 @@ requirements_mapping:
     when: "游戏运行时触发相应事件"
     then: "对应的粒子效果正确显示"
     status: "✅ IMPLEMENTED (代码层面)"
-    evidence: "assets/effect/particles/*.xml - 所有配置文件存在"
+    evidence: "data/particles/*.xml - 所有配置文件存在"
     test_coverage: "⚠️ PARTIAL - 缺少视觉验证测试"
 
   ac_6:

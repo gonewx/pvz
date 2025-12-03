@@ -7,7 +7,7 @@ import (
 
 // TestParseParticleXML_Award tests parsing the Award.xml file
 func TestParseParticleXML_Award(t *testing.T) {
-	config, err := ParseParticleXML("../../assets/effect/particles/Award.xml")
+	config, err := ParseParticleXML("../../data/particles/Award.xml")
 	if err != nil {
 		t.Fatalf("Failed to parse Award.xml: %v", err)
 	}
@@ -42,7 +42,7 @@ func TestParseParticleXML_Award(t *testing.T) {
 
 // TestParseParticleXML_BossExplosion tests parsing the BossExplosion.xml file
 func TestParseParticleXML_BossExplosion(t *testing.T) {
-	config, err := ParseParticleXML("../../assets/effect/particles/BossExplosion.xml")
+	config, err := ParseParticleXML("../../data/particles/BossExplosion.xml")
 	if err != nil {
 		t.Fatalf("Failed to parse BossExplosion.xml: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestParseParticleXML_NonExistent(t *testing.T) {
 
 // TestParseParticleXML_CabbageSplat tests parsing CabbageSplat.xml (multiple Fields)
 func TestParseParticleXML_CabbageSplat(t *testing.T) {
-	config, err := ParseParticleXML("../../assets/effect/particles/CabbageSplat.xml")
+	config, err := ParseParticleXML("../../data/particles/CabbageSplat.xml")
 	if err != nil {
 		t.Fatalf("Failed to parse CabbageSplat.xml: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestParseParticleXML_CabbageSplat(t *testing.T) {
 
 // TestParseParticleXML_BlastMark tests parsing BlastMark.xml (simple single emitter)
 func TestParseParticleXML_BlastMark(t *testing.T) {
-	config, err := ParseParticleXML("../../assets/effect/particles/BlastMark.xml")
+	config, err := ParseParticleXML("../../data/particles/BlastMark.xml")
 	if err != nil {
 		t.Fatalf("Failed to parse BlastMark.xml: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestParseParticleXML_BlastMark(t *testing.T) {
 
 // TestParseParticleXML_CoinPickupArrow tests parsing CoinPickupArrow.xml (UI effect with Position field)
 func TestParseParticleXML_CoinPickupArrow(t *testing.T) {
-	config, err := ParseParticleXML("../../assets/effect/particles/CoinPickupArrow.xml")
+	config, err := ParseParticleXML("../../data/particles/CoinPickupArrow.xml")
 	if err != nil {
 		t.Fatalf("Failed to parse CoinPickupArrow.xml: %v", err)
 	}

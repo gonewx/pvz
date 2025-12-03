@@ -79,7 +79,7 @@ go run cmd/particles/main.go --verbose --effect="Planting" > /tmp/planting.log 2
 ## 相关文件
 
 - **修复位置**: `pkg/systems/particle_system.go:210-240`
-- **配置文件**: `assets/effect/particles/Planting.xml`
+- **配置文件**: `data/particles/Planting.xml`
 - **测试命令**: `cmd/particles/main.go`
 
 ## 设计原则

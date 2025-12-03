@@ -4,7 +4,7 @@
 
 ---
 
-File: assets/effect/particles/PeaSplat.xml
+File: data/particles/PeaSplat.xml
 
 ### 效果总览
 

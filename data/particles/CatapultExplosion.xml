@@ -1,0 +1,111 @@
+<Emitter>
+  <Name>ZamboniSmallClouds</Name>
+  <SpawnMaxLaunched>14</SpawnMaxLaunched>
+  <ParticleDuration>[40 60]</ParticleDuration>
+  <ParticleRed>.55 .22,50 0</ParticleRed>
+  <ParticleGreen>.3 0</ParticleGreen>
+  <ParticleBlue>.2 0</ParticleBlue>
+  <ParticleAlpha>1,70 0</ParticleAlpha>
+  <ParticleScale>.5,59.999996 0</ParticleScale>
+  <EmitterRadius>[10 50]</EmitterRadius>
+  <SystemDuration>200</SystemDuration>
+  <Image>IMAGE_EXPLOSIONCLOUD</Image>
+  <Field>
+    <FieldType>Friction</FieldType>
+    <X>.15,39.999996 1</X>
+    <Y>.18,39.999996 1</Y>
+  </Field>
+  <ParticleSpinSpeed>[-200 200]</ParticleSpinSpeed>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <SpawnRate>150</SpawnRate>
+  <SystemAlpha>1,79.99999 0</SystemAlpha>
+  <LaunchSpeed>[2000 2500]</LaunchSpeed>
+</Emitter>
+<Emitter>
+  <Name>Manhole</Name>
+  <SpawnMinActive>0 1,9.999999</SpawnMinActive>
+  <ParticleDuration>80</ParticleDuration>
+  <ParticleScale>.8</ParticleScale>
+  <EmitterBoxX>[-35 35]</EmitterBoxX>
+  <EmitterBoxY>30</EmitterBoxY>
+  <Image>IMAGE_REANIM_ZOMBIE_CATAPULT_MANHOLE</Image>
+  <Field>
+    <FieldType>Acceleration</FieldType>
+    <Y>13</Y>
+  </Field>
+  <ParticleSpinSpeed>[-720 720] 0</ParticleSpinSpeed>
+  <SystemAlpha>1,90 0</SystemAlpha>
+  <LaunchSpeed>600</LaunchSpeed>
+  <LaunchAngle>[130 200]</LaunchAngle>
+</Emitter>
+<Emitter>
+  <Name>Parts</Name>
+  <SpawnMinActive>0 6,9.999999</SpawnMinActive>
+  <ParticleDuration>80</ParticleDuration>
+  <ParticleScale>[.4 .6]</ParticleScale>
+  <ImageFrames>5</ImageFrames>
+  <EmitterBoxX>[-35 35]</EmitterBoxX>
+  <EmitterBoxY>30</EmitterBoxY>
+  <Image>IMAGE_ZOMBOSS_PARTICLES</Image>
+  <Field>
+    <FieldType>Acceleration</FieldType>
+    <Y>13</Y>
+  </Field>
+  <ParticleSpinSpeed>[-720 720] 0</ParticleSpinSpeed>
+  <SystemAlpha>1,90 0</SystemAlpha>
+  <LaunchSpeed>600</LaunchSpeed>
+  <LaunchAngle>[130 200]</LaunchAngle>
+</Emitter>
+<Emitter>
+  <Name>Pole</Name>
+  <SpawnMinActive>1</SpawnMinActive>
+  <ParticleDuration>80</ParticleDuration>
+  <ParticleScale>.8</ParticleScale>
+  <Image>IMAGE_REANIM_ZOMBIE_CATAPULT_POLE_DAMAGE</Image>
+  <Field>
+    <FieldType>Acceleration</FieldType>
+    <Y>13</Y>
+  </Field>
+  <ParticleSpinSpeed>[-720 720] 0</ParticleSpinSpeed>
+  <SystemAlpha>1,90 0</SystemAlpha>
+  <LaunchSpeed>[550 650]</LaunchSpeed>
+  <LaunchAngle>[130 200]</LaunchAngle>
+</Emitter>
+<Emitter>
+  <Name>Backetballs</Name>
+  <SpawnMinActive>0 3,29.999998</SpawnMinActive>
+  <ParticleDuration>80</ParticleDuration>
+  <ParticleScale>.8</ParticleScale>
+  <Image>IMAGE_REANIM_ZOMBIE_CATAPULT_BASKETBALL</Image>
+  <Field>
+    <FieldType>Acceleration</FieldType>
+    <Y>11</Y>
+  </Field>
+  <ParticleSpinSpeed>[-720 720] 0</ParticleSpinSpeed>
+  <SystemAlpha>1,90 0</SystemAlpha>
+  <LaunchSpeed>500</LaunchSpeed>
+  <LaunchAngle>[130 200]</LaunchAngle>
+</Emitter>
+<Emitter>
+  <Name>ZamboniBigClouds</Name>
+  <SpawnMaxLaunched>14</SpawnMaxLaunched>
+  <ParticleDuration>[40 60]</ParticleDuration>
+  <ParticleRed>.55 .22,50 0</ParticleRed>
+  <ParticleGreen>.3 0</ParticleGreen>
+  <ParticleBlue>.2 0</ParticleBlue>
+  <ParticleAlpha>1,70 0</ParticleAlpha>
+  <ParticleScale>[1.2 1.6],59.999996 0</ParticleScale>
+  <EmitterRadius>[10 50]</EmitterRadius>
+  <SystemDuration>200</SystemDuration>
+  <Image>IMAGE_EXPLOSIONCLOUD</Image>
+  <Field>
+    <FieldType>Friction</FieldType>
+    <X>.12,39.999996 1</X>
+    <Y>.18,39.999996 1</Y>
+  </Field>
+  <ParticleSpinSpeed>[-200 200]</ParticleSpinSpeed>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <SpawnRate>150</SpawnRate>
+  <SystemAlpha>1,79.99999 0</SystemAlpha>
+  <LaunchSpeed>[500 1200]</LaunchSpeed>
+</Emitter>

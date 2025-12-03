@@ -1,0 +1,16 @@
+<Emitter>
+  <Name>HeadPool</Name>
+  <SpawnMinActive>1</SpawnMinActive>
+  <ParticleScale>.8</ParticleScale>
+  <SystemDuration>50</SystemDuration>
+  <EmitterOffsetX>5</EmitterOffsetX>
+  <Image>IMAGE_ZOMBIEHEAD</Image>
+  <Field>
+    <FieldType>Acceleration</FieldType>
+    <Y>17</Y>
+  </Field>
+  <ParticleSpinSpeed>[-720 720] 0,39.999996</ParticleSpinSpeed>
+  <SystemAlpha>1,79.99999 0</SystemAlpha>
+  <LaunchSpeed>330</LaunchSpeed>
+  <LaunchAngle>[150 185]</LaunchAngle>
+</Emitter>

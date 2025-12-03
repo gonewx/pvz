@@ -1258,7 +1258,7 @@ func (rm *ResourceManager) LoadAllResources() error {
 //
 // Parameters:
 //   - name: The particle configuration name. Can be either:
-//   - A simple name (e.g., "Award", "BossExplosion") - will be loaded from assets/effect/particles/
+//   - A simple name (e.g., "Award", "BossExplosion") - will be loaded from data/particles/
 //   - A path with directory separators (e.g., "path/to/config") - will be used as-is
 //
 // Returns:
@@ -1285,7 +1285,7 @@ func (rm *ResourceManager) LoadParticleConfig(name string) (*particle.ParticleCo
 		path = name + ".xml"
 	} else {
 		// Simple name, add default prefix
-		path = filepath.Join("assets/effect/particles", name+".xml")
+		path = filepath.Join("data/particles", name+".xml")
 	}
 
 	// Parse the configuration

@@ -1,0 +1,27 @@
+<Emitter>
+  <Name>Sparkle</Name>
+  <ParticleDuration>[70 100]</ParticleDuration>
+  <ParticleAlpha>0 1,19.999998 1,79.99999 0</ParticleAlpha>
+  <ParticleScale>1</ParticleScale>
+  <EmitterRadius>[0 40]</EmitterRadius>
+  <EmitterType>Circle</EmitterType>
+  <ImageFrames>3</ImageFrames>
+  <Image>IMAGE_ICE_SPARKLES</Image>
+  <ParticleSpinSpeed>0 -100,50 0</ParticleSpinSpeed>
+  <SystemLoops>1</SystemLoops>
+  <SpawnRate>.5</SpawnRate>
+</Emitter>
+<Emitter>
+  <Name>SparkleBottom</Name>
+  <ParticleDuration>[80 150]</ParticleDuration>
+  <ParticleAlpha>0 1,19.999998 1,79.99999 0</ParticleAlpha>
+  <ParticleScale>1</ParticleScale>
+  <EmitterRadius>[0 40]</EmitterRadius>
+  <EmitterType>Circle</EmitterType>
+  <ImageFrames>3</ImageFrames>
+  <EmitterOffsetY>130</EmitterOffsetY>
+  <Image>IMAGE_ICE_SPARKLES</Image>
+  <ParticleSpinSpeed>0 -100,50 0</ParticleSpinSpeed>
+  <SystemLoops>1</SystemLoops>
+  <SpawnRate>.9</SpawnRate>
+</Emitter>

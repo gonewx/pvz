@@ -1,0 +1,14 @@
+<Emitter>
+  <Name>SeaweedHead</Name>
+  <SpawnMinActive>1</SpawnMinActive>
+  <SpawnMaxLaunched>1</SpawnMaxLaunched>
+  <ParticleDuration>60</ParticleDuration>
+  <ParticleScale>[.6 .8]</ParticleScale>
+  <EmitterRadius>[0 5]</EmitterRadius>
+  <EmitterType>Circle</EmitterType>
+  <ImageFrames>4</ImageFrames>
+  <Image>IMAGE_ZOMBIE_SEAWEED</Image>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <SystemLoops>1</SystemLoops>
+  <ParticleLoops>1</ParticleLoops>
+</Emitter>

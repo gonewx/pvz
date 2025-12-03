@@ -1,0 +1,17 @@
+<Emitter>
+  <Name>Daisy</Name>
+  <SpawnMaxLaunched>[6 10]</SpawnMaxLaunched>
+  <ParticleDuration>18000</ParticleDuration>
+  <ParticleAlpha>0 1,0.4 1,99.5 0</ParticleAlpha>
+  <ParticleScale>0 [.6 1.2],0.5</ParticleScale>
+  <SystemDuration>18500</SystemDuration>
+  <EmitterBoxX>[-40 40]</EmitterBoxX>
+  <EmitterBoxY>[-10 10]</EmitterBoxY>
+  <Image>IMAGE_DAISY</Image>
+  <Field>
+    <FieldType>Position</FieldType>
+    <Y>0 -10,0.5</Y>
+  </Field>
+  <DieIfOverloaded>1</DieIfOverloaded>
+  <SpawnRate>10</SpawnRate>
+</Emitter>

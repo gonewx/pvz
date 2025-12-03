@@ -1,0 +1,136 @@
+<Emitter>
+  <Name>AwardRay8</Name>
+  <SpawnMinActive>1 5,90</SpawnMinActive>
+  <ParticleDuration>100</ParticleDuration>
+  <ParticleAlpha>.7 .9,50 .9,70 0,79.99999</ParticleAlpha>
+  <ParticleBrightness>.4</ParticleBrightness>
+  <ParticleSpinAngle>270</ParticleSpinAngle>
+  <ParticleScale>.4 Linear 20</ParticleScale>
+  <Image>IMAGE_AWARDRAYS2</Image>
+  <ParticleSpinSpeed>-60</ParticleSpinSpeed>
+  <Additive>1</Additive>
+</Emitter>
+<Emitter>
+  <Name>AwardRay7</Name>
+  <SpawnMinActive>1 5,90</SpawnMinActive>
+  <ParticleDuration>100</ParticleDuration>
+  <ParticleAlpha>.7 .9,50 .9,70 0,79.99999</ParticleAlpha>
+  <ParticleBrightness>.3</ParticleBrightness>
+  <ParticleSpinAngle>90</ParticleSpinAngle>
+  <ParticleScale>.4 Linear 20</ParticleScale>
+  <Image>IMAGE_AWARDRAYS2</Image>
+  <ParticleSpinSpeed>-60</ParticleSpinSpeed>
+  <Additive>1</Additive>
+</Emitter>
+<Emitter>
+  <Name>AwardRay6</Name>
+  <SpawnMinActive>1 5,90</SpawnMinActive>
+  <ParticleDuration>100</ParticleDuration>
+  <ParticleAlpha>.7 .9,50 .9,70 0,79.99999</ParticleAlpha>
+  <ParticleBrightness>.2</ParticleBrightness>
+  <ParticleSpinAngle>180</ParticleSpinAngle>
+  <ParticleScale>.4 Linear 20</ParticleScale>
+  <Image>IMAGE_AWARDRAYS1</Image>
+  <ParticleSpinSpeed>-60</ParticleSpinSpeed>
+  <Additive>1</Additive>
+</Emitter>
+<Emitter>
+  <Name>AwardRay5</Name>
+  <SpawnMinActive>1 5,90</SpawnMinActive>
+  <ParticleDuration>100</ParticleDuration>
+  <ParticleAlpha>.7 .9,50 .9,70 0,79.99999</ParticleAlpha>
+  <ParticleBrightness>.1</ParticleBrightness>
+  <ParticleSpinAngle>0</ParticleSpinAngle>
+  <ParticleScale>.4 Linear 20</ParticleScale>
+  <Image>IMAGE_AWARDRAYS1</Image>
+  <ParticleSpinSpeed>-60</ParticleSpinSpeed>
+  <Additive>1</Additive>
+</Emitter>
+<Emitter>
+  <Name>AwardRay4</Name>
+  <SpawnMinActive>0 5,70</SpawnMinActive>
+  <ParticleDuration>100</ParticleDuration>
+  <ParticleAlpha>.7 .9,50 .9,70 0,79.99999</ParticleAlpha>
+  <ParticleBrightness>.4</ParticleBrightness>
+  <ParticleSpinAngle>290</ParticleSpinAngle>
+  <ParticleScale>.4 Linear 30</ParticleScale>
+  <Image>IMAGE_AWARDRAYS2</Image>
+  <ParticleSpinSpeed>-45</ParticleSpinSpeed>
+  <Additive>1</Additive>
+</Emitter>
+<Emitter>
+  <Name>AwardRay3</Name>
+  <SpawnMinActive>0 5,70</SpawnMinActive>
+  <ParticleDuration>100</ParticleDuration>
+  <ParticleAlpha>.7 .9,50 .9,70 0,79.99999</ParticleAlpha>
+  <ParticleBrightness>.3</ParticleBrightness>
+  <ParticleSpinAngle>110</ParticleSpinAngle>
+  <ParticleScale>.4 Linear 30</ParticleScale>
+  <Image>IMAGE_AWARDRAYS2</Image>
+  <ParticleSpinSpeed>-45</ParticleSpinSpeed>
+  <Additive>1</Additive>
+</Emitter>
+<Emitter>
+  <Name>AwardRay2</Name>
+  <SpawnMinActive>0 5,70</SpawnMinActive>
+  <ParticleDuration>100</ParticleDuration>
+  <ParticleAlpha>.7 .9,50 .9,70 0,79.99999</ParticleAlpha>
+  <ParticleBrightness>.2</ParticleBrightness>
+  <ParticleSpinAngle>200</ParticleSpinAngle>
+  <ParticleScale>.4 Linear 30</ParticleScale>
+  <Image>IMAGE_AWARDRAYS1</Image>
+  <ParticleSpinSpeed>-45</ParticleSpinSpeed>
+  <Additive>1</Additive>
+</Emitter>
+<Emitter>
+  <Name>AwardRay1</Name>
+  <SpawnMinActive>0 5,70</SpawnMinActive>
+  <ParticleDuration>100</ParticleDuration>
+  <ParticleAlpha>.7 .9,50 .9,70 0,79.99999</ParticleAlpha>
+  <ParticleBrightness>.1</ParticleBrightness>
+  <ParticleSpinAngle>20</ParticleSpinAngle>
+  <ParticleScale>.4 Linear 30</ParticleScale>
+  <Image>IMAGE_AWARDRAYS1</Image>
+  <ParticleSpinSpeed>-45</ParticleSpinSpeed>
+  <Additive>1</Additive>
+</Emitter>
+<Emitter>
+  <Name>AwardGlow</Name>
+  <SpawnMinActive>0,18 1,18</SpawnMinActive>
+  <ParticleDuration>120</ParticleDuration>
+  <ParticleRed>1</ParticleRed>
+  <ParticleGreen>1</ParticleGreen>
+  <ParticleBlue>1</ParticleBlue>
+  <ParticleAlpha>0 1,59.999996 1,75 0</ParticleAlpha>
+  <ParticleScale>.1 100,79.99999</ParticleScale>
+  <Image>IMAGE_AWARDGLOW</Image>
+</Emitter>
+<Emitter>
+  <Name>AwardFlash2</Name>
+  <SpawnMinActive>0,19.999998 1,19.999998</SpawnMinActive>
+  <SpawnMaxLaunched>1</SpawnMaxLaunched>
+  <ParticleDuration>40</ParticleDuration>
+  <ParticleRed>1</ParticleRed>
+  <ParticleGreen>1</ParticleGreen>
+  <ParticleBlue>.9</ParticleBlue>
+  <ParticleAlpha>.2,50 0</ParticleAlpha>
+  <ParticleBrightness>.4</ParticleBrightness>
+  <ParticleScale>1 25</ParticleScale>
+  <SystemDuration>100</SystemDuration>
+  <Image>IMAGE_AWARDGLOW</Image>
+  <Additive>1</Additive>
+</Emitter>
+<Emitter>
+  <Name>AwardFlash1</Name>
+  <SpawnMinActive>1</SpawnMinActive>
+  <SpawnMaxLaunched>1</SpawnMaxLaunched>
+  <ParticleDuration>30</ParticleDuration>
+  <ParticleRed>1</ParticleRed>
+  <ParticleGreen>1</ParticleGreen>
+  <ParticleBlue>.9</ParticleBlue>
+  <ParticleAlpha>.6,50 0</ParticleAlpha>
+  <ParticleBrightness>.4</ParticleBrightness>
+  <ParticleScale>1 25</ParticleScale>
+  <Image>IMAGE_AWARDGLOW</Image>
+  <Additive>1</Additive>
+</Emitter>

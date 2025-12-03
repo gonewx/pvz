@@ -1,0 +1,22 @@
+<Emitter>
+  <SpawnMinActive>80</SpawnMinActive>
+  <ParticleDuration>40</ParticleDuration>
+  <ParticleAlpha>1 [.6 .9],79.99999 0</ParticleAlpha>
+  <ParticleScale>.3 [.4 1.5],9.999999 [.6 2],70 0</ParticleScale>
+  <EmitterRadius>[0 100]</EmitterRadius>
+  <EmitterType>Circle</EmitterType>
+  <SystemDuration>40</SystemDuration>
+  <ImageFrames>3</ImageFrames>
+  <Image>IMAGE_SNOWFLAKES</Image>
+  <Field>
+    <FieldType>Acceleration</FieldType>
+    <Y>5</Y>
+  </Field>
+  <Field>
+    <FieldType>Position</FieldType>
+    <X>0</X>
+  </Field>
+  <ParticleSpinSpeed>[-600 600]</ParticleSpinSpeed>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <LaunchSpeed>[200]</LaunchSpeed>
+</Emitter>

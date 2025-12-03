@@ -1,0 +1,20 @@
+<Emitter>
+  <SpawnMinActive>1</SpawnMinActive>
+  <ParticleScale>.8</ParticleScale>
+  <SystemDuration>50</SystemDuration>
+  <Image>IMAGE_REANIM_ZOMBIE_BUCKET3</Image>
+  <Field>
+    <FieldType>Acceleration</FieldType>
+    <Y>17</Y>
+  </Field>
+  <Field>
+    <FieldType>GroundConstraint</FieldType>
+    <Y>90</Y>
+  </Field>
+  <ParticleSpinSpeed>[-200 -400] 0,39.999996</ParticleSpinSpeed>
+  <SystemAlpha>1,79.99999 0</SystemAlpha>
+  <LaunchSpeed>200</LaunchSpeed>
+  <LaunchAngle>[120 180]</LaunchAngle>
+  <CollisionReflect>.3</CollisionReflect>
+  <CollisionSpin>[-3 -6]</CollisionSpin>
+</Emitter>

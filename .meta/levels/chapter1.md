@@ -78,7 +78,7 @@
     - 微小的抛物线感觉，无弹跳，直接 落到草坪上
   2. Phase 2: 等待点击 (Waiting) 
     - 卡片包静止在草坪上
-    - 卡片周围应该有个光晕效果的粒子效果（请在资源包在找到最合适的粒子效果，assets/effect/particles/SeedPacket.xml）
+    - 卡片周围应该有个光晕效果的粒子效果（请在资源包在找到最合适的粒子效果，data/particles/SeedPacket.xml）
     - 显示橙色向下箭头指示器(闪烁动画， 类似于植物卡片包下方的)
     - 等待玩家点击
     - 参考截图： .meta/screenshot/level1/截图 2025-10-16 17-34-00.png
@@ -227,7 +227,7 @@
     - `sodRowImageAnim: "IMAGE_BACKGROUND1"` - 叠加层使用完整背景图
     - `soddingAnimLanes: [1, 5]` - 只在第1/5行播放草皮卷动画
 
-- 需要有和前面关卡类似的奖励动画， 只是植物卡包换成铲子图片， 卡包背景的粒子效果换成 assets/effect/particles/AwardPickupArrow.xml。奖励动画时图片为 Shovel_hi_res.png, 缩放改为和植物卡包一样的逻辑.
+- 需要有和前面关卡类似的奖励动画， 只是植物卡包换成铲子图片， 卡包背景的粒子效果换成 data/particles/AwardPickupArrow.xml。奖励动画时图片为 Shovel_hi_res.png, 缩放改为和植物卡包一样的逻辑.
 
 ### **关卡 1-5**
 *   **场地布局**: 完整的5行草地。

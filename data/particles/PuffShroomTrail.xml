@@ -1,0 +1,28 @@
+<Emitter>
+  <ParticleDuration>20</ParticleDuration>
+  <ParticleAlpha>1 [.4 .8],79.99999 0</ParticleAlpha>
+  <ParticleScale>.3 [.4 1],9.999999 [.4 1],70 0</ParticleScale>
+  <EmitterRadius>[0 10]</EmitterRadius>
+  <EmitterType>Circle</EmitterType>
+  <SystemDuration>20</SystemDuration>
+  <Image>IMAGE_PUFFSHROOM_PUFF2</Image>
+  <Field>
+    <FieldType>Acceleration</FieldType>
+    <Y>5</Y>
+  </Field>
+  <Field>
+    <FieldType>Position</FieldType>
+    <X>0 Linear 20</X>
+  </Field>
+  <ParticleSpinSpeed>[-600 600]</ParticleSpinSpeed>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <SystemLoops>1</SystemLoops>
+  <ParticlesDontFollow>1</ParticlesDontFollow>
+  <SpawnRate>20</SpawnRate>
+  <LaunchSpeed>[10]</LaunchSpeed>
+</Emitter>
+<Emitter>
+  <Name>FadeOut</Name>
+  <ParticleAlpha>1 0</ParticleAlpha>
+  <CrossFadeDuration>50</CrossFadeDuration>
+</Emitter>

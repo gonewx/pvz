@@ -1,0 +1,21 @@
+<Emitter>
+  <Name>Mustache</Name>
+  <SpawnMinActive>1</SpawnMinActive>
+  <ParticleDuration>120</ParticleDuration>
+  <ParticleScale>.8</ParticleScale>
+  <Image>IMAGE_REANIM_ZOMBIE_MUSTACHE1</Image>
+  <Field>
+    <FieldType>Acceleration</FieldType>
+    <Y>17</Y>
+  </Field>
+  <Field>
+    <FieldType>GroundConstraint</FieldType>
+    <Y>90</Y>
+  </Field>
+  <ParticleSpinSpeed>[-1720 1720] 0,39.999996</ParticleSpinSpeed>
+  <SystemAlpha>1,95 0</SystemAlpha>
+  <LaunchSpeed>500</LaunchSpeed>
+  <LaunchAngle>[150 170]</LaunchAngle>
+  <CollisionReflect>.3 .3,39.999996 0,50</CollisionReflect>
+  <CollisionSpin>[-300 -350] 0,39.999996</CollisionSpin>
+</Emitter>

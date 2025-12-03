@@ -1,0 +1,51 @@
+<Emitter>
+  <Name>DirtSplash</Name>
+  <ParticleDuration>[30 40]</ParticleDuration>
+  <ParticleAlpha>1,70 0</ParticleAlpha>
+  <ParticleScale>[.7 .9]</ParticleScale>
+  <SystemDuration>100</SystemDuration>
+  <ImageFrames>8</ImageFrames>
+  <EmitterBoxX>[-25 25]</EmitterBoxX>
+  <EmitterBoxY>[-30 0]</EmitterBoxY>
+  <Image>IMAGE_DIRTSMALL</Image>
+  <Field>
+    <FieldType>Friction</FieldType>
+    <X>.02</X>
+    <Y>.02</Y>
+  </Field>
+  <Field>
+    <FieldType>Acceleration</FieldType>
+    <Y>5</Y>
+  </Field>
+  <ParticleSpinSpeed>[-1720 1720]</ParticleSpinSpeed>
+  <ImageRow>1</ImageRow>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <SpawnRate>50,59.999996 0,79.99999</SpawnRate>
+  <SpawnMaxActive>0 10,39.999996 100,50 0,90</SpawnMaxActive>
+  <SystemAlpha>1,91.99999 0</SystemAlpha>
+  <LaunchSpeed>[100 200] [100 200],50 [100 200]</LaunchSpeed>
+  <LaunchAngle>[120 240]</LaunchAngle>
+</Emitter>
+<Emitter>
+  <Name>DirtClumps</Name>
+  <SpawnMinActive>6</SpawnMinActive>
+  <ParticleDuration>100</ParticleDuration>
+  <ParticleScale>0 [.7 .9],9.999999</ParticleScale>
+  <SystemDuration>100</SystemDuration>
+  <ImageFrames>4</ImageFrames>
+  <EmitterBoxX>[5 15]</EmitterBoxX>
+  <EmitterBoxY>[-18 -12]</EmitterBoxY>
+  <Image>IMAGE_DIRTBIG</Image>
+  <Field>
+    <FieldType>Position</FieldType>
+    <X>[-5 5] [-25 25],50</X>
+    <Y>0 [12 18],50</Y>
+  </Field>
+  <Field>
+    <FieldType>Shake</FieldType>
+    <X>2 0</X>
+    <Y>2 0</Y>
+  </Field>
+  <ImageRow>1</ImageRow>
+  <SystemAlpha>1,94 0</SystemAlpha>
+</Emitter>

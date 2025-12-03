@@ -1,0 +1,200 @@
+<Emitter>
+  <Name>Gloom_East</Name>
+  <SpawnMinActive>0 5,19.999998</SpawnMinActive>
+  <SpawnMaxLaunched>5</SpawnMaxLaunched>
+  <ParticleDuration>[20 30]</ParticleDuration>
+  <ParticleAlpha>.9,79.99999 0</ParticleAlpha>
+  <ParticleScale>[.7 1.1]</ParticleScale>
+  <EmitterOffsetX>40</EmitterOffsetX>
+  <EmitterOffsetY>-5</EmitterOffsetY>
+  <Image>IMAGE_PUFFSHROOM_PUFF1</Image>
+  <Field>
+    <FieldType>Away</FieldType>
+    <X>400 0</X>
+  </Field>
+  <Field>
+    <FieldType>Circle</FieldType>
+    <X>[-100 100]</X>
+  </Field>
+  <Field>
+    <FieldType>Shake</FieldType>
+    <X>1 0</X>
+    <Y>1 0</Y>
+  </Field>
+  <SystemAlpha>.9,79.99999 0</SystemAlpha>
+</Emitter>
+<Emitter>
+  <Name>Gloom_South</Name>
+  <SpawnMinActive>0 5,19.999998</SpawnMinActive>
+  <SpawnMaxLaunched>5</SpawnMaxLaunched>
+  <ParticleDuration>[20 30]</ParticleDuration>
+  <ParticleAlpha>.9,79.99999 0</ParticleAlpha>
+  <ParticleScale>[.7 1.1]</ParticleScale>
+  <EmitterOffsetX>0</EmitterOffsetX>
+  <EmitterOffsetY>28</EmitterOffsetY>
+  <Image>IMAGE_PUFFSHROOM_PUFF1</Image>
+  <Field>
+    <FieldType>Away</FieldType>
+    <X>400 0</X>
+  </Field>
+  <Field>
+    <FieldType>Circle</FieldType>
+    <X>[-100 100]</X>
+  </Field>
+  <Field>
+    <FieldType>Shake</FieldType>
+    <X>1 0</X>
+    <Y>1 0</Y>
+  </Field>
+  <SystemAlpha>.9,79.99999 0</SystemAlpha>
+</Emitter>
+<Emitter>
+  <Name>Gloom_North</Name>
+  <SpawnMinActive>0 5,19.999998</SpawnMinActive>
+  <SpawnMaxLaunched>5</SpawnMaxLaunched>
+  <ParticleDuration>[20 30]</ParticleDuration>
+  <ParticleAlpha>.9,79.99999 0</ParticleAlpha>
+  <ParticleScale>[.7 1.1]</ParticleScale>
+  <EmitterOffsetX>0</EmitterOffsetX>
+  <EmitterOffsetY>-48</EmitterOffsetY>
+  <Image>IMAGE_PUFFSHROOM_PUFF1</Image>
+  <Field>
+    <FieldType>Away</FieldType>
+    <X>400 0</X>
+  </Field>
+  <Field>
+    <FieldType>Circle</FieldType>
+    <X>[-100 100]</X>
+  </Field>
+  <Field>
+    <FieldType>Shake</FieldType>
+    <X>1 0</X>
+    <Y>1 0</Y>
+  </Field>
+  <SystemAlpha>.9,79.99999 0</SystemAlpha>
+</Emitter>
+<Emitter>
+  <Name>Gloom_West</Name>
+  <SpawnMinActive>0 5,19.999998</SpawnMinActive>
+  <SpawnMaxLaunched>5</SpawnMaxLaunched>
+  <ParticleDuration>[20 30]</ParticleDuration>
+  <ParticleAlpha>.9,79.99999 0</ParticleAlpha>
+  <ParticleScale>[.7 1.1]</ParticleScale>
+  <EmitterOffsetX>-40</EmitterOffsetX>
+  <EmitterOffsetY>-5</EmitterOffsetY>
+  <Image>IMAGE_PUFFSHROOM_PUFF1</Image>
+  <Field>
+    <FieldType>Away</FieldType>
+    <X>400 0</X>
+  </Field>
+  <Field>
+    <FieldType>Circle</FieldType>
+    <X>[-100 100]</X>
+  </Field>
+  <Field>
+    <FieldType>Shake</FieldType>
+    <X>1 0</X>
+    <Y>1 0</Y>
+  </Field>
+  <SystemAlpha>.9,79.99999 0</SystemAlpha>
+</Emitter>
+<Emitter>
+  <Name>Gloom_SouthEast</Name>
+  <SpawnMinActive>0 5,19.999998</SpawnMinActive>
+  <SpawnMaxLaunched>5</SpawnMaxLaunched>
+  <ParticleDuration>[20 30]</ParticleDuration>
+  <ParticleAlpha>.9,79.99999 0</ParticleAlpha>
+  <ParticleScale>[.7 1.1]</ParticleScale>
+  <EmitterOffsetX>28</EmitterOffsetX>
+  <EmitterOffsetY>17</EmitterOffsetY>
+  <Image>IMAGE_PUFFSHROOM_PUFF1</Image>
+  <Field>
+    <FieldType>Away</FieldType>
+    <X>400 0</X>
+  </Field>
+  <Field>
+    <FieldType>Circle</FieldType>
+    <X>[-100 100]</X>
+  </Field>
+  <Field>
+    <FieldType>Shake</FieldType>
+    <X>1 0</X>
+    <Y>1 0</Y>
+  </Field>
+  <SystemAlpha>.9,79.99999 0</SystemAlpha>
+</Emitter>
+<Emitter>
+  <Name>Gloom_SouthWest</Name>
+  <SpawnMinActive>0 5,19.999998</SpawnMinActive>
+  <SpawnMaxLaunched>5</SpawnMaxLaunched>
+  <ParticleDuration>[20 30]</ParticleDuration>
+  <ParticleAlpha>.9,79.99999 0</ParticleAlpha>
+  <ParticleScale>[.7 1.1]</ParticleScale>
+  <EmitterOffsetX>-28</EmitterOffsetX>
+  <EmitterOffsetY>17</EmitterOffsetY>
+  <Image>IMAGE_PUFFSHROOM_PUFF1</Image>
+  <Field>
+    <FieldType>Away</FieldType>
+    <X>400 0</X>
+  </Field>
+  <Field>
+    <FieldType>Circle</FieldType>
+    <X>[-100 100]</X>
+  </Field>
+  <Field>
+    <FieldType>Shake</FieldType>
+    <X>1 0</X>
+    <Y>1 0</Y>
+  </Field>
+  <SystemAlpha>.9,79.99999 0</SystemAlpha>
+</Emitter>
+<Emitter>
+  <Name>Gloom_NorthEast</Name>
+  <SpawnMinActive>0 5,19.999998</SpawnMinActive>
+  <SpawnMaxLaunched>5</SpawnMaxLaunched>
+  <ParticleDuration>[20 30]</ParticleDuration>
+  <ParticleAlpha>.9,79.99999 0</ParticleAlpha>
+  <ParticleScale>[.7 1.1]</ParticleScale>
+  <EmitterOffsetX>34</EmitterOffsetX>
+  <EmitterOffsetY>-34</EmitterOffsetY>
+  <Image>IMAGE_PUFFSHROOM_PUFF1</Image>
+  <Field>
+    <FieldType>Away</FieldType>
+    <X>400 0</X>
+  </Field>
+  <Field>
+    <FieldType>Circle</FieldType>
+    <X>[-100 100]</X>
+  </Field>
+  <Field>
+    <FieldType>Shake</FieldType>
+    <X>1 0</X>
+    <Y>1 0</Y>
+  </Field>
+  <SystemAlpha>.9,79.99999 0</SystemAlpha>
+</Emitter>
+<Emitter>
+  <Name>Gloom_NorthWest</Name>
+  <SpawnMinActive>0 5,19.999998</SpawnMinActive>
+  <SpawnMaxLaunched>5</SpawnMaxLaunched>
+  <ParticleDuration>[20 30]</ParticleDuration>
+  <ParticleAlpha>.9,79.99999 0</ParticleAlpha>
+  <ParticleScale>[.7 1.1]</ParticleScale>
+  <EmitterOffsetX>-34</EmitterOffsetX>
+  <EmitterOffsetY>-34</EmitterOffsetY>
+  <Image>IMAGE_PUFFSHROOM_PUFF1</Image>
+  <Field>
+    <FieldType>Away</FieldType>
+    <X>400 0</X>
+  </Field>
+  <Field>
+    <FieldType>Circle</FieldType>
+    <X>[-100 100]</X>
+  </Field>
+  <Field>
+    <FieldType>Shake</FieldType>
+    <X>1 0</X>
+    <Y>1 0</Y>
+  </Field>
+  <SystemAlpha>.9,79.99999 0</SystemAlpha>
+</Emitter>

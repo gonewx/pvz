@@ -1,0 +1,12 @@
+<Emitter>
+  <ParticleDuration>[80 200]</ParticleDuration>
+  <ParticleAlpha>0 1,19.999998 1,79.99999 0</ParticleAlpha>
+  <ParticleScale>1</ParticleScale>
+  <ImageFrames>3</ImageFrames>
+  <EmitterBoxX>[23 800]</EmitterBoxX>
+  <EmitterBoxY>[28 74]</EmitterBoxY>
+  <Image>IMAGE_ICE_SPARKLES</Image>
+  <SystemLoops>1</SystemLoops>
+  <ParticlesDontFollow>1</ParticlesDontFollow>
+  <SpawnRate>12</SpawnRate>
+</Emitter>

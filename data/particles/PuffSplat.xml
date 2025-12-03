@@ -1,0 +1,23 @@
+<Emitter>
+  <Name>PuffSplatBits</Name>
+  <SpawnMinActive>[6 10]</SpawnMinActive>
+  <ParticleDuration>20</ParticleDuration>
+  <ParticleAlpha>1,79.99999 0</ParticleAlpha>
+  <ParticleScale>[.6 .8]</ParticleScale>
+  <EmitterRadius>[0 10]</EmitterRadius>
+  <EmitterType>Circle</EmitterType>
+  <SystemDuration>20</SystemDuration>
+  <Image>IMAGE_PUFFSHROOM_PUFF2</Image>
+  <Field>
+    <FieldType>Friction</FieldType>
+    <X>0,39.999996 .1</X>
+    <Y>0,39.999996 .1</Y>
+  </Field>
+  <Field>
+    <FieldType>Acceleration</FieldType>
+    <Y>3</Y>
+  </Field>
+  <ParticleSpinSpeed>[-200 200]</ParticleSpinSpeed>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <LaunchSpeed>[50 100]</LaunchSpeed>
+</Emitter>

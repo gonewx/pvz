@@ -135,8 +135,8 @@ ZombieEatParticleOffsetY = -20.0
 ### 资源文件
 
 粒子效果配置文件已存在：
-- `assets/effect/particles/WallnutEatLarge.xml` - 大碎屑效果
-- `assets/effect/particles/WallnutEatSmall.xml` - 小碎屑效果
+- `data/particles/WallnutEatLarge.xml` - 大碎屑效果
+- `data/particles/WallnutEatSmall.xml` - 小碎屑效果
 
 ---
 

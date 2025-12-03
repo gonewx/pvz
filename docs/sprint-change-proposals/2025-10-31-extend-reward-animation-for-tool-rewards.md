@@ -14,7 +14,7 @@
 
 ### 原始需求
 用户反馈：
-> "1-4 关卡胜利后，虽然解锁的是铲子，也需要有和前面关卡类似的奖励动画，只是植物卡换成铲子图片，卡包背景的粒子效果换成 `assets/effect/particles/AwardPickupArrow.xml`。"
+> "1-4 关卡胜利后，虽然解锁的是铲子，也需要有和前面关卡类似的奖励动画，只是植物卡换成铲子图片，卡包背景的粒子效果换成 `data/particles/AwardPickupArrow.xml`。"
 
 ### 问题核心
 - **当前状态**: Story 8.3 实现的 `RewardAnimationSystem` 只支持植物奖励（`PlantID` 字段）
@@ -417,7 +417,7 @@ loadingimages:
 ```
 
 **粒子效果配置文件**:
-- ✅ `assets/effect/particles/AwardPickupArrow.xml` 已存在（已验证）
+- ✅ `data/particles/AwardPickupArrow.xml` 已存在（已验证）
 - ✅ 包含 2 个发射器：
   1. `AwardGlow` - 光晕效果（IMAGE_AWARDPICKUPGLOW）
   2. `DownArrow` - 向下箭头（IMAGE_DOWNARROW，上下浮动动画）

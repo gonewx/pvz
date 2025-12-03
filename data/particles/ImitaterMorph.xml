@@ -1,0 +1,36 @@
+<Emitter>
+  <Name>ImitaterClouds</Name>
+  <SpawnMinActive>1</SpawnMinActive>
+  <ParticleDuration>60</ParticleDuration>
+  <ParticleAlpha>1,70 0,90</ParticleAlpha>
+  <ParticleScale>.3 1.2</ParticleScale>
+  <ImageFrames>2</ImageFrames>
+  <Image>IMAGE_IMITATERCLOUDS</Image>
+  <ParticleSpinSpeed>200</ParticleSpinSpeed>
+  <Animated>1</Animated>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+</Emitter>
+<Emitter>
+  <Name>ImitaterPuffs</Name>
+  <SpawnMinActive>0,19.999998 10,39.999996</SpawnMinActive>
+  <SpawnMaxLaunched>10</SpawnMaxLaunched>
+  <ParticleDuration>60</ParticleDuration>
+  <ParticleAlpha>0 1,19.999998</ParticleAlpha>
+  <ParticleScale>[.6 .8] [1.2 1.5]</ParticleScale>
+  <EmitterRadius>[1 10]</EmitterRadius>
+  <EmitterType>Circle</EmitterType>
+  <SystemDuration>60</SystemDuration>
+  <ImageFrames>8</ImageFrames>
+  <Image>IMAGE_IMITATERPUFFS</Image>
+  <Field>
+    <FieldType>Circle</FieldType>
+    <X>[-140 -70]</X>
+  </Field>
+  <Field>
+    <FieldType>Away</FieldType>
+    <X>[100 150]</X>
+  </Field>
+  <ParticleSpinSpeed>[300 400]</ParticleSpinSpeed>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <SystemAlpha>1,59.999996 0</SystemAlpha>
+</Emitter>

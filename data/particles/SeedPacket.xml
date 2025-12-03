@@ -1,0 +1,27 @@
+<Emitter>
+  <SpawnMinActive>1</SpawnMinActive>
+  <ParticleDuration>40</ParticleDuration>
+  <ParticleRed>1</ParticleRed>
+  <ParticleGreen>.9</ParticleGreen>
+  <ParticleBlue>.4</ParticleBlue>
+  <SystemDuration>100</SystemDuration>
+  <Image>IMAGE_DOWNARROW</Image>
+  <Field>
+    <FieldType>Position</FieldType>
+    <Y>0 Linear 10,50 Linear 0</Y>
+  </Field>
+  <SystemLoops>1</SystemLoops>
+  <ParticleLoops>1</ParticleLoops>
+</Emitter>
+<Emitter>
+  <Name>SeedPacketGlow</Name>
+  <SpawnMinActive>1</SpawnMinActive>
+  <ParticleDuration>100</ParticleDuration>
+  <ParticleAlpha>1</ParticleAlpha>
+  <ParticleScale>1</ParticleScale>
+  <SystemDuration>100</SystemDuration>
+  <EmitterOffsetY>62</EmitterOffsetY>
+  <Image>IMAGE_SEEDPACKETGLOW</Image>
+  <SystemLoops>1</SystemLoops>
+  <ParticleLoops>1</ParticleLoops>
+</Emitter>

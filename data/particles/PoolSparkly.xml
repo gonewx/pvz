@@ -1,0 +1,31 @@
+<Emitter>
+  <ParticleDuration>[20 80]</ParticleDuration>
+  <ParticleAlpha>.8</ParticleAlpha>
+  <ParticleScale>[.3 .6] [.4 .8],9.999999 [.5 1],50 [.4 .8],90 [.3 .6]</ParticleScale>
+  <EmitterBoxX>[0 FastInOutWeak 290]</EmitterBoxX>
+  <EmitterBoxY>[0 135]</EmitterBoxY>
+  <EmitterSkewX>-0.3</EmitterSkewX>
+  <Image>IMAGE_POOLSPARKLY</Image>
+  <Field>
+    <FieldType>Velocity</FieldType>
+    <X>[0 -10]</X>
+    <Y>[-2 2]</Y>
+  </Field>
+  <SystemLoops>1</SystemLoops>
+  <SpawnRate>150</SpawnRate>
+</Emitter>
+<Emitter>
+  <ParticleDuration>[20 60]</ParticleDuration>
+  <ParticleAlpha>.8</ParticleAlpha>
+  <ParticleScale>[.3 .6] [.4 .8],19.999998 [.5 1],50 [.4 .8],79.99999 [.3 .6]</ParticleScale>
+  <EmitterBoxX>[-330 260]</EmitterBoxX>
+  <EmitterBoxY>[0 135]</EmitterBoxY>
+  <Image>IMAGE_POOLSPARKLY</Image>
+  <Field>
+    <FieldType>Velocity</FieldType>
+    <X>[0 -5]</X>
+    <Y>[-2 2]</Y>
+  </Field>
+  <SystemLoops>1</SystemLoops>
+  <SpawnRate>20</SpawnRate>
+</Emitter>

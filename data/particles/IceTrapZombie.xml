@@ -1,0 +1,18 @@
+<Emitter>
+  <Name>IceTrapParticles</Name>
+  <SpawnMinActive>[10 12]</SpawnMinActive>
+  <ParticleAlpha>.8</ParticleAlpha>
+  <ParticleScale>[.6 .8]</ParticleScale>
+  <ImageFrames>4</ImageFrames>
+  <EmitterBoxX>[-20 0]</EmitterBoxX>
+  <EmitterBoxY>[-70 -10]</EmitterBoxY>
+  <Image>IMAGE_ICETRAP_PARTICLES</Image>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <SystemLoops>1</SystemLoops>
+  <ParticleLoops>1</ParticleLoops>
+</Emitter>
+<Emitter>
+  <Name>FadeOut</Name>
+  <ParticleAlpha>1 0</ParticleAlpha>
+  <CrossFadeDuration>25</CrossFadeDuration>
+</Emitter>

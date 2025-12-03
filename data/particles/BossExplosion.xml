@@ -1,0 +1,57 @@
+<Emitter>
+  <Name>Parts</Name>
+  <SpawnMinActive>0 [1 3],9.999999</SpawnMinActive>
+  <ParticleDuration>80</ParticleDuration>
+  <ParticleScale>[.7 .9]</ParticleScale>
+  <ImageFrames>5</ImageFrames>
+  <EmitterBoxX>[-35 35]</EmitterBoxX>
+  <EmitterBoxY>0</EmitterBoxY>
+  <Image>IMAGE_ZOMBOSS_PARTICLES</Image>
+  <Field>
+    <FieldType>Acceleration</FieldType>
+    <Y>13</Y>
+  </Field>
+  <ParticleSpinSpeed>[-720 720] 0</ParticleSpinSpeed>
+  <SystemAlpha>1,90 0</SystemAlpha>
+  <LaunchSpeed>600</LaunchSpeed>
+  <LaunchAngle>[130 200]</LaunchAngle>
+</Emitter>
+<Emitter>
+  <Name>BossExplosion1</Name>
+  <SpawnMinActive>1</SpawnMinActive>
+  <ParticleDuration>50</ParticleDuration>
+  <ParticleAlpha>.5,50 0</ParticleAlpha>
+  <ParticleScale>.7 .9,50 1</ParticleScale>
+  <Image>IMAGE_BOSSEXPLOSION1</Image>
+</Emitter>
+<Emitter>
+  <Name>BossExplosion2</Name>
+  <SpawnMinActive>1</SpawnMinActive>
+  <ParticleDuration>50</ParticleDuration>
+  <ParticleAlpha>1,79.99999 0</ParticleAlpha>
+  <ParticleScale>.7 .8,29.999998 .85</ParticleScale>
+  <Image>IMAGE_BOSSEXPLOSION2</Image>
+</Emitter>
+<Emitter>
+  <Name>BossExplosion3</Name>
+  <SpawnMinActive>1</SpawnMinActive>
+  <ParticleDuration>50</ParticleDuration>
+  <ParticleAlpha>0 1,29.999998 1,79.99999 0</ParticleAlpha>
+  <ParticleScale>[.5 .7] [.65 .85],50 [.7 .9]</ParticleScale>
+  <Image>IMAGE_BOSSEXPLOSION3</Image>
+  <ParticleSpinSpeed>0 [-20 20],50 0</ParticleSpinSpeed>
+</Emitter>
+<Emitter>
+  <Name>Flash</Name>
+  <SpawnMinActive>1</SpawnMinActive>
+  <SpawnMaxLaunched>1</SpawnMaxLaunched>
+  <ParticleDuration>50</ParticleDuration>
+  <ParticleRed>1</ParticleRed>
+  <ParticleGreen>[.5 1]</ParticleGreen>
+  <ParticleBlue>.1</ParticleBlue>
+  <ParticleAlpha>.2 0</ParticleAlpha>
+  <ParticleScale>1600</ParticleScale>
+  <SystemDuration>50</SystemDuration>
+  <Image>IMAGE_WHITEPIXEL</Image>
+  <FullScreen>1</FullScreen>
+</Emitter>

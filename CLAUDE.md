@@ -90,7 +90,7 @@ comp, ok := em.GetComponent(entity, reflect.TypeOf(&components.PlantComponent{})
 ### 粒子系统
 
 基于 XML 配置的粒子效果系统：
-- **配置文件**: `assets/effect/particles/` 下的 XML 文件（不可修改）
+- **配置文件**: `data/particles/` 下的 XML 文件（不可修改）
 - **组件**: `ParticleComponent` 存储粒子状态
 - **系统**: `ParticleSystem` 处理生成、更新和渲染
 - **批量渲染**: 使用 DrawTriangles 实现高性能批量渲染

@@ -1,0 +1,8 @@
+<Emitter>
+  <SpawnMinActive>1</SpawnMinActive>
+  <ParticleDuration>25</ParticleDuration>
+  <ParticleAlpha>0 1,39.999996 0</ParticleAlpha>
+  <EmitterOffsetX>25</EmitterOffsetX>
+  <EmitterOffsetY>35</EmitterOffsetY>
+  <Image>IMAGE_SEEDPACKETFLASH</Image>
+</Emitter>

@@ -1,0 +1,19 @@
+<Emitter>
+  <Name>PoolSplash</Name>
+  <SpawnMinActive>1,48.999996 0,50</SpawnMinActive>
+  <ParticleDuration>50</ParticleDuration>
+  <ParticleAlpha>1,95 0</ParticleAlpha>
+  <ParticleScale>1.5</ParticleScale>
+  <ParticleStretch>.1 .8,50 .5</ParticleStretch>
+  <SystemDuration>60</SystemDuration>
+  <EmitterOffsetX>0</EmitterOffsetX>
+  <EmitterOffsetY>0</EmitterOffsetY>
+  <Image>IMAGE_WATERPARTICLE</Image>
+  <Field>
+    <FieldType>Position</FieldType>
+    <Y>6 -20,50 -5</Y>
+  </Field>
+  <ImageCol>1</ImageCol>
+  <ImageRow>1</ImageRow>
+  <DieIfOverloaded>1</DieIfOverloaded>
+</Emitter>

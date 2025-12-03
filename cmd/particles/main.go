@@ -188,7 +188,7 @@ func NewParticleViewerGame() (*ParticleViewerGame, error) {
 
 // loadAllParticleEffectNames scans the particles directory and returns all effect names
 func loadAllParticleEffectNames() ([]string, error) {
-	particlesDir := "assets/effect/particles"
+	particlesDir := "data/particles"
 
 	// Scan directory for XML files
 	files, err := filepath.Glob(filepath.Join(particlesDir, "*.xml"))

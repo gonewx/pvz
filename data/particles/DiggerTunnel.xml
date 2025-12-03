@@ -1,0 +1,54 @@
+<Emitter>
+  <Name>Tossed Rocks</Name>
+  <ParticleDuration>[40 50]</ParticleDuration>
+  <ParticleAlpha>1,70 0</ParticleAlpha>
+  <ParticleScale>[.5 .8]</ParticleScale>
+  <ImageFrames>8</ImageFrames>
+  <EmitterBoxX>[-35 10]</EmitterBoxX>
+  <EmitterBoxY>0</EmitterBoxY>
+  <Image>IMAGE_DIRTSMALL</Image>
+  <Field>
+    <FieldType>Friction</FieldType>
+    <X>.02</X>
+    <Y>.02</Y>
+  </Field>
+  <Field>
+    <FieldType>Acceleration</FieldType>
+    <Y>10</Y>
+  </Field>
+  <Field>
+    <FieldType>Shake</FieldType>
+    <X>1 0</X>
+    <Y>1 0</Y>
+  </Field>
+  <ParticleSpinSpeed>[-720 720]</ParticleSpinSpeed>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <SystemLoops>1</SystemLoops>
+  <SpawnRate>20</SpawnRate>
+  <LaunchSpeed>[150 300]</LaunchSpeed>
+  <LaunchAngle>[140 175]</LaunchAngle>
+</Emitter>
+<Emitter>
+  <Name>Ground Rocks</Name>
+  <ParticleDuration>[60 80]</ParticleDuration>
+  <ParticleAlpha>1,70 0</ParticleAlpha>
+  <ParticleScale>0 [.3 .5],9.999999</ParticleScale>
+  <ImageFrames>4</ImageFrames>
+  <EmitterBoxX>[-40 -10]</EmitterBoxX>
+  <EmitterBoxY>[14 20]</EmitterBoxY>
+  <Image>IMAGE_DIRTBIG</Image>
+  <Field>
+    <FieldType>Velocity</FieldType>
+    <X>-1 0</X>
+  </Field>
+  <Field>
+    <FieldType>Shake</FieldType>
+    <X>2 0</X>
+    <Y>2 0</Y>
+  </Field>
+  <ParticleSpinSpeed>[-100 -700]</ParticleSpinSpeed>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <SystemLoops>1</SystemLoops>
+  <ParticlesDontFollow>1</ParticlesDontFollow>
+  <SpawnRate>2 4,12.5 6,25 2,37.5 0,50 8,62.5 2,75 6,87.5 4</SpawnRate>
+</Emitter>

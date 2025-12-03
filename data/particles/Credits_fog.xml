@@ -1,0 +1,20 @@
+<Emitter>
+  <ParticleDuration>100</ParticleDuration>
+  <ParticleAlpha>0 .7,19.999998 [.4 .7],70 0</ParticleAlpha>
+  <ParticleScale>.2 [.3 .4],39.999996 [.35 .45]</ParticleScale>
+  <EmitterRadius>[0 10]</EmitterRadius>
+  <EmitterType>Circle</EmitterType>
+  <SystemDuration>100</SystemDuration>
+  <ImageFrames>8</ImageFrames>
+  <Image>IMAGE_FOG</Image>
+  <Field>
+    <FieldType>Position</FieldType>
+    <X>0 [20 100],50 [-20 200]</X>
+    <Y>0 Linear [140 150]</Y>
+  </Field>
+  <ParticleSpinSpeed>[-100 100]</ParticleSpinSpeed>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <SystemLoops>1</SystemLoops>
+  <SpawnRate>15</SpawnRate>
+  <LaunchSpeed>[10]</LaunchSpeed>
+</Emitter>

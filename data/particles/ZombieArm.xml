@@ -1,0 +1,20 @@
+<Emitter>
+  <SpawnMinActive>1</SpawnMinActive>
+  <ParticleScale>.8</ParticleScale>
+  <SystemDuration>60</SystemDuration>
+  <Image>IMAGE_ZOMBIEARM</Image>
+  <Field>
+    <FieldType>Acceleration</FieldType>
+    <Y>15</Y>
+  </Field>
+  <Field>
+    <FieldType>GroundConstraint</FieldType>
+    <Y>60</Y>
+  </Field>
+  <ParticleSpinSpeed>[0 360] 0,39.999996</ParticleSpinSpeed>
+  <SystemAlpha>1,90 0</SystemAlpha>
+  <LaunchSpeed>40</LaunchSpeed>
+  <LaunchAngle>[90 185]</LaunchAngle>
+  <CollisionReflect>.5</CollisionReflect>
+  <CollisionSpin>[3 6]</CollisionSpin>
+</Emitter>

@@ -1,0 +1,26 @@
+<Emitter>
+  <ParticleDuration>[30 40]</ParticleDuration>
+  <ParticleAlpha>1,70 0</ParticleAlpha>
+  <ParticleScale>[.7 .9]</ParticleScale>
+  <SystemDuration>120</SystemDuration>
+  <ImageFrames>8</ImageFrames>
+  <EmitterBoxX>[-40 40]</EmitterBoxX>
+  <EmitterBoxY>[-25 25]</EmitterBoxY>
+  <Image>IMAGE_DIRTSMALL</Image>
+  <Field>
+    <FieldType>Friction</FieldType>
+    <X>.02</X>
+    <Y>.02</Y>
+  </Field>
+  <Field>
+    <FieldType>Acceleration</FieldType>
+    <Y>5</Y>
+  </Field>
+  <ParticleSpinSpeed>[-1720 1720]</ParticleSpinSpeed>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <SpawnRate>50,70 0,90</SpawnRate>
+  <SpawnMaxActive>0 10,39.999996 100,50 0,70</SpawnMaxActive>
+  <SystemAlpha>1,91.99999 0</SystemAlpha>
+  <LaunchSpeed>[100 200] [100 200],50 [100 200]</LaunchSpeed>
+  <LaunchAngle>[150 210]</LaunchAngle>
+</Emitter>

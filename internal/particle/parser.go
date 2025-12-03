@@ -20,7 +20,7 @@ import (
 //
 // Example usage:
 //
-//	config, err := ParseParticleXML("assets/effect/particles/Award.xml")
+//	config, err := ParseParticleXML("data/particles/Award.xml")
 //	if err != nil {
 //	    log.Fatal(err)
 //	}

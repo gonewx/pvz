@@ -1,0 +1,25 @@
+<Emitter>
+  <SpawnMaxLaunched>3</SpawnMaxLaunched>
+  <ParticleDuration>[30 60]</ParticleDuration>
+  <ParticleAlpha>1,79.99999 0</ParticleAlpha>
+  <ParticleScale>[.9 1.1]</ParticleScale>
+  <EmitterRadius>[0 10]</EmitterRadius>
+  <EmitterType>Circle</EmitterType>
+  <SystemDuration>200</SystemDuration>
+  <ImageFrames>5</ImageFrames>
+  <Image>IMAGE_WALLNUTPARTICLESSMALL</Image>
+  <Field>
+    <FieldType>Acceleration</FieldType>
+    <Y>8</Y>
+  </Field>
+  <Field>
+    <FieldType>Position</FieldType>
+    <X>0 [-40 10]</X>
+  </Field>
+  <ParticleSpinSpeed>[-1400 1400]</ParticleSpinSpeed>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <SpawnRate>40 0</SpawnRate>
+  <SystemAlpha>1,79.99999 0</SystemAlpha>
+  <LaunchSpeed>[100 120]</LaunchSpeed>
+  <LaunchAngle>[180 210]</LaunchAngle>
+</Emitter>

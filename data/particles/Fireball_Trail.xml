@@ -1,0 +1,29 @@
+<Emitter>
+  <Name>Fireball_Trail_ground</Name>
+  <SpawnMinActive>1</SpawnMinActive>
+  <SpawnMaxLaunched>1</SpawnMaxLaunched>
+  <ParticleDuration>[500 600]</ParticleDuration>
+  <ParticleAlpha>0 1,4.9999995 1,95 0</ParticleAlpha>
+  <ParticleScale>.1 [.5 1.1],19.999998</ParticleScale>
+  <ImageFrames>4</ImageFrames>
+  <Image>IMAGE_ZOMBIE_BOSS_FIREBALL_GROUNDPARTICLES</Image>
+</Emitter>
+<Emitter>
+  <Name>Fireball_Trail_embers</Name>
+  <ParticleDuration>[10 40]</ParticleDuration>
+  <ParticleAlpha>1,79.99999 0</ParticleAlpha>
+  <ParticleScale>[.2 .7]</ParticleScale>
+  <EmitterRadius>[0 30]</EmitterRadius>
+  <EmitterType>Circle</EmitterType>
+  <SystemDuration>400</SystemDuration>
+  <Image>IMAGE_ZOMBIE_BOSS_FIREBALL_ADDITIVEPARTICLE</Image>
+  <Field>
+    <FieldType>Velocity</FieldType>
+    <X>[-50 50] 0</X>
+  </Field>
+  <Additive>1</Additive>
+  <SpawnRate>15,79.99999 0</SpawnRate>
+  <SystemAlpha>1,79.99999 0</SystemAlpha>
+  <LaunchSpeed>[15 60] [10 30]</LaunchSpeed>
+  <LaunchAngle>[120 240]</LaunchAngle>
+</Emitter>

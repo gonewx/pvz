@@ -1,0 +1,24 @@
+<Emitter>
+  <Name>Planting</Name>
+  <SpawnMinActive>8</SpawnMinActive>
+  <ParticleDuration>30</ParticleDuration>
+  <ParticleScale>[.7 .9]</ParticleScale>
+  <EmitterRadius>[0 10]</EmitterRadius>
+  <SystemDuration>30</SystemDuration>
+  <ImageFrames>8</ImageFrames>
+  <Image>IMAGE_DIRTSMALL</Image>
+  <Field>
+    <FieldType>Friction</FieldType>
+    <X>.08</X>
+    <Y>.08</Y>
+  </Field>
+  <Field>
+    <FieldType>Acceleration</FieldType>
+    <Y>8</Y>
+  </Field>
+  <ParticleSpinSpeed>[-520 520]</ParticleSpinSpeed>
+  <RandomLaunchSpin>1</RandomLaunchSpin>
+  <SystemAlpha>1,85 0</SystemAlpha>
+  <LaunchSpeed>[300 500]</LaunchSpeed>
+  <LaunchAngle>[110 250]</LaunchAngle>
+</Emitter>
