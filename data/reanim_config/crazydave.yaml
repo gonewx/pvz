@@ -3,11 +3,14 @@ name: CrazyDave
 reanim_file: data/reanim/CrazyDave.reanim
 default_animation: anim_enter
 scale: 1
+# CenterOffset 设为 0，直接使用动画定义的坐标（与 SelectorScreen 一致）
+# Dave 作为 UI 元素渲染，不受摄像机影响
+center_offset: [0, 0]
 images:
     IMAGE_REANIM_CRAZYDAVE_BEARD: assets/reanim/CrazyDave_beard.png
     IMAGE_REANIM_CRAZYDAVE_BLINK1: assets/reanim/CrazyDave_blink1.png
     IMAGE_REANIM_CRAZYDAVE_BLINK2: assets/reanim/CrazyDave_blink2.png
-    IMAGE_REANIM_CRAZYDAVE_BODY1: assets/reanim/CrazyDave_body1.jpg
+    IMAGE_REANIM_CRAZYDAVE_BODY1: assets/reanim/CrazyDave_body1_.png
     IMAGE_REANIM_CRAZYDAVE_BODY2: assets/reanim/CrazyDave_body2.png
     IMAGE_REANIM_CRAZYDAVE_EYE: assets/reanim/CrazyDave_eye.png
     IMAGE_REANIM_CRAZYDAVE_EYEBROW: assets/reanim/CrazyDave_eyebrow.png
@@ -79,3 +82,166 @@ available_animations:
       display_name: talk_handing
     - name: anim_enterup
       display_name: enterup
+
+# 动画组合配置
+animation_combos:
+    - name: anim_enter
+      display_name: 入场
+      animations:
+          - anim_enter
+      binding_strategy: auto
+      loop: false
+      hidden_tracks:
+          - zombie_body
+          - zombie_upperleg1
+          - zombie_upperleg2
+          - zombie_lowerleg1
+          - zombie_lowerleg2
+          - zombie_foot1
+          - zombie_foot2
+          - zombie_arm1
+          - zombie_arm2
+          - zombie_hand1
+          - zombie_hand2
+          - zombie_head1
+          - zombie_head2
+          - grabhand1
+          - grabhand2
+
+    - name: anim_leave
+      display_name: 离场
+      animations:
+          - anim_leave
+      binding_strategy: auto
+      loop: false
+      hidden_tracks:
+          - zombie_body
+          - zombie_upperleg1
+          - zombie_upperleg2
+          - zombie_lowerleg1
+          - zombie_lowerleg2
+          - zombie_foot1
+          - zombie_foot2
+          - zombie_arm1
+          - zombie_arm2
+          - zombie_hand1
+          - zombie_hand2
+          - zombie_head1
+          - zombie_head2
+          - grabhand1
+          - grabhand2
+
+    - name: anim_idle
+      display_name: 空闲
+      animations:
+          - anim_idle
+      binding_strategy: auto
+      loop: true
+      hidden_tracks:
+          - zombie_body
+          - zombie_upperleg1
+          - zombie_upperleg2
+          - zombie_lowerleg1
+          - zombie_lowerleg2
+          - zombie_foot1
+          - zombie_foot2
+          - zombie_arm1
+          - zombie_arm2
+          - zombie_hand1
+          - zombie_hand2
+          - zombie_head1
+          - zombie_head2
+          - grabhand1
+          - grabhand2
+
+    - name: anim_crazy
+      display_name: 疯狂
+      animations:
+          - anim_crazy
+      binding_strategy: auto
+      loop: false
+      hidden_tracks:
+          - zombie_body
+          - zombie_upperleg1
+          - zombie_upperleg2
+          - zombie_lowerleg1
+          - zombie_lowerleg2
+          - zombie_foot1
+          - zombie_foot2
+          - zombie_arm1
+          - zombie_arm2
+          - zombie_hand1
+          - zombie_hand2
+          - zombie_head1
+          - zombie_head2
+          - grabhand1
+          - grabhand2
+
+    - name: anim_blahblah
+      display_name: 说话
+      animations:
+          - anim_blahblah
+      binding_strategy: auto
+      loop: true
+      hidden_tracks:
+          - zombie_body
+          - zombie_upperleg1
+          - zombie_upperleg2
+          - zombie_lowerleg1
+          - zombie_lowerleg2
+          - zombie_foot1
+          - zombie_foot2
+          - zombie_arm1
+          - zombie_arm2
+          - zombie_hand1
+          - zombie_hand2
+          - zombie_head1
+          - zombie_head2
+          - grabhand1
+          - grabhand2
+
+    - name: anim_smalltalk
+      display_name: 小声说话
+      animations:
+          - anim_smalltalk
+      binding_strategy: auto
+      loop: true
+      hidden_tracks:
+          - zombie_body
+          - zombie_upperleg1
+          - zombie_upperleg2
+          - zombie_lowerleg1
+          - zombie_lowerleg2
+          - zombie_foot1
+          - zombie_foot2
+          - zombie_arm1
+          - zombie_arm2
+          - zombie_hand1
+          - zombie_hand2
+          - zombie_head1
+          - zombie_head2
+          - grabhand1
+          - grabhand2
+
+    - name: anim_mediumtalk
+      display_name: 中声说话
+      animations:
+          - anim_mediumtalk
+      binding_strategy: auto
+      loop: true
+      hidden_tracks:
+          - zombie_body
+          - zombie_upperleg1
+          - zombie_upperleg2
+          - zombie_lowerleg1
+          - zombie_lowerleg2
+          - zombie_foot1
+          - zombie_foot2
+          - zombie_arm1
+          - zombie_arm2
+          - zombie_hand1
+          - zombie_hand2
+          - zombie_head1
+          - zombie_head2
+          - grabhand1
+          - grabhand2

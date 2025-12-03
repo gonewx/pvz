@@ -8,6 +8,7 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/modules"
 	"github.com/decker502/pvz/pkg/systems"
@@ -190,6 +191,9 @@ type GameScene struct {
 
 	// Story 19.6: 保龄球坚果滚动系统
 	bowlingNutSystem *systems.BowlingNutSystem // 保龄球坚果滚动系统
+
+	// Story 19.1: 疯狂戴夫对话系统
+	daveDialogueSystem *systems.DaveDialogueSystem // 疯狂戴夫对话系统
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -569,6 +573,10 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	scene.bowlingNutSystem = systems.NewBowlingNutSystem(scene.entityManager, rm)
 	log.Printf("[GameScene] Initialized bowling nut system")
 
+	// Story 19.1: 初始化疯狂戴夫对话系统
+	scene.daveDialogueSystem = systems.NewDaveDialogueSystem(scene.entityManager, scene.gameState, rm)
+	log.Printf("[GameScene] Initialized Dave dialogue system")
+
 	// Story 19.5: 根据关卡配置初始化传送带参数
 	if scene.gameState.CurrentLevel != nil && scene.gameState.CurrentLevel.ConveyorBelt != nil {
 		conveyorConfig := scene.gameState.CurrentLevel.ConveyorBelt
@@ -625,9 +633,43 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	scene.spawnPresetPlants()
 
 	// Story 19.4: 检查是否需要激活强引导模式（Level 1-5）
-	if scene.gameState.CurrentLevel != nil && len(scene.gameState.CurrentLevel.PresetPlants) > 0 {
-		log.Printf("[GameScene] Level has preset plants, activating guided tutorial mode")
-		scene.guidedTutorialSystem.SetActive(true)
+	// 并创建开场 Dave 对话
+	// Bug Fix: 如果有战斗存档，不在此处创建 Dave
+	// 因为用户可能选择"重玩关卡"导致场景重建，Dave 会重新创建
+	// 避免出现 Dave 入场一半就消失的问题
+	if scene.gameState.CurrentLevel != nil && len(scene.gameState.CurrentLevel.PresetPlants) > 0 && !scene.hasBattleSave {
+		log.Printf("[GameScene] Level has preset plants, creating opening Dave dialogue")
+
+		// 创建开场 Dave 对话（铲子教学阶段）
+		// 对话完成后才激活强引导模式
+		openingDialogueKeys := []string{
+			"CRAZY_DAVE_2400", // "你好，我的邻居！"
+			"CRAZY_DAVE_2401", // "我的名字叫疯狂的戴夫。"
+			"CRAZY_DAVE_2402", // "但你叫我疯狂的戴夫就行了。"
+			"CRAZY_DAVE_2403", // "听好，我有个惊喜要给你。"
+			"CRAZY_DAVE_2404", // "但是首先，我需要你清理一下草坪。"
+			"CRAZY_DAVE_2405", // "用你的铲子挖出那些植物！"
+			"CRAZY_DAVE_2406", // "开始挖吧！"
+		}
+
+		daveEntity, err := entities.NewCrazyDaveEntity(
+			scene.entityManager,
+			rm,
+			openingDialogueKeys,
+			func() {
+				// Dave 对话完成回调：激活强引导模式
+				log.Printf("[GameScene] Opening Dave dialogue completed, activating guided tutorial mode")
+				scene.guidedTutorialSystem.SetActive(true)
+			},
+		)
+
+		if err != nil {
+			log.Printf("[GameScene] ERROR: Failed to create opening Dave entity: %v", err)
+			// 跳过 Dave 对话，直接激活强引导模式
+			scene.guidedTutorialSystem.SetActive(true)
+		} else {
+			log.Printf("[GameScene] Opening Dave entity created: %d", daveEntity)
+		}
 	}
 
 	return scene
@@ -1027,6 +1069,10 @@ func (s *GameScene) Update(deltaTime float64) {
 	if s.bowlingNutSystem != nil {
 		s.bowlingNutSystem.Update(deltaTime) // 9.9. Update bowling nut rolling
 	}
+	// Story 19.1: Dave dialogue system (dialogue progression)
+	if s.daveDialogueSystem != nil {
+		s.daveDialogueSystem.Update(deltaTime) // 9.10. Update Dave dialogue
+	}
 	// Story 3.2: 植物预览系统 - 更新预览位置（双图像支持）
 	s.plantPreviewSystem.Update(deltaTime) // 10. Update plant preview position (dual-image support)
 	s.lawnGridSystem.Update(deltaTime)     // 10.5. Update lawn flash animation (Story 8.2)
@@ -1100,8 +1146,11 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 
 		// Layer 3: Draw plant cards (Story 3.1 架构优化)
 		// 在植物和僵尸下方渲染，符合原版PVZ设计
+		// Story 19.5: 保龄球模式不显示植物选择模块（使用传送带）
 		if s.plantSelectionModule != nil {
-			s.plantSelectionModule.Draw(screen)
+			if s.gameState.CurrentLevel == nil || s.gameState.CurrentLevel.InitialSun != 0 {
+				s.plantSelectionModule.Draw(screen)
+			}
 		}
 	}
 
@@ -1178,6 +1227,12 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	// Layer 10.1: Draw huge wave warning (Story 17.7)
 	// 红字警告 "A Huge Wave of Zombies is Approaching!"
 	s.drawHugeWaveWarning(screen)
+
+	// Layer 10.2: Draw Dave dialogue (Story 19.1)
+	// 疯狂戴夫对话气泡和文本
+	if s.daveDialogueSystem != nil {
+		s.daveDialogueSystem.Draw(screen)
+	}
 
 	// Layer 10.5: Draw reward panel (Story 8.3 + 8.4)
 	// Story 8.4重构：RewardAnimationSystem完全封装奖励面板渲染
@@ -1287,12 +1342,19 @@ func (s *GameScene) SetShovelSelected(selected bool) {
 
 // GetShovelSlotBounds 获取铲子槽位边界（屏幕坐标）
 // 实现 systems.ShovelStateProvider 接口
+// Story 19.5: 保龄球模式使用固定位置
 func (s *GameScene) GetShovelSlotBounds() image.Rectangle {
-	// 计算铲子 X 位置：紧挨选择栏右侧
-	shovelX := config.ShovelX // 默认值
-	if s.seedBank != nil {
+	// 计算铲子位置
+	var shovelX int
+	// Story 19.5: 保龄球模式（initialSun == 0）使用固定位置（左上角）
+	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.InitialSun == 0 {
+		shovelX = config.SeedBankX // 保龄球模式铲子在左上角
+	} else if s.seedBank != nil {
+		// 普通模式根据选择栏图片宽度动态计算
 		seedBankWidth := s.seedBank.Bounds().Dx()
 		shovelX = config.SeedBankX + seedBankWidth + config.ShovelGapFromSeedBank
+	} else {
+		shovelX = config.ShovelX // 默认值
 	}
 
 	// 铲子 Y 位置：与选择栏上对齐

@@ -35,7 +35,13 @@ func getSunFlashColor(timer float64, cycle float64) color.Color {
 
 // drawSeedBank renders the plant selection bar at the top left of the screen.
 // If the seed bank image is not loaded, it draws a simple rectangle as fallback.
+// Story 19.5: 保龄球模式使用传送带，不显示植物选择栏
 func (s *GameScene) drawSeedBank(screen *ebiten.Image) {
+	// Story 19.5: 保龄球模式（initialSun == 0）不显示植物选择栏
+	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.InitialSun == 0 {
+		return
+	}
+
 	// Story 8.8: 游戏冻结时隐藏植物选择栏
 	freezeEntities := ecs.GetEntitiesWith1[*components.GameFreezeComponent](s.entityManager)
 	if len(freezeEntities) > 0 {
@@ -122,6 +128,7 @@ func (s *GameScene) drawSunCounter(screen *ebiten.Image) {
 // The shovel will be used in future stories for removing plants.
 // Story 8.5: 1-1关（教学关卡）不显示铲子
 // Story 8.6: 检查铲子是否已解锁（1-4关完成后才解锁）
+// Story 19.5: 保龄球模式使用固定位置，不依赖选择栏
 // 铲子位置紧挨选择栏右侧，与选择栏上对齐
 func (s *GameScene) drawShovel(screen *ebiten.Image) {
 	// 教学关卡不显示铲子（玩家还不需要学习移除植物）
@@ -135,12 +142,17 @@ func (s *GameScene) drawShovel(screen *ebiten.Image) {
 		return
 	}
 
-	// 计算铲子 X 位置：紧挨选择栏右侧
-	shovelX := float64(config.ShovelX) // 默认值
-	if s.seedBank != nil {
-		// 根据选择栏图片宽度动态计算
+	// 计算铲子位置
+	var shovelX float64
+	// Story 19.5: 保龄球模式（initialSun == 0）使用固定位置（左上角）
+	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.InitialSun == 0 {
+		shovelX = float64(config.SeedBankX) // 保龄球模式铲子在左上角
+	} else if s.seedBank != nil {
+		// 普通模式根据选择栏图片宽度动态计算
 		seedBankWidth := float64(s.seedBank.Bounds().Dx())
 		shovelX = float64(config.SeedBankX) + seedBankWidth + float64(config.ShovelGapFromSeedBank)
+	} else {
+		shovelX = float64(config.ShovelX) // 默认值
 	}
 
 	// 铲子 Y 位置：与选择栏上对齐

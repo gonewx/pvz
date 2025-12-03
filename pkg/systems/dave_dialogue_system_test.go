@@ -159,7 +159,7 @@ func TestDaveDialogueSystem_StateTransitions(t *testing.T) {
 	// 创建一个 Dave 实体（Entering 状态）
 	entityID := em.CreateEntity()
 	em.AddComponent(entityID, &components.PositionComponent{
-		X: config.DaveEnterStartX, // 初始在屏幕外
+		X: 0, // 位置由动画控制，初始值设为 0
 		Y: config.DaveTargetY,
 	})
 	em.AddComponent(entityID, &components.DaveDialogueComponent{
@@ -173,31 +173,36 @@ func TestDaveDialogueSystem_StateTransitions(t *testing.T) {
 	em.AddComponent(entityID, &components.ReanimComponent{
 		CurrentAnimations: []string{"anim_enter"},
 		IsLooping:         false,
+		IsFinished:        false, // 动画尚未完成
 	})
 
 	// 测试 Entering → Talking
 	t.Run("Entering to Talking transition", func(t *testing.T) {
-		// 更新系统足够多次让 Dave 移动到目标位置
-		for i := 0; i < 10; i++ {
-			sys.Update(0.1) // 每次 0.1 秒
-		}
+		// 更新一次，状态应该保持 Entering（动画未完成）
+		sys.Update(0.1)
 
 		dialogueComp, _ := ecs.GetComponent[*components.DaveDialogueComponent](em, entityID)
-		posComp, _ := ecs.GetComponent[*components.PositionComponent](em, entityID)
+		if dialogueComp.State != components.DaveStateEntering {
+			t.Errorf("Expected state Entering before animation finishes, got %v", dialogueComp.State)
+		}
+
+		// 模拟动画完成
+		reanimComp, _ := ecs.GetComponent[*components.ReanimComponent](em, entityID)
+		reanimComp.IsFinished = true
+
+		// 再次更新，应该触发状态转换
+		sys.Update(0.1)
+
+		dialogueComp, _ = ecs.GetComponent[*components.DaveDialogueComponent](em, entityID)
 
 		// 验证状态转换
 		if dialogueComp.State != components.DaveStateTalking {
-			t.Errorf("Expected state Talking, got %v", dialogueComp.State)
+			t.Errorf("Expected state Talking after animation finishes, got %v", dialogueComp.State)
 		}
 
 		// 验证对话可见
 		if !dialogueComp.IsVisible {
 			t.Error("Expected dialogue to be visible")
-		}
-
-		// 验证位置到达目标
-		if posComp.X < config.DaveTargetX {
-			t.Errorf("Expected X >= %f, got %f", config.DaveTargetX, posComp.X)
 		}
 
 		// 验证加载了第一条对话
@@ -284,7 +289,7 @@ func TestDaveDialogueSystem_LeavingToHidden(t *testing.T) {
 	// 创建 Dave 实体（Leaving 状态）
 	entityID := em.CreateEntity()
 	em.AddComponent(entityID, &components.PositionComponent{
-		X: config.DaveTargetX,
+		X: 0, // 位置由动画控制
 		Y: config.DaveTargetY,
 	})
 	em.AddComponent(entityID, &components.DaveDialogueComponent{
@@ -296,12 +301,24 @@ func TestDaveDialogueSystem_LeavingToHidden(t *testing.T) {
 	})
 	em.AddComponent(entityID, &components.ReanimComponent{
 		CurrentAnimations: []string{"anim_leave"},
+		IsLooping:         false,
+		IsFinished:        false, // 动画尚未完成
 	})
 
-	// 更新系统让 Dave 移动出屏幕
-	for i := 0; i < 10; i++ {
-		sys.Update(0.1)
+	// 更新一次，状态应该保持 Leaving（动画未完成）
+	sys.Update(0.1)
+
+	dialogueComp, _ := ecs.GetComponent[*components.DaveDialogueComponent](em, entityID)
+	if dialogueComp.State != components.DaveStateLeaving {
+		t.Errorf("Expected state Leaving before animation finishes, got %v", dialogueComp.State)
 	}
+
+	// 模拟动画完成
+	reanimComp, _ := ecs.GetComponent[*components.ReanimComponent](em, entityID)
+	reanimComp.IsFinished = true
+
+	// 再次更新，应该触发状态转换和实体销毁
+	sys.Update(0.1)
 
 	// DestroyEntity 只标记实体待销毁，需要调用 RemoveMarkedEntities 才真正删除
 	em.RemoveMarkedEntities()
@@ -508,7 +525,7 @@ func TestDaveDialogueSystem_NilCallbackSafe(t *testing.T) {
 	// 创建没有回调的 Dave 实体（Leaving 状态）
 	entityID := em.CreateEntity()
 	em.AddComponent(entityID, &components.PositionComponent{
-		X: config.DaveTargetX,
+		X: 0, // 位置由动画控制
 		Y: config.DaveTargetY,
 	})
 	em.AddComponent(entityID, &components.DaveDialogueComponent{
@@ -518,6 +535,8 @@ func TestDaveDialogueSystem_NilCallbackSafe(t *testing.T) {
 	})
 	em.AddComponent(entityID, &components.ReanimComponent{
 		CurrentAnimations: []string{"anim_leave"},
+		IsLooping:         false,
+		IsFinished:        false, // 动画尚未完成
 	})
 
 	// 更新系统让 Dave 移动出屏幕（不应该 panic）
@@ -527,9 +546,15 @@ func TestDaveDialogueSystem_NilCallbackSafe(t *testing.T) {
 		}
 	}()
 
-	for i := 0; i < 10; i++ {
-		sys.Update(0.1)
-	}
+	// 更新一次，动画未完成
+	sys.Update(0.1)
+
+	// 模拟动画完成
+	reanimComp, _ := ecs.GetComponent[*components.ReanimComponent](em, entityID)
+	reanimComp.IsFinished = true
+
+	// 再次更新，应该触发状态转换和实体销毁（无 panic）
+	sys.Update(0.1)
 
 	// DestroyEntity 只标记实体待销毁，需要调用 RemoveMarkedEntities 才真正删除
 	em.RemoveMarkedEntities()
@@ -853,7 +878,7 @@ func TestDaveDialogueSystem_CompleteStateMachineFlow(t *testing.T) {
 	// 创建 Dave 实体（Entering 状态）
 	entityID := em.CreateEntity()
 	em.AddComponent(entityID, &components.PositionComponent{
-		X: config.DaveEnterStartX,
+		X: 0, // 位置由动画控制
 		Y: config.DaveTargetY,
 	})
 	em.AddComponent(entityID, &components.DaveDialogueComponent{
@@ -868,14 +893,29 @@ func TestDaveDialogueSystem_CompleteStateMachineFlow(t *testing.T) {
 	em.AddComponent(entityID, &components.ReanimComponent{
 		CurrentAnimations: []string{"anim_enter"},
 		IsLooping:         false,
+		IsFinished:        false, // 动画尚未完成
 	})
 
 	// 阶段 1: Entering → Talking
-	for i := 0; i < 10; i++ {
-		sys.Update(0.1)
-	}
+	// 更新一次，动画未完成，状态保持 Entering
+	sys.Update(0.1)
 
 	dialogueComp, exists := ecs.GetComponent[*components.DaveDialogueComponent](em, entityID)
+	if !exists {
+		t.Fatal("Entity should exist")
+	}
+	if dialogueComp.State != components.DaveStateEntering {
+		t.Errorf("Expected state Entering before animation finishes, got %v", dialogueComp.State)
+	}
+
+	// 模拟入场动画完成
+	reanimComp, _ := ecs.GetComponent[*components.ReanimComponent](em, entityID)
+	reanimComp.IsFinished = true
+
+	// 再次更新，触发状态转换
+	sys.Update(0.1)
+
+	dialogueComp, exists = ecs.GetComponent[*components.DaveDialogueComponent](em, entityID)
 	if !exists {
 		t.Fatal("Entity should exist after entering")
 	}
@@ -899,9 +939,23 @@ func TestDaveDialogueSystem_CompleteStateMachineFlow(t *testing.T) {
 	}
 
 	// 阶段 4: Leaving → Hidden (实体销毁)
-	for i := 0; i < 10; i++ {
-		sys.Update(0.1)
+	// 重置 IsFinished（playAnimation 切换到 anim_leave 后需要等动画完成）
+	reanimComp, _ = ecs.GetComponent[*components.ReanimComponent](em, entityID)
+	reanimComp.IsFinished = false
+
+	// 更新一次，动画未完成
+	sys.Update(0.1)
+
+	dialogueComp, _ = ecs.GetComponent[*components.DaveDialogueComponent](em, entityID)
+	if dialogueComp.State != components.DaveStateLeaving {
+		t.Errorf("Expected state Leaving before anim_leave finishes, got %v", dialogueComp.State)
 	}
+
+	// 模拟离场动画完成
+	reanimComp.IsFinished = true
+
+	// 再次更新，触发实体销毁
+	sys.Update(0.1)
 
 	// DestroyEntity 只标记实体待销毁，需要调用 RemoveMarkedEntities 才真正删除
 	em.RemoveMarkedEntities()

@@ -58,7 +58,7 @@ func NewDaveDialogueSystem(
 	}
 
 	// 加载对话字体（18号）
-	dialogueFont, err := rm.LoadFont("assets/fonts/SourceHanSansCN-Bold.otf", config.DaveDialogueFontSize)
+	dialogueFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.DaveDialogueFontSize)
 	if err != nil {
 		log.Printf("[DaveDialogueSystem] Warning: Failed to load dialogue font: %v", err)
 	}
@@ -111,6 +111,8 @@ func (s *DaveDialogueSystem) Update(dt float64) {
 }
 
 // updateEnteringState 处理入场状态
+// 动画文件 CrazyDave.reanim 已定义入场移动轨迹（anim_enter: X 从 -356.9 到 -55.9）
+// 因此不需要手动移动位置，只需检测动画完成状态
 func (s *DaveDialogueSystem) updateEnteringState(
 	entityID ecs.EntityID,
 	dialogueComp *components.DaveDialogueComponent,
@@ -119,17 +121,9 @@ func (s *DaveDialogueSystem) updateEnteringState(
 	hasReanimComp bool,
 	dt float64,
 ) {
-	// 移动 Dave 从起始位置到目标位置
-	targetX := config.DaveTargetX
-	if posComp.X < targetX {
-		posComp.X += config.DaveEnterSpeed * dt
-		if posComp.X >= targetX {
-			posComp.X = targetX
-		}
-	}
-
-	// 检查是否到达目标位置
-	if posComp.X >= targetX {
+	// 检测入场动画是否完成
+	// anim_enter 是非循环动画，播放完成后 IsFinished 会被设置为 true
+	if hasReanimComp && reanimComp.IsFinished {
 		// 切换到 Talking 状态
 		dialogueComp.State = components.DaveStateTalking
 		dialogueComp.IsVisible = true
@@ -137,10 +131,10 @@ func (s *DaveDialogueSystem) updateEnteringState(
 		// 加载第一条对话
 		s.loadCurrentDialogue(dialogueComp)
 
-		// 切换到 idle 动画
+		// 切换到 idle 动画（循环播放）
 		s.playAnimation(entityID, "anim_idle", true)
 
-		log.Printf("[DaveDialogueSystem] Entity %d: Entering → Talking, showing dialogue", entityID)
+		log.Printf("[DaveDialogueSystem] Entity %d: Entering → Talking, anim_enter finished", entityID)
 	}
 }
 
@@ -158,6 +152,8 @@ func (s *DaveDialogueSystem) updateTalkingState(
 }
 
 // updateLeavingState 处理离场状态
+// 动画文件 CrazyDave.reanim 已定义离场移动轨迹（anim_leave: X 从 -55.9 移动到屏幕外）
+// 因此不需要手动移动位置，只需检测动画完成状态
 func (s *DaveDialogueSystem) updateLeavingState(
 	entityID ecs.EntityID,
 	dialogueComp *components.DaveDialogueComponent,
@@ -166,17 +162,9 @@ func (s *DaveDialogueSystem) updateLeavingState(
 	hasReanimComp bool,
 	dt float64,
 ) {
-	// 移动 Dave 向左离开屏幕
-	targetX := config.DaveEnterStartX
-	if posComp.X > targetX {
-		posComp.X -= config.DaveEnterSpeed * dt
-		if posComp.X <= targetX {
-			posComp.X = targetX
-		}
-	}
-
-	// 检查是否离开屏幕
-	if posComp.X <= targetX {
+	// 检测离场动画是否完成
+	// anim_leave 是非循环动画，播放完成后 IsFinished 会被设置为 true
+	if hasReanimComp && reanimComp.IsFinished {
 		// 切换到 Hidden 状态
 		dialogueComp.State = components.DaveStateHidden
 
@@ -188,7 +176,7 @@ func (s *DaveDialogueSystem) updateLeavingState(
 		// 销毁实体
 		s.entityManager.DestroyEntity(entityID)
 
-		log.Printf("[DaveDialogueSystem] Entity %d: Leaving → Hidden, entity destroyed", entityID)
+		log.Printf("[DaveDialogueSystem] Entity %d: Leaving → Hidden, anim_leave finished, entity destroyed", entityID)
 	}
 }
 

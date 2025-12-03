@@ -42,10 +42,12 @@ func NewCrazyDaveEntity(
 		return 0, fmt.Errorf("dialogue keys cannot be empty")
 	}
 
-	// 入场动画起始位置（屏幕左侧外）
-	startX := config.DaveEnterStartX
-	// Y 坐标：目标位置
-	posY := config.DaveTargetY
+	// 位置由动画控制，初始设为 (0, 0)
+	// 动画文件 CrazyDave.reanim 中 anim_enter 定义了入场轨迹：
+	// - Dave_body1 轨道 X 从 -356.9 移动到 -55.9
+	// 因此不需要手动指定起始位置
+	startX := config.DaveTargetX // 0.0
+	posY := config.DaveTargetY   // 0.0
 
 	// 创建实体
 	entityID := em.CreateEntity()
@@ -74,6 +76,9 @@ func NewCrazyDaveEntity(
 		ScaleX:     1.0,
 		ScaleY:     1.0,
 	})
+
+	// 添加 UIComponent（Dave 作为 UI 元素，不受摄像机影响）
+	em.AddComponent(entityID, &components.UIComponent{})
 
 	// 添加 AnimationCommand 组件，播放入场动画
 	ecs.AddComponent(em, entityID, &components.AnimationCommandComponent{

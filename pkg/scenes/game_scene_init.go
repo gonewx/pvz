@@ -425,6 +425,8 @@ func (s *GameScene) showBattleSaveDialog() {
 			// Bug Fix: 用户确认继续后才删除存档
 			s.deleteBattleSave()
 			// 数据已在对话框显示前恢复，无需再加载
+			// Bug Fix: 如果关卡有预设植物，需要创建 Dave 对话
+			s.createOpeningDaveDialogueIfNeeded()
 			// 游戏将在下一帧正常更新
 		},
 		// "重玩关卡"按钮回调 - 重新创建场景
@@ -458,6 +460,57 @@ func (s *GameScene) showBattleSaveDialog() {
 
 	s.battleSaveDialogID = dialogEntity
 	log.Printf("[GameScene] 继续游戏对话框已显示 (对话框ID: %d)", dialogEntity)
+}
+
+// createOpeningDaveDialogueIfNeeded 如果需要则创建开场 Dave 对话
+//
+// Bug Fix: 当有战斗存档时，Dave 对话不在构造函数中创建
+// 此方法在用户选择"继续"后被调用，确保 Dave 对话在正确时机创建
+//
+// 条件：
+//   - 当前关卡有预设植物（PresetPlants）
+//   - Dave 对话系统已初始化
+func (s *GameScene) createOpeningDaveDialogueIfNeeded() {
+	// 检查是否需要创建 Dave 对话
+	if s.gameState.CurrentLevel == nil || len(s.gameState.CurrentLevel.PresetPlants) == 0 {
+		return
+	}
+
+	log.Printf("[GameScene] Creating opening Dave dialogue after battle save dialog")
+
+	// 创建开场 Dave 对话（铲子教学阶段）
+	openingDialogueKeys := []string{
+		"CRAZY_DAVE_2400", // "你好，我的邻居！"
+		"CRAZY_DAVE_2401", // "我的名字叫疯狂的戴夫。"
+		"CRAZY_DAVE_2402", // "但你叫我疯狂的戴夫就行了。"
+		"CRAZY_DAVE_2403", // "听好，我有个惊喜要给你。"
+		"CRAZY_DAVE_2404", // "但是首先，我需要你清理一下草坪。"
+		"CRAZY_DAVE_2405", // "用你的铲子挖出那些植物！"
+		"CRAZY_DAVE_2406", // "开始挖吧！"
+	}
+
+	daveEntity, err := entities.NewCrazyDaveEntity(
+		s.entityManager,
+		s.resourceManager,
+		openingDialogueKeys,
+		func() {
+			// Dave 对话完成回调：激活强引导模式
+			log.Printf("[GameScene] Opening Dave dialogue completed, activating guided tutorial mode")
+			if s.guidedTutorialSystem != nil {
+				s.guidedTutorialSystem.SetActive(true)
+			}
+		},
+	)
+
+	if err != nil {
+		log.Printf("[GameScene] ERROR: Failed to create opening Dave entity: %v", err)
+		// 跳过 Dave 对话，直接激活强引导模式
+		if s.guidedTutorialSystem != nil {
+			s.guidedTutorialSystem.SetActive(true)
+		}
+	} else {
+		log.Printf("[GameScene] Opening Dave entity created after battle save dialog: %d", daveEntity)
+	}
 }
 
 // skipOpeningAnimation 跳过开场动画
@@ -511,11 +564,17 @@ func (s *GameScene) skipOpeningAnimation() {
 		log.Printf("[GameScene] 恢复存档: 通知教学系统铺草皮已完成")
 	}
 
-	// 阳光生成：从存档恢复时直接启用
-	// 因为玩家已经开始游戏了（有存档数据），教学的初始阶段已过
+	// 阳光生成：从存档恢复时根据关卡配置决定是否启用
+	// Story 19.10: 保龄球关卡（initialSun == 0）禁用阳光生成
 	if s.sunSpawnSystem != nil {
-		s.sunSpawnSystem.Enable()
-		log.Printf("[GameScene] 恢复存档: 启用自动阳光生成")
+		if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.InitialSun == 0 {
+			// 保龄球关卡不使用阳光，保持禁用状态
+			log.Printf("[GameScene] 恢复存档: 保龄球关卡，阳光生成保持禁用")
+		} else {
+			// 普通关卡启用阳光生成
+			s.sunSpawnSystem.Enable()
+			log.Printf("[GameScene] 恢复存档: 启用自动阳光生成")
+		}
 	}
 
 	log.Printf("[GameScene] 跳过开场动画，直接进入游戏")

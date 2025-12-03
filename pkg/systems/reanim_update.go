@@ -177,6 +177,11 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 			if comp.ReanimName == "SelectorScreen" && (animName == "anim_idle" || animName == "anim_grass") {
 				log.Printf("[ReanimSystem] 🔍 处理动画: %s, 帧索引: %.2f", animName, comp.AnimationFrameIndices[animName])
 			}
+			// 🔍 调试：打印 CrazyDave 动画处理
+			if comp.ReanimName == "crazydave" || comp.ReanimName == "CrazyDave" {
+				log.Printf("[ReanimSystem] 🎩 CrazyDave 处理动画: %s, 帧索引: %.2f, FPS: %.1f",
+					animName, comp.AnimationFrameIndices[animName], comp.AnimationFPS)
+			}
 
 			// 检查是否暂停
 			if comp.AnimationPausedStates != nil {
@@ -210,6 +215,11 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 					if comp.ReanimName == "SelectorScreen" && animName == "anim_open" && int(currentFrame) < 15 {
 						log.Printf("[ReanimSystem] 🔍 检查 anim_open: currentFrame=%.2f, visibleCount=%d, isLooping=%v",
 							currentFrame, visibleCount, isLooping)
+					}
+					// 🔍 调试：打印 CrazyDave 非循环动画检查
+					if (comp.ReanimName == "crazydave" || comp.ReanimName == "CrazyDave") && int(currentFrame) < 5 {
+						log.Printf("[ReanimSystem] 🎩 CrazyDave 非循环检查: anim=%s, frame=%.2f, visibleCount=%d",
+							animName, currentFrame, visibleCount)
 					}
 
 					if visibleCount > 0 && int(currentFrame) >= visibleCount {

@@ -200,7 +200,8 @@ func applyDefaults(config *LevelConfig) {
 	}
 
 	// 如果 InitialSun 为0（未配置），设置为50（原版默认值）
-	if config.InitialSun == 0 {
+	// 注意：保龄球关卡（specialRules == "bowling"）有意设置 InitialSun 为 0，不应覆盖
+	if config.InitialSun == 0 && config.SpecialRules != "bowling" {
 		config.InitialSun = 50
 	}
 

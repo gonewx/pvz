@@ -375,32 +375,35 @@ const (
 	OpeningUsernameShadowOffsetY = 2.0
 
 	// ========== 疯狂戴夫对话系统配置参数（Story 19.1）（可手工调节） ==========
+	// 注意：Dave 使用 CenterOffset = (0, 0)，直接按动画定义的坐标渲染
+	// Dave 有 UIComponent，不受摄像机影响
+	//
+	// 动画文件定义了入场/离场的移动轨迹：
+	// - anim_enter: X 从 -356.9 移动到 -55.9（动画自带走动效果）
+	// - anim_idle: X 约 -55.9（静止位置）
+	// - anim_leave: X 从 -55.9 移动到屏幕外
+	//
+	// 因此 pos 保持 (0, 0)，让动画自己控制移动，无需代码干预
 
 	// DaveTargetX Dave 目标位置X坐标（屏幕坐标，像素）
-	// Dave 从屏幕左侧滑入后的停留位置
-	// 建议值范围：50.0 - 150.0
-	DaveTargetX = 80.0
+	// 保持为 0，动画本身会将 Dave 移动到正确位置
+	DaveTargetX = 0.0
 
 	// DaveTargetY Dave 目标位置Y坐标（屏幕坐标，像素）
-	// Dave 在屏幕下方，略高于底部
-	// 建议值范围：400.0 - 500.0
-	DaveTargetY = 420.0
+	// 保持为 0，使用动画定义的 Y 坐标
+	DaveTargetY = 0.0
 
 	// DaveEnterStartX Dave 入场动画起始X坐标（屏幕坐标，像素）
-	// 负值表示在屏幕左侧外
-	DaveEnterStartX = -200.0
-
-	// DaveEnterSpeed Dave 入场/离场动画移动速度（像素/秒）
-	// 建议值范围：200.0 - 400.0
-	DaveEnterSpeed = 300.0
+	// 保持为 0，因为动画本身定义了入场移动轨迹
+	DaveEnterStartX = 0.0
 
 	// DaveBubbleOffsetX 对话气泡相对于 Dave 位置的X偏移（像素）
-	// 正值向右偏移
-	DaveBubbleOffsetX = 180.0
+	// Dave 静止位置约 X=-55 到 X=298，中心约 X=121
+	// 气泡放在 Dave 右侧
+	DaveBubbleOffsetX = 320.0
 
 	// DaveBubbleOffsetY 对话气泡相对于 Dave 位置的Y偏移（像素）
-	// 负值向上偏移（气泡在 Dave 头顶上方）
-	DaveBubbleOffsetY = -300.0
+	DaveBubbleOffsetY = 20.0
 
 	// DaveBubblePaddingX 对话气泡内部水平内边距（像素）
 	DaveBubblePaddingX = 20.0

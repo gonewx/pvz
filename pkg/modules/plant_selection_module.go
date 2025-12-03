@@ -139,6 +139,13 @@ func (m *PlantSelectionModule) createPlantCards(levelConfig *config.LevelConfig,
 
 	// 获取本关可用植物列表
 	availablePlants := levelConfig.AvailablePlants
+
+	// Story 19.5: 保龄球模式（initialSun == 0）使用传送带，不创建植物卡片
+	if levelConfig.InitialSun == 0 && len(availablePlants) == 0 {
+		log.Printf("[PlantSelectionModule] Bowling mode: skipping plant card creation (uses conveyor belt)")
+		return nil
+	}
+
 	if len(availablePlants) == 0 {
 		// 如果未配置，使用默认植物列表（向日葵、豌豆射手、坚果墙、樱桃炸弹）
 		availablePlants = []string{"sunflower", "peashooter", "wallnut", "cherrybomb"}
