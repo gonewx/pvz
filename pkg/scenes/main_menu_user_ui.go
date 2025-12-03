@@ -678,6 +678,7 @@ func (m *MainMenuScene) showDeleteUserDialog(username string) {
 			if err != nil || len(users) == 0 {
 				// 没有用户了，清空木板显示并进入强制新建用户流程
 				m.isFirstLaunch = true
+				m.newUserDialogShown = true // 防止 Update 中重复调用 showNewUserDialogForFirstLaunch
 
 				// 清空木板显示：移除 UserSignComponent，恢复原始木牌图片
 				if m.userSignEntity != 0 {
@@ -753,18 +754,18 @@ func (m *MainMenuScene) showDeleteUserDialog(username string) {
 // Story 12.4: 删除最后一个用户后的特殊流程
 // 新建用户成功后，关闭两个对话框（新建用户对话框 + 用户管理对话框）
 func (m *MainMenuScene) showNewUserDialogAfterDeleteAll() {
+	// 保存用户管理对话框 ID，用于后续关闭
+	userManagementDialogID := m.currentUserDialogID
+
+	// 用于存储新建用户对话框 ID 的变量（供闭包使用）
+	var newUserDialogID ecs.EntityID
+	var newUserInputBoxID ecs.EntityID
+
 	// 创建新建用户对话框的回调
 	callback := func(result entities.NewUserDialogResult) {
 		if result.Confirmed {
 			// 用户点击"好"按钮
-			m.onNewUserCreated(result.Username)
-			// 新建用户成功后，关闭用户管理对话框
-			if m.currentUserDialogID != 0 {
-				m.entityManager.DestroyEntity(m.currentUserDialogID)
-				m.currentUserDialogID = 0
-				m.currentDialog = 0
-				log.Printf("[MainMenuScene] Closed user management dialog after creating new user")
-			}
+			m.onNewUserCreatedAfterDeleteAll(result.Username, newUserDialogID, newUserInputBoxID, userManagementDialogID)
 		} else {
 			// 用户点击"取消"按钮 - 强制创建，显示错误提示
 			log.Printf("[MainMenuScene] Cannot cancel: must create a user")
@@ -786,9 +787,106 @@ func (m *MainMenuScene) showNewUserDialogAfterDeleteAll() {
 		return
 	}
 
+	// 保存到闭包变量
+	newUserDialogID = dialogID
+	newUserInputBoxID = inputBoxID
+
 	m.currentInputBoxID = inputBoxID
-	m.currentDialog = dialogID // 设置 currentDialog，但不覆盖 currentUserDialogID
+	m.currentDialog = dialogID
 	log.Printf("[MainMenuScene] New user dialog opened after deleting all users (entity ID: %d)", dialogID)
+}
+
+// onNewUserCreatedAfterDeleteAll 处理删除所有用户后新建用户的回调
+// 需要关闭新建用户对话框和用户管理对话框
+func (m *MainMenuScene) onNewUserCreatedAfterDeleteAll(username string, newUserDialogID, newUserInputBoxID, userManagementDialogID ecs.EntityID) {
+	log.Printf("[MainMenuScene] Creating new user after delete all: %s", username)
+
+	gameState := getGameState()
+	saveManager := gameState.GetSaveManager()
+
+	// 验证用户名
+	if err := saveManager.ValidateUsername(username); err != nil {
+		log.Printf("[MainMenuScene] Invalid username: %v", err)
+		m.showErrorDialog("无效的用户名", err.Error())
+		return
+	}
+
+	// 创建用户
+	if err := saveManager.CreateUser(username); err != nil {
+		log.Printf("[MainMenuScene] Failed to create user: %v", err)
+		m.showErrorDialog("创建用户失败", err.Error())
+		return
+	}
+
+	log.Printf("[MainMenuScene] User created successfully: %s", username)
+
+	// 关闭新建用户对话框
+	if newUserInputBoxID != 0 {
+		m.entityManager.DestroyEntity(newUserInputBoxID)
+	}
+	if newUserDialogID != 0 {
+		m.entityManager.DestroyEntity(newUserDialogID)
+	}
+
+	// 关闭用户管理对话框
+	if userManagementDialogID != 0 {
+		m.entityManager.DestroyEntity(userManagementDialogID)
+	}
+
+	// 清理跟踪变量
+	m.currentUserDialogID = 0
+	m.currentInputBoxID = 0
+	m.currentDialog = 0
+
+	// 重新加载存档数据
+	if err := saveManager.Load(); err == nil {
+		m.currentLevel = saveManager.GetHighestLevel()
+		if m.currentLevel == "" {
+			m.currentLevel = "1-1"
+		}
+		m.hasStartedGame = saveManager.GetHasStartedGame()
+	}
+
+	// 记录是否首次启动，然后设置为 false
+	wasFirstLaunch := m.isFirstLaunch
+	m.isFirstLaunch = false
+
+	// 首次启动时，取消隐藏木牌和草叶子轨道
+	if wasFirstLaunch && m.selectorScreenEntity != 0 {
+		reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
+		if ok && reanimComp.HiddenTracks != nil {
+			delete(reanimComp.HiddenTracks, "woodsign1")
+			delete(reanimComp.HiddenTracks, "woodsign2")
+			delete(reanimComp.HiddenTracks, "woodsign3")
+			delete(reanimComp.HiddenTracks, "leaf1")
+			delete(reanimComp.HiddenTracks, "leaf2")
+			delete(reanimComp.HiddenTracks, "leaf3")
+			delete(reanimComp.HiddenTracks, "leaf4")
+			delete(reanimComp.HiddenTracks, "leaf5")
+			delete(reanimComp.HiddenTracks, "leaf22")
+			delete(reanimComp.HiddenTracks, "leaf_SelectorScreen_Leaves")
+			log.Printf("[MainMenuScene] First launch: unhidden woodsign and leaf tracks")
+
+			if reanimComp.AnimationLoopStates == nil {
+				reanimComp.AnimationLoopStates = make(map[string]bool)
+			}
+			reanimComp.AnimationLoopStates["anim_sign"] = false
+			reanimComp.AnimationLoopStates["anim_grass"] = true
+		}
+
+		if err := m.reanimSystem.AddAnimation(m.selectorScreenEntity, "anim_sign"); err != nil {
+			log.Printf("[MainMenuScene] Warning: Failed to add anim_sign: %v", err)
+		}
+		if err := m.reanimSystem.AddAnimation(m.selectorScreenEntity, "anim_grass"); err != nil {
+			log.Printf("[MainMenuScene] Warning: Failed to add anim_grass: %v", err)
+		}
+		log.Printf("[MainMenuScene] First launch: added anim_sign + anim_grass to existing animations")
+	}
+
+	m.updateButtonVisibility()
+	m.initUserSign()
+
+	log.Printf("[MainMenuScene] New user created after delete all, setup completed")
 }
 
 // refreshUserManagementDialog 刷新用户管理对话框的列表数据
