@@ -234,6 +234,13 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 			reanimComp.CenterOffsetX = 0
 			reanimComp.CenterOffsetY = 0
 			log.Printf("[MainMenuScene] SelectorScreen 使用左上角对齐（CenterOffset = 0）")
+
+			// 首次启动时，设置开场动画为非循环模式
+			// PlayAnimation 默认设置 IsLooping = true，需要手动覆盖
+			if scene.isFirstLaunch {
+				reanimComp.IsLooping = false
+				log.Printf("[MainMenuScene] First launch: set anim_open to non-looping mode")
+			}
 		}
 	}
 
@@ -410,6 +417,11 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 		if !m.cloudAnimsResumed && m.selectorScreenEntity != 0 {
 			reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
 			if ok && reanimComp.IsFinished {
+				// 初始化 AnimationLoopStates（如果需要）
+				if reanimComp.AnimationLoopStates == nil {
+					reanimComp.AnimationLoopStates = make(map[string]bool)
+				}
+
 				// 开场动画已完成，添加循环动画
 				cloudAnims := []string{"anim_cloud1", "anim_cloud2", "anim_cloud4",
 					"anim_cloud5", "anim_cloud6", "anim_cloud7"}

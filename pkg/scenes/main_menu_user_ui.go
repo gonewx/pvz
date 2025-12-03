@@ -115,6 +115,9 @@ func (m *MainMenuScene) onNewUserCreated(username string) {
 			log.Printf("[MainMenuScene] First launch: unhidden woodsign and leaf tracks")
 
 			// ✅ 设置动画循环状态
+			if reanimComp.AnimationLoopStates == nil {
+				reanimComp.AnimationLoopStates = make(map[string]bool)
+			}
 			reanimComp.AnimationLoopStates["anim_sign"] = false // 木牌动画非循环
 			reanimComp.AnimationLoopStates["anim_grass"] = true // 草动画循环
 		}

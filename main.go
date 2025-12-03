@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"image/color"
 	"io"
 	"log"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"github.com/decker502/pvz/pkg/scenes"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
 // Game represents the main game structure.
@@ -24,6 +26,11 @@ type Game struct {
 // This method is called every tick (typically 60 times per second).
 // Returns an error if the game should terminate.
 func (g *Game) Update() error {
+	// F11 切换全屏
+	if inpututil.IsKeyJustPressed(ebiten.KeyF11) {
+		ebiten.SetFullscreen(!ebiten.IsFullscreen())
+	}
+
 	// Calculate delta time (assuming 60 TPS - Ticks Per Second)
 	deltaTime := 1.0 / 60.0
 	g.sceneManager.Update(deltaTime)
@@ -34,6 +41,17 @@ func (g *Game) Update() error {
 // This method is called every frame to draw the game content.
 func (g *Game) Draw(screen *ebiten.Image) {
 	g.sceneManager.Draw(screen)
+}
+
+// DrawFinalScreen 实现 FinalScreenDrawer 接口
+// 用于控制全屏时 letterbox 的颜色
+func (g *Game) DrawFinalScreen(screen ebiten.FinalScreen, offscreen *ebiten.Image, geoM ebiten.GeoM) {
+	// 先填充黑色背景（全屏时左右两边为黑色）
+	screen.Fill(color.Black)
+	// 然后绘制游戏画面
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM = geoM
+	screen.DrawImage(offscreen, op)
 }
 
 // Layout returns the game's logical screen size.
@@ -165,6 +183,7 @@ func main() {
 	// Set window properties
 	ebiten.SetWindowSize(800, 600)
 	ebiten.SetWindowTitle("植物大战僵尸 - Go复刻版")
+	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	// Start the game loop
 	// This will call Update() and Draw() repeatedly until the window is closed
