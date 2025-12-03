@@ -60,6 +60,9 @@ type GuidedTutorialStateProvider interface {
 type ShovelSlotBoundsProvider interface {
 	// GetShovelSlotBounds 获取铲子槽位边界（屏幕坐标）
 	GetShovelSlotBounds() image.Rectangle
+	// GetShovelIconBounds 获取铲子图标边界（屏幕坐标）
+	// Story 19.x QA: 铲子图标在卡槽内居中，此方法返回图标的实际位置
+	GetShovelIconBounds() image.Rectangle
 }
 
 // shovelSlotBoundsProvider 铲子槽位边界提供者引用
@@ -244,30 +247,36 @@ func (s *GuidedTutorialSystem) updateArrowDisplay(guidedComp *components.GuidedT
 }
 
 // showShovelArrow 显示指向铲子的浮动箭头
+// Story 19.x QA: 箭头指向铲子本身而非卡槽
 func (s *GuidedTutorialSystem) showShovelArrow(guidedComp *components.GuidedTutorialComponent) {
 	// 如果箭头已存在，先隐藏
 	if guidedComp.ArrowEntityID != 0 {
 		s.hideArrow(guidedComp)
 	}
 
-	// 获取铲子槽位位置
+	// 获取铲子图标位置
 	if guidedTutorialShovelProvider == nil {
 		log.Printf("[GuidedTutorialSystem] Warning: ShovelSlotBoundsProvider not set, cannot show arrow")
 		return
 	}
 
-	bounds := guidedTutorialShovelProvider.GetShovelSlotBounds()
+	// Story 19.x QA: 使用 GetShovelIconBounds 获取铲子图标的实际位置
+	bounds := guidedTutorialShovelProvider.GetShovelIconBounds()
 
-	// 箭头位置说明：
-	// - 发射器位置直接使用铲子槽位左上角坐标
-	// - UpsellArrow.xml 中的 EmitterOffsetX=25, EmitterOffsetY=80 会自动调整粒子位置
-	// - 最终粒子出现在：(pos.X + 25, pos.Y + 80)，刚好在铲子下方指向铲子
-	// - 这是原版设计的正确位置，无需手动调整
-	arrowX := float64(bounds.Min.X) // 发射器X坐标（铲子左上角）
-	arrowY := float64(bounds.Min.Y) // 发射器Y坐标（铲子左上角）
+	// 计算箭头发射器位置
+	// UpsellArrow.xml 中 EmitterOffsetX=25, EmitterOffsetY=80
+	// 粒子实际出现位置 = 发射器位置 + (25, 80)
+	// 目标：箭头指向铲子的水平居中、底部位置
+	// 所以：发射器X = 铲子中心X - 25
+	//       发射器Y = 铲子底部Y - 80
+	shovelCenterX := float64(bounds.Min.X+bounds.Max.X) / 2
+	shovelBottomY := float64(bounds.Max.Y)
 
-	log.Printf("[GuidedTutorialSystem] Showing arrow at emitter(%.1f, %.1f), shovel bounds: %v",
-		arrowX, arrowY, bounds)
+	arrowX := shovelCenterX - 25 // 抵消 EmitterOffsetX
+	arrowY := shovelBottomY - 80 // 抵消 EmitterOffsetY
+
+	log.Printf("[GuidedTutorialSystem] Showing arrow: emitter(%.1f, %.1f), target shovel bottom center(%.1f, %.1f), icon bounds: %v",
+		arrowX, arrowY, shovelCenterX, shovelBottomY, bounds)
 
 	// 创建 UpsellArrow 粒子效果
 	arrowEntity, err := entities.CreateParticleEffect(

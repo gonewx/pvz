@@ -1387,6 +1387,39 @@ func (s *GameScene) GetShovelSlotBounds() image.Rectangle {
 	)
 }
 
+// GetShovelIconBounds 获取铲子图标边界（屏幕坐标）
+// 实现 systems.ShovelSlotBoundsProvider 接口
+// Story 19.x QA: 铲子图标在卡槽内居中显示，此方法返回图标的实际位置
+func (s *GameScene) GetShovelIconBounds() image.Rectangle {
+	slotBounds := s.GetShovelSlotBounds()
+
+	// 如果铲子图片不存在，返回卡槽边界
+	if s.shovel == nil {
+		return slotBounds
+	}
+
+	// 计算铲子图标在卡槽内的居中位置
+	shovelImgBounds := s.shovel.Bounds()
+	shovelImgW := shovelImgBounds.Dx()
+	shovelImgH := shovelImgBounds.Dy()
+
+	// 居中偏移：(卡槽尺寸 - 图片尺寸) / 2
+	slotW := config.ShovelWidth
+	slotH := config.ShovelHeight
+	offsetX := (slotW - shovelImgW) / 2
+	offsetY := (slotH - shovelImgH) / 2
+
+	iconX := slotBounds.Min.X + offsetX
+	iconY := slotBounds.Min.Y + offsetY
+
+	return image.Rect(
+		iconX,
+		iconY,
+		iconX+shovelImgW,
+		iconY+shovelImgH,
+	)
+}
+
 // ============================================================================
 // Story 19.3: GuidedTutorialStateProvider 接口实现
 // ============================================================================

@@ -174,6 +174,21 @@ func (s *GameScene) updateMouseCursor() {
 		}
 	}
 
+	// 5. Story 19.x QA: Check if hovering over shovel slot
+	// 铲子槽位悬停时显示手形光标
+	if cursorShape == ebiten.CursorShapeDefault && !s.shovelSelected {
+		mouseX, mouseY := ebiten.CursorPosition()
+		bounds := s.GetShovelSlotBounds()
+		if mouseX >= bounds.Min.X && mouseX <= bounds.Max.X &&
+			mouseY >= bounds.Min.Y && mouseY <= bounds.Max.Y {
+			// 检查铲子是否可用（已解锁或铲子教学关卡）
+			isShovelTutorialLevel := s.gameState.CurrentLevel != nil && len(s.gameState.CurrentLevel.PresetPlants) > 0
+			if s.gameState.IsToolUnlocked("shovel") || isShovelTutorialLevel {
+				cursorShape = ebiten.CursorShapePointer
+			}
+		}
+	}
+
 	// Only update cursor if shape changed (避免闪烁)
 	if cursorShape != s.lastCursorShape {
 		ebiten.SetCursorShape(cursorShape)
