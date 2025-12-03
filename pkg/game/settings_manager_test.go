@@ -2,7 +2,6 @@ package game
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/quasilyte/gdata/v2"
@@ -369,11 +368,7 @@ func TestGameStateSettingsManager(t *testing.T) {
 	os.Setenv("HOME", tempDir)
 	defer os.Setenv("HOME", originalHome)
 
-	// 确保 data/saves 目录存在
-	savesDir := filepath.Join("data", "saves")
-	if err := os.MkdirAll(savesDir, 0755); err != nil {
-		t.Logf("Warning: Failed to create saves dir: %v", err)
-	}
+	// 注意：SaveManager 现在使用 gdata API，不再需要 data/saves 目录
 
 	// 获取 GameState（触发初始化）
 	gs := GetGameState()

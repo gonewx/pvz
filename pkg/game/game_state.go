@@ -84,15 +84,8 @@ func GetGameState() *GameState {
 			lawnStrings = nil
 		}
 
-		// Story 8.6: 初始化保存管理器
-		saveManager, err := NewSaveManager("data/saves")
-		if err != nil {
-			log.Printf("[GameState] Warning: Failed to initialize SaveManager: %v", err)
-			// 如果保存管理器初始化失败，使用 nil（游戏可以运行，但无法保存进度）
-			saveManager = nil
-		}
-
 		// Story 20.1: 初始化 gdata Manager（跨平台存储）
+		// 注意：必须在 SaveManager 之前初始化，因为 SaveManager 需要 gdataManager
 		gdataManager, err := gdata.Open(gdata.Config{
 			AppName: "pvz_newx",
 		})
@@ -100,6 +93,14 @@ func GetGameState() *GameState {
 			log.Printf("[GameState] Warning: Failed to initialize gdata Manager: %v", err)
 			// 降级方案：gdataManager 为 nil，游戏继续运行
 			gdataManager = nil
+		}
+
+		// Story 20.3: 初始化保存管理器（必须在 gdataManager 之后）
+		saveManager, err := NewSaveManager(gdataManager)
+		if err != nil {
+			log.Printf("[GameState] Warning: Failed to initialize SaveManager: %v", err)
+			// 如果保存管理器初始化失败，使用 nil（游戏可以运行，但无法保存进度）
+			saveManager = nil
 		}
 
 		// Story 20.2: 初始化 SettingsManager（必须在 gdataManager 之后）

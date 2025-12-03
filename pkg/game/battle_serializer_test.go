@@ -1,18 +1,31 @@
 package game
 
 import (
-	"os"
-	"path/filepath"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/quasilyte/gdata/v2"
 )
+
+// createTestGdataManagerForBattle 创建用于测试的 gdata Manager
+func createTestGdataManagerForBattle(testName string) *gdata.Manager {
+	appName := fmt.Sprintf("pvz_battle_test_%s_%d", testName, time.Now().UnixNano())
+	manager, err := gdata.Open(gdata.Config{
+		AppName: appName,
+	})
+	if err != nil {
+		return nil
+	}
+	return manager
+}
 
 // TestBattleSerializer_NewBattleSerializer 测试创建序列化器
 func TestBattleSerializer_NewBattleSerializer(t *testing.T) {
-	serializer := NewBattleSerializer()
+	serializer := NewBattleSerializer(nil)
 	if serializer == nil {
 		t.Fatal("NewBattleSerializer returned nil")
 	}
@@ -20,11 +33,15 @@ func TestBattleSerializer_NewBattleSerializer(t *testing.T) {
 
 // TestBattleSerializer_SaveBattle_NilEntityManager 测试空 EntityManager
 func TestBattleSerializer_SaveBattle_NilEntityManager(t *testing.T) {
-	serializer := NewBattleSerializer()
-	gs := &GameState{Sun: 100}
-	tmpFile := filepath.Join(t.TempDir(), "test.sav")
+	gdataManager := createTestGdataManagerForBattle("nil_em")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
 
-	err := serializer.SaveBattle(nil, gs, tmpFile)
+	serializer := NewBattleSerializer(gdataManager)
+	gs := &GameState{Sun: 100}
+
+	err := serializer.SaveBattle(nil, gs, "testuser")
 	if err == nil {
 		t.Error("Expected error when EntityManager is nil")
 	}
@@ -32,20 +49,38 @@ func TestBattleSerializer_SaveBattle_NilEntityManager(t *testing.T) {
 
 // TestBattleSerializer_SaveBattle_NilGameState 测试空 GameState
 func TestBattleSerializer_SaveBattle_NilGameState(t *testing.T) {
-	serializer := NewBattleSerializer()
-	em := ecs.NewEntityManager()
-	tmpFile := filepath.Join(t.TempDir(), "test.sav")
+	gdataManager := createTestGdataManagerForBattle("nil_gs")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
 
-	err := serializer.SaveBattle(em, nil, tmpFile)
+	serializer := NewBattleSerializer(gdataManager)
+	em := ecs.NewEntityManager()
+
+	err := serializer.SaveBattle(em, nil, "testuser")
 	if err == nil {
 		t.Error("Expected error when GameState is nil")
 	}
 }
 
+// TestBattleSerializer_SaveBattle_NilGdataManager 测试空 gdata Manager
+func TestBattleSerializer_SaveBattle_NilGdataManager(t *testing.T) {
+	serializer := NewBattleSerializer(nil)
+	em := ecs.NewEntityManager()
+	gs := &GameState{Sun: 100}
+
+	err := serializer.SaveBattle(em, gs, "testuser")
+	if err == nil {
+		t.Error("Expected error when gdata manager is nil")
+	}
+}
+
 // TestBattleSerializer_SaveAndLoadBattle_Empty 测试空战斗状态
 func TestBattleSerializer_SaveAndLoadBattle_Empty(t *testing.T) {
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "test_battle.sav")
+	gdataManager := createTestGdataManagerForBattle("empty")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
 
 	// 创建空的 EntityManager 和基本 GameState
 	em := ecs.NewEntityManager()
@@ -57,19 +92,20 @@ func TestBattleSerializer_SaveAndLoadBattle_Empty(t *testing.T) {
 	}
 
 	// 保存
-	serializer := NewBattleSerializer()
-	err := serializer.SaveBattle(em, gs, filePath)
+	serializer := NewBattleSerializer(gdataManager)
+	err := serializer.SaveBattle(em, gs, "testuser")
 	if err != nil {
 		t.Fatalf("SaveBattle failed: %v", err)
 	}
 
-	// 验证文件存在
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		t.Fatal("Save file was not created")
+	// 验证数据存在
+	battleKey := "testuser" + BattleSaveKeySuffix
+	if !gdataManager.ObjectPropExists(savesObject, battleKey) {
+		t.Fatal("Save data was not created in gdata")
 	}
 
 	// 加载
-	data, err := serializer.LoadBattle(filePath)
+	data, err := serializer.LoadBattle("testuser")
 	if err != nil {
 		t.Fatalf("LoadBattle failed: %v", err)
 	}
@@ -91,8 +127,10 @@ func TestBattleSerializer_SaveAndLoadBattle_Empty(t *testing.T) {
 
 // TestBattleSerializer_SaveAndLoadBattle_WithPlants 测试带植物的战斗状态
 func TestBattleSerializer_SaveAndLoadBattle_WithPlants(t *testing.T) {
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "test_battle.sav")
+	gdataManager := createTestGdataManagerForBattle("with_plants")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
 
 	em := ecs.NewEntityManager()
 	gs := &GameState{
@@ -121,14 +159,14 @@ func TestBattleSerializer_SaveAndLoadBattle_WithPlants(t *testing.T) {
 	ecs.AddComponent(em, plant2, &components.HealthComponent{CurrentHealth: 200, MaxHealth: 200})
 
 	// 保存
-	serializer := NewBattleSerializer()
-	err := serializer.SaveBattle(em, gs, filePath)
+	serializer := NewBattleSerializer(gdataManager)
+	err := serializer.SaveBattle(em, gs, "testuser")
 	if err != nil {
 		t.Fatalf("SaveBattle failed: %v", err)
 	}
 
 	// 加载
-	data, err := serializer.LoadBattle(filePath)
+	data, err := serializer.LoadBattle("testuser")
 	if err != nil {
 		t.Fatalf("LoadBattle failed: %v", err)
 	}
@@ -158,8 +196,10 @@ func TestBattleSerializer_SaveAndLoadBattle_WithPlants(t *testing.T) {
 
 // TestBattleSerializer_SaveAndLoadBattle_WithZombies 测试带僵尸的战斗状态
 func TestBattleSerializer_SaveAndLoadBattle_WithZombies(t *testing.T) {
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "test_battle.sav")
+	gdataManager := createTestGdataManagerForBattle("with_zombies")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
 
 	em := ecs.NewEntityManager()
 	gs := &GameState{
@@ -185,14 +225,14 @@ func TestBattleSerializer_SaveAndLoadBattle_WithZombies(t *testing.T) {
 	ecs.AddComponent(em, zombie2, &components.ZombieTargetLaneComponent{TargetRow: 2})
 
 	// 保存
-	serializer := NewBattleSerializer()
-	err := serializer.SaveBattle(em, gs, filePath)
+	serializer := NewBattleSerializer(gdataManager)
+	err := serializer.SaveBattle(em, gs, "testuser")
 	if err != nil {
 		t.Fatalf("SaveBattle failed: %v", err)
 	}
 
 	// 加载
-	data, err := serializer.LoadBattle(filePath)
+	data, err := serializer.LoadBattle("testuser")
 	if err != nil {
 		t.Fatalf("LoadBattle failed: %v", err)
 	}
@@ -222,8 +262,10 @@ func TestBattleSerializer_SaveAndLoadBattle_WithZombies(t *testing.T) {
 
 // TestBattleSerializer_SaveAndLoadBattle_WithLawnmowers 测试带除草车的战斗状态
 func TestBattleSerializer_SaveAndLoadBattle_WithLawnmowers(t *testing.T) {
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "test_battle.sav")
+	gdataManager := createTestGdataManagerForBattle("with_lawnmowers")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
 
 	em := ecs.NewEntityManager()
 	gs := &GameState{
@@ -247,14 +289,14 @@ func TestBattleSerializer_SaveAndLoadBattle_WithLawnmowers(t *testing.T) {
 	}
 
 	// 保存
-	serializer := NewBattleSerializer()
-	err := serializer.SaveBattle(em, gs, filePath)
+	serializer := NewBattleSerializer(gdataManager)
+	err := serializer.SaveBattle(em, gs, "testuser")
 	if err != nil {
 		t.Fatalf("SaveBattle failed: %v", err)
 	}
 
 	// 加载
-	data, err := serializer.LoadBattle(filePath)
+	data, err := serializer.LoadBattle("testuser")
 	if err != nil {
 		t.Fatalf("LoadBattle failed: %v", err)
 	}
@@ -282,83 +324,52 @@ func TestBattleSerializer_SaveAndLoadBattle_WithLawnmowers(t *testing.T) {
 	}
 }
 
-// TestBattleSerializer_LoadBattle_FileNotFound 测试加载不存在的文件
-func TestBattleSerializer_LoadBattle_FileNotFound(t *testing.T) {
-	serializer := NewBattleSerializer()
-	_, err := serializer.LoadBattle("/nonexistent/path/save.sav")
+// TestBattleSerializer_LoadBattle_NotFound 测试加载不存在的存档
+func TestBattleSerializer_LoadBattle_NotFound(t *testing.T) {
+	gdataManager := createTestGdataManagerForBattle("not_found")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	serializer := NewBattleSerializer(gdataManager)
+	_, err := serializer.LoadBattle("nonexistent")
 	if err == nil {
-		t.Error("Expected error when loading non-existent file")
+		t.Error("Expected error when loading non-existent save")
 	}
 }
 
-// TestBattleSerializer_LoadBattle_CorruptedFile 测试加载损坏的文件
-func TestBattleSerializer_LoadBattle_CorruptedFile(t *testing.T) {
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "corrupted.sav")
+// TestBattleSerializer_LoadBattle_Corrupted 测试加载损坏的存档
+func TestBattleSerializer_LoadBattle_Corrupted(t *testing.T) {
+	gdataManager := createTestGdataManagerForBattle("corrupted")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
 
 	// 写入无效数据
-	err := os.WriteFile(filePath, []byte("invalid gob data"), 0644)
-	if err != nil {
-		t.Fatalf("Failed to write corrupted file: %v", err)
+	battleKey := "testuser" + BattleSaveKeySuffix
+	if err := gdataManager.SaveObjectProp(savesObject, battleKey, []byte("invalid gob data")); err != nil {
+		t.Fatalf("Failed to create corrupted save: %v", err)
 	}
 
-	serializer := NewBattleSerializer()
-	_, err = serializer.LoadBattle(filePath)
+	serializer := NewBattleSerializer(gdataManager)
+	_, err := serializer.LoadBattle("testuser")
 	if err == nil {
-		t.Error("Expected error when loading corrupted file")
+		t.Error("Expected error when loading corrupted save")
 	}
 }
 
-// TestBattleSerializer_LoadBattle_VersionMismatch 测试版本不匹配
-func TestBattleSerializer_LoadBattle_VersionMismatch(t *testing.T) {
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "old_version.sav")
-
-	em := ecs.NewEntityManager()
-	gs := &GameState{
-		Sun:          100,
-		SpawnedWaves: []bool{true},
-		CurrentLevel: &config.LevelConfig{ID: "1-1"},
-	}
-
-	// 保存当前版本
-	serializer := NewBattleSerializer()
-	err := serializer.SaveBattle(em, gs, filePath)
-	if err != nil {
-		t.Fatalf("SaveBattle failed: %v", err)
-	}
-
-	// 修改 BattleSaveVersion 并加载（模拟版本不匹配）
-	// 由于无法直接修改常量，这里通过直接创建一个旧版本存档来测试
-	// 实际上，这个测试验证的是版本检查逻辑
-	data, err := serializer.LoadBattle(filePath)
-	if err != nil {
-		t.Fatalf("LoadBattle failed: %v", err)
-	}
-	if data.Version != BattleSaveVersion {
-		t.Errorf("Unexpected version: expected %d, got %d", BattleSaveVersion, data.Version)
-	}
-}
-
-// TestBattleSerializer_SaveBattle_InvalidPath 测试保存到无效路径
-func TestBattleSerializer_SaveBattle_InvalidPath(t *testing.T) {
-	serializer := NewBattleSerializer()
-	em := ecs.NewEntityManager()
-	gs := &GameState{
-		Sun:          100,
-		SpawnedWaves: []bool{},
-		CurrentLevel: &config.LevelConfig{ID: "1-1"},
-	}
-
-	err := serializer.SaveBattle(em, gs, "/nonexistent/directory/test.sav")
+// TestBattleSerializer_LoadBattle_NilGdataManager 测试空 gdata Manager
+func TestBattleSerializer_LoadBattle_NilGdataManager(t *testing.T) {
+	serializer := NewBattleSerializer(nil)
+	_, err := serializer.LoadBattle("testuser")
 	if err == nil {
-		t.Error("Expected error when saving to invalid path")
+		t.Error("Expected error when gdata manager is nil")
 	}
 }
 
 // TestBattleSerializer_CollectLevelState 测试关卡状态收集
 func TestBattleSerializer_CollectLevelState(t *testing.T) {
-	serializer := NewBattleSerializer()
+	serializer := NewBattleSerializer(nil)
 	saveData := NewBattleSaveData()
 
 	gs := &GameState{
@@ -474,8 +485,10 @@ func TestBehaviorTypeToString(t *testing.T) {
 
 // TestBattleSerializer_SaveAndLoadBattle_WithSuns 测试带阳光的战斗状态
 func TestBattleSerializer_SaveAndLoadBattle_WithSuns(t *testing.T) {
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "test_battle.sav")
+	gdataManager := createTestGdataManagerForBattle("with_suns")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
 
 	em := ecs.NewEntityManager()
 	gs := &GameState{
@@ -503,14 +516,14 @@ func TestBattleSerializer_SaveAndLoadBattle_WithSuns(t *testing.T) {
 	})
 
 	// 保存
-	serializer := NewBattleSerializer()
-	err := serializer.SaveBattle(em, gs, filePath)
+	serializer := NewBattleSerializer(gdataManager)
+	err := serializer.SaveBattle(em, gs, "testuser")
 	if err != nil {
 		t.Fatalf("SaveBattle failed: %v", err)
 	}
 
 	// 加载
-	data, err := serializer.LoadBattle(filePath)
+	data, err := serializer.LoadBattle("testuser")
 	if err != nil {
 		t.Fatalf("LoadBattle failed: %v", err)
 	}
@@ -537,8 +550,10 @@ func TestBattleSerializer_SaveAndLoadBattle_WithSuns(t *testing.T) {
 
 // TestBattleSerializer_SaveAndLoadBattle_WithProjectiles 测试带子弹的战斗状态
 func TestBattleSerializer_SaveAndLoadBattle_WithProjectiles(t *testing.T) {
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "test_battle.sav")
+	gdataManager := createTestGdataManagerForBattle("with_projectiles")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
 
 	em := ecs.NewEntityManager()
 	gs := &GameState{
@@ -560,14 +575,14 @@ func TestBattleSerializer_SaveAndLoadBattle_WithProjectiles(t *testing.T) {
 	ecs.AddComponent(em, proj2, &components.CollisionComponent{Width: 20, Height: 20})
 
 	// 保存
-	serializer := NewBattleSerializer()
-	err := serializer.SaveBattle(em, gs, filePath)
+	serializer := NewBattleSerializer(gdataManager)
+	err := serializer.SaveBattle(em, gs, "testuser")
 	if err != nil {
 		t.Fatalf("SaveBattle failed: %v", err)
 	}
 
 	// 加载
-	data, err := serializer.LoadBattle(filePath)
+	data, err := serializer.LoadBattle("testuser")
 	if err != nil {
 		t.Fatalf("LoadBattle failed: %v", err)
 	}
@@ -590,8 +605,10 @@ func TestBattleSerializer_SaveAndLoadBattle_WithProjectiles(t *testing.T) {
 
 // TestBattleSerializer_SaveAndLoadBattle_CompleteScenario 测试完整的战斗场景
 func TestBattleSerializer_SaveAndLoadBattle_CompleteScenario(t *testing.T) {
-	tmpDir := t.TempDir()
-	filePath := filepath.Join(tmpDir, "complete_battle.sav")
+	gdataManager := createTestGdataManagerForBattle("complete")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
 
 	em := ecs.NewEntityManager()
 	gs := &GameState{
@@ -645,14 +662,14 @@ func TestBattleSerializer_SaveAndLoadBattle_CompleteScenario(t *testing.T) {
 	}
 
 	// 保存
-	serializer := NewBattleSerializer()
-	err := serializer.SaveBattle(em, gs, filePath)
+	serializer := NewBattleSerializer(gdataManager)
+	err := serializer.SaveBattle(em, gs, "testuser")
 	if err != nil {
 		t.Fatalf("SaveBattle failed: %v", err)
 	}
 
 	// 加载
-	data, err := serializer.LoadBattle(filePath)
+	data, err := serializer.LoadBattle("testuser")
 	if err != nil {
 		t.Fatalf("LoadBattle failed: %v", err)
 	}
@@ -709,5 +726,155 @@ func TestBattleSerializer_SaveAndLoadBattle_CompleteScenario(t *testing.T) {
 	}
 	if !foundBuckethead {
 		t.Error("Buckethead zombie not found in saved data")
+	}
+}
+
+// --- 教学数据测试 (Story 20.3 QA Fix) ---
+
+// TestBattleSerializer_CollectTutorialData_NoTutorial 测试非教学关卡
+func TestBattleSerializer_CollectTutorialData_NoTutorial(t *testing.T) {
+	serializer := NewBattleSerializer(nil)
+	em := ecs.NewEntityManager()
+
+	// 没有教学组件的实体
+	tutorialData := serializer.collectTutorialData(em)
+
+	if tutorialData != nil {
+		t.Error("Expected nil tutorial data for non-tutorial level")
+	}
+}
+
+// TestBattleSerializer_CollectTutorialData_WithTutorial 测试教学关卡
+func TestBattleSerializer_CollectTutorialData_WithTutorial(t *testing.T) {
+	serializer := NewBattleSerializer(nil)
+	em := ecs.NewEntityManager()
+
+	// 创建教学实体
+	tutorialEntity := em.CreateEntity()
+	ecs.AddComponent(em, tutorialEntity, &components.TutorialComponent{
+		CurrentStepIndex: 3,
+		IsActive:         true,
+		CompletedSteps: map[string]bool{
+			"step1": true,
+			"step2": true,
+			"step3": true,
+		},
+	})
+
+	// 创建一些植物实体
+	plant1 := em.CreateEntity()
+	ecs.AddComponent(em, plant1, &components.PlantComponent{
+		PlantType: components.PlantSunflower,
+	})
+
+	plant2 := em.CreateEntity()
+	ecs.AddComponent(em, plant2, &components.PlantComponent{
+		PlantType: components.PlantPeashooter,
+	})
+
+	plant3 := em.CreateEntity()
+	ecs.AddComponent(em, plant3, &components.PlantComponent{
+		PlantType: components.PlantSunflower,
+	})
+
+	// 收集教学数据
+	tutorialData := serializer.collectTutorialData(em)
+
+	if tutorialData == nil {
+		t.Fatal("Expected tutorial data, got nil")
+	}
+
+	if tutorialData.CurrentStepIndex != 3 {
+		t.Errorf("Expected CurrentStepIndex 3, got %d", tutorialData.CurrentStepIndex)
+	}
+
+	if !tutorialData.IsActive {
+		t.Error("Expected IsActive to be true")
+	}
+
+	if len(tutorialData.CompletedSteps) != 3 {
+		t.Errorf("Expected 3 completed steps, got %d", len(tutorialData.CompletedSteps))
+	}
+
+	if tutorialData.PlantCount != 3 {
+		t.Errorf("Expected PlantCount 3, got %d", tutorialData.PlantCount)
+	}
+
+	if tutorialData.SunflowerCount != 2 {
+		t.Errorf("Expected SunflowerCount 2, got %d", tutorialData.SunflowerCount)
+	}
+}
+
+// TestBattleSerializer_SaveAndLoadBattle_WithTutorial 测试带教学数据的存档
+func TestBattleSerializer_SaveAndLoadBattle_WithTutorial(t *testing.T) {
+	gdataManager := createTestGdataManagerForBattle("with_tutorial")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	em := ecs.NewEntityManager()
+	gs := &GameState{
+		Sun:          100,
+		SpawnedWaves: []bool{true},
+		CurrentLevel: &config.LevelConfig{ID: "1-1"},
+	}
+
+	// 创建教学实体
+	tutorialEntity := em.CreateEntity()
+	ecs.AddComponent(em, tutorialEntity, &components.TutorialComponent{
+		CurrentStepIndex: 2,
+		IsActive:         true,
+		CompletedSteps: map[string]bool{
+			"intro":       true,
+			"plantFirst":  true,
+		},
+	})
+
+	// 创建向日葵
+	sunflower := em.CreateEntity()
+	ecs.AddComponent(em, sunflower, &components.PlantComponent{
+		PlantType: components.PlantSunflower,
+		GridRow:   0,
+		GridCol:   1,
+	})
+	ecs.AddComponent(em, sunflower, &components.PositionComponent{X: 150, Y: 80})
+	ecs.AddComponent(em, sunflower, &components.HealthComponent{CurrentHealth: 200, MaxHealth: 200})
+
+	// 保存
+	serializer := NewBattleSerializer(gdataManager)
+	err := serializer.SaveBattle(em, gs, "testuser")
+	if err != nil {
+		t.Fatalf("SaveBattle failed: %v", err)
+	}
+
+	// 加载
+	data, err := serializer.LoadBattle("testuser")
+	if err != nil {
+		t.Fatalf("LoadBattle failed: %v", err)
+	}
+
+	// 验证教学数据
+	if data.Tutorial == nil {
+		t.Fatal("Expected tutorial data, got nil")
+	}
+
+	if data.Tutorial.CurrentStepIndex != 2 {
+		t.Errorf("Expected CurrentStepIndex 2, got %d", data.Tutorial.CurrentStepIndex)
+	}
+
+	if !data.Tutorial.IsActive {
+		t.Error("Expected IsActive to be true")
+	}
+
+	if len(data.Tutorial.CompletedSteps) != 2 {
+		t.Errorf("Expected 2 completed steps, got %d", len(data.Tutorial.CompletedSteps))
+	}
+
+	if data.Tutorial.PlantCount != 1 {
+		t.Errorf("Expected PlantCount 1, got %d", data.Tutorial.PlantCount)
+	}
+
+	if data.Tutorial.SunflowerCount != 1 {
+		t.Errorf("Expected SunflowerCount 1, got %d", data.Tutorial.SunflowerCount)
 	}
 }

@@ -346,17 +346,21 @@ func (s *GameScene) saveBattleState() {
 		return
 	}
 
-	// 获取存档文件路径
-	battleSavePath := saveManager.GetBattleSavePath(currentUser)
+	// 获取 gdata Manager
+	gdataManager := s.gameState.GetGdataManager()
+	if gdataManager == nil {
+		log.Printf("[GameScene] Warning: gdata Manager not available, cannot save battle state")
+		return
+	}
 
 	// 创建序列化器并保存
-	serializer := game.NewBattleSerializer()
-	if err := serializer.SaveBattle(s.entityManager, s.gameState, battleSavePath); err != nil {
+	serializer := game.NewBattleSerializer(gdataManager)
+	if err := serializer.SaveBattle(s.entityManager, s.gameState, currentUser); err != nil {
 		log.Printf("[GameScene] ERROR: Failed to save battle state: %v", err)
 		return
 	}
 
-	log.Printf("[GameScene] Battle state saved successfully to %s", battleSavePath)
+	log.Printf("[GameScene] Battle state saved successfully for user: %s", currentUser)
 }
 
 // deleteBattleSave 删除当前用户的战斗存档
@@ -606,13 +610,18 @@ func (s *GameScene) restoreBattleState() {
 		return
 	}
 
-	// 获取存档路径
-	battleSavePath := saveManager.GetBattleSavePath(currentUser)
-	log.Printf("[GameScene] 开始从战斗存档恢复: %s", battleSavePath)
+	// 获取 gdata Manager
+	gdataManager := s.gameState.GetGdataManager()
+	if gdataManager == nil {
+		log.Printf("[GameScene] Warning: gdata Manager not available, cannot restore battle state")
+		return
+	}
+
+	log.Printf("[GameScene] 开始从战斗存档恢复用户: %s", currentUser)
 
 	// 创建序列化器并加载
-	serializer := game.NewBattleSerializer()
-	saveData, err := serializer.LoadBattle(battleSavePath)
+	serializer := game.NewBattleSerializer(gdataManager)
+	saveData, err := serializer.LoadBattle(currentUser)
 	if err != nil {
 		log.Printf("[GameScene] ERROR: Failed to load battle data: %v", err)
 		log.Printf("[GameScene] 继续正常游戏...")
