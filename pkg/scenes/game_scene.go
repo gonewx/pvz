@@ -612,6 +612,19 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	scene.levelPhaseSystem.SetOnDisableGuidedTutorial(func() {
 		log.Printf("[GameScene] Disabling guided tutorial mode")
 		scene.guidedTutorialSystem.SetActive(false)
+
+		// Story 19.x QA: 铲除任务完成后自动恢复鼠标和铲子卡槽状态
+		// 取消铲子选中状态
+		if scene.shovelSelected {
+			scene.SetShovelSelected(false)
+			log.Printf("[GameScene] Auto-deselected shovel after guided tutorial completed")
+		}
+		// 恢复系统光标
+		ebiten.SetCursorMode(ebiten.CursorModeVisible)
+		// 清除植物高亮效果
+		if scene.shovelInteractionSystem != nil {
+			scene.shovelInteractionSystem.ClearHighlight()
+		}
 	})
 
 	scene.levelPhaseSystem.SetOnActivateBowling(func() {
@@ -1361,13 +1374,18 @@ func (s *GameScene) SetShovelSelected(selected bool) {
 
 // GetShovelSlotBounds 获取铲子槽位边界（屏幕坐标）
 // 实现 systems.ShovelStateProvider 接口
-// Story 19.5: 保龄球模式使用固定位置
+// Story 19.5: 保龄球模式使用相对于菜单按钮的位置
+// Story 19.x QA: 铲子位置相对于菜单按钮偏左 10px
 func (s *GameScene) GetShovelSlotBounds() image.Rectangle {
 	// 计算铲子位置
 	var shovelX int
-	// Story 19.5: 保龄球模式（initialSun == 0）使用固定位置（左上角）
+	// Story 19.5: 保龄球模式（initialSun == 0）使用相对于菜单按钮的位置
 	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.InitialSun == 0 {
-		shovelX = config.SeedBankX // 保龄球模式铲子在左上角
+		// 菜单按钮 X 位置
+		menuButtonX := WindowWidth - int(config.MenuButtonOffsetFromRight)
+		// 铲子右边缘到菜单按钮左边缘的距离为 BowlingShovelGapFromMenuButton
+		// 铲子 X = 菜单按钮 X - 间距 - 铲子宽度
+		shovelX = menuButtonX - config.BowlingShovelGapFromMenuButton - config.ShovelWidth
 	} else if s.seedBank != nil {
 		// 普通模式根据选择栏图片宽度动态计算
 		seedBankWidth := s.seedBank.Bounds().Dx()
@@ -1376,8 +1394,8 @@ func (s *GameScene) GetShovelSlotBounds() image.Rectangle {
 		shovelX = config.ShovelX // 默认值
 	}
 
-	// 铲子 Y 位置：与选择栏上对齐
-	shovelY := config.SeedBankY
+	// 铲子 Y 位置
+	shovelY := config.BowlingShovelY
 
 	return image.Rect(
 		shovelX,

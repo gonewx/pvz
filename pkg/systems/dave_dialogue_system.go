@@ -452,15 +452,16 @@ func (s *DaveDialogueSystem) drawContinueHint(screen *ebiten.Image, bubbleX, bub
 		bubbleHeight = float64(bounds.Dy())
 	}
 
-	// 计算位置（气泡底部居中）
+	// 计算位置（气泡底部居中，调整距离底部的偏移）
 	hintWidth := s.measureTextWidth(hintText)
 	hintX := bubbleX + (bubbleWidth-hintWidth)/2
-	hintY := bubbleY + bubbleHeight - config.DaveContinueTextOffsetY - config.DaveDialogueFontSize
+	// Story 19.x QA: 调整位置，减小距离底部的偏移量，使其更靠近文本区域
+	hintY := bubbleY + bubbleHeight - config.DaveContinueTextOffsetY - config.DaveDialogueFontSize - 20
 
-	// 绘制文本（灰色）
+	// 绘制文本（黑色，Story 19.x QA: 修复颜色问题）
 	op := &text.DrawOptions{}
 	op.GeoM.Translate(hintX, hintY)
-	op.ColorScale.ScaleWithColor(color.RGBA{128, 128, 128, 255})
+	op.ColorScale.ScaleWithColor(color.Black)
 	text.Draw(screen, hintText, s.dialogueFont, op)
 }
 

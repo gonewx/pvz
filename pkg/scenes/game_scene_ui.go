@@ -151,9 +151,14 @@ func (s *GameScene) drawShovel(screen *ebiten.Image) {
 
 	// 计算铲子位置
 	var shovelX float64
-	// Story 19.5: 保龄球模式（initialSun == 0）使用固定位置（左上角）
+	// Story 19.5: 保龄球模式（initialSun == 0）使用相对于菜单按钮的位置
+	// Story 19.x QA: 铲子位置相对于菜单按钮偏左 10px
 	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.InitialSun == 0 {
-		shovelX = float64(config.SeedBankX) // 保龄球模式铲子在左上角
+		// 菜单按钮 X 位置
+		menuButtonX := float64(WindowWidth) - config.MenuButtonOffsetFromRight
+		// 铲子右边缘到菜单按钮左边缘的距离为 BowlingShovelGapFromMenuButton
+		// 铲子 X = 菜单按钮 X - 间距 - 铲子宽度
+		shovelX = menuButtonX - float64(config.BowlingShovelGapFromMenuButton) - float64(config.ShovelWidth)
 	} else if s.seedBank != nil {
 		// 普通模式根据选择栏图片宽度动态计算
 		seedBankWidth := float64(s.seedBank.Bounds().Dx())
@@ -163,7 +168,7 @@ func (s *GameScene) drawShovel(screen *ebiten.Image) {
 	}
 
 	// 铲子 Y 位置：与选择栏上对齐
-	shovelY := float64(config.SeedBankY)
+	shovelY := float64(config.BowlingShovelY)
 
 	// Draw shovel slot background first
 	if s.shovelSlot != nil {

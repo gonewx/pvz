@@ -195,6 +195,13 @@ const (
 	// ShovelHeight 铲子高度（像素）
 	ShovelHeight = 74
 
+	// BowlingShovelGapFromMenuButton 保龄球模式铲子与菜单按钮之间的间距（像素）
+	// 铲子右边缘到菜单按钮左边缘的距离
+	BowlingShovelGapFromMenuButton = 2
+
+	// BowlingShovelY 保龄球模式铲子Y坐标（屏幕坐标，像素）
+	BowlingShovelY = 0
+
 	// IntroAnimDuration 开场动画时长（秒）
 	IntroAnimDuration = 3.0
 
@@ -202,7 +209,7 @@ const (
 	CameraScrollSpeed = 100
 
 	// MenuButtonOffsetFromRight 菜单按钮距离屏幕右边缘的距离（像素）
-	MenuButtonOffsetFromRight = 145.0
+	MenuButtonOffsetFromRight = 138.0
 
 	// MenuButtonOffsetFromTop 菜单按钮距离屏幕顶部的距离（像素）
 	MenuButtonOffsetFromTop = 0.0

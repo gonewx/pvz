@@ -52,8 +52,8 @@ func NewLevelPhaseSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.Res
 		gameState:       gs,
 		resourceManager: rm,
 		daveDialogueKeys: []string{
-			"CRAZY_DAVE_2407", // "Ok goody, now for the surprise..."
-			"CRAZY_DAVE_2408", // "We're going BOWLING!"
+			"CRAZY_DAVE_2410", // "好的，干得不错，现在给你个惊喜……"
+			"CRAZY_DAVE_2411", // "我们去玩保龄球！"
 		},
 	}
 
@@ -202,9 +202,25 @@ func (s *LevelPhaseSystem) createTransitionDaveDialogue(phaseComp *components.Le
 }
 
 // checkDaveDialogueComplete 检查 Dave 对话是否完成
+// Story 19.x QA: 监听对话进度，当 Dave 说第二句话时显示红线
 func (s *LevelPhaseSystem) checkDaveDialogueComplete(phaseComp *components.LevelPhaseComponent) {
-	// Dave 对话完成由回调处理，这里只做超时检查（可选）
-	// 当前实现依赖回调，无需额外检查
+	// 获取 Dave 对话实体
+	if phaseComp.DaveDialogueEntityID == 0 {
+		return
+	}
+
+	daveEntityID := ecs.EntityID(phaseComp.DaveDialogueEntityID)
+	dialogueComp, ok := ecs.GetComponent[*components.DaveDialogueComponent](s.entityManager, daveEntityID)
+	if !ok {
+		return
+	}
+
+	// Story 19.x QA: 当 Dave 说第二句话（CRAZY_DAVE_2411 "我们去玩保龄球！"）时显示红线
+	// CurrentLineIndex == 1 表示正在显示第二句（索引从 0 开始）
+	if dialogueComp.CurrentLineIndex >= 1 && !phaseComp.ShowRedLine {
+		log.Printf("[LevelPhaseSystem] Dave is saying line %d, showing red line", dialogueComp.CurrentLineIndex+1)
+		phaseComp.ShowRedLine = true
+	}
 }
 
 // advanceToConveyorSlide 推进到传送带滑入步骤
@@ -245,9 +261,14 @@ func (s *LevelPhaseSystem) updateConveyorSlideIn(dt float64, phaseComp *componen
 }
 
 // executeShowRedLine 执行步骤4：显示红线
+// Story 19.x QA: 红线可能已在 Dave 对话期间显示，这里做兼容检查
 func (s *LevelPhaseSystem) executeShowRedLine(phaseComp *components.LevelPhaseComponent) {
-	log.Printf("[LevelPhaseSystem] Step 4: Showing red line")
-	phaseComp.ShowRedLine = true
+	if !phaseComp.ShowRedLine {
+		log.Printf("[LevelPhaseSystem] Step 4: Showing red line")
+		phaseComp.ShowRedLine = true
+	} else {
+		log.Printf("[LevelPhaseSystem] Step 4: Red line already shown during Dave dialogue")
+	}
 	phaseComp.TransitionStep = components.TransitionStepActivateBowling
 }
 

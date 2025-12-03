@@ -52,8 +52,9 @@ Dave 从屏幕左侧滑入和滑出
     *   当 **Plant_Count == 0** 时，触发下一步。
 
 4.  **转场 (Transition)**:
-    *   Dave: *"Ok goody, now for the surprise..."* (好极了，现在是惊喜时间……)
-    *   Dave: *"We're going BOWLING!"* (我们要去打保龄球了！)
+    *   Dave: *CRAZY_DAVE_2410* （ 好的，干得不错，现在给你个惊
+喜…… ）
+    *   Dave: *CRAZY_DAVE_2411* （ 我们去玩保龄球！{MOUTH_SMALL_SMILE} ）同时绘制红线
     *   **动作**:
         1.  Dave 消失。
         2.  **铲子槽保持显示**（保龄球模式下仍可使用铲子）。
