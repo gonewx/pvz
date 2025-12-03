@@ -30,37 +30,44 @@
 
 ```
 pvz3/
-├── assets/                  # 44MB, 2275 files - 游戏资源
+├── assets/                  # ~43MB - 游戏二进制资源
 │   ├── reanim/             # 13M - 动画部件图片 (PNG)
 │   ├── images/             # 6.6M - 界面图片
 │   ├── sounds/             # 8M - 音效文件
-│   ├── effect/             # 448K - 粒子特效配置 (XML)
 │   ├── fonts/              # 字体文件
-│   ├── config/             # 资源配置
-│   ├── data/               # 数据文件
-│   ├── particles/          # 粒子资源
+│   ├── config/             # 资源配置 (YAML)
+│   ├── particles/          # 粒子图片资源
 │   └── properties/         # 属性配置
 │
-├── data/                    # 11MB, 305 files - 数据配置
+├── data/                    # ~11MB - 数据定义文件
 │   ├── reanim/             # 9.9M - .reanim 动画定义 (XML)
 │   ├── reanim_config/      # 604K - 动画配置 (YAML)
+│   ├── particles/          # 448K - 粒子特效定义 (XML) ← 从 assets/effect/ 迁移
 │   ├── levels/             # 28K - 关卡配置 (YAML)
 │   ├── saves/              # ⚠️ 用户存档 - 不应被 embed
 │   └── *.yaml              # 其他配置文件
 ```
 
+**设计原则**：
+- `assets/` = 二进制资源（图片、音效、字体）
+- `data/` = 数据定义文件（XML、YAML 配置）
+- 粒子系统遵循与 reanim 相同的分离模式：
+  - 定义文件 (XML) → `data/particles/`
+  - 图片资源 (PNG) → `assets/particles/`
+
 ### 2.2 Embed 适用性评估
 
 | 目录 | 大小 | 适合 Embed | 说明 |
 |------|------|------------|------|
-| `assets/` (全部) | 44M | ✅ 是 | 静态游戏资源 |
+| `assets/` (全部) | ~43M | ✅ 是 | 二进制游戏资源 |
 | `data/reanim/` | 9.9M | ✅ 是 | 动画定义文件 |
 | `data/reanim_config/` | 604K | ✅ 是 | 动画配置 |
+| `data/particles/` | 448K | ✅ 是 | 粒子特效定义 |
 | `data/levels/` | 28K | ✅ 是 | 关卡配置 |
 | `data/*.yaml` | ~10K | ✅ 是 | 配置文件 |
 | `data/saves/` | 动态 | ❌ **否** | 运行时用户数据 |
 
-**合计 Embed 大小**: 约 55MB
+**合计 Embed 大小**: 约 54MB
 
 ---
 
@@ -307,7 +314,7 @@ import "embed"
 //go:embed assets
 var Assets embed.FS
 
-//go:embed data/reanim data/reanim_config data/levels
+//go:embed data/reanim data/reanim_config data/particles data/levels
 //go:embed data/reanim_config.yaml data/spawn_rules.yaml
 //go:embed data/zombie_physics.yaml data/zombie_stats.yaml
 var Data embed.FS
@@ -442,4 +449,5 @@ func (rm *ResourceManager) LoadImage(path string) (*ebiten.Image, error) {
 
 | 日期 | 版本 | 变更内容 |
 |------|------|----------|
+| 2024-12-03 | 1.1 | 更新目录结构：粒子定义从 assets/effect/ 迁移到 data/particles/ |
 | 2024-12-03 | 1.0 | 初始版本，完整设计方案 |

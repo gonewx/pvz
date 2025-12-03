@@ -223,7 +223,7 @@ const (
 	CameraScrollSpeed = 100
 
 	// MenuButtonOffsetFromRight 菜单按钮距离屏幕右边缘的距离（像素）
-	MenuButtonOffsetFromRight = 138.0
+	MenuButtonOffsetFromRight = 123.0
 
 	// MenuButtonOffsetFromTop 菜单按钮距离屏幕顶部的距离（像素）
 	MenuButtonOffsetFromTop = 0.0
@@ -232,7 +232,7 @@ const (
 	MenuButtonTextPadding = 16.0
 
 	// MenuButtonTextWidth 菜单按钮文字宽度（"菜单"两个字，像素）
-	MenuButtonTextWidth = 32.0
+	MenuButtonTextWidth = 18.0
 
 	// ProgressBarOffsetFromRight 进度条距离屏幕右边缘的距离（像素）
 	ProgressBarOffsetFromRight = 170.0
@@ -421,7 +421,7 @@ const (
 	// DaveBubbleOffsetX 对话气泡相对于 Dave 位置的X偏移（像素）
 	// Dave 静止位置约 X=-55 到 X=298，中心约 X=121
 	// 气泡放在 Dave 右侧
-	DaveBubbleOffsetX = 320.0
+	DaveBubbleOffsetX = 300.0
 
 	// DaveBubbleOffsetY 对话气泡相对于 Dave 位置的Y偏移（像素）
 	DaveBubbleOffsetY = 20.0
@@ -466,8 +466,8 @@ const (
 	ConveyorBeltStartY = -100.0
 
 	// ConveyorBeltTargetY 传送带目标 Y 位置
-	// 与种子栏上对齐
-	ConveyorBeltTargetY = 10.0
+	// 与铲子卡槽上对齐（BowlingShovelY = 0）
+	ConveyorBeltTargetY = 0.0
 
 	// BowlingRedLineColumn 红线位置（第 3 列和第 4 列之间）
 	// 红线 X 坐标 = GridWorldStartX + BowlingRedLineColumn * CellWidth
@@ -490,7 +490,7 @@ const (
 	ConveyorCardHeight = 60.0
 
 	// ConveyorCardSpacing 卡片间距（像素）
-	ConveyorCardSpacing = 5.0
+	ConveyorCardSpacing = 2.0
 
 	// ConveyorBeltAnimSpeed 传动动画速度（像素/秒）
 	ConveyorBeltAnimSpeed = 50.0
@@ -505,6 +505,17 @@ const (
 	// ConveyorBeltRowCount 传送带纹理行数
 	// ConveyorBelt.png 有 6 行交错纹理
 	ConveyorBeltRowCount = 6
+
+	// ConveyorBeltAnimOffsetX 履带纹理相对于背景的 X 偏移（像素）
+	// 正值向右移动，负值向左移动
+	// 用于调整履带在背景上的水平位置
+	ConveyorBeltAnimOffsetX = 0.0
+
+	// ConveyorBeltAnimOffsetY 履带纹理相对于背景的 Y 偏移（像素）
+	// 正值向下移动，负值向上移动
+	// 背景高度 86px，履带高度 96px（6行x16px）
+	// 履带应该在背景的下边部分显示
+	ConveyorBeltAnimOffsetY = 60.0
 
 	// ========== 保龄球坚果配置参数（Story 19.6）（可手工调节） ==========
 

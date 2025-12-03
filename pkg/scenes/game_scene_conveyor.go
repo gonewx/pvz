@@ -47,15 +47,29 @@ func (s *GameScene) drawConveyorBelt(screen *ebiten.Image) {
 // calculateConveyorX 计算传送带 X 位置
 // 传送带右边缘紧挨铲子槽位左边缘
 func (s *GameScene) calculateConveyorX() float64 {
-	// 铲子 X 位置
-	shovelX := float64(config.ShovelX) // 默认值
-	if s.seedBank != nil {
+	// 计算铲子 X 位置（与 drawShovel 保持一致）
+	var shovelX float64
+
+	// 保龄球模式（initialSun == 0）使用相对于菜单按钮的位置
+	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.InitialSun == 0 {
+		menuButtonX := float64(WindowWidth) - config.MenuButtonOffsetFromRight
+		shovelX = menuButtonX - float64(config.BowlingShovelGapFromMenuButton) - float64(config.ShovelWidth)
+	} else if s.seedBank != nil {
+		// 普通模式根据选择栏图片宽度动态计算
 		seedBankWidth := float64(s.seedBank.Bounds().Dx())
 		shovelX = float64(config.SeedBankX) + seedBankWidth + float64(config.ShovelGapFromSeedBank)
+	} else {
+		shovelX = float64(config.ShovelX) // 默认值
 	}
 
-	// 传送带 X = 铲子 X - 传送带宽度
-	conveyorX := shovelX - config.ConveyorBeltWidth
+	// 使用实际背景图片宽度来定位，确保右边紧挨铲子卡槽
+	backdropWidth := config.ConveyorBeltWidth // 默认值
+	if s.conveyorBeltBackdrop != nil {
+		backdropWidth = float64(s.conveyorBeltBackdrop.Bounds().Dx())
+	}
+
+	// 传送带 X = 铲子 X - 传送带背景宽度
+	conveyorX := shovelX - backdropWidth
 
 	return conveyorX
 }
@@ -89,16 +103,16 @@ func (s *GameScene) drawConveyorBeltAnimation(screen *ebiten.Image, x, y float64
 		}
 	}
 
-	// 获取纹理尺寸
+	// 获取履带纹理尺寸
 	imgBounds := s.conveyorBelt.Bounds()
 	imgWidth := imgBounds.Dx()
 	imgHeight := imgBounds.Dy()
 	rowHeight := imgHeight / config.ConveyorBeltRowCount
 
-	// 计算传送带实际渲染宽度
-	beltRenderWidth := config.ConveyorBeltWidth - config.ConveyorBeltPadding*2
-	beltRenderX := x + config.ConveyorBeltPadding
-	beltRenderY := y + config.ConveyorBeltPadding
+	// 使用履带图片的实际宽度作为渲染宽度
+	beltRenderWidth := float64(imgWidth)
+	beltRenderX := x + config.ConveyorBeltPadding + config.ConveyorBeltAnimOffsetX
+	beltRenderY := y + config.ConveyorBeltPadding + config.ConveyorBeltAnimOffsetY
 
 	// 渲染 6 行交错滚动
 	for row := 0; row < config.ConveyorBeltRowCount; row++ {
