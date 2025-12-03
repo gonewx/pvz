@@ -67,7 +67,7 @@ func NewNewUserDialogEntity(
 
 	// 对话框尺寸
 	const dialogWidth = 500.0
-	const dialogHeight = 250.0
+	const dialogHeight = 280.0 // 增加高度以容纳描述文字和输入框
 
 	// 计算居中位置
 	dialogX := float64(windowWidth)/2 - dialogWidth/2
@@ -86,7 +86,7 @@ func NewNewUserDialogEntity(
 	const inputBoxWidth = 350.0
 	const inputBoxHeight = 30.0
 	inputBoxX := dialogWidth/2 - inputBoxWidth/2
-	inputBoxY := 110.0 // 往下移动（原来是90.0）
+	inputBoxY := 140.0 // 在描述文字下方（标题60 + 消息区域约60 + 间距）
 
 	// 创建输入框实体
 	inputEntity := em.CreateEntity()
