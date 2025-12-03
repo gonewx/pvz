@@ -401,6 +401,7 @@ func (s *GuidedTutorialSystem) showTutorialText(guidedComp *components.GuidedTut
 		MaxDisplayTime:  0, // 无限显示，直到教学完成
 		BackgroundAlpha: 0.5,
 		IsAdvisory:      false, // 使用标准位置
+		IsBowling:       true,  // Level 1-5 专用配置
 	}
 	s.entityManager.AddComponent(textEntity, textComp)
 

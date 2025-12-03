@@ -22,4 +22,9 @@ type TutorialTextComponent struct {
 	// true: 使用更靠下的位置，自动定时消失（Level 1-2 向日葵教学）
 	// false: 使用标准位置，需要手动隐藏（Level 1-1 强制教学）
 	IsAdvisory bool
+
+	// IsBowling 是否为 Level 1-5 保龄球关卡的教学文本
+	// true: 使用 Bowling 专用配置（更小的背景高度、更靠下的位置）
+	// false: 使用默认配置
+	IsBowling bool
 }

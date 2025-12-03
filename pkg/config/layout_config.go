@@ -93,6 +93,20 @@ const (
 	// AdvisoryTutorialTextBackgroundOffsetFromBottom 提示性教学背景条距离屏幕底部的偏移（像素）
 	AdvisoryTutorialTextBackgroundOffsetFromBottom = 125.0
 
+	// ========== Level 1-5 铲子教学文本UI配置参数（Story 19.x） ==========
+
+	// BowlingTutorialTextBackgroundHeight Level 1-5 教学文本背景条高度（像素）
+	BowlingTutorialTextBackgroundHeight = 50.0
+
+	// BowlingTutorialTextOffsetFromBottom Level 1-5 教学文本距离屏幕底部的偏移（像素）
+	BowlingTutorialTextOffsetFromBottom = 60.0
+
+	// BowlingTutorialTextBackgroundOffsetFromBottom Level 1-5 教学背景条距离屏幕底部的偏移（像素）
+	BowlingTutorialTextBackgroundOffsetFromBottom = 70.0
+
+	// BowlingTutorialTextFontSize Level 1-5 教学文本字体大小
+	BowlingTutorialTextFontSize = 28.0
+
 	// AdvisoryTutorialTextDisplayDuration 提示性教学文字显示时长（秒）
 	AdvisoryTutorialTextDisplayDuration = 5.0
 

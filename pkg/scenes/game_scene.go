@@ -123,8 +123,9 @@ type GameScene struct {
 	flashEffectSystem *systems.FlashEffectSystem // 闪烁效果系统（僵尸受击闪烁）
 
 	// Story 8.2: Tutorial System
-	tutorialSystem *systems.TutorialSystem // 教学系统（关卡 1-1 教学引导）
-	tutorialFont   interface{}             // 教学文本字体（*utils.BitmapFont 或 *text.GoTextFace）
+	tutorialSystem       *systems.TutorialSystem // 教学系统（关卡 1-1 教学引导）
+	tutorialFont         interface{}             // 教学文本字体（*utils.BitmapFont 或 *text.GoTextFace）
+	bowlingTutorialFont  interface{}             // Level 1-5 保龄球教学字体（42px）
 
 	// Story 8.2 QA改进：完整的铺草皮动画系统
 	soddingSystem *systems.SoddingSystem // 铺草皮动画系统（SodRoll 滚动动画）
@@ -509,6 +510,15 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	if scene.gameState.CurrentLevel != nil && scene.gameState.CurrentLevel.InitialSun == 0 {
 		scene.sunSpawnSystem.Disable()
 		log.Printf("[GameScene] Bowling level (initialSun=0): sun spawn system DISABLED")
+
+		// 加载保龄球关卡专用的大字体（42px）
+		bowlingFont, err := scene.resourceManager.LoadFont("assets/fonts/SimHei.ttf", config.BowlingTutorialTextFontSize)
+		if err != nil {
+			log.Printf("WARNING: Failed to load bowling tutorial font: %v", err)
+		} else {
+			scene.bowlingTutorialFont = bowlingFont
+			log.Printf("[GameScene] Loaded bowling tutorial font: SimHei.ttf (%.0fpx)", config.BowlingTutorialTextFontSize)
+		}
 	}
 
 	// Story 8.2 QA改进：初始化铺草皮动画系统
@@ -1233,11 +1243,11 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	// - GuidedTutorialSystem 创建的教学文本也需要被渲染
 	// 使用 DrawTutorialText 渲染所有 TutorialTextComponent 实体
 	if s.tutorialFont != nil {
-		s.renderSystem.DrawTutorialText(screen, s.tutorialFont)
+		s.renderSystem.DrawTutorialText(screen, s.tutorialFont, s.bowlingTutorialFont)
 	} else if s.guidedTutorialSystem != nil && s.guidedTutorialSystem.IsActive() {
 		// Story 19.x QA: GuidedTutorialSystem 使用 sunCounterFont 作为备选字体
 		if s.sunCounterFont != nil {
-			s.renderSystem.DrawTutorialText(screen, s.sunCounterFont)
+			s.renderSystem.DrawTutorialText(screen, s.sunCounterFont, s.bowlingTutorialFont)
 		}
 	}
 

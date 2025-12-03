@@ -1027,7 +1027,8 @@ func (s *RenderSystem) buildParticleVertices(particle *components.ParticleCompon
 // 参数:
 //   - screen: 绘制目标屏幕
 //   - tutorialFont: 教学字体（SimHei.ttf 或其他 TrueType 字体）
-func (s *RenderSystem) DrawTutorialText(screen *ebiten.Image, tutorialFont interface{}) {
+//   - bowlingFont: Level 1-5 保龄球关卡专用大字体（可为 nil）
+func (s *RenderSystem) DrawTutorialText(screen *ebiten.Image, tutorialFont interface{}, bowlingFont interface{}) {
 	// 查询教学文本实体
 	textEntities := ecs.GetEntitiesWith1[*components.TutorialTextComponent](s.entityManager)
 
@@ -1049,21 +1050,36 @@ func (s *RenderSystem) DrawTutorialText(screen *ebiten.Image, tutorialFont inter
 		// 获取屏幕尺寸
 		screenWidth, screenHeight := screen.Bounds().Dx(), screen.Bounds().Dy()
 
-		// 根据教学类型选择位置配置
-		var bgOffsetFromBottom, textOffsetFromBottom float64
-		if textComp.IsAdvisory {
+		// 根据教学类型选择位置配置和字体
+		var bgOffsetFromBottom, textOffsetFromBottom, bgHeight float64
+		var activeFont interface{}
+		if textComp.IsBowling {
+			// Level 1-5 保龄球关卡：专用配置（更小背景、更靠下、更大字体）
+			bgOffsetFromBottom = config.BowlingTutorialTextBackgroundOffsetFromBottom
+			textOffsetFromBottom = config.BowlingTutorialTextOffsetFromBottom
+			bgHeight = config.BowlingTutorialTextBackgroundHeight
+			// 优先使用保龄球专用字体
+			if bowlingFont != nil {
+				activeFont = bowlingFont
+			} else {
+				activeFont = tutorialFont
+			}
+		} else if textComp.IsAdvisory {
 			// 提示性教学（Level 1-2）：更靠下
 			bgOffsetFromBottom = config.AdvisoryTutorialTextBackgroundOffsetFromBottom
 			textOffsetFromBottom = config.AdvisoryTutorialTextOffsetFromBottom
+			bgHeight = config.TutorialTextBackgroundHeight
+			activeFont = tutorialFont
 		} else {
 			// 强制性教学（Level 1-1）：标准位置
 			bgOffsetFromBottom = config.TutorialTextBackgroundOffsetFromBottom
 			textOffsetFromBottom = config.TutorialTextOffsetFromBottom
+			bgHeight = config.TutorialTextBackgroundHeight
+			activeFont = tutorialFont
 		}
 
 		// 绘制半透明黑色背景条（横贯整个屏幕）
 		bgY := float64(screenHeight) - bgOffsetFromBottom
-		bgHeight := config.TutorialTextBackgroundHeight
 		ebitenutil.DrawRect(screen, 0, bgY, float64(screenWidth), bgHeight,
 			color.RGBA{0, 0, 0, uint8(config.TutorialTextBackgroundAlpha)})
 
@@ -1072,10 +1088,10 @@ func (s *RenderSystem) DrawTutorialText(screen *ebiten.Image, tutorialFont inter
 		textY := float64(screenHeight) - textOffsetFromBottom
 
 		// 检查是否为 TrueType 字体
-		if ttFont, ok := tutorialFont.(*text.GoTextFace); ok && ttFont != nil {
+		if ttFont, ok := activeFont.(*text.GoTextFace); ok && ttFont != nil {
 			// 使用 TrueType 字体绘制（浅黄色文字 + 黑色描边）
 			s.drawCenteredTextTTF(screen, textComp.Text, textX, textY, ttFont)
-		} else if bFont, ok := tutorialFont.(*utils.BitmapFont); ok && bFont != nil {
+		} else if bFont, ok := activeFont.(*utils.BitmapFont); ok && bFont != nil {
 			// 备选：位图字体（不支持中文，已废弃）
 			log.Printf("[RenderSystem] WARNING: BitmapFont does not support Chinese, using fallback")
 			bFont.DrawText(screen, textComp.Text, textX, textY, "center")
@@ -1118,7 +1134,7 @@ func (s *RenderSystem) drawCenteredTextTTF(screen *ebiten.Image, textStr string,
 
 	// Step 2: 绘制浅黄色主文本（在中心）
 	// 使用浅黄色 RGB(255, 242, 0)
-	textColor := color.RGBA{R: 255, G: 242, B: 0, A: 255}
+	textColor := color.RGBA{R: 238, G: 232, B: 170, A: 0}
 	op := &text.DrawOptions{}
 	op.GeoM.Translate(x, y)
 	op.ColorScale.ScaleWithColor(textColor)
