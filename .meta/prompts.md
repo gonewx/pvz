@@ -18,7 +18,7 @@
 - [x] 我将原图片目录备份到了 assets/imagesold， 现在的资源目录 assets 收集了完整的原版资源，请先根据 assets/properties/resources.xml 结合我们调整后的实际目录，创建我们的资源映射文件（由原来的 xml 改为yaml格式） ，并创新新的资源引用与管理模块，然后将代码原有引用旧资源的逻辑改为使用新的资源管理方式。
 
 - [x] 教学关卡时，指向植物卡片的箭头不显示了 - 原因：GameScene.Draw() 缺少 UI 粒子渲染调用
-- [x] 僵尸死亡时，头和手臂一起掉落了 - 原因：手臂掉落应在受伤时触发，而不是死亡时。手臂掉落的粒子文件是 assets/effect/particles/ZombieArm.xml 。 头掉落的是：assets/effect/particles/ZombieHead.xml
+- [x] 僵尸死亡时，头和手臂一起掉落了 - 原因：手臂掉落应在受伤时触发，而不是死亡时。手臂掉落的粒子文件是 data/particles/ZombieArm.xml 。 头掉落的是：data/particles/ZombieHead.xml
 - [x] 子弹与僵尸的碰撞检测要优化 - 原因：physics_system.go 碰撞检测遗漏了 BehaviorZombieDying
 
 - [x] 豌豆射手的动画效果之前一直不知道 anim_stem 轨道的作用，通过实际运行后，发现原版效果在攻击时，茎干的摇晃一直没停，只是头部换成了攻击轨道的动画，所以大胆猜想 anim_stem 轨道是定位茎干位移的，请尝试修复攻击时的动画效果。
@@ -50,8 +50,6 @@
 
 - [x] level 1-4配置了conehead ,但预览时和最后一波时,都没有出现.非普通类僵尸预览必须保证种类的显示. 游戏中必须保证数量完全按配置显示 .
 
-日志(文件很大): /tmp/pvz.log 
-
  cmd/animation_showcase 中渲染的zombie_flagpole 动画 ,旗子和旗杆位置是正确的, 但游戏中旗帜僵尸使用子动画的方式渲染的。 旗子在旗杆偏左一个旗杆宽度的位置.看起来 就是没有装在旗杆上的感觉 . 日志(文件很大): /tmp/pvz.log 
 
 请在cmd/verify_gameplay 中添加旗帜僵尸,以便快速验证动画效果. 旗帜僵尸是通过 `data/reanim/Zombie.reanim`  `data/reanim/Zombie_FlagPole.reanim` 这2个动画定义,采用轨道合并的方式实现旗帜僵尸的. 
@@ -69,6 +67,19 @@
     - 继续后, 游戏存档恢复不完整, 除草车恢复后,位置正确,但是在动画状态,应该是静止状态. 草皮没有正确显示. 教学流程没有正确显示. 阳光没有正常生成 . 
     - 继续后, 游戏存档恢复不正确, 进度条直接恢复到存档时的进度，不需要有动画效果. 教学关卡的流程恢复后，感觉恢复点不太对。
     - 在啃食坚果墙的僵尸在恢复存档后看不到了，只能看到脚下的阴影
+
+- [] 加载界面、主菜单界面、level 1-1 至 level -15 关卡的的功能都已经实现，但有很多音效还没有加到游戏环节中，请从音效资源目录(`assets/sounds`) 汇总所有的音效, 以及这些音效要应用在哪些地方, 给出最终的汇总表, 以便接下来查漏补缺将音效添加到游戏环节中.
+
+- [] 暂停面板中能通过已经绘制`音乐``音效`调节声音大小，通过`全屏`复选框，指定打开时默认是否全屏。 `3d加速` 默认选中，不可修改。
+
+- [] 游戏可通过窗口栏上全屏按钮使游戏全屏。按 `ctrl+esc`键可退出全屏
+
+- [] 资源使用 golang 的 embed 加载，以便编译后打包成一个可执行程序
+
+  - /BMad:agents:architect *research 要实现资源使用 golang 的 embed 加载，以便编译后打包成一个可执行程序, 请评估 @data @assets
+  两个目录的设计是否合理? 有没有需要调整的地方? 
+
+- [] 编写 github ci/cd 脚本，方便发布、编译各平台运行二进制 
 
 ## 5.3
 
@@ -109,7 +120,7 @@
 - 每一关的奖励动画要修正逻辑: 植物或铲子移动到的目标位置应该是根据后续出现的奖励面板中要显示相应图片来确定，这样移动到目标位置后,奖励面板显示,但不再显示植物或铲子, 复用动画中最后显示的植物或铲子. 奖励面板的按钮要添加鼠标悬停时切换为手形以及发亮的效果。
 
 - 参见：.meta/data/plant_hit_effects.md
-| **坚果墙 (Wallnut)** | **粒子效果** | `assets/effect/particles/WallnutEatLarge.xml`<br>`assets/effect/particles/WallnutEatSmall.xml` | `assets/effect/particles/WallnutEatSmall.xml` 是在啃食时触发的， `assets/effect/particles/WallnutEatLarge.xml` 是在受损时更换图片时触发的。而且现在显示的位置也不对，应该是显示在啃食的接触点 |
+| **坚果墙 (Wallnut)** | **粒子效果** | `data/particles/WallnutEatLarge.xml`<br>`data/particles/WallnutEatSmall.xml` | `data/particles/WallnutEatSmall.xml` 是在啃食时触发的， `data/particles/WallnutEatLarge.xml` 是在受损时更换图片时触发的。而且现在显示的位置也不对，应该是显示在啃食的接触点 |
 | | **外观破损** | `assets/reanim/Wallnut_cracked1.png`<br>`assets/reanim/Wallnut_cracked2.png` | 根据生命值降低，外观会呈现轻微破损和严重破损状态。 |
 
 在啃食时， 坚果墙就切换到 anim_blink_twitch动画，不摇摆了。 而且啃食时颜色要发亮，造成一闪一闪的效果。隔一小会儿就播放一次眨眼动画 anim_blink_twice 或anim_blink_thrice  随机选择
@@ -122,15 +133,15 @@
 
 现在要全面支持粒子效果， 例如：僵尸的手臂掉落、头掉落的效果等等，请全面分析粒子系统的配置格式，优雅的实现粒子系统。实现方案要优先使用Ebitengine 引擎，有必要的话先使用 `mcp__deepwiki` 工具的`ask_question`方法，查阅最新的文档，以找到最正确的方法
 
-- `assets/effect/particles`：粒子系统的配置，指定粒子的发射器、轨迹与贴图（引用 `assets/particles` 中的 PNG）
+- `data/particles`：粒子系统的配置，指定粒子的发射器、轨迹与贴图（引用 `assets/particles` 中的 PNG）
 - `assets/particles`：粒子系统用的贴图素材（效果精灵）。如爆炸、烟雾、火花、雨滴、泡泡、星星等（例如 `DoomShroom_Explosion_*`, `PoolSparkly.png`, `SnowPea_*`）
 
 - 僵尸头粒子效果和原版的表现不一样,请参考我的理解,检查实现是否不正确? .meta/particles/ZombieHead.md  
-assets/effect/particles/ZombieHead.xml 从实际运行 cmd/particles/main.go 看,僵尸头没有在地面弹跳的效果
+data/particles/ZombieHead.xml 从实际运行 cmd/particles/main.go 看,僵尸头没有在地面弹跳的效果
 
--  僵尸头粒子效果和原版的表现不一样, 掉落速度慢,头滚动少,很快就消失了，没看到反弹地面的效果.是不是我们对配置文件的字段含义理解有误?或实现有误? .meta/particles/ZombieHead.md  assets/effect/particles/ZombieHead.xml  cmd/particles/main.go
+-  僵尸头粒子效果和原版的表现不一样, 掉落速度慢,头滚动少,很快就消失了，没看到反弹地面的效果.是不是我们对配置文件的字段含义理解有误?或实现有误? .meta/particles/ZombieHead.md  data/particles/ZombieHead.xml  cmd/particles/main.go
 
-- assets/effect/particles/SodRoll.xml 中的所有字段都解析并应用到渲染中了吗? 验证粒子系统的实现， 可以使用类似 `go run cmd/particles/main.go --verbose --effect="Planting"  > /tmp/p.log 2>&1` 的命令运行，并查看日志
+- data/particles/SodRoll.xml 中的所有字段都解析并应用到渲染中了吗? 验证粒子系统的实现， 可以使用类似 `go run cmd/particles/main.go --verbose --effect="Planting"  > /tmp/p.log 2>&1` 的命令运行，并查看日志
 
 ## 8
 
@@ -163,7 +174,7 @@ assets/effect/particles/ZombieHead.xml 从实际运行 cmd/particles/main.go 看
     - 每行有效的草坪左边台阶上需要增加除草车，是最后一道防线，可以一次从左到右除草，消灭所在行的所有僵尸。（正确显示除草车，能正确触发除草车动画效果，能消灭所在行所有僵尸）
     - 进度条上的旗帜标记显示（当前只显示背景和进度填充）
 
-- @assets/effect/particles/SodRoll.xml 应该铺草皮时土粒飞溅的效果. 添加最后一波僵尸的提示动画: 
+- @data/particles/SodRoll.xml 应该铺草皮时土粒飞溅的效果. 添加最后一波僵尸的提示动画: 
 assets/effect/reanim/FinalWave.reanim. 完善进度条显示: 1.位置 
 2.正确显示当前进度,僵尸头的位置要匹配进度，僵尸头开始在右边,随着进度条移动,而且进度条要有绿色的进度显示. FlagMeter.png: 背景框和绿色进度填充,一张图有2行, 根据进度百分比从左到右裁剪显示. 绿色进度填充从右到左增长.关卡文字有黑色描边效果. 文字位置要在进度条左面的外侧.  FlagMeterLevelProgress.png（装饰条）：垂直对齐：图片的Y轴中点对齐背景框的下边沿，水平居中在背景框， FlagMeterParts.png  是3部分,1 僵尸头 2: 竖线 3: 旗帜: 
 assets/images/FlagMeter.png
@@ -179,7 +190,7 @@ assets/images/FlagMeterParts.png
 
 ### level 1-4
 
-- 1-4 关卡胜利后，虽然解锁的是铲子，也需要有和前面关卡类似的奖励动画， 只是植物卡包换成铲子图片， 卡包背景的粒子效果换成 assets/effect/particles/AwardPickupArrow.xml。
+- 1-4 关卡胜利后，虽然解锁的是铲子，也需要有和前面关卡类似的奖励动画， 只是植物卡包换成铲子图片， 卡包背景的粒子效果换成 data/particles/AwardPickupArrow.xml。
 
 ## bugs
 
@@ -207,6 +218,18 @@ assets/images/FlagMeterParts.png
 
 - 我们之前重构动画系统时, 由中心锚点改为了左上角锚点,现在的问题和这个改动有关系吗?
 
+- [] epic 19 实现后，还有以下问题:
+  - [x] 打开后，显示了植物选择栏 。 
+  - [x] 没有显示dave的动画
+  - [x] 整个关卡没有生成阳光的逻辑
+  - [] dave 对话环节，鼠标光标不变换，保持原始形状
+  - [] 除草车和僵尸是铲子教学后，传送带环节才出现的
+  - [] 铲子卡槽位置不正确，点击铲子后，鼠标光标没显示成铲子，也看不到光标
+  - [] 指向铲子卡槽的箭头位置也不正确, 现在偏下偏右
+  - [] 铲子悬停在植物上时，植物没变亮
+  - [] 没有显示下方的教学文本
+
+  日志(文件很大): /tmp/pvz.log 
 ## 架构
 
 - reanim 模块的设计和使用是否有不符合架构设计的地方？
