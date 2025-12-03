@@ -2,7 +2,11 @@ module github.com/decker502/pvz
 
 go 1.25.1
 
-require github.com/hajimehoshi/ebiten/v2 v2.9.0
+require (
+	github.com/hajimehoshi/ebiten/v2 v2.9.0
+	github.com/quasilyte/gdata/v2 v2.0.0
+	gopkg.in/yaml.v3 v3.0.1
+)
 
 require (
 	github.com/ebitengine/gomobile v0.0.0-20250923094054-ea854a63cce1 // indirect
@@ -19,5 +23,4 @@ require (
 	golang.org/x/sync v0.17.0 // indirect
 	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/text v0.30.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

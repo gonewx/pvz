@@ -6,6 +6,7 @@ import (
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
+	"github.com/quasilyte/gdata/v2"
 )
 
 // GameState 存储全局游戏状态
@@ -56,6 +57,11 @@ type GameState struct {
 	// Story 17.1: 难度引擎数据
 	TotalCompletedFlags int // 已完成的旗帜总数（跨关卡累计）
 	WavesPerRound       int // 每轮波次数（默认20）
+
+	// Story 20.1: 跨平台存储管理器
+	// 使用 gdata 库实现跨平台数据存储（桌面端、移动端、WASM）
+	// 如果初始化失败，gdataManager 为 nil，游戏仍可运行但无法持久化数据
+	gdataManager *gdata.Manager
 }
 
 // 全局单例实例（这是架构规范允许的唯一全局变量）
@@ -81,6 +87,16 @@ func GetGameState() *GameState {
 			saveManager = nil
 		}
 
+		// Story 20.1: 初始化 gdata Manager（跨平台存储）
+		gdataManager, err := gdata.Open(gdata.Config{
+			AppName: "pvz_newx",
+		})
+		if err != nil {
+			log.Printf("[GameState] Warning: Failed to initialize gdata Manager: %v", err)
+			// 降级方案：gdataManager 为 nil，游戏继续运行
+			gdataManager = nil
+		}
+
 		globalGameState = &GameState{
 			Sun:                50, // 默认阳光值（加载关卡后会被 levelConfig.InitialSun 覆盖）
 			plantUnlockManager: NewPlantUnlockManager(),
@@ -93,6 +109,8 @@ func GetGameState() *GameState {
 			// Story 17.1: 初始化难度引擎数据
 			TotalCompletedFlags: 0,
 			WavesPerRound:       20, // 默认每轮20波
+			// Story 20.1: 跨平台存储管理器
+			gdataManager: gdataManager,
 		}
 	}
 	return globalGameState
@@ -403,6 +421,17 @@ func (gs *GameState) UpdateSunFlash(deltaTime float64) {
 //   - *SaveManager: 保存管理器实例，如果未初始化返回 nil
 func (gs *GameState) GetSaveManager() *SaveManager {
 	return gs.saveManager
+}
+
+// GetGdataManager 获取 gdata 跨平台存储管理器
+//
+// Story 20.1: 返回 gdata.Manager 实例，用于跨平台数据存储
+// 如果初始化失败，返回 nil（调用方需检查）
+//
+// 返回：
+//   - *gdata.Manager: gdata 管理器实例，如果未初始化返回 nil
+func (gs *GameState) GetGdataManager() *gdata.Manager {
+	return gs.gdataManager
 }
 
 // SaveProgress 保存当前游戏进度
