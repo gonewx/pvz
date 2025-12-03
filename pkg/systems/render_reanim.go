@@ -102,6 +102,12 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		flashIntensity = flashComp.Intensity
 	}
 
+	// 检查是否有悬停高亮组件（持续高亮，不闪烁）
+	if hoverComp, hasHover := ecs.GetComponent[*components.HoverHighlightComponent](s.entityManager, id); hasHover && hoverComp.IsActive {
+		// 悬停高亮叠加到闪烁强度上
+		flashIntensity += hoverComp.Intensity
+	}
+
 	// 检查向日葵脸部发光效果
 	var sunflowerGlow *components.SunflowerGlowComponent
 	if glowComp, hasGlow := ecs.GetComponent[*components.SunflowerGlowComponent](s.entityManager, id); hasGlow {

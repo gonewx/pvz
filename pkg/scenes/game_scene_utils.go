@@ -70,6 +70,7 @@ func (s *GameScene) easeOutQuad(t float64) float64 {
 //
 // 检查优先级:
 //  0. 奖励动画 (RewardAnimationSystem - 最高优先级，遮盖其他元素)
+//  0.5. Dave 对话 (DaveDialogueComponent - 对话期间强制默认光标)
 //  1. 面板按钮 (ButtonComponent)
 //  2. 对话框按钮 (DialogComponent.HoveredButtonIdx)
 //  3. 植物卡片 (PlantCardComponent + UIComponent)
@@ -83,6 +84,23 @@ func (s *GameScene) updateMouseCursor() {
 		rewardCursor := s.rewardSystem.GetCursorShape()
 		if rewardCursor != ebiten.CursorShapeDefault {
 			cursorShape = rewardCursor
+		}
+	}
+
+	// 0.5. Story 19.x QA: Dave 对话期间强制使用默认光标
+	// Dave 对话时不检测其他元素的悬停状态，直接使用默认光标
+	daveEntities := ecs.GetEntitiesWith1[*components.DaveDialogueComponent](s.entityManager)
+	for _, entityID := range daveEntities {
+		daveComp, ok := ecs.GetComponent[*components.DaveDialogueComponent](s.entityManager, entityID)
+		if ok && (daveComp.State == components.DaveStateTalking ||
+			daveComp.State == components.DaveStateEntering ||
+			daveComp.State == components.DaveStateLeaving) {
+			// Dave 对话期间，跳过其他检测，直接设置默认光标
+			if cursorShape != s.lastCursorShape {
+				ebiten.SetCursorShape(ebiten.CursorShapeDefault)
+				s.lastCursorShape = ebiten.CursorShapeDefault
+			}
+			return
 		}
 	}
 

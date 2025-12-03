@@ -4,6 +4,7 @@ import "github.com/decker502/pvz/pkg/ecs"
 
 // GuidedTutorialComponent 强引导教学组件
 // Story 19.3: 强引导教学系统
+// Story 19.x QA: 添加教学文本支持
 //
 // 此组件用于管理 Level 1-5 的强制铲子教学阶段的状态。
 // 与 TutorialComponent 不同，这是"强制式"引导，限制玩家只能进行特定操作。
@@ -60,4 +61,13 @@ type GuidedTutorialComponent struct {
 	// 当转场条件满足时调用此回调
 	// 由外部系统（如 GameScene）设置，遵循零耦合原则
 	OnTransitionCallback func()
+
+	// TextEntityID 教学文本实体 ID
+	// Story 19.x QA: 用于显示铲子教学提示文本
+	// 0 表示当前没有显示教学文本
+	TextEntityID ecs.EntityID
+
+	// TutorialTextKey 教学文本键（从 LawnStrings.txt 加载）
+	// 默认为 "SHOVEL_INSTRUCTION"
+	TutorialTextKey string
 }

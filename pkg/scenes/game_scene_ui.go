@@ -129,16 +129,23 @@ func (s *GameScene) drawSunCounter(screen *ebiten.Image) {
 // Story 8.5: 1-1关（教学关卡）不显示铲子
 // Story 8.6: 检查铲子是否已解锁（1-4关完成后才解锁）
 // Story 19.5: 保龄球模式使用固定位置，不依赖选择栏
+// Story 19.x QA: 铲子教学关卡（有预设植物）强制显示铲子
 // 铲子位置紧挨选择栏右侧，与选择栏上对齐
 func (s *GameScene) drawShovel(screen *ebiten.Image) {
 	// 教学关卡不显示铲子（玩家还不需要学习移除植物）
+	// 但是：铲子教学关卡（Level 1-5，有预设植物）需要显示铲子
 	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.OpeningType == "tutorial" {
-		return
+		// 铲子教学关卡：有预设植物的关卡应该显示铲子
+		if len(s.gameState.CurrentLevel.PresetPlants) == 0 {
+			return
+		}
 	}
 
 	// Story 8.6: 检查铲子是否已解锁
 	// 铲子在完成 1-4 关卡后解锁
-	if !s.gameState.IsToolUnlocked("shovel") {
+	// 例外：铲子教学关卡（Level 1-5）强制显示铲子（用于教学）
+	isShovelTutorialLevel := s.gameState.CurrentLevel != nil && len(s.gameState.CurrentLevel.PresetPlants) > 0
+	if !s.gameState.IsToolUnlocked("shovel") && !isShovelTutorialLevel {
 		return
 	}
 
@@ -165,39 +172,26 @@ func (s *GameScene) drawShovel(screen *ebiten.Image) {
 		screen.DrawImage(s.shovelSlot, op)
 	}
 
-	// Draw shovel icon on top of the slot
-	if s.shovel != nil {
+	// Draw shovel icon on top of the slot (centered in the slot)
+	// 原版行为：铲子选中后从卡槽消失，变成鼠标光标
+	if s.shovel != nil && !s.shovelSelected {
 		op := &ebiten.DrawImageOptions{}
-		op.GeoM.Translate(shovelX, shovelY)
+		shovelBounds := s.shovel.Bounds()
+		shovelImgW := float64(shovelBounds.Dx())
+		shovelImgH := float64(shovelBounds.Dy())
+		// 计算居中偏移：(卡槽尺寸 - 图片尺寸) / 2
+		slotW := float64(config.ShovelWidth)
+		slotH := float64(config.ShovelHeight)
+		offsetX := (slotW - shovelImgW) / 2.0
+		offsetY := (slotH - shovelImgH) / 2.0
+		op.GeoM.Translate(shovelX+offsetX, shovelY+offsetY)
 		screen.DrawImage(s.shovel, op)
-	} else if s.shovelSlot == nil {
+	} else if s.shovelSlot == nil && !s.shovelSelected {
 		// Fallback: Draw a gray rectangle if both images are missing
 		ebitenutil.DrawRect(screen,
 			shovelX, shovelY,
 			config.ShovelWidth, config.ShovelHeight,
 			color.RGBA{R: 128, G: 128, B: 128, A: 255}) // Gray
-	}
-
-	// Story 19.2: 铲子选中状态高亮效果
-	if s.shovelSelected {
-		// 绘制半透明黄色叠加层
-		highlightColor := color.RGBA{R: 255, G: 255, B: 0, A: 80} // 半透明黄色
-		ebitenutil.DrawRect(screen,
-			shovelX, shovelY,
-			float64(config.ShovelWidth), float64(config.ShovelHeight),
-			highlightColor)
-
-		// 绘制金色边框
-		borderColor := color.RGBA{R: 255, G: 215, B: 0, A: 200} // 金色
-		borderWidth := 2.0
-		// 上边框
-		ebitenutil.DrawRect(screen, shovelX, shovelY, float64(config.ShovelWidth), borderWidth, borderColor)
-		// 下边框
-		ebitenutil.DrawRect(screen, shovelX, shovelY+float64(config.ShovelHeight)-borderWidth, float64(config.ShovelWidth), borderWidth, borderColor)
-		// 左边框
-		ebitenutil.DrawRect(screen, shovelX, shovelY, borderWidth, float64(config.ShovelHeight), borderColor)
-		// 右边框
-		ebitenutil.DrawRect(screen, shovelX+float64(config.ShovelWidth)-borderWidth, shovelY, borderWidth, float64(config.ShovelHeight), borderColor)
 	}
 }
 

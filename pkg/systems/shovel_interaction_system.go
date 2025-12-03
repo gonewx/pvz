@@ -2,7 +2,6 @@ package systems
 
 import (
 	"image"
-	"image/color"
 	"log"
 
 	"github.com/decker502/pvz/pkg/components"
@@ -10,7 +9,6 @@ import (
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
-	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
@@ -32,6 +30,8 @@ type ShovelInteractionSystem struct {
 	cursorAnchorY     float64               // 光标锚点Y偏移
 	shovelEntity      ecs.EntityID          // 铲子交互实体ID
 	lastCursorMode    ebiten.CursorModeType // 上一次的光标模式
+	justActivated     bool                  // 刚刚被激活，跳过本帧的取消检测
+	lastHighlightedPlant ecs.EntityID       // 上一帧高亮的植物实体ID（用于移除闪烁效果）
 }
 
 // ShovelStateProvider 铲子状态提供者接口
@@ -76,15 +76,10 @@ func NewShovelInteractionSystem(em *ecs.EntityManager, gs *game.GameState, rm *g
 		system.shovelSoundPlayer = shovelPlayer
 	}
 
-	// 加载铲子光标图片
-	cursorImg, err := rm.LoadImage("assets/images/Shovel_hi_res.png")
+	// 加载铲子光标图片（使用 Shovel.png，与卡槽中的铲子一致）
+	cursorImg, err := rm.LoadImage("assets/images/Shovel.png")
 	if err != nil {
 		log.Printf("[ShovelInteractionSystem] Warning: Failed to load shovel cursor image: %v", err)
-		// 尝试加载备用图片
-		cursorImg, err = rm.LoadImage("assets/images/Shovel.png")
-		if err != nil {
-			log.Printf("[ShovelInteractionSystem] Warning: Failed to load backup shovel image: %v", err)
-		}
 	}
 	system.cursorImage = cursorImg
 
@@ -98,6 +93,14 @@ func NewShovelInteractionSystem(em *ecs.EntityManager, gs *game.GameState, rm *g
 		CursorAnchorY:          system.cursorAnchorY,
 	}
 	em.AddComponent(system.shovelEntity, shovelComp)
+
+	// 验证光标图片是否加载成功
+	if system.cursorImage != nil {
+		bounds := system.cursorImage.Bounds()
+		log.Printf("[ShovelInteractionSystem] Cursor image loaded: %dx%d pixels", bounds.Dx(), bounds.Dy())
+	} else {
+		log.Printf("[ShovelInteractionSystem] WARNING: Cursor image is nil, shovel cursor will not display!")
+	}
 
 	log.Printf("[ShovelInteractionSystem] Initialized (Entity ID: %d)", system.shovelEntity)
 
@@ -122,9 +125,17 @@ func (s *ShovelInteractionSystem) Update(deltaTime float64, cameraX float64) {
 		return
 	}
 
+	// 记录上一帧的选中状态
+	wasSelected := shovelComp.IsSelected
+
 	// 从状态提供者同步选中状态
 	if shovelStateProvider != nil {
 		shovelComp.IsSelected = shovelStateProvider.IsShovelSelected()
+	}
+
+	// 检测是否刚刚被激活（从未选中变为选中）
+	if shovelComp.IsSelected && !wasSelected {
+		s.justActivated = true
 	}
 
 	// 如果铲子未选中，跳过处理
@@ -134,7 +145,10 @@ func (s *ShovelInteractionSystem) Update(deltaTime float64, cameraX float64) {
 			ebiten.SetCursorMode(ebiten.CursorModeVisible)
 			s.lastCursorMode = ebiten.CursorModeVisible
 		}
+		// 移除上一帧高亮植物的闪烁效果
+		s.clearPlantHighlight()
 		shovelComp.HighlightedPlantEntity = 0
+		s.justActivated = false
 		return
 	}
 
@@ -151,22 +165,17 @@ func (s *ShovelInteractionSystem) Update(deltaTime float64, cameraX float64) {
 
 	// 检测鼠标悬停的植物
 	highlightedPlant := s.detectPlantUnderMouse(mouseWorldX, mouseWorldY)
+
+	// 更新植物高亮效果（使用 FlashEffectComponent）
+	s.updatePlantHighlight(highlightedPlant)
 	shovelComp.HighlightedPlantEntity = highlightedPlant
 
 	// 检测左键点击事件
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
-		// 检查是否点击了铲子槽位（再次点击取消）
-		if shovelStateProvider != nil {
-			bounds := shovelStateProvider.GetShovelSlotBounds()
-			if bounds.Min.X <= mouseScreenX && mouseScreenX <= bounds.Max.X &&
-				bounds.Min.Y <= mouseScreenY && mouseScreenY <= bounds.Max.Y {
-				// 点击铲子槽位，取消铲子模式
-				shovelStateProvider.SetShovelSelected(false)
-				shovelComp.IsSelected = false
-				shovelComp.HighlightedPlantEntity = 0
-				log.Printf("[ShovelInteractionSystem] 再次点击铲子槽位，取消铲子模式")
-				return
-			}
+		// 如果刚刚被激活，跳过本次点击检测（避免同一次点击被处理两次）
+		if s.justActivated {
+			s.justActivated = false
+			return
 		}
 
 		// 如果有高亮植物，移除它
@@ -176,15 +185,8 @@ func (s *ShovelInteractionSystem) Update(deltaTime float64, cameraX float64) {
 		}
 	}
 
-	// 检测右键点击取消铲子模式
-	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight) {
-		if shovelStateProvider != nil {
-			shovelStateProvider.SetShovelSelected(false)
-		}
-		shovelComp.IsSelected = false
-		shovelComp.HighlightedPlantEntity = 0
-		log.Printf("[ShovelInteractionSystem] 右键取消铲子模式")
-	}
+	// 重置激活标记（如果没有点击事件，下一帧重置）
+	s.justActivated = false
 }
 
 // detectPlantUnderMouse 检测鼠标悬停的植物
@@ -288,35 +290,68 @@ func (s *ShovelInteractionSystem) Draw(screen *ebiten.Image, cameraX float64) {
 	s.drawShovelCursor(screen)
 }
 
+// updatePlantHighlight 更新植物高亮效果
+// 使用 HoverHighlightComponent 实现持续高亮（不闪烁）
+//
+// 参数：
+//   - newHighlightedPlant: 新的高亮植物实体ID（0 表示无高亮）
+func (s *ShovelInteractionSystem) updatePlantHighlight(newHighlightedPlant ecs.EntityID) {
+	// 如果高亮植物没有变化，无需操作
+	if newHighlightedPlant == s.lastHighlightedPlant {
+		return
+	}
+
+	// 移除旧植物的高亮效果
+	if s.lastHighlightedPlant != 0 {
+		if _, hasHighlight := ecs.GetComponent[*components.HoverHighlightComponent](s.entityManager, s.lastHighlightedPlant); hasHighlight {
+			ecs.RemoveComponent[*components.HoverHighlightComponent](s.entityManager, s.lastHighlightedPlant)
+		}
+	}
+
+	// 添加新植物的高亮效果
+	if newHighlightedPlant != 0 {
+		// 检查植物是否已有 HoverHighlightComponent
+		if _, hasHighlight := ecs.GetComponent[*components.HoverHighlightComponent](s.entityManager, newHighlightedPlant); !hasHighlight {
+			// 添加悬停高亮组件
+			highlightComp := &components.HoverHighlightComponent{
+				Intensity: 0.3, // 中等强度的高亮效果
+				IsActive:  true,
+			}
+			ecs.AddComponent(s.entityManager, newHighlightedPlant, highlightComp)
+		}
+	}
+
+	// 更新上一帧高亮的植物
+	s.lastHighlightedPlant = newHighlightedPlant
+}
+
+// clearPlantHighlight 清除所有植物高亮效果
+func (s *ShovelInteractionSystem) clearPlantHighlight() {
+	if s.lastHighlightedPlant != 0 {
+		if _, hasHighlight := ecs.GetComponent[*components.HoverHighlightComponent](s.entityManager, s.lastHighlightedPlant); hasHighlight {
+			ecs.RemoveComponent[*components.HoverHighlightComponent](s.entityManager, s.lastHighlightedPlant)
+		}
+		s.lastHighlightedPlant = 0
+	}
+}
+
+// ClearHighlight 公开方法：清除植物高亮效果
+// 供 GameScene 在取消铲子模式时调用
+func (s *ShovelInteractionSystem) ClearHighlight() {
+	s.clearPlantHighlight()
+}
+
 // drawPlantHighlight 渲染植物高亮效果
+// 注意：高亮效果现在通过 FlashEffectComponent 由 RenderSystem 自动处理
+// 此方法保留但不再绘制任何内容
 //
 // 参数：
 //   - screen: 目标屏幕
 //   - entityID: 高亮植物实体ID
 //   - cameraX: 摄像机X坐标
 func (s *ShovelInteractionSystem) drawPlantHighlight(screen *ebiten.Image, entityID ecs.EntityID, cameraX float64) {
-	// 获取植物位置
-	posComp, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
-	if !ok {
-		return
-	}
-
-	// 计算屏幕坐标
-	screenX := posComp.X - cameraX
-	screenY := posComp.Y
-
-	// 植物尺寸
-	plantWidth := 60.0
-	plantHeight := 80.0
-
-	// 绘制半透明白色叠加层
-	highlightColor := color.RGBA{R: 255, G: 255, B: 255, A: 100}
-	ebitenutil.DrawRect(screen,
-		screenX-plantWidth/2,
-		screenY-plantHeight/2,
-		plantWidth,
-		plantHeight,
-		highlightColor)
+	// 高亮效果通过 FlashEffectComponent 实现，RenderSystem 会自动渲染
+	// 此方法不再需要绘制任何内容
 }
 
 // drawShovelCursor 渲染铲子光标
@@ -325,6 +360,7 @@ func (s *ShovelInteractionSystem) drawPlantHighlight(screen *ebiten.Image, entit
 //   - screen: 目标屏幕
 func (s *ShovelInteractionSystem) drawShovelCursor(screen *ebiten.Image) {
 	if s.cursorImage == nil {
+		log.Printf("[ShovelInteractionSystem] drawShovelCursor: cursorImage is nil!")
 		return
 	}
 

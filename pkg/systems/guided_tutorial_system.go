@@ -140,6 +140,8 @@ func NewGuidedTutorialSystem(em *ecs.EntityManager, gs *game.GameState, rm *game
 		LastPlantCount:       0,
 		TransitionReady:      false,
 		OnTransitionCallback: nil,
+		TextEntityID:         0,
+		TutorialTextKey:      "ADVICE_CLICK_SHOVEL", // Story 19.x QA: 铲子教学默认文本
 	}
 	em.AddComponent(system.guidedEntity, guidedComp)
 
@@ -209,8 +211,9 @@ func (s *GuidedTutorialSystem) monitorPlantCount(guidedComp *components.GuidedTu
 		guidedComp.TransitionReady = true
 		log.Printf("[GuidedTutorialSystem] All plants removed, transition ready!")
 
-		// 隐藏箭头
+		// 隐藏箭头和教学文本
 		s.hideArrow(guidedComp)
+		s.hideTutorialText(guidedComp)
 
 		// 调用转场回调
 		if guidedComp.OnTransitionCallback != nil {
@@ -255,11 +258,15 @@ func (s *GuidedTutorialSystem) showShovelArrow(guidedComp *components.GuidedTuto
 
 	bounds := guidedTutorialShovelProvider.GetShovelSlotBounds()
 
-	// 计算箭头位置（铲子槽位下方）
-	arrowX := float64(bounds.Min.X + bounds.Dx()/2) // 水平居中
-	arrowY := float64(bounds.Max.Y) + config.GuidedTutorialArrowOffsetY
+	// 箭头位置说明：
+	// - 发射器位置直接使用铲子槽位左上角坐标
+	// - UpsellArrow.xml 中的 EmitterOffsetX=25, EmitterOffsetY=80 会自动调整粒子位置
+	// - 最终粒子出现在：(pos.X + 25, pos.Y + 80)，刚好在铲子下方指向铲子
+	// - 这是原版设计的正确位置，无需手动调整
+	arrowX := float64(bounds.Min.X) // 发射器X坐标（铲子左上角）
+	arrowY := float64(bounds.Min.Y) // 发射器Y坐标（铲子左上角）
 
-	log.Printf("[GuidedTutorialSystem] Showing arrow at (%.1f, %.1f), shovel bounds: %v",
+	log.Printf("[GuidedTutorialSystem] Showing arrow at emitter(%.1f, %.1f), shovel bounds: %v",
 		arrowX, arrowY, bounds)
 
 	// 创建 UpsellArrow 粒子效果
@@ -327,6 +334,7 @@ func (s *GuidedTutorialSystem) IsActive() bool {
 }
 
 // SetActive 设置强引导模式激活状态
+// Story 19.x QA: 添加教学文本显示/隐藏
 func (s *GuidedTutorialSystem) SetActive(active bool) {
 	guidedComp, ok := ecs.GetComponent[*components.GuidedTutorialComponent](s.entityManager, s.guidedEntity)
 	if !ok {
@@ -342,12 +350,68 @@ func (s *GuidedTutorialSystem) SetActive(active bool) {
 		guidedComp.ShowArrow = false
 		guidedComp.TransitionReady = false
 		s.initialized = false
+		// Story 19.x QA: 显示教学文本
+		s.showTutorialText(guidedComp)
 		log.Printf("[GuidedTutorialSystem] Activated")
 	} else if !active && wasActive {
-		// 停用时隐藏箭头
+		// 停用时隐藏箭头和教学文本
 		s.hideArrow(guidedComp)
+		s.hideTutorialText(guidedComp)
 		log.Printf("[GuidedTutorialSystem] Deactivated")
 	}
+}
+
+// showTutorialText 显示教学文本
+// Story 19.x QA: 创建 TutorialTextComponent 显示铲子教学提示
+func (s *GuidedTutorialSystem) showTutorialText(guidedComp *components.GuidedTutorialComponent) {
+	// 如果已有教学文本实体，先隐藏
+	if guidedComp.TextEntityID != 0 {
+		s.hideTutorialText(guidedComp)
+	}
+
+	// 获取教学文本内容
+	textKey := guidedComp.TutorialTextKey
+	if textKey == "" {
+		textKey = "ADVICE_CLICK_SHOVEL"
+	}
+
+	var text string
+	if s.gameState.LawnStrings != nil {
+		text = s.gameState.LawnStrings.GetString(textKey)
+	}
+	if text == "" {
+		// 使用默认文本
+		text = "点击拾取铲子！"
+	}
+
+	// 创建教学文本实体
+	textEntity := s.entityManager.CreateEntity()
+	textComp := &components.TutorialTextComponent{
+		Text:            text,
+		DisplayTime:     0,
+		MaxDisplayTime:  0, // 无限显示，直到教学完成
+		BackgroundAlpha: 0.5,
+		IsAdvisory:      false, // 使用标准位置
+	}
+	s.entityManager.AddComponent(textEntity, textComp)
+
+	// 保存实体ID
+	guidedComp.TextEntityID = textEntity
+
+	log.Printf("[GuidedTutorialSystem] Tutorial text shown: '%s' (Entity ID: %d)", text, textEntity)
+}
+
+// hideTutorialText 隐藏教学文本
+// Story 19.x QA: 销毁教学文本实体
+func (s *GuidedTutorialSystem) hideTutorialText(guidedComp *components.GuidedTutorialComponent) {
+	if guidedComp.TextEntityID == 0 {
+		return
+	}
+
+	s.entityManager.DestroyEntity(guidedComp.TextEntityID)
+	guidedComp.TextEntityID = 0
+
+	log.Printf("[GuidedTutorialSystem] Tutorial text hidden")
 }
 
 // IsOperationAllowed 检查操作是否在白名单中

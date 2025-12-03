@@ -626,6 +626,10 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 			scene.levelSystem.ResumeWaveTiming()
 			log.Printf("[GameScene] Wave timing resumed for bowling phase")
 		}
+		// Story 19.x QA: 保龄球阶段开始时创建除草车
+		// 除草车应该在铲子教学完成后才出现
+		scene.initLawnmowers()
+		log.Printf("[GameScene] Lawnmowers initialized for bowling phase")
 	})
 
 	// Story 19.4: 生成预设植物
@@ -937,8 +941,14 @@ func (s *GameScene) Update(deltaTime float64) {
 				log.Printf("[GameScene] 关卡配置禁用铺草皮动画，无预铺草皮，跳过")
 			}
 			s.soddingAnimStarted = true
-			// 立即初始化除草车（无需等待动画）
-			s.initLawnmowers()
+			// Story 19.x QA: 有预设植物的关卡（铲子教学关卡），延迟除草车创建到保龄球阶段
+			// 除草车应该在铲子教学完成后才出现
+			if len(s.gameState.CurrentLevel.PresetPlants) == 0 {
+				// 无预设植物的普通关卡：立即初始化除草车
+				s.initLawnmowers()
+			} else {
+				log.Printf("[GameScene] 预设植物关卡：除草车延迟到保龄球阶段创建")
+			}
 			// 通知教学系统
 			if s.tutorialSystem != nil {
 				s.tutorialSystem.OnSoddingComplete()
@@ -1203,10 +1213,19 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	// 阳光在最顶层以确保始终可点击
 	s.renderSystem.DrawSuns(screen, s.cameraX)
 
-	// Layer 8.5: Draw tutorial text (Story 8.2)
+	// Layer 8.5: Draw tutorial text (Story 8.2 + Story 19.x QA)
 	// 教学文本在阳光之下、UI之上
-	if s.tutorialSystem != nil && s.tutorialFont != nil {
+	// Story 19.x QA: 修复教学文本不显示问题
+	// - TutorialSystem 创建的教学文本需要 tutorialFont
+	// - GuidedTutorialSystem 创建的教学文本也需要被渲染
+	// 使用 DrawTutorialText 渲染所有 TutorialTextComponent 实体
+	if s.tutorialFont != nil {
 		s.renderSystem.DrawTutorialText(screen, s.tutorialFont)
+	} else if s.guidedTutorialSystem != nil && s.guidedTutorialSystem.IsActive() {
+		// Story 19.x QA: GuidedTutorialSystem 使用 sunCounterFont 作为备选字体
+		if s.sunCounterFont != nil {
+			s.renderSystem.DrawTutorialText(screen, s.sunCounterFont)
+		}
 	}
 
 	// Layer 8.6: Draw UI particles (教学箭头、奖励粒子等)
@@ -1402,16 +1421,23 @@ func (s *GameScene) NotifyOperation(operation string) {
 // updateShovelSlotClick 检测铲子槽位点击
 // Story 19.2: 点击铲子槽位切换铲子模式
 // Story 19.3: 强引导模式下检查操作限制
+// Story 19.x QA: 铲子教学关卡（有预设植物）强制启用铲子点击
 func (s *GameScene) updateShovelSlotClick() {
-	// 检查铲子是否可用（教学关卡不显示、未解锁时不显示）
-	// Story 19.3: 强引导模式下始终显示铲子（不受 tutorial 类型限制）
+	// 检查铲子是否可用
+	// Story 19.x QA: 铲子教学关卡（有预设植物）强制启用铲子
+	isShovelTutorialLevel := s.gameState.CurrentLevel != nil && len(s.gameState.CurrentLevel.PresetPlants) > 0
+
+	// 教学关卡不显示铲子（玩家还不需要学习移除植物）
+	// 但是：铲子教学关卡或强引导模式激活时需要启用铲子
 	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.OpeningType == "tutorial" {
-		// Story 19.3: 如果强引导模式激活，不跳过铲子检测
-		if !s.IsGuidedTutorialActive() {
+		if !isShovelTutorialLevel && !s.IsGuidedTutorialActive() {
 			return
 		}
 	}
-	if !s.gameState.IsToolUnlocked("shovel") {
+
+	// Story 8.6: 检查铲子是否已解锁
+	// 例外：铲子教学关卡强制启用铲子
+	if !s.gameState.IsToolUnlocked("shovel") && !isShovelTutorialLevel {
 		return
 	}
 
@@ -1434,8 +1460,15 @@ func (s *GameScene) updateShovelSlotClick() {
 			// 切换铲子选中状态
 			s.SetShovelSelected(!s.shovelSelected)
 			if s.shovelSelected {
+				// 激活时隐藏系统光标（铲子图标会作为光标显示）
+				ebiten.SetCursorMode(ebiten.CursorModeHidden)
 				log.Printf("[GameScene] 铲子模式激活")
 			} else {
+				// 取消时恢复系统光标并清除高亮
+				ebiten.SetCursorMode(ebiten.CursorModeVisible)
+				if s.shovelInteractionSystem != nil {
+					s.shovelInteractionSystem.ClearHighlight()
+				}
 				log.Printf("[GameScene] 铲子模式取消")
 			}
 		}
@@ -1445,6 +1478,11 @@ func (s *GameScene) updateShovelSlotClick() {
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight) {
 		if s.shovelSelected {
 			s.SetShovelSelected(false)
+			// 立即恢复系统光标并清除高亮
+			ebiten.SetCursorMode(ebiten.CursorModeVisible)
+			if s.shovelInteractionSystem != nil {
+				s.shovelInteractionSystem.ClearHighlight()
+			}
 			log.Printf("[GameScene] 右键取消铲子模式")
 		}
 	}
