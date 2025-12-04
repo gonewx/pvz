@@ -2,6 +2,8 @@
 
 > 使用 Go 语言和 Ebitengine 引擎开发的《植物大战僵尸》精确复刻项目
 
+[![CI](https://github.com/decker502/pvz/actions/workflows/ci.yml/badge.svg)](https://github.com/decker502/pvz/actions/workflows/ci.yml)
+[![Release](https://github.com/decker502/pvz/actions/workflows/release.yml/badge.svg)](https://github.com/decker502/pvz/actions/workflows/release.yml)
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://golang.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
