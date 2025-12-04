@@ -624,6 +624,7 @@ func TestBowlingNutSystem_FlashEffectAdded(t *testing.T) {
 }
 
 // TestBowlingNutSystem_IsZombieType 测试僵尸类型检测
+// 只有活着的僵尸才返回true，死亡中的僵尸返回false（避免无效碰撞）
 func TestBowlingNutSystem_IsZombieType(t *testing.T) {
 	em := ecs.NewEntityManager()
 	system := NewBowlingNutSystem(em, nil)
@@ -634,7 +635,7 @@ func TestBowlingNutSystem_IsZombieType(t *testing.T) {
 	}{
 		{components.BehaviorZombieBasic, true},
 		{components.BehaviorZombieEating, true},
-		{components.BehaviorZombieDying, true},
+		{components.BehaviorZombieDying, false}, // 死亡中的僵尸不参与碰撞检测
 		{components.BehaviorZombieConehead, true},
 		{components.BehaviorZombieBuckethead, true},
 		{components.BehaviorZombieFlag, true},

@@ -107,20 +107,18 @@ func (s *BowlingNutSystem) Update(dt float64) {
 
 		// 不在弹射中且冷却结束时检测碰撞
 		if !nutComp.IsBouncing && nutComp.CollisionCooldown <= 0 {
-			collidedZombies := s.checkCollisionWithZombies(entityID, posComp, nutComp)
-			if len(collidedZombies) > 0 {
-				// 对所有碰撞的僵尸造成伤害
-				for _, zombieID := range collidedZombies {
-					s.applyDamageToZombie(zombieID)
-				}
+			collidedZombie := s.checkCollisionWithNearestZombie(entityID, posComp, nutComp)
+			if collidedZombie != 0 {
+				// 只对最近的一只僵尸造成伤害
+				s.applyDamageToZombie(collidedZombie)
 
-			// 处理碰撞后的行为
-			if nutComp.IsExplosive {
-				// Story 19.8: 爆炸坚果触发 3x3 范围爆炸
-				log.Printf("[BowlingNutSystem] 爆炸坚果碰撞，触发爆炸: entityID=%d", entityID)
-				s.triggerExplosion(entityID, posComp)
-				continue
-			} else {
+				// 处理碰撞后的行为
+				if nutComp.IsExplosive {
+					// Story 19.8: 爆炸坚果触发 3x3 范围爆炸
+					log.Printf("[BowlingNutSystem] 爆炸坚果碰撞，触发爆炸: entityID=%d", entityID)
+					s.triggerExplosion(entityID, posComp)
+					continue
+				} else {
 					// 普通坚果：播放撞击音效，计算弹射方向，开始弹射
 					s.playImpactSound()
 					targetRow := s.calculateBounceDirection(nutComp.Row, posComp.X)
@@ -145,7 +143,8 @@ func (s *BowlingNutSystem) Update(dt float64) {
 	s.cleanupSoundPlayers()
 }
 
-// checkCollisionWithZombies 检测坚果与同行僵尸的碰撞
+// checkCollisionWithNearestZombie 检测坚果与最近僵尸的碰撞
+// 每次碰撞只返回一只僵尸（X轴最近的那只）
 //
 // 参数:
 //   - nutEntityID: 坚果实体ID
@@ -153,13 +152,14 @@ func (s *BowlingNutSystem) Update(dt float64) {
 //   - nutComp: 坚果组件
 //
 // 返回:
-//   - []ecs.EntityID: 碰撞的僵尸实体ID列表
-func (s *BowlingNutSystem) checkCollisionWithZombies(
+//   - ecs.EntityID: 碰撞的最近僵尸实体ID，无碰撞返回0
+func (s *BowlingNutSystem) checkCollisionWithNearestZombie(
 	nutEntityID ecs.EntityID,
 	nutPos *components.PositionComponent,
 	nutComp *components.BowlingNutComponent,
-) []ecs.EntityID {
-	var collidedZombies []ecs.EntityID
+) ecs.EntityID {
+	var nearestZombie ecs.EntityID
+	nearestDist := math.MaxFloat64
 
 	// 计算坚果碰撞盒
 	nutLeft := nutPos.X - config.BowlingNutCollisionWidth/2
@@ -194,25 +194,33 @@ func (s *BowlingNutSystem) checkCollisionWithZombies(
 		// AABB 碰撞检测
 		if nutRight >= zombieLeft && nutLeft <= zombieRight &&
 			nutBottom >= zombieTop && nutTop <= zombieBottom {
-			collidedZombies = append(collidedZombies, zombieID)
-			log.Printf("[BowlingNutSystem] 坚果碰撞僵尸: nutID=%d, zombieID=%d", nutEntityID, zombieID)
+			// 计算与坚果的X轴距离，选择最近的
+			dist := math.Abs(zombiePos.X - nutPos.X)
+			if dist < nearestDist {
+				nearestDist = dist
+				nearestZombie = zombieID
+			}
 		}
 	}
 
-	return collidedZombies
+	if nearestZombie != 0 {
+		log.Printf("[BowlingNutSystem] 坚果碰撞最近僵尸: nutID=%d, zombieID=%d", nutEntityID, nearestZombie)
+	}
+
+	return nearestZombie
 }
 
-// isZombieType 检查行为类型是否是僵尸
+// isZombieType 检查行为类型是否是活着的僵尸（排除死亡状态）
 func (s *BowlingNutSystem) isZombieType(behaviorType components.BehaviorType) bool {
 	switch behaviorType {
 	case components.BehaviorZombieBasic,
 		components.BehaviorZombieEating,
-		components.BehaviorZombieDying,
 		components.BehaviorZombieConehead,
 		components.BehaviorZombieBuckethead,
 		components.BehaviorZombieFlag:
 		return true
 	default:
+		// 排除 BehaviorZombieDying, BehaviorZombieSquashing, BehaviorZombieDyingExplosion 等死亡状态
 		return false
 	}
 }
@@ -312,8 +320,13 @@ func (s *BowlingNutSystem) triggerExplosion(entityID ecs.EntityID, posComp *comp
 		zombiePos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
 
 		// 计算距离（使用距离平方优化性能）
+		// 修正：僵尸的 PositionComponent.Y 包含了 ZombieVerticalOffset (-25.0)
+		// 这导致上行僵尸距离变远，下行僵尸距离变近
+		// 为了保证上下行对称判定，需要还原到格子中心进行距离计算
+		zombieEffectiveY := zombiePos.Y - config.ZombieVerticalOffset
+
 		dx := zombiePos.X - posComp.X
-		dy := zombiePos.Y - posComp.Y
+		dy := zombieEffectiveY - posComp.Y
 		distSq := dx*dx + dy*dy
 
 		// 检查是否在爆炸范围内
