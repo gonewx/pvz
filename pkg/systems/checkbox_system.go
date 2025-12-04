@@ -60,13 +60,11 @@ func NewCheckboxSystemWithInput(em *ecs.EntityManager, input CheckboxMouseInput)
 // Update 更新复选框交互状态
 // 检测鼠标位置和点击，更新复选框状态
 func (s *CheckboxSystem) Update(deltaTime float64) {
-	// 检测鼠标左键是否刚按下（通过接口调用，支持 mock）
-	if !s.mouseInput.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
-		return
-	}
-
 	// 获取鼠标位置
 	mouseX, mouseY := s.mouseInput.CursorPosition()
+
+	// 检测鼠标左键是否刚按下
+	mouseJustPressed := s.mouseInput.IsMouseButtonJustPressed(ebiten.MouseButtonLeft)
 
 	// 查询所有复选框实体
 	entities := ecs.GetEntitiesWith2[*components.CheckboxComponent, *components.PositionComponent](s.entityManager)
@@ -88,11 +86,18 @@ func (s *CheckboxSystem) Update(deltaTime float64) {
 			width = float64(checkbox.UncheckedImage.Bounds().Dx())
 			height = float64(checkbox.UncheckedImage.Bounds().Dy())
 		} else {
+			checkbox.IsHovered = false
 			continue
 		}
 
 		// 检测鼠标是否在复选框区域内
-		if s.isMouseInCheckbox(float64(mouseX), float64(mouseY), pos.X, pos.Y, width, height) {
+		isInCheckbox := s.isMouseInCheckbox(float64(mouseX), float64(mouseY), pos.X, pos.Y, width, height)
+
+		// 更新悬停状态
+		checkbox.IsHovered = isInCheckbox
+
+		// 点击处理
+		if mouseJustPressed && isInCheckbox {
 			// 切换状态
 			checkbox.IsChecked = !checkbox.IsChecked
 

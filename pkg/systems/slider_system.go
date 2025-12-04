@@ -91,6 +91,9 @@ func (s *SliderSystem) Update(deltaTime float64) {
 		// 检测鼠标是否在滑槽区域内
 		isInSlot := s.isMouseInSlot(float64(mouseX), float64(mouseY), slotX, slotY, slotWidth, slotHeight)
 
+		// 更新悬停状态
+		slider.IsHovered = isInSlot
+
 		if mousePressed {
 			// 如果鼠标按下且在滑槽内，或者正在拖拽
 			if isInSlot || slider.IsDragging {

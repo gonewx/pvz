@@ -24,6 +24,7 @@ type SliderComponent struct {
 
 	// 状态
 	IsDragging bool // 是否正在拖动
+	IsHovered  bool // 是否鼠标悬停
 
 	// 回调函数
 	OnValueChange func(value float64) // 值改变时的回调

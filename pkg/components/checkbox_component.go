@@ -11,6 +11,7 @@ type CheckboxComponent struct {
 
 	// 当前状态
 	IsChecked bool
+	IsHovered bool // 是否鼠标悬停
 
 	// 标签文字
 	Label     string
