@@ -78,6 +78,8 @@ type MainMenuScene struct {
 	// Story 12.3: Help and Options panels
 	buttonSystem       *systems.ButtonSystem       // Button interaction system
 	buttonRenderSystem *systems.ButtonRenderSystem // Button render system
+	sliderSystem       *systems.SliderSystem       // Slider interaction system (for options panel)
+	checkboxSystem     *systems.CheckboxSystem     // Checkbox interaction system (for options panel)
 	helpPanelModule    *modules.HelpPanelModule    // Help panel module
 	optionsPanelModule *modules.OptionsPanelModule // Options panel module
 
@@ -319,6 +321,8 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	// Story 12.3: Initialize button systems (shared by help and options panels)
 	scene.buttonSystem = systems.NewButtonSystem(scene.entityManager)
 	scene.buttonRenderSystem = systems.NewButtonRenderSystem(scene.entityManager)
+	scene.sliderSystem = systems.NewSliderSystem(scene.entityManager)
+	scene.checkboxSystem = systems.NewCheckboxSystem(scene.entityManager)
 
 	// Story 12.3: Initialize help panel module
 	helpPanel, err := modules.NewHelpPanelModule(
@@ -338,13 +342,13 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	}
 
 	// Story 12.3: Initialize options panel module
-	// Story 20.5: 传递 nil 作为 settingsManager（主菜单场景暂无 GameState）
+	// Story 20.5: 从 GameState 获取 SettingsManager，复用已实现的设置保存逻辑
 	optionsPanel, err := modules.NewOptionsPanelModule(
 		scene.entityManager,
 		rm,
 		scene.buttonSystem,
 		scene.buttonRenderSystem,
-		nil, // settingsManager（主菜单场景暂无 GameState，使用降级模式）
+		gameState.GetSettingsManager(), // 复用 SettingsManager，支持全屏设置保存
 		WindowWidth,
 		WindowHeight,
 		nil, // onClose callback (no special action needed)
@@ -483,6 +487,16 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 	// Story 12.3: Update button system (for panel buttons)
 	if m.buttonSystem != nil {
 		m.buttonSystem.Update(deltaTime)
+	}
+
+	// 选项面板激活时更新滑块和复选框系统（复用游戏场景的交互逻辑）
+	if m.optionsPanelModule != nil && m.optionsPanelModule.IsActive() {
+		if m.sliderSystem != nil {
+			m.sliderSystem.Update(deltaTime)
+		}
+		if m.checkboxSystem != nil {
+			m.checkboxSystem.Update(deltaTime)
+		}
 	}
 
 	// Get mouse position (needed for both dialog and background interaction)

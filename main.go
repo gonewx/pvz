@@ -189,6 +189,18 @@ func main() {
 	ebiten.SetWindowTitle("植物大战僵尸 - Go复刻版")
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
+	// 应用保存的全屏设置
+	gameState := game.GetGameState()
+	if settingsManager := gameState.GetSettingsManager(); settingsManager != nil {
+		settings := settingsManager.GetSettings()
+		if settings.Fullscreen {
+			ebiten.SetFullscreen(true)
+			if *verboseFlag {
+				log.Printf("[main] Applying saved fullscreen setting: true")
+			}
+		}
+	}
+
 	// Start the game loop
 	// This will call Update() and Draw() repeatedly until the window is closed
 	if err := ebiten.RunGame(gameInstance); err != nil {
