@@ -345,7 +345,7 @@ func TestBowlingIntegration_CollisionAndBounce(t *testing.T) {
 		nutEntity := em.CreateEntity()
 		em.AddComponent(nutEntity, &components.PositionComponent{X: 500, Y: 328})
 		em.AddComponent(nutEntity, &components.BowlingNutComponent{
-			VelocityX: config.BowlingNutSpeed,
+			VelocityX: 250.0, // 测试用固定速度
 			IsRolling: true,
 			Row:       2,
 		})
@@ -411,7 +411,7 @@ func TestBowlingIntegration_CollisionAndBounce(t *testing.T) {
 		nutX, nutY := 500.0, 328.0
 		em.AddComponent(nutEntity, &components.PositionComponent{X: nutX, Y: nutY})
 		em.AddComponent(nutEntity, &components.BowlingNutComponent{
-			VelocityX:   config.BowlingNutSpeed,
+			VelocityX:   250.0, // 测试用固定速度
 			IsRolling:   true,
 			Row:         2,
 			IsExplosive: true,
@@ -511,7 +511,7 @@ func TestBowlingIntegration_EdgeCases(t *testing.T) {
 			nutEntity := em.CreateEntity()
 			em.AddComponent(nutEntity, &components.PositionComponent{X: 500 - float64(i)*10, Y: 328})
 			em.AddComponent(nutEntity, &components.BowlingNutComponent{
-				VelocityX: config.BowlingNutSpeed,
+				VelocityX: 250.0, // 测试用固定速度
 				IsRolling: true,
 				Row:       2,
 			})
@@ -572,7 +572,7 @@ func TestBowlingIntegration_EdgeCases(t *testing.T) {
 				Y: 328,
 			})
 			em.AddComponent(nutEntity, &components.BowlingNutComponent{
-				VelocityX: config.BowlingNutSpeed,
+				VelocityX: 250.0, // 测试用固定速度
 				IsRolling: true,
 				Row:       2,
 			})
