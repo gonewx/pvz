@@ -380,6 +380,8 @@ func (rprs *RewardPanelRenderSystem) getPlantType(plantID string) components.Pla
 		return components.PlantCherryBomb
 	case "wallnut":
 		return components.PlantWallnut
+	case "potatomine":
+		return components.PlantPotatoMine
 	default:
 		return components.PlantUnknown
 	}
@@ -397,6 +399,8 @@ func (rprs *RewardPanelRenderSystem) getReanimName(plantType components.PlantTyp
 		return "CherryBomb"
 	case components.PlantWallnut:
 		return "Wallnut" // 修复：与资源加载时的名称一致（小写n）
+	case components.PlantPotatoMine:
+		return "PotatoMine"
 	default:
 		return ""
 	}
@@ -413,6 +417,8 @@ func (rprs *RewardPanelRenderSystem) getConfigID(plantType components.PlantType)
 		return "cherrybomb"
 	case components.PlantWallnut:
 		return "wallnut"
+	case components.PlantPotatoMine:
+		return "potatomine"
 	default:
 		return ""
 	}

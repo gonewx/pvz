@@ -26,7 +26,7 @@ const (
 
 var (
 	// 命令行参数
-	plantID = flag.String("plant", "sunflower", "植物ID (sunflower, peashooter, cherrybomb, wallnut)")
+	plantID = flag.String("plant", "sunflower", "植物ID (sunflower, peashooter, cherrybomb, wallnut, potatomine)")
 	verbose = flag.Bool("verbose", false, "显示详细调试信息")
 )
 
@@ -365,11 +365,12 @@ func main() {
 		"peashooter": true,
 		"cherrybomb": true,
 		"wallnut":    true,
+		"potatomine": true,
 	}
 
 	if !validPlants[*plantID] {
 		fmt.Fprintf(os.Stderr, "错误: 无效的植物ID '%s'\n", *plantID)
-		fmt.Fprintln(os.Stderr, "有效的植物ID: sunflower, peashooter, cherrybomb, wallnut")
+		fmt.Fprintln(os.Stderr, "有效的植物ID: sunflower, peashooter, cherrybomb, wallnut, potatomine")
 		os.Exit(1)
 	}
 

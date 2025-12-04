@@ -26,7 +26,7 @@ const (
 
 var (
 	// 命令行参数
-	plantID = flag.String("plant", "sunflower", "植物ID (sunflower, peashooter, cherrybomb, wallnut)")
+	plantID = flag.String("plant", "sunflower", "植物ID (sunflower, peashooter, cherrybomb, wallnut, potatomine)")
 	verbose = flag.Bool("verbose", false, "显示详细调试信息")
 )
 
@@ -135,6 +135,10 @@ func NewVerifyPanelGame() (*VerifyPanelGame, error) {
 		plantName = "坚果墙"
 		plantDesc = "阻挡僵尸前进"
 		sunCost = 50
+	case "potatomine":
+		plantName = "土豆雷"
+		plantDesc = "埋在地里等待僵尸踩上去后爆炸"
+		sunCost = 25
 	}
 
 	// 添加面板组件（PlantID 字段很重要，用于自动加载图标）
@@ -292,11 +296,12 @@ func main() {
 		"peashooter": true,
 		"cherrybomb": true,
 		"wallnut":    true,
+		"potatomine": true,
 	}
 
 	if !validPlants[*plantID] {
 		fmt.Fprintf(os.Stderr, "错误: 无效的植物ID '%s'\n", *plantID)
-		fmt.Fprintln(os.Stderr, "有效的植物ID: sunflower, peashooter, cherrybomb, wallnut")
+		fmt.Fprintln(os.Stderr, "有效的植物ID: sunflower, peashooter, cherrybomb, wallnut, potatomine")
 		os.Exit(1)
 	}
 
