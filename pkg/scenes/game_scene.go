@@ -280,6 +280,24 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 		scene.gameState.LoadLevel(levelConfig)
 		log.Printf("[GameScene] Loaded level: %s (%d waves, %d plants available, enabled lanes: %v)",
 			levelConfig.Name, len(levelConfig.Waves), len(levelConfig.AvailablePlants), levelConfig.EnabledLanes)
+
+		// Bug Fix: 验证战斗存档的 LevelID 是否与当前加载的关卡匹配
+		// 如果不匹配，清除存档标记并删除不匹配的存档
+		// 这可以防止在错误的关卡场景中恢复存档数据
+		if scene.hasBattleSave && scene.battleSaveInfo != nil {
+			if scene.battleSaveInfo.LevelID != "" && scene.battleSaveInfo.LevelID != levelConfig.ID {
+				log.Printf("[GameScene] ⚠️ 战斗存档关卡不匹配! 存档关卡: %s, 当前关卡: %s",
+					scene.battleSaveInfo.LevelID, levelConfig.ID)
+				log.Printf("[GameScene] 清除存档标记，删除不匹配的存档...")
+				// 删除不匹配的存档
+				if err := saveManager.DeleteBattleSave(currentUser); err != nil {
+					log.Printf("[GameScene] Warning: Failed to delete mismatched battle save: %v", err)
+				}
+				// 清除存档标记，避免显示对话框
+				scene.hasBattleSave = false
+				scene.battleSaveInfo = nil
+			}
+		}
 	}
 
 	// Initialize systems

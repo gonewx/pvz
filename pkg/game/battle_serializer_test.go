@@ -2,6 +2,8 @@ package game
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -12,7 +14,7 @@ import (
 )
 
 // createTestGdataManagerForBattle 创建用于测试的 gdata Manager
-func createTestGdataManagerForBattle(testName string) *gdata.Manager {
+func createTestGdataManagerForBattle(t *testing.T, testName string) *gdata.Manager {
 	appName := fmt.Sprintf("pvz_battle_test_%s_%d", testName, time.Now().UnixNano())
 	manager, err := gdata.Open(gdata.Config{
 		AppName: appName,
@@ -20,6 +22,16 @@ func createTestGdataManagerForBattle(testName string) *gdata.Manager {
 	if err != nil {
 		return nil
 	}
+
+	// 注册清理函数，测试结束后删除测试目录
+	t.Cleanup(func() {
+		homeDir, err := os.UserHomeDir()
+		if err == nil {
+			testDir := filepath.Join(homeDir, ".local", "share", appName)
+			os.RemoveAll(testDir)
+		}
+	})
+
 	return manager
 }
 
@@ -33,7 +45,7 @@ func TestBattleSerializer_NewBattleSerializer(t *testing.T) {
 
 // TestBattleSerializer_SaveBattle_NilEntityManager 测试空 EntityManager
 func TestBattleSerializer_SaveBattle_NilEntityManager(t *testing.T) {
-	gdataManager := createTestGdataManagerForBattle("nil_em")
+	gdataManager := createTestGdataManagerForBattle(t, "nil_em")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -49,7 +61,7 @@ func TestBattleSerializer_SaveBattle_NilEntityManager(t *testing.T) {
 
 // TestBattleSerializer_SaveBattle_NilGameState 测试空 GameState
 func TestBattleSerializer_SaveBattle_NilGameState(t *testing.T) {
-	gdataManager := createTestGdataManagerForBattle("nil_gs")
+	gdataManager := createTestGdataManagerForBattle(t, "nil_gs")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -77,7 +89,7 @@ func TestBattleSerializer_SaveBattle_NilGdataManager(t *testing.T) {
 
 // TestBattleSerializer_SaveAndLoadBattle_Empty 测试空战斗状态
 func TestBattleSerializer_SaveAndLoadBattle_Empty(t *testing.T) {
-	gdataManager := createTestGdataManagerForBattle("empty")
+	gdataManager := createTestGdataManagerForBattle(t, "empty")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -127,7 +139,7 @@ func TestBattleSerializer_SaveAndLoadBattle_Empty(t *testing.T) {
 
 // TestBattleSerializer_SaveAndLoadBattle_WithPlants 测试带植物的战斗状态
 func TestBattleSerializer_SaveAndLoadBattle_WithPlants(t *testing.T) {
-	gdataManager := createTestGdataManagerForBattle("with_plants")
+	gdataManager := createTestGdataManagerForBattle(t, "with_plants")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -196,7 +208,7 @@ func TestBattleSerializer_SaveAndLoadBattle_WithPlants(t *testing.T) {
 
 // TestBattleSerializer_SaveAndLoadBattle_WithZombies 测试带僵尸的战斗状态
 func TestBattleSerializer_SaveAndLoadBattle_WithZombies(t *testing.T) {
-	gdataManager := createTestGdataManagerForBattle("with_zombies")
+	gdataManager := createTestGdataManagerForBattle(t, "with_zombies")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -262,7 +274,7 @@ func TestBattleSerializer_SaveAndLoadBattle_WithZombies(t *testing.T) {
 
 // TestBattleSerializer_SaveAndLoadBattle_WithLawnmowers 测试带除草车的战斗状态
 func TestBattleSerializer_SaveAndLoadBattle_WithLawnmowers(t *testing.T) {
-	gdataManager := createTestGdataManagerForBattle("with_lawnmowers")
+	gdataManager := createTestGdataManagerForBattle(t, "with_lawnmowers")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -326,7 +338,7 @@ func TestBattleSerializer_SaveAndLoadBattle_WithLawnmowers(t *testing.T) {
 
 // TestBattleSerializer_LoadBattle_NotFound 测试加载不存在的存档
 func TestBattleSerializer_LoadBattle_NotFound(t *testing.T) {
-	gdataManager := createTestGdataManagerForBattle("not_found")
+	gdataManager := createTestGdataManagerForBattle(t, "not_found")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -340,7 +352,7 @@ func TestBattleSerializer_LoadBattle_NotFound(t *testing.T) {
 
 // TestBattleSerializer_LoadBattle_Corrupted 测试加载损坏的存档
 func TestBattleSerializer_LoadBattle_Corrupted(t *testing.T) {
-	gdataManager := createTestGdataManagerForBattle("corrupted")
+	gdataManager := createTestGdataManagerForBattle(t, "corrupted")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -485,7 +497,7 @@ func TestBehaviorTypeToString(t *testing.T) {
 
 // TestBattleSerializer_SaveAndLoadBattle_WithSuns 测试带阳光的战斗状态
 func TestBattleSerializer_SaveAndLoadBattle_WithSuns(t *testing.T) {
-	gdataManager := createTestGdataManagerForBattle("with_suns")
+	gdataManager := createTestGdataManagerForBattle(t, "with_suns")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -550,7 +562,7 @@ func TestBattleSerializer_SaveAndLoadBattle_WithSuns(t *testing.T) {
 
 // TestBattleSerializer_SaveAndLoadBattle_WithProjectiles 测试带子弹的战斗状态
 func TestBattleSerializer_SaveAndLoadBattle_WithProjectiles(t *testing.T) {
-	gdataManager := createTestGdataManagerForBattle("with_projectiles")
+	gdataManager := createTestGdataManagerForBattle(t, "with_projectiles")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -605,7 +617,7 @@ func TestBattleSerializer_SaveAndLoadBattle_WithProjectiles(t *testing.T) {
 
 // TestBattleSerializer_SaveAndLoadBattle_CompleteScenario 测试完整的战斗场景
 func TestBattleSerializer_SaveAndLoadBattle_CompleteScenario(t *testing.T) {
-	gdataManager := createTestGdataManagerForBattle("complete")
+	gdataManager := createTestGdataManagerForBattle(t, "complete")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -807,7 +819,7 @@ func TestBattleSerializer_CollectTutorialData_WithTutorial(t *testing.T) {
 
 // TestBattleSerializer_SaveAndLoadBattle_WithTutorial 测试带教学数据的存档
 func TestBattleSerializer_SaveAndLoadBattle_WithTutorial(t *testing.T) {
-	gdataManager := createTestGdataManagerForBattle("with_tutorial")
+	gdataManager := createTestGdataManagerForBattle(t, "with_tutorial")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}

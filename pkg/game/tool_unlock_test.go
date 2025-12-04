@@ -2,6 +2,8 @@ package game
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -10,7 +12,7 @@ import (
 )
 
 // createTestGdataManagerForTool 创建用于测试的 gdata Manager
-func createTestGdataManagerForTool(testName string) *gdata.Manager {
+func createTestGdataManagerForTool(t *testing.T, testName string) *gdata.Manager {
 	appName := fmt.Sprintf("pvz_tool_test_%s_%d", testName, time.Now().UnixNano())
 	manager, err := gdata.Open(gdata.Config{
 		AppName: appName,
@@ -18,12 +20,22 @@ func createTestGdataManagerForTool(testName string) *gdata.Manager {
 	if err != nil {
 		return nil
 	}
+
+	// 注册清理函数，测试结束后删除测试目录
+	t.Cleanup(func() {
+		homeDir, err := os.UserHomeDir()
+		if err == nil {
+			testDir := filepath.Join(homeDir, ".local", "share", appName)
+			os.RemoveAll(testDir)
+		}
+	})
+
 	return manager
 }
 
 // TestToolUnlock 测试工具解锁功能
 func TestToolUnlock(t *testing.T) {
-	gdataManager := createTestGdataManagerForTool("unlock")
+	gdataManager := createTestGdataManagerForTool(t, "unlock")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -68,7 +80,7 @@ func TestToolUnlock(t *testing.T) {
 
 // TestCompleteLevelWithToolUnlock 测试关卡完成时解锁工具
 func TestCompleteLevelWithToolUnlock(t *testing.T) {
-	gdataManager := createTestGdataManagerForTool("complete_level")
+	gdataManager := createTestGdataManagerForTool(t, "complete_level")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -121,7 +133,7 @@ func TestCompleteLevelWithToolUnlock(t *testing.T) {
 
 // TestShovelDisplayLogic 测试铲子显示逻辑
 func TestShovelDisplayLogic(t *testing.T) {
-	gdataManager := createTestGdataManagerForTool("display_logic")
+	gdataManager := createTestGdataManagerForTool(t, "display_logic")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -167,7 +179,7 @@ func TestShovelDisplayLogic(t *testing.T) {
 	gs.CurrentLevel = level12
 
 	// 使用新的 gdata Manager 重置状态
-	gdataManager2 := createTestGdataManagerForTool("display_logic_2")
+	gdataManager2 := createTestGdataManagerForTool(t, "display_logic_2")
 	if gdataManager2 == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}

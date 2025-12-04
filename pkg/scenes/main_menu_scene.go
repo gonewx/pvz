@@ -164,12 +164,27 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 		// Not first launch: load current user's save
 		scene.isFirstLaunch = false
 		if err := saveManager.Load(); err == nil {
-			scene.currentLevel = saveManager.GetHighestLevel()
-			if scene.currentLevel == "" {
-				scene.currentLevel = "1-1"
-			}
 			scene.hasStartedGame = saveManager.GetHasStartedGame()
-			log.Printf("[MainMenuScene] Loaded highest level: %s, hasStartedGame: %v", scene.currentLevel, scene.hasStartedGame)
+
+			// Bug Fix: 优先使用战斗存档中的 LevelID（与 onStartAdventureClicked 保持一致）
+			// 如果有战斗存档，必须使用存档中的关卡ID，否则会导致主菜单显示与实际加载的关卡不匹配
+			scene.currentLevel = ""
+			currentUser := saveManager.GetCurrentUser()
+			if currentUser != "" && saveManager.HasBattleSave(currentUser) {
+				if battleInfo, err := saveManager.GetBattleSaveInfo(currentUser); err == nil && battleInfo != nil {
+					scene.currentLevel = battleInfo.LevelID
+					log.Printf("[MainMenuScene] Found battle save for level %s, using it for display", scene.currentLevel)
+				}
+			}
+
+			// 如果没有战斗存档，使用 GetNextLevelToPlay
+			if scene.currentLevel == "" {
+				scene.currentLevel = saveManager.GetNextLevelToPlay()
+				log.Printf("[MainMenuScene] No battle save, using next level: %s (highest completed: %s)",
+					scene.currentLevel, saveManager.GetHighestLevel())
+			}
+
+			log.Printf("[MainMenuScene] Display level: %s, hasStartedGame: %v", scene.currentLevel, scene.hasStartedGame)
 		} else {
 			scene.currentLevel = "1-1"
 			scene.hasStartedGame = false

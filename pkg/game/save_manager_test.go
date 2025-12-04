@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -12,7 +14,8 @@ import (
 
 // createTestGdataManager 创建用于测试的 gdata Manager
 // 每个测试使用唯一的 AppName 来隔离数据
-func createTestGdataManager(testName string) *gdata.Manager {
+// 返回 manager 和清理函数
+func createTestGdataManager(t *testing.T, testName string) *gdata.Manager {
 	appName := fmt.Sprintf("pvz_test_%s_%d", testName, time.Now().UnixNano())
 	manager, err := gdata.Open(gdata.Config{
 		AppName: appName,
@@ -20,12 +23,24 @@ func createTestGdataManager(testName string) *gdata.Manager {
 	if err != nil {
 		return nil
 	}
+
+	// 注册清理函数，测试结束后删除测试目录
+	t.Cleanup(func() {
+		// gdata 在 Linux 上使用 ~/.local/share/<appName>
+		// 在其他平台上可能不同，但我们主要在 Linux 上测试
+		homeDir, err := os.UserHomeDir()
+		if err == nil {
+			testDir := filepath.Join(homeDir, ".local", "share", appName)
+			os.RemoveAll(testDir)
+		}
+	})
+
 	return manager
 }
 
 func TestSaveManager_NewGame(t *testing.T) {
 	// 使用 gdata manager 测试
-	gdataManager := createTestGdataManager("new_game")
+	gdataManager := createTestGdataManager(t, "new_game")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -81,7 +96,7 @@ func TestSaveManager_NewSaveManagerNilGdata(t *testing.T) {
 }
 
 func TestSaveManager_CreateUser(t *testing.T) {
-	gdataManager := createTestGdataManager("create_user")
+	gdataManager := createTestGdataManager(t, "create_user")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -122,7 +137,7 @@ func TestSaveManager_CreateUser(t *testing.T) {
 }
 
 func TestSaveManager_CreateUser_DuplicateName(t *testing.T) {
-	gdataManager := createTestGdataManager("duplicate_name")
+	gdataManager := createTestGdataManager(t, "duplicate_name")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -171,7 +186,7 @@ func TestSaveManager_ValidateUsername(t *testing.T) {
 }
 
 func TestSaveManager_SaveAndLoad_WithUser(t *testing.T) {
-	gdataManager := createTestGdataManager("save_load")
+	gdataManager := createTestGdataManager(t, "save_load")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -229,7 +244,7 @@ func TestSaveManager_SaveAndLoad_WithUser(t *testing.T) {
 }
 
 func TestSaveManager_RenameUser(t *testing.T) {
-	gdataManager := createTestGdataManager("rename_user")
+	gdataManager := createTestGdataManager(t, "rename_user")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -270,7 +285,7 @@ func TestSaveManager_RenameUser(t *testing.T) {
 }
 
 func TestSaveManager_RenameUser_WithBattleSave(t *testing.T) {
-	gdataManager := createTestGdataManager("rename_with_battle")
+	gdataManager := createTestGdataManager(t, "rename_with_battle")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -311,7 +326,7 @@ func TestSaveManager_RenameUser_NotExists(t *testing.T) {
 }
 
 func TestSaveManager_RenameUser_TargetExists(t *testing.T) {
-	gdataManager := createTestGdataManager("rename_target_exists")
+	gdataManager := createTestGdataManager(t, "rename_target_exists")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -328,7 +343,7 @@ func TestSaveManager_RenameUser_TargetExists(t *testing.T) {
 }
 
 func TestSaveManager_DeleteUser(t *testing.T) {
-	gdataManager := createTestGdataManager("delete_user")
+	gdataManager := createTestGdataManager(t, "delete_user")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -361,7 +376,7 @@ func TestSaveManager_DeleteUser(t *testing.T) {
 }
 
 func TestSaveManager_DeleteUser_WithBattleSave(t *testing.T) {
-	gdataManager := createTestGdataManager("delete_with_battle")
+	gdataManager := createTestGdataManager(t, "delete_with_battle")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -388,7 +403,7 @@ func TestSaveManager_DeleteUser_WithBattleSave(t *testing.T) {
 }
 
 func TestSaveManager_DeleteUser_NotCurrent(t *testing.T) {
-	gdataManager := createTestGdataManager("delete_not_current")
+	gdataManager := createTestGdataManager(t, "delete_not_current")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -425,7 +440,7 @@ func TestSaveManager_DeleteUser_NotExists(t *testing.T) {
 }
 
 func TestSaveManager_SwitchUser(t *testing.T) {
-	gdataManager := createTestGdataManager("switch_user")
+	gdataManager := createTestGdataManager(t, "switch_user")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -463,7 +478,7 @@ func TestSaveManager_SwitchUser(t *testing.T) {
 }
 
 func TestSaveManager_SwitchUser_NotExists(t *testing.T) {
-	gdataManager := createTestGdataManager("switch_not_exists")
+	gdataManager := createTestGdataManager(t, "switch_not_exists")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -479,7 +494,7 @@ func TestSaveManager_SwitchUser_NotExists(t *testing.T) {
 }
 
 func TestSaveManager_MultipleUsers_DataIsolation(t *testing.T) {
-	gdataManager := createTestGdataManager("data_isolation")
+	gdataManager := createTestGdataManager(t, "data_isolation")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -557,7 +572,7 @@ func TestSaveManager_UnlockTool_Duplicate(t *testing.T) {
 }
 
 func TestSaveManager_UserListPersistence(t *testing.T) {
-	gdataManager := createTestGdataManager("user_persistence")
+	gdataManager := createTestGdataManager(t, "user_persistence")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -587,7 +602,7 @@ func TestSaveManager_UserListPersistence(t *testing.T) {
 // --- 战斗存档管理方法测试 (Story 18.1, 重构于 Story 20.3) ---
 
 func TestSaveManager_HasBattleSave_NotExists(t *testing.T) {
-	gdataManager := createTestGdataManager("has_battle_not_exists")
+	gdataManager := createTestGdataManager(t, "has_battle_not_exists")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -600,7 +615,7 @@ func TestSaveManager_HasBattleSave_NotExists(t *testing.T) {
 }
 
 func TestSaveManager_HasBattleSave_Exists(t *testing.T) {
-	gdataManager := createTestGdataManager("has_battle_exists")
+	gdataManager := createTestGdataManager(t, "has_battle_exists")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -628,7 +643,7 @@ func TestSaveManager_HasBattleSave_NilGdata(t *testing.T) {
 }
 
 func TestSaveManager_DeleteBattleSave(t *testing.T) {
-	gdataManager := createTestGdataManager("delete_battle")
+	gdataManager := createTestGdataManager(t, "delete_battle")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -659,7 +674,7 @@ func TestSaveManager_DeleteBattleSave(t *testing.T) {
 }
 
 func TestSaveManager_DeleteBattleSave_NotExists(t *testing.T) {
-	gdataManager := createTestGdataManager("delete_battle_not_exists")
+	gdataManager := createTestGdataManager(t, "delete_battle_not_exists")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -674,7 +689,7 @@ func TestSaveManager_DeleteBattleSave_NotExists(t *testing.T) {
 }
 
 func TestSaveManager_GetBattleSaveInfo(t *testing.T) {
-	gdataManager := createTestGdataManager("get_battle_info")
+	gdataManager := createTestGdataManager(t, "get_battle_info")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -716,7 +731,7 @@ func TestSaveManager_GetBattleSaveInfo(t *testing.T) {
 }
 
 func TestSaveManager_GetBattleSaveInfo_NotExists(t *testing.T) {
-	gdataManager := createTestGdataManager("get_info_not_exists")
+	gdataManager := createTestGdataManager(t, "get_info_not_exists")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -739,7 +754,7 @@ func TestSaveManager_GetBattleSaveInfo_NilGdata(t *testing.T) {
 }
 
 func TestSaveManager_GetBattleSaveInfo_Corrupted(t *testing.T) {
-	gdataManager := createTestGdataManager("get_info_corrupted")
+	gdataManager := createTestGdataManager(t, "get_info_corrupted")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -783,7 +798,7 @@ func TestSaveManager_SetHasStartedGame(t *testing.T) {
 }
 
 func TestSaveManager_HasStartedGame_Persistence(t *testing.T) {
-	gdataManager := createTestGdataManager("has_started_persistence")
+	gdataManager := createTestGdataManager(t, "has_started_persistence")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -802,7 +817,7 @@ func TestSaveManager_HasStartedGame_Persistence(t *testing.T) {
 }
 
 func TestSaveManager_HasStartedGame_UserIsolation(t *testing.T) {
-	gdataManager := createTestGdataManager("has_started_isolation")
+	gdataManager := createTestGdataManager(t, "has_started_isolation")
 	if gdataManager == nil {
 		t.Skip("Cannot create gdata manager for testing")
 	}
@@ -827,5 +842,59 @@ func TestSaveManager_HasStartedGame_UserIsolation(t *testing.T) {
 	sm.SwitchUser("user1")
 	if !sm.GetHasStartedGame() {
 		t.Error("User1 should have started game")
+	}
+}
+
+func TestSaveManager_GetNextLevelToPlay(t *testing.T) {
+	tests := []struct {
+		name          string
+		highestLevel  string
+		expectedLevel string
+	}{
+		{
+			name:          "新用户，未完成任何关卡",
+			highestLevel:  "",
+			expectedLevel: "1-1",
+		},
+		{
+			name:          "完成1-1，应返回1-2",
+			highestLevel:  "1-1",
+			expectedLevel: "1-2",
+		},
+		{
+			name:          "完成1-2，应返回1-3",
+			highestLevel:  "1-2",
+			expectedLevel: "1-3",
+		},
+		{
+			name:          "完成1-9，应返回1-10",
+			highestLevel:  "1-9",
+			expectedLevel: "1-10",
+		},
+		{
+			name:          "完成1-10（最后一关），应返回1-10",
+			highestLevel:  "1-10",
+			expectedLevel: "1-10",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// 创建一个新的 SaveManager（使用 nil gdata，纯内存模式）
+			sm, _ := NewSaveManager(nil)
+
+			// 设置最高完成关卡
+			if tt.highestLevel != "" {
+				sm.SetHighestLevel(tt.highestLevel)
+			}
+
+			// 获取下一关
+			nextLevel := sm.GetNextLevelToPlay()
+
+			if nextLevel != tt.expectedLevel {
+				t.Errorf("GetNextLevelToPlay() = %q, want %q (highestLevel: %q)",
+					nextLevel, tt.expectedLevel, tt.highestLevel)
+			}
+		})
 	}
 }

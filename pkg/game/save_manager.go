@@ -268,6 +268,42 @@ func (sm *SaveManager) SetHighestLevel(levelID string) {
 	}
 }
 
+// GetNextLevelToPlay 获取下一个应该加载的关卡
+//
+// 逻辑：
+//   - 如果没有完成任何关卡（HighestLevel 为空），返回 "1-1"
+//   - 否则返回已完成关卡的下一关（如 "1-1" → "1-2"）
+//   - 如果已完成所有关卡，返回最后一关（目前最大 "1-10"）
+//
+// 返回：
+//   - string: 下一个应该加载的关卡ID
+func (sm *SaveManager) GetNextLevelToPlay() string {
+	highest := sm.data.HighestLevel
+	if highest == "" {
+		return "1-1" // 新用户从 1-1 开始
+	}
+
+	// 解析关卡ID（格式："X-Y"）
+	var chapter, level int
+	_, err := fmt.Sscanf(highest, "%d-%d", &chapter, &level)
+	if err != nil {
+		log.Printf("[SaveManager] Failed to parse level ID: %s, defaulting to 1-1", highest)
+		return "1-1"
+	}
+
+	// 计算下一关
+	nextLevel := level + 1
+
+	// 检查是否超出章节最大关卡数（目前第1章最大10关）
+	maxLevelsPerChapter := 10
+	if nextLevel > maxLevelsPerChapter {
+		// 已完成所有关卡，返回最后一关
+		return fmt.Sprintf("%d-%d", chapter, maxLevelsPerChapter)
+	}
+
+	return fmt.Sprintf("%d-%d", chapter, nextLevel)
+}
+
 // GetHasStartedGame 获取是否已开始过游戏的标记
 //
 // 返回：

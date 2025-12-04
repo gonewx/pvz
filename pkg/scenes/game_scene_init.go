@@ -636,6 +636,24 @@ func (s *GameScene) restoreBattleState() {
 		return
 	}
 
+	// Bug Fix: 验证存档的 LevelID 是否与当前加载的关卡匹配
+	// 如果不匹配，说明存档数据与当前关卡配置不兼容，应该中止恢复
+	// 这可以防止在错误的关卡场景中恢复存档数据（例如 1-2 的植物位置在 1-1 的场景中）
+	currentLevelID := ""
+	if s.gameState.CurrentLevel != nil {
+		currentLevelID = s.gameState.CurrentLevel.ID
+	}
+	if saveData.LevelID != "" && saveData.LevelID != currentLevelID {
+		log.Printf("[GameScene] ⚠️ 存档关卡不匹配! 存档关卡: %s, 当前关卡: %s",
+			saveData.LevelID, currentLevelID)
+		log.Printf("[GameScene] 中止存档恢复，删除不匹配的存档，开始新游戏...")
+		// 删除不匹配的存档，避免下次进入时再次出现问题
+		if err := saveManager.DeleteBattleSave(currentUser); err != nil {
+			log.Printf("[GameScene] Warning: Failed to delete mismatched battle save: %v", err)
+		}
+		return
+	}
+
 	// 恢复游戏状态
 	s.gameState.Sun = saveData.Sun
 	s.gameState.LevelTime = saveData.LevelTime
@@ -806,6 +824,14 @@ func (s *GameScene) restorePlants(plants []game.PlantData) {
 
 		log.Printf("[GameScene] Restored plant %s at (%d,%d), health=%d/%d",
 			plantData.PlantType, plantData.GridRow, plantData.GridCol, plantData.Health, plantData.MaxHealth)
+
+		// 验证恢复后的植物组件 GridRow 是否正确
+		if plantComp, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, entityID); ok {
+			if plantComp.GridRow != plantData.GridRow || plantComp.GridCol != plantData.GridCol {
+				log.Printf("[GameScene] WARNING: Plant position mismatch! SaveData(%d,%d) vs PlantComponent(%d,%d)",
+					plantData.GridRow, plantData.GridCol, plantComp.GridRow, plantComp.GridCol)
+			}
+		}
 	}
 }
 
