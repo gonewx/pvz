@@ -234,6 +234,7 @@ func (s *ShovelInteractionSystem) detectPlantUnderMouse(worldX, worldY float64) 
 //   - entityID: 要移除的植物实体ID
 //
 // Story 19.3: 强引导模式下通知系统植物被移除
+// Level 1-5: 铲子教学阶段，每次铲除一个植物后自动释放铲子
 func (s *ShovelInteractionSystem) removePlant(entityID ecs.EntityID) {
 	// Story 19.3: 通知强引导系统发生了植物点击操作
 	NotifyGuidedTutorialOperation("click_plant")
@@ -267,6 +268,21 @@ func (s *ShovelInteractionSystem) removePlant(entityID ecs.EntityID) {
 	s.entityManager.DestroyEntity(entityID)
 
 	log.Printf("[ShovelInteractionSystem] 植物已移除 (Entity ID: %d)", entityID)
+
+	// Level 1-5: 强引导模式（铲子教学阶段）下，每次铲除一个植物后自动释放铲子
+	// 玩家需要再次点击铲子才能继续铲除下一个植物
+	if guidedTutorialStateProvider != nil && guidedTutorialStateProvider.IsGuidedTutorialActive() {
+		// 释放铲子选中状态
+		if shovelStateProvider != nil {
+			shovelStateProvider.SetShovelSelected(false)
+			log.Printf("[ShovelInteractionSystem] 强引导模式: 铲除植物后自动释放铲子")
+		}
+		// 清除高亮效果
+		s.clearPlantHighlight()
+		// 立即恢复系统光标（不等待下一帧 Update）
+		ebiten.SetCursorMode(ebiten.CursorModeVisible)
+		s.lastCursorMode = ebiten.CursorModeVisible
+	}
 }
 
 // Draw 渲染铲子光标和植物高亮效果
