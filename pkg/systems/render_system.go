@@ -257,7 +257,12 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 	})
 
 	// Story 10.7: 第二遍A：渲染僵尸阴影（中间层-阴影层）
-	s.drawZombieShadows(screen, zombiesAndProjectiles, cameraX)
+	// 当僵尸进入房子时（Phase 2+），阴影也需要被门框剪裁
+	if currentPhase >= 2 {
+		s.drawZombieShadowsWithClipping(screen, zombiesAndProjectiles, cameraX, config.GameOverDoorMaskX)
+	} else {
+		s.drawZombieShadows(screen, zombiesAndProjectiles, cameraX)
+	}
 
 	// Story 8.8 - Task 6: Phase 2+ 时渲染房门图片
 	// 渲染顺序：阴影层（underlay）→ 僵尸 → 门板层（mask）→ ZombiesWon动画（UI层）
@@ -1303,11 +1308,16 @@ func (s *RenderSystem) drawPlantShadows(screen *ebiten.Image, entities []ecs.Ent
 //   - 僵尸脚底位置约在格子底部
 //   - 阴影绘制在格子底部中心
 //
+// 剪裁策略（僵尸进入房子时）：
+//   - 当 clipLeftWorldX > 0 时，阴影超过门板左边界的部分会被剪裁
+//   - 确保阴影与僵尸本身保持一致的渲染层级
+//
 // 参数:
 //   - screen: 绘制目标屏幕
 //   - zombieEntities: 僵尸实体的ID列表（已按Y坐标排序）
 //   - cameraX: 摄像机X坐标
-func (s *RenderSystem) drawZombieShadows(screen *ebiten.Image, zombieEntities []ecs.EntityID, cameraX float64) {
+//   - clipLeftWorldX: 剪裁左边界的世界坐标（0 表示不剪裁）
+func (s *RenderSystem) drawZombieShadowsWithClipping(screen *ebiten.Image, zombieEntities []ecs.EntityID, cameraX float64, clipLeftWorldX float64) {
 	if s.resourceManager == nil {
 		return
 	}
@@ -1356,10 +1366,52 @@ func (s *RenderSystem) drawZombieShadows(screen *ebiten.Image, zombieEntities []
 		shadowOffsetX := config.ZombieShadowOffsetX // 可配置的 X 偏移量
 		shadowOffsetY := config.ZombieShadowOffsetY // 可配置的 Y 偏移量
 		footY := pos.Y - config.ZombieVerticalOffset + config.CellHeight/2 + shadowOffsetY
-		screenX := pos.X - shadowImgWidth/2 - cameraX + shadowOffsetX
+		shadowWorldX := pos.X - shadowImgWidth/2 + shadowOffsetX
+		shadowWorldRightX := shadowWorldX + shadowImgWidth
+		screenX := shadowWorldX - cameraX
 		screenY := footY - shadowImgHeight/2
 
-		// 应用变换和透明度
+		// 如果需要剪裁（僵尸进入房子）
+		if clipLeftWorldX > 0 {
+			// 1. 阴影完全在门板左侧（完全被遮挡）：不渲染
+			if shadowWorldRightX <= clipLeftWorldX {
+				continue
+			}
+
+			// 2. 阴影完全在门板右侧（无需剪裁）：正常渲染
+			if shadowWorldX >= clipLeftWorldX {
+				op := &ebiten.DrawImageOptions{}
+				op.GeoM.Translate(screenX, screenY)
+				op.ColorScale.ScaleAlpha(config.DefaultShadowAlpha)
+				screen.DrawImage(shadowImg, op)
+				continue
+			}
+
+			// 3. 阴影部分重叠（需要剪裁）
+			// 计算剪裁起始位置（相对于阴影图片左边缘）
+			clipStartX := int(clipLeftWorldX - shadowWorldX)
+			if clipStartX < 0 {
+				clipStartX = 0
+			}
+
+			// 获取剪裁后的子图像
+			if clipStartX < shadowImgBounds.Dx() {
+				clippedShadow := shadowImg.SubImage(image.Rect(
+					clipStartX, 0,
+					shadowImgBounds.Dx(), shadowImgBounds.Dy(),
+				)).(*ebiten.Image)
+
+				// 绘制剪裁后的阴影
+				op := &ebiten.DrawImageOptions{}
+				clippedScreenX := clipLeftWorldX - cameraX
+				op.GeoM.Translate(clippedScreenX, screenY)
+				op.ColorScale.ScaleAlpha(config.DefaultShadowAlpha)
+				screen.DrawImage(clippedShadow, op)
+			}
+			continue
+		}
+
+		// 无需剪裁：正常渲染
 		op := &ebiten.DrawImageOptions{}
 		op.GeoM.Translate(screenX, screenY)
 		op.ColorScale.ScaleAlpha(config.DefaultShadowAlpha) // 使用配置的透明度
@@ -1367,4 +1419,9 @@ func (s *RenderSystem) drawZombieShadows(screen *ebiten.Image, zombieEntities []
 		// 绘制阴影
 		screen.DrawImage(shadowImg, op)
 	}
+}
+
+// drawZombieShadows 渲染僵尸阴影（无剪裁版本，向后兼容）
+func (s *RenderSystem) drawZombieShadows(screen *ebiten.Image, zombieEntities []ecs.EntityID, cameraX float64) {
+	s.drawZombieShadowsWithClipping(screen, zombieEntities, cameraX, 0)
 }
