@@ -28,6 +28,10 @@ GOROOT := $(shell go env GOROOT)
 WASM_EXEC_JS := $(shell if [ -f "$(GOROOT)/lib/wasm/wasm_exec.js" ]; then echo "$(GOROOT)/lib/wasm/wasm_exec.js"; else echo "$(GOROOT)/misc/wasm/wasm_exec.js"; fi)
 WASM_HTML_TEMPLATE := scripts/wasm_index.html
 
+# 移动端配置
+ANDROID_API := 23
+JAVA_PKG := com.decker.pvz
+
 # ============================================================================
 # 默认目标
 # ============================================================================
@@ -41,7 +45,7 @@ help: ## 显示帮助信息
 	@echo ""
 	@echo "可用目标:"
 	@echo ""
-	@echo "  构建命令:"
+	@echo "  桌面构建命令:"
 	@echo "    build              构建当前平台可执行文件"
 	@echo "    build-linux        构建 Linux (amd64 + arm64)"
 	@echo "    build-linux-amd64  构建 Linux amd64"
@@ -55,10 +59,20 @@ help: ## 显示帮助信息
 	@echo "    build-darwin-universal 构建 macOS Universal Binary"
 	@echo "    build-wasm         构建 WebAssembly"
 	@echo "    serve-wasm         构建并启动 WASM 本地服务器"
-	@echo "    all                构建所有平台"
+	@echo ""
+	@echo "  移动端构建命令:"
+	@echo "    install-ebitenmobile 安装 ebitenmobile 工具"
+	@echo "    prepare-mobile     准备移动端资源（复制 assets/data 到 mobile/）"
+	@echo "    build-android      构建 Android .aar (需要 Android SDK/NDK)"
+	@echo "    build-ios          构建 iOS .xcframework (需要 macOS + Xcode)"
+	@echo "    build-mobile       构建所有移动端平台"
+	@echo ""
+	@echo "  全平台构建:"
+	@echo "    all                构建所有桌面平台 + WASM"
 	@echo ""
 	@echo "  其他命令:"
 	@echo "    clean              清理构建目录"
+	@echo "    clean-mobile       清理移动端资源副本"
 	@echo "    help               显示此帮助信息"
 	@echo ""
 	@echo "构建产物输出到: $(BUILD_DIR)/{platform}/"
@@ -197,6 +211,53 @@ serve-wasm: build-wasm ## 构建并启动 WASM 本地服务器 (http://localhost
 	@cd $(BUILD_DIR)/wasm && python3 -m http.server 8080
 
 # ============================================================================
+# 移动端构建
+# ============================================================================
+.PHONY: install-ebitenmobile prepare-mobile clean-mobile build-android build-ios build-mobile
+
+install-ebitenmobile: ## 安装 ebitenmobile 工具
+	@echo "==> 安装 ebitenmobile..."
+	@go install github.com/hajimehoshi/ebiten/v2/cmd/ebitenmobile@latest
+	@echo "==> 安装完成"
+	@echo "==> 验证安装:"
+	@ebitenmobile version || echo "警告: ebitenmobile 未在 PATH 中，请确保 GOPATH/bin 在 PATH 中"
+
+prepare-mobile: ## 准备移动端资源（复制 assets/data 到 mobile/）
+	@echo "==> 准备移动端资源..."
+	@rm -rf mobile/assets mobile/data
+	@cp -r assets mobile/assets
+	@cp -r data mobile/data
+	@echo "==> 资源复制完成"
+
+clean-mobile: ## 清理移动端资源副本
+	@echo "==> 清理移动端资源..."
+	@rm -rf mobile/assets mobile/data
+	@echo "==> 清理完成"
+
+build-android: prepare-mobile ## 构建 Android .aar (需要 Android SDK/NDK)
+	@echo "==> 构建 Android AAR..."
+	@echo "==> Android API: $(ANDROID_API)"
+	@echo "==> Java 包名: $(JAVA_PKG)"
+	@mkdir -p $(BUILD_DIR)/android
+	@ebitenmobile bind -target android -tags mobile -androidapi $(ANDROID_API) -javapkg $(JAVA_PKG) -o $(BUILD_DIR)/android/$(APP_NAME).aar -v ./mobile
+	@echo "==> 完成: $(BUILD_DIR)/android/$(APP_NAME).aar"
+	@ls -la $(BUILD_DIR)/android/
+
+build-ios: prepare-mobile ## 构建 iOS .xcframework (需要 macOS + Xcode)
+ifeq ($(GOOS_CURRENT),darwin)
+	@echo "==> 构建 iOS XCFramework..."
+	@mkdir -p $(BUILD_DIR)/ios
+	@ebitenmobile bind -target ios -tags mobile -o $(BUILD_DIR)/ios/PVZ.xcframework -v ./mobile
+	@echo "==> 完成: $(BUILD_DIR)/ios/PVZ.xcframework"
+	@ls -la $(BUILD_DIR)/ios/
+else
+	@echo "==> 跳过 iOS 构建 (需要在 macOS 主机上运行)"
+endif
+
+build-mobile: build-android build-ios ## 构建所有移动端平台
+	@echo "==> 移动端构建完成"
+
+# ============================================================================
 # 全平台构建
 # ============================================================================
 .PHONY: all
@@ -217,7 +278,7 @@ endif
 # ============================================================================
 .PHONY: clean
 
-clean: ## 清理构建目录
+clean: clean-mobile ## 清理构建目录
 	@echo "==> 清理构建目录..."
 	@rm -rf $(BUILD_DIR)
 	@echo "==> 清理完成"

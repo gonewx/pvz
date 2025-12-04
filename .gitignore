@@ -43,3 +43,7 @@ verify_reward_panel
 
 # 构建产物
 build/
+
+# 移动端构建时复制的资源（由 make prepare-mobile 生成）
+mobile/assets/
+mobile/data/
