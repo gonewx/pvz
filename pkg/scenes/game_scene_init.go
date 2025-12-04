@@ -679,6 +679,13 @@ func (s *GameScene) restoreBattleState() {
 		}
 	}
 
+	// Story 19.x: 恢复保龄球模式数据（Level 1-5）
+	s.restoreBowlingNuts(saveData.BowlingNuts)
+	s.restoreConveyorBelt(saveData.ConveyorBelt)
+	s.restoreLevelPhase(saveData.LevelPhase)
+	s.restoreDaveDialogue(saveData.DaveDialogue)
+	s.restoreGuidedTutorial(saveData.GuidedTutorial)
+
 	// Bug Fix: 不再在恢复后立即删除存档
 	// 存档删除应该在用户确认"继续"后才执行，这样：
 	// - 用户选择"取消"返回主菜单时，存档仍然保留
@@ -1210,4 +1217,283 @@ func (s *GameScene) restoreTutorialState(tutorialData *game.TutorialSaveData) {
 	log.Printf("[GameScene] 教学状态已恢复: StepIndex=%d, IsActive=%v, CompletedSteps=%d, PlantCount=%d",
 		tutorial.CurrentStepIndex, tutorial.IsActive,
 		len(tutorial.CompletedSteps), tutorialData.PlantCount)
+}
+
+// =============================================================================
+// 保龄球模式数据恢复方法（Level 1-5）
+// =============================================================================
+
+// restoreBowlingNuts 恢复保龄球坚果实体
+//
+// Story 19.x: 从存档数据重建保龄球坚果实体
+//
+// 恢复内容：
+//   - 位置和速度（X, Y, VelocityX, VelocityY）
+//   - 行号和弹射状态
+//   - 是否为爆炸坚果
+//   - 弹射次数和方向
+func (s *GameScene) restoreBowlingNuts(bowlingNuts []game.BowlingNutData) {
+	if len(bowlingNuts) == 0 {
+		return
+	}
+
+	log.Printf("[GameScene] 恢复 %d 个保龄球坚果...", len(bowlingNuts))
+
+	for _, nutData := range bowlingNuts {
+		// 使用工厂函数创建（col=0 作为临时值，后续会覆盖位置）
+		entityID, err := entities.NewBowlingNutEntity(
+			s.entityManager,
+			s.resourceManager,
+			nutData.Row,
+			0, // 临时 col，位置会被覆盖
+			nutData.IsExplosive,
+		)
+
+		if err != nil {
+			log.Printf("[GameScene] ERROR: Failed to restore bowling nut at (%.1f, %.1f): %v",
+				nutData.X, nutData.Y, err)
+			continue
+		}
+
+		// 恢复位置（覆盖工厂函数计算的默认位置）
+		if posComp, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID); ok {
+			posComp.X = nutData.X
+			posComp.Y = nutData.Y
+		}
+
+		// 恢复保龄球坚果组件状态
+		if bowlingComp, ok := ecs.GetComponent[*components.BowlingNutComponent](s.entityManager, entityID); ok {
+			bowlingComp.VelocityX = nutData.VelocityX
+			bowlingComp.VelocityY = nutData.VelocityY
+			bowlingComp.Row = nutData.Row
+			bowlingComp.IsRolling = nutData.IsRolling
+			bowlingComp.IsBouncing = nutData.IsBouncing
+			bowlingComp.TargetRow = nutData.TargetRow
+			bowlingComp.BounceCount = nutData.BounceCount
+			bowlingComp.CollisionCooldown = nutData.CollisionCooldown
+			bowlingComp.BounceDirection = nutData.BounceDirection
+		}
+
+		log.Printf("[GameScene] Restored bowling nut at (%.1f, %.1f), row=%d, explosive=%v, bouncing=%v",
+			nutData.X, nutData.Y, nutData.Row, nutData.IsExplosive, nutData.IsBouncing)
+	}
+}
+
+// restoreConveyorBelt 恢复传送带状态
+//
+// Story 19.x: 从存档数据恢复传送带状态
+//
+// 恢复内容：
+//   - 卡片队列
+//   - 生成计时器和间隔
+//   - 激活状态
+//   - 选中状态
+func (s *GameScene) restoreConveyorBelt(conveyorData *game.ConveyorBeltData) {
+	if conveyorData == nil {
+		return
+	}
+
+	log.Printf("[GameScene] 恢复传送带状态...")
+
+	// 查找传送带组件
+	conveyorEntities := ecs.GetEntitiesWith1[*components.ConveyorBeltComponent](s.entityManager)
+	if len(conveyorEntities) == 0 {
+		log.Printf("[GameScene] Warning: No conveyor belt entity found, cannot restore")
+		return
+	}
+
+	conveyorEntity := conveyorEntities[0]
+	conveyorComp, ok := ecs.GetComponent[*components.ConveyorBeltComponent](s.entityManager, conveyorEntity)
+	if !ok {
+		log.Printf("[GameScene] Warning: ConveyorBeltComponent not found")
+		return
+	}
+
+	// 恢复卡片队列
+	conveyorComp.Cards = make([]components.ConveyorCard, len(conveyorData.Cards))
+	for i, cardData := range conveyorData.Cards {
+		conveyorComp.Cards[i] = components.ConveyorCard{
+			CardType:      cardData.CardType,
+			SlideProgress: cardData.SlideProgress,
+			SlotIndex:     cardData.SlotIndex,
+		}
+	}
+
+	// 恢复状态
+	conveyorComp.Capacity = conveyorData.Capacity
+	conveyorComp.ScrollOffset = conveyorData.ScrollOffset
+	conveyorComp.IsActive = conveyorData.IsActive
+	conveyorComp.GenerationTimer = conveyorData.GenerationTimer
+	conveyorComp.GenerationInterval = conveyorData.GenerationInterval
+	conveyorComp.SelectedCardIndex = conveyorData.SelectedCardIndex
+	conveyorComp.FinalWaveTriggered = conveyorData.FinalWaveTriggered
+
+	log.Printf("[GameScene] 传送带已恢复: Cards=%d, IsActive=%v, Timer=%.2f, Selected=%d",
+		len(conveyorComp.Cards), conveyorComp.IsActive,
+		conveyorComp.GenerationTimer, conveyorComp.SelectedCardIndex)
+}
+
+// restoreLevelPhase 恢复关卡阶段状态
+//
+// Story 19.x: 从存档数据恢复关卡阶段状态
+//
+// 恢复内容：
+//   - 当前阶段编号
+//   - 阶段状态
+//   - 转场进度
+//   - 传送带和红线可见性
+func (s *GameScene) restoreLevelPhase(phaseData *game.LevelPhaseData) {
+	if phaseData == nil {
+		return
+	}
+
+	log.Printf("[GameScene] 恢复关卡阶段状态...")
+
+	// 查找关卡阶段组件
+	phaseEntities := ecs.GetEntitiesWith1[*components.LevelPhaseComponent](s.entityManager)
+	if len(phaseEntities) == 0 {
+		log.Printf("[GameScene] Warning: No level phase entity found, cannot restore")
+		return
+	}
+
+	phaseEntity := phaseEntities[0]
+	phaseComp, ok := ecs.GetComponent[*components.LevelPhaseComponent](s.entityManager, phaseEntity)
+	if !ok {
+		log.Printf("[GameScene] Warning: LevelPhaseComponent not found")
+		return
+	}
+
+	// 恢复状态
+	phaseComp.CurrentPhase = phaseData.CurrentPhase
+	phaseComp.PhaseState = phaseData.PhaseState
+	phaseComp.TransitionProgress = phaseData.TransitionProgress
+	phaseComp.TransitionStep = phaseData.TransitionStep
+	phaseComp.ConveyorBeltY = phaseData.ConveyorBeltY
+	phaseComp.ConveyorBeltVisible = phaseData.ConveyorBeltVisible
+	phaseComp.ShowRedLine = phaseData.ShowRedLine
+
+	log.Printf("[GameScene] 关卡阶段已恢复: Phase=%d, State=%s, ConveyorVisible=%v, ShowRedLine=%v",
+		phaseComp.CurrentPhase, phaseComp.PhaseState,
+		phaseComp.ConveyorBeltVisible, phaseComp.ShowRedLine)
+}
+
+// restoreDaveDialogue 恢复 Dave 对话状态
+//
+// Story 19.x: 从存档数据恢复 Dave 对话状���
+//
+// 恢复内容：
+//   - 对话进度（当前行索引）
+//   - 对话文本
+//   - Dave 状态和表情
+//   - 位置
+//
+// 特殊处理：
+//   - 先删除初始化时创建的 Dave 实体（避免重复）
+//   - 如果 Dave 已经离开（State == Hidden），删除后不重新创建
+//   - 如果 Dave 正在对话中，恢复对话进度
+func (s *GameScene) restoreDaveDialogue(daveData *game.DaveDialogueData) {
+	// 首先删除所有现有的 Dave 对话实体（初始化时可能已创建）
+	existingDaves := ecs.GetEntitiesWith1[*components.DaveDialogueComponent](s.entityManager)
+	for _, entityID := range existingDaves {
+		s.entityManager.DestroyEntity(entityID)
+		log.Printf("[GameScene] 删除现有 Dave 实体: %d", entityID)
+	}
+
+	if daveData == nil {
+		log.Printf("[GameScene] 无 Dave 对话数据，已清理现有实体")
+		return
+	}
+
+	// 如果 Dave 已经离开，不需要恢复（已经删除了现有实体）
+	if daveData.State == int(components.DaveStateHidden) {
+		log.Printf("[GameScene] Dave 对话已完成，不需要恢复")
+		return
+	}
+
+	log.Printf("[GameScene] 恢复 Dave 对话状态...")
+
+	// 创建 Dave 实体并恢复状态
+	daveEntity, err := entities.NewCrazyDaveEntity(
+		s.entityManager,
+		s.resourceManager,
+		daveData.DialogueKeys,
+		func() {
+			// Dave 对话完成回调
+			log.Printf("[GameScene] Restored Dave dialogue completed")
+			if s.guidedTutorialSystem != nil {
+				s.guidedTutorialSystem.SetActive(true)
+			}
+		},
+	)
+
+	if err != nil {
+		log.Printf("[GameScene] ERROR: Failed to restore Dave entity: %v", err)
+		return
+	}
+
+	// 恢复对话进度
+	if daveComp, ok := ecs.GetComponent[*components.DaveDialogueComponent](s.entityManager, daveEntity); ok {
+		daveComp.CurrentLineIndex = daveData.CurrentLineIndex
+		daveComp.CurrentText = daveData.CurrentText
+		daveComp.IsVisible = daveData.IsVisible
+		daveComp.State = components.DaveState(daveData.State)
+		daveComp.Expression = daveData.Expression
+	}
+
+	// 恢复位置
+	if posComp, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, daveEntity); ok {
+		posComp.X = daveData.DaveX
+		posComp.Y = daveData.DaveY
+	}
+
+	log.Printf("[GameScene] Dave 对话已恢复: LineIndex=%d/%d, State=%d, Visible=%v",
+		daveData.CurrentLineIndex, len(daveData.DialogueKeys),
+		daveData.State, daveData.IsVisible)
+}
+
+// restoreGuidedTutorial 恢复强引导教学状态
+//
+// Story 19.x: 从存档数据恢复强引导教学状态
+//
+// 恢复内容：
+//   - 激活状态
+//   - 允许的操作列表
+//   - 空闲计时器
+//   - 箭头显示状态
+//   - 转场条件
+func (s *GameScene) restoreGuidedTutorial(guidedData *game.GuidedTutorialData) {
+	if guidedData == nil {
+		return
+	}
+
+	log.Printf("[GameScene] 恢复强引导教学状态...")
+
+	// 查找强引导教学组件
+	guidedEntities := ecs.GetEntitiesWith1[*components.GuidedTutorialComponent](s.entityManager)
+	if len(guidedEntities) == 0 {
+		log.Printf("[GameScene] Warning: No guided tutorial entity found, cannot restore")
+		return
+	}
+
+	guidedEntity := guidedEntities[0]
+	guidedComp, ok := ecs.GetComponent[*components.GuidedTutorialComponent](s.entityManager, guidedEntity)
+	if !ok {
+		log.Printf("[GameScene] Warning: GuidedTutorialComponent not found")
+		return
+	}
+
+	// 恢复状态
+	guidedComp.IsActive = guidedData.IsActive
+	guidedComp.AllowedActions = make([]string, len(guidedData.AllowedActions))
+	copy(guidedComp.AllowedActions, guidedData.AllowedActions)
+	guidedComp.IdleTimer = guidedData.IdleTimer
+	guidedComp.IdleThreshold = guidedData.IdleThreshold
+	guidedComp.ShowArrow = guidedData.ShowArrow
+	guidedComp.ArrowTarget = guidedData.ArrowTarget
+	guidedComp.LastPlantCount = guidedData.LastPlantCount
+	guidedComp.TransitionReady = guidedData.TransitionReady
+	guidedComp.TutorialTextKey = guidedData.TutorialTextKey
+
+	log.Printf("[GameScene] 强引导教学已恢复: IsActive=%v, ArrowTarget=%s, TransitionReady=%v",
+		guidedComp.IsActive, guidedComp.ArrowTarget, guidedComp.TransitionReady)
 }

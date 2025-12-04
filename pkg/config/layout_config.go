@@ -545,12 +545,12 @@ const (
 	// 控制卡片从传送带右侧进入的速度
 	// 值越小速度越慢：0.5 = 2秒完成，1.0 = 1秒完成，2.0 = 0.5秒完成
 	// 建议值范围：0.3 - 2.0
-	ConveyorCardSlideInSpeed = 0.8
+	ConveyorCardSlideInSpeed = 0.35
 
 	// ConveyorBeltLeftPadding 传送带左侧内边距（像素）
 	// 卡片不会进入此区域，防止卡片太靠左遮挡边框
 	// 建议值范围：10.0 - 30.0
-	ConveyorBeltLeftPadding = 15.0
+	ConveyorBeltLeftPadding = 10.0
 
 	// BowlingNutPreviewAlpha 草坪预览透明度（0-255）
 	// 悬停在草坪网格时显示的半透明坚果预览
