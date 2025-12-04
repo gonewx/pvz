@@ -38,5 +38,7 @@
     *   **目标:** 为《植物大战僵尸》复刻版实现战斗中存档/读档功能。玩家点击暂停菜单的"主菜单"按钮时自动保存当前战斗进度，再次进入冒险模式时可选择继续游戏或重玩关卡，提供简洁的用户交互体验。
 *   **Epic 19: 关卡 1-5 坚果保龄球 (Level 1-5: Wall-nut Bowling)** ⭐**NEW**
     *   **目标:** 实现第一章第五关"坚果保龄球"，包含铲子教学阶段（疯狂戴夫对话、强引导机制、预设植物）和保龄球玩法阶段（传送带系统、保龄球物理、爆炸坚果），为玩家提供独特的迷你游戏体验。
-*   **Epic 20: Go Embed 资源嵌入与跨平台存储 (Go Embed & Cross-Platform Storage)** ⭐**NEW**
+*   **Epic 20: Go Embed 资源嵌入与跨平台存储 (Go Embed & Cross-Platform Storage)**
     *   **目标:** 使用 Go 的 `embed` 功能将游戏资源（assets/ 和 data/）打包进可执行程序，实现单一可执行文件分发；使用 gdata 库实现跨平台用户数据存储（存档、设置），支持桌面端、移动端和 WASM 平台。
+*   **Epic 21: 跨平台构建与 CI/CD (Cross-Platform Build & CI/CD)** ⭐**NEW**
+    *   **目标:** 为游戏创建完整的跨平台构建系统和 CI/CD 流水线，支持 Linux、Windows、macOS、Android、iOS 和 Web (WASM) 六大平台的自动化构建与发布，通过 Makefile 和 GitHub Actions 实现标准化的构建流程。

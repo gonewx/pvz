@@ -79,7 +79,7 @@
   - /BMad:agents:architect *research 要实现资源使用 golang 的 embed 加载，以便编译后打包成一个可执行程序, 请评估 @data @assets
   两个目录的设计是否合理? 有没有需要调整的地方? 
 
-- [] 编写 github ci/cd 脚本，方便发布、编译各平台运行二进制 。支持的平台 Linux\Windows\MacOS\Android\iOS\Web(WASM)
+- [] 编写运维类脚本（包括 github ci/cd 脚本 ），方便发布、编译各平台运行二进制 。支持的平台 Linux\Windows\MacOS\Android\iOS\Web(WASM)。  
 
 ## 5.3
 
