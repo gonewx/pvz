@@ -179,8 +179,26 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 				continue
 			}
 
-			// 使用帧插值获取平滑的帧数据
-			frame := s.getInterpolatedFrame(animName, logicalFrame, animVisibles, mergedFrames)
+			// 获取该动画的循环状态和起始帧（用于边界插值）
+			animIsLooping := comp.IsLooping // 默认使用全局循环状态
+			if comp.AnimationLoopStates != nil {
+				if loopState, hasState := comp.AnimationLoopStates[animName]; hasState {
+					animIsLooping = loopState
+				}
+			}
+			animStartFrame := 0
+			if comp.AnimationStartFrames != nil {
+				if sf, ok := comp.AnimationStartFrames[animName]; ok {
+					animStartFrame = sf
+				}
+			}
+
+			// 使用帧插值获取平滑的帧数据（传递循环参数支持边界插值）
+			loopFlag := 0
+			if animIsLooping {
+				loopFlag = 1
+			}
+			frame := s.getInterpolatedFrame(animName, logicalFrame, animVisibles, mergedFrames, loopFlag, animStartFrame)
 
 			// 图片继承逻辑：如果插值后的帧没有图片，向前搜索最近的有图片的帧
 			hasValidImage := false
@@ -883,6 +901,8 @@ func (s *ReanimSystem) rebuildAnimationData(comp *components.ReanimComponent) {
 //   - logicalFrame: 浮点逻辑帧索引（如 2.7 表示第 2 帧和第 3 帧之间，插值因子 0.7）
 //   - animVisibles: 动画可见性数组
 //   - mergedFrames: 轨道的累加帧数组
+//   - isLooping: 是否是循环动画（可选，用于边界插值）
+//   - startFrame: 循环动画的起始帧（可选，用于边界插值）
 //
 // 返回：插值后的帧数据
 func (s *ReanimSystem) getInterpolatedFrame(
@@ -890,23 +910,49 @@ func (s *ReanimSystem) getInterpolatedFrame(
 	logicalFrame float64,
 	animVisibles []int,
 	mergedFrames []reanim.Frame,
+	loopParams ...int, // 可选参数：[0]=isLooping (0/1), [1]=startFrame
 ) reanim.Frame {
+	// 解析可选循环参数
+	isLooping := false
+	startFrame := 0
+	if len(loopParams) >= 2 {
+		isLooping = loopParams[0] != 0
+		startFrame = loopParams[1]
+	}
+
 	// 1. 获取整数部分和小数部分
 	frame1Index := int(logicalFrame)         // 当前帧索引
 	frame2Index := frame1Index + 1           // 下一帧索引
 	t := logicalFrame - float64(frame1Index) // 插值因子 (0.0 - 1.0)
 
-	// 2. 映射逻辑帧到物理帧
+	// 2. 计算可见帧总数（用于循环边界判断）
+	visibleCount := countVisibleFrames(animVisibles)
+
+	// 3. 检查逻辑帧是否越界（直接比较逻辑帧索引）
+	// 注意：MapLogicalToPhysical 在越界时返回最后一帧而不是 -1，所以必须直接检查逻辑帧
+	isFrame2OutOfBounds := frame2Index >= visibleCount
+
+	// 4. 映射逻辑帧到物理帧
 	physicalFrame1 := MapLogicalToPhysical(frame1Index, animVisibles)
 	physicalFrame2 := MapLogicalToPhysical(frame2Index, animVisibles)
 
-	// 3. 边界检查
+	// 5. 边界检查
 	if physicalFrame1 < 0 || physicalFrame1 >= len(mergedFrames) {
 		return reanim.Frame{} // 返回空帧
 	}
-	if physicalFrame2 < 0 || physicalFrame2 >= len(mergedFrames) {
-		// 如果下一帧越界，直接返回当前帧（不插值）
-		return mergedFrames[physicalFrame1]
+	if isFrame2OutOfBounds || physicalFrame2 < 0 || physicalFrame2 >= len(mergedFrames) {
+		// 下一帧越界
+		if isLooping && visibleCount > 0 {
+			// 循环动画：插值到起始帧
+			physicalFrame2 = MapLogicalToPhysical(startFrame, animVisibles)
+			if physicalFrame2 < 0 || physicalFrame2 >= len(mergedFrames) {
+				// 起始帧也无效，直接返回当前帧
+				return mergedFrames[physicalFrame1]
+			}
+		} else {
+			// 非循环动画：直接返回当前帧（不插值）
+			return mergedFrames[physicalFrame1]
+		}
 	}
 
 	// 4. 获取两个帧
@@ -949,15 +995,34 @@ func (s *ReanimSystem) getInterpolatedFrame(
 	}
 
 	// 插值倾斜角度 (SkewX, SkewY)
+	// 特殊处理：循环动画中 360° → 0° 的过渡需要使用最短路径插值
 	if f1.SkewX != nil && f2.SkewX != nil {
-		interpolatedSkewX := *f1.SkewX + (*f2.SkewX-*f1.SkewX)*t
+		skew1 := *f1.SkewX
+		skew2 := *f2.SkewX
+		// 处理角度循环：如果差值超过 180°，调整 skew2 使差值最小化
+		diff := skew2 - skew1
+		if diff > 180 {
+			skew2 -= 360
+		} else if diff < -180 {
+			skew2 += 360
+		}
+		interpolatedSkewX := skew1 + (skew2-skew1)*t
 		result.SkewX = &interpolatedSkewX
 	} else if f1.SkewX != nil {
 		result.SkewX = f1.SkewX
 	}
 
 	if f1.SkewY != nil && f2.SkewY != nil {
-		interpolatedSkewY := *f1.SkewY + (*f2.SkewY-*f1.SkewY)*t
+		skew1 := *f1.SkewY
+		skew2 := *f2.SkewY
+		// 处理角度循环：如果差值超过 180°，调整 skew2 使差值最小化
+		diff := skew2 - skew1
+		if diff > 180 {
+			skew2 -= 360
+		} else if diff < -180 {
+			skew2 += 360
+		}
+		interpolatedSkewY := skew1 + (skew2-skew1)*t
 		result.SkewY = &interpolatedSkewY
 	} else if f1.SkewY != nil {
 		result.SkewY = f1.SkewY

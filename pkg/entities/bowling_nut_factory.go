@@ -3,7 +3,9 @@ package entities
 import (
 	"fmt"
 	"log"
+	"math"
 
+	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
@@ -28,6 +30,17 @@ func NewBowlingNutEntity(em *ecs.EntityManager, rm ResourceLoader, row, col int,
 	worldX := config.GridWorldStartX + float64(col)*config.CellWidth + config.CellWidth/2
 	worldY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
 
+	// 加载 Wallnut Reanim 资源
+	reanimXML := rm.GetReanimXML("Wallnut")
+	partImages := rm.GetReanimPartImages("Wallnut")
+
+	if reanimXML == nil || partImages == nil {
+		return 0, fmt.Errorf("failed to load Wallnut Reanim resources for bowling nut")
+	}
+
+	// 从动画数据动态计算滚动速度
+	rollingSpeed := calculateRollingSpeedFromReanim(reanimXML)
+
 	// 创建实体
 	entityID := em.CreateEntity()
 
@@ -39,22 +52,13 @@ func NewBowlingNutEntity(em *ecs.EntityManager, rm ResourceLoader, row, col int,
 
 	// 添加 BowlingNutComponent
 	em.AddComponent(entityID, &components.BowlingNutComponent{
-		VelocityX:    config.BowlingNutSpeed,
+		VelocityX:    rollingSpeed,
 		Row:          row,
 		IsRolling:    true, // 放置后立即滚动
 		IsExplosive:  isExplosive,
 		BounceCount:  0,     // Story 19.7 使用
 		SoundPlaying: false, // 音效由 BowlingNutSystem 管理
 	})
-
-	// 加载 Wallnut Reanim 资源
-	reanimXML := rm.GetReanimXML("Wallnut")
-	partImages := rm.GetReanimPartImages("Wallnut")
-
-	if reanimXML == nil || partImages == nil {
-		em.DestroyEntity(entityID)
-		return 0, fmt.Errorf("failed to load Wallnut Reanim resources for bowling nut")
-	}
 
 	// Clone partImages to avoid shared state issues
 	clonedPartImages := make(map[string]*ebiten.Image, len(partImages))
@@ -71,15 +75,11 @@ func NewBowlingNutEntity(em *ecs.EntityManager, rm ResourceLoader, row, col int,
 
 	// 添加 AnimationCommandComponent 触发滚动动画
 	// 使用 anim_face 动画（包含摇摆和滚动两部分）
-	// 帧结构分析：
-	//   - 逻辑帧 0-16 → 物理帧 0-16（摇摆动画）
-	//   - 逻辑帧 17 → 物理帧 43（起始帧，kx=0°）
-	//   - 逻辑帧 18-29 → 物理帧 44-55（kx=27.6°→360°）
-	// StartFrame=17 确保完整的360°循环：0° → 360° → 循环回0°
+	// StartFrame 从配置读取，确保从滚动动画起始帧开始循环
 	ecs.AddComponent(em, entityID, &components.AnimationCommandComponent{
 		AnimationName: "anim_face",
 		Processed:     false,
-		StartFrame:    17, // 从0°开始，确保360°→0°循环连续
+		StartFrame:    config.BowlingNutRollingStartFrame,
 	})
 
 	// 添加 CollisionComponent（为 Story 19.7 预留）
@@ -93,9 +93,166 @@ func NewBowlingNutEntity(em *ecs.EntityManager, rm ResourceLoader, row, col int,
 	if isExplosive {
 		nutType = components.BowlingNutTypeExplosive
 	}
-	log.Printf("[BowlingNutFactory] 创建保龄球坚果: entityID=%d, row=%d, col=%d, type=%s, worldX=%.1f, worldY=%.1f",
-		entityID, row, col, nutType, worldX, worldY)
+	log.Printf("[BowlingNutFactory] 创建保龄球坚果: entityID=%d, row=%d, col=%d, type=%s, speed=%.1f, worldX=%.1f, worldY=%.1f",
+		entityID, row, col, nutType, rollingSpeed, worldX, worldY)
 
 	return entityID, nil
+}
+
+// calculateRollingSpeedFromReanim 从 Reanim 数据动态计算滚动速度
+// 使位移速度与动画旋转速度同步
+//
+// 计算逻辑：
+//  1. 从 ReanimXML.FPS 获取帧率
+//  2. 从 anim_face 轨道计算可见帧数
+//  3. 从滚动帧的 x 轨迹计算周长（直径 = max_x - min_x，周长 = π * 直径）
+//  4. 速度 = 周长 * FPS / 滚动帧数
+//
+// 参数:
+//   - reanimXML: Reanim 动画数据
+//
+// 返回:
+//   - float64: 滚动速度（像素/秒）
+func calculateRollingSpeedFromReanim(reanimXML *reanim.ReanimXML) float64 {
+	// 获取动画 FPS
+	fps := reanimXML.FPS
+	if fps <= 0 {
+		fps = 12 // 默认 PVZ 动画帧率
+	}
+
+	// 获取 anim_face 轨道的可见帧数
+	totalVisibleFrames := countTrackVisibleFrames(reanimXML, "anim_face")
+	if totalVisibleFrames <= 0 {
+		totalVisibleFrames = 30 // 默认值（17 摇摆 + 13 滚动）
+	}
+
+	// 滚动动画帧数 = 可见帧总数 - 起始帧
+	rollingFrameCount := totalVisibleFrames - config.BowlingNutRollingStartFrame
+	if rollingFrameCount <= 0 {
+		rollingFrameCount = 13 // 默认滚动帧数
+	}
+
+	// 从滚动帧的 x 轨迹计算周长
+	circumference := calculateCircumferenceFromTrack(reanimXML, "anim_face", config.BowlingNutRollingStartFrame)
+	if circumference <= 0 {
+		circumference = 220.0 // 默认周长（直径约 70 像素）
+	}
+
+	// 计算同步速度
+	speed := config.CalculateBowlingNutSpeed(fps, rollingFrameCount, circumference)
+
+	log.Printf("[BowlingNutFactory] 动态计算滚动速度: fps=%d, totalFrames=%d, rollingFrames=%d, circumference=%.1f, speed=%.1f",
+		fps, totalVisibleFrames, rollingFrameCount, circumference, speed)
+
+	return speed
+}
+
+// countTrackVisibleFrames 计算指定轨道的可见帧数
+// 可见帧定义：FrameNum 为 nil 或 >= 0 的帧
+//
+// 参数:
+//   - reanimXML: Reanim 动画数据
+//   - trackName: 轨道名称
+//
+// 返回:
+//   - int: 可见帧数量
+func countTrackVisibleFrames(reanimXML *reanim.ReanimXML, trackName string) int {
+	// 查找指定轨道
+	var track *reanim.Track
+	for i := range reanimXML.Tracks {
+		if reanimXML.Tracks[i].Name == trackName {
+			track = &reanimXML.Tracks[i]
+			break
+		}
+	}
+	if track == nil {
+		return 0
+	}
+
+	// 统计可见帧数
+	// 逻辑：遍历所有帧，累积 FrameNum 状态
+	// - FrameNum == nil：继承上一帧状态
+	// - FrameNum == -1：隐藏
+	// - FrameNum >= 0：可见
+	visibleCount := 0
+	currentVisible := true // 默认可见
+
+	for _, frame := range track.Frames {
+		if frame.FrameNum != nil {
+			currentVisible = *frame.FrameNum >= 0
+		}
+		if currentVisible {
+			visibleCount++
+		}
+	}
+
+	return visibleCount
+}
+
+// calculateCircumferenceFromTrack 从轨道的 x 轨迹计算滚动周长
+// 周长 = π * 直径 = π * (max_x - min_x)
+//
+// 参数:
+//   - reanimXML: Reanim 动画数据
+//   - trackName: 轨道名称
+//   - startFrame: 滚动动画起始帧（逻辑帧索引）
+//
+// 返回:
+//   - float64: 周长（像素）
+func calculateCircumferenceFromTrack(reanimXML *reanim.ReanimXML, trackName string, startFrame int) float64 {
+	// 查找指定轨道
+	var track *reanim.Track
+	for i := range reanimXML.Tracks {
+		if reanimXML.Tracks[i].Name == trackName {
+			track = &reanimXML.Tracks[i]
+			break
+		}
+	}
+	if track == nil {
+		return 0
+	}
+
+	// 遍历滚动帧，找到 x 的最大值和最小值
+	minX := math.MaxFloat64
+	maxX := -math.MaxFloat64
+	currentX := 0.0
+	visibleFrameIndex := 0
+	currentVisible := true
+
+	for _, frame := range track.Frames {
+		// 更新可见状态
+		if frame.FrameNum != nil {
+			currentVisible = *frame.FrameNum >= 0
+		}
+
+		if currentVisible {
+			// 更新 x 值（继承机制）
+			if frame.X != nil {
+				currentX = *frame.X
+			}
+
+			// 只统计滚动帧（从 startFrame 开始）
+			if visibleFrameIndex >= startFrame {
+				if currentX < minX {
+					minX = currentX
+				}
+				if currentX > maxX {
+					maxX = currentX
+				}
+			}
+			visibleFrameIndex++
+		}
+	}
+
+	// 如果没有找到有效数据，返回 0
+	if minX == math.MaxFloat64 || maxX == -math.MaxFloat64 {
+		return 0
+	}
+
+	// 周长 = π * 直径
+	diameter := maxX - minX
+	circumference := math.Pi * diameter
+
+	return circumference
 }
 

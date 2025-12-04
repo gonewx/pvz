@@ -34,10 +34,43 @@ func (m *mockResourceLoaderForBowling) LoadSoundEffect(path string) (interface{}
 
 // createMockResourceLoaderForBowling 创建模拟资源加载器
 func createMockResourceLoaderForBowling() *mockResourceLoaderForBowling {
+	// 创建模拟的 anim_face 轨道数据（滚动动画）
+	// 模拟 30 帧可见：17 帧摇摆 + 13 帧滚动
+	// x 值范围：-8 到 96（直径约 104，周长约 327）
+	minX := -8.0
+	maxX := 96.0
+	frames := make([]reanim.Frame, 56) // 56 帧总数
+
+	// 帧 0-16：摇摆帧（可见）
+	for i := 0; i <= 16; i++ {
+		x := 7.0 // 摇摆帧 x 值稳定
+		frames[i] = reanim.Frame{X: &x}
+	}
+
+	// 帧 17：隐藏帧
+	hidden := -1
+	frames[17] = reanim.Frame{FrameNum: &hidden}
+
+	// 帧 18-42：继承隐藏
+	for i := 18; i <= 42; i++ {
+		frames[i] = reanim.Frame{}
+	}
+
+	// 帧 43-55：滚动帧（可见）
+	visible := 0
+	frames[43] = reanim.Frame{FrameNum: &visible, X: &minX}
+	for i := 44; i <= 54; i++ {
+		x := minX + (maxX-minX)*float64(i-43)/12.0
+		frames[i] = reanim.Frame{X: &x}
+	}
+	frames[55] = reanim.Frame{X: &maxX}
+
 	return &mockResourceLoaderForBowling{
 		reanimXML: &reanim.ReanimXML{
-			FPS:    12,
-			Tracks: []reanim.Track{},
+			FPS: 12,
+			Tracks: []reanim.Track{
+				{Name: "anim_face", Frames: frames},
+			},
 		},
 		partImages: map[string]*ebiten.Image{
 			"test_part": ebiten.NewImage(64, 64),
@@ -90,8 +123,9 @@ func TestNewBowlingNutEntity_Normal(t *testing.T) {
 	if nutComp.Row != 2 {
 		t.Errorf("Row = %d, want 2", nutComp.Row)
 	}
-	if nutComp.VelocityX != config.BowlingNutSpeed {
-		t.Errorf("VelocityX = %f, want %f", nutComp.VelocityX, config.BowlingNutSpeed)
+	// 验证速度是动态计算的，应该在合理范围内（150-400 像素/秒）
+	if nutComp.VelocityX < 150 || nutComp.VelocityX > 400 {
+		t.Errorf("VelocityX = %f, should be in range [150, 400]", nutComp.VelocityX)
 	}
 }
 

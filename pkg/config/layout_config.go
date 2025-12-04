@@ -519,10 +519,10 @@ const (
 
 	// ========== 保龄球坚果配置参数（Story 19.6）（可手工调节） ==========
 
-	// BowlingNutSpeed 保龄球坚果滚动速度（像素/秒）
-	// 坚果向右滚动的恒定速度
-	// 建议值范围：200.0 - 300.0
-	BowlingNutSpeed = 250.0
+	// BowlingNutRollingStartFrame 滚动动画起始帧（逻辑帧索引）
+	// anim_face 轨道中滚动动画的起始逻辑帧
+	// 逻辑帧 17 对应物理帧 43（kx=0°）
+	BowlingNutRollingStartFrame = 18
 
 	// BowlingNutCollisionWidth 保龄球坚果碰撞盒宽度（像素）
 	// 用于 Story 19.7 碰撞检测
@@ -559,3 +559,23 @@ const (
 	// 实际像素半径 = ExplosiveNutExplosionRadius * CellWidth = 1.5 * 80 = 120 像素
 	ExplosiveNutExplosionRadius = 1.5
 )
+
+// CalculateBowlingNutSpeed 动态计算保龄球坚果滚动速度
+// 使位移速度与动画旋转速度同步，避免"滑步"效果
+//
+// 计算公式：
+//
+//	动画周期 = 帧数 / FPS
+//	速度 = 周长 / 动画周期 = 周长 * FPS / 帧数
+//
+// 参数:
+//   - fps: 动画帧率（从 ReanimXML.FPS 获取）
+//   - rollingFrameCount: 滚动动画帧数（从 AnimVisibles 计算）
+//   - circumference: 滚动周长（从动画 x 轨迹计算）
+//
+// 返回:
+//   - float64: 滚动速度（像素/秒）
+func CalculateBowlingNutSpeed(fps int, rollingFrameCount int, circumference float64) float64 {
+	animationPeriod := float64(rollingFrameCount) / float64(fps)
+	return circumference / animationPeriod
+}

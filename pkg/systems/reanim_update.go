@@ -294,10 +294,15 @@ func (s *ReanimSystem) Update(deltaTime float64) {
 						effectiveFrameCount := visibleCount - startFrame
 						if effectiveFrameCount > 0 {
 							// 循环回到起始帧
-							currentOffset := int(comp.AnimationFrameIndices[animName]) - startFrame
-							newOffset := currentOffset % effectiveFrameCount
+							// 关键修复：循环时重置到整数帧边界，而不是保留小数部分
+							// 原因：帧 17.2 会被解释为"帧 17 和帧 18 之间 0.2 的位置"，
+							//       但循环后应该是"刚进入新循环"，应该从帧 17 开始。
+							// 保留小数会导致：
+							//   - 循环前帧 29.2 插值到帧 17，x ≈ 7.0
+							//   - 循环后帧 17.2 插值到帧 18，x ≈ 11.7
+							//   - 产生约 4.7 像素的跳变
 							oldFrame := comp.AnimationFrameIndices[animName]
-							comp.AnimationFrameIndices[animName] = float64(startFrame + newOffset)
+							comp.AnimationFrameIndices[animName] = float64(startFrame)
 
 							// Debug: Wallnut 循环重置
 							if comp.ReanimName == "Wallnut" {
