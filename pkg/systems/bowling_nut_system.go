@@ -154,6 +154,10 @@ func (s *BowlingNutSystem) Update(dt float64) {
 //
 // 返回:
 //   - ecs.EntityID: 碰撞的最近僵尸实体ID，无碰撞返回0
+//
+// 注意：
+//   - 只检测同一行的僵尸，避免跨行碰撞误判
+//   - 弹射中时使用目标行进行检测
 func (s *BowlingNutSystem) checkCollisionWithNearestZombie(
 	nutEntityID ecs.EntityID,
 	nutPos *components.PositionComponent,
@@ -162,11 +166,15 @@ func (s *BowlingNutSystem) checkCollisionWithNearestZombie(
 	var nearestZombie ecs.EntityID
 	nearestDist := math.MaxFloat64
 
-	// 计算坚果碰撞盒
+	// 确定当前检测的行号
+	currentRow := nutComp.Row
+	if nutComp.IsBouncing {
+		currentRow = nutComp.TargetRow
+	}
+
+	// 计算坚果碰撞盒（只用于 X 轴检测）
 	nutLeft := nutPos.X - config.BowlingNutCollisionWidth/2
 	nutRight := nutPos.X + config.BowlingNutCollisionWidth/2
-	nutTop := nutPos.Y - config.BowlingNutCollisionHeight/2
-	nutBottom := nutPos.Y + config.BowlingNutCollisionHeight/2
 
 	// 查询所有僵尸实体
 	zombieEntities := ecs.GetEntitiesWith3[
@@ -184,17 +192,21 @@ func (s *BowlingNutSystem) checkCollisionWithNearestZombie(
 		}
 
 		zombiePos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
+
+		// 检查僵尸是否在同一行
+		zombieRow := s.calculateRowFromY(zombiePos.Y)
+		if zombieRow != currentRow {
+			continue
+		}
+
 		zombieCol, _ := ecs.GetComponent[*components.CollisionComponent](s.entityManager, zombieID)
 
-		// 计算僵尸碰撞盒
+		// 计算僵尸 X 轴碰撞范围
 		zombieLeft := zombiePos.X + zombieCol.OffsetX - zombieCol.Width/2
 		zombieRight := zombiePos.X + zombieCol.OffsetX + zombieCol.Width/2
-		zombieTop := zombiePos.Y + zombieCol.OffsetY - zombieCol.Height/2
-		zombieBottom := zombiePos.Y + zombieCol.OffsetY + zombieCol.Height/2
 
-		// AABB 碰撞检测
-		if nutRight >= zombieLeft && nutLeft <= zombieRight &&
-			nutBottom >= zombieTop && nutTop <= zombieBottom {
+		// X 轴碰撞检测（同行僵尸只需检测 X 轴重叠）
+		if nutRight >= zombieLeft && nutLeft <= zombieRight {
 			// 计算与坚果的X轴距离，选择最近的
 			dist := math.Abs(zombiePos.X - nutPos.X)
 			if dist < nearestDist {
@@ -205,7 +217,7 @@ func (s *BowlingNutSystem) checkCollisionWithNearestZombie(
 	}
 
 	if nearestZombie != 0 {
-		log.Printf("[BowlingNutSystem] 坚果碰撞最近僵尸: nutID=%d, zombieID=%d", nutEntityID, nearestZombie)
+		log.Printf("[BowlingNutSystem] 坚果碰撞最近僵尸: nutID=%d, zombieID=%d, row=%d", nutEntityID, nearestZombie, currentRow)
 	}
 
 	return nearestZombie
