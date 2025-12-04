@@ -40,3 +40,6 @@ verify_reward_panel
 /verify_gameplay
 
 /*.out
+
+# 构建产物
+build/

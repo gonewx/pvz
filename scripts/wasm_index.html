@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PvZ - Plants vs. Zombies</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+        }
+        #game {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            font-family: Arial, sans-serif;
+            font-size: 24px;
+            text-align: center;
+        }
+        #loading.hidden {
+            display: none;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            margin: 20px auto;
+            border: 4px solid #333;
+            border-top-color: #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div class="spinner"></div>
+        <p>加载中...</p>
+    </div>
+    <script src="wasm_exec.js"></script>
+    <script>
+        // 检查 WebAssembly 支持
+        if (!WebAssembly.instantiateStreaming) {
+            WebAssembly.instantiateStreaming = async (resp, importObject) => {
+                const source = await (await resp).arrayBuffer();
+                return await WebAssembly.instantiate(source, importObject);
+            };
+        }
+
+        const go = new Go();
+        
+        WebAssembly.instantiateStreaming(fetch("pvz.wasm"), go.importObject)
+            .then((result) => {
+                // 隐藏加载提示
+                document.getElementById("loading").classList.add("hidden");
+                // 运行 Go 程序
+                go.run(result.instance);
+            })
+            .catch((err) => {
+                const loading = document.getElementById("loading");
+                loading.innerHTML = '<p style="color: #f44336;">加载失败</p><p style="font-size: 14px; margin-top: 10px;">' + err.message + '</p>';
+                console.error("WASM 加载失败:", err);
+            });
+    </script>
+</body>
+</html>
+
