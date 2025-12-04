@@ -55,6 +55,9 @@ const (
 	// 爆炸对以自身为中心的3x3范围内的所有僵尸造成1800点伤害（足以秒杀所有僵尸）
 	// 爆炸后樱桃炸弹实体被移除
 	BehaviorCherryBomb
+	// BehaviorPotatoMine 土豆雷行为：种植后需要时间武装，武装完成后等待僵尸踩上触发爆炸
+	// 爆炸对踩上的僵尸造成巨额伤害（秒杀），爆炸后土豆雷实体被移除
+	BehaviorPotatoMine
 	// BehaviorZombiePreview 僵尸预告行为：开场动画中的僵尸预览，不移动、不攻击、只播放 idle 动画
 	BehaviorZombiePreview
 )

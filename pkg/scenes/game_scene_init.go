@@ -470,9 +470,17 @@ func (s *GameScene) showBattleSaveDialog() {
 // 条件：
 //   - 当前关卡有预设植物（PresetPlants）
 //   - Dave 对话系统已初始化
+//   - 当前没有已存在的 Dave 对话实体（避免重复创建）
 func (s *GameScene) createOpeningDaveDialogueIfNeeded() {
 	// 检查是否需要创建 Dave 对话
 	if s.gameState.CurrentLevel == nil || len(s.gameState.CurrentLevel.PresetPlants) == 0 {
+		return
+	}
+
+	// Bug Fix: 如果已经有 Dave 对话实体（从存档恢复的），不再创建
+	existingDaves := ecs.GetEntitiesWith1[*components.DaveDialogueComponent](s.entityManager)
+	if len(existingDaves) > 0 {
+		log.Printf("[GameScene] Dave dialogue already exists (entity %d), skipping creation", existingDaves[0])
 		return
 	}
 
@@ -1309,13 +1317,13 @@ func (s *GameScene) restoreConveyorBelt(conveyorData *game.ConveyorBeltData) {
 		return
 	}
 
-	// 恢复卡片队列
+	// Story 19.12: 恢复卡片队列（使用 PositionX 和 IsAtLeftEdge）
 	conveyorComp.Cards = make([]components.ConveyorCard, len(conveyorData.Cards))
 	for i, cardData := range conveyorData.Cards {
 		conveyorComp.Cards[i] = components.ConveyorCard{
-			CardType:      cardData.CardType,
-			SlideProgress: cardData.SlideProgress,
-			SlotIndex:     cardData.SlotIndex,
+			CardType:     cardData.CardType,
+			PositionX:    cardData.PositionX,
+			IsAtLeftEdge: cardData.IsAtLeftEdge,
 		}
 	}
 
@@ -1323,14 +1331,13 @@ func (s *GameScene) restoreConveyorBelt(conveyorData *game.ConveyorBeltData) {
 	conveyorComp.Capacity = conveyorData.Capacity
 	conveyorComp.ScrollOffset = conveyorData.ScrollOffset
 	conveyorComp.IsActive = conveyorData.IsActive
-	conveyorComp.GenerationTimer = conveyorData.GenerationTimer
-	conveyorComp.GenerationInterval = conveyorData.GenerationInterval
+	conveyorComp.NextSpacing = conveyorData.NextSpacing
 	conveyorComp.SelectedCardIndex = conveyorData.SelectedCardIndex
 	conveyorComp.FinalWaveTriggered = conveyorData.FinalWaveTriggered
 
-	log.Printf("[GameScene] 传送带已恢复: Cards=%d, IsActive=%v, Timer=%.2f, Selected=%d",
+	log.Printf("[GameScene] 传送带已恢复: Cards=%d, IsActive=%v, NextSpacing=%.1f, Selected=%d",
 		len(conveyorComp.Cards), conveyorComp.IsActive,
-		conveyorComp.GenerationTimer, conveyorComp.SelectedCardIndex)
+		conveyorComp.NextSpacing, conveyorComp.SelectedCardIndex)
 }
 
 // restoreLevelPhase 恢复关卡阶段状态
@@ -1379,7 +1386,7 @@ func (s *GameScene) restoreLevelPhase(phaseData *game.LevelPhaseData) {
 
 // restoreDaveDialogue 恢复 Dave 对话状态
 //
-// Story 19.x: 从存档数据恢复 Dave 对话状���
+// Story 19.x: 从存档数据恢复 Dave 对话状态
 //
 // 恢复内容：
 //   - 对话进度（当前行索引）
@@ -1391,6 +1398,7 @@ func (s *GameScene) restoreLevelPhase(phaseData *game.LevelPhaseData) {
 //   - 先删除初始化时创建的 Dave 实体（避免重复）
 //   - 如果 Dave 已经离开（State == Hidden），删除后不重新创建
 //   - 如果 Dave 正在对话中，恢复对话进度
+//   - Bug Fix: 如果正在转场阶段的 Dave 对话步骤，设置正确的对话完成回调
 func (s *GameScene) restoreDaveDialogue(daveData *game.DaveDialogueData) {
 	// 首先删除所有现有的 Dave 对话实体（初始化时可能已创建）
 	existingDaves := ecs.GetEntitiesWith1[*components.DaveDialogueComponent](s.entityManager)
@@ -1412,23 +1420,46 @@ func (s *GameScene) restoreDaveDialogue(daveData *game.DaveDialogueData) {
 
 	log.Printf("[GameScene] 恢复 Dave 对话状态...")
 
+	// Bug Fix: 检查是否正在转场阶段的 Dave 对话步骤
+	// 如果是，需要设置正确的对话完成回调（推进到传送带滑入而不是激活强引导）
+	isInTransitionDaveDialogue := s.levelPhaseSystem != nil && s.levelPhaseSystem.IsInDaveDialogueStep()
+
+	// 确定 Dave 对话完成后的回调
+	var onComplete func()
+	if isInTransitionDaveDialogue {
+		log.Printf("[GameScene] 检测到转场阶段的 Dave 对话，设置转场回调")
+		onComplete = func() {
+			log.Printf("[GameScene] Restored transition Dave dialogue completed, advancing to conveyor slide")
+			if s.levelPhaseSystem != nil {
+				s.levelPhaseSystem.AdvanceToConveyorSlide()
+			}
+		}
+	} else {
+		onComplete = func() {
+			// Dave 对话完成回调（非转场阶段）
+			log.Printf("[GameScene] Restored Dave dialogue completed")
+			if s.guidedTutorialSystem != nil {
+				s.guidedTutorialSystem.SetActive(true)
+			}
+		}
+	}
+
 	// 创建 Dave 实体并恢复状态
 	daveEntity, err := entities.NewCrazyDaveEntity(
 		s.entityManager,
 		s.resourceManager,
 		daveData.DialogueKeys,
-		func() {
-			// Dave 对话完成回调
-			log.Printf("[GameScene] Restored Dave dialogue completed")
-			if s.guidedTutorialSystem != nil {
-				s.guidedTutorialSystem.SetActive(true)
-			}
-		},
+		onComplete,
 	)
 
 	if err != nil {
 		log.Printf("[GameScene] ERROR: Failed to restore Dave entity: %v", err)
 		return
+	}
+
+	// Bug Fix: 如果正在转场阶段的 Dave 对话步骤，更新 LevelPhaseComponent 中的实体ID
+	if isInTransitionDaveDialogue && s.levelPhaseSystem != nil {
+		s.levelPhaseSystem.SetDaveDialogueEntityID(daveEntity)
 	}
 
 	// 恢复对话进度
@@ -1446,9 +1477,9 @@ func (s *GameScene) restoreDaveDialogue(daveData *game.DaveDialogueData) {
 		posComp.Y = daveData.DaveY
 	}
 
-	log.Printf("[GameScene] Dave 对话已恢复: LineIndex=%d/%d, State=%d, Visible=%v",
+	log.Printf("[GameScene] Dave 对话已恢复: LineIndex=%d/%d, State=%d, Visible=%v, IsTransitionDialogue=%v",
 		daveData.CurrentLineIndex, len(daveData.DialogueKeys),
-		daveData.State, daveData.IsVisible)
+		daveData.State, daveData.IsVisible, isInTransitionDaveDialogue)
 }
 
 // restoreGuidedTutorial 恢复强引导教学状态

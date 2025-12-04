@@ -18,13 +18,17 @@ type CardPoolEntry struct {
 }
 
 // ConveyorBeltSystem 传送带系统
-// Story 19.5: 管理传送带动画、卡片生成和交互
+// Story 19.5 & 19.12: 管理传送带动画、卡片生成和交互
 //
 // 此系统负责：
 // - 更新传动动画（6行交错滚动）
 // - 按权重生成卡片
-// - 管理卡片滑入动画
+// - 管理卡片移动（随传送带向左移动）
 // - 处理最终波特殊生成
+//
+// Story 19.12 修正：
+// - 坚果以固定间隔摆放，随传送带被动向左移动
+// - 使用距离驱动生成，而非时间计时器
 //
 // 遵循零耦合原则：
 // - 通过组件查询访问传送带状态
@@ -42,7 +46,9 @@ type ConveyorBeltSystem struct {
 
 	// 常量缓存
 	beltAnimSpeed float64 // 传动动画速度（像素/秒）
-	slideInSpeed  float64 // 卡片滑入速度（单位/秒）
+	moveSpeed     float64 // 传送带移动速度（像素/秒）
+	nutSpacing    float64 // 坚果基础间隔（像素）
+	stopX         float64 // 坚果停止的左边缘 X 位置
 }
 
 // NewConveyorBeltSystem 创建传送带系统
@@ -60,7 +66,9 @@ func NewConveyorBeltSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.R
 		gameState:       gs,
 		resourceManager: rm,
 		beltAnimSpeed:   config.ConveyorBeltAnimSpeed,
-		slideInSpeed:    config.ConveyorCardSlideInSpeed,
+		moveSpeed:       config.ConveyorBeltMoveSpeed,
+		nutSpacing:      config.ConveyorNutSpacing,
+		stopX:           config.ConveyorNutStopX,
 	}
 
 	// 初始化默认卡片池（85% 普通坚果，15% 爆炸坚果）
@@ -74,10 +82,11 @@ func NewConveyorBeltSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.R
 
 	// 初始化传送带组件
 	beltComp := components.NewConveyorBeltComponent()
+	beltComp.NextSpacing = system.nutSpacing
 	em.AddComponent(system.beltEntity, beltComp)
 
-	log.Printf("[ConveyorBeltSystem] Initialized (Entity ID: %d), capacity=%d, interval=%.1fs",
-		system.beltEntity, beltComp.Capacity, beltComp.GenerationInterval)
+	log.Printf("[ConveyorBeltSystem] Initialized (Entity ID: %d), capacity=%d, moveSpeed=%.1f px/s, spacing=%.1f px",
+		system.beltEntity, beltComp.Capacity, system.moveSpeed, system.nutSpacing)
 
 	return system
 }
@@ -100,15 +109,12 @@ func (s *ConveyorBeltSystem) Update(dt float64) {
 	// 1. 更新传动动画
 	s.updateBeltAnimation(dt, beltComp)
 
-	// 2. 更新卡片生成
-	s.updateCardGeneration(dt, beltComp)
-
-	// 3. 更新卡片滑入动画
-	s.updateCardSlideIn(dt, beltComp)
+	// 2. Story 19.12: 更新坚果移动和生成
+	s.updateNutMovementAndSpawning(dt, beltComp)
 }
 
 // updateBeltAnimation 更新传动动画
-// 6行交错滚动效果
+// 履带一直匀速滚动，不管是否有卡片在滑入
 func (s *ConveyorBeltSystem) updateBeltAnimation(dt float64, beltComp *components.ConveyorBeltComponent) {
 	// 滚动偏移量持续增加
 	beltComp.ScrollOffset += s.beltAnimSpeed * dt
@@ -121,40 +127,74 @@ func (s *ConveyorBeltSystem) updateBeltAnimation(dt float64, beltComp *component
 	}
 }
 
-// updateCardGeneration 更新卡片生成
-func (s *ConveyorBeltSystem) updateCardGeneration(dt float64, beltComp *components.ConveyorBeltComponent) {
-	// 如果传送带已满，不生成新卡片
+// updateNutMovementAndSpawning 更新坚果移动和生成
+// Story 19.12: 距离驱动的生成逻辑
+func (s *ConveyorBeltSystem) updateNutMovementAndSpawning(dt float64, beltComp *components.ConveyorBeltComponent) {
+	// 1. 更新所有卡片位置（向左移动）
+	for i := range beltComp.Cards {
+		card := &beltComp.Cards[i]
+		if !card.IsAtLeftEdge {
+			card.PositionX -= s.moveSpeed * dt
+			if card.PositionX <= s.stopX {
+				card.PositionX = s.stopX
+				card.IsAtLeftEdge = true
+			}
+		}
+	}
+
+	// 2. 检查是否需要生成新坚果
+	if beltComp.IsFull() {
+		return // 传送带已满
+	}
+
+	if len(beltComp.Cards) == 0 {
+		return // 第一个坚果在 Activate() 中生成
+	}
+
+	// 找到最右侧坚果（队列最后一个）
+	rightmostCard := &beltComp.Cards[len(beltComp.Cards)-1]
+
+	// 获取传送带宽度
+	beltWidth := s.getBeltWidth()
+
+	// 当最右侧坚果移动了足够距离时，生成新坚果
+	// 生成阈值 = 传送带右边缘 - 下一个间隔
+	spawnThreshold := beltWidth - beltComp.NextSpacing
+	if rightmostCard.PositionX <= spawnThreshold {
+		s.spawnCardAtRight(beltComp)
+
+		// 计算下一个间隔（可能是大间隔）
+		beltComp.NextSpacing = s.nutSpacing
+		if rand.Float64() < config.ConveyorLargeSpacingChance {
+			beltComp.NextSpacing *= config.ConveyorLargeSpacingMultiplier
+		}
+	}
+}
+
+// spawnCardAtRight 在传送带右侧生成新卡片
+func (s *ConveyorBeltSystem) spawnCardAtRight(beltComp *components.ConveyorBeltComponent) {
 	if beltComp.IsFull() {
 		return
 	}
 
-	// 更新生成计时器
-	beltComp.GenerationTimer -= dt
+	cardType := s.generateCard()
+	beltWidth := s.getBeltWidth()
 
-	// 计时器到期，生成新卡片
-	if beltComp.GenerationTimer <= 0 {
-		cardType := s.generateCard()
-		s.addCard(beltComp, cardType)
-
-		// 重置计时器
-		beltComp.GenerationTimer = beltComp.GenerationInterval
-
-		log.Printf("[ConveyorBeltSystem] Generated card: %s, queue length: %d/%d",
-			cardType, len(beltComp.Cards), beltComp.Capacity)
+	card := components.ConveyorCard{
+		CardType:     cardType,
+		PositionX:    beltWidth, // 从右边缘开始
+		IsAtLeftEdge: false,
 	}
+
+	beltComp.Cards = append(beltComp.Cards, card)
+
+	log.Printf("[ConveyorBeltSystem] Spawned card at right: %s, posX=%.1f, queue=%d/%d",
+		cardType, beltWidth, len(beltComp.Cards), beltComp.Capacity)
 }
 
-// updateCardSlideIn 更新卡片滑入动画
-func (s *ConveyorBeltSystem) updateCardSlideIn(dt float64, beltComp *components.ConveyorBeltComponent) {
-	for i := range beltComp.Cards {
-		card := &beltComp.Cards[i]
-		if card.SlideProgress < 1.0 {
-			card.SlideProgress += s.slideInSpeed * dt
-			if card.SlideProgress > 1.0 {
-				card.SlideProgress = 1.0
-			}
-		}
-	}
+// getBeltWidth 获取传送带宽度
+func (s *ConveyorBeltSystem) getBeltWidth() float64 {
+	return config.ConveyorBeltWidth
 }
 
 // generateCard 按权重生成卡片类型
@@ -185,17 +225,20 @@ func (s *ConveyorBeltSystem) generateCard() string {
 	return s.cardPool[0].Type // fallback
 }
 
-// addCard 添加卡片到传送带
+// addCard 添加卡片到传送带（用于测试）
+// Story 19.12: 新卡片添加到右侧，使用 PositionX
 func (s *ConveyorBeltSystem) addCard(beltComp *components.ConveyorBeltComponent, cardType string) bool {
 	if beltComp.IsFull() {
 		return false
 	}
 
+	beltWidth := s.getBeltWidth()
+
 	// 新卡片添加到队列末尾（最右侧）
 	card := components.ConveyorCard{
-		CardType:      cardType,
-		SlideProgress: 0.0, // 从0开始滑入动画
-		SlotIndex:     len(beltComp.Cards),
+		CardType:     cardType,
+		PositionX:    beltWidth, // 从右边缘开始
+		IsAtLeftEdge: false,
 	}
 
 	beltComp.Cards = append(beltComp.Cards, card)
@@ -227,17 +270,13 @@ func (s *ConveyorBeltSystem) OnFinalWave() {
 }
 
 // insertCardToFront 将卡片插入队列前端
+// Story 19.12: 用于最终波强制插入爆炸坚果
 func (s *ConveyorBeltSystem) insertCardToFront(beltComp *components.ConveyorBeltComponent, cardType string) {
-	// 创建新卡片
+	// 创建新卡片（在左边缘位置，立即可见）
 	card := components.ConveyorCard{
-		CardType:      cardType,
-		SlideProgress: 1.0, // 立即显示，无滑入动画
-		SlotIndex:     0,
-	}
-
-	// 更新现有卡片的槽位索引
-	for i := range beltComp.Cards {
-		beltComp.Cards[i].SlotIndex++
+		CardType:     cardType,
+		PositionX:    s.stopX, // 在左边缘位置
+		IsAtLeftEdge: true,    // 已到达左边缘
 	}
 
 	// 插入到前端
@@ -250,46 +289,41 @@ func (s *ConveyorBeltSystem) insertCardToFront(beltComp *components.ConveyorBelt
 }
 
 // GetCardAtPosition 获取指定屏幕位置的卡片索引
+// Story 19.12: 合并原来的两个方法，使用 PositionX 计算实时位置
 //
 // 参数：
 //   - x, y: 屏幕坐标
-//   - conveyorX, conveyorY: 传送带左上角位置
-//   - cardWidth, cardHeight: 卡片尺寸（用于点击检测），0表示使用默认值
+//   - conveyorX: 传送带左上角X位置
+//   - cardStartY: 卡片起始Y位置
+//   - cardWidth, cardHeight: 卡片尺寸
 //
 // 返回：
 //   - 卡片索引，-1 表示没有卡片
-func (s *ConveyorBeltSystem) GetCardAtPosition(x, y float64, conveyorX, conveyorY float64, cardWidth, cardHeight float64) int {
+func (s *ConveyorBeltSystem) GetCardAtPosition(x, y float64, conveyorX, cardStartY float64, cardWidth, cardHeight float64) int {
 	beltComp, ok := ecs.GetComponent[*components.ConveyorBeltComponent](s.entityManager, s.beltEntity)
 	if !ok {
 		return -1
 	}
 
-	// 计算卡片区域参数 - 使用传入的参数，如果为0则使用默认值
-	if cardWidth <= 0 {
-		cardWidth = config.ConveyorCardWidth
-	}
-	if cardHeight <= 0 {
-		cardHeight = config.ConveyorCardHeight
-	}
-	cardSpacing := config.ConveyorCardSpacing
-
-	// 检查 Y 坐标是否在传送带范围内
-	if y < conveyorY || y > conveyorY+cardHeight {
+	// 检查 Y 坐标是否在卡片范围内
+	if y < cardStartY || y > cardStartY+cardHeight {
 		return -1
 	}
 
-	// 计算点击位置对应的槽位
-	relativeX := x - conveyorX
-	if relativeX < 0 {
-		return -1
-	}
+	beltWidth := s.getBeltWidth()
 
-	slotWidth := cardWidth + cardSpacing
-	slotIndex := int(relativeX / slotWidth)
-
-	// 检查是否有卡片在该槽位
+	// Story 19.12: 使用 PositionX 计算卡片实时屏幕位置
 	for i, card := range beltComp.Cards {
-		if card.SlotIndex == slotIndex && card.SlideProgress >= 0.9 {
+		// 卡片屏幕 X 位置 = 传送带 X + 卡片局部 X
+		cardScreenX := conveyorX + card.PositionX
+
+		// 检查卡片是否在传送带可见范围内
+		if card.PositionX > beltWidth {
+			continue // 完全在传送带外，跳过
+		}
+
+		// 检查点击是否在卡片区域内
+		if x >= cardScreenX && x <= cardScreenX+cardWidth {
 			return i
 		}
 	}
@@ -320,10 +354,7 @@ func (s *ConveyorBeltSystem) RemoveCard(index int) string {
 	// 从队列中移除
 	beltComp.Cards = append(beltComp.Cards[:index], beltComp.Cards[index+1:]...)
 
-	// 更新剩余卡片的槽位索引
-	for i := range beltComp.Cards {
-		beltComp.Cards[i].SlotIndex = i
-	}
+	// Story 19.12: 不再需要更新 SlotIndex，因为使用 PositionX 来定位
 
 	// 清除选中状态
 	beltComp.SelectedCardIndex = -1
@@ -335,6 +366,7 @@ func (s *ConveyorBeltSystem) RemoveCard(index int) string {
 }
 
 // SelectCard 选中指定索引的卡片
+// Story 19.12: 基于 PositionX 判断卡片可见性
 //
 // 参数：
 //   - index: 卡片索引
@@ -351,12 +383,19 @@ func (s *ConveyorBeltSystem) SelectCard(index int) bool {
 		return false
 	}
 
-	// 检查卡片滑入动画是否完成
-	if beltComp.Cards[index].SlideProgress < 0.9 {
-		return false
+	// Story 19.12: 允许选中任何可见的卡片（无论是否到达左边缘）
+	// 卡片只要在传送带范围内就可以被选中
+	beltWidth := s.getBeltWidth()
+	card := &beltComp.Cards[index]
+
+	// 检查卡片是否在传送带可见范围内（至少部分可见）
+	if card.PositionX > beltWidth {
+		return false // 完全在传送带外，不可选中
 	}
 
 	beltComp.SelectedCardIndex = index
+	log.Printf("[ConveyorBeltSystem] Card selected: index=%d, type=%s, posX=%.1f, atLeftEdge=%v",
+		index, card.CardType, card.PositionX, card.IsAtLeftEdge)
 	return true
 }
 
@@ -388,6 +427,7 @@ func (s *ConveyorBeltSystem) GetSelectedCard() string {
 }
 
 // Activate 激活传送带
+// Story 19.12: 激活时在右侧生成第一个坚果
 func (s *ConveyorBeltSystem) Activate() {
 	beltComp, ok := ecs.GetComponent[*components.ConveyorBeltComponent](s.entityManager, s.beltEntity)
 	if !ok {
@@ -395,9 +435,16 @@ func (s *ConveyorBeltSystem) Activate() {
 	}
 
 	beltComp.IsActive = true
-	beltComp.GenerationTimer = 0 // 立即生成第一张卡片
 
-	log.Printf("[ConveyorBeltSystem] Activated")
+	// Story 19.12: 激活时在右侧生成第一个坚果
+	if len(beltComp.Cards) == 0 {
+		s.spawnCardAtRight(beltComp)
+	}
+
+	// 初始化下一个间隔
+	beltComp.NextSpacing = s.nutSpacing
+
+	log.Printf("[ConveyorBeltSystem] Activated, first card spawned at right")
 }
 
 // Deactivate 停用传送带
@@ -434,16 +481,12 @@ func (s *ConveyorBeltSystem) SetCardPool(pool []CardPoolEntry) {
 	}
 }
 
-// SetGenerationInterval 设置卡片生成间隔
-func (s *ConveyorBeltSystem) SetGenerationInterval(interval float64) {
-	beltComp, ok := ecs.GetComponent[*components.ConveyorBeltComponent](s.entityManager, s.beltEntity)
-	if !ok {
-		return
-	}
-
-	if interval > 0 {
-		beltComp.GenerationInterval = interval
-		log.Printf("[ConveyorBeltSystem] Generation interval set to %.1fs", interval)
+// SetNutSpacing 设置坚果间隔
+// Story 19.12: 替代原来的 SetGenerationInterval
+func (s *ConveyorBeltSystem) SetNutSpacing(spacing float64) {
+	if spacing > 0 {
+		s.nutSpacing = spacing
+		log.Printf("[ConveyorBeltSystem] Nut spacing set to %.1f px", spacing)
 	}
 }
 

@@ -601,25 +601,25 @@ func (s *BattleSerializer) collectConveyorBeltData(em *ecs.EntityManager) *Conve
 	}
 
 	// 收集卡片数据
+	// Story 19.12: 使用 PositionX 和 IsAtLeftEdge
 	var cards []ConveyorCardData
 	for _, card := range conveyorComp.Cards {
 		cards = append(cards, ConveyorCardData{
-			CardType:      card.CardType,
-			SlideProgress: card.SlideProgress,
-			SlotIndex:     card.SlotIndex,
+			CardType:     card.CardType,
+			PositionX:    card.PositionX,
+			IsAtLeftEdge: card.IsAtLeftEdge,
 		})
 	}
 
-	log.Printf("[BattleSerializer] Collected conveyor belt: Cards=%d, IsActive=%v, Timer=%.2f",
-		len(cards), conveyorComp.IsActive, conveyorComp.GenerationTimer)
+	log.Printf("[BattleSerializer] Collected conveyor belt: Cards=%d, IsActive=%v, NextSpacing=%.1f",
+		len(cards), conveyorComp.IsActive, conveyorComp.NextSpacing)
 
 	return &ConveyorBeltData{
 		Cards:              cards,
 		Capacity:           conveyorComp.Capacity,
 		ScrollOffset:       conveyorComp.ScrollOffset,
 		IsActive:           conveyorComp.IsActive,
-		GenerationTimer:    conveyorComp.GenerationTimer,
-		GenerationInterval: conveyorComp.GenerationInterval,
+		NextSpacing:        conveyorComp.NextSpacing,
 		SelectedCardIndex:  conveyorComp.SelectedCardIndex,
 		FinalWaveTriggered: conveyorComp.FinalWaveTriggered,
 	}

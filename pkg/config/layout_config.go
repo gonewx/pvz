@@ -492,11 +492,8 @@ const (
 	// ConveyorCardSpacing 卡片间距（像素）
 	ConveyorCardSpacing = 2.0
 
-	// ConveyorBeltAnimSpeed 传动动画速度（像素/秒）
-	ConveyorBeltAnimSpeed = 50.0
-
 	// ConveyorCardGenerationInterval 默认卡片生成间隔（秒）
-	ConveyorCardGenerationInterval = 3.0
+	ConveyorCardGenerationInterval = 5.0
 
 	// ConveyorBeltPadding 传送带内边距（像素）
 	// 卡片距离传送带边缘的距离
@@ -533,7 +530,7 @@ const (
 	BowlingNutCollisionHeight = 60.0
 
 	// ConveyorCardScale 传送带卡片缩放比例
-	// 用于等比例缩小卡片，基于原始卡片背景尺寸（约 100x140）
+	// 用于等比例缩小卡片
 	// 建议值范围：0.3 - 0.6
 	ConveyorCardScale = 0.5
 
@@ -541,16 +538,48 @@ const (
 	// 选中状态的传送带卡片添加的半透明灰色遮罩
 	ConveyorCardSelectedOverlayAlpha = 128
 
-	// ConveyorCardSlideInSpeed 卡片滑入速度（单位/秒）
+	// ConveyorCardSlideInSpeed 卡片滑入速度（进度/秒）
 	// 控制卡片从传送带右侧进入的速度
 	// 值越小速度越慢：0.5 = 2秒完成，1.0 = 1秒完成，2.0 = 0.5秒完成
-	// 建议值范围：0.3 - 2.0
-	ConveyorCardSlideInSpeed = 0.35
+	// 建议值范围：0.1 - 1.0
+	ConveyorCardSlideInSpeed = 0.0365
+
+	// ConveyorBeltAnimSpeed 履带滚动速度（像素/秒）
+	// 手工调整此值使履带与卡片视觉同步
+	// 建议值范围：20.0 - 100.0
+	ConveyorBeltAnimSpeed = 20.0
 
 	// ConveyorBeltLeftPadding 传送带左侧内边距（像素）
 	// 卡片不会进入此区域，防止卡片太靠左遮挡边框
 	// 建议值范围：10.0 - 30.0
 	ConveyorBeltLeftPadding = 10.0
+
+	// ========== Story 19.12: 传送带坚果移动配置参数 ==========
+
+	// ConveyorNutSpacing 坚果基础间隔（像素）
+	// Story 19.12: 当最右侧坚果移动此距离后生成新坚果
+	// 建议值范围：60.0 - 120.0
+	ConveyorNutSpacing = 80.0
+
+	// ConveyorBeltMoveSpeed 传送带移动速度（像素/秒）
+	// Story 19.12: 所有坚果以此速度向左移动
+	// 建议值范围：20.0 - 50.0
+	ConveyorBeltMoveSpeed = 30.0
+
+	// ConveyorNutStopX 坚果停止的左边缘 X 位置（局部坐标，像素）
+	// Story 19.12: 坚果到达此位置后停止移动，等待玩家拾取
+	// 建议值范围：5.0 - 20.0
+	ConveyorNutStopX = 10.0
+
+	// ConveyorLargeSpacingChance 大间隔出现概率
+	// Story 19.12: 后期偶尔出现大间隔，增加游戏紧张感
+	// 建议值范围：0.10 - 0.25
+	ConveyorLargeSpacingChance = 0.15
+
+	// ConveyorLargeSpacingMultiplier 大间隔倍数
+	// Story 19.12: 大间隔 = 基础间隔 * 此倍数
+	// 建议值范围：1.5 - 3.0
+	ConveyorLargeSpacingMultiplier = 2.0
 
 	// BowlingNutPreviewAlpha 草坪预览透明度（0-255）
 	// 悬停在草坪网格时显示的半透明坚果预览

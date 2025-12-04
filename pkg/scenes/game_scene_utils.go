@@ -189,6 +189,14 @@ func (s *GameScene) updateMouseCursor() {
 		}
 	}
 
+	// 6. Story 19.x QA: Check if hovering over conveyor belt cards
+	// 传送带卡片悬停时显示手形光标（包括滑入动画中的卡片）
+	if cursorShape == ebiten.CursorShapeDefault && s.conveyorBeltSystem != nil && s.conveyorBeltSystem.IsActive() {
+		if s.isHoveringConveyorCard() {
+			cursorShape = ebiten.CursorShapePointer
+		}
+	}
+
 	// Only update cursor if shape changed (避免闪烁)
 	if cursorShape != s.lastCursorShape {
 		ebiten.SetCursorShape(cursorShape)
