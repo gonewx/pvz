@@ -200,39 +200,76 @@ func (s *GameScene) drawConveyorCards(screen *ebiten.Image, conveyorX, conveyorY
 		return
 	}
 
-	// 卡片布局参数 - 优先使用关卡配置，否则使用全局默认值
-	cardWidth := config.ConveyorCardWidth
-	cardHeight := config.ConveyorCardHeight
-	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.ConveyorBelt != nil {
-		if s.gameState.CurrentLevel.ConveyorBelt.CardWidth > 0 {
-			cardWidth = s.gameState.CurrentLevel.ConveyorBelt.CardWidth
-		}
-		if s.gameState.CurrentLevel.ConveyorBelt.CardHeight > 0 {
-			cardHeight = s.gameState.CurrentLevel.ConveyorBelt.CardHeight
-		}
+	// 卡片布局参数 - 使用缩放比例配置
+	// 获取原始卡片背景尺寸
+	var originalCardWidth, originalCardHeight float64
+	if s.conveyorCardBackground != nil {
+		bgBounds := s.conveyorCardBackground.Bounds()
+		originalCardWidth = float64(bgBounds.Dx())
+		originalCardHeight = float64(bgBounds.Dy())
+	} else {
+		// 回退：使用默认值
+		originalCardWidth = 100.0
+		originalCardHeight = 140.0
 	}
-	cardSpacing := config.ConveyorCardSpacing
-	padding := config.ConveyorBeltPadding
 
-	// 卡片起始位置（从左到右排列）
-	cardStartX := conveyorX + padding
-	cardStartY := conveyorY + padding + 10 // 居中偏移
+	// 使用缩放比例等比例计算卡片尺寸
+	cardScale := config.ConveyorCardScale
+	cardWidth := originalCardWidth * cardScale
+	cardHeight := originalCardHeight * cardScale
+
+	cardSpacing := config.ConveyorCardSpacing
+
+	// 获取传送带背景尺寸
+	var beltHeight, beltWidth float64
+	if s.conveyorBeltBackdrop != nil {
+		beltHeight = float64(s.conveyorBeltBackdrop.Bounds().Dy())
+		beltWidth = float64(s.conveyorBeltBackdrop.Bounds().Dx())
+	} else {
+		beltHeight = 80.0 // 默认高度
+		beltWidth = config.ConveyorBeltWidth
+	}
+
+	// 卡片起始位置（从左到右排列）- 使用左侧内边距配置
+	cardStartX := conveyorX + config.ConveyorBeltLeftPadding
+	// 垂直居中：卡片Y = 传送带Y + (传送带高度 - 卡片高度) / 2
+	cardStartY := conveyorY + (beltHeight-cardHeight)/2
+
+	// 传送带可见区域右边界（用于裁剪）
+	beltRightEdge := conveyorX + beltWidth - config.ConveyorBeltPadding
 
 	// 遍历绘制每张卡片
 	for i, card := range beltComp.Cards {
-		// 计算卡片 X 位置
-		// 滑入动画：新卡片从右侧滑入
+		// 计算卡片目标 X 位置（最终位置）
 		targetX := cardStartX + float64(card.SlotIndex)*(cardWidth+cardSpacing)
-		slideOffset := (1.0 - card.SlideProgress) * (cardWidth + cardSpacing)
-		cardX := targetX + slideOffset
+
+		// 滑入动画：新卡片从传送带右边外侧进入
+		// slideProgress: 0 -> 1，0 表示刚生成（在右侧外部），1 表示到达目标位置
+		// 起始位置 = 传送带右边缘外侧
+		slideStartX := conveyorX + beltWidth + cardWidth
+		// 当前位置 = 起始位置 + (目标位置 - 起始位置) * progress
+		cardX := slideStartX + (targetX-slideStartX)*card.SlideProgress
 
 		cardY := cardStartY
 
 		// 检查是否选中
 		isSelected := beltComp.SelectedCardIndex == i
 
-		// 绘制卡片
-		s.drawConveyorCard(screen, card.CardType, cardX, cardY, cardWidth, cardHeight, isSelected)
+		// 计算裁剪参数（用于右侧进入时的部分可见效果）
+		// 卡片右边缘超出传送带右边界时，计算需要裁剪的比例
+		clipRatio := 1.0 // 默认完全可见
+		if cardX+cardWidth > beltRightEdge {
+			// 卡片部分或完全在传送带外
+			visibleWidth := beltRightEdge - cardX
+			if visibleWidth <= 0 {
+				// 卡片完全在传送带外，不绘制
+				continue
+			}
+			clipRatio = visibleWidth / cardWidth
+		}
+
+		// 绘制卡片（带裁剪）
+		s.drawConveyorCardClipped(screen, card.CardType, cardX, cardY, cardWidth, cardHeight, isSelected, clipRatio)
 	}
 }
 
@@ -247,6 +284,159 @@ func (s *GameScene) drawConveyorCard(screen *ebiten.Image, cardType string, x, y
 
 	// 回退：使用简单矩形绘制（资源未加载时）
 	s.drawConveyorCardFallback(screen, cardType, x, y, width, height, isSelected)
+}
+
+// drawConveyorCardClipped 绘制带裁剪的卡片
+// clipRatio: 可见比例（0-1），1 表示完全可见，0.5 表示只显示左半部分
+func (s *GameScene) drawConveyorCardClipped(screen *ebiten.Image, cardType string, x, y, width, height float64, isSelected bool, clipRatio float64) {
+	// 如果完全可见，直接调用普通绘制
+	if clipRatio >= 1.0 {
+		s.drawConveyorCard(screen, cardType, x, y, width, height, isSelected)
+		return
+	}
+
+	// 如果完全不可见，不绘制
+	if clipRatio <= 0 {
+		return
+	}
+
+	// 使用真实卡片图像渲染（带裁剪）
+	if s.conveyorCardBackground != nil && s.conveyorWallnutIcon != nil {
+		s.drawConveyorCardWithImagesClipped(screen, cardType, x, y, width, height, isSelected, clipRatio)
+		return
+	}
+
+	// 回退：使用简单矩形绘制（资源未加载时）
+	s.drawConveyorCardFallbackClipped(screen, cardType, x, y, width, height, isSelected, clipRatio)
+}
+
+// drawConveyorCardWithImagesClipped 使用真实图像绘制带裁剪的传送带卡片
+func (s *GameScene) drawConveyorCardWithImagesClipped(screen *ebiten.Image, cardType string, x, y, width, height float64, isSelected bool, clipRatio float64) {
+	// 计算卡片缩放因子
+	bgBounds := s.conveyorCardBackground.Bounds()
+	bgWidth := float64(bgBounds.Dx())
+	bgHeight := float64(bgBounds.Dy())
+	cardScale := width / bgWidth
+
+	// 计算裁剪后的源图像区域（从左侧开始裁剪）
+	clipWidth := int(bgWidth * clipRatio)
+	if clipWidth <= 0 {
+		return
+	}
+
+	// 1. 绘制卡片背景框（裁剪）
+	srcRect := image.Rect(0, 0, clipWidth, int(bgHeight))
+	clippedBg := s.conveyorCardBackground.SubImage(srcRect).(*ebiten.Image)
+
+	bgOp := &ebiten.DrawImageOptions{}
+	bgOp.GeoM.Scale(cardScale, cardScale)
+	bgOp.GeoM.Translate(x, y)
+	screen.DrawImage(clippedBg, bgOp)
+
+	// 2. 绘制植物图标（需要判断是否在裁剪范围内）
+	var plantIcon *ebiten.Image
+	switch cardType {
+	case components.CardTypeExplodeONut:
+		plantIcon = s.conveyorExplodeNutIcon
+	default:
+		plantIcon = s.conveyorWallnutIcon
+	}
+
+	if plantIcon != nil {
+		iconScale := config.PlantCardIconScale * cardScale
+		iconOffsetY := config.PlantCardIconOffsetY * cardScale
+
+		iconWidth := float64(plantIcon.Bounds().Dx()) * iconScale
+		scaledBgWidth := bgWidth * cardScale
+
+		// 图标水平居中
+		iconOffsetX := (scaledBgWidth - iconWidth) / 2.0
+
+		// 计算图标在卡片中的可见区域
+		visibleCardWidth := float64(clipWidth) * cardScale
+		iconX := x + iconOffsetX
+		iconRightEdge := iconX + iconWidth
+
+		// 如果图标完全在裁剪区域外，不绘制
+		if iconX >= x+visibleCardWidth {
+			// 图标完全不可见
+		} else if iconRightEdge <= x+visibleCardWidth {
+			// 图标完全可见
+			iconOp := &ebiten.DrawImageOptions{}
+			iconOp.GeoM.Scale(iconScale, iconScale)
+			iconOp.GeoM.Translate(iconX, y+iconOffsetY)
+
+			if cardType == components.CardTypeExplodeONut {
+				iconOp.ColorScale.Scale(1.0, 0.6, 0.6, 1.0)
+			}
+			screen.DrawImage(plantIcon, iconOp)
+		} else {
+			// 图标部分可见，需要裁剪
+			iconVisibleWidth := x + visibleCardWidth - iconX
+			iconClipRatio := iconVisibleWidth / iconWidth
+			iconSrcWidth := int(float64(plantIcon.Bounds().Dx()) * iconClipRatio)
+			if iconSrcWidth > 0 {
+				iconSrcRect := image.Rect(0, 0, iconSrcWidth, plantIcon.Bounds().Dy())
+				clippedIcon := plantIcon.SubImage(iconSrcRect).(*ebiten.Image)
+
+				iconOp := &ebiten.DrawImageOptions{}
+				iconOp.GeoM.Scale(iconScale, iconScale)
+				iconOp.GeoM.Translate(iconX, y+iconOffsetY)
+
+				if cardType == components.CardTypeExplodeONut {
+					iconOp.ColorScale.Scale(1.0, 0.6, 0.6, 1.0)
+				}
+				screen.DrawImage(clippedIcon, iconOp)
+			}
+		}
+	}
+
+	// 3. 选中状态：绘制禁用遮罩（裁剪）
+	if isSelected {
+		scaledWidth := float64(clipWidth) * cardScale
+		scaledHeight := bgHeight * cardScale
+		intWidth := int(scaledWidth)
+		intHeight := int(scaledHeight)
+
+		if intWidth > 0 && intHeight > 0 {
+			mask := ebiten.NewImage(intWidth, intHeight)
+			mask.Fill(color.RGBA{R: 0, G: 0, B: 0, A: uint8(config.ConveyorCardSelectedOverlayAlpha)})
+
+			maskOp := &ebiten.DrawImageOptions{}
+			maskOp.GeoM.Translate(x, y)
+			screen.DrawImage(mask, maskOp)
+		}
+	}
+}
+
+// drawConveyorCardFallbackClipped 使用简单矩形绘制带裁剪的卡片（回退方案）
+func (s *GameScene) drawConveyorCardFallbackClipped(screen *ebiten.Image, cardType string, x, y, width, height float64, isSelected bool, clipRatio float64) {
+	// 卡片背景颜色（根据类型）
+	var bgColor color.RGBA
+
+	switch cardType {
+	case components.CardTypeWallnutBowling:
+		bgColor = color.RGBA{R: 160, G: 120, B: 80, A: 255} // 棕色
+	case components.CardTypeExplodeONut:
+		bgColor = color.RGBA{R: 200, G: 80, B: 80, A: 255} // 红色
+	default:
+		bgColor = color.RGBA{R: 128, G: 128, B: 128, A: 255} // 灰色
+	}
+
+	// 绘制裁剪后的卡片背景
+	visibleWidth := width * clipRatio
+	ebitenutil.DrawRect(screen, x, y, visibleWidth, height, bgColor)
+
+	// 选中状态添加禁用遮罩
+	if isSelected {
+		overlayColor := color.RGBA{
+			R: 0,
+			G: 0,
+			B: 0,
+			A: uint8(config.ConveyorCardSelectedOverlayAlpha),
+		}
+		ebitenutil.DrawRect(screen, x, y, visibleWidth, height, overlayColor)
+	}
 }
 
 // drawConveyorCardWithImages 使用真实图像绘制传送带卡片
@@ -375,23 +565,36 @@ func (s *GameScene) handleConveyorBeltClick(mouseX, mouseY int) bool {
 		return false
 	}
 
-	// 获取关卡配置的卡片尺寸
-	cardWidth := config.ConveyorCardWidth
-	cardHeight := config.ConveyorCardHeight
-	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.ConveyorBelt != nil {
-		if s.gameState.CurrentLevel.ConveyorBelt.CardWidth > 0 {
-			cardWidth = s.gameState.CurrentLevel.ConveyorBelt.CardWidth
-		}
-		if s.gameState.CurrentLevel.ConveyorBelt.CardHeight > 0 {
-			cardHeight = s.gameState.CurrentLevel.ConveyorBelt.CardHeight
-		}
+	// 使用缩放比例计算卡片尺寸
+	var originalCardWidth, originalCardHeight float64
+	if s.conveyorCardBackground != nil {
+		bgBounds := s.conveyorCardBackground.Bounds()
+		originalCardWidth = float64(bgBounds.Dx())
+		originalCardHeight = float64(bgBounds.Dy())
+	} else {
+		originalCardWidth = 100.0
+		originalCardHeight = 140.0
 	}
+	cardScale := config.ConveyorCardScale
+	cardWidth := originalCardWidth * cardScale
+	cardHeight := originalCardHeight * cardScale
+
+	// 获取传送带背景高度，用于计算垂直居中的Y偏移
+	var beltHeight float64
+	if s.conveyorBeltBackdrop != nil {
+		beltHeight = float64(s.conveyorBeltBackdrop.Bounds().Dy())
+	} else {
+		beltHeight = 80.0
+	}
+	// 垂直居中偏移
+	cardStartY := conveyorY + (beltHeight-cardHeight)/2
 
 	// 检查点击是否在传送带卡片上
+	// 使用左侧内边距配置
 	cardIndex := s.conveyorBeltSystem.GetCardAtPosition(
 		float64(mouseX), float64(mouseY),
-		conveyorX+config.ConveyorBeltPadding,
-		conveyorY+config.ConveyorBeltPadding+10,
+		conveyorX+config.ConveyorBeltLeftPadding,
+		cardStartY,
 		cardWidth, cardHeight,
 	)
 
@@ -581,8 +784,23 @@ func (s *GameScene) updateConveyorBeltClick() {
 		return
 	}
 
+	// 右键取消选中的卡片
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight) {
+		if s.isConveyorCardSelected() {
+			s.conveyorBeltSystem.DeselectCard()
+			s.destroyConveyorCardPreview()
+			log.Printf("[GameScene] 右键取消选中传送带卡片")
+			return
+		}
+	}
+
 	// 检测左键点击
 	if !inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+		return
+	}
+
+	// 如果铲子被选中，跳过传送带卡片点击处理（避免同时选中）
+	if s.shovelSelected {
 		return
 	}
 

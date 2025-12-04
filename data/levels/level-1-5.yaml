@@ -45,8 +45,6 @@ conveyorBelt:
   enabled: true
   capacity: 10
   generationInterval: 3.0
-  cardWidth: 50.0    # 保龄球关卡专用卡片宽度
-  cardHeight: 70.0   # 保龄球关卡专用卡片高度
   cardPool:
     - type: "wallnut_bowling"
       weight: 85

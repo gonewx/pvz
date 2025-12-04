@@ -109,21 +109,22 @@ func (s *BowlingNutSystem) Update(dt float64) {
 		if !nutComp.IsBouncing && nutComp.CollisionCooldown <= 0 {
 			collidedZombie := s.checkCollisionWithNearestZombie(entityID, posComp, nutComp)
 			if collidedZombie != 0 {
-				// 只对最近的一只僵尸造成伤害
-				s.applyDamageToZombie(collidedZombie)
-
 				// 处理碰撞后的行为
 				if nutComp.IsExplosive {
-					// Story 19.8: 爆炸坚果触发 3x3 范围爆炸
+					// Story 19.8: 爆炸坚果触发 3x3 范围爆炸（直接爆炸，不走普通碰撞伤害）
 					log.Printf("[BowlingNutSystem] 爆炸坚果碰撞，触发爆炸: entityID=%d", entityID)
 					s.triggerExplosion(entityID, posComp)
 					continue
 				} else {
-					// 普通坚果：播放撞击音效，计算弹射方向，开始弹射
+					// 普通坚果：对碰撞的僵尸造成伤害，然后弹射
+					s.applyDamageToZombie(collidedZombie)
 					s.playImpactSound()
 					targetRow := s.calculateBounceDirection(nutComp.Row, posComp.X)
 					s.startBounce(entityID, nutComp, posComp, targetRow)
 				}
+			} else if nutComp.BounceDirection != 0 {
+				// 没有碰撞僵尸，但有弹射方向 -> 继续弹射直到边缘
+				s.continueBounce(entityID, nutComp, posComp)
 			}
 		}
 
@@ -225,36 +226,28 @@ func (s *BowlingNutSystem) isZombieType(behaviorType components.BehaviorType) bo
 	}
 }
 
-// applyDamageToZombie 对僵尸造成伤害
+// applyDamageToZombie 对僵尸造成碰撞伤害
 //
 // 参数:
 //   - zombieID: 僵尸实体ID
 //
-// 处理逻辑：
-// - 有护甲：优先扣除护甲，溢出伤害扣身体
-// - 无护甲：直接扣除身体生命值
+// 处理逻辑（与樱桃炸弹不同）：
+// - 有护甲：移除护甲（打掉帽子/桶），不造成身体伤害
+// - 无护甲：秒杀僵尸（直接将血量设为0）
 // - 添加闪烁效果
 func (s *BowlingNutSystem) applyDamageToZombie(zombieID ecs.EntityID) {
-	damage := config.BowlingNutDamage
-
 	// 检查是否有护甲
 	armor, hasArmor := ecs.GetComponent[*components.ArmorComponent](s.entityManager, zombieID)
 	health, hasHealth := ecs.GetComponent[*components.HealthComponent](s.entityManager, zombieID)
 
 	if hasArmor && armor.CurrentArmor > 0 {
-		// 有护甲且护甲未破坏
-		overflowDamage := damage - armor.CurrentArmor
-		armor.CurrentArmor = 0 // 护甲完全破坏
-
-		// 溢出伤害扣除身体生命值
-		if overflowDamage > 0 && hasHealth {
-			health.CurrentHealth -= overflowDamage
-		}
-		log.Printf("[BowlingNutSystem] 僵尸护甲破坏: zombieID=%d, overflowDamage=%d", zombieID, overflowDamage)
+		// 有护甲且护甲未破坏：移除护甲，不造成身体伤害
+		log.Printf("[BowlingNutSystem] 僵尸护甲破坏: zombieID=%d, 原护甲=%d", zombieID, armor.CurrentArmor)
+		armor.CurrentArmor = 0
 	} else if hasHealth {
-		// 没有护甲或护甲已破坏，直接扣除身体生命值
-		health.CurrentHealth -= damage
-		log.Printf("[BowlingNutSystem] 僵尸受到伤害: zombieID=%d, damage=%d, remainingHealth=%d", zombieID, damage, health.CurrentHealth)
+		// 没有护甲或护甲已破坏：秒杀僵尸
+		log.Printf("[BowlingNutSystem] 僵尸被秒杀: zombieID=%d, 原血量=%d", zombieID, health.CurrentHealth)
+		health.CurrentHealth = 0
 	}
 
 	// 添加闪烁效果
@@ -362,6 +355,7 @@ func (s *BowlingNutSystem) triggerExplosion(entityID ecs.EntityID, posComp *comp
 // 处理逻辑：
 // - 有护甲：优先扣除护甲，溢出伤害扣身体
 // - 无护甲：直接扣除身体生命值
+// - 如果僵尸被杀死，标记为爆炸死亡（触发烧焦动画）
 // - 添加闪烁效果
 func (s *BowlingNutSystem) applyExplosionDamageToZombie(zombieID ecs.EntityID) {
 	damage := config.ExplosiveNutDamage
@@ -378,11 +372,19 @@ func (s *BowlingNutSystem) applyExplosionDamageToZombie(zombieID ecs.EntityID) {
 		// 溢出伤害扣除身体生命值
 		if overflowDamage > 0 && hasHealth {
 			health.CurrentHealth -= overflowDamage
+			// 如果被杀死，标记为爆炸死亡
+			if health.CurrentHealth <= 0 {
+				health.KilledByExplosion = true
+			}
 		}
 		log.Printf("[BowlingNutSystem] 爆炸伤害破坏护甲: zombieID=%d, 溢出伤害=%d", zombieID, overflowDamage)
 	} else if hasHealth {
 		// 没有护甲或护甲已破坏，直接扣除身体生命值
 		health.CurrentHealth -= damage
+		// 如果被杀死，标记为爆炸死亡
+		if health.CurrentHealth <= 0 {
+			health.KilledByExplosion = true
+		}
 		log.Printf("[BowlingNutSystem] 爆炸伤害: zombieID=%d, 伤害=%d, 剩余血量=%d",
 			zombieID, damage, health.CurrentHealth)
 	}
@@ -548,16 +550,67 @@ func (s *BowlingNutSystem) startBounce(
 	nutComp.BounceCount++
 	nutComp.CollisionCooldown = config.BowlingNutCollisionCooldown
 
-	// 计算垂直速度方向
+	// 计算垂直速度方向并记录弹射方向
+	targetY := s.calculateRowCenterY(targetRow)
+	if targetY > posComp.Y {
+		nutComp.VelocityY = config.BowlingNutBounceSpeed // 向下
+		nutComp.BounceDirection = 1                      // 记录向下弹射
+	} else {
+		nutComp.VelocityY = -config.BowlingNutBounceSpeed // 向上
+		nutComp.BounceDirection = -1                      // 记录向上弹射
+	}
+
+	log.Printf("[BowlingNutSystem] 开始弹射: entityID=%d, fromRow=%d, toRow=%d, bounceCount=%d, direction=%d",
+		entityID, nutComp.Row, targetRow, nutComp.BounceCount, nutComp.BounceDirection)
+}
+
+// continueBounce 持续弹射直到边缘
+// 当坚果到达目标行后没有碰到僵尸时调用
+//
+// 逻辑：
+// - 如果当前在边缘行（0或4），反转弹射方向并弹向相邻行
+// - 如果在中间行（1-3），继续向同一方向弹射
+//
+// 参数:
+//   - entityID: 坚果实体ID
+//   - nutComp: 坚果组件
+//   - posComp: 位置组件
+func (s *BowlingNutSystem) continueBounce(
+	entityID ecs.EntityID,
+	nutComp *components.BowlingNutComponent,
+	posComp *components.PositionComponent,
+) {
+	var targetRow int
+
+	if nutComp.Row == 0 {
+		// 到达顶边，反转方向向下弹射
+		nutComp.BounceDirection = 1
+		targetRow = 1
+		log.Printf("[BowlingNutSystem] 到达顶边，反弹向下: entityID=%d", entityID)
+	} else if nutComp.Row == 4 {
+		// 到达底边，反转方向向上弹射
+		nutComp.BounceDirection = -1
+		targetRow = 3
+		log.Printf("[BowlingNutSystem] 到达底边，反弹向上: entityID=%d", entityID)
+	} else {
+		// 中间行，继续向同一方向弹射
+		targetRow = nutComp.Row + nutComp.BounceDirection
+		log.Printf("[BowlingNutSystem] 继续弹射: entityID=%d, row=%d, direction=%d, targetRow=%d",
+			entityID, nutComp.Row, nutComp.BounceDirection, targetRow)
+	}
+
+	// 开始弹射到目标行
+	nutComp.IsBouncing = true
+	nutComp.TargetRow = targetRow
+	nutComp.CollisionCooldown = config.BowlingNutCollisionCooldown
+
+	// 计算垂直速度
 	targetY := s.calculateRowCenterY(targetRow)
 	if targetY > posComp.Y {
 		nutComp.VelocityY = config.BowlingNutBounceSpeed // 向下
 	} else {
 		nutComp.VelocityY = -config.BowlingNutBounceSpeed // 向上
 	}
-
-	log.Printf("[BowlingNutSystem] 开始弹射: entityID=%d, fromRow=%d, toRow=%d, bounceCount=%d",
-		entityID, nutComp.Row, targetRow, nutComp.BounceCount)
 }
 
 // playImpactSound 播放撞击音效

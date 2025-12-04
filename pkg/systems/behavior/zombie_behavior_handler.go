@@ -31,8 +31,14 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 
 		if health.CurrentHealth <= 0 {
 			// 生命值 <= 0，触发死亡状态转换
-			log.Printf("[BehaviorSystem] 僵尸 %d 生命值 <= 0 (HP=%d)，触发死亡", entityID, health.CurrentHealth)
-			s.triggerZombieDeath(entityID)
+			// 检查是否被爆炸杀死（爆炸坚果、樱桃炸弹等），触发烧焦死亡动画
+			if health.KilledByExplosion {
+				log.Printf("[BehaviorSystem] 僵尸 %d 被爆炸杀死 (HP=%d)，触发烧焦死亡", entityID, health.CurrentHealth)
+				s.triggerZombieExplosionDeath(entityID)
+			} else {
+				log.Printf("[BehaviorSystem] 僵尸 %d 生命值 <= 0 (HP=%d)，触发死亡", entityID, health.CurrentHealth)
+				s.triggerZombieDeath(entityID)
+			}
 			return // 跳过正常移动逻辑
 		}
 	}
@@ -575,8 +581,14 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 
 		// 检查生命值是否归零（即使在啃食状态也要检查）
 		if health.CurrentHealth <= 0 {
-			log.Printf("[BehaviorSystem] 啃食中的僵尸 %d 生命值 <= 0 (HP=%d)，触发死亡", entityID, health.CurrentHealth)
-			s.triggerZombieDeath(entityID)
+			// 检查是否被爆炸杀死（爆炸坚果、樱桃炸弹等），触发烧焦死亡动画
+			if health.KilledByExplosion {
+				log.Printf("[BehaviorSystem] 啃食中的僵尸 %d 被爆炸杀死 (HP=%d)，触发烧焦死亡", entityID, health.CurrentHealth)
+				s.triggerZombieExplosionDeath(entityID)
+			} else {
+				log.Printf("[BehaviorSystem] 啃食中的僵尸 %d 生命值 <= 0 (HP=%d)，触发死亡", entityID, health.CurrentHealth)
+				s.triggerZombieDeath(entityID)
+			}
 			return
 		}
 	}

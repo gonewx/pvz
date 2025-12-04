@@ -337,7 +337,7 @@ func TestBowlingIntegration_ConveyorAndNutSystem(t *testing.T) {
 
 // TestBowlingIntegration_CollisionAndBounce 测试碰撞和弹射物理
 func TestBowlingIntegration_CollisionAndBounce(t *testing.T) {
-	t.Run("nut_zombie_collision_damage", func(t *testing.T) {
+	t.Run("nut_zombie_collision_instant_kill", func(t *testing.T) {
 		em := ecs.NewEntityManager()
 		nutSystem := NewBowlingNutSystem(em, nil)
 
@@ -350,7 +350,7 @@ func TestBowlingIntegration_CollisionAndBounce(t *testing.T) {
 			Row:       2,
 		})
 
-		// 创建僵尸
+		// 创建普通僵尸（无护甲）
 		zombieEntity := em.CreateEntity()
 		em.AddComponent(zombieEntity, &components.PositionComponent{X: 510, Y: 328})
 		em.AddComponent(zombieEntity, &components.BehaviorComponent{
@@ -370,18 +370,70 @@ func TestBowlingIntegration_CollisionAndBounce(t *testing.T) {
 		// 更新系统
 		nutSystem.Update(0.016)
 
-		// 验证僵尸受到伤害
+		// 验证普通僵尸被秒杀（血量归零）
 		health, ok := ecs.GetComponent[*components.HealthComponent](em, zombieEntity)
 		if !ok {
 			t.Fatal("HealthComponent not found")
 		}
 
-		expectedDamage := config.BowlingNutDamage
-		expectedHealth := 270 - expectedDamage
+		if health.CurrentHealth != 0 {
+			t.Errorf("Zombie health = %d, expected 0 (instant kill)", health.CurrentHealth)
+		}
+	})
 
-		if health.CurrentHealth != expectedHealth {
-			t.Errorf("Zombie health = %d, expected %d (damage = %d)",
-				health.CurrentHealth, expectedHealth, expectedDamage)
+	t.Run("nut_armored_zombie_remove_armor_only", func(t *testing.T) {
+		em := ecs.NewEntityManager()
+		nutSystem := NewBowlingNutSystem(em, nil)
+
+		// 创建保龄球坚果
+		nutEntity := em.CreateEntity()
+		em.AddComponent(nutEntity, &components.PositionComponent{X: 500, Y: 328})
+		em.AddComponent(nutEntity, &components.BowlingNutComponent{
+			VelocityX: 250.0, // 测试用固定速度
+			IsRolling: true,
+			Row:       2,
+		})
+
+		// 创建路障僵尸（有护甲）
+		zombieEntity := em.CreateEntity()
+		em.AddComponent(zombieEntity, &components.PositionComponent{X: 510, Y: 328})
+		em.AddComponent(zombieEntity, &components.BehaviorComponent{
+			Type: components.BehaviorZombieConehead,
+		})
+		em.AddComponent(zombieEntity, &components.HealthComponent{
+			MaxHealth:     270,
+			CurrentHealth: 270,
+		})
+		em.AddComponent(zombieEntity, &components.ArmorComponent{
+			MaxArmor:     370,
+			CurrentArmor: 370,
+		})
+		em.AddComponent(zombieEntity, &components.CollisionComponent{
+			Width:   50,
+			Height:  80,
+			OffsetX: 0,
+			OffsetY: 0,
+		})
+
+		// 更新系统
+		nutSystem.Update(0.016)
+
+		// 验证护甲被移除但身体血量不变
+		armor, armorOk := ecs.GetComponent[*components.ArmorComponent](em, zombieEntity)
+		health, healthOk := ecs.GetComponent[*components.HealthComponent](em, zombieEntity)
+
+		if !armorOk {
+			t.Fatal("ArmorComponent not found")
+		}
+		if !healthOk {
+			t.Fatal("HealthComponent not found")
+		}
+
+		if armor.CurrentArmor != 0 {
+			t.Errorf("Armor = %d, expected 0 (armor removed)", armor.CurrentArmor)
+		}
+		if health.CurrentHealth != 270 {
+			t.Errorf("Health = %d, expected 270 (no body damage)", health.CurrentHealth)
 		}
 	})
 
@@ -427,9 +479,9 @@ func TestBowlingIntegration_CollisionAndBounce(t *testing.T) {
 		em.AddComponent(zombieEntities[0], &components.HealthComponent{MaxHealth: 270, CurrentHealth: 270})
 		em.AddComponent(zombieEntities[0], &components.CollisionComponent{Width: 50, Height: 80})
 
-		// 范围内僵尸 2（相邻行）
+		// 范围内僵尸 2（相邻行，考虑 ZombieVerticalOffset 修正后仍在 120 像素范围内）
 		zombieEntities[1] = em.CreateEntity()
-		em.AddComponent(zombieEntities[1], &components.PositionComponent{X: nutX + 30, Y: nutY + 100})
+		em.AddComponent(zombieEntities[1], &components.PositionComponent{X: nutX + 30, Y: nutY + 80})
 		em.AddComponent(zombieEntities[1], &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
 		em.AddComponent(zombieEntities[1], &components.HealthComponent{MaxHealth: 270, CurrentHealth: 270})
 		em.AddComponent(zombieEntities[1], &components.CollisionComponent{Width: 50, Height: 80})

@@ -52,6 +52,12 @@ type BowlingNutComponent struct {
 	// SoundPlaying 是否正在播放滚动音效
 	// 用于避免重复播放和正确停止音效
 	SoundPlaying bool
+
+	// BounceDirection 弹射方向
+	// -1 = 向上，1 = 向下，0 = 未弹射/已停止
+	// 用于持续弹射到边缘的逻辑：弹射后如果没碰到僵尸，
+	// 应该继续向同一方向弹射直到到达边缘行才反弹
+	BounceDirection int
 }
 
 // BowlingNutType 保龄球坚果类型常量

@@ -532,19 +532,31 @@ const (
 	// 用于 Story 19.7 碰撞检测
 	BowlingNutCollisionHeight = 60.0
 
+	// ConveyorCardScale 传送带卡片缩放比例
+	// 用于等比例缩小卡片，基于原始卡片背景尺寸（约 100x140）
+	// 建议值范围：0.3 - 0.6
+	ConveyorCardScale = 0.5
+
 	// ConveyorCardSelectedOverlayAlpha 选中卡片遮罩透明度（0-255）
 	// 选中状态的传送带卡片添加的半透明灰色遮罩
 	ConveyorCardSelectedOverlayAlpha = 128
+
+	// ConveyorCardSlideInSpeed 卡片滑入速度（单位/秒）
+	// 控制卡片从传送带右侧进入的速度
+	// 值越小速度越慢：0.5 = 2秒完成，1.0 = 1秒完成，2.0 = 0.5秒完成
+	// 建议值范围：0.3 - 2.0
+	ConveyorCardSlideInSpeed = 0.8
+
+	// ConveyorBeltLeftPadding 传送带左侧内边距（像素）
+	// 卡片不会进入此区域，防止卡片太靠左遮挡边框
+	// 建议值范围：10.0 - 30.0
+	ConveyorBeltLeftPadding = 15.0
 
 	// BowlingNutPreviewAlpha 草坪预览透明度（0-255）
 	// 悬停在草坪网格时显示的半透明坚果预览
 	BowlingNutPreviewAlpha = 150
 
 	// ========== 保龄球坚果碰撞与弹射配置参数（Story 19.7）（可手工调节） ==========
-
-	// BowlingNutDamage 保龄球坚果碰撞伤害
-	// 与樱桃炸弹相同，足以秒杀所有僵尸
-	BowlingNutDamage = 1800
 
 	// BowlingNutBounceSpeed 弹射时的垂直移动速度（像素/秒）
 	// 建议值范围：200.0 - 400.0

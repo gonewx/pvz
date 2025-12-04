@@ -295,6 +295,7 @@ func TestBowlingNutSystem_CollisionDetection(t *testing.T) {
 }
 
 // TestBowlingNutSystem_ArmorDamage 测试护甲伤害处理
+// 普通碰撞只移除护甲，不造成身体伤害。需要两次碰撞才能击杀路障僵尸。
 func TestBowlingNutSystem_ArmorDamage(t *testing.T) {
 	em := ecs.NewEntityManager()
 	system := NewBowlingNutSystem(em, nil)
@@ -318,23 +319,24 @@ func TestBowlingNutSystem_ArmorDamage(t *testing.T) {
 	em.AddComponent(zombieID, &components.ArmorComponent{CurrentArmor: 370, MaxArmor: 370})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
 
-	// 更新系统
+	// 更新系统（第一次碰撞）
 	system.Update(0.016)
 
 	// 验证护甲被破坏
 	armor, _ := ecs.GetComponent[*components.ArmorComponent](em, zombieID)
-	if armor.CurrentArmor > 0 {
+	if armor.CurrentArmor != 0 {
 		t.Errorf("Armor should be destroyed, got %d", armor.CurrentArmor)
 	}
 
-	// 验证溢出伤害：1800 - 370 = 1430 溢出，270 - 1430 = -1160
+	// 验证第一次碰撞后身体血量不变
 	health, _ := ecs.GetComponent[*components.HealthComponent](em, zombieID)
-	if health.CurrentHealth > 0 {
-		t.Errorf("Zombie should be killed by overflow damage, got health %d", health.CurrentHealth)
+	if health.CurrentHealth != 270 {
+		t.Errorf("Health should be unchanged after first hit, got %d", health.CurrentHealth)
 	}
 }
 
 // TestBowlingNutSystem_BucketheadZombieArmorDamage 测试铁桶僵尸护甲伤害
+// 普通碰撞只移除护甲，不造成身体伤害。需要两次碰撞才能击杀铁桶僵尸。
 func TestBowlingNutSystem_BucketheadZombieArmorDamage(t *testing.T) {
 	em := ecs.NewEntityManager()
 	system := NewBowlingNutSystem(em, nil)
@@ -358,19 +360,19 @@ func TestBowlingNutSystem_BucketheadZombieArmorDamage(t *testing.T) {
 	em.AddComponent(zombieID, &components.ArmorComponent{CurrentArmor: 1100, MaxArmor: 1100})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
 
-	// 更新系统
+	// 更新系统（第一次碰撞）
 	system.Update(0.016)
 
 	// 验证护甲被破坏
 	armor, _ := ecs.GetComponent[*components.ArmorComponent](em, zombieID)
-	if armor.CurrentArmor > 0 {
+	if armor.CurrentArmor != 0 {
 		t.Errorf("Armor should be destroyed, got %d", armor.CurrentArmor)
 	}
 
-	// 验证溢出伤害：1800 - 1100 = 700 溢出，270 - 700 = -430
+	// 验证第一次碰撞后身体血量不变
 	health, _ := ecs.GetComponent[*components.HealthComponent](em, zombieID)
-	if health.CurrentHealth > 0 {
-		t.Errorf("Buckethead zombie should be killed, got health %d", health.CurrentHealth)
+	if health.CurrentHealth != 270 {
+		t.Errorf("Health should be unchanged after first hit, got %d", health.CurrentHealth)
 	}
 }
 
@@ -985,6 +987,7 @@ func TestBowlingNutSystem_ExplosiveNut_MultipleZombiesInRange(t *testing.T) {
 	})
 
 	// 创建多个范围内僵尸
+	// 爆炸半径 120 像素，需要考虑 ZombieVerticalOffset (-25) 修正
 	zombieIDs := make([]ecs.EntityID, 3)
 
 	// 僵尸1：同行，近距离
@@ -994,18 +997,16 @@ func TestBowlingNutSystem_ExplosiveNut_MultipleZombiesInRange(t *testing.T) {
 	em.AddComponent(zombieIDs[0], &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(zombieIDs[0], &components.CollisionComponent{Width: 40, Height: 115})
 
-	// 僵尸2：上行（行1）
-	row1Y := config.GridWorldStartY + float64(1)*config.CellHeight + config.CellHeight/2
+	// 僵尸2：上方（Y 偏移 -60，考虑 ZombieVerticalOffset 后有效距离约 85 像素）
 	zombieIDs[1] = em.CreateEntity()
-	em.AddComponent(zombieIDs[1], &components.PositionComponent{X: 500.0, Y: row1Y})
+	em.AddComponent(zombieIDs[1], &components.PositionComponent{X: 500.0, Y: nutY - 60})
 	em.AddComponent(zombieIDs[1], &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
 	em.AddComponent(zombieIDs[1], &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(zombieIDs[1], &components.CollisionComponent{Width: 40, Height: 115})
 
-	// 僵尸3：下行（行3）
-	row3Y := config.GridWorldStartY + float64(3)*config.CellHeight + config.CellHeight/2
+	// 僵尸3：下方（Y 偏移 +60，考虑 ZombieVerticalOffset 后有效距离约 85 像素）
 	zombieIDs[2] = em.CreateEntity()
-	em.AddComponent(zombieIDs[2], &components.PositionComponent{X: 500.0, Y: row3Y})
+	em.AddComponent(zombieIDs[2], &components.PositionComponent{X: 500.0, Y: nutY + 60})
 	em.AddComponent(zombieIDs[2], &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
 	em.AddComponent(zombieIDs[2], &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(zombieIDs[2], &components.CollisionComponent{Width: 40, Height: 115})
@@ -1024,4 +1025,185 @@ func TestBowlingNutSystem_ExplosiveNut_MultipleZombiesInRange(t *testing.T) {
 		}
 	}
 }
+
+// ========== 持续弹射到边缘测试 ==========
+
+// TestBowlingNutSystem_ContinueBounce_MiddleRow 测试中间行继续弹射
+// 坚果到达中间行后没有碰到僵尸，应该继续向同一方向弹射
+func TestBowlingNutSystem_ContinueBounce_MiddleRow(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	// 创建坚果实体，初始在第2行，弹射方向向上(-1)
+	row := 2
+	nutY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+	nutID := em.CreateEntity()
+	posComp := &components.PositionComponent{X: 500.0, Y: nutY}
+	nutComp := &components.BowlingNutComponent{
+		VelocityX:       250.0,
+		Row:             row,
+		IsRolling:       true,
+		BounceDirection: -1, // 向上弹射
+	}
+	em.AddComponent(nutID, posComp)
+	em.AddComponent(nutID, nutComp)
+
+	// 不创建任何僵尸，让坚果继续弹射
+
+	// 更新系统
+	system.Update(0.016)
+
+	// 验证坚果开始继续弹射
+	if !nutComp.IsBouncing {
+		t.Error("Nut should start bouncing when in middle row with BounceDirection set")
+	}
+	if nutComp.TargetRow != 1 {
+		t.Errorf("Target row should be 1 (row 2 + direction -1), got %d", nutComp.TargetRow)
+	}
+}
+
+// TestBowlingNutSystem_ContinueBounce_TopEdge 测试顶边反弹
+// 坚果到达第0行后应该反转方向向下弹射
+func TestBowlingNutSystem_ContinueBounce_TopEdge(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	// 创建坚果实体，在第0行（顶边），弹射方向向上(-1)
+	row := 0
+	nutY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+	nutID := em.CreateEntity()
+	posComp := &components.PositionComponent{X: 500.0, Y: nutY}
+	nutComp := &components.BowlingNutComponent{
+		VelocityX:       250.0,
+		Row:             row,
+		IsRolling:       true,
+		BounceDirection: -1, // 原本向上，但在顶边应该反转
+	}
+	em.AddComponent(nutID, posComp)
+	em.AddComponent(nutID, nutComp)
+
+	// 更新系统
+	system.Update(0.016)
+
+	// 验证弹射方向反转为向下
+	if nutComp.BounceDirection != 1 {
+		t.Errorf("BounceDirection should be 1 (down) at top edge, got %d", nutComp.BounceDirection)
+	}
+	if nutComp.TargetRow != 1 {
+		t.Errorf("Target row should be 1, got %d", nutComp.TargetRow)
+	}
+	if !nutComp.IsBouncing {
+		t.Error("Nut should be bouncing after edge reflection")
+	}
+}
+
+// TestBowlingNutSystem_ContinueBounce_BottomEdge 测试底边反弹
+// 坚果到达第4行后应该反转方向向上弹射
+func TestBowlingNutSystem_ContinueBounce_BottomEdge(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	// 创建坚果实体，在第4行（底边），弹射方向向下(1)
+	row := 4
+	nutY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+	nutID := em.CreateEntity()
+	posComp := &components.PositionComponent{X: 500.0, Y: nutY}
+	nutComp := &components.BowlingNutComponent{
+		VelocityX:       250.0,
+		Row:             row,
+		IsRolling:       true,
+		BounceDirection: 1, // 原本向下，但在底边应该反转
+	}
+	em.AddComponent(nutID, posComp)
+	em.AddComponent(nutID, nutComp)
+
+	// 更新系统
+	system.Update(0.016)
+
+	// 验证弹射方向反转为向上
+	if nutComp.BounceDirection != -1 {
+		t.Errorf("BounceDirection should be -1 (up) at bottom edge, got %d", nutComp.BounceDirection)
+	}
+	if nutComp.TargetRow != 3 {
+		t.Errorf("Target row should be 3, got %d", nutComp.TargetRow)
+	}
+	if !nutComp.IsBouncing {
+		t.Error("Nut should be bouncing after edge reflection")
+	}
+}
+
+// TestBowlingNutSystem_ContinueBounce_StopsOnCollision 测试碰撞僵尸后停止持续弹射
+// 坚果碰撞僵尸后应该重新计算弹射方向，而不是继续原方向
+func TestBowlingNutSystem_ContinueBounce_StopsOnCollision(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	// 创建坚果实体，在第2行，有弹射方向
+	row := 2
+	nutY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+	nutID := em.CreateEntity()
+	posComp := &components.PositionComponent{X: 500.0, Y: nutY}
+	nutComp := &components.BowlingNutComponent{
+		VelocityX:       250.0,
+		Row:             row,
+		IsRolling:       true,
+		BounceDirection: -1, // 原本向上
+	}
+	em.AddComponent(nutID, posComp)
+	em.AddComponent(nutID, nutComp)
+
+	// 创建僵尸在同行（触发碰撞）
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY}) // 同行碰撞
+	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
+	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+
+	// 创建第3行更近的僵尸（影响弹射方向计算）
+	row3Y := config.GridWorldStartY + float64(3)*config.CellHeight + config.CellHeight/2
+	zombie3ID := em.CreateEntity()
+	em.AddComponent(zombie3ID, &components.PositionComponent{X: 520.0, Y: row3Y})
+	em.AddComponent(zombie3ID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	em.AddComponent(zombie3ID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
+	em.AddComponent(zombie3ID, &components.CollisionComponent{Width: 40, Height: 115})
+
+	// 更新系统
+	system.Update(0.016)
+
+	// 验证碰撞僵尸后弹射方向会被重新计算
+	// 因为第3行僵尸更近，应该弹向第3行（方向向下）
+	if nutComp.BounceDirection != 1 {
+		t.Errorf("BounceDirection should be 1 (down, toward nearest zombie), got %d", nutComp.BounceDirection)
+	}
+}
+
+// TestBowlingNutSystem_ContinueBounce_NoBounceWithoutDirection 测试没有弹射方向时不会继续弹射
+// 如果 BounceDirection 为 0，坚果不应该自动弹射
+func TestBowlingNutSystem_ContinueBounce_NoBounceWithoutDirection(t *testing.T) {
+	em := ecs.NewEntityManager()
+	system := NewBowlingNutSystem(em, nil)
+
+	// 创建坚果实体，没有弹射方向
+	row := 2
+	nutY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+	nutID := em.CreateEntity()
+	posComp := &components.PositionComponent{X: 500.0, Y: nutY}
+	nutComp := &components.BowlingNutComponent{
+		VelocityX:       250.0,
+		Row:             row,
+		IsRolling:       true,
+		BounceDirection: 0, // 没有弹射方向
+	}
+	em.AddComponent(nutID, posComp)
+	em.AddComponent(nutID, nutComp)
+
+	// 更新系统
+	system.Update(0.016)
+
+	// 验证坚果不会自动弹射
+	if nutComp.IsBouncing {
+		t.Error("Nut should not bounce when BounceDirection is 0")
+	}
+}
+
 

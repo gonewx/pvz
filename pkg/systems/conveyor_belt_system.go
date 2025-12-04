@@ -60,7 +60,7 @@ func NewConveyorBeltSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.R
 		gameState:       gs,
 		resourceManager: rm,
 		beltAnimSpeed:   config.ConveyorBeltAnimSpeed,
-		slideInSpeed:    2.0, // 卡片滑入速度，0.5秒完成
+		slideInSpeed:    config.ConveyorCardSlideInSpeed,
 	}
 
 	// 初始化默认卡片池（85% 普通坚果，15% 爆炸坚果）
