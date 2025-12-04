@@ -54,6 +54,10 @@ func NewLevelPhaseSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.Res
 		daveDialogueKeys: []string{
 			"CRAZY_DAVE_2410", // "好的，干得不错，现在给你个惊喜……"
 			"CRAZY_DAVE_2411", // "我们去玩保龄球！"
+			"CRAZY_DAVE_2412", // "嘿，拿好这个坚果墙！" {SHOW_WALLNUT}
+			"CRAZY_DAVE_2413", // "为什么我要给你坚果墙？"
+			"CRAZY_DAVE_2414", // "因为我发~~~疯了！！！！！" {SHAKE}
+			"CRAZY_DAVE_2415", // "现在出发！给我赢个冠军回来！" {SCREAM}
 		},
 	}
 
@@ -379,4 +383,37 @@ func (s *LevelPhaseSystem) SetOnTransitionComplete(callback func()) {
 // GetPhaseEntity 获取阶段管理实体ID
 func (s *LevelPhaseSystem) GetPhaseEntity() ecs.EntityID {
 	return s.phaseEntity
+}
+
+// SetDaveDialogueEntityID 设置转场 Dave 对话实体ID
+//
+// Story 19.x Bug Fix: 从存档恢复时，需要更新 Dave 对话实体ID
+// 因为恢复时创建的 Dave 实体是新的，与存档中保存的实体ID不同
+func (s *LevelPhaseSystem) SetDaveDialogueEntityID(entityID ecs.EntityID) {
+	phaseComp, ok := ecs.GetComponent[*components.LevelPhaseComponent](s.entityManager, s.phaseEntity)
+	if !ok {
+		return
+	}
+	phaseComp.DaveDialogueEntityID = int(entityID)
+	log.Printf("[LevelPhaseSystem] Updated DaveDialogueEntityID to %d", entityID)
+}
+
+// AdvanceToConveyorSlide 公开方法：推进到传送带滑入步骤
+//
+// Story 19.x Bug Fix: 从存档恢复 Dave 对话完成时调用
+// 用于替代私有方法 advanceToConveyorSlide()，允许外部调用
+func (s *LevelPhaseSystem) AdvanceToConveyorSlide() {
+	s.advanceToConveyorSlide()
+}
+
+// IsInDaveDialogueStep 检查是否正在转场的 Dave 对话步骤
+//
+// Story 19.x Bug Fix: 用于存档恢复时判断是否需要设置特殊回调
+func (s *LevelPhaseSystem) IsInDaveDialogueStep() bool {
+	phaseComp, ok := ecs.GetComponent[*components.LevelPhaseComponent](s.entityManager, s.phaseEntity)
+	if !ok {
+		return false
+	}
+	return phaseComp.PhaseState == components.PhaseStateTransitioning &&
+		phaseComp.TransitionStep == components.TransitionStepDaveDialogue
 }

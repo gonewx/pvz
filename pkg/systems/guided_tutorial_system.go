@@ -11,6 +11,18 @@ import (
 	"github.com/decker502/pvz/pkg/game"
 )
 
+// TutorialStep 教学步骤枚举
+type TutorialStep int
+
+const (
+	// TutorialStepClickShovel 第一步：点击铲子
+	TutorialStepClickShovel TutorialStep = iota
+	// TutorialStepClickPlant 第二步：点击植物
+	TutorialStepClickPlant
+	// TutorialStepKeepDigging 第三步：继续铲除
+	TutorialStepKeepDigging
+)
+
 // GuidedTutorialSystem 强引导教学系统
 // Story 19.3: 强引导教学系统
 //
@@ -18,6 +30,7 @@ import (
 //   - 限制玩家操作，只允许白名单中的操作
 //   - 监控空闲时间，超时后显示浮动箭头提示
 //   - 监控植物数量，所有植物移除后触发转场
+//   - 根据当前步骤显示对应的教学文本
 type GuidedTutorialSystem struct {
 	entityManager   *ecs.EntityManager
 	gameState       *game.GameState
@@ -27,10 +40,12 @@ type GuidedTutorialSystem struct {
 	guidedEntity ecs.EntityID
 
 	// 内部状态跟踪
-	lastPlantCount int     // 上一帧的植物数量
-	initialized    bool    // 系统是否已初始化
-	lastShovelMode bool    // 上一帧的铲子模式状态（用于检测模式切换）
-	totalTime      float64 // 总运行时间（用于调试）
+	lastPlantCount   int          // 上一帧的植物数量
+	initialized      bool         // 系统是否已初始化
+	lastShovelMode   bool         // 上一帧的铲子模式状态（用于检测模式切换）
+	totalTime        float64      // 总运行时间（用于调试）
+	currentStep      TutorialStep // 当前教学步骤
+	firstPlantRemoved bool        // 是否已移除第一颗植物
 }
 
 // GuidedTutorialStateProvider 强引导教学状态提供者接口
@@ -177,17 +192,75 @@ func (s *GuidedTutorialSystem) Update(dt float64) {
 		s.lastPlantCount = len(plantEntities)
 		guidedComp.LastPlantCount = s.lastPlantCount
 		s.initialized = true
+		s.currentStep = TutorialStepClickShovel
+		s.firstPlantRemoved = false
 		log.Printf("[GuidedTutorialSystem] Initialized with %d plants", s.lastPlantCount)
 	}
 
 	// 更新空闲计时器
 	guidedComp.IdleTimer += dt
 
+	// 监控教学步骤变化
+	s.updateTutorialStep(guidedComp)
+
 	// 监控植物数量变化
 	s.monitorPlantCount(guidedComp)
 
 	// 更新箭头显示状态
 	s.updateArrowDisplay(guidedComp)
+}
+
+// updateTutorialStep 更新教学步骤
+// 根据玩家操作推进教学进度，并更新显示的文本
+func (s *GuidedTutorialSystem) updateTutorialStep(guidedComp *components.GuidedTutorialComponent) {
+	// 检测铲子模式变化
+	currentShovelMode := false
+	if shovelStateProvider != nil {
+		currentShovelMode = shovelStateProvider.IsShovelSelected()
+	}
+
+	// 步骤 1 → 步骤 2：玩家点击了铲子
+	if s.currentStep == TutorialStepClickShovel && currentShovelMode && !s.lastShovelMode {
+		s.currentStep = TutorialStepClickPlant
+		s.updateTutorialText(guidedComp, "ADVICE_CLICK_PLANT")
+		log.Printf("[GuidedTutorialSystem] Step advanced: ClickShovel → ClickPlant")
+	}
+
+	// 更新铲子模式状态
+	s.lastShovelMode = currentShovelMode
+}
+
+// updateTutorialText 更新教学文本
+// 参数：
+//   - textKey: 新的文本 key
+func (s *GuidedTutorialSystem) updateTutorialText(guidedComp *components.GuidedTutorialComponent, textKey string) {
+	// 更新组件中的 key
+	guidedComp.TutorialTextKey = textKey
+
+	// 获取新文本内容
+	var text string
+	if s.gameState != nil && s.gameState.LawnStrings != nil {
+		text = s.gameState.LawnStrings.GetString(textKey)
+	}
+	if text == "" {
+		// 使用默认文本
+		switch textKey {
+		case "ADVICE_CLICK_SHOVEL":
+			text = "点击拾取铲子！"
+		case "ADVICE_CLICK_PLANT":
+			text = "点击移除一颗植物！"
+		case "ADVICE_KEEP_DIGGING":
+			text = "一直挖吧，直到你的草坪上没有植物！"
+		}
+	}
+
+	// 更新现有文本实体
+	if guidedComp.TextEntityID != 0 {
+		if textComp, ok := ecs.GetComponent[*components.TutorialTextComponent](s.entityManager, guidedComp.TextEntityID); ok {
+			textComp.Text = text
+			log.Printf("[GuidedTutorialSystem] Tutorial text updated: '%s'", text)
+		}
+	}
 }
 
 // monitorPlantCount 监控植物数量变化
@@ -203,6 +276,14 @@ func (s *GuidedTutorialSystem) monitorPlantCount(guidedComp *components.GuidedTu
 		log.Printf("[GuidedTutorialSystem] Plant removed: %d -> %d, resetting idle timer",
 			s.lastPlantCount, currentPlantCount)
 		s.ResetIdleTimer()
+
+		// 步骤 2 → 步骤 3：移除了第一颗植物
+		if !s.firstPlantRemoved {
+			s.firstPlantRemoved = true
+			s.currentStep = TutorialStepKeepDigging
+			s.updateTutorialText(guidedComp, "ADVICE_KEEP_DIGGING")
+			log.Printf("[GuidedTutorialSystem] Step advanced: ClickPlant → KeepDigging")
+		}
 	}
 
 	// 更新计数
@@ -385,7 +466,7 @@ func (s *GuidedTutorialSystem) showTutorialText(guidedComp *components.GuidedTut
 	}
 
 	var text string
-	if s.gameState.LawnStrings != nil {
+	if s.gameState != nil && s.gameState.LawnStrings != nil {
 		text = s.gameState.LawnStrings.GetString(textKey)
 	}
 	if text == "" {

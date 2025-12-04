@@ -392,3 +392,114 @@ func TestLevelPhaseSystem_GetConveyorBeltY(t *testing.T) {
 		t.Errorf("Expected negative initial Y position, got %f", y)
 	}
 }
+
+// TestLevelPhaseSystem_SetDaveDialogueEntityID 测试设置 Dave 对话实体 ID
+// Bug Fix: 从存档恢复时需要更新 Dave 对话实体 ID
+func TestLevelPhaseSystem_SetDaveDialogueEntityID(t *testing.T) {
+	t.Run("updates DaveDialogueEntityID in component", func(t *testing.T) {
+		em := ecs.NewEntityManager()
+		gs := game.GetGameState()
+		system := NewLevelPhaseSystem(em, gs, nil)
+
+		// 设置新的 Dave 对话实体 ID
+		newEntityID := ecs.EntityID(42)
+		system.SetDaveDialogueEntityID(newEntityID)
+
+		// 验证组件中的 ID 已更新
+		phaseComp, ok := ecs.GetComponent[*components.LevelPhaseComponent](em, system.GetPhaseEntity())
+		if !ok {
+			t.Fatal("Expected phase component")
+		}
+
+		if phaseComp.DaveDialogueEntityID != int(newEntityID) {
+			t.Errorf("Expected DaveDialogueEntityID %d, got %d", newEntityID, phaseComp.DaveDialogueEntityID)
+		}
+	})
+}
+
+// TestLevelPhaseSystem_AdvanceToConveyorSlide 测试推进到传送带滑入步骤
+// Bug Fix: 从存档恢复 Dave 对话完成时调用
+func TestLevelPhaseSystem_AdvanceToConveyorSlide(t *testing.T) {
+	t.Run("advances to conveyor slide step", func(t *testing.T) {
+		em := ecs.NewEntityManager()
+		gs := game.GetGameState()
+		system := NewLevelPhaseSystem(em, gs, nil)
+
+		// 设置到 Dave 对话步骤
+		phaseComp, ok := ecs.GetComponent[*components.LevelPhaseComponent](em, system.GetPhaseEntity())
+		if !ok {
+			t.Fatal("Expected phase component")
+		}
+		phaseComp.PhaseState = components.PhaseStateTransitioning
+		phaseComp.TransitionStep = components.TransitionStepDaveDialogue
+
+		// 调用公开方法推进到传送带滑入
+		system.AdvanceToConveyorSlide()
+
+		// 验证状态已更新
+		if phaseComp.TransitionStep != components.TransitionStepConveyorSlide {
+			t.Errorf("Expected TransitionStep %d, got %d",
+				components.TransitionStepConveyorSlide, phaseComp.TransitionStep)
+		}
+
+		// 传送带应该可见
+		if !phaseComp.ConveyorBeltVisible {
+			t.Error("Expected conveyor belt to be visible")
+		}
+
+		// 进度应该重置
+		if phaseComp.TransitionProgress != 0 {
+			t.Errorf("Expected TransitionProgress 0, got %f", phaseComp.TransitionProgress)
+		}
+	})
+}
+
+// TestLevelPhaseSystem_IsInDaveDialogueStep 测试检查是否在 Dave 对话步骤
+// Bug Fix: 用于存档恢复时判断是否需要设置特殊回调
+func TestLevelPhaseSystem_IsInDaveDialogueStep(t *testing.T) {
+	t.Run("returns false when not transitioning", func(t *testing.T) {
+		em := ecs.NewEntityManager()
+		gs := game.GetGameState()
+		system := NewLevelPhaseSystem(em, gs, nil)
+
+		if system.IsInDaveDialogueStep() {
+			t.Error("Expected false when not transitioning")
+		}
+	})
+
+	t.Run("returns false when transitioning but not in Dave dialogue step", func(t *testing.T) {
+		em := ecs.NewEntityManager()
+		gs := game.GetGameState()
+		system := NewLevelPhaseSystem(em, gs, nil)
+
+		// 设置为转场状态但不是 Dave 对话步骤
+		phaseComp, ok := ecs.GetComponent[*components.LevelPhaseComponent](em, system.GetPhaseEntity())
+		if !ok {
+			t.Fatal("Expected phase component")
+		}
+		phaseComp.PhaseState = components.PhaseStateTransitioning
+		phaseComp.TransitionStep = components.TransitionStepConveyorSlide
+
+		if system.IsInDaveDialogueStep() {
+			t.Error("Expected false when not in Dave dialogue step")
+		}
+	})
+
+	t.Run("returns true when transitioning and in Dave dialogue step", func(t *testing.T) {
+		em := ecs.NewEntityManager()
+		gs := game.GetGameState()
+		system := NewLevelPhaseSystem(em, gs, nil)
+
+		// 设置为转场状态且在 Dave 对话步骤
+		phaseComp, ok := ecs.GetComponent[*components.LevelPhaseComponent](em, system.GetPhaseEntity())
+		if !ok {
+			t.Fatal("Expected phase component")
+		}
+		phaseComp.PhaseState = components.PhaseStateTransitioning
+		phaseComp.TransitionStep = components.TransitionStepDaveDialogue
+
+		if !system.IsInDaveDialogueStep() {
+			t.Error("Expected true when in Dave dialogue step during transition")
+		}
+	})
+}

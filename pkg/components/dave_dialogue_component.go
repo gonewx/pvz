@@ -98,6 +98,34 @@ type DaveDialogueComponent struct {
 	// 空字符串表示默认表情
 	Expression string
 
+	// TextShaking 文字是否正在抖动
+	// 由 {SHAKE} 标签触发，类似僵尸胜利时文字的抖动效果
+	TextShaking bool
+
+	// TextShakeTime 文字抖动计时器（秒）
+	// 用于生成抖动偏移量
+	TextShakeTime float64
+
+	// IsHoldingItem 是否正在手持物品
+	// 由 {SHOW_WALLNUT} 等标签触发，用于切换到拿物品的动画
+	IsHoldingItem bool
+
+	// HeldItemType 手持物品类型
+	// 可选值: "wallnut" 等
+	HeldItemType string
+
+	// CurrentTalkAnimation 当前说话动画名称
+	// 根据文本长度选择：anim_smalltalk / anim_mediumtalk / anim_blahblah
+	CurrentTalkAnimation string
+
+	// TalkAnimationTargetFrame 说话动画的目标停止帧
+	// 根据文本长度计算，动画播放到该帧后暂停
+	TalkAnimationTargetFrame int
+
+	// TalkAnimationStarted 标记当前对话的说话动画是否已开始播放
+	// 用于确保每条对话只启动一次动画
+	TalkAnimationStarted bool
+
 	// ==========================================================================
 	// 位置配置 (Position Configuration)
 	// ==========================================================================

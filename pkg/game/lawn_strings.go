@@ -4,13 +4,16 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 )
 
 // LawnStrings 游戏文本字符串管理器
 // 从 LawnStrings.txt 加载本地化文本，支持通过键快速查询
 type LawnStrings struct {
-	strings map[string]string // 键 -> 文本映射
+	strings  map[string]string   // 键 -> 文本映射
+	keyTags  map[string][]string // 键 -> key行上的标签（如 {SHAKE}, {SHOW_WALLNUT}）
+	tagRegex *regexp.Regexp      // 标签解析正则表达式
 }
 
 // NewLawnStrings 从文件加载游戏文本字符串
@@ -40,12 +43,15 @@ func NewLawnStrings(filePath string) (*LawnStrings, error) {
 
 	// 初始化字符串映射表
 	ls := &LawnStrings{
-		strings: make(map[string]string),
+		strings:  make(map[string]string),
+		keyTags:  make(map[string][]string),
+		tagRegex: regexp.MustCompile(`\{([A-Z_]+)\}`),
 	}
 
 	// 逐行读取并解析
 	scanner := bufio.NewScanner(file)
 	var currentKey string
+	var currentKeyTags []string
 	for scanner.Scan() {
 		line := scanner.Text()
 
@@ -54,17 +60,41 @@ func NewLawnStrings(filePath string) (*LawnStrings, error) {
 			continue
 		}
 
-		// 检查是否为键定义（格式：[KEY]）
-		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
-			// 提取键名（去掉方括号）
-			currentKey = strings.TrimSpace(line[1 : len(line)-1])
-			continue
+		// 检查是否为键定义
+		// 支持两种格式：
+		//   1. [KEY] - 标准格式
+		//   2. [KEY] {TAG} - 带尾部标签格式（如 {SHOW_WALLNUT}, {SHAKE}）
+		if strings.HasPrefix(line, "[") {
+			// 查找 ] 的位置
+			bracketEnd := strings.Index(line, "]")
+			if bracketEnd > 0 {
+				// 提取键名（去掉方括号）
+				currentKey = strings.TrimSpace(line[1:bracketEnd])
+
+				// 提取 key 行上的标签（] 之后的部分）
+				currentKeyTags = nil
+				if bracketEnd < len(line)-1 {
+					tagPart := line[bracketEnd+1:]
+					matches := ls.tagRegex.FindAllStringSubmatch(tagPart, -1)
+					for _, match := range matches {
+						if len(match) >= 2 {
+							currentKeyTags = append(currentKeyTags, match[1])
+						}
+					}
+				}
+				continue
+			}
 		}
 
 		// 如果有当前键，则将该行作为值存储
 		if currentKey != "" {
 			ls.strings[currentKey] = line
+			// 保存 key 行上的标签
+			if len(currentKeyTags) > 0 {
+				ls.keyTags[currentKey] = currentKeyTags
+			}
 			currentKey = "" // 重置键，准备读取下一个键值对
+			currentKeyTags = nil
 		}
 	}
 
@@ -93,4 +123,19 @@ func (ls *LawnStrings) GetString(key string) string {
 	}
 	// 键不存在时返回带方括号的键名（调试用）
 	return "[" + key + "]"
+}
+
+// GetKeyTags 获取 key 定义行上的标签
+// 例如 [CRAZY_DAVE_2414] {SHAKE} 会返回 ["SHAKE"]
+//
+// 参数：
+//   - key: 文本键
+//
+// 返回：
+//   - []string: 标签列表，如果没有标签则返回 nil
+func (ls *LawnStrings) GetKeyTags(key string) []string {
+	if tags, ok := ls.keyTags[key]; ok {
+		return tags
+	}
+	return nil
 }
