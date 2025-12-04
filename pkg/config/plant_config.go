@@ -44,6 +44,14 @@ var PlantConfigs = map[types.PlantType]*PlantResourceConfig{
 		PreviewFrame: 0,
 		HiddenTracks: nil, // 无需隐藏轨道
 	},
+	types.PlantPotatoMine: {
+		ResourceName: "PotatoMine",
+		ConfigID:     "potatomine",
+		PreviewFrame: -1, // 自动选择
+		HiddenTracks: []string{
+			"anim_blink", // 隐藏眨眼轨道
+		},
+	},
 }
 
 // GetPlantConfig 获取植物配置

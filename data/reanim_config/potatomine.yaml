@@ -37,3 +37,9 @@ available_animations:
       display_name: light
     - name: anim_glow
       display_name: glow
+animation_combos:
+    - name: idle
+      display_name: 待机
+      animations:
+        - anim_armed
+      binding_strategy: auto

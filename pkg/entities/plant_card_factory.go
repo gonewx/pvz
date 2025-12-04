@@ -54,6 +54,9 @@ func NewPlantCardEntity(em *ecs.EntityManager, rm *game.ResourceManager, rs Rean
 	case components.PlantCherryBomb:
 		sunCost = config.CherryBombSunCost
 		cooldownTime = config.CherryBombCooldown
+	case components.PlantPotatoMine:
+		sunCost = config.PotatoMineSunCost
+		cooldownTime = config.PotatoMineRechargeTime
 	default:
 		em.DestroyEntity(entity)
 		em.RemoveMarkedEntities()

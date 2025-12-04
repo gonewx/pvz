@@ -267,6 +267,16 @@ const (
 	ZombieEatParticleOffsetY = -20.0
 )
 
+// Potato Mine Configuration (土豆雷配置)
+const (
+	// PotatoMineSunCost 土豆雷的阳光消耗
+	// 土豆雷是低成本的一次性爆炸植物
+	PotatoMineSunCost = 25
+
+	// PotatoMineRechargeTime 土豆雷的冷却时间（秒）
+	PotatoMineRechargeTime = 30.0
+)
+
 // Cherry Bomb Configuration (樱桃炸弹配置)
 const (
 	// CherryBombSunCost 樱桃炸弹的阳光消耗

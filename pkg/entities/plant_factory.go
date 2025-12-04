@@ -386,3 +386,83 @@ func NewCherryBombEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.Game
 
 	return entityID, nil
 }
+
+// NewPotatoMineEntity 创建土豆雷实体
+// 土豆雷是一种低成本的地雷植物，需要一定时间武装后才能触发爆炸
+//
+// 参数:
+//   - em: 实体管理器
+//   - rm: 资源管理器（用于加载土豆雷图像和 Reanim 资源）
+//   - gs: 游戏状态
+//   - col: 网格列索引 (0-8)
+//   - row: 网格行索引 (0-4)
+//
+// 返回:
+//   - ecs.EntityID: 创建的土豆雷实体ID，如果失败返回 0
+//   - error: 如果创建失败返回错误信息
+func NewPotatoMineEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState, col, row int) (ecs.EntityID, error) {
+	// 计算格子中心坐标（使用世界坐标系统）
+	worldCenterX := config.GridWorldStartX + float64(col)*config.CellWidth + config.CellWidth/2
+	worldCenterY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+
+	// 创建实体
+	entityID := em.CreateEntity()
+
+	// 添加位置组件（使用世界坐标）
+	em.AddComponent(entityID, &components.PositionComponent{
+		X: worldCenterX,
+		Y: worldCenterY,
+	})
+
+	// 从 ResourceManager 获取土豆雷的 Reanim 数据和部件图片
+	reanimXML := rm.GetReanimXML("PotatoMine")
+	partImages := rm.GetReanimPartImages("PotatoMine")
+
+	if reanimXML == nil || partImages == nil {
+		return 0, fmt.Errorf("failed to load PotatoMine Reanim resources")
+	}
+
+	// 添加 ReanimComponent
+	em.AddComponent(entityID, &components.ReanimComponent{
+		ReanimName: "PotatoMine",
+		ReanimXML:  reanimXML,
+		PartImages: partImages,
+	})
+
+	// 使用 AnimationCommand 触发默认动画（anim_armed）
+	ecs.AddComponent(em, entityID, &components.AnimationCommandComponent{
+		AnimationName: "anim_armed",
+		Processed:     false,
+	})
+	log.Printf("[PlantFactory] 土豆雷 %d: 成功添加 ReanimComponent 并初始化动画", entityID)
+
+	// 添加植物组件（用于碰撞检测和网格位置追踪）
+	em.AddComponent(entityID, &components.PlantComponent{
+		PlantType:       components.PlantPotatoMine,
+		GridRow:         row,
+		GridCol:         col,
+		AttackAnimState: components.AttackAnimIdle,
+	})
+
+	// 添加行为组件（土豆雷行为）
+	em.AddComponent(entityID, &components.BehaviorComponent{
+		Type: components.BehaviorPotatoMine,
+	})
+
+	// 添加碰撞组件（用于后续爆炸范围检测）
+	em.AddComponent(entityID, &components.CollisionComponent{
+		Width:  config.CellWidth,
+		Height: config.CellHeight,
+	})
+
+	// 添加阴影组件
+	shadowSize := config.GetShadowSize("potatomine")
+	em.AddComponent(entityID, &components.ShadowComponent{
+		Width:   shadowSize.Width,
+		Height:  shadowSize.Height,
+		Alpha:   config.DefaultShadowAlpha,
+		OffsetY: 0,
+	})
+
+	return entityID, nil
+}

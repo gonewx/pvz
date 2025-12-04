@@ -290,6 +290,7 @@ func (vg *VerifyGameplayGame) createPlantCards() {
 		components.PlantPeashooter,
 		components.PlantWallnut,
 		components.PlantCherryBomb,
+		components.PlantPotatoMine,
 	}
 
 	startX := float64(config.SeedBankX + config.PlantCardStartOffsetX)
@@ -728,6 +729,13 @@ func (vg *VerifyGameplayGame) handleLawnClick() {
 			vg.gameState,
 			col, row,
 		)
+	case components.PlantPotatoMine:
+		plantID, err = entities.NewPotatoMineEntity(
+			vg.entityManager,
+			vg.resourceManager,
+			vg.gameState,
+			col, row,
+		)
 	default:
 		log.Printf("[VerifyGameplay] Unknown plant type: %d", vg.selectedPlantType)
 		return
@@ -767,6 +775,8 @@ func (vg *VerifyGameplayGame) getSunCost(plantType components.PlantType) int {
 		return config.WallnutCost
 	case components.PlantCherryBomb:
 		return config.CherryBombSunCost
+	case components.PlantPotatoMine:
+		return config.PotatoMineSunCost
 	default:
 		return 0
 	}
