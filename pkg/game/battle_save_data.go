@@ -6,7 +6,8 @@ import (
 
 // BattleSaveVersion 战斗存档版本号
 // 用于版本兼容性检查，当数据结构发生不兼容变更时递增
-const BattleSaveVersion = 1
+// v2: 添加保龄球模式支持（BowlingNuts, ConveyorBelt, LevelPhase, DaveDialogue, GuidedTutorial）
+const BattleSaveVersion = 2
 
 // BattleSaveData 战斗存档数据结构
 //
@@ -41,6 +42,13 @@ type BattleSaveData struct {
 	Projectiles []ProjectileData // 子弹数据
 	Suns        []SunData        // 阳光数据
 	Lawnmowers  []LawnmowerData  // 除草车数据
+
+	// 保龄球模式数据（Level 1-5）
+	BowlingNuts    []BowlingNutData    // 保龄球坚果数据
+	ConveyorBelt   *ConveyorBeltData   // 传送带数据（可选）
+	LevelPhase     *LevelPhaseData     // 关卡阶段数据（可选）
+	DaveDialogue   *DaveDialogueData   // Dave 对话数据（可选）
+	GuidedTutorial *GuidedTutorialData // 强引导教学数据（可选）
 }
 
 // TutorialSaveData 教学进度序列化数据
@@ -140,14 +148,15 @@ type BattleSaveInfo struct {
 // 返回一个初始化的 BattleSaveData 实例，版本号和时间已设置。
 func NewBattleSaveData() *BattleSaveData {
 	return &BattleSaveData{
-		Version:     BattleSaveVersion,
-		SaveTime:    time.Now(),
+		Version:      BattleSaveVersion,
+		SaveTime:     time.Now(),
 		SpawnedWaves: []bool{},
-		Plants:      []PlantData{},
-		Zombies:     []ZombieData{},
-		Projectiles: []ProjectileData{},
-		Suns:        []SunData{},
-		Lawnmowers:  []LawnmowerData{},
+		Plants:       []PlantData{},
+		Zombies:      []ZombieData{},
+		Projectiles:  []ProjectileData{},
+		Suns:         []SunData{},
+		Lawnmowers:   []LawnmowerData{},
+		BowlingNuts:  []BowlingNutData{},
 	}
 }
 
@@ -161,4 +170,89 @@ func (b *BattleSaveData) ToBattleSaveInfo() *BattleSaveInfo {
 		Sun:       b.Sun,
 		WaveIndex: b.CurrentWaveIndex,
 	}
+}
+
+// =============================================================================
+// 保龄球模式数据结构（Level 1-5）
+// =============================================================================
+
+// BowlingNutData 保龄球坚果序列化数据
+//
+// 包含保龄球坚果实体的核心状态，用于恢复滚动中的坚果。
+type BowlingNutData struct {
+	X                 float64 // X坐标（世界坐标）
+	Y                 float64 // Y坐标（世界坐标）
+	VelocityX         float64 // 水平移动速度（像素/秒）
+	VelocityY         float64 // 垂直移动速度（像素/秒）
+	Row               int     // 所在行号（0-4）
+	IsRolling         bool    // 是否正在滚动
+	IsBouncing        bool    // 是否正在弹射中
+	TargetRow         int     // 弹射目标行（0-4）
+	IsExplosive       bool    // 是否为爆炸坚果
+	BounceCount       int     // 弹射次数
+	CollisionCooldown float64 // 碰撞冷却时间（秒）
+	BounceDirection   int     // 弹射方向（-1=向上, 1=向下, 0=未弹射）
+}
+
+// ConveyorBeltData 传送带序列化数据
+//
+// 包含传送带的完整状态，用于恢复卡片队列和生成进度。
+type ConveyorBeltData struct {
+	Cards              []ConveyorCardData // 卡片队列
+	Capacity           int                // 最大容量
+	ScrollOffset       float64            // 传动动画偏移量
+	IsActive           bool               // 是否激活
+	GenerationTimer    float64            // 卡片生成计时器
+	GenerationInterval float64            // 卡片生成间隔（秒）
+	SelectedCardIndex  int                // 当前选中的卡片索引
+	FinalWaveTriggered bool               // 最终波是否已触发
+}
+
+// ConveyorCardData 传送带卡片序列化数据
+type ConveyorCardData struct {
+	CardType      string  // 卡片类型
+	SlideProgress float64 // 滑入动画进度
+	SlotIndex     int     // 槽位索引
+}
+
+// LevelPhaseData 关卡阶段序列化数据
+//
+// 包含多阶段关卡的当前状态，用于恢复阶段流程。
+type LevelPhaseData struct {
+	CurrentPhase        int     // 当前阶段编号（1=铲子教学, 2=保龄球）
+	PhaseState          string  // 阶段状态（active/transitioning/completed）
+	TransitionProgress  float64 // 转场动画进度
+	TransitionStep      int     // 转场序列当前步骤
+	ConveyorBeltY       float64 // 传送带当前 Y 位置
+	ConveyorBeltVisible bool    // 传送带是否可见
+	ShowRedLine         bool    // 是否显示红线
+}
+
+// DaveDialogueData Dave 对话序列化数据
+//
+// 包含 Dave 对话的当前状态，用于恢复对话流程。
+type DaveDialogueData struct {
+	DialogueKeys     []string // 对话文本 key 列表
+	CurrentLineIndex int      // 当前对话行索引
+	CurrentText      string   // 当前显示的文本内容
+	IsVisible        bool     // 对话气泡是否可见
+	State            int      // Dave 当前状态（0=Hidden, 1=Entering, 2=Talking, 3=Leaving）
+	Expression       string   // 当前表情状态
+	DaveX            float64  // Dave X 坐标
+	DaveY            float64  // Dave Y 坐标
+}
+
+// GuidedTutorialData 强引导教学序列化数据
+//
+// 包含强引导教学的状态，用于恢复铲子教学阶段。
+type GuidedTutorialData struct {
+	IsActive        bool     // 强引导模式是否激活
+	AllowedActions  []string // 允许的操作白名单
+	IdleTimer       float64  // 空闲计时器（秒）
+	IdleThreshold   float64  // 空闲阈值（秒）
+	ShowArrow       bool     // 是否显示浮动箭头
+	ArrowTarget     string   // 箭头指向目标
+	LastPlantCount  int      // 上一帧的植物数量
+	TransitionReady bool     // 转场条件是否满足
+	TutorialTextKey string   // 教学文本键
 }

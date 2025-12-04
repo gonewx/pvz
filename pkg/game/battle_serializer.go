@@ -66,6 +66,13 @@ func (s *BattleSerializer) SaveBattle(em *ecs.EntityManager, gs *GameState, file
 	// 收集教学状态（如果是教学关卡）
 	saveData.Tutorial = s.collectTutorialData(em)
 
+	// 收集保龄球模式数据（Level 1-5）
+	saveData.BowlingNuts = s.collectBowlingNutData(em)
+	saveData.ConveyorBelt = s.collectConveyorBeltData(em)
+	saveData.LevelPhase = s.collectLevelPhaseData(em)
+	saveData.DaveDialogue = s.collectDaveDialogueData(em)
+	saveData.GuidedTutorial = s.collectGuidedTutorialData(em)
+
 	// 创建文件
 	file, err := os.Create(filePath)
 	if err != nil {
@@ -521,5 +528,216 @@ func (s *BattleSerializer) collectTutorialData(em *ecs.EntityManager) *TutorialS
 		IsActive:         tutorialComp.IsActive,
 		PlantCount:       plantCount,
 		SunflowerCount:   sunflowerCount,
+	}
+}
+
+// =============================================================================
+// 保龄球模式数据收集方法（Level 1-5）
+// =============================================================================
+
+// collectBowlingNutData 从 EntityManager 收集所有保龄球坚果数据
+//
+// 查找所有拥有 BowlingNutComponent 的实体并收集其状态
+func (s *BattleSerializer) collectBowlingNutData(em *ecs.EntityManager) []BowlingNutData {
+	var bowlingNuts []BowlingNutData
+
+	// 查询所有拥有 BowlingNutComponent 和 PositionComponent 的实体
+	entities := ecs.GetEntitiesWith2[
+		*components.BowlingNutComponent,
+		*components.PositionComponent,
+	](em)
+
+	for _, entity := range entities {
+		bowlingComp, ok := ecs.GetComponent[*components.BowlingNutComponent](em, entity)
+		if !ok {
+			continue
+		}
+
+		posComp, ok := ecs.GetComponent[*components.PositionComponent](em, entity)
+		if !ok {
+			continue
+		}
+
+		bowlingNuts = append(bowlingNuts, BowlingNutData{
+			X:                 posComp.X,
+			Y:                 posComp.Y,
+			VelocityX:         bowlingComp.VelocityX,
+			VelocityY:         bowlingComp.VelocityY,
+			Row:               bowlingComp.Row,
+			IsRolling:         bowlingComp.IsRolling,
+			IsBouncing:        bowlingComp.IsBouncing,
+			TargetRow:         bowlingComp.TargetRow,
+			IsExplosive:       bowlingComp.IsExplosive,
+			BounceCount:       bowlingComp.BounceCount,
+			CollisionCooldown: bowlingComp.CollisionCooldown,
+			BounceDirection:   bowlingComp.BounceDirection,
+		})
+	}
+
+	if len(bowlingNuts) > 0 {
+		log.Printf("[BattleSerializer] Collected %d bowling nuts", len(bowlingNuts))
+	}
+
+	return bowlingNuts
+}
+
+// collectConveyorBeltData 从 EntityManager 收集传送带数据
+//
+// 查找 ConveyorBeltComponent 并收集其状态
+// 如果没有传送带（非传送带关卡），返回 nil
+func (s *BattleSerializer) collectConveyorBeltData(em *ecs.EntityManager) *ConveyorBeltData {
+	// 查询所有拥有 ConveyorBeltComponent 的实体
+	entities := ecs.GetEntitiesWith1[*components.ConveyorBeltComponent](em)
+
+	if len(entities) == 0 {
+		return nil
+	}
+
+	// 取第一个传送带实体（通常只有一个）
+	entity := entities[0]
+	conveyorComp, ok := ecs.GetComponent[*components.ConveyorBeltComponent](em, entity)
+	if !ok {
+		return nil
+	}
+
+	// 收集卡片数据
+	var cards []ConveyorCardData
+	for _, card := range conveyorComp.Cards {
+		cards = append(cards, ConveyorCardData{
+			CardType:      card.CardType,
+			SlideProgress: card.SlideProgress,
+			SlotIndex:     card.SlotIndex,
+		})
+	}
+
+	log.Printf("[BattleSerializer] Collected conveyor belt: Cards=%d, IsActive=%v, Timer=%.2f",
+		len(cards), conveyorComp.IsActive, conveyorComp.GenerationTimer)
+
+	return &ConveyorBeltData{
+		Cards:              cards,
+		Capacity:           conveyorComp.Capacity,
+		ScrollOffset:       conveyorComp.ScrollOffset,
+		IsActive:           conveyorComp.IsActive,
+		GenerationTimer:    conveyorComp.GenerationTimer,
+		GenerationInterval: conveyorComp.GenerationInterval,
+		SelectedCardIndex:  conveyorComp.SelectedCardIndex,
+		FinalWaveTriggered: conveyorComp.FinalWaveTriggered,
+	}
+}
+
+// collectLevelPhaseData 从 EntityManager 收集关卡阶段数据
+//
+// 查找 LevelPhaseComponent 并收集其状态
+// 如果没有阶段组件（非多阶段关卡），返回 nil
+func (s *BattleSerializer) collectLevelPhaseData(em *ecs.EntityManager) *LevelPhaseData {
+	// 查询所有拥有 LevelPhaseComponent 的实体
+	entities := ecs.GetEntitiesWith1[*components.LevelPhaseComponent](em)
+
+	if len(entities) == 0 {
+		return nil
+	}
+
+	// 取第一个阶段实体
+	entity := entities[0]
+	phaseComp, ok := ecs.GetComponent[*components.LevelPhaseComponent](em, entity)
+	if !ok {
+		return nil
+	}
+
+	log.Printf("[BattleSerializer] Collected level phase: Phase=%d, State=%s, Step=%d",
+		phaseComp.CurrentPhase, phaseComp.PhaseState, phaseComp.TransitionStep)
+
+	return &LevelPhaseData{
+		CurrentPhase:        phaseComp.CurrentPhase,
+		PhaseState:          phaseComp.PhaseState,
+		TransitionProgress:  phaseComp.TransitionProgress,
+		TransitionStep:      phaseComp.TransitionStep,
+		ConveyorBeltY:       phaseComp.ConveyorBeltY,
+		ConveyorBeltVisible: phaseComp.ConveyorBeltVisible,
+		ShowRedLine:         phaseComp.ShowRedLine,
+	}
+}
+
+// collectDaveDialogueData 从 EntityManager 收集 Dave 对话数据
+//
+// 查找 DaveDialogueComponent 并收集其状态
+// 如果没有对话组件，返回 nil
+func (s *BattleSerializer) collectDaveDialogueData(em *ecs.EntityManager) *DaveDialogueData {
+	// 查询所有拥有 DaveDialogueComponent 的实体
+	entities := ecs.GetEntitiesWith1[*components.DaveDialogueComponent](em)
+
+	if len(entities) == 0 {
+		return nil
+	}
+
+	// 取第一个对话实体
+	entity := entities[0]
+	daveComp, ok := ecs.GetComponent[*components.DaveDialogueComponent](em, entity)
+	if !ok {
+		return nil
+	}
+
+	// 获取 Dave 的位置
+	var daveX, daveY float64
+	if posComp, ok := ecs.GetComponent[*components.PositionComponent](em, entity); ok {
+		daveX = posComp.X
+		daveY = posComp.Y
+	}
+
+	// 复制对话键列表
+	dialogueKeys := make([]string, len(daveComp.DialogueKeys))
+	copy(dialogueKeys, daveComp.DialogueKeys)
+
+	log.Printf("[BattleSerializer] Collected Dave dialogue: LineIndex=%d/%d, State=%s, Visible=%v",
+		daveComp.CurrentLineIndex, len(daveComp.DialogueKeys), daveComp.State.String(), daveComp.IsVisible)
+
+	return &DaveDialogueData{
+		DialogueKeys:     dialogueKeys,
+		CurrentLineIndex: daveComp.CurrentLineIndex,
+		CurrentText:      daveComp.CurrentText,
+		IsVisible:        daveComp.IsVisible,
+		State:            int(daveComp.State),
+		Expression:       daveComp.Expression,
+		DaveX:            daveX,
+		DaveY:            daveY,
+	}
+}
+
+// collectGuidedTutorialData 从 EntityManager 收集强引导教学数据
+//
+// 查找 GuidedTutorialComponent 并收集其状态
+// 如果没有强引导组件，返回 nil
+func (s *BattleSerializer) collectGuidedTutorialData(em *ecs.EntityManager) *GuidedTutorialData {
+	// 查询所有拥有 GuidedTutorialComponent 的实体
+	entities := ecs.GetEntitiesWith1[*components.GuidedTutorialComponent](em)
+
+	if len(entities) == 0 {
+		return nil
+	}
+
+	// 取第一个强引导实体
+	entity := entities[0]
+	guidedComp, ok := ecs.GetComponent[*components.GuidedTutorialComponent](em, entity)
+	if !ok {
+		return nil
+	}
+
+	// 复制允许的操作列表
+	allowedActions := make([]string, len(guidedComp.AllowedActions))
+	copy(allowedActions, guidedComp.AllowedActions)
+
+	log.Printf("[BattleSerializer] Collected guided tutorial: IsActive=%v, ArrowTarget=%s, TransitionReady=%v",
+		guidedComp.IsActive, guidedComp.ArrowTarget, guidedComp.TransitionReady)
+
+	return &GuidedTutorialData{
+		IsActive:        guidedComp.IsActive,
+		AllowedActions:  allowedActions,
+		IdleTimer:       guidedComp.IdleTimer,
+		IdleThreshold:   guidedComp.IdleThreshold,
+		ShowArrow:       guidedComp.ShowArrow,
+		ArrowTarget:     guidedComp.ArrowTarget,
+		LastPlantCount:  guidedComp.LastPlantCount,
+		TransitionReady: guidedComp.TransitionReady,
+		TutorialTextKey: guidedComp.TutorialTextKey,
 	}
 }
