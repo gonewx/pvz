@@ -30,8 +30,10 @@ type Config struct {
 
 // App 是游戏应用的核心包装器，实现 ebiten.Game 接口
 type App struct {
-	sceneManager *game.SceneManager
-	verbose      bool
+	sceneManager            *game.SceneManager
+	verbose                 bool
+	pendingWindowSizeReset  bool // 延迟设置窗口大小标志
+	windowSizeResetCountdown int  // 延迟帧数
 }
 
 // NewApp 创建并初始化游戏应用
@@ -120,9 +122,32 @@ func NewApp(cfg Config) (*App, error) {
 // Update 更新游戏逻辑
 // 每个 tick 调用一次（通常每秒 60 次）
 func (a *App) Update() error {
+	// 延迟设置窗口大小（退出全屏后需要等待几帧才能正确设置）
+	if a.pendingWindowSizeReset {
+		a.windowSizeResetCountdown--
+		if a.windowSizeResetCountdown <= 0 {
+			ebiten.SetWindowSize(config.GameWindowWidth, config.GameWindowHeight)
+			log.Printf("[App] Delayed SetWindowSize(%d, %d)", config.GameWindowWidth, config.GameWindowHeight)
+			a.pendingWindowSizeReset = false
+		}
+	}
+
 	// F11 切换全屏
 	if inpututil.IsKeyJustPressed(ebiten.KeyF11) {
-		ebiten.SetFullscreen(!ebiten.IsFullscreen())
+		isFullscreen := ebiten.IsFullscreen()
+		if isFullscreen {
+			// 退出全屏
+			ebiten.SetFullscreen(false)
+			if ebiten.IsWindowMaximized() || ebiten.IsWindowMinimized() {
+				ebiten.RestoreWindow()
+			}
+			// 延迟几帧后设置窗口大小，让窗口管理器有时间处理
+			a.pendingWindowSizeReset = true
+			a.windowSizeResetCountdown = 3
+			log.Printf("[App] Exit fullscreen, will reset window size in 3 frames")
+		} else {
+			ebiten.SetFullscreen(true)
+		}
 	}
 
 	deltaTime := 1.0 / 60.0
@@ -150,7 +175,7 @@ func (a *App) DrawFinalScreen(screen ebiten.FinalScreen, offscreen *ebiten.Image
 // Layout 返回游戏的逻辑屏幕尺寸
 // 此尺寸独立于实际窗口大小
 func (a *App) Layout(outsideWidth, outsideHeight int) (int, int) {
-	return 800, 600
+	return config.GameWindowWidth, config.GameWindowHeight
 }
 
 // GetSceneManager 返回场景管理器

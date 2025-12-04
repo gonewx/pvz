@@ -314,7 +314,16 @@ func (m *SettingsPanelModule) createUIElements(rm *game.ResourceManager) error {
 				m.settingsManager.SetFullscreen(isChecked)
 			}
 			// Story 20.5: 立即切换全屏状态
-			ebiten.SetFullscreen(isChecked)
+			if isChecked {
+				ebiten.SetFullscreen(true)
+			} else {
+				// 退出全屏时，恢复窗口尺寸为游戏逻辑尺寸
+				ebiten.SetFullscreen(false)
+				if ebiten.IsWindowMaximized() || ebiten.IsWindowMinimized() {
+					ebiten.RestoreWindow()
+				}
+				ebiten.SetWindowSize(config.GameWindowWidth, config.GameWindowHeight)
+			}
 			// 触发回调（如果有）
 			if m.onFullscreenToggle != nil {
 				m.onFullscreenToggle(isChecked)

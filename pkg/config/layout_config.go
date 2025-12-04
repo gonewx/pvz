@@ -3,6 +3,15 @@ package config
 // 布局配置常量
 // 本文件定义了游戏场景中的布局参数，包括网格系统、UI元素位置等
 
+// Window Configuration (窗口配置)
+const (
+	// GameWindowWidth 游戏窗口逻辑宽度（像素）
+	GameWindowWidth = 800
+
+	// GameWindowHeight 游戏窗口逻辑高度（像素）
+	GameWindowHeight = 600
+)
+
 // Background Configuration (背景配置)
 const (
 	// BackgroundWidth 背景图片宽度（像素）
