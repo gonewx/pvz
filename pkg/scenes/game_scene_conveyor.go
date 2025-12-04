@@ -188,7 +188,6 @@ func (s *GameScene) drawBeltRowSegment(screen *ebiten.Image, srcRect image.Recta
 }
 
 // drawConveyorCards 绘制传送带上的卡片
-// Story 19.12: 使用 card.PositionX 计算屏幕位置
 func (s *GameScene) drawConveyorCards(screen *ebiten.Image, conveyorX, conveyorY float64) {
 	if s.conveyorBeltSystem == nil {
 		return
@@ -201,23 +200,23 @@ func (s *GameScene) drawConveyorCards(screen *ebiten.Image, conveyorX, conveyorY
 		return
 	}
 
-	// 卡片布局参数 - 使用缩放比例配置
-	// 获取原始卡片背景尺寸
+	// 卡片尺寸 - 使用缩放比例配置
 	var originalCardWidth, originalCardHeight float64
 	if s.conveyorCardBackground != nil {
 		bgBounds := s.conveyorCardBackground.Bounds()
 		originalCardWidth = float64(bgBounds.Dx())
 		originalCardHeight = float64(bgBounds.Dy())
 	} else {
-		// 回退：使用默认值
 		originalCardWidth = 100.0
 		originalCardHeight = 140.0
 	}
 
-	// 使用缩放比例等比例计算卡片尺寸
 	cardScale := config.ConveyorCardScale
 	cardWidth := originalCardWidth * cardScale
 	cardHeight := originalCardHeight * cardScale
+
+	// 通知系统当前卡片宽度（用于碰撞检测）
+	s.conveyorBeltSystem.SetCardWidth(cardWidth)
 
 	// 获取传送带背景尺寸
 	var beltHeight, beltWidth float64
@@ -225,36 +224,40 @@ func (s *GameScene) drawConveyorCards(screen *ebiten.Image, conveyorX, conveyorY
 		beltHeight = float64(s.conveyorBeltBackdrop.Bounds().Dy())
 		beltWidth = float64(s.conveyorBeltBackdrop.Bounds().Dx())
 	} else {
-		beltHeight = 80.0 // 默认高度
+		beltHeight = 80.0
 		beltWidth = config.ConveyorBeltWidth
 	}
 
-	// 垂直居中：卡片Y = 传送带Y + (传送带高度 - 卡片高度) / 2
-	cardY := conveyorY + (beltHeight-cardHeight)/2
+	// 垂直位置：垂直居中 + 上边距微调
+	cardY := conveyorY + (beltHeight-cardHeight)/2 + config.ConveyorBeltTopPadding
 
-	// 传送带可见区域右边界（用于裁剪）
+	// 传送带可见区域边界（用于裁剪）
+	beltLeftEdge := conveyorX + config.ConveyorBeltPadding
 	beltRightEdge := conveyorX + beltWidth - config.ConveyorBeltPadding
 
 	// 遍历绘制每张卡片
 	for i, card := range beltComp.Cards {
-		// Story 19.12: 使用 PositionX 计算屏幕位置
-		// 卡片屏幕 X = 传送带 X + 卡片局部 X
+		// 卡片 X 位置：传送带左边界 + 卡片的 PositionX
 		cardX := conveyorX + card.PositionX
 
 		// 检查是否选中
 		isSelected := beltComp.SelectedCardIndex == i
 
-		// 计算裁剪参数（用于右侧进入时的部分可见效果）
-		// 卡片右边缘超出传送带右边界时，计算需要裁剪的比例
-		clipRatio := 1.0 // 默认完全可见
+		// 计算裁剪参数
+		clipRatio := 1.0
+
+		// 右侧裁剪：卡片超出右边界
 		if cardX+cardWidth > beltRightEdge {
-			// 卡片部分或完全在传送带外
 			visibleWidth := beltRightEdge - cardX
 			if visibleWidth <= 0 {
-				// 卡片完全在传送带外，不绘制
-				continue
+				continue // 完全在右边界外，不绘制
 			}
 			clipRatio = visibleWidth / cardWidth
+		}
+
+		// 左侧裁剪：卡片超出左边界（通常不会发生）
+		if cardX < beltLeftEdge {
+			continue // 超出左边界，不绘制
 		}
 
 		// 绘制卡片（带裁剪）
@@ -535,11 +538,70 @@ func (s *GameScene) getConveyorBeltBounds() (x, y, width, height float64) {
 	conveyorX := s.calculateConveyorX()
 	conveyorY := s.levelPhaseSystem.GetConveyorBeltY()
 
-	return conveyorX, conveyorY, config.ConveyorBeltWidth, config.ConveyorCardHeight + config.ConveyorBeltPadding*2 + 20
+	// 卡片高度使用比例配置计算（原始高度约 140px * 缩放比例）
+	cardHeight := 140.0 * config.ConveyorCardScale
+
+	return conveyorX, conveyorY, config.ConveyorBeltWidth, cardHeight + config.ConveyorBeltPadding*2 + 20
+}
+
+// isMouseOverConveyorCard 检测鼠标是否悬停在传送带卡片上
+// 用于更新鼠标光标形状
+func (s *GameScene) isMouseOverConveyorCard() bool {
+	if s.conveyorBeltSystem == nil || !s.conveyorBeltSystem.IsActive() {
+		return false
+	}
+
+	// 如果已选中卡片，不检测悬停（避免光标闪烁）
+	if s.isConveyorCardSelected() {
+		return false
+	}
+
+	// 获取传送带边界
+	conveyorX, conveyorY, _, _ := s.getConveyorBeltBounds()
+	if conveyorX == 0 && conveyorY == 0 {
+		return false
+	}
+
+	// 使用缩放比例计算卡片尺寸
+	var originalCardWidth, originalCardHeight float64
+	if s.conveyorCardBackground != nil {
+		bgBounds := s.conveyorCardBackground.Bounds()
+		originalCardWidth = float64(bgBounds.Dx())
+		originalCardHeight = float64(bgBounds.Dy())
+	} else {
+		originalCardWidth = 100.0
+		originalCardHeight = 140.0
+	}
+	cardScale := config.ConveyorCardScale
+	cardWidth := originalCardWidth * cardScale
+	cardHeight := originalCardHeight * cardScale
+
+	// 获取传送带背景高度，用于计算垂直居中的Y偏移
+	var beltHeight float64
+	if s.conveyorBeltBackdrop != nil {
+		beltHeight = float64(s.conveyorBeltBackdrop.Bounds().Dy())
+	} else {
+		beltHeight = 80.0
+	}
+	// 垂直居中偏移
+	cardStartY := conveyorY + (beltHeight-cardHeight)/2 + config.ConveyorBeltTopPadding
+
+	// 获取鼠标位置
+	mouseX, mouseY := ebiten.CursorPosition()
+
+	// 检测是否悬停在任意卡片上（包括移动中的卡片）
+	cardIndex := s.conveyorBeltSystem.GetCardAtPositionForHover(
+		float64(mouseX), float64(mouseY),
+		conveyorX+config.ConveyorBeltLeftPadding,
+		cardStartY,
+		cardWidth, cardHeight,
+	)
+
+	return cardIndex >= 0
 }
 
 // handleConveyorBeltClick 处理传送带卡片点击
-// Story 19.5 & 19.12: 卡片选中逻辑
+// Story 19.5: 卡片选中逻辑
 //
 // 返回：
 //   - 是否消费了点击事件
@@ -568,21 +630,22 @@ func (s *GameScene) handleConveyorBeltClick(mouseX, mouseY int) bool {
 	cardWidth := originalCardWidth * cardScale
 	cardHeight := originalCardHeight * cardScale
 
-	// 获取传送带背景尺寸
+	// 获取传送带背景高度，用于计算垂直居中的Y偏移
 	var beltHeight float64
 	if s.conveyorBeltBackdrop != nil {
 		beltHeight = float64(s.conveyorBeltBackdrop.Bounds().Dy())
 	} else {
 		beltHeight = 80.0
 	}
-
-	// 卡片起始 Y 位置（垂直居中）
+	// 垂直居中偏移
 	cardStartY := conveyorY + (beltHeight-cardHeight)/2
 
-	// Story 19.12: 使用简化的点击检测方法
+	// 检查点击是否在传送带卡片上
+	// 使用左侧内边距配置
 	cardIndex := s.conveyorBeltSystem.GetCardAtPosition(
 		float64(mouseX), float64(mouseY),
-		conveyorX, cardStartY,
+		conveyorX+config.ConveyorBeltLeftPadding,
+		cardStartY,
 		cardWidth, cardHeight,
 	)
 
@@ -616,8 +679,8 @@ func (s *GameScene) handleConveyorCardPlacement(worldX, worldY float64) bool {
 
 	// 检查放置位置是否有效（红线左侧）
 	if !s.conveyorBeltSystem.IsPlacementValid(worldX) {
-		// 显示提示文字，但保持卡片选中和预览状态
-		// 让玩家可以继续尝试在红线左侧放置
+		// 显示提示文字，但不取消选中状态
+		// 玩家可以继续移动鼠标到有效位置
 		s.showPlacementHint()
 		return false
 	}
@@ -677,75 +740,31 @@ func (s *GameScene) handleConveyorCardPlacement(worldX, worldY float64) bool {
 
 // showPlacementHint 显示放置限制提示
 // Story 19.5: 使用 [ADVICE_NOT_PASSED_LINE] 文本 key
-// 在教学文字区显示提示，告知玩家只能在红线左侧放置坚果
+// 在教学文字区显示"在红线的左边才能放坚果墙"提示
 func (s *GameScene) showPlacementHint() {
 	// 获取提示文本
-	var hintText string
-	if s.gameState.LawnStrings != nil {
-		hintText = s.gameState.LawnStrings.GetString("ADVICE_NOT_PASSED_LINE")
+	textKey := "ADVICE_NOT_PASSED_LINE"
+	var text string
+	if s.gameState != nil && s.gameState.LawnStrings != nil {
+		text = s.gameState.LawnStrings.GetString(textKey)
 	}
-	if hintText == "" {
-		hintText = "在红线的左边才能放坚果墙" // 默认文本
+	if text == "" {
+		text = "在红线的左边才能放坚果墙"
 	}
 
-	// 先清理所有现有的临时教学文本（避免冲突）
-	s.cleanupTempTutorialTexts()
-
-	// 创建新的教学文本实体
+	// 创建临时教学文本实体
 	textEntity := s.entityManager.CreateEntity()
 	textComp := &components.TutorialTextComponent{
-		Text:            hintText,
+		Text:            text,
 		DisplayTime:     0,
-		MaxDisplayTime:  3.0, // 3秒后自动消失
+		MaxDisplayTime:  config.AdvisoryTutorialTextDisplayDuration, // 自动消失
 		BackgroundAlpha: 0.5,
 		IsAdvisory:      false, // 使用标准位置
 		IsBowling:       true,  // Level 1-5 专用配置
 	}
 	s.entityManager.AddComponent(textEntity, textComp)
 
-	log.Printf("[GameScene] 显示放置提示: '%s' (Entity ID: %d)", hintText, textEntity)
-}
-
-// updateTempTutorialTexts 更新临时教学文本的生命周期
-// 处理 MaxDisplayTime > 0 的教学文本实体，更新显示时间并在到期后销毁
-func (s *GameScene) updateTempTutorialTexts(deltaTime float64) {
-	textEntities := ecs.GetEntitiesWith1[*components.TutorialTextComponent](s.entityManager)
-
-	for _, entityID := range textEntities {
-		textComp, ok := ecs.GetComponent[*components.TutorialTextComponent](s.entityManager, entityID)
-		if !ok {
-			continue
-		}
-
-		// 只处理有最大显示时间限制的临时文本
-		if textComp.MaxDisplayTime > 0 {
-			textComp.DisplayTime += deltaTime
-
-			// 检查是否到期
-			if textComp.DisplayTime >= textComp.MaxDisplayTime {
-				s.entityManager.DestroyEntity(entityID)
-				log.Printf("[GameScene] 临时教学文本到期销毁 (Entity ID: %d)", entityID)
-			}
-		}
-	}
-}
-
-// cleanupTempTutorialTexts 清理所有临时教学文本（MaxDisplayTime > 0 的）
-// 用于显示新提示前清理旧提示，避免冲突
-func (s *GameScene) cleanupTempTutorialTexts() {
-	textEntities := ecs.GetEntitiesWith1[*components.TutorialTextComponent](s.entityManager)
-
-	for _, entityID := range textEntities {
-		textComp, ok := ecs.GetComponent[*components.TutorialTextComponent](s.entityManager, entityID)
-		if !ok {
-			continue
-		}
-
-		// 只清理临时文本（MaxDisplayTime > 0），保留永久显示的教学文本
-		if textComp.MaxDisplayTime > 0 {
-			s.entityManager.DestroyEntity(entityID)
-		}
-	}
+	log.Printf("[GameScene] 显示放置提示: '%s' (Entity ID: %d)", text, textEntity)
 }
 
 // isConveyorCardSelected 检查是否有传送带卡片被选中
@@ -754,56 +773,6 @@ func (s *GameScene) isConveyorCardSelected() bool {
 		return false
 	}
 	return s.conveyorBeltSystem.GetSelectedCard() != ""
-}
-
-// isHoveringConveyorCard 检查鼠标是否悬停在传送带卡片上
-// Story 19.12: 使用 PositionX 检测悬停
-func (s *GameScene) isHoveringConveyorCard() bool {
-	if s.conveyorBeltSystem == nil || !s.conveyorBeltSystem.IsActive() {
-		return false
-	}
-
-	// 获取传送带边界
-	conveyorX, conveyorY, _, _ := s.getConveyorBeltBounds()
-	if conveyorX == 0 && conveyorY == 0 {
-		return false
-	}
-
-	// 使用缩放比例计算卡片尺寸
-	var originalCardWidth, originalCardHeight float64
-	if s.conveyorCardBackground != nil {
-		bgBounds := s.conveyorCardBackground.Bounds()
-		originalCardWidth = float64(bgBounds.Dx())
-		originalCardHeight = float64(bgBounds.Dy())
-	} else {
-		originalCardWidth = 100.0
-		originalCardHeight = 140.0
-	}
-	cardScale := config.ConveyorCardScale
-	cardWidth := originalCardWidth * cardScale
-	cardHeight := originalCardHeight * cardScale
-
-	// 获取传送带背景尺寸
-	var beltHeight float64
-	if s.conveyorBeltBackdrop != nil {
-		beltHeight = float64(s.conveyorBeltBackdrop.Bounds().Dy())
-	} else {
-		beltHeight = 80.0
-	}
-
-	// 卡片起始 Y 位置（垂直居中）
-	cardStartY := conveyorY + (beltHeight-cardHeight)/2
-
-	mouseX, mouseY := ebiten.CursorPosition()
-
-	// Story 19.12: 使用简化的点击检测方法
-	cardIndex := s.conveyorBeltSystem.GetCardAtPosition(
-		float64(mouseX), float64(mouseY),
-		conveyorX, cardStartY,
-		cardWidth, cardHeight,
-	)
-
-	return cardIndex >= 0
 }
 
 // createConveyorCardPreview 创建传送带卡片预览实体
@@ -915,12 +884,12 @@ func (s *GameScene) updateConveyorBeltClick() {
 
 		// 检查是否点击在草坪区域
 		if worldY >= config.GridWorldStartY && worldY < config.GridWorldStartY+float64(config.GridRows)*config.CellHeight {
-			// 尝试放置，只有成功放置时才销毁预览
+			// 尝试放置，只有成功时才销毁预览
 			if s.handleConveyorCardPlacement(worldX, worldY) {
 				// 放置成功，销毁预览
 				s.destroyConveyorCardPreview()
 			}
-			// 放置失败（如红线右侧），保持预览状态
+			// 放置失败（如红线右侧），保持选中状态，不销毁预览
 			return
 		}
 

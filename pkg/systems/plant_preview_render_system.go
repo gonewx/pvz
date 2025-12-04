@@ -1,7 +1,10 @@
 package systems
 
 import (
+	"log"
+
 	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -13,6 +16,9 @@ import (
 type PlantPreviewRenderSystem struct {
 	entityManager      *ecs.EntityManager
 	plantPreviewSystem *PlantPreviewSystem // 用于获取两个渲染位置
+
+	// 红线限制（保龄球关卡）
+	redLineEnabled bool // 是否启用红线限制
 }
 
 // NewPlantPreviewRenderSystem 创建植物预览渲染系统
@@ -20,7 +26,15 @@ func NewPlantPreviewRenderSystem(em *ecs.EntityManager, pps *PlantPreviewSystem)
 	return &PlantPreviewRenderSystem{
 		entityManager:      em,
 		plantPreviewSystem: pps,
+		redLineEnabled:     false,
 	}
+}
+
+// SetRedLineEnabled 设置是否启用红线限制
+// 启用后，网格预览在红线右侧不显示
+func (s *PlantPreviewRenderSystem) SetRedLineEnabled(enabled bool) {
+	s.redLineEnabled = enabled
+	log.Printf("[PlantPreviewRenderSystem] 红线限制已设置: %v", enabled)
 }
 
 // Draw 渲染所有植物预览实体（双图像渲染，使用静态图像）
@@ -46,6 +60,16 @@ func (s *PlantPreviewRenderSystem) Draw(screen *ebiten.Image, cameraX float64) {
 	// 获取两个渲染位置
 	mouseX, mouseY, gridX, gridY, isInGrid := s.plantPreviewSystem.GetPreviewPositions()
 
+	// 红线检查：如果启用红线限制且网格位置在红线右侧，不显示网格预览
+	showGridPreview := isInGrid
+	if s.redLineEnabled && isInGrid {
+		// 计算红线 X 位置
+		redLineX := config.GridWorldStartX + float64(config.BowlingRedLineColumn)*config.CellWidth
+		if gridX >= redLineX {
+			showGridPreview = false
+		}
+	}
+
 	for _, entityID := range entities {
 		// 获取组件
 		preview, ok := ecs.GetComponent[*components.PlantPreviewComponent](s.entityManager, entityID)
@@ -61,8 +85,8 @@ func (s *PlantPreviewRenderSystem) Draw(screen *ebiten.Image, cameraX float64) {
 		// 1️⃣ 渲染鼠标光标处的不透明图像（Alpha=1.0）
 		s.drawStaticPreview(screen, sprite.Image, mouseX, mouseY, 1.0, cameraX, preview.IsExplosive)
 
-		// 2️⃣ 如果在网格内，渲染格子中心的半透明预览图像（Alpha=0.5）
-		if isInGrid {
+		// 2️⃣ 如果在网格内且不在红线右侧，渲染格子中心的半透明预览图像（Alpha=0.5）
+		if showGridPreview {
 			s.drawStaticPreview(screen, sprite.Image, gridX, gridY, 0.5, cameraX, preview.IsExplosive)
 		}
 	}

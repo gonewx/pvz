@@ -40,12 +40,12 @@ type GuidedTutorialSystem struct {
 	guidedEntity ecs.EntityID
 
 	// 内部状态跟踪
-	lastPlantCount   int          // 上一帧的植物数量
-	initialized      bool         // 系统是否已初始化
-	lastShovelMode   bool         // 上一帧的铲子模式状态（用于检测模式切换）
-	totalTime        float64      // 总运行时间（用于调试）
-	currentStep      TutorialStep // 当前教学步骤
-	firstPlantRemoved bool        // 是否已移除第一颗植物
+	lastPlantCount    int          // 上一帧的植物数量
+	initialized       bool         // 系统是否已初始化
+	lastShovelMode    bool         // 上一帧的铲子模式状态（用于检测模式切换）
+	totalTime         float64      // 总运行时间（用于调试）
+	currentStep       TutorialStep // 当前教学步骤
+	firstPlantRemoved bool         // 是否已移除第一颗植物
 }
 
 // GuidedTutorialStateProvider 强引导教学状态提供者接口

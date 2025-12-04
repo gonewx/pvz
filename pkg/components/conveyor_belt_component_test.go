@@ -12,9 +12,9 @@ func TestNewConveyorBeltComponent(t *testing.T) {
 		t.Errorf("Expected capacity %d, got %d", DefaultConveyorCapacity, comp.Capacity)
 	}
 
-	if comp.NextSpacing != DefaultNutSpacing {
-		t.Errorf("Expected next spacing %.1f, got %.1f",
-			DefaultNutSpacing, comp.NextSpacing)
+	if comp.GenerationInterval != DefaultCardGenerationInterval {
+		t.Errorf("Expected generation interval %.1f, got %.1f",
+			DefaultCardGenerationInterval, comp.GenerationInterval)
 	}
 
 	if comp.IsActive {
@@ -27,10 +27,6 @@ func TestNewConveyorBeltComponent(t *testing.T) {
 
 	if len(comp.Cards) != 0 {
 		t.Errorf("Expected empty cards slice, got %d cards", len(comp.Cards))
-	}
-
-	if comp.FinalWaveTriggered {
-		t.Error("Expected FinalWaveTriggered to be false by default")
 	}
 }
 
@@ -101,28 +97,21 @@ func TestCardTypeConstants(t *testing.T) {
 }
 
 func TestConveyorCard(t *testing.T) {
-	// Story 19.12: 测试新的距离驱动字段
 	card := ConveyorCard{
-		CardType:     CardTypeWallnutBowling,
-		PositionX:    150.0,
-		IsAtLeftEdge: false,
+		CardType:  CardTypeWallnutBowling,
+		PositionX: 100.0,
+		IsStopped: true,
 	}
 
 	if card.CardType != CardTypeWallnutBowling {
 		t.Errorf("Expected CardType '%s', got '%s'", CardTypeWallnutBowling, card.CardType)
 	}
 
-	if card.PositionX != 150.0 {
-		t.Errorf("Expected PositionX 150.0, got %f", card.PositionX)
+	if card.PositionX != 100.0 {
+		t.Errorf("Expected PositionX 100.0, got %f", card.PositionX)
 	}
 
-	if card.IsAtLeftEdge {
-		t.Error("Expected IsAtLeftEdge to be false")
-	}
-
-	// 测试到达左侧边缘的状态
-	card.IsAtLeftEdge = true
-	if !card.IsAtLeftEdge {
-		t.Error("Expected IsAtLeftEdge to be true after setting")
+	if !card.IsStopped {
+		t.Error("Expected IsStopped to be true")
 	}
 }

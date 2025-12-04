@@ -202,17 +202,17 @@ type ConveyorBeltData struct {
 	Capacity           int                // 最大容量
 	ScrollOffset       float64            // 传动动画偏移量
 	IsActive           bool               // 是否激活
-	NextSpacing        float64            // Story 19.12: 下一个坚果的间隔距离
+	GenerationTimer    float64            // 卡片生成计时器
+	GenerationInterval float64            // 卡片生成间隔（秒）
 	SelectedCardIndex  int                // 当前选中的卡片索引
 	FinalWaveTriggered bool               // 最终波是否已触发
 }
 
 // ConveyorCardData 传送带卡片序列化数据
-// Story 19.12: 使用 PositionX 和 IsAtLeftEdge 替代 SlideProgress 和 SlotIndex
 type ConveyorCardData struct {
-	CardType     string  // 卡片类型
-	PositionX    float64 // 在传送带上的 X 位置（局部坐标）
-	IsAtLeftEdge bool    // 是否已到达左侧边缘
+	CardType  string  // 卡片类型
+	PositionX float64 // X 位置（像素）
+	IsStopped bool    // 是否已停止
 }
 
 // LevelPhaseData 关卡阶段序列化数据

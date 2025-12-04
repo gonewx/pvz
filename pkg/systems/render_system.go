@@ -1106,6 +1106,30 @@ func (s *RenderSystem) DrawTutorialText(screen *ebiten.Image, tutorialFont inter
 	}
 }
 
+// UpdateTutorialTextTime 更新所有 TutorialTextComponent 的显示时间
+// 如果超过 MaxDisplayTime 则自动销毁实体
+// 参数：
+//   - dt: 时间增量（秒）
+func (s *RenderSystem) UpdateTutorialTextTime(dt float64) {
+	textEntities := ecs.GetEntitiesWith1[*components.TutorialTextComponent](s.entityManager)
+
+	for _, entity := range textEntities {
+		textComp, ok := ecs.GetComponent[*components.TutorialTextComponent](s.entityManager, entity)
+		if !ok {
+			continue
+		}
+
+		// 更新显示时间
+		textComp.DisplayTime += dt
+
+		// 如果有最大显示时间限制，检查是否需要销毁
+		if textComp.MaxDisplayTime > 0 && textComp.DisplayTime >= textComp.MaxDisplayTime {
+			s.entityManager.DestroyEntity(entity)
+			log.Printf("[RenderSystem] 教学文本自动消失: text='%s'", textComp.Text)
+		}
+	}
+}
+
 // drawCenteredTextTTF 使用 TrueType 字体绘制居中文本（带黑色描边）
 // 教学文本效果：浅黄色文字 + 黑色描边
 // 参数:

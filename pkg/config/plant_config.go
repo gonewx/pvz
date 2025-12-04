@@ -47,7 +47,7 @@ var PlantConfigs = map[types.PlantType]*PlantResourceConfig{
 	types.PlantPotatoMine: {
 		ResourceName: "PotatoMine",
 		ConfigID:     "potatomine",
-		PreviewFrame: -1, // 自动选择
+		PreviewFrame: 30, // 物理帧 25（anim_armed 可见范围 20-30）
 		HiddenTracks: []string{
 			"anim_blink", // 隐藏眨眼轨道
 		},

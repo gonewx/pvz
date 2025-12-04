@@ -837,18 +837,18 @@ func TestBattleSerializer_SaveAndLoadBattle_WithConveyorBelt(t *testing.T) {
 	}
 
 	// 创建传送带实体
-	// Story 19.12: 使用 PositionX 和 IsAtLeftEdge 替代 SlideProgress 和 SlotIndex
 	conveyorEntity := em.CreateEntity()
 	conveyorComp := &components.ConveyorBeltComponent{
 		Cards: []components.ConveyorCard{
-			{CardType: components.CardTypeWallnutBowling, PositionX: 10.0, IsAtLeftEdge: true},
-			{CardType: components.CardTypeWallnutBowling, PositionX: 100.0, IsAtLeftEdge: false},
-			{CardType: components.CardTypeExplodeONut, PositionX: 200.0, IsAtLeftEdge: false},
+			{CardType: components.CardTypeWallnutBowling, PositionX: 0, IsStopped: true},
+			{CardType: components.CardTypeWallnutBowling, PositionX: 60, IsStopped: true},
+			{CardType: components.CardTypeExplodeONut, PositionX: 120, IsStopped: false},
 		},
 		Capacity:           10,
 		ScrollOffset:       25.5,
 		IsActive:           true,
-		NextSpacing:        80.0,
+		GenerationTimer:    1.5,
+		GenerationInterval: 3.0,
 		SelectedCardIndex:  -1,
 		FinalWaveTriggered: false,
 	}
@@ -884,19 +884,17 @@ func TestBattleSerializer_SaveAndLoadBattle_WithConveyorBelt(t *testing.T) {
 		t.Error("ConveyorBelt should be active")
 	}
 
-	// Story 19.12: 验证 NextSpacing 替代 GenerationTimer
-	if data.ConveyorBelt.NextSpacing != 80.0 {
-		t.Errorf("NextSpacing mismatch: expected 80.0, got %f", data.ConveyorBelt.NextSpacing)
+	if data.ConveyorBelt.GenerationTimer != 1.5 {
+		t.Errorf("GenerationTimer mismatch: expected 1.5, got %f", data.ConveyorBelt.GenerationTimer)
 	}
 
-	// 验证卡片类型和位置
+	// 验证卡片类型
 	var foundExplodeONut bool
 	for _, card := range data.ConveyorBelt.Cards {
 		if card.CardType == components.CardTypeExplodeONut {
 			foundExplodeONut = true
-			// Story 19.12: 验证 PositionX 替代 SlideProgress
-			if card.PositionX != 200.0 {
-				t.Errorf("Explode-o-nut PositionX mismatch: expected 200.0, got %f", card.PositionX)
+			if card.PositionX != 120 {
+				t.Errorf("Explode-o-nut position X mismatch: expected 120, got %f", card.PositionX)
 			}
 		}
 	}
@@ -1121,17 +1119,17 @@ func TestBattleSerializer_SaveAndLoadBattle_Level15Complete(t *testing.T) {
 	})
 
 	// 创建传送带
-	// Story 19.12: 使用 PositionX 和 IsAtLeftEdge 替代 SlideProgress 和 SlotIndex
 	conveyorEntity := em.CreateEntity()
 	ecs.AddComponent(em, conveyorEntity, &components.ConveyorBeltComponent{
 		Cards: []components.ConveyorCard{
-			{CardType: components.CardTypeWallnutBowling, PositionX: 10.0, IsAtLeftEdge: true},
-			{CardType: components.CardTypeWallnutBowling, PositionX: 100.0, IsAtLeftEdge: false},
+			{CardType: components.CardTypeWallnutBowling, PositionX: 0, IsStopped: true},
+			{CardType: components.CardTypeWallnutBowling, PositionX: 60, IsStopped: true},
 		},
-		Capacity:          10,
-		IsActive:          true,
-		NextSpacing:       80.0,
-		SelectedCardIndex: 0,
+		Capacity:           10,
+		IsActive:           true,
+		GenerationTimer:    2.0,
+		GenerationInterval: 3.0,
+		SelectedCardIndex:  0,
 	})
 
 	// 创建滚动中的保龄球坚果

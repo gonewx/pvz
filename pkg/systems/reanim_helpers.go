@@ -352,6 +352,34 @@ func MapLogicalToPhysical(logicalFrameNum int, animVisibles []int) int {
 	return -1
 }
 
+// mapPhysicalToLogical 将物理帧号转换为逻辑帧号
+// 物理帧号是 reanim 文件中的帧索引（0-based）
+// 逻辑帧号是可见帧的序号（0-based）
+// 如果物理帧不可见，返回最近的可见帧的逻辑帧号
+func mapPhysicalToLogical(physicalFrame int, animVisibles []int) int {
+	if len(animVisibles) == 0 {
+		return physicalFrame
+	}
+
+	// 遍历可见性数组，计算物理帧对应的逻辑帧号
+	logicalFrame := 0
+	for i := 0; i < len(animVisibles); i++ {
+		if animVisibles[i] == 0 {
+			if i == physicalFrame {
+				return logicalFrame
+			}
+			logicalFrame++
+		}
+	}
+
+	// 如果物理帧超出可见范围，返回最后一个可见帧的逻辑帧号
+	if logicalFrame > 0 {
+		return logicalFrame - 1
+	}
+
+	return 0
+}
+
 // findVisibleWindow 查找动画的可见时间窗口
 func findVisibleWindow(animVisibles []int) (int, int) {
 	firstVisible, lastVisible := -1, -1

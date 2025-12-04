@@ -45,9 +45,9 @@ type GameScene struct {
 	conveyorBelt         *ebiten.Image // Conveyor belt animation (传送带传动动画，6行纹理)
 
 	// 传送带卡片渲染资源（复用植物卡片渲染逻辑）
-	conveyorCardBackground *ebiten.Image // 卡片背景框（SeedPacket_Larger）
-	conveyorWallnutIcon    *ebiten.Image // 普通坚果图标
-	conveyorExplodeNutIcon *ebiten.Image // 爆炸坚果图标（红色版本）
+	conveyorCardBackground  *ebiten.Image // 卡片背景框（SeedPacket_Larger）
+	conveyorWallnutIcon     *ebiten.Image // 普通坚果图标
+	conveyorExplodeNutIcon  *ebiten.Image // 爆炸坚果图标（红色版本）
 
 	// Story 8.2 QA改进：草皮叠加层（随动画进度渐进显示）
 	sodRowImage        *ebiten.Image // 草皮叠加图片（sod1row.jpg 或 sod3row.jpg）
@@ -128,9 +128,9 @@ type GameScene struct {
 	flashEffectSystem *systems.FlashEffectSystem // 闪烁效果系统（僵尸受击闪烁）
 
 	// Story 8.2: Tutorial System
-	tutorialSystem      *systems.TutorialSystem // 教学系统（关卡 1-1 教学引导）
-	tutorialFont        interface{}             // 教学文本字体（*utils.BitmapFont 或 *text.GoTextFace）
-	bowlingTutorialFont interface{}             // Level 1-5 保龄球教学字体（42px）
+	tutorialSystem       *systems.TutorialSystem // 教学系统（关卡 1-1 教学引导）
+	tutorialFont         interface{}             // 教学文本字体（*utils.BitmapFont 或 *text.GoTextFace）
+	bowlingTutorialFont  interface{}             // Level 1-5 保龄球教学字体（42px）
 
 	// Story 8.2 QA改进：完整的铺草皮动画系统
 	soddingSystem *systems.SoddingSystem // 铺草皮动画系统（SodRoll 滚动动画）
@@ -592,13 +592,14 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	scene.daveDialogueSystem = systems.NewDaveDialogueSystem(scene.entityManager, scene.gameState, rm)
 	log.Printf("[GameScene] Initialized Dave dialogue system")
 
-	// Story 19.5 & 19.12: 根据关卡配置初始化传送带参数
+	// Story 19.5: 根据关卡配置初始化传送带参数
 	if scene.gameState.CurrentLevel != nil && scene.gameState.CurrentLevel.ConveyorBelt != nil {
 		conveyorConfig := scene.gameState.CurrentLevel.ConveyorBelt
 		if conveyorConfig.Enabled {
-			// Story 19.12: 设置坚果间隔（替代原来的生成间隔）
-			// 配置文件中的 GenerationInterval 现在作为间隔基数的参考值
-			// 不再直接使用，而是保持默认的基于距离的间隔
+			// 设置卡片生成间隔
+			if conveyorConfig.GenerationInterval > 0 {
+				scene.conveyorBeltSystem.SetGenerationInterval(conveyorConfig.GenerationInterval)
+			}
 			// 设置卡片池
 			if len(conveyorConfig.CardPool) > 0 {
 				cardPool := make([]systems.CardPoolEntry, len(conveyorConfig.CardPool))
@@ -610,8 +611,8 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 				}
 				scene.conveyorBeltSystem.SetCardPool(cardPool)
 			}
-			log.Printf("[GameScene] Conveyor belt configured from level config: pool=%d entries",
-				len(conveyorConfig.CardPool))
+			log.Printf("[GameScene] Conveyor belt configured from level config: interval=%.1fs, pool=%d entries",
+				conveyorConfig.GenerationInterval, len(conveyorConfig.CardPool))
 
 			// 加载传送带卡片渲染资源（需要在 reanimSystem 初始化后）
 			scene.loadConveyorCardResources()
@@ -650,6 +651,10 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 		if scene.conveyorBeltSystem != nil {
 			scene.conveyorBeltSystem.Activate()
 		}
+		// 启用红线限制（网格预览在红线右侧不显示）
+		if scene.plantPreviewRenderSystem != nil {
+			scene.plantPreviewRenderSystem.SetRedLineEnabled(true)
+		}
 		// Story 19.9: 恢复波次计时系统
 		// 特殊关卡在 LevelSystem 初始化时暂停了波次计时，现在需要初始化并恢复
 		if scene.levelSystem != nil {
@@ -664,10 +669,7 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 
 	// Story 19.4: 生成预设植物
 	// 必须在 GuidedTutorialSystem 初始化之后调用，这样系统才能正确追踪植物数量
-	// Bug Fix: 如果有战斗存档，不创建预设植物（会从存档恢复）
-	if !scene.hasBattleSave {
-		scene.spawnPresetPlants()
-	}
+	scene.spawnPresetPlants()
 
 	// Story 19.4: 检查是否需要激活强引导模式（Level 1-5）
 	// 并创建开场 Dave 对话
@@ -1096,6 +1098,8 @@ func (s *GameScene) Update(deltaTime float64) {
 	if s.tutorialSystem != nil {
 		s.tutorialSystem.Update(deltaTime) // 9.5. Update tutorial text display
 	}
+	// 更新所有教学文本的显示时间（包括 showPlacementHint 创建的临时文本）
+	s.renderSystem.UpdateTutorialTextTime(deltaTime)
 	// Story 19.3: Guided tutorial system (Level 1-5 shovel teaching)
 	if s.guidedTutorialSystem != nil {
 		s.guidedTutorialSystem.Update(deltaTime) // 9.6. Update guided tutorial state
@@ -1123,8 +1127,6 @@ func (s *GameScene) Update(deltaTime float64) {
 	if s.buttonSystem != nil {
 		s.buttonSystem.Update(deltaTime) // 10.7. Update button interactions (hover, click)
 	}
-	// Story 19.5: 更新临时教学文本生命周期（红线提示等）
-	s.updateTempTutorialTexts(deltaTime)   // 10.8. Update temp tutorial text display time
 	s.lifetimeSystem.Update(deltaTime)     // 11. Check for expired entities
 	s.entityManager.RemoveMarkedEntities() // 12. Clean up deleted entities (always last)
 
@@ -1250,22 +1252,14 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 
 	// Layer 8.5: Draw tutorial text (Story 8.2 + Story 19.x QA)
 	// 教学文本在阳光之下、UI之上
-	// Story 19.x QA: 修复教学文本不显示问题
-	// - TutorialSystem 创建的教学文本需要 tutorialFont
-	// - GuidedTutorialSystem 创建的教学文本也需要被渲染
-	// - 保龄球阶段的放置提示文本也需要被渲染（即使教学系统不活跃）
-	// 使用 DrawTutorialText 渲染所有 TutorialTextComponent 实体
-	if s.tutorialFont != nil {
-		s.renderSystem.DrawTutorialText(screen, s.tutorialFont, s.bowlingTutorialFont)
-	} else if s.bowlingTutorialFont != nil {
-		// Story 19.x Bug Fix: 保龄球关卡始终使用 bowlingTutorialFont 渲染教学文本
-		// 包括铲子教学阶段和保龄球阶段的放置提示
+	// 渲染所有 TutorialTextComponent 实体（包括临时提示文本）
+	// 优先使用 bowlingTutorialFont，其次 tutorialFont，最后 sunCounterFont
+	if s.bowlingTutorialFont != nil {
 		s.renderSystem.DrawTutorialText(screen, s.bowlingTutorialFont, s.bowlingTutorialFont)
-	} else if s.guidedTutorialSystem != nil && s.guidedTutorialSystem.IsActive() {
-		// Story 19.x QA: GuidedTutorialSystem 使用 sunCounterFont 作为备选字体
-		if s.sunCounterFont != nil {
-			s.renderSystem.DrawTutorialText(screen, s.sunCounterFont, nil)
-		}
+	} else if s.tutorialFont != nil {
+		s.renderSystem.DrawTutorialText(screen, s.tutorialFont, s.bowlingTutorialFont)
+	} else if s.sunCounterFont != nil {
+		s.renderSystem.DrawTutorialText(screen, s.sunCounterFont, nil)
 	}
 
 	// Layer 8.6: Draw UI particles (教学箭头、奖励粒子等)

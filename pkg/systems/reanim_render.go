@@ -127,6 +127,15 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 				log.Printf("[ReanimSystem] 🟫 SodRoll Frame %d: trackName=%s, animName=%s, logicalFrame=%.2f, physicalFrame=%d, isSynthetic=%v",
 					comp.CurrentFrame, trackName, animName, logicalFrame, physicalFrame, isSyntheticAnim)
 			}
+			// Debug: PotatoMine 卡片预览渲染
+			if strings.EqualFold(comp.ReanimName, "potatomine") && comp.IsPaused && trackName == "anim_face" {
+				// 打印物理帧的实际数据
+				if physicalFrame >= 0 && physicalFrame < len(mergedFrames) {
+					frame := mergedFrames[physicalFrame]
+					log.Printf("[ReanimSystem] 🥔 PotatoMine prepareRenderCache: logicalFrame=%.2f -> physicalFrame=%d, x=%.1f, y=%.1f, sx=%.3f, sy=%.3f",
+						logicalFrame, physicalFrame, getFloat(frame.X), getFloat(frame.Y), getFloat(frame.ScaleX), getFloat(frame.ScaleY))
+				}
+			}
 
 			// Debug: Wallnut 帧映射
 			if comp.ReanimName == "Wallnut" && trackName == "anim_face" {
@@ -383,6 +392,11 @@ func (s *ReanimSystem) GetRenderData(entityID ecs.EntityID) []components.RenderP
 		if comp.ReanimName == "sodroll" && comp.CurrentFrame < 15 {
 			log.Printf("[ReanimSystem] 🟫 SodRoll 重建缓存: Frame %d, needRebuild=true", comp.CurrentFrame)
 		}
+		// Debug: PotatoMine 缓存重建（忽略大小写）
+		if strings.EqualFold(comp.ReanimName, "potatomine") {
+			log.Printf("[ReanimSystem] 🥔 PotatoMine GetRenderData重建缓存: CurrentFrame=%d, IsPaused=%v, AnimationFrameIndices=%v",
+				comp.CurrentFrame, comp.IsPaused, comp.AnimationFrameIndices)
+		}
 		s.prepareRenderCache(comp)
 	}
 
@@ -469,19 +483,39 @@ func (s *ReanimSystem) PrepareStaticPreview(entityID ecs.EntityID, plantType typ
 	}
 
 	// 查找最佳预览帧
+	// 注意：targetFrame 最终表示的是「逻辑帧号」，供 AnimationFrameIndices 使用
+	// PreviewFrame 配置的是「物理帧号」（reanim 文件中的帧索引）
 	var targetFrame int
-	if cfg.PreviewFrame >= 0 {
-		// 策略 1：使用配置的帧
-		targetFrame = cfg.PreviewFrame
-		log.Printf("[ReanimSystem] PrepareStaticPreview: %s using configured frame %d",
-			cfg.ConfigID, cfg.PreviewFrame)
-	} else if len(comp.CurrentAnimations) > 0 {
-		// 策略 2：自动选择中间帧
+	if cfg.PreviewFrame >= 0 && len(comp.CurrentAnimations) > 0 {
+		// 策略 1：使用配置的物理帧号，转换为逻辑帧号
 		animName := comp.CurrentAnimations[0]
 		if visibles, ok := comp.AnimVisiblesMap[animName]; ok && len(visibles) > 0 {
-			targetFrame = len(visibles) / 2
-			log.Printf("[ReanimSystem] PrepareStaticPreview: %s auto-selected frame %d/%d",
-				cfg.ConfigID, targetFrame, len(visibles))
+			physicalFrame := cfg.PreviewFrame
+			// 将物理帧号转换为逻辑帧号
+			logicalFrame := mapPhysicalToLogical(physicalFrame, visibles)
+			targetFrame = logicalFrame
+			log.Printf("[ReanimSystem] PrepareStaticPreview: %s physical frame %d -> logical frame %d (visibles len=%d)",
+				cfg.ConfigID, cfg.PreviewFrame, targetFrame, len(visibles))
+		} else {
+			// 如果没有可见性数组，直接使用物理帧号
+			targetFrame = cfg.PreviewFrame
+			log.Printf("[ReanimSystem] PrepareStaticPreview: %s using configured frame %d (no visibles map)",
+				cfg.ConfigID, cfg.PreviewFrame)
+		}
+	} else if cfg.PreviewFrame >= 0 {
+		// 没有 CurrentAnimations 时直接使用配置帧
+		targetFrame = cfg.PreviewFrame
+		log.Printf("[ReanimSystem] PrepareStaticPreview: %s using configured frame %d (no animations)",
+			cfg.ConfigID, cfg.PreviewFrame)
+	} else if len(comp.CurrentAnimations) > 0 {
+		// 策略 2：自动选择可见帧的中间帧
+		animName := comp.CurrentAnimations[0]
+		if visibles, ok := comp.AnimVisiblesMap[animName]; ok && len(visibles) > 0 {
+			// 计算可见帧数量，选择中间帧
+			visibleCount := countVisibleFrames(visibles)
+			targetFrame = visibleCount / 2
+			log.Printf("[ReanimSystem] PrepareStaticPreview: %s auto-selected logical frame %d (of %d visible frames)",
+				cfg.ConfigID, targetFrame, visibleCount)
 		}
 	}
 
@@ -497,6 +531,9 @@ func (s *ReanimSystem) PrepareStaticPreview(entityID ecs.EntityID, plantType typ
 	// 暂停动画播放（静态预览）
 	comp.IsPaused = true
 	comp.IsLooping = false
+
+	// 强制重置 LastRenderFrame 确保缓存重建
+	comp.LastRenderFrame = -1
 
 	// 强制更新渲染缓存
 	s.prepareRenderCache(comp)

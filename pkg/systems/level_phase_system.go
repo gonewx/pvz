@@ -30,10 +30,10 @@ type LevelPhaseSystem struct {
 	phaseEntity ecs.EntityID
 
 	// 外部系统回调（遵循零耦合原则）
-	onDisableGuidedTutorial func()           // 关闭强引导模式回调
-	onActivateBowling       func()           // 激活保龄球阶段回调
-	onTransitionComplete    func()           // 转场完成回调
-	daveDialogueKeys        []string         // Dave 对话文本 keys
+	onDisableGuidedTutorial func()                  // 关闭强引导模式回调
+	onActivateBowling       func()                  // 激活保龄球阶段回调
+	onTransitionComplete    func()                  // 转场完成回调
+	daveDialogueKeys        []string                // Dave 对话文本 keys
 	resourceLoader          entities.ResourceLoader // 资源加载器接口
 }
 
@@ -72,7 +72,7 @@ func NewLevelPhaseSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.Res
 
 	// 初始化阶段组件
 	phaseComp := &components.LevelPhaseComponent{
-		CurrentPhase:        1,                              // 初始为阶段 1（铲子教学）
+		CurrentPhase:        1, // 初始为阶段 1（铲子教学）
 		PhaseState:          components.PhaseStateActive,
 		TransitionProgress:  0,
 		TransitionStep:      components.TransitionStepNone,
