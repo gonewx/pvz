@@ -3,6 +3,7 @@ package systems
 import (
 	"image/color"
 	"log"
+	"math"
 	"regexp"
 	"strings"
 
@@ -13,6 +14,31 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
+)
+
+// 文字抖动参数（参考 ZombiesWonPhaseSystem 的屏幕抖动参数）
+const (
+	TextShakeAmplitude = 3.0   // 振幅（像素）
+	TextShakeFrequency = 30.0  // 频率（Hz），相对较低以便可见
+)
+
+// Dave 说话动画参数
+// 根据文本长度选择不同动画，动画播放到与文本长度匹配的帧数后暂停
+const (
+	// 动画可见帧范围（24 FPS，从 reanim 文件分析得出）
+	// anim_smalltalk: 帧 85-94 可见（9帧）
+	// anim_mediumtalk: 帧 130-148 可见（18帧）
+	// anim_blahblah: 帧 33-64 可见（31帧）
+	DaveSmallTalkStartFrame  = 85
+	DaveSmallTalkEndFrame    = 94
+	DaveMediumTalkStartFrame = 130
+	DaveMediumTalkEndFrame   = 148
+	DaveBlahBlahStartFrame   = 33
+	DaveBlahBlahEndFrame     = 64
+
+	// 文本长度阈值（按 rune 计数，中文每个字符为 1）
+	DaveShortTextThreshold  = 8  // ≤8 字符使用 anim_smalltalk (9帧)
+	DaveMediumTextThreshold = 12 // ≤12 字符使用 anim_mediumtalk (18帧)，>12 使用 anim_blahblah (31帧)
 )
 
 // DaveDialogueSystem 疯狂戴夫对话系统
@@ -128,11 +154,12 @@ func (s *DaveDialogueSystem) updateEnteringState(
 		dialogueComp.State = components.DaveStateTalking
 		dialogueComp.IsVisible = true
 
-		// 加载第一条对话
+		// 加载第一条对话（会计算动画类型和目标帧）
 		s.loadCurrentDialogue(dialogueComp)
 
-		// 切换到 idle 动画（循环播放）
-		s.playAnimation(entityID, "anim_idle", true)
+		// Bug Fix: 应用第一条对话的表情指令
+		// 之前只在 advanceDialogue 中调用 applyExpressions，导致第一条对话的表情不生效
+		s.applyExpressions(entityID, dialogueComp)
 
 		log.Printf("[DaveDialogueSystem] Entity %d: Entering → Talking, anim_enter finished", entityID)
 	}
@@ -145,6 +172,34 @@ func (s *DaveDialogueSystem) updateTalkingState(
 	posComp *components.PositionComponent,
 	dt float64,
 ) {
+	// 更新文字抖动计时器
+	if dialogueComp.TextShaking {
+		dialogueComp.TextShakeTime += dt
+	}
+
+	// 监控说话动画帧，到达目标帧后暂停
+	if dialogueComp.TalkAnimationStarted && !dialogueComp.IsHoldingItem {
+		reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+		if ok && !reanimComp.IsPaused && len(reanimComp.CurrentAnimations) > 0 {
+			animName := reanimComp.CurrentAnimations[0]
+			// 检查是否是说话动画
+			if animName == dialogueComp.CurrentTalkAnimation {
+				// 获取当前帧
+				currentFrame := reanimComp.CurrentFrame
+				if frameIdx, exists := reanimComp.AnimationFrameIndices[animName]; exists {
+					currentFrame = int(frameIdx)
+				}
+
+				// 到达目标帧后暂停动画
+				if currentFrame >= dialogueComp.TalkAnimationTargetFrame {
+					reanimComp.IsPaused = true
+					log.Printf("[DaveDialogueSystem] Entity %d: Talk animation paused at frame %d (target=%d)",
+						entityID, currentFrame, dialogueComp.TalkAnimationTargetFrame)
+				}
+			}
+		}
+	}
+
 	// 检测点击输入
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
 		s.advanceDialogue(entityID, dialogueComp)
@@ -220,11 +275,86 @@ func (s *DaveDialogueSystem) loadCurrentDialogue(dialogueComp *components.DaveDi
 	// 解析表情指令
 	cleanText, expressions := s.parseExpressionCommands(rawText)
 
+	// 合并 key 行上的标签（如 {SHAKE}, {SHOW_WALLNUT}）
+	// 这些标签在 [KEY] {TAG} 格式中定义，需要优先应用
+	keyTags := s.gameState.LawnStrings.GetKeyTags(key)
+	if len(keyTags) > 0 {
+		// key 行标签插入到表情列表前面，优先处理
+		expressions = append(keyTags, expressions...)
+	}
+
 	dialogueComp.CurrentText = cleanText
 	dialogueComp.CurrentExpressions = expressions
 
-	log.Printf("[DaveDialogueSystem] Loaded dialogue key=%s, text='%s', expressions=%v",
-		key, cleanText, expressions)
+	// 重置文字抖动状态（新对话开始时）
+	dialogueComp.TextShaking = false
+	dialogueComp.TextShakeTime = 0.0
+
+	// 计算说话动画类型和目标帧
+	s.calculateTalkAnimation(dialogueComp, cleanText)
+
+	log.Printf("[DaveDialogueSystem] Loaded dialogue key=%s, text='%s', expressions=%v, keyTags=%v, anim=%s, targetFrame=%d",
+		key, cleanText, expressions, keyTags, dialogueComp.CurrentTalkAnimation, dialogueComp.TalkAnimationTargetFrame)
+}
+
+// calculateTalkAnimation 根据文本长度计算说话动画类型和目标停止帧
+func (s *DaveDialogueSystem) calculateTalkAnimation(dialogueComp *components.DaveDialogueComponent, text string) {
+	textLen := len([]rune(text))
+
+	// 根据文本长度选择动画和计算目标停止帧
+	var animName string
+	var startFrame, endFrame int
+
+	if textLen <= DaveShortTextThreshold {
+		animName = "anim_smalltalk"
+		startFrame = DaveSmallTalkStartFrame
+		endFrame = DaveSmallTalkEndFrame
+	} else if textLen <= DaveMediumTextThreshold {
+		animName = "anim_mediumtalk"
+		startFrame = DaveMediumTalkStartFrame
+		endFrame = DaveMediumTalkEndFrame
+	} else {
+		animName = "anim_blahblah"
+		startFrame = DaveBlahBlahStartFrame
+		endFrame = DaveBlahBlahEndFrame
+	}
+
+	// 动画帧范围
+	frameRange := endFrame - startFrame
+
+	// 计算目标停止帧：根据文本长度在帧范围内线性映射
+	// 文本越长，播放到越接近 endFrame 的位置
+	var targetFrame int
+	if textLen <= DaveShortTextThreshold {
+		// 短文本：在 smalltalk 范围内按比例
+		ratio := float64(textLen) / float64(DaveShortTextThreshold)
+		targetFrame = startFrame + int(float64(frameRange)*ratio)
+	} else if textLen <= DaveMediumTextThreshold {
+		// 中等文本：在 mediumtalk 范围内按比例
+		ratio := float64(textLen-DaveShortTextThreshold) / float64(DaveMediumTextThreshold-DaveShortTextThreshold)
+		targetFrame = startFrame + int(float64(frameRange)*ratio)
+	} else {
+		// 长文本：在 blahblah 范围内按比例，最大 30 字符映射到完整范围
+		maxLongText := 30
+		effectiveLen := textLen - DaveMediumTextThreshold
+		if effectiveLen > maxLongText-DaveMediumTextThreshold {
+			effectiveLen = maxLongText - DaveMediumTextThreshold
+		}
+		ratio := float64(effectiveLen) / float64(maxLongText-DaveMediumTextThreshold)
+		targetFrame = startFrame + int(float64(frameRange)*ratio)
+	}
+
+	// 确保目标帧在有效范围内
+	if targetFrame < startFrame {
+		targetFrame = startFrame
+	}
+	if targetFrame > endFrame {
+		targetFrame = endFrame
+	}
+
+	dialogueComp.CurrentTalkAnimation = animName
+	dialogueComp.TalkAnimationTargetFrame = targetFrame
+	dialogueComp.TalkAnimationStarted = false
 }
 
 // parseExpressionCommands 解析并移除表情指令
@@ -255,6 +385,14 @@ func (s *DaveDialogueSystem) applyExpressions(
 	entityID ecs.EntityID,
 	dialogueComp *components.DaveDialogueComponent,
 ) {
+	// 重置手持物品状态
+	wasHoldingItem := dialogueComp.IsHoldingItem
+	dialogueComp.IsHoldingItem = false
+	dialogueComp.HeldItemType = ""
+
+	// 检查是否需要特殊动画
+	hasSpecialAnimation := false
+
 	for _, expr := range dialogueComp.CurrentExpressions {
 		switch expr {
 		case "MOUTH_SMALL_OH":
@@ -273,23 +411,44 @@ func (s *DaveDialogueSystem) applyExpressions(
 			s.setMouthTrack(entityID, "IMAGE_REANIM_CRAZYDAVE_MOUTH5")
 
 		case "SHAKE":
-			// 播放 anim_crazy 动画
+			// 播放 anim_crazy 动画 + 启用文字抖动效果
 			dialogueComp.Expression = "SHAKE"
+			dialogueComp.TextShaking = true
+			dialogueComp.TextShakeTime = 0.0
 			s.playAnimation(entityID, "anim_crazy", false)
+			hasSpecialAnimation = true
 
 		case "SCREAM":
 			// 切换到 MOUTH1 轨道 + 播放 anim_crazy
 			dialogueComp.Expression = "SCREAM"
 			s.setMouthTrack(entityID, "IMAGE_REANIM_CRAZYDAVE_MOUTH1")
 			s.playAnimation(entityID, "anim_crazy", false)
+			hasSpecialAnimation = true
 
 		case "SHOW_WALLNUT":
-			// 本 Story 不实现，后续 Story 处理
-			log.Printf("[DaveDialogueSystem] Expression SHOW_WALLNUT not implemented yet")
+			// 显示拿坚果的动画
+			dialogueComp.IsHoldingItem = true
+			dialogueComp.HeldItemType = "wallnut"
+			// 播放拿物品说话的动画（循环播放）
+			s.playAnimation(entityID, "anim_talk_handing", true)
+			// 设置坚果图片到手部轨道
+			s.setHandingItemImage(entityID, "assets/reanim/Wallnut_body.png")
+			hasSpecialAnimation = true
+			log.Printf("[DaveDialogueSystem] SHOW_WALLNUT: Playing anim_talk_handing with wallnut")
 
 		default:
 			log.Printf("[DaveDialogueSystem] Unknown expression: %s", expr)
 		}
+	}
+
+	// 如果没有特殊动画指令，播放根据文本长度选择的说话动画（非循环）
+	if !hasSpecialAnimation {
+		if wasHoldingItem {
+			// 清除手持物品图片
+			s.clearHandingItemImage(entityID)
+		}
+		// 播放计算好的说话动画（非循环，到达目标帧后暂停）
+		s.playTalkAnimation(entityID, dialogueComp)
 	}
 }
 
@@ -332,6 +491,47 @@ func (s *DaveDialogueSystem) setMouthTrack(entityID ecs.EntityID, mouthImageKey 
 	log.Printf("[DaveDialogueSystem] Entity %d: Set mouth track to %s", entityID, mouthImageKey)
 }
 
+// setHandingItemImage 设置手持物品图片
+// 将指定图片设置到 Dave 的手部轨道上
+func (s *DaveDialogueSystem) setHandingItemImage(entityID ecs.EntityID, imagePath string) {
+	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !ok {
+		return
+	}
+
+	// 加载物品图片
+	itemImage, err := s.resourceManager.LoadImage(imagePath)
+	if err != nil {
+		log.Printf("[DaveDialogueSystem] Failed to load handing item image %s: %v", imagePath, err)
+		return
+	}
+
+	// 使用 ImageOverrides 将手部图片覆盖为物品图片
+	// handinghand3 是手掌上方的图层，适合放置物品
+	if reanimComp.ImageOverrides == nil {
+		reanimComp.ImageOverrides = make(map[string]*ebiten.Image)
+	}
+
+	// 将物品图片设置到 handinghand3 轨道（手掌上方）
+	reanimComp.ImageOverrides["IMAGE_REANIM_CRAZYDAVE_HANDINGHAND3"] = itemImage
+
+	log.Printf("[DaveDialogueSystem] Entity %d: Set handing item image to %s", entityID, imagePath)
+}
+
+// clearHandingItemImage 清除手持物品图片
+func (s *DaveDialogueSystem) clearHandingItemImage(entityID ecs.EntityID) {
+	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !ok {
+		return
+	}
+
+	if reanimComp.ImageOverrides != nil {
+		delete(reanimComp.ImageOverrides, "IMAGE_REANIM_CRAZYDAVE_HANDINGHAND3")
+	}
+
+	log.Printf("[DaveDialogueSystem] Entity %d: Cleared handing item image", entityID)
+}
+
 // playAnimation 播放动画
 func (s *DaveDialogueSystem) playAnimation(entityID ecs.EntityID, animName string, loop bool) {
 	// 使用 AnimationCommandComponent 触发动画（符合 ECS 架构）
@@ -345,9 +545,28 @@ func (s *DaveDialogueSystem) playAnimation(entityID ecs.EntityID, animName strin
 	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 	if ok {
 		reanimComp.IsLooping = loop
+		reanimComp.IsPaused = false // 确保动画不是暂停状态
 	}
 
 	log.Printf("[DaveDialogueSystem] Entity %d: Playing animation %s (loop=%v)", entityID, animName, loop)
+}
+
+// playTalkAnimation 播放根据文本长度选择的说话动画
+// 动画为非循环，到达目标帧后由 updateTalkingState 暂停
+func (s *DaveDialogueSystem) playTalkAnimation(entityID ecs.EntityID, dialogueComp *components.DaveDialogueComponent) {
+	animName := dialogueComp.CurrentTalkAnimation
+	if animName == "" {
+		animName = "anim_smalltalk" // 默认使用短动画
+	}
+
+	// 播放动画（非循环）
+	s.playAnimation(entityID, animName, false)
+
+	// 标记动画已开始
+	dialogueComp.TalkAnimationStarted = true
+
+	log.Printf("[DaveDialogueSystem] Entity %d: Playing talk animation %s, target frame=%d",
+		entityID, animName, dialogueComp.TalkAnimationTargetFrame)
 }
 
 // Draw 渲染对话气泡和文本
@@ -374,8 +593,9 @@ func (s *DaveDialogueSystem) Draw(screen *ebiten.Image) {
 		// 渲染对话气泡背景
 		s.drawBubble(screen, bubbleX, bubbleY)
 
-		// 渲染对话文本
-		s.drawDialogueText(screen, dialogueComp.CurrentText, bubbleX, bubbleY)
+		// 渲染对话文本（传递抖动状态）
+		s.drawDialogueText(screen, dialogueComp.CurrentText, bubbleX, bubbleY,
+			dialogueComp.TextShaking, dialogueComp.TextShakeTime)
 
 		// 渲染「点击继续」提示
 		s.drawContinueHint(screen, bubbleX, bubbleY)
@@ -394,7 +614,9 @@ func (s *DaveDialogueSystem) drawBubble(screen *ebiten.Image, x, y float64) {
 }
 
 // drawDialogueText 渲染对话文本
-func (s *DaveDialogueSystem) drawDialogueText(screen *ebiten.Image, textStr string, bubbleX, bubbleY float64) {
+// shaking: 是否启用文字抖动效果
+// shakeTime: 抖动计时器（秒）
+func (s *DaveDialogueSystem) drawDialogueText(screen *ebiten.Image, textStr string, bubbleX, bubbleY float64, shaking bool, shakeTime float64) {
 	if s.dialogueFont == nil || textStr == "" {
 		return
 	}
@@ -420,6 +642,14 @@ func (s *DaveDialogueSystem) drawDialogueText(screen *ebiten.Image, textStr stri
 	totalTextHeight := float64(len(lines)) * config.DaveDialogueLineHeight
 	startY := textAreaY + (textAreaHeight-totalTextHeight)/2
 
+	// 计算抖动偏移量
+	var shakeOffsetX, shakeOffsetY float64
+	if shaking {
+		// 使用正弦波计算抖动偏移（水平+垂直同时抖动，相位差90度）
+		shakeOffsetX = TextShakeAmplitude * math.Sin(2*math.Pi*TextShakeFrequency*shakeTime)
+		shakeOffsetY = TextShakeAmplitude * math.Sin(2*math.Pi*TextShakeFrequency*shakeTime+math.Pi/2)
+	}
+
 	// 渲染每一行
 	for i, line := range lines {
 		lineY := startY + float64(i)*config.DaveDialogueLineHeight
@@ -428,9 +658,13 @@ func (s *DaveDialogueSystem) drawDialogueText(screen *ebiten.Image, textStr stri
 		lineWidth := s.measureTextWidth(line)
 		lineX := textAreaX + (textAreaWidth-lineWidth)/2
 
+		// 应用抖动偏移
+		finalX := lineX + shakeOffsetX
+		finalY := lineY + shakeOffsetY
+
 		// 绘制文本（黑色）
 		op := &text.DrawOptions{}
-		op.GeoM.Translate(lineX, lineY)
+		op.GeoM.Translate(finalX, finalY)
 		op.ColorScale.ScaleWithColor(color.Black)
 		text.Draw(screen, line, s.dialogueFont, op)
 	}

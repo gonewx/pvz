@@ -182,7 +182,7 @@ animation_combos:
       animations:
           - anim_blahblah
       binding_strategy: auto
-      loop: true
+      loop: false
       hidden_tracks:
           - zombie_body
           - zombie_upperleg1
@@ -205,7 +205,7 @@ animation_combos:
       animations:
           - anim_smalltalk
       binding_strategy: auto
-      loop: true
+      loop: false
       hidden_tracks:
           - zombie_body
           - zombie_upperleg1
@@ -227,6 +227,52 @@ animation_combos:
       display_name: 中声说话
       animations:
           - anim_mediumtalk
+      binding_strategy: auto
+      loop: false
+      hidden_tracks:
+          - zombie_body
+          - zombie_upperleg1
+          - zombie_upperleg2
+          - zombie_lowerleg1
+          - zombie_lowerleg2
+          - zombie_foot1
+          - zombie_foot2
+          - zombie_arm1
+          - zombie_arm2
+          - zombie_hand1
+          - zombie_hand2
+          - zombie_head1
+          - zombie_head2
+          - grabhand1
+          - grabhand2
+
+    - name: anim_idle_handing
+      display_name: 拿物品空闲
+      animations:
+          - anim_idle_handing
+      binding_strategy: auto
+      loop: true
+      hidden_tracks:
+          - zombie_body
+          - zombie_upperleg1
+          - zombie_upperleg2
+          - zombie_lowerleg1
+          - zombie_lowerleg2
+          - zombie_foot1
+          - zombie_foot2
+          - zombie_arm1
+          - zombie_arm2
+          - zombie_hand1
+          - zombie_hand2
+          - zombie_head1
+          - zombie_head2
+          - grabhand1
+          - grabhand2
+
+    - name: anim_talk_handing
+      display_name: 拿物品说话
+      animations:
+          - anim_talk_handing
       binding_strategy: auto
       loop: true
       hidden_tracks:
