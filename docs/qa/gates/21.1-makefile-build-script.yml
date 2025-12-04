@@ -1,0 +1,52 @@
+# Quality Gate Decision - Story 21.1
+schema: 1
+story: "21.1"
+story_title: "本地构建脚本 (Makefile)"
+gate: PASS
+status_reason: "所有 9 个验收标准验证通过，Makefile 实现质量高，代码结构清晰，无安全或性能问题。"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-12-04T11:35:00+08:00"
+
+# No issues found
+top_issues: []
+
+# No waiver needed
+waiver: { active: false }
+
+# Extended fields
+quality_score: 100
+expires: "2025-12-18T00:00:00+08:00"
+
+evidence:
+  tests_reviewed: 0  # 构建脚本无 Go 单元测试
+  manual_verifications: 9  # 所有 AC 手动验证
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "无安全相关代码，使用标准 Go 工具链"
+  performance:
+    status: PASS
+    notes: "使用 -s -w 优化二进制体积"
+  reliability:
+    status: PASS
+    notes: "优雅处理缺失工具链情况"
+  maintainability:
+    status: PASS
+    notes: "代码注释充分，结构清晰"
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
+  recommendations:
+    must_fix: []
+    monitor: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: "考虑添加 CI/CD 集成（Story 21.2 将处理）"
+      refs: ["Makefile"]

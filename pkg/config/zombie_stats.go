@@ -2,8 +2,8 @@ package config
 
 import (
 	"fmt"
-	"os"
 
+	"github.com/decker502/pvz/pkg/embedded"
 	"gopkg.in/yaml.v3"
 )
 
@@ -31,7 +31,7 @@ type ZombieStatsConfig struct {
 //	*ZombieStatsConfig - 解析后的配置对象
 //	error - 如果文件读取或解析失败，返回错误信息
 func LoadZombieStats(filepath string) (*ZombieStatsConfig, error) {
-	data, err := os.ReadFile(filepath)
+	data, err := embedded.ReadFile(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read zombie stats file %s: %w", filepath, err)
 	}

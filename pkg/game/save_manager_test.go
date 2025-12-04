@@ -1,18 +1,52 @@
 package game
 
 import (
+	"bytes"
 	"encoding/gob"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
+
+	"github.com/quasilyte/gdata/v2"
 )
 
+// createTestGdataManager 创建用于测试的 gdata Manager
+// 每个测试使用唯一的 AppName 来隔离数据
+// 返回 manager 和清理函数
+func createTestGdataManager(t *testing.T, testName string) *gdata.Manager {
+	appName := fmt.Sprintf("pvz_test_%s_%d", testName, time.Now().UnixNano())
+	manager, err := gdata.Open(gdata.Config{
+		AppName: appName,
+	})
+	if err != nil {
+		return nil
+	}
+
+	// 注册清理函数，测试结束后删除测试目录
+	t.Cleanup(func() {
+		// gdata 在 Linux 上使用 ~/.local/share/<appName>
+		// 在其他平台上可能不同，但我们主要在 Linux 上测试
+		homeDir, err := os.UserHomeDir()
+		if err == nil {
+			testDir := filepath.Join(homeDir, ".local", "share", appName)
+			os.RemoveAll(testDir)
+		}
+	})
+
+	return manager
+}
+
 func TestSaveManager_NewGame(t *testing.T) {
-	// 创建临时目录
-	tempDir := t.TempDir()
+	// 使用 gdata manager 测试
+	gdataManager := createTestGdataManager(t, "new_game")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
 
 	// 创建SaveManager
-	sm, err := NewSaveManager(tempDir)
+	sm, err := NewSaveManager(gdataManager)
 	if err != nil {
 		t.Fatalf("Failed to create SaveManager: %v", err)
 	}
@@ -31,9 +65,43 @@ func TestSaveManager_NewGame(t *testing.T) {
 	}
 }
 
+func TestSaveManager_NewSaveManagerNilGdata(t *testing.T) {
+	// 测试降级场景：gdataManager 为 nil
+	sm, err := NewSaveManager(nil)
+	if err != nil {
+		t.Fatalf("NewSaveManager should not return error for nil gdata: %v", err)
+	}
+
+	// 验证可以正常创建用户（内存模式）
+	err = sm.CreateUser("testuser")
+	if err != nil {
+		t.Fatalf("CreateUser should work in degraded mode: %v", err)
+	}
+
+	if sm.GetCurrentUser() != "testuser" {
+		t.Errorf("Expected current user 'testuser', got %q", sm.GetCurrentUser())
+	}
+
+	// Save 应该不报错（降级模式下静默成功）
+	err = sm.Save()
+	if err != nil {
+		t.Errorf("Save should not error in degraded mode: %v", err)
+	}
+
+	// Load 应该不报错（降级模式下使用默认数据）
+	err = sm.Load()
+	if err != nil {
+		t.Errorf("Load should not error in degraded mode: %v", err)
+	}
+}
+
 func TestSaveManager_CreateUser(t *testing.T) {
-	tempDir := t.TempDir()
-	sm, err := NewSaveManager(tempDir)
+	gdataManager := createTestGdataManager(t, "create_user")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	sm, err := NewSaveManager(gdataManager)
 	if err != nil {
 		t.Fatalf("Failed to create SaveManager: %v", err)
 	}
@@ -57,22 +125,24 @@ func TestSaveManager_CreateUser(t *testing.T) {
 		t.Errorf("Expected username 'player1', got %q", users[0].Username)
 	}
 
-	// 验证存档文件创建
-	saveFile := filepath.Join(tempDir, "player1.yaml")
-	if _, err := os.Stat(saveFile); os.IsNotExist(err) {
-		t.Error("Expected save file to exist")
+	// 验证存档已保存到 gdata（通过检查数据存在性）
+	if !gdataManager.ObjectPropExists(savesObject, "player1") {
+		t.Error("Expected save data to exist in gdata")
 	}
 
-	// 验证用户列表文件创建
-	userListFile := filepath.Join(tempDir, "users.yaml")
-	if _, err := os.Stat(userListFile); os.IsNotExist(err) {
-		t.Error("Expected user list file to exist")
+	// 验证用户列表已保存到 gdata
+	if !gdataManager.ObjectPropExists(savesObject, usersProperty) {
+		t.Error("Expected user list to exist in gdata")
 	}
 }
 
 func TestSaveManager_CreateUser_DuplicateName(t *testing.T) {
-	tempDir := t.TempDir()
-	sm, _ := NewSaveManager(tempDir)
+	gdataManager := createTestGdataManager(t, "duplicate_name")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	sm, _ := NewSaveManager(gdataManager)
 
 	// 创建第一个用户
 	err := sm.CreateUser("player1")
@@ -88,8 +158,7 @@ func TestSaveManager_CreateUser_DuplicateName(t *testing.T) {
 }
 
 func TestSaveManager_ValidateUsername(t *testing.T) {
-	tempDir := t.TempDir()
-	sm, _ := NewSaveManager(tempDir)
+	sm, _ := NewSaveManager(nil)
 
 	tests := []struct {
 		name     string
@@ -117,11 +186,13 @@ func TestSaveManager_ValidateUsername(t *testing.T) {
 }
 
 func TestSaveManager_SaveAndLoad_WithUser(t *testing.T) {
-	// 创建临时目录
-	tempDir := t.TempDir()
+	gdataManager := createTestGdataManager(t, "save_load")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
 
 	// 创建SaveManager并创建用户
-	sm1, err := NewSaveManager(tempDir)
+	sm1, err := NewSaveManager(gdataManager)
 	if err != nil {
 		t.Fatalf("Failed to create SaveManager: %v", err)
 	}
@@ -141,8 +212,8 @@ func TestSaveManager_SaveAndLoad_WithUser(t *testing.T) {
 		t.Fatalf("Failed to save: %v", err)
 	}
 
-	// 创建新的SaveManager加载数据
-	sm2, err := NewSaveManager(tempDir)
+	// 创建新的SaveManager加载数据（使用同一个 gdata manager 模拟重启）
+	sm2, err := NewSaveManager(gdataManager)
 	if err != nil {
 		t.Fatalf("Failed to create second SaveManager: %v", err)
 	}
@@ -173,8 +244,12 @@ func TestSaveManager_SaveAndLoad_WithUser(t *testing.T) {
 }
 
 func TestSaveManager_RenameUser(t *testing.T) {
-	tempDir := t.TempDir()
-	sm, _ := NewSaveManager(tempDir)
+	gdataManager := createTestGdataManager(t, "rename_user")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	sm, _ := NewSaveManager(gdataManager)
 
 	// 创建用户
 	sm.CreateUser("oldname")
@@ -199,21 +274,50 @@ func TestSaveManager_RenameUser(t *testing.T) {
 		t.Errorf("Expected username 'newname', got %q", users[0].Username)
 	}
 
-	// 验证旧存档文件删除，新文件创建
-	oldFile := filepath.Join(tempDir, "oldname.yaml")
-	if _, err := os.Stat(oldFile); !os.IsNotExist(err) {
-		t.Error("Expected old save file to be removed")
+	// 验证 gdata 中旧数据已删除，新数据已创建
+	if gdataManager.ObjectPropExists(savesObject, "oldname") {
+		t.Error("Expected old save data to be removed from gdata")
 	}
 
-	newFile := filepath.Join(tempDir, "newname.yaml")
-	if _, err := os.Stat(newFile); os.IsNotExist(err) {
-		t.Error("Expected new save file to exist")
+	if !gdataManager.ObjectPropExists(savesObject, "newname") {
+		t.Error("Expected new save data to exist in gdata")
+	}
+}
+
+func TestSaveManager_RenameUser_WithBattleSave(t *testing.T) {
+	gdataManager := createTestGdataManager(t, "rename_with_battle")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	sm, _ := NewSaveManager(gdataManager)
+	sm.CreateUser("oldname")
+
+	// 创建战斗存档
+	oldBattleKey := "oldname" + BattleSaveKeySuffix
+	if err := gdataManager.SaveObjectProp(savesObject, oldBattleKey, []byte("battle data")); err != nil {
+		t.Fatalf("Failed to create battle save: %v", err)
+	}
+
+	// 重命名
+	err := sm.RenameUser("oldname", "newname")
+	if err != nil {
+		t.Fatalf("Failed to rename user: %v", err)
+	}
+
+	// 验证战斗存档也被迁移
+	if gdataManager.ObjectPropExists(savesObject, oldBattleKey) {
+		t.Error("Expected old battle save to be removed")
+	}
+
+	newBattleKey := "newname" + BattleSaveKeySuffix
+	if !gdataManager.ObjectPropExists(savesObject, newBattleKey) {
+		t.Error("Expected new battle save to exist")
 	}
 }
 
 func TestSaveManager_RenameUser_NotExists(t *testing.T) {
-	tempDir := t.TempDir()
-	sm, _ := NewSaveManager(tempDir)
+	sm, _ := NewSaveManager(nil)
 
 	err := sm.RenameUser("notexist", "newname")
 	if err == nil {
@@ -222,8 +326,12 @@ func TestSaveManager_RenameUser_NotExists(t *testing.T) {
 }
 
 func TestSaveManager_RenameUser_TargetExists(t *testing.T) {
-	tempDir := t.TempDir()
-	sm, _ := NewSaveManager(tempDir)
+	gdataManager := createTestGdataManager(t, "rename_target_exists")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	sm, _ := NewSaveManager(gdataManager)
 
 	sm.CreateUser("user1")
 	sm.CreateUser("user2")
@@ -235,8 +343,12 @@ func TestSaveManager_RenameUser_TargetExists(t *testing.T) {
 }
 
 func TestSaveManager_DeleteUser(t *testing.T) {
-	tempDir := t.TempDir()
-	sm, _ := NewSaveManager(tempDir)
+	gdataManager := createTestGdataManager(t, "delete_user")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	sm, _ := NewSaveManager(gdataManager)
 
 	sm.CreateUser("todelete")
 
@@ -257,16 +369,46 @@ func TestSaveManager_DeleteUser(t *testing.T) {
 		t.Errorf("Expected empty current user after deletion, got %q", sm.GetCurrentUser())
 	}
 
-	// 验证存档文件删除
-	saveFile := filepath.Join(tempDir, "todelete.yaml")
-	if _, err := os.Stat(saveFile); !os.IsNotExist(err) {
-		t.Error("Expected save file to be removed")
+	// 验证 gdata 中存档已删除
+	if gdataManager.ObjectPropExists(savesObject, "todelete") {
+		t.Error("Expected save data to be removed from gdata")
+	}
+}
+
+func TestSaveManager_DeleteUser_WithBattleSave(t *testing.T) {
+	gdataManager := createTestGdataManager(t, "delete_with_battle")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	sm, _ := NewSaveManager(gdataManager)
+	sm.CreateUser("todelete")
+
+	// 创建战斗存档
+	battleKey := "todelete" + BattleSaveKeySuffix
+	if err := gdataManager.SaveObjectProp(savesObject, battleKey, []byte("battle data")); err != nil {
+		t.Fatalf("Failed to create battle save: %v", err)
+	}
+
+	// 删除用户
+	err := sm.DeleteUser("todelete")
+	if err != nil {
+		t.Fatalf("Failed to delete user: %v", err)
+	}
+
+	// 验证战斗存档也被删除
+	if gdataManager.ObjectPropExists(savesObject, battleKey) {
+		t.Error("Expected battle save to be removed")
 	}
 }
 
 func TestSaveManager_DeleteUser_NotCurrent(t *testing.T) {
-	tempDir := t.TempDir()
-	sm, _ := NewSaveManager(tempDir)
+	gdataManager := createTestGdataManager(t, "delete_not_current")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	sm, _ := NewSaveManager(gdataManager)
 
 	sm.CreateUser("user1")
 	sm.CreateUser("user2") // current user is now user2
@@ -289,8 +431,7 @@ func TestSaveManager_DeleteUser_NotCurrent(t *testing.T) {
 }
 
 func TestSaveManager_DeleteUser_NotExists(t *testing.T) {
-	tempDir := t.TempDir()
-	sm, _ := NewSaveManager(tempDir)
+	sm, _ := NewSaveManager(nil)
 
 	err := sm.DeleteUser("notexist")
 	if err == nil {
@@ -299,8 +440,12 @@ func TestSaveManager_DeleteUser_NotExists(t *testing.T) {
 }
 
 func TestSaveManager_SwitchUser(t *testing.T) {
-	tempDir := t.TempDir()
-	sm, _ := NewSaveManager(tempDir)
+	gdataManager := createTestGdataManager(t, "switch_user")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	sm, _ := NewSaveManager(gdataManager)
 
 	// 创建两个用户
 	sm.CreateUser("user1")
@@ -333,8 +478,12 @@ func TestSaveManager_SwitchUser(t *testing.T) {
 }
 
 func TestSaveManager_SwitchUser_NotExists(t *testing.T) {
-	tempDir := t.TempDir()
-	sm, _ := NewSaveManager(tempDir)
+	gdataManager := createTestGdataManager(t, "switch_not_exists")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	sm, _ := NewSaveManager(gdataManager)
 
 	sm.CreateUser("user1")
 
@@ -345,8 +494,12 @@ func TestSaveManager_SwitchUser_NotExists(t *testing.T) {
 }
 
 func TestSaveManager_MultipleUsers_DataIsolation(t *testing.T) {
-	tempDir := t.TempDir()
-	sm, _ := NewSaveManager(tempDir)
+	gdataManager := createTestGdataManager(t, "data_isolation")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	sm, _ := NewSaveManager(gdataManager)
 
 	// 创建用户1并设置数据
 	sm.CreateUser("alice")
@@ -388,8 +541,7 @@ func TestSaveManager_MultipleUsers_DataIsolation(t *testing.T) {
 }
 
 func TestSaveManager_UnlockPlant_Duplicate(t *testing.T) {
-	tempDir := t.TempDir()
-	sm, _ := NewSaveManager(tempDir)
+	sm, _ := NewSaveManager(nil)
 
 	sm.CreateUser("testuser")
 
@@ -405,8 +557,7 @@ func TestSaveManager_UnlockPlant_Duplicate(t *testing.T) {
 }
 
 func TestSaveManager_UnlockTool_Duplicate(t *testing.T) {
-	tempDir := t.TempDir()
-	sm, _ := NewSaveManager(tempDir)
+	sm, _ := NewSaveManager(nil)
 
 	sm.CreateUser("testuser")
 
@@ -420,31 +571,18 @@ func TestSaveManager_UnlockTool_Duplicate(t *testing.T) {
 	}
 }
 
-func TestSaveManager_LoadCorruptedUserList(t *testing.T) {
-	tempDir := t.TempDir()
-
-	// 创建损坏的 users.yaml 文件
-	corruptedFile := filepath.Join(tempDir, "users.yaml")
-	if err := os.WriteFile(corruptedFile, []byte("invalid: yaml: content: ["), 0644); err != nil {
-		t.Fatalf("Failed to write corrupted file: %v", err)
-	}
-
-	// 尝试加载
-	_, err := NewSaveManager(tempDir)
-	if err == nil {
-		t.Error("Expected error when loading corrupted user list file, got nil")
-	}
-}
-
 func TestSaveManager_UserListPersistence(t *testing.T) {
-	tempDir := t.TempDir()
+	gdataManager := createTestGdataManager(t, "user_persistence")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
 
 	// 创建用户
-	sm1, _ := NewSaveManager(tempDir)
+	sm1, _ := NewSaveManager(gdataManager)
 	sm1.CreateUser("persistent")
 
-	// 新建 SaveManager 实例
-	sm2, err := NewSaveManager(tempDir)
+	// 新建 SaveManager 实例（模拟重启）
+	sm2, err := NewSaveManager(gdataManager)
 	if err != nil {
 		t.Fatalf("Failed to create second SaveManager: %v", err)
 	}
@@ -461,23 +599,15 @@ func TestSaveManager_UserListPersistence(t *testing.T) {
 	}
 }
 
-// --- 战斗存档管理方法测试 (Story 18.1) ---
-
-func TestSaveManager_GetBattleSavePath(t *testing.T) {
-	tempDir := t.TempDir()
-	sm, _ := NewSaveManager(tempDir)
-
-	path := sm.GetBattleSavePath("testuser")
-	expected := filepath.Join(tempDir, "testuser"+BattleSaveFileSuffix)
-
-	if path != expected {
-		t.Errorf("Expected path %q, got %q", expected, path)
-	}
-}
+// --- 战斗存档管理方法测试 (Story 18.1, 重构于 Story 20.3) ---
 
 func TestSaveManager_HasBattleSave_NotExists(t *testing.T) {
-	tempDir := t.TempDir()
-	sm, _ := NewSaveManager(tempDir)
+	gdataManager := createTestGdataManager(t, "has_battle_not_exists")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	sm, _ := NewSaveManager(gdataManager)
 
 	if sm.HasBattleSave("nonexistent") {
 		t.Error("Expected HasBattleSave to return false for non-existent save")
@@ -485,13 +615,17 @@ func TestSaveManager_HasBattleSave_NotExists(t *testing.T) {
 }
 
 func TestSaveManager_HasBattleSave_Exists(t *testing.T) {
-	tempDir := t.TempDir()
-	sm, _ := NewSaveManager(tempDir)
+	gdataManager := createTestGdataManager(t, "has_battle_exists")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
 
-	// 创建一个空的战斗存档文件
-	battleSavePath := sm.GetBattleSavePath("testuser")
-	if err := os.WriteFile(battleSavePath, []byte("dummy data"), 0644); err != nil {
-		t.Fatalf("Failed to create dummy save file: %v", err)
+	sm, _ := NewSaveManager(gdataManager)
+
+	// 创建一个战斗存档
+	battleKey := "testuser" + BattleSaveKeySuffix
+	if err := gdataManager.SaveObjectProp(savesObject, battleKey, []byte("dummy data")); err != nil {
+		t.Fatalf("Failed to create dummy save: %v", err)
 	}
 
 	if !sm.HasBattleSave("testuser") {
@@ -499,19 +633,32 @@ func TestSaveManager_HasBattleSave_Exists(t *testing.T) {
 	}
 }
 
-func TestSaveManager_DeleteBattleSave(t *testing.T) {
-	tempDir := t.TempDir()
-	sm, _ := NewSaveManager(tempDir)
+func TestSaveManager_HasBattleSave_NilGdata(t *testing.T) {
+	sm, _ := NewSaveManager(nil)
 
-	// 创建战斗存档文件
-	battleSavePath := sm.GetBattleSavePath("testuser")
-	if err := os.WriteFile(battleSavePath, []byte("dummy data"), 0644); err != nil {
-		t.Fatalf("Failed to create save file: %v", err)
+	// 降级模式下应该返回 false
+	if sm.HasBattleSave("testuser") {
+		t.Error("Expected HasBattleSave to return false in degraded mode")
+	}
+}
+
+func TestSaveManager_DeleteBattleSave(t *testing.T) {
+	gdataManager := createTestGdataManager(t, "delete_battle")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
 	}
 
-	// 验证文件存在
+	sm, _ := NewSaveManager(gdataManager)
+
+	// 创建战斗存档
+	battleKey := "testuser" + BattleSaveKeySuffix
+	if err := gdataManager.SaveObjectProp(savesObject, battleKey, []byte("dummy data")); err != nil {
+		t.Fatalf("Failed to create save: %v", err)
+	}
+
+	// 验证存档存在
 	if !sm.HasBattleSave("testuser") {
-		t.Fatal("Save file should exist before deletion")
+		t.Fatal("Save should exist before deletion")
 	}
 
 	// 删除
@@ -520,49 +667,51 @@ func TestSaveManager_DeleteBattleSave(t *testing.T) {
 		t.Fatalf("DeleteBattleSave failed: %v", err)
 	}
 
-	// 验证文件已删除
+	// 验证存档已删除
 	if sm.HasBattleSave("testuser") {
-		t.Error("Save file should not exist after deletion")
+		t.Error("Save should not exist after deletion")
 	}
 }
 
 func TestSaveManager_DeleteBattleSave_NotExists(t *testing.T) {
-	tempDir := t.TempDir()
-	sm, _ := NewSaveManager(tempDir)
+	gdataManager := createTestGdataManager(t, "delete_battle_not_exists")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
 
-	// 删除不存在的文件应该不返回错误
+	sm, _ := NewSaveManager(gdataManager)
+
+	// 删除不存在的存档应该不返回错误
 	err := sm.DeleteBattleSave("nonexistent")
 	if err != nil {
-		t.Errorf("DeleteBattleSave for non-existent file should not return error: %v", err)
+		t.Errorf("DeleteBattleSave for non-existent save should not return error: %v", err)
 	}
 }
 
 func TestSaveManager_GetBattleSaveInfo(t *testing.T) {
-	tempDir := t.TempDir()
-	sm, _ := NewSaveManager(tempDir)
+	gdataManager := createTestGdataManager(t, "get_battle_info")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	sm, _ := NewSaveManager(gdataManager)
 
 	// 使用 BattleSerializer 创建有效的存档
-	serializer := NewBattleSerializer()
 	saveData := NewBattleSaveData()
 	saveData.LevelID = "1-3"
 	saveData.Sun = 200
 	saveData.CurrentWaveIndex = 4
 
-	// 手动保存（模拟完整保存流程）
-	battleSavePath := sm.GetBattleSavePath("testuser")
-	file, err := os.Create(battleSavePath)
-	if err != nil {
-		t.Fatalf("Failed to create save file: %v", err)
-	}
-	defer file.Close()
-
-	// 用于测试的简单序列化（直接使用 gob）
-	_ = serializer
-	encoder := gob.NewEncoder(file)
+	// 手动保存（使用 gob 编码）
+	battleKey := "testuser" + BattleSaveKeySuffix
+	var buffer bytes.Buffer
+	encoder := gob.NewEncoder(&buffer)
 	if err := encoder.Encode(saveData); err != nil {
 		t.Fatalf("Failed to encode save data: %v", err)
 	}
-	file.Close() // 确保写入完成
+	if err := gdataManager.SaveObjectProp(savesObject, battleKey, buffer.Bytes()); err != nil {
+		t.Fatalf("Failed to save battle data: %v", err)
+	}
 
 	// 获取存档信息
 	info, err := sm.GetBattleSaveInfo("testuser")
@@ -582,8 +731,12 @@ func TestSaveManager_GetBattleSaveInfo(t *testing.T) {
 }
 
 func TestSaveManager_GetBattleSaveInfo_NotExists(t *testing.T) {
-	tempDir := t.TempDir()
-	sm, _ := NewSaveManager(tempDir)
+	gdataManager := createTestGdataManager(t, "get_info_not_exists")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	sm, _ := NewSaveManager(gdataManager)
 
 	_, err := sm.GetBattleSaveInfo("nonexistent")
 	if err == nil {
@@ -591,18 +744,157 @@ func TestSaveManager_GetBattleSaveInfo_NotExists(t *testing.T) {
 	}
 }
 
-func TestSaveManager_GetBattleSaveInfo_Corrupted(t *testing.T) {
-	tempDir := t.TempDir()
-	sm, _ := NewSaveManager(tempDir)
+func TestSaveManager_GetBattleSaveInfo_NilGdata(t *testing.T) {
+	sm, _ := NewSaveManager(nil)
 
-	// 创建损坏的存档文件
-	battleSavePath := sm.GetBattleSavePath("testuser")
-	if err := os.WriteFile(battleSavePath, []byte("corrupted data"), 0644); err != nil {
-		t.Fatalf("Failed to create corrupted file: %v", err)
+	_, err := sm.GetBattleSaveInfo("testuser")
+	if err == nil {
+		t.Error("Expected error when getting info with nil gdata manager")
+	}
+}
+
+func TestSaveManager_GetBattleSaveInfo_Corrupted(t *testing.T) {
+	gdataManager := createTestGdataManager(t, "get_info_corrupted")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	sm, _ := NewSaveManager(gdataManager)
+
+	// 创建损坏的存档
+	battleKey := "testuser" + BattleSaveKeySuffix
+	if err := gdataManager.SaveObjectProp(savesObject, battleKey, []byte("corrupted data")); err != nil {
+		t.Fatalf("Failed to create corrupted save: %v", err)
 	}
 
 	_, err := sm.GetBattleSaveInfo("testuser")
 	if err == nil {
 		t.Error("Expected error when getting info for corrupted save")
+	}
+}
+
+// --- 游戏开始标记测试 (Story 20.3 QA Fix) ---
+
+func TestSaveManager_GetHasStartedGame_Default(t *testing.T) {
+	sm, _ := NewSaveManager(nil)
+	sm.CreateUser("testuser")
+
+	// 新用户默认未开始游戏
+	if sm.GetHasStartedGame() {
+		t.Error("Expected HasStartedGame to be false for new user")
+	}
+}
+
+func TestSaveManager_SetHasStartedGame(t *testing.T) {
+	sm, _ := NewSaveManager(nil)
+	sm.CreateUser("testuser")
+
+	// 设置已开始游戏
+	sm.SetHasStartedGame()
+
+	if !sm.GetHasStartedGame() {
+		t.Error("Expected HasStartedGame to be true after SetHasStartedGame")
+	}
+}
+
+func TestSaveManager_HasStartedGame_Persistence(t *testing.T) {
+	gdataManager := createTestGdataManager(t, "has_started_persistence")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	// 创建用户并设置已开始游戏
+	sm1, _ := NewSaveManager(gdataManager)
+	sm1.CreateUser("testuser")
+	sm1.SetHasStartedGame()
+	sm1.Save()
+
+	// 重新加载
+	sm2, _ := NewSaveManager(gdataManager)
+	if !sm2.GetHasStartedGame() {
+		t.Error("Expected HasStartedGame to persist after reload")
+	}
+}
+
+func TestSaveManager_HasStartedGame_UserIsolation(t *testing.T) {
+	gdataManager := createTestGdataManager(t, "has_started_isolation")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	sm, _ := NewSaveManager(gdataManager)
+
+	// 创建用户1并设置已开始游戏
+	sm.CreateUser("user1")
+	sm.SetHasStartedGame()
+	sm.Save()
+
+	// 创建用户2（不设置）
+	sm.CreateUser("user2")
+	sm.Save()
+
+	// 验证用户2未开始游戏
+	if sm.GetHasStartedGame() {
+		t.Error("User2 should not have started game")
+	}
+
+	// 切换回用户1，验证已开始游戏
+	sm.SwitchUser("user1")
+	if !sm.GetHasStartedGame() {
+		t.Error("User1 should have started game")
+	}
+}
+
+func TestSaveManager_GetNextLevelToPlay(t *testing.T) {
+	tests := []struct {
+		name          string
+		highestLevel  string
+		expectedLevel string
+	}{
+		{
+			name:          "新用户，未完成任何关卡",
+			highestLevel:  "",
+			expectedLevel: "1-1",
+		},
+		{
+			name:          "完成1-1，应返回1-2",
+			highestLevel:  "1-1",
+			expectedLevel: "1-2",
+		},
+		{
+			name:          "完成1-2，应返回1-3",
+			highestLevel:  "1-2",
+			expectedLevel: "1-3",
+		},
+		{
+			name:          "完成1-9，应返回1-10",
+			highestLevel:  "1-9",
+			expectedLevel: "1-10",
+		},
+		{
+			name:          "完成1-10（最后一关），应返回1-10",
+			highestLevel:  "1-10",
+			expectedLevel: "1-10",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// 创建一个新的 SaveManager（使用 nil gdata，纯内存模式）
+			sm, _ := NewSaveManager(nil)
+
+			// 设置最高完成关卡
+			if tt.highestLevel != "" {
+				sm.SetHighestLevel(tt.highestLevel)
+			}
+
+			// 获取下一关
+			nextLevel := sm.GetNextLevelToPlay()
+
+			if nextLevel != tt.expectedLevel {
+				t.Errorf("GetNextLevelToPlay() = %q, want %q (highestLevel: %q)",
+					nextLevel, tt.expectedLevel, tt.highestLevel)
+			}
+		})
 	}
 }

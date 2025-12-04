@@ -96,7 +96,14 @@ func (s *GameScene) initMenuButton(rm *game.ResourceManager) {
 // initPauseMenuModule 初始化暂停菜单（ECS 架构）
 // Story 10.1: 创建暂停菜单实体和三个按钮
 // Story 18.2: 添加战斗存档保存回调
+// Story 20.5: 传递 SettingsManager 到暂停菜单
 func (s *GameScene) initPauseMenuModule(rm *game.ResourceManager) {
+	// Story 20.5: 从 GameState 获取 SettingsManager
+	var settingsManager *game.SettingsManager
+	if s.gameState != nil {
+		settingsManager = s.gameState.GetSettingsManager()
+	}
+
 	var err error
 	s.pauseMenuModule, err = modules.NewPauseMenuModule(
 		s.entityManager,
@@ -104,6 +111,7 @@ func (s *GameScene) initPauseMenuModule(rm *game.ResourceManager) {
 		rm,
 		s.buttonSystem,
 		s.buttonRenderSystem,
+		settingsManager, // Story 20.5: 传递 SettingsManager
 		WindowWidth,
 		WindowHeight,
 		modules.PauseMenuCallbacks{
@@ -346,17 +354,21 @@ func (s *GameScene) saveBattleState() {
 		return
 	}
 
-	// 获取存档文件路径
-	battleSavePath := saveManager.GetBattleSavePath(currentUser)
+	// 获取 gdata Manager
+	gdataManager := s.gameState.GetGdataManager()
+	if gdataManager == nil {
+		log.Printf("[GameScene] Warning: gdata Manager not available, cannot save battle state")
+		return
+	}
 
 	// 创建序列化器并保存
-	serializer := game.NewBattleSerializer()
-	if err := serializer.SaveBattle(s.entityManager, s.gameState, battleSavePath); err != nil {
+	serializer := game.NewBattleSerializer(gdataManager)
+	if err := serializer.SaveBattle(s.entityManager, s.gameState, currentUser); err != nil {
 		log.Printf("[GameScene] ERROR: Failed to save battle state: %v", err)
 		return
 	}
 
-	log.Printf("[GameScene] Battle state saved successfully to %s", battleSavePath)
+	log.Printf("[GameScene] Battle state saved successfully for user: %s", currentUser)
 }
 
 // deleteBattleSave 删除当前用户的战斗存档
@@ -606,16 +618,39 @@ func (s *GameScene) restoreBattleState() {
 		return
 	}
 
-	// 获取存档路径
-	battleSavePath := saveManager.GetBattleSavePath(currentUser)
-	log.Printf("[GameScene] 开始从战斗存档恢复: %s", battleSavePath)
+	// 获取 gdata Manager
+	gdataManager := s.gameState.GetGdataManager()
+	if gdataManager == nil {
+		log.Printf("[GameScene] Warning: gdata Manager not available, cannot restore battle state")
+		return
+	}
+
+	log.Printf("[GameScene] 开始从战斗存档恢复用户: %s", currentUser)
 
 	// 创建序列化器并加载
-	serializer := game.NewBattleSerializer()
-	saveData, err := serializer.LoadBattle(battleSavePath)
+	serializer := game.NewBattleSerializer(gdataManager)
+	saveData, err := serializer.LoadBattle(currentUser)
 	if err != nil {
 		log.Printf("[GameScene] ERROR: Failed to load battle data: %v", err)
 		log.Printf("[GameScene] 继续正常游戏...")
+		return
+	}
+
+	// Bug Fix: 验证存档的 LevelID 是否与当前加载的关卡匹配
+	// 如果不匹配，说明存档数据与当前关卡配置不兼容，应该中止恢复
+	// 这可以防止在错误的关卡场景中恢复存档数据（例如 1-2 的植物位置在 1-1 的场景中）
+	currentLevelID := ""
+	if s.gameState.CurrentLevel != nil {
+		currentLevelID = s.gameState.CurrentLevel.ID
+	}
+	if saveData.LevelID != "" && saveData.LevelID != currentLevelID {
+		log.Printf("[GameScene] ⚠️ 存档关卡不匹配! 存档关卡: %s, 当前关卡: %s",
+			saveData.LevelID, currentLevelID)
+		log.Printf("[GameScene] 中止存档恢复，删除不匹配的存档，开始新游戏...")
+		// 删除不匹配的存档，避免下次进入时再次出现问题
+		if err := saveManager.DeleteBattleSave(currentUser); err != nil {
+			log.Printf("[GameScene] Warning: Failed to delete mismatched battle save: %v", err)
+		}
 		return
 	}
 
@@ -796,6 +831,14 @@ func (s *GameScene) restorePlants(plants []game.PlantData) {
 
 		log.Printf("[GameScene] Restored plant %s at (%d,%d), health=%d/%d",
 			plantData.PlantType, plantData.GridRow, plantData.GridCol, plantData.Health, plantData.MaxHealth)
+
+		// 验证恢复后的植物组件 GridRow 是否正确
+		if plantComp, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, entityID); ok {
+			if plantComp.GridRow != plantData.GridRow || plantComp.GridCol != plantData.GridCol {
+				log.Printf("[GameScene] WARNING: Plant position mismatch! SaveData(%d,%d) vs PlantComponent(%d,%d)",
+					plantData.GridRow, plantData.GridCol, plantComp.GridRow, plantComp.GridCol)
+			}
+		}
 	}
 }
 

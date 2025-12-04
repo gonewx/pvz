@@ -2,8 +2,8 @@ package config
 
 import (
 	"fmt"
-	"os"
 
+	"github.com/decker502/pvz/pkg/embedded"
 	"gopkg.in/yaml.v3"
 )
 
@@ -86,8 +86,8 @@ type AnimationComboConfig struct {
 //   - *ReanimConfig: 解析后的配置对象
 //   - error: 加载或解析错误
 func LoadReanimConfig(path string) (*ReanimConfig, error) {
-	// 1. 读取文件
-	data, err := os.ReadFile(path)
+	// 1. 从 embedded FS 读取文件
+	data, err := embedded.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("无法读取配置文件 %s: %w", path, err)
 	}

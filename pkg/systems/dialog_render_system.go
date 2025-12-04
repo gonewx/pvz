@@ -240,13 +240,21 @@ func (s *DialogRenderSystem) drawMessage(screen *ebiten.Image, dialog *component
 	// 计算总高度（用于垂直居中）
 	totalHeight := float64(len(lines)) * lineHeight
 
-	// 计算消息可用区域（在标题和按钮之间）
-	messageAreaTop := dialogY + titleAreaHeight
-	messageAreaBottom := dialogY + dialog.Height - buttonAreaHeight
-	messageAreaHeight := messageAreaBottom - messageAreaTop
+	var startY float64
 
-	// 在可用区域内垂直居中
-	startY := messageAreaTop + (messageAreaHeight-totalHeight)/2
+	// 如果对话框有子实体（输入框），消息固定在标题下方
+	if len(dialog.ChildEntities) > 0 {
+		// 固定位置：标题区域下方，留出适当间距
+		startY = dialogY + titleAreaHeight + 20.0
+	} else {
+		// 计算消息可用区域（在标题和按钮之间）
+		messageAreaTop := dialogY + titleAreaHeight
+		messageAreaBottom := dialogY + dialog.Height - buttonAreaHeight
+		messageAreaHeight := messageAreaBottom - messageAreaTop
+
+		// 在可用区域内垂直居中
+		startY = messageAreaTop + (messageAreaHeight-totalHeight)/2
+	}
 
 	log.Printf("[DialogRenderSystem] 绘制消息 (%d 行): '%s' at (%.0f, %.0f)", len(lines), dialog.Message, dialogX+dialog.Width/2, startY)
 

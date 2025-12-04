@@ -2,8 +2,8 @@ package config
 
 import (
 	"fmt"
-	"os"
 
+	"github.com/decker502/pvz/pkg/embedded"
 	"gopkg.in/yaml.v3"
 )
 
@@ -165,8 +165,8 @@ type ZombieSpawn struct {
 //	*LevelConfig - 解析后的关卡配置对象
 //	error - 如果文件读取或解析失败，返回错误信息
 func LoadLevelConfig(filepath string) (*LevelConfig, error) {
-	// 读取文件内容
-	data, err := os.ReadFile(filepath)
+	// 从 embedded FS 读取文件内容
+	data, err := embedded.ReadFile(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read level config file %s: %w", filepath, err)
 	}

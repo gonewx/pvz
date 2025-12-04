@@ -6,6 +6,7 @@ import (
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
+	"github.com/quasilyte/gdata/v2"
 )
 
 // GameState 存储全局游戏状态
@@ -56,6 +57,16 @@ type GameState struct {
 	// Story 17.1: 难度引擎数据
 	TotalCompletedFlags int // 已完成的旗帜总数（跨关卡累计）
 	WavesPerRound       int // 每轮波次数（默认20）
+
+	// Story 20.1: 跨平台存储管理器
+	// 使用 gdata 库实现跨平台数据存储（桌面端、移动端、WASM）
+	// 如果初始化失败，gdataManager 为 nil，游戏仍可运行但无法持久化数据
+	gdataManager *gdata.Manager
+
+	// Story 20.2: 设置管理器
+	// 管理游戏设置（音量、全屏等），使用 gdata 进行跨平台存储
+	// 如果初始化失败，settingsManager 为 nil，游戏使用默认设置
+	settingsManager *SettingsManager
 }
 
 // 全局单例实例（这是架构规范允许的唯一全局变量）
@@ -73,12 +84,32 @@ func GetGameState() *GameState {
 			lawnStrings = nil
 		}
 
-		// Story 8.6: 初始化保存管理器
-		saveManager, err := NewSaveManager("data/saves")
+		// Story 20.1: 初始化 gdata Manager（跨平台存储）
+		// 注意：必须在 SaveManager 之前初始化，因为 SaveManager 需要 gdataManager
+		gdataManager, err := gdata.Open(gdata.Config{
+			AppName: "pvz_newx",
+		})
+		if err != nil {
+			log.Printf("[GameState] Warning: Failed to initialize gdata Manager: %v", err)
+			// 降级方案：gdataManager 为 nil，游戏继续运行
+			gdataManager = nil
+		}
+
+		// Story 20.3: 初始化保存管理器（必须在 gdataManager 之后）
+		saveManager, err := NewSaveManager(gdataManager)
 		if err != nil {
 			log.Printf("[GameState] Warning: Failed to initialize SaveManager: %v", err)
 			// 如果保存管理器初始化失败，使用 nil（游戏可以运行，但无法保存进度）
 			saveManager = nil
+		}
+
+		// Story 20.2: 初始化 SettingsManager（必须在 gdataManager 之后）
+		var settingsManager *SettingsManager
+		settingsManager, err = NewSettingsManager(gdataManager)
+		if err != nil {
+			log.Printf("[GameState] Warning: Failed to initialize SettingsManager: %v", err)
+			// 降级方案：settingsManager 为 nil，游戏使用默认设置
+			settingsManager = nil
 		}
 
 		globalGameState = &GameState{
@@ -93,6 +124,10 @@ func GetGameState() *GameState {
 			// Story 17.1: 初始化难度引擎数据
 			TotalCompletedFlags: 0,
 			WavesPerRound:       20, // 默认每轮20波
+			// Story 20.1: 跨平台存储管理器
+			gdataManager: gdataManager,
+			// Story 20.2: 设置管理器
+			settingsManager: settingsManager,
 		}
 	}
 	return globalGameState
@@ -403,6 +438,28 @@ func (gs *GameState) UpdateSunFlash(deltaTime float64) {
 //   - *SaveManager: 保存管理器实例，如果未初始化返回 nil
 func (gs *GameState) GetSaveManager() *SaveManager {
 	return gs.saveManager
+}
+
+// GetGdataManager 获取 gdata 跨平台存储管理器
+//
+// Story 20.1: 返回 gdata.Manager 实例，用于跨平台数据存储
+// 如果初始化失败，返回 nil（调用方需检查）
+//
+// 返回：
+//   - *gdata.Manager: gdata 管理器实例，如果未初始化返回 nil
+func (gs *GameState) GetGdataManager() *gdata.Manager {
+	return gs.gdataManager
+}
+
+// GetSettingsManager 获取设置管理器
+//
+// Story 20.2: 返回 SettingsManager 实例，用于管理游戏设置
+// 如果初始化失败，返回 nil（调用方需检查）
+//
+// 返回：
+//   - *SettingsManager: 设置管理器实例，如果未初始化返回 nil
+func (gs *GameState) GetSettingsManager() *SettingsManager {
+	return gs.settingsManager
 }
 
 // SaveProgress 保存当前游戏进度

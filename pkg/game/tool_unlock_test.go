@@ -1,18 +1,46 @@
 package game
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/decker502/pvz/pkg/config"
+	"github.com/quasilyte/gdata/v2"
 )
+
+// createTestGdataManagerForTool 创建用于测试的 gdata Manager
+func createTestGdataManagerForTool(t *testing.T, testName string) *gdata.Manager {
+	appName := fmt.Sprintf("pvz_tool_test_%s_%d", testName, time.Now().UnixNano())
+	manager, err := gdata.Open(gdata.Config{
+		AppName: appName,
+	})
+	if err != nil {
+		return nil
+	}
+
+	// 注册清理函数，测试结束后删除测试目录
+	t.Cleanup(func() {
+		homeDir, err := os.UserHomeDir()
+		if err == nil {
+			testDir := filepath.Join(homeDir, ".local", "share", appName)
+			os.RemoveAll(testDir)
+		}
+	})
+
+	return manager
+}
 
 // TestToolUnlock 测试工具解锁功能
 func TestToolUnlock(t *testing.T) {
-	// 创建临时保存目录
-	tmpDir := t.TempDir()
-	saveManager, err := NewSaveManager(tmpDir)
+	gdataManager := createTestGdataManagerForTool(t, "unlock")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	saveManager, err := NewSaveManager(gdataManager)
 	if err != nil {
 		t.Fatalf("Failed to create SaveManager: %v", err)
 	}
@@ -38,8 +66,8 @@ func TestToolUnlock(t *testing.T) {
 		t.Fatalf("Failed to save: %v", err)
 	}
 
-	// 创建新的 SaveManager 实例加载存档
-	saveManager2, err := NewSaveManager(tmpDir)
+	// 创建新的 SaveManager 实例加载存档（使用同一个 gdata manager 模拟重启）
+	saveManager2, err := NewSaveManager(gdataManager)
 	if err != nil {
 		t.Fatalf("Failed to create SaveManager2: %v", err)
 	}
@@ -52,9 +80,12 @@ func TestToolUnlock(t *testing.T) {
 
 // TestCompleteLevelWithToolUnlock 测试关卡完成时解锁工具
 func TestCompleteLevelWithToolUnlock(t *testing.T) {
-	// 创建临时保存目录
-	tmpDir := t.TempDir()
-	saveManager, err := NewSaveManager(tmpDir)
+	gdataManager := createTestGdataManagerForTool(t, "complete_level")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	saveManager, err := NewSaveManager(gdataManager)
 	if err != nil {
 		t.Fatalf("Failed to create SaveManager: %v", err)
 	}
@@ -94,20 +125,27 @@ func TestCompleteLevelWithToolUnlock(t *testing.T) {
 		t.Error("Shovel should be unlocked after completing 1-4")
 	}
 
-	// 验证存档文件已保存（现在是 testuser.yaml 而不是 progress.yaml）
-	saveFile := filepath.Join(tmpDir, "testuser.yaml")
-	if _, err := os.Stat(saveFile); os.IsNotExist(err) {
-		t.Error("Save file should exist after CompleteLevel()")
+	// 验证存档已保存到 gdata
+	if !gdataManager.ObjectPropExists(savesObject, "testuser") {
+		t.Error("Save data should exist in gdata after CompleteLevel()")
 	}
 }
 
 // TestShovelDisplayLogic 测试铲子显示逻辑
 func TestShovelDisplayLogic(t *testing.T) {
-	// 创建临时保存目录
-	tmpDir := t.TempDir()
-	saveManager, err := NewSaveManager(tmpDir)
+	gdataManager := createTestGdataManagerForTool(t, "display_logic")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	saveManager, err := NewSaveManager(gdataManager)
 	if err != nil {
 		t.Fatalf("Failed to create SaveManager: %v", err)
+	}
+
+	// 创建测试用户
+	if err := saveManager.CreateUser("testuser"); err != nil {
+		t.Fatalf("Failed to create user: %v", err)
 	}
 
 	// 创建 GameState
@@ -140,8 +178,13 @@ func TestShovelDisplayLogic(t *testing.T) {
 	}
 	gs.CurrentLevel = level12
 
-	// 重置铲子解锁状态
-	saveManager2, _ := NewSaveManager(t.TempDir())
+	// 使用新的 gdata Manager 重置状态
+	gdataManager2 := createTestGdataManagerForTool(t, "display_logic_2")
+	if gdataManager2 == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+	saveManager2, _ := NewSaveManager(gdataManager2)
+	saveManager2.CreateUser("testuser2")
 	gs.saveManager = saveManager2
 
 	// 铲子未解锁时不应该显示

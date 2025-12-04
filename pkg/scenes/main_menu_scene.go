@@ -78,6 +78,8 @@ type MainMenuScene struct {
 	// Story 12.3: Help and Options panels
 	buttonSystem       *systems.ButtonSystem       // Button interaction system
 	buttonRenderSystem *systems.ButtonRenderSystem // Button render system
+	sliderSystem       *systems.SliderSystem       // Slider interaction system (for options panel)
+	checkboxSystem     *systems.CheckboxSystem     // Checkbox interaction system (for options panel)
 	helpPanelModule    *modules.HelpPanelModule    // Help panel module
 	optionsPanelModule *modules.OptionsPanelModule // Options panel module
 
@@ -164,12 +166,27 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 		// Not first launch: load current user's save
 		scene.isFirstLaunch = false
 		if err := saveManager.Load(); err == nil {
-			scene.currentLevel = saveManager.GetHighestLevel()
-			if scene.currentLevel == "" {
-				scene.currentLevel = "1-1"
-			}
 			scene.hasStartedGame = saveManager.GetHasStartedGame()
-			log.Printf("[MainMenuScene] Loaded highest level: %s, hasStartedGame: %v", scene.currentLevel, scene.hasStartedGame)
+
+			// Bug Fix: 优先使用战斗存档中的 LevelID（与 onStartAdventureClicked 保持一致）
+			// 如果有战斗存档，必须使用存档中的关卡ID，否则会导致主菜单显示与实际加载的关卡不匹配
+			scene.currentLevel = ""
+			currentUser := saveManager.GetCurrentUser()
+			if currentUser != "" && saveManager.HasBattleSave(currentUser) {
+				if battleInfo, err := saveManager.GetBattleSaveInfo(currentUser); err == nil && battleInfo != nil {
+					scene.currentLevel = battleInfo.LevelID
+					log.Printf("[MainMenuScene] Found battle save for level %s, using it for display", scene.currentLevel)
+				}
+			}
+
+			// 如果没有战斗存档，使用 GetNextLevelToPlay
+			if scene.currentLevel == "" {
+				scene.currentLevel = saveManager.GetNextLevelToPlay()
+				log.Printf("[MainMenuScene] No battle save, using next level: %s (highest completed: %s)",
+					scene.currentLevel, saveManager.GetHighestLevel())
+			}
+
+			log.Printf("[MainMenuScene] Display level: %s, hasStartedGame: %v", scene.currentLevel, scene.hasStartedGame)
 		} else {
 			scene.currentLevel = "1-1"
 			scene.hasStartedGame = false
@@ -234,6 +251,13 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 			reanimComp.CenterOffsetX = 0
 			reanimComp.CenterOffsetY = 0
 			log.Printf("[MainMenuScene] SelectorScreen 使用左上角对齐（CenterOffset = 0）")
+
+			// 首次启动时，设置开场动画为非循环模式
+			// PlayAnimation 默认设置 IsLooping = true，需要手动覆盖
+			if scene.isFirstLaunch {
+				reanimComp.IsLooping = false
+				log.Printf("[MainMenuScene] First launch: set anim_open to non-looping mode")
+			}
 		}
 	}
 
@@ -297,6 +321,8 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	// Story 12.3: Initialize button systems (shared by help and options panels)
 	scene.buttonSystem = systems.NewButtonSystem(scene.entityManager)
 	scene.buttonRenderSystem = systems.NewButtonRenderSystem(scene.entityManager)
+	scene.sliderSystem = systems.NewSliderSystem(scene.entityManager)
+	scene.checkboxSystem = systems.NewCheckboxSystem(scene.entityManager)
 
 	// Story 12.3: Initialize help panel module
 	helpPanel, err := modules.NewHelpPanelModule(
@@ -316,11 +342,13 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	}
 
 	// Story 12.3: Initialize options panel module
+	// Story 20.5: 从 GameState 获取 SettingsManager，复用已实现的设置保存逻辑
 	optionsPanel, err := modules.NewOptionsPanelModule(
 		scene.entityManager,
 		rm,
 		scene.buttonSystem,
 		scene.buttonRenderSystem,
+		gameState.GetSettingsManager(), // 复用 SettingsManager，支持全屏设置保存
 		WindowWidth,
 		WindowHeight,
 		nil, // onClose callback (no special action needed)
@@ -410,6 +438,11 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 		if !m.cloudAnimsResumed && m.selectorScreenEntity != 0 {
 			reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
 			if ok && reanimComp.IsFinished {
+				// 初始化 AnimationLoopStates（如果需要）
+				if reanimComp.AnimationLoopStates == nil {
+					reanimComp.AnimationLoopStates = make(map[string]bool)
+				}
+
 				// 开场动画已完成，添加循环动画
 				cloudAnims := []string{"anim_cloud1", "anim_cloud2", "anim_cloud4",
 					"anim_cloud5", "anim_cloud6", "anim_cloud7"}
@@ -454,6 +487,16 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 	// Story 12.3: Update button system (for panel buttons)
 	if m.buttonSystem != nil {
 		m.buttonSystem.Update(deltaTime)
+	}
+
+	// 选项面板激活时更新滑块和复选框系统（复用游戏场景的交互逻辑）
+	if m.optionsPanelModule != nil && m.optionsPanelModule.IsActive() {
+		if m.sliderSystem != nil {
+			m.sliderSystem.Update(deltaTime)
+		}
+		if m.checkboxSystem != nil {
+			m.checkboxSystem.Update(deltaTime)
+		}
 	}
 
 	// Get mouse position (needed for both dialog and background interaction)

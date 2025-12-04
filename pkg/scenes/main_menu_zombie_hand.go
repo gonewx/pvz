@@ -113,14 +113,22 @@ func (m *MainMenuScene) checkZombieHandAnimationFinished() {
 		}
 	}
 
-	levelToLoad := "1-1" // Default to first level
-	if err := saveManager.Load(); err == nil {
-		// Save file exists, get highest level
-		highestLevel := saveManager.GetHighestLevel()
-		if highestLevel != "" {
-			levelToLoad = highestLevel
-			log.Printf("[MainMenu] Loading from save: highest level = %s", highestLevel)
+	// Bug Fix: 优先使用战斗存档中的 LevelID
+	// 如果有战斗存档，必须使用存档中的关卡ID，否则会导致关卡配置与存档数据不匹配
+	levelToLoad := ""
+	currentUser := saveManager.GetCurrentUser()
+	if currentUser != "" && saveManager.HasBattleSave(currentUser) {
+		if battleInfo, err := saveManager.GetBattleSaveInfo(currentUser); err == nil && battleInfo != nil {
+			levelToLoad = battleInfo.LevelID
+			log.Printf("[MainMenu] Found battle save for level %s, using it", levelToLoad)
 		}
+	}
+
+	// 如果没有战斗存档，使用 GetNextLevelToPlay
+	if levelToLoad == "" {
+		levelToLoad = saveManager.GetNextLevelToPlay()
+		log.Printf("[MainMenu] No battle save, loading next level: %s (highest completed: %s)",
+			levelToLoad, saveManager.GetHighestLevel())
 	}
 
 	// Pass ResourceManager, SceneManager, and levelID to GameScene

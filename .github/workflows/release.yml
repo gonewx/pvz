@@ -1,0 +1,202 @@
+# ============================================================================
+# Release 工作流
+# 推送 tag (v*.*.*) 时触发，构建所有平台并创建 GitHub Release
+# ============================================================================
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  APP_NAME: pvz
+
+jobs:
+  # ==========================================================================
+  # 构建 Linux, Windows, WASM (在 Ubuntu runner 上)
+  # ==========================================================================
+  build-linux-windows-wasm:
+    name: Build Linux/Windows/WASM
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev xorg-dev libasound2-dev zip
+
+      # --- Linux amd64 ---
+      - name: Build Linux amd64
+        run: make build-linux-amd64
+
+      - name: Package Linux amd64
+        run: |
+          cd build/linux-amd64
+          tar -czvf ../../${{ env.APP_NAME }}-linux-amd64.tar.gz ${{ env.APP_NAME }}
+
+      # --- Linux arm64 ---
+      - name: Build Linux arm64
+        run: make build-linux-arm64
+
+      - name: Package Linux arm64
+        run: |
+          cd build/linux-arm64
+          tar -czvf ../../${{ env.APP_NAME }}-linux-arm64.tar.gz ${{ env.APP_NAME }}
+
+      # --- Windows amd64 ---
+      - name: Build Windows amd64
+        run: make build-windows-amd64
+
+      - name: Package Windows amd64
+        run: |
+          cd build/windows-amd64
+          zip ../../${{ env.APP_NAME }}-windows-amd64.zip ${{ env.APP_NAME }}.exe
+
+      # --- Windows arm64 ---
+      - name: Build Windows arm64
+        run: make build-windows-arm64
+
+      - name: Package Windows arm64
+        run: |
+          cd build/windows-arm64
+          zip ../../${{ env.APP_NAME }}-windows-arm64.zip ${{ env.APP_NAME }}.exe
+
+      # --- WASM ---
+      - name: Build WASM
+        run: make build-wasm
+
+      - name: Package WASM
+        run: |
+          cd build/wasm
+          zip ../../${{ env.APP_NAME }}-wasm.zip ${{ env.APP_NAME }}.wasm wasm_exec.js index.html
+
+      # --- Upload artifacts ---
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: builds-linux-windows-wasm
+          path: |
+            ${{ env.APP_NAME }}-linux-amd64.tar.gz
+            ${{ env.APP_NAME }}-linux-arm64.tar.gz
+            ${{ env.APP_NAME }}-windows-amd64.zip
+            ${{ env.APP_NAME }}-windows-arm64.zip
+            ${{ env.APP_NAME }}-wasm.zip
+
+  # ==========================================================================
+  # 构建 macOS (在 macOS runner 上，需要 CGO)
+  # ==========================================================================
+  build-macos:
+    name: Build macOS
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+
+      # --- macOS amd64 ---
+      - name: Build macOS amd64
+        run: make build-darwin-amd64
+
+      - name: Package macOS amd64
+        run: |
+          cd build/darwin-amd64
+          tar -czvf ../../${{ env.APP_NAME }}-darwin-amd64.tar.gz ${{ env.APP_NAME }}
+
+      # --- macOS arm64 ---
+      - name: Build macOS arm64
+        run: make build-darwin-arm64
+
+      - name: Package macOS arm64
+        run: |
+          cd build/darwin-arm64
+          tar -czvf ../../${{ env.APP_NAME }}-darwin-arm64.tar.gz ${{ env.APP_NAME }}
+
+      # --- macOS Universal Binary ---
+      - name: Build macOS Universal
+        run: make build-darwin-universal
+
+      - name: Package macOS Universal
+        run: |
+          cd build/darwin-universal
+          tar -czvf ../../${{ env.APP_NAME }}-darwin-universal.tar.gz ${{ env.APP_NAME }}
+
+      # --- Upload artifacts ---
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: builds-macos
+          path: |
+            ${{ env.APP_NAME }}-darwin-amd64.tar.gz
+            ${{ env.APP_NAME }}-darwin-arm64.tar.gz
+            ${{ env.APP_NAME }}-darwin-universal.tar.gz
+
+  # ==========================================================================
+  # 创建 GitHub Release 并上传所有构建产物
+  # ==========================================================================
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [build-linux-windows-wasm, build-macos]
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Linux/Windows/WASM artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: builds-linux-windows-wasm
+          path: ./artifacts
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: builds-macos
+          path: ./artifacts
+
+      - name: List artifacts
+        run: ls -la ./artifacts/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            ./artifacts/${{ env.APP_NAME }}-linux-amd64.tar.gz
+            ./artifacts/${{ env.APP_NAME }}-linux-arm64.tar.gz
+            ./artifacts/${{ env.APP_NAME }}-windows-amd64.zip
+            ./artifacts/${{ env.APP_NAME }}-windows-arm64.zip
+            ./artifacts/${{ env.APP_NAME }}-darwin-amd64.tar.gz
+            ./artifacts/${{ env.APP_NAME }}-darwin-arm64.tar.gz
+            ./artifacts/${{ env.APP_NAME }}-darwin-universal.tar.gz
+            ./artifacts/${{ env.APP_NAME }}-wasm.zip

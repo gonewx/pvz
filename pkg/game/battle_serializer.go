@@ -1,52 +1,66 @@
 package game
 
 import (
+	"bytes"
 	"encoding/gob"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/quasilyte/gdata/v2"
 )
 
 // BattleSerializer 战斗状态序列化器
 //
 // Story 18.1: 战斗状态序列化系统
+// Story 20.3: 重构为使用 gdata API 进行跨平台存储
 //
-// 负责将游戏战斗状态序列化为二进制文件，以及从文件反序列化恢复游戏状态。
+// 负责将游戏战斗状态序列化为二进制数据，以及从 gdata 反序列化恢复游戏状态。
 // 使用 gob 二进制格式，具有紧凑、类型安全、防作弊等优点。
 //
 // 架构说明：
 //   - 这是一个工具类，不是 ECS 系统
 //   - 可以访问 EntityManager 收集实体数据
 //   - 不直接修改游戏状态，仅负责序列化/反序列化
-type BattleSerializer struct{}
-
-// NewBattleSerializer 创建战斗序列化器实例
-func NewBattleSerializer() *BattleSerializer {
-	return &BattleSerializer{}
+type BattleSerializer struct {
+	gdataManager *gdata.Manager // gdata 跨平台存储管理器，可为 nil（降级模式）
 }
 
-// SaveBattle 保存战斗状态到文件
+// NewBattleSerializer 创建战斗序列化器实例
 //
-// 从 EntityManager 收集所有实体数据，从 GameState 收集关卡状态，
-// 序列化为 gob 二进制格式并写入文件。
+// Story 20.3: 接收 gdata.Manager 进行跨平台存储
+//
+// 参数：
+//   - gdataManager: gdata 跨平台存储管理器，可为 nil（降级模式）
+func NewBattleSerializer(gdataManager *gdata.Manager) *BattleSerializer {
+	return &BattleSerializer{
+		gdataManager: gdataManager,
+	}
+}
+
+// SaveBattle 保存战斗状态到 gdata
+//
+// Story 20.3: 从 EntityManager 收集所有实体数据，从 GameState 收集关卡状态，
+// 序列化为 gob 二进制格式并通过 gdata 保存。
 //
 // 参数：
 //   - em: EntityManager 实例，用于收集实体数据
 //   - gs: GameState 实例，用于收集关卡状态
-//   - filePath: 保存文件路径
+//   - username: 用户名，用于构建存储 key
 //
 // 返回：
 //   - error: 如果保存失败返回错误
-func (s *BattleSerializer) SaveBattle(em *ecs.EntityManager, gs *GameState, filePath string) error {
+func (s *BattleSerializer) SaveBattle(em *ecs.EntityManager, gs *GameState, username string) error {
 	if em == nil {
 		return fmt.Errorf("EntityManager is nil")
 	}
 	if gs == nil {
 		return fmt.Errorf("GameState is nil")
+	}
+	if s.gdataManager == nil {
+		return fmt.Errorf("gdata manager not available")
 	}
 
 	// 创建存档数据
@@ -66,55 +80,53 @@ func (s *BattleSerializer) SaveBattle(em *ecs.EntityManager, gs *GameState, file
 	// 收集教学状态（如果是教学关卡）
 	saveData.Tutorial = s.collectTutorialData(em)
 
-	// 收集保龄球模式数据（Level 1-5）
-	saveData.BowlingNuts = s.collectBowlingNutData(em)
-	saveData.ConveyorBelt = s.collectConveyorBeltData(em)
-	saveData.LevelPhase = s.collectLevelPhaseData(em)
-	saveData.DaveDialogue = s.collectDaveDialogueData(em)
-	saveData.GuidedTutorial = s.collectGuidedTutorialData(em)
-
-	// 创建文件
-	file, err := os.Create(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to create save file: %w", err)
-	}
-	defer file.Close()
-
-	// 使用 gob 编码
-	encoder := gob.NewEncoder(file)
+	// 使用 gob 编码到内存 buffer
+	var buffer bytes.Buffer
+	encoder := gob.NewEncoder(&buffer)
 	if err := encoder.Encode(saveData); err != nil {
 		return fmt.Errorf("failed to encode save data: %w", err)
 	}
 
-	log.Printf("[BattleSerializer] Saved battle to %s: Level=%s, Sun=%d, Wave=%d/%d, Plants=%d, Zombies=%d",
-		filePath, saveData.LevelID, saveData.Sun, saveData.CurrentWaveIndex,
+	// 保存到 gdata
+	battleKey := username + BattleSaveKeySuffix
+	if err := s.gdataManager.SaveObjectProp(savesObject, battleKey, buffer.Bytes()); err != nil {
+		return fmt.Errorf("failed to save battle data: %w", err)
+	}
+
+	log.Printf("[BattleSerializer] Saved battle for user %s: Level=%s, Sun=%d, Wave=%d/%d, Plants=%d, Zombies=%d",
+		username, saveData.LevelID, saveData.Sun, saveData.CurrentWaveIndex,
 		len(saveData.SpawnedWaves), len(saveData.Plants), len(saveData.Zombies))
 
 	return nil
 }
 
-// LoadBattle 从文件加载战斗状态
+// LoadBattle 从 gdata 加载战斗状态
 //
-// 从 gob 二进制文件反序列化战斗数据。
+// Story 20.3: 从 gdata 加载 gob 二进制数据并反序列化战斗数据。
 // 会进行版本兼容性检查，如果版本不匹配返回错误。
 //
 // 参数：
-//   - filePath: 存档文件路径
+//   - username: 用户名，用于构建存储 key
 //
 // 返回：
 //   - *BattleSaveData: 战斗存档数据
 //   - error: 如果加载失败返回错误
-func (s *BattleSerializer) LoadBattle(filePath string) (*BattleSaveData, error) {
-	// 打开文件
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open save file: %w", err)
+func (s *BattleSerializer) LoadBattle(username string) (*BattleSaveData, error) {
+	if s.gdataManager == nil {
+		return nil, fmt.Errorf("gdata manager not available")
 	}
-	defer file.Close()
+
+	// 从 gdata 加载数据
+	battleKey := username + BattleSaveKeySuffix
+	data, err := s.gdataManager.LoadObjectProp(savesObject, battleKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load battle data: %w", err)
+	}
 
 	// 使用 gob 解码
 	var saveData BattleSaveData
-	decoder := gob.NewDecoder(file)
+	reader := bytes.NewReader(data)
+	decoder := gob.NewDecoder(reader)
 	if err := decoder.Decode(&saveData); err != nil {
 		return nil, fmt.Errorf("failed to decode save data: %w", err)
 	}
@@ -125,8 +137,8 @@ func (s *BattleSerializer) LoadBattle(filePath string) (*BattleSaveData, error) 
 			saveData.Version, BattleSaveVersion)
 	}
 
-	log.Printf("[BattleSerializer] Loaded battle from %s: Level=%s, Sun=%d, Wave=%d/%d, Plants=%d, Zombies=%d",
-		filePath, saveData.LevelID, saveData.Sun, saveData.CurrentWaveIndex,
+	log.Printf("[BattleSerializer] Loaded battle for user %s: Level=%s, Sun=%d, Wave=%d/%d, Plants=%d, Zombies=%d",
+		username, saveData.LevelID, saveData.Sun, saveData.CurrentWaveIndex,
 		len(saveData.SpawnedWaves), len(saveData.Plants), len(saveData.Zombies))
 
 	return &saveData, nil

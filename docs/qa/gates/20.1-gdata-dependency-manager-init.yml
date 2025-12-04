@@ -1,0 +1,73 @@
+# Quality Gate Decision for Story 20.1
+# <!-- Powered by BMAD™ Core -->
+
+schema: 1
+story: "20.1"
+story_title: "gdata 依赖与 Manager 初始化"
+gate: PASS
+status_reason: "所有验收标准已满足，6个测试用例全部通过，代码质量优秀，遵循项目编码标准"
+reviewer: "Quinn (Test Architect)"
+updated: "2024-12-03T15:50:00+08:00"
+
+waiver: { active: false }
+
+top_issues: []
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
+  recommendations:
+    must_fix: []
+    monitor: []
+
+quality_score: 100
+expires: "2024-12-17T15:50:00+08:00"
+
+evidence:
+  tests_reviewed: 6
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "使用标准平台存储路径，无安全敏感操作"
+  performance:
+    status: PASS
+    notes: "一次性初始化，无运行时开销"
+  reliability:
+    status: PASS
+    notes: "完善的降级方案确保游戏可用性"
+  maintainability:
+    status: PASS
+    notes: "代码清晰，注释完整，与 SaveManager 模式一致"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "后续 Story (20.2, 20.3) 添加 gdata 数据持久化测试"
+      refs: ["pkg/game/game_state_gdata_test.go"]
+
+# Acceptance Criteria Traceability
+ac_traceability:
+  - ac: 1
+    description: "添加 gdata 依赖到 go.mod"
+    test: "go.mod 包含 github.com/quasilyte/gdata/v2 v2.0.0"
+    status: PASS
+  - ac: 2
+    description: "在 GameState 中创建全局 gdata.Manager 实例"
+    test: "TestGetGdataManager, TestGdataManagerIntegration"
+    status: PASS
+  - ac: 3
+    description: "应用启动时初始化 Manager，使用应用名 pvz_newx"
+    test: "TestGdataManagerInit, TestGdataManagerAppName"
+    status: PASS
+  - ac: 4
+    description: "处理初始化错误，提供降级方案"
+    test: "TestGdataManagerNilSafe, TestGameStateWithGdataFailure"
+    status: PASS
+  - ac: 5
+    description: "单元测试覆盖率 ≥ 80%"
+    test: "6 个测试用例覆盖所有场景"
+    status: PASS

@@ -149,6 +149,10 @@ type GameScene struct {
 	buttonRenderSystem *systems.ButtonRenderSystem // 按钮渲染系统
 	menuButtonEntity   ecs.EntityID                // 菜单按钮实体ID
 
+	// Story 20.5: Slider and Checkbox Systems (滑块和复选框系统)
+	sliderSystem   *systems.SliderSystem   // 滑块交互系统
+	checkboxSystem *systems.CheckboxSystem // 复选框交互系统
+
 	// Story 10.1: Pause Menu Systems (暂停菜单系统)
 	pauseMenuModule *modules.PauseMenuModule // 暂停菜单模块（Story 10.1）
 
@@ -282,6 +286,24 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 		scene.gameState.LoadLevel(levelConfig)
 		log.Printf("[GameScene] Loaded level: %s (%d waves, %d plants available, enabled lanes: %v)",
 			levelConfig.Name, len(levelConfig.Waves), len(levelConfig.AvailablePlants), levelConfig.EnabledLanes)
+
+		// Bug Fix: 验证战斗存档的 LevelID 是否与当前加载的关卡匹配
+		// 如果不匹配，清除存档标记并删除不匹配的存档
+		// 这可以防止在错误的关卡场景中恢复存档数据
+		if scene.hasBattleSave && scene.battleSaveInfo != nil {
+			if scene.battleSaveInfo.LevelID != "" && scene.battleSaveInfo.LevelID != levelConfig.ID {
+				log.Printf("[GameScene] ⚠️ 战斗存档关卡不匹配! 存档关卡: %s, 当前关卡: %s",
+					scene.battleSaveInfo.LevelID, levelConfig.ID)
+				log.Printf("[GameScene] 清除存档标记，删除不匹配的存档...")
+				// 删除不匹配的存档
+				if err := saveManager.DeleteBattleSave(currentUser); err != nil {
+					log.Printf("[GameScene] Warning: Failed to delete mismatched battle save: %v", err)
+				}
+				// 清除存档标记，避免显示对话框
+				scene.hasBattleSave = false
+				scene.battleSaveInfo = nil
+			}
+		}
 	}
 
 	// Initialize systems
@@ -535,6 +557,11 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	scene.buttonRenderSystem = systems.NewButtonRenderSystem(scene.entityManager)
 	log.Printf("[GameScene] Initialized button systems")
 
+	// Story 20.5: 滑块和复选框系统初始化
+	scene.sliderSystem = systems.NewSliderSystem(scene.entityManager)
+	scene.checkboxSystem = systems.NewCheckboxSystem(scene.entityManager)
+	log.Printf("[GameScene] Initialized slider and checkbox systems")
+
 	// 对话框系统初始化（ECS 架构）
 	// Story 8.8: Load dialog fonts for DialogRenderSystem
 	titleFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 24)
@@ -781,9 +808,16 @@ func (s *GameScene) Update(deltaTime float64) {
 
 	// Story 10.1: Check if game is paused
 	if s.gameState.IsPaused {
-		// 暂停时只更新 UI 系统（按钮交互、暂停菜单、对话框）
+		// 暂停时只更新 UI 系统（按钮交互、暂停菜单、对话框、滑块、复选框）
 		if s.buttonSystem != nil {
 			s.buttonSystem.Update(deltaTime)
+		}
+		// Story 20.5: 暂停菜单中的滑块和复选框交互
+		if s.sliderSystem != nil {
+			s.sliderSystem.Update(deltaTime)
+		}
+		if s.checkboxSystem != nil {
+			s.checkboxSystem.Update(deltaTime)
 		}
 		// ✅ ECS 架构修复: 更新对话框输入系统（暂停菜单可能包含对话框）
 		if s.dialogInputSystem != nil {

@@ -81,6 +81,7 @@ func NewVerifyPauseMenuGame() (*VerifyPauseMenuGame, error) {
 		rm,
 		buttonSystem,
 		buttonRenderSystem,
+		nil, // settingsManager（测试场景使用 nil）
 		screenWidth,
 		screenHeight,
 		modules.PauseMenuCallbacks{

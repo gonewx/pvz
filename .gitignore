@@ -1,8 +1,6 @@
 # BMAD (local only)
 .bmad-core/
 .bmad-*/
-/docs/prd
-/docs/architecture
 
 .claude/settings.local.json
 
@@ -42,3 +40,10 @@ scenes.test
 /verify_gameplay
 
 /*.out
+
+# 构建产物
+build/
+
+# 移动端构建时复制的资源（由 make prepare-mobile 生成）
+mobile/assets/
+mobile/data/

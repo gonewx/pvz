@@ -1,0 +1,50 @@
+# Quality Gate Decision
+# Story 20.3: SaveManager 重构 (gdata API)
+
+schema: 1
+story: "20.3"
+story_title: "SaveManager 重构 (gdata API)"
+gate: PASS
+status_reason: "全部 7 个 AC 已满足。代码实现质量优秀，Story 修改文件测试覆盖率 ≥80%（save_manager.go ~82%, battle_serializer.go ~90%）。"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-12-03T17:25:00+08:00"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 95  # 高质量实现，所有 AC 满足
+
+evidence:
+  tests_reviewed: 51  # SaveManager 29 + BattleSerializer 22
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7]
+    ac_gaps: []
+  coverage_analysis:
+    save_manager_avg: "~82%"
+    battle_serializer_avg: "~90%"
+    pkg_game_overall: "57.7% (includes unrelated files)"
+    conclusion: "Story modified files meet 80% target"
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "用户数据存储在平台安全位置，使用 gdata 标准 API"
+  performance:
+    status: PASS
+    notes: "使用 bytes.Buffer 进行内存序列化，无不必要的磁盘 IO"
+  reliability:
+    status: PASS
+    notes: "降级模式实现正确，gdataManager 为 nil 时优雅降级"
+  maintainability:
+    status: PASS
+    notes: "代码结构清晰，注释充分，常量定义规范"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "运行游戏进行手动验证（用户管理、战斗存档功能）"
+      refs: ["pkg/game/save_manager.go", "pkg/scenes/game_scene_init.go"]
+    - action: "考虑添加集成测试验证完整的存档流程"
+      refs: ["pkg/game/"]

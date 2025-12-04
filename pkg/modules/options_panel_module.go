@@ -31,8 +31,12 @@ import (
 //   - 低耦合：通过回调与外部交互
 //
 // Story 12.3: 对话框系统基础 - 选项面板实现
+// Story 20.5: 添加 SettingsManager 支持
 // 重构：使用组合模式消除代码重复，底部按钮完全由 SettingsPanelModule 管理
 type OptionsPanelModule struct {
+	// Story 20.5: 设置管理器（用于保存设置）
+	settingsManager *game.SettingsManager
+
 	// 组合：通用设置面板（复用）
 	settingsPanelModule *SettingsPanelModule
 }
@@ -44,6 +48,7 @@ type OptionsPanelModule struct {
 //   - rm: ResourceManager 实例（用于加载资源）
 //   - buttonSystem: 按钮交互系统（引用，不拥有）
 //   - buttonRenderSystem: 按钮渲染系统（引用，不拥有）
+//   - settingsManager: 设置管理器（可为 nil）
 //   - windowWidth, windowHeight: 游戏窗口尺寸
 //   - onClose: 关闭面板回调函数（可选）
 //
@@ -52,42 +57,62 @@ type OptionsPanelModule struct {
 //   - error: 如果初始化失败
 //
 // Story 12.3: 对话框系统基础
+// Story 20.5: 添加 settingsManager 参数
 // 重构：完全组合 SettingsPanelModule，底部按钮由其管理
 func NewOptionsPanelModule(
 	em *ecs.EntityManager,
 	rm *game.ResourceManager,
 	buttonSystem *systems.ButtonSystem,
 	buttonRenderSystem *systems.ButtonRenderSystem,
+	settingsManager *game.SettingsManager,
 	windowWidth, windowHeight int,
 	onClose func(),
 ) (*OptionsPanelModule, error) {
-	module := &OptionsPanelModule{}
+	module := &OptionsPanelModule{
+		settingsManager: settingsManager,
+	}
 
 	// 创建通用设置面板模块（组合），配置底部"确定"按钮
 	settingsPanelModule, err := NewSettingsPanelModule(
 		em,
 		rm,
 		buttonRenderSystem, // 传递按钮渲染系统（用于渲染底部按钮）
+		settingsManager,    // Story 20.5: 传递 SettingsManager
 		windowWidth,
 		windowHeight,
 		SettingsPanelCallbacks{
 			OnMusicVolumeChange: func(volume float64) {
-				// TODO: 实际控制音乐音量
+				// 日志/通知回调
 			},
 			OnSoundVolumeChange: func(volume float64) {
-				// TODO: 实际控制音效音量
+				// 日志/通知回调
 			},
 			On3DToggle: func(enabled bool) {
 				// TODO: 实际控制3D加速
 			},
 			OnFullscreenToggle: func(enabled bool) {
-				// TODO: 实际切换全屏
+				// 全屏切换由 SettingsPanelModule 内部处理
+			},
+			// Story 20.5: 音量应用回调（TODO: 连接到音频系统）
+			OnMusicVolumeApply: func(volume float64) {
+				log.Printf("[OptionsPanelModule] Applying music volume: %.2f (TODO: connect to audio system)", volume)
+			},
+			OnSoundVolumeApply: func(volume float64) {
+				log.Printf("[OptionsPanelModule] Applying sound volume: %.2f (TODO: connect to audio system)", volume)
 			},
 		},
 		&BottomButtonConfig{
 			Text: "确定",
 			OnClick: func() {
 				log.Printf("[OptionsPanelModule] Confirm button clicked!")
+				// Story 20.5: 关闭时自动保存设置
+				if module.settingsManager != nil {
+					if err := module.settingsManager.Save(); err != nil {
+						log.Printf("[OptionsPanelModule] Warning: Failed to save settings: %v", err)
+					} else {
+						log.Printf("[OptionsPanelModule] Settings saved successfully")
+					}
+				}
 				module.Hide()
 				if onClose != nil {
 					onClose()

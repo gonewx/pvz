@@ -23,6 +23,9 @@
 | 2025-11-01 | 1.7 | Added Epic 12: Main Menu System (主菜单系统完整实现). | Sarah (PO) |
 | 2025-11-27 | 1.8 | Added Epic 17: Zombie Generation Engine (僵尸生成引擎). | Sarah (PO) |
 | 2025-11-29 | 1.9 | Added Epic 18: Battle Save System (游戏战斗存档系统). | John (PM) |
+| 2025-12-01 | 2.0 | Added Epic 19: Level 1-5 Wall-nut Bowling (坚果保龄球). | Sarah (PO) |
+| 2025-12-03 | 2.1 | Added Epic 20: Go Embed & Cross-Platform Storage (资源嵌入与跨平台存储). | Bob (SM) |
+| 2025-12-04 | 2.2 | Added Epic 21: Cross-Platform Build & CI/CD (跨平台构建与CI/CD). | Sarah (PO) |
 
 ## **2. Requirements (需求)**
 
@@ -135,6 +138,12 @@
     *   **目标:** 实现《植物大战僵尸》冒险模式的精确僵尸生成系统，包括难度动态调整、行分配平滑权重算法、波次计时控制和旗帜波特殊机制，完全还原原版游戏的出怪逻辑和游戏节奏。详见 [Epic 17 详细文档](prd/epic-17-zombie-generation-engine.md)。
 *   **Epic 18: 游戏战斗存档系统 (Battle Save System) - Brownfield Enhancement**
     *   **目标:** 为《植物大战僵尸》复刻版实现战斗中存档/读档功能。玩家点击暂停菜单的"主菜单"按钮时自动保存当前战斗进度，再次进入冒险模式时可选择继续游戏或重玩关卡，提供简洁的用户交互体验。详见 [Epic 18 详细文档](prd/epic-18-battle-save-system.md)。
+*   **Epic 19: 关卡 1-5 坚果保龄球 (Level 1-5: Wall-nut Bowling)**
+    *   **目标:** 实现第一章第五关"坚果保龄球"，包含铲子教学阶段（疯狂戴夫对话、强引导机制、预设植物）和保龄球玩法阶段（传送带系统、保龄球物理、爆炸坚果），为玩家提供独特的迷你游戏体验。详见 [Epic 19 详细文档](prd/epic-19-level-1-5-bowling.md)。
+*   **Epic 20: Go Embed 资源嵌入与跨平台存储 (Go Embed & Cross-Platform Storage)**
+    *   **目标:** 使用 Go 的 `embed` 功能将游戏资源（assets/ 和 data/）打包进可执行程序，实现单一可执行文件分发；使用 gdata 库实现跨平台用户数据存储（存档、设置），支持桌面端、移动端和 WASM 平台。详见 [Epic 20 详细文档](prd/epic-20-embed-cross-platform-storage.md)。
+*   **Epic 21: 跨平台构建与 CI/CD (Cross-Platform Build & CI/CD)** ⭐**NEW**
+    *   **目标:** 为游戏创建完整的跨平台构建系统和 CI/CD 流水线，支持 Linux、Windows、macOS、Android、iOS 和 Web (WASM) 六大平台的自动化构建与发布，通过 Makefile 和 GitHub Actions 实现标准化的构建流程。详见 [Epic 21 详细文档](prd/epic-21-cross-platform-build-cicd.md)。
 
 ## **Epic 1: 游戏基础框架与主循环 (Game Foundation & Main Loop)**
 **史诗目标:** 搭建整个Go+Ebitengine项目的基本结构，创建一个可以运行的空窗口，并实现游戏的核心状态管理和主菜单。这是所有后续功能的基础。

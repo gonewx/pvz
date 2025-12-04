@@ -2,8 +2,8 @@ package config
 
 import (
 	"fmt"
-	"os"
 
+	"github.com/decker502/pvz/pkg/embedded"
 	"gopkg.in/yaml.v3"
 )
 
@@ -46,7 +46,7 @@ type HealthAccelerationConfig struct {
 
 // LoadSpawnRules 从 YAML 文件加载僵尸生成规则配置
 func LoadSpawnRules(filePath string) (*SpawnRulesConfig, error) {
-	data, err := os.ReadFile(filePath)
+	data, err := embedded.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read spawn rules file: %w", err)
 	}

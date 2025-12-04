@@ -1,0 +1,48 @@
+schema: 1
+story: "20.5"
+story_title: "暂停面板 UI (音量/全屏设置)"
+gate: PASS
+status_reason: "所有验收标准满足，测试覆盖率达标（SliderSystem 86.8%, CheckboxSystem 88.5%）"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-12-03T21:30:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 25
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "设置存储使用 gdata API，安全性在 Story 20.1 中已验证"
+  performance:
+    status: PASS
+    notes: "UI 系统仅在暂停菜单激活时更新，无性能问题"
+  reliability:
+    status: PASS
+    notes: "降级处理完善，settingsManager 为 nil 时使用默认值；依赖注入支持测试"
+  maintainability:
+    status: PASS
+    notes: "符合 ECS 架构，代码结构清晰，测试覆盖充分"
+
+history:
+  - at: "2025-12-03T20:47:00Z"
+    gate: CONCERNS
+    note: "初次评审 - 测试覆盖率 ~12%，低于 AC7 要求的 80%"
+  - at: "2025-12-03T21:30:00Z"
+    gate: PASS
+    note: "Re-review - Dev 团队添加依赖注入和完整测试，覆盖率达 86.8%/88.5%"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "考虑添加 SettingsPanelModule 的集成测试"
+      refs: ["pkg/modules/settings_panel_module.go"]

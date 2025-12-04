@@ -2,10 +2,10 @@ package config
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"sync"
 
+	"github.com/decker502/pvz/pkg/embedded"
 	"gopkg.in/yaml.v3"
 )
 
@@ -70,24 +70,25 @@ type ReanimConfigManager struct {
 //   - *ReanimConfigManager: 配置管理器实例
 //   - error: 加载或解析错误
 func NewReanimConfigManager(configPath string) (*ReanimConfigManager, error) {
-	// 1. 判断路径类型
-	fileInfo, err := os.Stat(configPath)
-	if err != nil {
-		return nil, fmt.Errorf("无法访问路径 %s: %w", configPath, err)
+	// 1. 判断路径类型（检查是否为目录）
+	// 使用 embedded.ReadDir 尝试读取目录来判断
+	if _, err := embedded.ReadDir(configPath); err == nil {
+		// 是目录
+		return loadFromDirectory(configPath)
 	}
 
-	// 2. 根据路径类型选择加载方式
-	if fileInfo.IsDir() {
-		return loadFromDirectory(configPath)
-	} else {
+	// 尝试作为文件加载
+	if embedded.Exists(configPath) {
 		return loadFromFile(configPath)
 	}
+
+	return nil, fmt.Errorf("无法访问路径 %s", configPath)
 }
 
 // loadFromFile 从单个文件加载配置（向后兼容）
 func loadFromFile(configPath string) (*ReanimConfigManager, error) {
-	// 1. 读取配置文件
-	data, err := os.ReadFile(configPath)
+	// 1. 从 embedded FS 读取配置文件
+	data, err := embedded.ReadFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("无法读取配置文件 %s: %w", configPath, err)
 	}
@@ -125,8 +126,9 @@ func loadFromDirectory(dirPath string) (*ReanimConfigManager, error) {
 		return nil, fmt.Errorf("加载全局配置失败: %w", err)
 	}
 
-	// 2. 扫描目录中的所有 YAML 文件
-	files, err := filepath.Glob(filepath.Join(dirPath, "*.yaml"))
+	// 2. 扫描目录中的所有 YAML 文件（使用 embedded.Glob）
+	pattern := dirPath + "/*.yaml"
+	files, err := embedded.Glob(pattern)
 	if err != nil {
 		return nil, fmt.Errorf("扫描目录 %s 失败: %w", dirPath, err)
 	}
@@ -175,7 +177,7 @@ func loadFromDirectory(dirPath string) (*ReanimConfigManager, error) {
 
 // loadAnimationUnit 加载单个动画单元配置文件
 func loadAnimationUnit(filePath string) (AnimationUnitConfig, error) {
-	data, err := os.ReadFile(filePath)
+	data, err := embedded.ReadFile(filePath)
 	if err != nil {
 		return AnimationUnitConfig{}, fmt.Errorf("无法读取文件: %w", err)
 	}
@@ -193,10 +195,10 @@ func loadAnimationUnit(filePath string) (AnimationUnitConfig, error) {
 // 如果不存在，使用默认配置
 func loadGlobalConfig(dirPath string) (GlobalConfig, error) {
 	// 1. 尝试从上级目录加载全局配置文件
-	globalPath := filepath.Join(filepath.Dir(dirPath), "reanim_config.yaml")
-	if _, err := os.Stat(globalPath); err == nil {
-		// 文件存在，读取全局配置
-		data, err := os.ReadFile(globalPath)
+	globalPath := filepath.Dir(dirPath) + "/reanim_config.yaml"
+	if embedded.Exists(globalPath) {
+		// 文件存在，从 embedded FS 读取全局配置
+		data, err := embedded.ReadFile(globalPath)
 		if err != nil {
 			return GlobalConfig{}, fmt.Errorf("无法读取全局配置文件 %s: %w", globalPath, err)
 		}
