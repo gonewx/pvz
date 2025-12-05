@@ -30,9 +30,9 @@ type Config struct {
 
 // App 是游戏应用的核心包装器，实现 ebiten.Game 接口
 type App struct {
-	sceneManager            *game.SceneManager
-	verbose                 bool
-	pendingWindowSizeReset  bool // 延迟设置窗口大小标志
+	sceneManager             *game.SceneManager
+	verbose                  bool
+	pendingWindowSizeReset   bool // 延迟设置窗口大小标志
 	windowSizeResetCountdown int  // 延迟帧数
 }
 
@@ -168,18 +168,19 @@ func (a *App) Draw(screen *ebiten.Image) {
 }
 
 // DrawFinalScreen 实现 FinalScreenDrawer 接口
-// 用于控制全屏时 letterbox 的颜色
+// 用于控制全屏时的缩放和 letterbox 颜色
 func (a *App) DrawFinalScreen(screen ebiten.FinalScreen, offscreen *ebiten.Image, geoM ebiten.GeoM) {
 	// 先填充黑色背景（全屏时左右两边为黑色）
 	screen.Fill(color.Black)
-	// 然后绘制游戏画面
+	// 使用线性滤波绘制游戏画面，提高缩放质量
 	op := &ebiten.DrawImageOptions{}
 	op.GeoM = geoM
+	op.Filter = ebiten.FilterLinear // 使用线性滤波减少锯齿和模糊
 	screen.DrawImage(offscreen, op)
 }
 
 // Layout 返回游戏的逻辑屏幕尺寸
-// 此尺寸独立于实际窗口大小
+// 此尺寸独立于实际窗口大小，Ebitengine 会自动处理缩放
 func (a *App) Layout(outsideWidth, outsideHeight int) (int, int) {
 	return config.GameWindowWidth, config.GameWindowHeight
 }
