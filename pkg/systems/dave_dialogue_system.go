@@ -18,8 +18,8 @@ import (
 
 // 文字抖动参数（参考 ZombiesWonPhaseSystem 的屏幕抖动参数）
 const (
-	TextShakeAmplitude = 3.0   // 振幅（像素）
-	TextShakeFrequency = 30.0  // 频率（Hz），相对较低以便可见
+	TextShakeAmplitude = 3.0  // 振幅（像素）
+	TextShakeFrequency = 10.0 // 频率（Hz），相对较低以便可见
 )
 
 // Dave 说话动画参数
@@ -429,8 +429,8 @@ func (s *DaveDialogueSystem) applyExpressions(
 			// 显示拿坚果的动画
 			dialogueComp.IsHoldingItem = true
 			dialogueComp.HeldItemType = "wallnut"
-			// 播放拿物品说话的动画（循环播放）
-			s.playAnimation(entityID, "anim_talk_handing", true)
+			// 播放拿物品说话的动画（非循环，与其他特殊动画保持一致）
+			s.playAnimation(entityID, "anim_talk_handing", false)
 			// 设置坚果图片到手部轨道
 			s.setHandingItemImage(entityID, "assets/reanim/Wallnut_body.png")
 			hasSpecialAnimation = true

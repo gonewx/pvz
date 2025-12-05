@@ -274,7 +274,7 @@ animation_combos:
       animations:
           - anim_talk_handing
       binding_strategy: auto
-      loop: true
+      loop: false
       hidden_tracks:
           - zombie_body
           - zombie_upperleg1
