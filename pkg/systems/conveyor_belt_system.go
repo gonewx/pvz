@@ -43,7 +43,7 @@ type ConveyorBeltSystem struct {
 	cardWidth      float64 // 卡片宽度
 	beltWidth      float64 // 传送带宽度
 	leftPadding    float64 // 左侧内边距
-	stoppedSpacing float64 // 停止后的间距
+	minSpacing float64 // 卡片最小间距
 	startOffsetX   float64 // 卡片起始位置偏移
 
 	// Story 19.12: 动态调节配置
@@ -61,7 +61,7 @@ func NewConveyorBeltSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.R
 		cardWidth:       100.0 * config.ConveyorCardScale, // 默认卡片宽度
 		beltWidth:       config.ConveyorBeltWidth,
 		leftPadding:     config.ConveyorBeltLeftPadding,
-		stoppedSpacing:  config.ConveyorCardStoppedSpacing,
+		minSpacing:      config.ConveyorCardMinSpacing,
 		startOffsetX:    config.ConveyorCardStartOffsetX,
 	}
 
@@ -172,6 +172,7 @@ func (s *ConveyorBeltSystem) updateCardGeneration(dt float64, beltComp *componen
 // 核心逻辑：
 // - 所有未停止的卡片以相同速度向左移动
 // - 到达左边界或碰到前面停止的卡片时停止
+// - 移动中的卡片之间也保持最小间距
 func (s *ConveyorBeltSystem) updateCardMovement(dt float64, beltComp *components.ConveyorBeltComponent) {
 	moveDistance := s.beltSpeed * dt
 
@@ -183,7 +184,18 @@ func (s *ConveyorBeltSystem) updateCardMovement(dt float64, beltComp *components
 		}
 
 		// 向左移动
-		card.PositionX -= moveDistance
+		newX := card.PositionX - moveDistance
+
+		// 检查与前面卡片的最小间距（无论前面卡片是否停止）
+		if i > 0 {
+			prevCard := &beltComp.Cards[i-1]
+			minX := prevCard.PositionX + s.cardWidth + s.minSpacing
+			if newX < minX {
+				newX = minX
+			}
+		}
+
+		card.PositionX = newX
 
 		// 计算停止位置
 		stopX := s.calculateStopPosition(beltComp, i)
@@ -211,7 +223,7 @@ func (s *ConveyorBeltSystem) calculateStopPosition(beltComp *components.Conveyor
 		prevCard := &beltComp.Cards[i]
 		if prevCard.IsStopped {
 			// 停在前面卡片的右侧 + 停止间距
-			return prevCard.PositionX + s.cardWidth + s.stoppedSpacing
+			return prevCard.PositionX + s.cardWidth + s.minSpacing
 		}
 	}
 
@@ -314,7 +326,7 @@ func (s *ConveyorBeltSystem) insertCardToFront(beltComp *components.ConveyorBelt
 	}
 
 	// 将现有卡片向右移动（增加位置偏移）
-	offset := s.cardWidth + s.stoppedSpacing
+	offset := s.cardWidth + s.minSpacing
 	for i := range beltComp.Cards {
 		beltComp.Cards[i].PositionX += offset
 		// 如果卡片被挤出边界，标记为未停止，让它继续移动

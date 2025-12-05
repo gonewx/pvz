@@ -500,17 +500,17 @@ const (
 	// ConveyorBeltSpeed 传送带速度（像素/秒）
 	// 同时控制履带滚动和卡片移动，使两者保持相对静止
 	// 建议值范围：30.0 - 100.0
-	ConveyorBeltSpeed = 35.0
+	ConveyorBeltSpeed = 30.0
 
 	// ConveyorCardStartOffsetX 卡片起始位置相对于传送带右边界的偏移（像素）
 	// 正值表示在传送带右边界外更远处开始，避免覆盖右边框
 	// 建议值范围：0.0 - 50.0
 	ConveyorCardStartOffsetX = 10.0
 
-	// ConveyorCardStoppedSpacing 卡片停止后的最终间距（像素）
-	// 卡片到达左边界或顶住前面卡片后的间距
+	// ConveyorCardMinSpacing 卡片之间的最小间距（像素）
+	// 无论静止还是移动状态，卡片之间至少保持此间距
 	// 建议值范围：2.0 - 10.0
-	ConveyorCardStoppedSpacing = 2.0
+	ConveyorCardMinSpacing = 2.0
 
 	// ConveyorBeltLeftPadding 传送带左侧内边距（像素）
 	// 卡片不会进入此区域，防止卡片太靠左遮挡边框

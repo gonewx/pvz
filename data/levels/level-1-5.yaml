@@ -53,15 +53,15 @@ conveyorBelt:
   # Story 19.12: 三阶段动态配置
   phaseConfigs:
     - progressThreshold: 0.0   # 前期 (0%-30%)
-      explodeNutWeight: 10
+      explodeNutWeight: 3
       intervalMin: 3.0
       intervalMax: 3.5
     - progressThreshold: 0.3   # 中期 (30%-70%)
-      explodeNutWeight: 20
+      explodeNutWeight: 10
       intervalMin: 2.2
       intervalMax: 2.5
     - progressThreshold: 0.7   # 终盘 (70%-100%)
-      explodeNutWeight: 30
+      explodeNutWeight: 20
       intervalMin: 1.5
       intervalMax: 1.8
   # Story 19.12: 动态调节参数
