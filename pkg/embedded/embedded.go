@@ -4,13 +4,16 @@
 // embed.FS 变量必须声明在项目根目录（embed.go）。
 // 本包提供包装函数，让其他包可以访问嵌入的资源。
 //
-// 使用前必须调用 Init() 初始化。
+// 使用方式：
+//   - 主程序：调用 Init() 初始化后使用嵌入资源
+//   - cmd 工具：无需初始化，自动回退到文件系统读取
 package embedded
 
 import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -36,16 +39,18 @@ func IsInitialized() bool {
 
 // Open 根据路径前缀选择正确的 embed.FS 并打开文件
 // 路径必须以 "assets/" 或 "data/" 开头
+// 如果未初始化，自动回退到文件系统读取
 func Open(path string) (fs.File, error) {
-	if !initialized {
-		return nil, fmt.Errorf("embedded package not initialized, call Init() first")
-	}
-
 	// 标准化路径分隔符为正斜杠（embed.FS 使用正斜杠）
 	path = filepath.ToSlash(path)
 
 	// 移除可能的 "./" 前缀
 	path = strings.TrimPrefix(path, "./")
+
+	// 未初始化时回退到文件系统
+	if !initialized {
+		return os.Open(path)
+	}
 
 	if strings.HasPrefix(path, "assets/") {
 		return assetsFS.Open(path)
@@ -57,16 +62,18 @@ func Open(path string) (fs.File, error) {
 
 // ReadFile 根据路径前缀选择正确的 embed.FS 并读取文件内容
 // 路径必须以 "assets/" 或 "data/" 开头
+// 如果未初始化，自动回退到文件系统读取
 func ReadFile(path string) ([]byte, error) {
-	if !initialized {
-		return nil, fmt.Errorf("embedded package not initialized, call Init() first")
-	}
-
 	// 标准化路径分隔符为正斜杠
 	path = filepath.ToSlash(path)
 
 	// 移除可能的 "./" 前缀
 	path = strings.TrimPrefix(path, "./")
+
+	// 未初始化时回退到文件系统
+	if !initialized {
+		return os.ReadFile(path)
+	}
 
 	if strings.HasPrefix(path, "assets/") {
 		return fs.ReadFile(assetsFS, path)
@@ -88,16 +95,18 @@ func Exists(path string) bool {
 
 // Glob 在 embed.FS 中匹配文件
 // 路径模式必须以 "assets/" 或 "data/" 开头
+// 如果未初始化，自动回退到文件系统读取
 func Glob(pattern string) ([]string, error) {
-	if !initialized {
-		return nil, fmt.Errorf("embedded package not initialized, call Init() first")
-	}
-
 	// 标准化路径分隔符为正斜杠
 	pattern = filepath.ToSlash(pattern)
 
 	// 移除可能的 "./" 前缀
 	pattern = strings.TrimPrefix(pattern, "./")
+
+	// 未初始化时回退到文件系统
+	if !initialized {
+		return filepath.Glob(pattern)
+	}
 
 	if strings.HasPrefix(pattern, "assets/") {
 		return fs.Glob(assetsFS, pattern)
@@ -109,16 +118,18 @@ func Glob(pattern string) ([]string, error) {
 
 // ReadDir 读取目录内容
 // 路径必须以 "assets/" 或 "data/" 开头
+// 如果未初始化，自动回退到文件系统读取
 func ReadDir(path string) ([]fs.DirEntry, error) {
-	if !initialized {
-		return nil, fmt.Errorf("embedded package not initialized, call Init() first")
-	}
-
 	// 标准化路径分隔符为正斜杠
 	path = filepath.ToSlash(path)
 
 	// 移除可能的 "./" 前缀
 	path = strings.TrimPrefix(path, "./")
+
+	// 未初始化时回退到文件系统
+	if !initialized {
+		return os.ReadDir(path)
+	}
 
 	if strings.HasPrefix(path, "assets/") {
 		return fs.ReadDir(assetsFS, path)
@@ -130,16 +141,18 @@ func ReadDir(path string) ([]fs.DirEntry, error) {
 
 // Sub 返回指定目录的子文件系统
 // 路径必须以 "assets/" 或 "data/" 开头
+// 如果未初始化，自动回退到文件系统读取
 func Sub(dir string) (fs.FS, error) {
-	if !initialized {
-		return nil, fmt.Errorf("embedded package not initialized, call Init() first")
-	}
-
 	// 标准化路径分隔符为正斜杠
 	dir = filepath.ToSlash(dir)
 
 	// 移除可能的 "./" 前缀
 	dir = strings.TrimPrefix(dir, "./")
+
+	// 未初始化时回退到文件系统
+	if !initialized {
+		return os.DirFS(dir), nil
+	}
 
 	if strings.HasPrefix(dir, "assets/") {
 		return fs.Sub(assetsFS, dir)

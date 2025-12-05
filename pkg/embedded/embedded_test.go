@@ -2,6 +2,8 @@ package embedded
 
 import (
 	"embed"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -31,60 +33,82 @@ func TestIsInitialized(t *testing.T) {
 	initialized = false
 }
 
-// TestOpenNotInitialized 测试未初始化时调用 Open
-func TestOpenNotInitialized(t *testing.T) {
+// TestFallbackToFilesystem 测试未初始化时回退到文件系统
+func TestFallbackToFilesystem(t *testing.T) {
 	// 重置状态
 	initialized = false
 
-	_, err := Open("assets/test.png")
-	if err == nil {
-		t.Error("Expected error when calling Open() before Init()")
+	// 创建临时测试文件
+	tmpDir := t.TempDir()
+	testDir := filepath.Join(tmpDir, "assets")
+	if err := os.MkdirAll(testDir, 0755); err != nil {
+		t.Fatalf("Failed to create test directory: %v", err)
 	}
-	if err.Error() != "embedded package not initialized, call Init() first" {
-		t.Errorf("Unexpected error message: %v", err)
+
+	testFile := filepath.Join(testDir, "test.txt")
+	testContent := []byte("hello world")
+	if err := os.WriteFile(testFile, testContent, 0644); err != nil {
+		t.Fatalf("Failed to create test file: %v", err)
+	}
+
+	// 切换到临时目录
+	originalDir, _ := os.Getwd()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Failed to change directory: %v", err)
+	}
+	defer os.Chdir(originalDir)
+
+	// 测试 Open 回退到文件系统
+	file, err := Open("assets/test.txt")
+	if err != nil {
+		t.Errorf("Open should fall back to filesystem: %v", err)
+	} else {
+		file.Close()
+	}
+
+	// 测试 ReadFile 回退到文件系统
+	data, err := ReadFile("assets/test.txt")
+	if err != nil {
+		t.Errorf("ReadFile should fall back to filesystem: %v", err)
+	}
+	if string(data) != "hello world" {
+		t.Errorf("ReadFile returned unexpected content: %s", string(data))
+	}
+
+	// 测试 Exists 回退到文件系统
+	if !Exists("assets/test.txt") {
+		t.Error("Exists should return true for existing file when using filesystem fallback")
+	}
+
+	// 测试 Glob 回退到文件系统
+	matches, err := Glob("assets/*.txt")
+	if err != nil {
+		t.Errorf("Glob should fall back to filesystem: %v", err)
+	}
+	if len(matches) != 1 {
+		t.Errorf("Glob should find one file, got %d", len(matches))
+	}
+
+	// 测试 ReadDir 回退到文件系统
+	entries, err := ReadDir("assets")
+	if err != nil {
+		t.Errorf("ReadDir should fall back to filesystem: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Errorf("ReadDir should find one entry, got %d", len(entries))
+	}
+
+	// 测试 Sub 回退到文件系统
+	subFS, err := Sub("assets")
+	if err != nil {
+		t.Errorf("Sub should fall back to filesystem: %v", err)
+	}
+	if subFS == nil {
+		t.Error("Sub should return a valid fs.FS")
 	}
 }
 
-// TestReadFileNotInitialized 测试未初始化时调用 ReadFile
-func TestReadFileNotInitialized(t *testing.T) {
-	// 重置状态
-	initialized = false
-
-	_, err := ReadFile("assets/test.txt")
-	if err == nil {
-		t.Error("Expected error when calling ReadFile() before Init()")
-	}
-	if err.Error() != "embedded package not initialized, call Init() first" {
-		t.Errorf("Unexpected error message: %v", err)
-	}
-}
-
-// TestExistsNotInitialized 测试未初始化时调用 Exists
-func TestExistsNotInitialized(t *testing.T) {
-	// 重置状态
-	initialized = false
-
-	// Exists 在未初始化时应返回 false（因为内部调用 Open 会出错）
-	if Exists("assets/test.png") {
-		t.Error("Expected Exists() to return false before Init()")
-	}
-}
-
-// TestGlobNotInitialized 测试未初始化时调用 Glob
-func TestGlobNotInitialized(t *testing.T) {
-	// 重置状态
-	initialized = false
-
-	_, err := Glob("assets/*.png")
-	if err == nil {
-		t.Error("Expected error when calling Glob() before Init()")
-	}
-	if err.Error() != "embedded package not initialized, call Init() first" {
-		t.Errorf("Unexpected error message: %v", err)
-	}
-}
-
-// TestOpenInvalidPrefix 测试无效路径前缀
+// TestOpenInvalidPrefix 测试无效路径前缀（已初始化时）
 func TestOpenInvalidPrefix(t *testing.T) {
 	// 用空的 embed.FS 初始化
 	var emptyFS embed.FS
@@ -100,7 +124,7 @@ func TestOpenInvalidPrefix(t *testing.T) {
 	}
 }
 
-// TestReadFileInvalidPrefix 测试无效路径前缀
+// TestReadFileInvalidPrefix 测试无效路径前缀（已初始化时）
 func TestReadFileInvalidPrefix(t *testing.T) {
 	// 用空的 embed.FS 初始化
 	var emptyFS embed.FS
@@ -116,7 +140,7 @@ func TestReadFileInvalidPrefix(t *testing.T) {
 	}
 }
 
-// TestGlobInvalidPrefix 测试无效路径前缀
+// TestGlobInvalidPrefix 测试无效路径前缀（已初始化时）
 func TestGlobInvalidPrefix(t *testing.T) {
 	// 用空的 embed.FS 初始化
 	var emptyFS embed.FS
@@ -128,49 +152,6 @@ func TestGlobInvalidPrefix(t *testing.T) {
 		t.Error("Expected error for invalid path prefix")
 	}
 	if err.Error() != "unknown resource path prefix: invalid/*.txt (must start with 'assets/' or 'data/')" {
-		t.Errorf("Unexpected error message: %v", err)
-	}
-}
-
-// TestReadDirNotInitialized 测试未初始化时调用 ReadDir
-func TestReadDirNotInitialized(t *testing.T) {
-	// 重置状态
-	initialized = false
-
-	_, err := ReadDir("assets/images")
-	if err == nil {
-		t.Error("Expected error when calling ReadDir() before Init()")
-	}
-	if err.Error() != "embedded package not initialized, call Init() first" {
-		t.Errorf("Unexpected error message: %v", err)
-	}
-}
-
-// TestSubNotInitialized 测试未初始化时调用 Sub
-func TestSubNotInitialized(t *testing.T) {
-	// 重置状态
-	initialized = false
-
-	_, err := Sub("assets/images")
-	if err == nil {
-		t.Error("Expected error when calling Sub() before Init()")
-	}
-	if err.Error() != "embedded package not initialized, call Init() first" {
-		t.Errorf("Unexpected error message: %v", err)
-	}
-}
-
-// TestStatNotInitialized 测试未初始化时调用 Stat
-func TestStatNotInitialized(t *testing.T) {
-	// 重置状态
-	initialized = false
-
-	_, err := Stat("assets/test.png")
-	if err == nil {
-		t.Error("Expected error when calling Stat() before Init()")
-	}
-	// Stat 内部调用 Open，所以错误信息相同
-	if err.Error() != "embedded package not initialized, call Init() first" {
 		t.Errorf("Unexpected error message: %v", err)
 	}
 }
@@ -196,7 +177,7 @@ func TestPathNormalization(t *testing.T) {
 	}
 }
 
-// TestReadDirInvalidPrefix 测试 ReadDir 无效路径前缀
+// TestReadDirInvalidPrefix 测试 ReadDir 无效路径前缀（已初始化时）
 func TestReadDirInvalidPrefix(t *testing.T) {
 	var emptyFS embed.FS
 	Init(emptyFS, emptyFS)
@@ -208,7 +189,7 @@ func TestReadDirInvalidPrefix(t *testing.T) {
 	}
 }
 
-// TestSubInvalidPrefix 测试 Sub 无效路径前缀
+// TestSubInvalidPrefix 测试 Sub 无效路径前缀（已初始化时）
 func TestSubInvalidPrefix(t *testing.T) {
 	var emptyFS embed.FS
 	Init(emptyFS, emptyFS)
@@ -416,4 +397,3 @@ func TestSubDataPath(t *testing.T) {
 		}
 	}
 }
-
