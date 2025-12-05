@@ -502,11 +502,6 @@ const (
 	// 建议值范围：30.0 - 100.0
 	ConveyorBeltSpeed = 35.0
 
-	// ConveyorCardMovingSpacing 卡片移动时的间距（像素）
-	// 卡片在传送带上移动时与前面卡片保持的间距
-	// 建议值范围：5.0 - 50.0
-	ConveyorCardMovingSpacing = 5.0
-
 	// ConveyorCardStartOffsetX 卡片起始位置相对于传送带右边界的偏移（像素）
 	// 正值表示在传送带右边界外更远处开始，避免覆盖右边框
 	// 建议值范围：0.0 - 50.0
@@ -515,11 +510,12 @@ const (
 	// ConveyorCardStoppedSpacing 卡片停止后的最终间距（像素）
 	// 卡片到达左边界或顶住前面卡片后的间距
 	// 建议值范围：2.0 - 10.0
-	ConveyorCardStoppedSpacing = 3.0
+	ConveyorCardStoppedSpacing = 2.0
 
-	// ConveyorBeltPadding 传送带内边距（像素）
-	// 卡片距离传送带左边缘的距离
-	ConveyorBeltPadding = 5.0
+	// ConveyorBeltLeftPadding 传送带左侧内边距（像素）
+	// 卡片不会进入此区域，防止卡片太靠左遮挡边框
+	// 建议值范围：10.0 - 30.0
+	ConveyorBeltLeftPadding = 9.0
 
 	// ConveyorBeltRightPadding 传送带右侧内边距（像素）
 	// 卡片距离传送带右边缘的距离，用于裁剪控制
@@ -534,13 +530,13 @@ const (
 	// ConveyorBeltAnimOffsetX 履带纹理相对于背景的 X 偏移（像素）
 	// 正值向右移动，负值向左移动
 	// 用于调整履带在背景上的水平位置
-	ConveyorBeltAnimOffsetX = 0.0
+	ConveyorBeltAnimOffsetX = -2.0
 
 	// ConveyorBeltAnimOffsetY 履带纹理相对于背景的 Y 偏移（像素）
 	// 正值向下移动，负值向上移动
 	// 背景高度 86px，履带高度 96px（6行x16px）
 	// 履带应该在背景的下边部分显示
-	ConveyorBeltAnimOffsetY = 60.0
+	ConveyorBeltAnimOffsetY = 55.0
 
 	// ========== 保龄球坚果配置参数（Story 19.6）（可手工调节） ==========
 
@@ -560,16 +556,11 @@ const (
 	// ConveyorCardScale 传送带卡片缩放比例
 	// 用于等比例缩小卡片，基于原始卡片背景尺寸（约 100x140）
 	// 建议值范围：0.3 - 0.6
-	ConveyorCardScale = 0.50
+	ConveyorCardScale = 0.48
 
 	// ConveyorCardSelectedOverlayAlpha 选中卡片遮罩透明度（0-255）
 	// 选中状态的传送带卡片添加的半透明灰色遮罩
 	ConveyorCardSelectedOverlayAlpha = 128
-
-	// ConveyorBeltLeftPadding 传送带左侧内边距（像素）
-	// 卡片不会进入此区域，防止卡片太靠左遮挡边框
-	// 建议值范围：10.0 - 30.0
-	ConveyorBeltLeftPadding = 10.0
 
 	// BowlingNutPreviewAlpha 草坪预览透明度（0-255）
 	// 悬停在草坪网格时显示的半透明坚果预览

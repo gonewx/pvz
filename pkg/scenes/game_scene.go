@@ -14,6 +14,7 @@ import (
 	"github.com/decker502/pvz/pkg/systems"
 	"github.com/decker502/pvz/pkg/systems/behavior"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
@@ -189,6 +190,7 @@ type GameScene struct {
 	// Story 19.2: 铲子交互系统
 	shovelSelected          bool                             // 铲子是否被选中
 	shovelInteractionSystem *systems.ShovelInteractionSystem // 铲子交互系统
+	shovelClickSoundPlayer  *audio.Player                    // 铲子槽点击音效播放器
 
 	// Story 19.3: 强引导教学系统
 	guidedTutorialSystem *systems.GuidedTutorialSystem // 强引导教学系统（Level 1-5 铲子教学）
@@ -638,8 +640,12 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 				}
 				scene.conveyorBeltSystem.SetCardPool(cardPool)
 			}
-			log.Printf("[GameScene] Conveyor belt configured from level config: interval=%.1fs, pool=%d entries",
-				conveyorConfig.GenerationInterval, len(conveyorConfig.CardPool))
+			// Story 19.12: 设置动态调节配置
+			if len(conveyorConfig.PhaseConfigs) > 0 || conveyorConfig.DynamicAdjustment != nil {
+				scene.conveyorBeltSystem.SetDynamicConfig(conveyorConfig.PhaseConfigs, conveyorConfig.DynamicAdjustment)
+			}
+			log.Printf("[GameScene] Conveyor belt configured from level config: interval=%.1fs, pool=%d entries, phases=%d",
+				conveyorConfig.GenerationInterval, len(conveyorConfig.CardPool), len(conveyorConfig.PhaseConfigs))
 
 			// 加载传送带卡片渲染资源（需要在 reanimSystem 初始化后）
 			scene.loadConveyorCardResources()
@@ -696,7 +702,12 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 
 	// Story 19.4: 生成预设植物
 	// 必须在 GuidedTutorialSystem 初始化之后调用，这样系统才能正确追踪植物数量
-	scene.spawnPresetPlants()
+	// Bug Fix: 如果有战斗存档，跳过预设植物生成（会从存档恢复）
+	if !scene.hasBattleSave {
+		scene.spawnPresetPlants()
+	} else {
+		log.Printf("[GameScene] Skipping preset plants spawn (will restore from battle save)")
+	}
 
 	// Story 19.4: 检查是否需要激活强引导模式（Level 1-5）
 	// 并创建开场 Dave 对话
@@ -1562,6 +1573,12 @@ func (s *GameScene) updateShovelSlotClick() {
 
 			// Story 19.3: 通知系统操作发生
 			s.NotifyOperation("click_shovel")
+
+			// 播放铲子点击音效
+			if s.shovelClickSoundPlayer != nil {
+				s.shovelClickSoundPlayer.Rewind()
+				s.shovelClickSoundPlayer.Play()
+			}
 
 			// 切换铲子选中状态
 			s.SetShovelSelected(!s.shovelSelected)

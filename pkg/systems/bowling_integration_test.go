@@ -241,12 +241,14 @@ func TestBowlingIntegration_ConveyorAndNutSystem(t *testing.T) {
 
 		conveyorSystem.Activate()
 
+		beltComp, _ := ecs.GetComponent[*components.ConveyorBeltComponent](em, conveyorSystem.GetBeltEntity())
+
 		// 生成大量卡片来测试权重
 		wallnutCount := 0
 		explodeCount := 0
 
 		for i := 0; i < 1000; i++ {
-			cardType := conveyorSystem.generateCard()
+			cardType := conveyorSystem.generateCard(beltComp)
 			if cardType == components.CardTypeWallnutBowling {
 				wallnutCount++
 			} else if cardType == components.CardTypeExplodeONut {

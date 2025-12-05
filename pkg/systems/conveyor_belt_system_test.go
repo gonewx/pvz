@@ -4,7 +4,9 @@ import (
 	"testing"
 
 	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/game"
 )
 
 // createTestConveyorBeltSystem 创建测试用传送带系统
@@ -12,6 +14,14 @@ func createTestConveyorBeltSystem() (*ConveyorBeltSystem, *ecs.EntityManager) {
 	em := ecs.NewEntityManager()
 	system := NewConveyorBeltSystem(em, nil, nil)
 	return system, em
+}
+
+// createTestConveyorBeltSystemWithGameState 创建测试用传送带系统（带 GameState）
+func createTestConveyorBeltSystemWithGameState() (*ConveyorBeltSystem, *ecs.EntityManager, *game.GameState) {
+	em := ecs.NewEntityManager()
+	gs := game.GetGameState()
+	system := NewConveyorBeltSystem(em, gs, nil)
+	return system, em, gs
 }
 
 func TestNewConveyorBeltSystem(t *testing.T) {
@@ -65,13 +75,15 @@ func TestConveyorBeltSystem_Activate(t *testing.T) {
 func TestConveyorBeltSystem_CardGeneration(t *testing.T) {
 	system, em := createTestConveyorBeltSystem()
 
+	beltComp, _ := ecs.GetComponent[*components.ConveyorBeltComponent](em, system.GetBeltEntity())
+
 	// 生成大量卡片统计分布
 	wallnutCount := 0
 	explodeCount := 0
 	total := 10000
 
 	for i := 0; i < total; i++ {
-		cardType := system.generateCard()
+		cardType := system.generateCard(beltComp)
 		if cardType == components.CardTypeWallnutBowling {
 			wallnutCount++
 		} else if cardType == components.CardTypeExplodeONut {
@@ -89,8 +101,6 @@ func TestConveyorBeltSystem_CardGeneration(t *testing.T) {
 	if explodeRatio < 0.10 || explodeRatio > 0.20 {
 		t.Errorf("Expected explode ratio ~0.15, got %.3f", explodeRatio)
 	}
-
-	_ = em // 避免未使用警告
 }
 
 func TestConveyorBeltSystem_CapacityLimit(t *testing.T) {
@@ -270,7 +280,9 @@ func TestConveyorBeltSystem_PlacementValidation(t *testing.T) {
 }
 
 func TestConveyorBeltSystem_SetCardPool(t *testing.T) {
-	system, _ := createTestConveyorBeltSystem()
+	system, em := createTestConveyorBeltSystem()
+
+	beltComp, _ := ecs.GetComponent[*components.ConveyorBeltComponent](em, system.GetBeltEntity())
 
 	// 设置自定义卡片池（100% 爆炸坚果）
 	customPool := []CardPoolEntry{
@@ -280,7 +292,7 @@ func TestConveyorBeltSystem_SetCardPool(t *testing.T) {
 
 	// 验证生成的都是爆炸坚果
 	for i := 0; i < 100; i++ {
-		cardType := system.generateCard()
+		cardType := system.generateCard(beltComp)
 		if cardType != components.CardTypeExplodeONut {
 			t.Errorf("Expected all cards to be explode_o_nut with custom pool, got '%s'", cardType)
 			break
@@ -301,15 +313,360 @@ func TestConveyorBeltSystem_Update(t *testing.T) {
 
 	// 激活并更新
 	system.Activate()
-	beltComp.GenerationTimer = 0 // 立即生成
 
-	// 更新多次，应该生成卡片
-	for i := 0; i < 5; i++ {
-		beltComp.GenerationTimer = 0
+	// Story 19.12: 使用足够大的时间增量来触发卡片生成
+	// 默认生成间隔为 3.0 秒，需要累积足够时间
+	for i := 0; i < 35; i++ { // 3.5 秒
 		system.Update(0.1)
 	}
 
 	if len(beltComp.Cards) == 0 {
 		t.Error("Expected cards to be generated after Update")
+	}
+}
+
+// ========================================
+// Story 19.12: 动态调节系统测试
+// ========================================
+
+func TestConveyorBeltSystem_PhaseDetection(t *testing.T) {
+	system, em, gs := createTestConveyorBeltSystemWithGameState()
+
+	// 加载测试关卡配置（10 波）
+	testLevelConfig := &config.LevelConfig{
+		ID:   "test-1",
+		Name: "Test Level",
+		Waves: []config.WaveConfig{
+			{WaveNum: 1}, {WaveNum: 2}, {WaveNum: 3}, {WaveNum: 4}, {WaveNum: 5},
+			{WaveNum: 6}, {WaveNum: 7}, {WaveNum: 8}, {WaveNum: 9}, {WaveNum: 10},
+		},
+	}
+	gs.LoadLevel(testLevelConfig)
+
+	_ = em
+
+	tests := []struct {
+		currentWave   int
+		expectedPhase int
+	}{
+		{0, 1},  // 0/10 = 0% → 前期
+		{1, 1},  // 1/10 = 10% → 前期
+		{2, 1},  // 2/10 = 20% → 前期
+		{3, 2},  // 3/10 = 30% → 中期
+		{5, 2},  // 5/10 = 50% → 中期
+		{6, 2},  // 6/10 = 60% → 中期
+		{7, 3},  // 7/10 = 70% → 终盘
+		{9, 3},  // 9/10 = 90% → 终盘
+		{10, 3}, // 10/10 = 100% → 终盘
+	}
+
+	for _, tt := range tests {
+		gs.CurrentWaveIndex = tt.currentWave
+		phase := system.getCurrentPhase()
+		if phase != tt.expectedPhase {
+			t.Errorf("currentWave=%d: expected phase %d, got %d", tt.currentWave, tt.expectedPhase, phase)
+		}
+	}
+}
+
+func TestConveyorBeltSystem_PhaseDetection_FewWaves(t *testing.T) {
+	system, em, gs := createTestConveyorBeltSystemWithGameState()
+
+	// 加载测试关卡配置（2 波 - 简化波次）
+	testLevelConfig := &config.LevelConfig{
+		ID:   "test-2",
+		Name: "Test Level",
+		Waves: []config.WaveConfig{
+			{WaveNum: 1}, {WaveNum: 2},
+		},
+	}
+	gs.LoadLevel(testLevelConfig)
+
+	_ = em
+
+	// 简化波次支持：当波次过少时使用中期配置
+	for waveIdx := 0; waveIdx <= 2; waveIdx++ {
+		gs.CurrentWaveIndex = waveIdx
+		phase := system.getCurrentPhase()
+		if phase != 2 {
+			t.Errorf("currentWave=%d (few waves): expected phase 2 (中期), got %d", waveIdx, phase)
+		}
+	}
+}
+
+func TestConveyorBeltSystem_DynamicWeight(t *testing.T) {
+	system, em, gs := createTestConveyorBeltSystemWithGameState()
+
+	// 加载测试关卡配置
+	testLevelConfig := &config.LevelConfig{
+		ID:   "test-3",
+		Name: "Test Level",
+		Waves: []config.WaveConfig{
+			{WaveNum: 1}, {WaveNum: 2}, {WaveNum: 3}, {WaveNum: 4}, {WaveNum: 5},
+			{WaveNum: 6}, {WaveNum: 7}, {WaveNum: 8}, {WaveNum: 9}, {WaveNum: 10},
+		},
+	}
+	gs.LoadLevel(testLevelConfig)
+
+	// 设置动态配置
+	phaseConfigs := []config.PhaseConfig{
+		{ProgressThreshold: 0.0, ExplodeNutWeight: 10, IntervalMin: 3.0, IntervalMax: 3.5},
+		{ProgressThreshold: 0.3, ExplodeNutWeight: 20, IntervalMin: 2.2, IntervalMax: 2.5},
+		{ProgressThreshold: 0.7, ExplodeNutWeight: 30, IntervalMin: 1.5, IntervalMax: 1.8},
+	}
+	system.SetDynamicConfig(phaseConfigs, nil)
+
+	beltComp, _ := ecs.GetComponent[*components.ConveyorBeltComponent](em, system.GetBeltEntity())
+
+	// 测试前期（10% 爆炸坚果）
+	gs.CurrentWaveIndex = 0
+	explodeCount := 0
+	total := 1000
+	for i := 0; i < total; i++ {
+		if system.generateCard(beltComp) == components.CardTypeExplodeONut {
+			explodeCount++
+		}
+	}
+	ratio := float64(explodeCount) / float64(total)
+	if ratio < 0.05 || ratio > 0.15 {
+		t.Errorf("前期: expected explode ratio ~0.10, got %.3f", ratio)
+	}
+
+	// 测试终盘（30% 爆炸坚果）
+	gs.CurrentWaveIndex = 8 // 80% 进度
+	explodeCount = 0
+	for i := 0; i < total; i++ {
+		if system.generateCard(beltComp) == components.CardTypeExplodeONut {
+			explodeCount++
+		}
+	}
+	ratio = float64(explodeCount) / float64(total)
+	if ratio < 0.25 || ratio > 0.40 {
+		t.Errorf("终盘: expected explode ratio ~0.30, got %.3f", ratio)
+	}
+}
+
+func TestConveyorBeltSystem_EmptyBeltEmergency(t *testing.T) {
+	system, em, _ := createTestConveyorBeltSystemWithGameState()
+
+	beltComp, _ := ecs.GetComponent[*components.ConveyorBeltComponent](em, system.GetBeltEntity())
+
+	// 设置动态调节配置
+	dynamicCfg := &config.DynamicAdjustmentConfig{
+		EmptyBeltThreshold: 3.0,
+	}
+	system.SetDynamicConfig(nil, dynamicCfg)
+
+	// 确保传送带为空
+	beltComp.Cards = nil
+	if !beltComp.IsEmpty() {
+		t.Fatal("Expected belt to be empty")
+	}
+
+	// 模拟 2.5 秒空带（不应触发）
+	for i := 0; i < 250; i++ {
+		system.checkEmptyBeltEmergency(0.01, beltComp)
+	}
+	if len(beltComp.Cards) != 0 {
+		t.Errorf("Expected no cards after 2.5s, got %d", len(beltComp.Cards))
+	}
+
+	// 再模拟 0.6 秒（超过 3 秒阈值）
+	for i := 0; i < 60; i++ {
+		system.checkEmptyBeltEmergency(0.01, beltComp)
+	}
+
+	// 应该自动生成一个普通坚果
+	if len(beltComp.Cards) != 1 {
+		t.Errorf("Expected 1 card after 3s+ empty, got %d", len(beltComp.Cards))
+	}
+	if len(beltComp.Cards) > 0 && beltComp.Cards[0].CardType != components.CardTypeWallnutBowling {
+		t.Errorf("Expected wallnut_bowling, got %s", beltComp.Cards[0].CardType)
+	}
+}
+
+func TestConveyorBeltSystem_FullBeltThrottle(t *testing.T) {
+	system, em, _ := createTestConveyorBeltSystemWithGameState()
+
+	beltComp, _ := ecs.GetComponent[*components.ConveyorBeltComponent](em, system.GetBeltEntity())
+	beltComp.Capacity = 5
+
+	// 设置动态调节配置
+	dynamicCfg := &config.DynamicAdjustmentConfig{
+		FullBeltThreshold:         8.0,
+		FullBeltThrottleMultiplier: 1.5,
+	}
+	system.SetDynamicConfig(nil, dynamicCfg)
+
+	// 填满传送带
+	for i := 0; i < 5; i++ {
+		beltComp.Cards = append(beltComp.Cards, components.ConveyorCard{
+			CardType:  components.CardTypeWallnutBowling,
+			PositionX: float64(i * 100),
+			IsStopped: true,
+		})
+	}
+
+	if !beltComp.IsFull() {
+		t.Fatal("Expected belt to be full")
+	}
+
+	// 初始状态不应降频
+	if beltComp.IsThrottled {
+		t.Error("Expected not throttled initially")
+	}
+
+	// 模拟 7 秒满带（不应触发）
+	for i := 0; i < 700; i++ {
+		system.checkFullBeltThrottle(0.01, beltComp)
+	}
+	if beltComp.IsThrottled {
+		t.Error("Expected not throttled after 7s")
+	}
+
+	// 再模拟 1.1 秒（超过 8 秒阈值）
+	for i := 0; i < 110; i++ {
+		system.checkFullBeltThrottle(0.01, beltComp)
+	}
+
+	// 应该进入降频状态
+	if !beltComp.IsThrottled {
+		t.Error("Expected throttled after 8s+")
+	}
+
+	// 移除 3 张卡片（低于满容量 2 格）
+	beltComp.Cards = beltComp.Cards[:2]
+	beltComp.FullDuration = 0 // 重置计时
+
+	system.checkFullBeltThrottle(0.01, beltComp)
+
+	// 应该解除降频
+	if beltComp.IsThrottled {
+		t.Error("Expected throttle released after cards removed")
+	}
+}
+
+func TestConveyorBeltSystem_CrisisExplodeNut(t *testing.T) {
+	system, em, gs := createTestConveyorBeltSystemWithGameState()
+
+	beltComp, _ := ecs.GetComponent[*components.ConveyorBeltComponent](em, system.GetBeltEntity())
+
+	// 设置动态调节配置
+	dynamicCfg := &config.DynamicAdjustmentConfig{
+		CrisisExplodeNutCooldown: 5.0,
+		CrisisZombieCount:        2,
+		CrisisDistanceThreshold:  300.0,
+	}
+	system.SetDynamicConfig(nil, dynamicCfg)
+
+	// 设置关卡时间超过冷却时间
+	gs.LevelTime = 10.0
+	beltComp.LastExplodeNutTime = 0.0
+
+	// 创建僵尸实体（在同一行，接近安全线）
+	row := 2
+	zombieY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+
+	// 创建第一个僵尸
+	zombie1 := em.CreateEntity()
+	em.AddComponent(zombie1, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	em.AddComponent(zombie1, &components.PositionComponent{
+		X: config.GridWorldStartX + 200, // 在危机距离内
+		Y: zombieY,
+	})
+
+	// 创建第二个僵尸（同一行）
+	zombie2 := em.CreateEntity()
+	em.AddComponent(zombie2, &components.BehaviorComponent{Type: components.BehaviorZombieConehead})
+	em.AddComponent(zombie2, &components.PositionComponent{
+		X: config.GridWorldStartX + 150, // 在危机距离内
+		Y: zombieY,
+	})
+
+	// 初始状态不应强制生成
+	if beltComp.ForceExplodeNut {
+		t.Error("Expected ForceExplodeNut to be false initially")
+	}
+
+	// 检测危机
+	system.checkCrisisExplodeNut(beltComp)
+
+	// 应该标记强制生成爆炸坚果
+	if !beltComp.ForceExplodeNut {
+		t.Error("Expected ForceExplodeNut to be true after crisis detected")
+	}
+}
+
+func TestConveyorBeltSystem_ForceExplodeNutGeneration(t *testing.T) {
+	system, em, gs := createTestConveyorBeltSystemWithGameState()
+
+	beltComp, _ := ecs.GetComponent[*components.ConveyorBeltComponent](em, system.GetBeltEntity())
+
+	// 设置 ForceExplodeNut 标志
+	beltComp.ForceExplodeNut = true
+	beltComp.LastExplodeNutTime = 0.0
+	gs.LevelTime = 10.0
+
+	// 生成卡片
+	cardType := system.generateCard(beltComp)
+
+	// 应该强制生成爆炸坚果
+	if cardType != components.CardTypeExplodeONut {
+		t.Errorf("Expected explode_o_nut when ForceExplodeNut=true, got %s", cardType)
+	}
+
+	// 标志应该被重置
+	if beltComp.ForceExplodeNut {
+		t.Error("Expected ForceExplodeNut to be reset after generation")
+	}
+
+	// LastExplodeNutTime 应该被更新
+	if beltComp.LastExplodeNutTime != gs.LevelTime {
+		t.Errorf("Expected LastExplodeNutTime=%f, got %f", gs.LevelTime, beltComp.LastExplodeNutTime)
+	}
+}
+
+func TestConveyorBeltSystem_DynamicInterval(t *testing.T) {
+	system, em, gs := createTestConveyorBeltSystemWithGameState()
+
+	// 加载测试关卡配置
+	testLevelConfig := &config.LevelConfig{
+		ID:   "test-4",
+		Name: "Test Level",
+		Waves: []config.WaveConfig{
+			{WaveNum: 1}, {WaveNum: 2}, {WaveNum: 3}, {WaveNum: 4}, {WaveNum: 5},
+			{WaveNum: 6}, {WaveNum: 7}, {WaveNum: 8}, {WaveNum: 9}, {WaveNum: 10},
+		},
+	}
+	gs.LoadLevel(testLevelConfig)
+
+	_ = em
+
+	// 设置动态配置
+	phaseConfigs := []config.PhaseConfig{
+		{ProgressThreshold: 0.0, ExplodeNutWeight: 10, IntervalMin: 3.0, IntervalMax: 3.5},
+		{ProgressThreshold: 0.3, ExplodeNutWeight: 20, IntervalMin: 2.2, IntervalMax: 2.5},
+		{ProgressThreshold: 0.7, ExplodeNutWeight: 30, IntervalMin: 1.5, IntervalMax: 1.8},
+	}
+	system.SetDynamicConfig(phaseConfigs, nil)
+
+	// 测试前期间隔
+	gs.CurrentWaveIndex = 0
+	for i := 0; i < 100; i++ {
+		interval := system.getPhaseGenerationInterval()
+		if interval < 3.0 || interval > 3.5 {
+			t.Errorf("前期: expected interval in [3.0, 3.5], got %.3f", interval)
+			break
+		}
+	}
+
+	// 测试终盘间隔
+	gs.CurrentWaveIndex = 8
+	for i := 0; i < 100; i++ {
+		interval := system.getPhaseGenerationInterval()
+		if interval < 1.5 || interval > 1.8 {
+			t.Errorf("终盘: expected interval in [1.5, 1.8], got %.3f", interval)
+			break
+		}
 	}
 }

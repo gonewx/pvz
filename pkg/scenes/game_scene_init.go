@@ -482,10 +482,55 @@ func (s *GameScene) showBattleSaveDialog() {
 // 条件：
 //   - 当前关卡有预设植物（PresetPlants）
 //   - Dave 对话系统已初始化
+//   - 关卡阶段尚未进入保龄球阶段（CurrentPhase < 2）
 func (s *GameScene) createOpeningDaveDialogueIfNeeded() {
 	// 检查是否需要创建 Dave 对话
 	if s.gameState.CurrentLevel == nil || len(s.gameState.CurrentLevel.PresetPlants) == 0 {
 		return
+	}
+
+	// Bug Fix: 如果场景中已经有 Dave 对话实体（从存档恢复），不创建新的
+	// 这避免了覆盖从存档恢复的 Dave 对话进度
+	existingDaves := ecs.GetEntitiesWith1[*components.DaveDialogueComponent](s.entityManager)
+	if len(existingDaves) > 0 {
+		log.Printf("[GameScene] Skipping Dave dialogue creation: already exists from save restore (entity %d)", existingDaves[0])
+		return
+	}
+
+	// Bug Fix: 检查关卡阶段，如果已进入保龄球阶段（阶段2），不创建 Dave 对话
+	// 从存档恢复时，LevelPhaseComponent 会被恢复，可以判断当前阶段
+	phaseEntities := ecs.GetEntitiesWith1[*components.LevelPhaseComponent](s.entityManager)
+	if len(phaseEntities) > 0 {
+		if phaseComp, ok := ecs.GetComponent[*components.LevelPhaseComponent](s.entityManager, phaseEntities[0]); ok {
+			if phaseComp.CurrentPhase >= 2 {
+				log.Printf("[GameScene] Skipping Dave dialogue: already in phase %d (bowling phase)", phaseComp.CurrentPhase)
+				return
+			}
+		}
+	}
+
+	// Bug Fix: 兼容旧存档 - 检查传送带是否已激活（无 LevelPhase 数据的旧存档）
+	// 如果传送带已激活，说明已经进入保龄球阶段
+	conveyorEntities := ecs.GetEntitiesWith1[*components.ConveyorBeltComponent](s.entityManager)
+	if len(conveyorEntities) > 0 {
+		if conveyorComp, ok := ecs.GetComponent[*components.ConveyorBeltComponent](s.entityManager, conveyorEntities[0]); ok {
+			if conveyorComp.IsActive {
+				log.Printf("[GameScene] Skipping Dave dialogue: conveyor belt is active (bowling phase)")
+				return
+			}
+		}
+	}
+
+	// Bug Fix: 检查强引导教学是否已激活（铲子教学阶段）
+	// 如果强引导教学已激活，说明 Dave 对话已完成，不需要再创建
+	guidedEntities := ecs.GetEntitiesWith1[*components.GuidedTutorialComponent](s.entityManager)
+	if len(guidedEntities) > 0 {
+		if guidedComp, ok := ecs.GetComponent[*components.GuidedTutorialComponent](s.entityManager, guidedEntities[0]); ok {
+			if guidedComp.IsActive {
+				log.Printf("[GameScene] Skipping Dave dialogue: guided tutorial is active (shovel phase)")
+				return
+			}
+		}
 	}
 
 	log.Printf("[GameScene] Creating opening Dave dialogue after battle save dialog")
@@ -1418,6 +1463,29 @@ func (s *GameScene) restoreLevelPhase(phaseData *game.LevelPhaseData) {
 	log.Printf("[GameScene] 关卡阶段已恢复: Phase=%d, State=%s, ConveyorVisible=%v, ShowRedLine=%v",
 		phaseComp.CurrentPhase, phaseComp.PhaseState,
 		phaseComp.ConveyorBeltVisible, phaseComp.ShowRedLine)
+
+	// Bug Fix: 如果恢复的是 Phase 2（保龄球阶段）且状态为 active，
+	// 需要激活相关系统（这些操作在正常转场完成时由回调执行）
+	if phaseComp.CurrentPhase == 2 && phaseComp.PhaseState == components.PhaseStateActive {
+		log.Printf("[GameScene] 恢复 Phase 2 激活状态，启动相关系统...")
+
+		// 激活传送带系统
+		if s.conveyorBeltSystem != nil {
+			s.conveyorBeltSystem.Activate()
+			log.Printf("[GameScene] 传送带系统已激活")
+		}
+
+		// 启用红线限制
+		if s.plantPreviewRenderSystem != nil {
+			s.plantPreviewRenderSystem.SetRedLineEnabled(true)
+		}
+
+		// 恢复波次计时系统
+		if s.levelSystem != nil {
+			s.levelSystem.ResumeWaveTiming()
+			log.Printf("[GameScene] 波次计时系统已恢复")
+		}
+	}
 }
 
 // restoreDaveDialogue 恢复 Dave 对话状态
@@ -1455,18 +1523,45 @@ func (s *GameScene) restoreDaveDialogue(daveData *game.DaveDialogueData) {
 
 	log.Printf("[GameScene] 恢复 Dave 对话状态...")
 
+	// Bug Fix: 检查是否是转场对话
+	// 如果当前是转场状态且处于 DaveDialogue 步骤，则需要设置转场完成回调
+	isTransitionDave := false
+	phaseEntities := ecs.GetEntitiesWith1[*components.LevelPhaseComponent](s.entityManager)
+	if len(phaseEntities) > 0 {
+		if phaseComp, ok := ecs.GetComponent[*components.LevelPhaseComponent](s.entityManager, phaseEntities[0]); ok {
+			if phaseComp.PhaseState == components.PhaseStateTransitioning &&
+				phaseComp.TransitionStep == components.TransitionStepDaveDialogue {
+				isTransitionDave = true
+			}
+		}
+	}
+
+	// 根据对话类型设置不同的回调
+	var onComplete func()
+	if isTransitionDave {
+		// 转场对话完成后，推进到传送带滑入步骤
+		onComplete = func() {
+			log.Printf("[GameScene] Restored transition Dave dialogue completed, advancing to conveyor slide")
+			if s.levelPhaseSystem != nil {
+				s.levelPhaseSystem.AdvanceToConveyorSlide()
+			}
+		}
+	} else {
+		// 普通对话（阶段1开场对话）完成后，激活引导教学
+		onComplete = func() {
+			log.Printf("[GameScene] Restored Dave dialogue completed")
+			if s.guidedTutorialSystem != nil {
+				s.guidedTutorialSystem.SetActive(true)
+			}
+		}
+	}
+
 	// 创建 Dave 实体并恢复状态
 	daveEntity, err := entities.NewCrazyDaveEntity(
 		s.entityManager,
 		s.resourceManager,
 		daveData.DialogueKeys,
-		func() {
-			// Dave 对话完成回调
-			log.Printf("[GameScene] Restored Dave dialogue completed")
-			if s.guidedTutorialSystem != nil {
-				s.guidedTutorialSystem.SetActive(true)
-			}
-		},
+		onComplete,
 	)
 
 	if err != nil {
@@ -1487,6 +1582,25 @@ func (s *GameScene) restoreDaveDialogue(daveData *game.DaveDialogueData) {
 	if posComp, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, daveEntity); ok {
 		posComp.X = daveData.DaveX
 		posComp.Y = daveData.DaveY
+	}
+
+	// Bug Fix: 如果 Dave 正在对话中，需要设置正确的动画（跳过入场动画）
+	if daveData.State == int(components.DaveStateTalking) {
+		// 设置动画命令为对话动画，跳过入场动画
+		if animCmd, ok := ecs.GetComponent[*components.AnimationCommandComponent](s.entityManager, daveEntity); ok {
+			animCmd.ComboName = "anim_smalltalk"
+			animCmd.Processed = false
+			log.Printf("[GameScene] Dave 动画已设置为对话状态: anim_smalltalk")
+		}
+	}
+
+	// Bug Fix: 如果当前是转场状态，设置 LevelPhaseComponent.DaveDialogueEntityID
+	// 这样 LevelPhaseSystem 就知道 Dave 对话已经存在，不需要重新创建
+	if isTransitionDave && len(phaseEntities) > 0 {
+		if phaseComp, ok := ecs.GetComponent[*components.LevelPhaseComponent](s.entityManager, phaseEntities[0]); ok {
+			phaseComp.DaveDialogueEntityID = int(daveEntity)
+			log.Printf("[GameScene] 设置转场 Dave 实体 ID: %d", daveEntity)
+		}
 	}
 
 	log.Printf("[GameScene] Dave 对话已恢复: LineIndex=%d/%d, State=%d, Visible=%v",
