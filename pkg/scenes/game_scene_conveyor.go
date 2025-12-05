@@ -111,8 +111,8 @@ func (s *GameScene) drawConveyorBeltAnimation(screen *ebiten.Image, x, y float64
 
 	// 使用履带图片的实际宽度作为渲染宽度
 	beltRenderWidth := float64(imgWidth)
-	beltRenderX := x + config.ConveyorBeltPadding + config.ConveyorBeltAnimOffsetX
-	beltRenderY := y + config.ConveyorBeltPadding + config.ConveyorBeltAnimOffsetY
+	beltRenderX := x + config.ConveyorBeltLeftPadding + config.ConveyorBeltAnimOffsetX
+	beltRenderY := y + config.ConveyorBeltLeftPadding + config.ConveyorBeltAnimOffsetY
 
 	// 渲染 6 行交错滚动
 	for row := 0; row < config.ConveyorBeltRowCount; row++ {
@@ -232,7 +232,7 @@ func (s *GameScene) drawConveyorCards(screen *ebiten.Image, conveyorX, conveyorY
 	cardY := conveyorY + (beltHeight-cardHeight)/2 + config.ConveyorBeltTopPadding
 
 	// 传送带可见区域边界（用于裁剪）
-	beltLeftEdge := conveyorX + config.ConveyorBeltPadding
+	beltLeftEdge := conveyorX + config.ConveyorBeltLeftPadding
 	beltRightEdge := conveyorX + beltWidth - config.ConveyorBeltRightPadding
 
 	// 遍历绘制每张卡片
@@ -541,7 +541,7 @@ func (s *GameScene) getConveyorBeltBounds() (x, y, width, height float64) {
 	// 卡片高度使用比例配置计算（原始高度约 140px * 缩放比例）
 	cardHeight := 140.0 * config.ConveyorCardScale
 
-	return conveyorX, conveyorY, config.ConveyorBeltWidth, cardHeight + config.ConveyorBeltPadding*2 + 20
+	return conveyorX, conveyorY, config.ConveyorBeltWidth, cardHeight + config.ConveyorBeltLeftPadding*2 + 20
 }
 
 // isMouseOverConveyorCard 检测鼠标是否悬停在传送带卡片上

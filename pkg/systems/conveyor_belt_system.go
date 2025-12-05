@@ -43,7 +43,6 @@ type ConveyorBeltSystem struct {
 	cardWidth      float64 // 卡片宽度
 	beltWidth      float64 // 传送带宽度
 	leftPadding    float64 // 左侧内边距
-	movingSpacing  float64 // 移动时的间距
 	stoppedSpacing float64 // 停止后的间距
 	startOffsetX   float64 // 卡片起始位置偏移
 
@@ -62,7 +61,6 @@ func NewConveyorBeltSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.R
 		cardWidth:       100.0 * config.ConveyorCardScale, // 默认卡片宽度
 		beltWidth:       config.ConveyorBeltWidth,
 		leftPadding:     config.ConveyorBeltLeftPadding,
-		movingSpacing:   config.ConveyorCardMovingSpacing,
 		stoppedSpacing:  config.ConveyorCardStoppedSpacing,
 		startOffsetX:    config.ConveyorCardStartOffsetX,
 	}
@@ -131,7 +129,7 @@ func (s *ConveyorBeltSystem) updateBeltAnimation(dt float64, beltComp *component
 }
 
 // updateCardGeneration 更新卡片生成
-// Story 19.12: 支持动态间隔和降频调节
+// Story 19.12: 完全依赖动态时间间隔控制生成频率
 func (s *ConveyorBeltSystem) updateCardGeneration(dt float64, beltComp *components.ConveyorBeltComponent) {
 	if beltComp.IsFull() {
 		return
@@ -162,38 +160,12 @@ func (s *ConveyorBeltSystem) updateCardGeneration(dt float64, beltComp *componen
 		return
 	}
 
-	// 计算新卡片的默认起始位置
-	defaultStartX := s.beltWidth + s.cardWidth + s.startOffsetX
-
-	// 检查是否可以生成新卡片（确保有足够空间）
-	canGenerate := false
-
-	if len(beltComp.Cards) == 0 {
-		// 没有卡片，可以生成第一张
-		canGenerate = true
-	} else {
-		// 找到最右边的卡片
-		rightmostX := 0.0
-		for _, card := range beltComp.Cards {
-			if card.PositionX > rightmostX {
-				rightmostX = card.PositionX
-			}
-		}
-
-		// 检查最右边卡片与新卡片起始位置之间是否有足够间距
-		gap := defaultStartX - (rightmostX + s.cardWidth)
-		if gap >= s.movingSpacing {
-			canGenerate = true
-		}
-	}
-
-	if canGenerate {
-		cardType := s.generateCard(beltComp)
-		s.addCard(beltComp, cardType)
-		// 重置计时器并计算下一次的生成间隔
-		beltComp.GenerationTimer = 0
-		beltComp.CurrentInterval = s.getPhaseGenerationInterval()
-	}
+	// 生成新卡片
+	cardType := s.generateCard(beltComp)
+	s.addCard(beltComp, cardType)
+	// 重置计时器并计算下一次的生成间隔
+	beltComp.GenerationTimer = 0
+	beltComp.CurrentInterval = s.getPhaseGenerationInterval()
 }
 
 // updateCardMovement 更新卡片移动
