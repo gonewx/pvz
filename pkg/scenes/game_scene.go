@@ -696,7 +696,12 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 
 	// Story 19.4: 生成预设植物
 	// 必须在 GuidedTutorialSystem 初始化之后调用，这样系统才能正确追踪植物数量
-	scene.spawnPresetPlants()
+	// Bug Fix: 如果有战斗存档，跳过预设植物生成（会从存档恢复）
+	if !scene.hasBattleSave {
+		scene.spawnPresetPlants()
+	} else {
+		log.Printf("[GameScene] Skipping preset plants spawn (will restore from battle save)")
+	}
 
 	// Story 19.4: 检查是否需要激活强引导模式（Level 1-5）
 	// 并创建开场 Dave 对话

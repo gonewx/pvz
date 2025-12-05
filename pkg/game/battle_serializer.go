@@ -80,6 +80,13 @@ func (s *BattleSerializer) SaveBattle(em *ecs.EntityManager, gs *GameState, user
 	// 收集教学状态（如果是教学关卡）
 	saveData.Tutorial = s.collectTutorialData(em)
 
+	// 收集保龄球模式数据（Level 1-5）
+	saveData.BowlingNuts = s.collectBowlingNutData(em)
+	saveData.ConveyorBelt = s.collectConveyorBeltData(em)
+	saveData.LevelPhase = s.collectLevelPhaseData(em)
+	saveData.DaveDialogue = s.collectDaveDialogueData(em)
+	saveData.GuidedTutorial = s.collectGuidedTutorialData(em)
+
 	// 使用 gob 编码到内存 buffer
 	var buffer bytes.Buffer
 	encoder := gob.NewEncoder(&buffer)
@@ -677,6 +684,8 @@ func (s *BattleSerializer) collectLevelPhaseData(em *ecs.EntityManager) *LevelPh
 func (s *BattleSerializer) collectDaveDialogueData(em *ecs.EntityManager) *DaveDialogueData {
 	// 查询所有拥有 DaveDialogueComponent 的实体
 	entities := ecs.GetEntitiesWith1[*components.DaveDialogueComponent](em)
+
+	log.Printf("[BattleSerializer] collectDaveDialogueData: found %d Dave entities", len(entities))
 
 	if len(entities) == 0 {
 		return nil

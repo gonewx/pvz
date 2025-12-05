@@ -140,6 +140,13 @@ func (s *LevelPhaseSystem) StartPhaseTransition(from, to int) {
 		return
 	}
 
+	// Bug Fix: 如果已经在转场中，忽略重复的转场请求
+	// 这可能发生在从存档恢复后，GuidedTutorialSystem 再次触发回调的情况
+	if phaseComp.PhaseState == components.PhaseStateTransitioning {
+		log.Printf("[LevelPhaseSystem] Already transitioning, ignoring duplicate transition request")
+		return
+	}
+
 	// 验证转场有效性
 	if phaseComp.CurrentPhase != from {
 		log.Printf("[LevelPhaseSystem] WARNING: Current phase is %d, not %d, ignoring transition request",
@@ -174,6 +181,15 @@ func (s *LevelPhaseSystem) executeDisableGuided(phaseComp *components.LevelPhase
 // createTransitionDaveDialogue 创建转场 Dave 对话
 func (s *LevelPhaseSystem) createTransitionDaveDialogue(phaseComp *components.LevelPhaseComponent) {
 	log.Printf("[LevelPhaseSystem] Step 2: Creating Dave dialogue for transition")
+
+	// Bug Fix: 检查是否已存在 Dave 实体（从存档恢复的情况）
+	// 如果已存在，使用现有实体而不是创建新的
+	existingDaves := ecs.GetEntitiesWith1[*components.DaveDialogueComponent](s.entityManager)
+	if len(existingDaves) > 0 {
+		phaseComp.DaveDialogueEntityID = int(existingDaves[0])
+		log.Printf("[LevelPhaseSystem] Using existing Dave entity from save restore: %d", existingDaves[0])
+		return
+	}
 
 	// 检查资源加载器是否可用（测试环境下可能为 nil）
 	if s.resourceLoader == nil {
