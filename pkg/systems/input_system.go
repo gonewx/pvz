@@ -90,6 +90,10 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 		s.gameState.TogglePause()
 		if s.gameState.IsPaused {
 			log.Printf("[InputSystem] 游戏暂停 (ESC)")
+			// 播放暂停音效
+			if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+				audioManager.PlaySound("SOUND_PAUSE")
+			}
 		} else {
 			log.Printf("[InputSystem] 游戏恢复 (ESC)")
 		}

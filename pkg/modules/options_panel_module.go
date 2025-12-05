@@ -93,12 +93,18 @@ func NewOptionsPanelModule(
 			OnFullscreenToggle: func(enabled bool) {
 				// 全屏切换由 SettingsPanelModule 内部处理
 			},
-			// Story 20.5: 音量应用回调（TODO: 连接到音频系统）
+			// 音量应用回调：连接到 AudioManager
 			OnMusicVolumeApply: func(volume float64) {
-				log.Printf("[OptionsPanelModule] Applying music volume: %.2f (TODO: connect to audio system)", volume)
+				if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+					audioManager.SetMusicVolume(volume)
+					log.Printf("[OptionsPanelModule] Applied music volume: %.2f", volume)
+				}
 			},
 			OnSoundVolumeApply: func(volume float64) {
-				log.Printf("[OptionsPanelModule] Applying sound volume: %.2f (TODO: connect to audio system)", volume)
+				if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+					audioManager.SetSoundVolume(volume)
+					log.Printf("[OptionsPanelModule] Applied sound volume: %.2f", volume)
+				}
 			},
 		},
 		&BottomButtonConfig{

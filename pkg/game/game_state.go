@@ -67,6 +67,11 @@ type GameState struct {
 	// 管理游戏设置（音量、全屏等），使用 gdata 进行跨平台存储
 	// 如果初始化失败，settingsManager 为 nil，游戏使用默认设置
 	settingsManager *SettingsManager
+
+	// 音频管理器
+	// 管理游戏中所有音效和背景音乐的播放，支持音量控制
+	// 需要通过 SetAudioManager 设置，由持有 ResourceManager 的组件初始化
+	audioManager *AudioManager
 }
 
 // 全局单例实例（这是架构规范允许的唯一全局变量）
@@ -585,4 +590,25 @@ func (gs *GameState) IncrementCompletedFlags(count int) {
 //   - bool: true 表示二周目，false 表示一周目
 func (gs *GameState) IsSecondPlaythrough() bool {
 	return gs.TotalCompletedFlags >= 50
+}
+
+// ========================================
+// 音频管理器
+// ========================================
+
+// SetAudioManager 设置音频管理器
+// 由持有 ResourceManager 的场景初始化后设置
+//
+// 参数：
+//   - am: AudioManager 实例
+func (gs *GameState) SetAudioManager(am *AudioManager) {
+	gs.audioManager = am
+}
+
+// GetAudioManager 获取音频管理器
+//
+// 返回：
+//   - *AudioManager: 音频管理器实例，如果未设置返回 nil
+func (gs *GameState) GetAudioManager() *AudioManager {
+	return gs.audioManager
 }

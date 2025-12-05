@@ -179,11 +179,11 @@ func (s *FlagWaveWarningSystem) createFinalWaveWarningEntity() {
 		Processed: false,
 	})
 
-	// 播放音效：SOUND_AWOOGA（僵尸来袭音效）
-	if audioPlayer := s.resourceManager.GetAudioPlayer("SOUND_AWOOGA"); audioPlayer != nil {
-		audioPlayer.Rewind()
-		audioPlayer.Play()
-		log.Printf("[FlagWaveWarningSystem] Playing SOUND_AWOOGA for final wave")
+	// 播放音效：SOUND_AWOOGA（僵尸来袭音效）+ SOUND_FINALWAVE（最后一波特有音效）
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_AWOOGA")
+		audioManager.PlaySound("SOUND_FINALWAVE")
+		log.Printf("[FlagWaveWarningSystem] Playing SOUND_AWOOGA + SOUND_FINALWAVE for final wave")
 	}
 
 	log.Printf("[FlagWaveWarningSystem] Created final wave warning entity (ID: %d) - queued after huge wave",
@@ -317,13 +317,11 @@ func (s *FlagWaveWarningSystem) createWarningEntity() {
 		Processed: false,
 	})
 
-	// 播放音效：SOUND_AWOOGA（僵尸来袭音效）
-	if audioPlayer := s.resourceManager.GetAudioPlayer("SOUND_AWOOGA"); audioPlayer != nil {
-		audioPlayer.Rewind()
-		audioPlayer.Play()
-		log.Printf("[FlagWaveWarningSystem] Playing SOUND_AWOOGA")
-	} else {
-		log.Printf("[FlagWaveWarningSystem] WARNING: SOUND_AWOOGA not loaded")
+	// 播放音效：SOUND_AWOOGA（僵尸来袭音效）+ SOUND_HUGE_WAVE（大波特有音效）
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_AWOOGA")
+		audioManager.PlaySound("SOUND_HUGE_WAVE")
+		log.Printf("[FlagWaveWarningSystem] Playing SOUND_AWOOGA + SOUND_HUGE_WAVE")
 	}
 
 	log.Printf("[FlagWaveWarningSystem] Created huge wave warning entity (ID: %d) at (%.0f, %.0f) with custom text image",

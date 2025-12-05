@@ -249,6 +249,13 @@ func (s *WaveSpawnSystem) ActivateWave(waveIndex int) int {
 	// 查询所有带 ZombieWaveStateComponent 的僵尸
 	zombieEntities := ecs.GetEntitiesWith1[*components.ZombieWaveStateComponent](s.entityManager)
 
+	// 播放僵尸呻吟音效（每波激活时播放一次，随机选择）
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		groanSounds := []string{"SOUND_GROAN", "SOUND_GROAN2", "SOUND_GROAN3", "SOUND_GROAN4", "SOUND_GROAN5", "SOUND_GROAN6"}
+		randomIndex := rand.Intn(len(groanSounds))
+		audioManager.PlaySound(groanSounds[randomIndex])
+	}
+
 	activated := 0
 	for _, entityID := range zombieEntities {
 		waveState, ok := ecs.GetComponent[*components.ZombieWaveStateComponent](s.entityManager, entityID)

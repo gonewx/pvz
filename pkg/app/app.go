@@ -74,6 +74,12 @@ func NewApp(cfg Config) (*App, error) {
 	// 将配置管理器传递给 ResourceManager
 	resourceManager.SetReanimConfigManager(reanimConfigManager)
 
+	// 初始化 AudioManager 并设置到 GameState
+	gameState := game.GetGameState()
+	audioManager := game.NewAudioManager(resourceManager, gameState.GetSettingsManager())
+	gameState.SetAudioManager(audioManager)
+	log.Printf("[App] AudioManager initialized")
+
 	// 创建场景管理器
 	sceneManager := game.NewSceneManager()
 	sceneManager.SetSceneFactory(func(levelID string) game.Scene {

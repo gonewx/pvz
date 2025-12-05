@@ -443,6 +443,11 @@ func (s *ZombiesWonPhaseSystem) updatePhase4Dialog(
 	if !phaseComp.DialogShown {
 		log.Printf("[ZombiesWonPhaseSystem] Phase 4: Showing game over dialog immediately")
 
+		// 播放失败音乐
+		if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+			audioManager.PlayMusic("SOUND_LOSEMUSIC")
+		}
+
 		// 直接创建游戏结束对话框（只有"再次尝试"按钮）
 		_, err := entities.NewGameOverDialogEntity(
 			s.entityManager,

@@ -2,11 +2,13 @@ package behavior
 
 import (
 	"log"
+	"math/rand"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/entities"
+	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/types"
 	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -128,6 +130,13 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 // 注意：手臂掉落粒子效果在 updateZombieDamageState 中触发（受伤时）
 
 func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
+	// 播放僵尸死亡音效（随机选择 splat 音效）
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		splatSounds := []string{"SOUND_SPLAT", "SOUND_SPLAT2", "SOUND_SPLAT3"}
+		randomIndex := rand.Intn(len(splatSounds))
+		audioManager.PlaySound(splatSounds[randomIndex])
+	}
+
 	// 1. 切换行为类型为 BehaviorZombieDying
 	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
 	if !ok {
@@ -288,6 +297,11 @@ func (s *BehaviorSystem) updateZombieDamageState(entityID ecs.EntityID, health *
 	if health.CurrentHealth <= armLostThreshold && !health.ArmLost {
 		// 标记手臂已掉落，防止重复触发
 		health.ArmLost = true
+
+		// 播放手臂掉落音效
+		if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+			audioManager.PlaySound("SOUND_LIMBS_POP")
+		}
 
 		// 获取行为组件，检查僵尸类型
 		behavior, hasBehavior := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
@@ -476,6 +490,13 @@ func (s *BehaviorSystem) changeZombieAnimation(zombieID ecs.EntityID, newState c
 
 func (s *BehaviorSystem) startEatingPlant(zombieID, plantID ecs.EntityID) {
 	log.Printf("[BehaviorSystem] 僵尸 %d 开始啃食植物 %d", zombieID, plantID)
+
+	// 播放僵尸开始啃食音效（随机选择 chomp 音效）
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		chompSounds := []string{"SOUND_CHOMP", "SOUND_CHOMP2"}
+		randomIndex := rand.Intn(len(chompSounds))
+		audioManager.PlaySound(chompSounds[randomIndex])
+	}
 
 	// 1. 移除僵尸的 VelocityComponent（停止移动）
 	ecs.RemoveComponent[*components.VelocityComponent](s.entityManager, zombieID)
