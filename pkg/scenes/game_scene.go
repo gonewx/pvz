@@ -638,8 +638,12 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 				}
 				scene.conveyorBeltSystem.SetCardPool(cardPool)
 			}
-			log.Printf("[GameScene] Conveyor belt configured from level config: interval=%.1fs, pool=%d entries",
-				conveyorConfig.GenerationInterval, len(conveyorConfig.CardPool))
+			// Story 19.12: 设置动态调节配置
+			if len(conveyorConfig.PhaseConfigs) > 0 || conveyorConfig.DynamicAdjustment != nil {
+				scene.conveyorBeltSystem.SetDynamicConfig(conveyorConfig.PhaseConfigs, conveyorConfig.DynamicAdjustment)
+			}
+			log.Printf("[GameScene] Conveyor belt configured from level config: interval=%.1fs, pool=%d entries, phases=%d",
+				conveyorConfig.GenerationInterval, len(conveyorConfig.CardPool), len(conveyorConfig.PhaseConfigs))
 
 			// 加载传送带卡片渲染资源（需要在 reanimSystem 初始化后）
 			scene.loadConveyorCardResources()

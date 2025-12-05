@@ -44,12 +44,34 @@ rewardPlant: "potatomine"       # 完成后奖励土豆地雷（注意：无下�
 conveyorBelt:
   enabled: true
   capacity: 10
-  generationInterval: 4.0
+  generationInterval: 3.0
   cardPool:
     - type: "wallnut_bowling"
       weight: 85
     - type: "explode_o_nut"
       weight: 15
+  # Story 19.12: 三阶段动态配置
+  phaseConfigs:
+    - progressThreshold: 0.0   # 前期 (0%-30%)
+      explodeNutWeight: 10
+      intervalMin: 3.0
+      intervalMax: 3.5
+    - progressThreshold: 0.3   # 中期 (30%-70%)
+      explodeNutWeight: 20
+      intervalMin: 2.2
+      intervalMax: 2.5
+    - progressThreshold: 0.7   # 终盘 (70%-100%)
+      explodeNutWeight: 30
+      intervalMin: 1.5
+      intervalMax: 1.8
+  # Story 19.12: 动态调节参数
+  dynamicAdjustment:
+    emptyBeltThreshold: 3.0        # 空带保底阈值（秒）
+    fullBeltThreshold: 8.0         # 满带降频阈值（秒）
+    fullBeltThrottleMultiplier: 1.5  # 降频倍率
+    crisisExplodeNutCooldown: 5.0  # 危机爆炸坚果冷却（秒）
+    crisisZombieCount: 2           # 危机检测僵尸数量
+    crisisDistanceThreshold: 300   # 危机检测距离阈值（像素）
 
 # === 波次配置 (保龄球阶段) ===
 # 注意：保龄球阶段的波次会在转场完成后才开始生效

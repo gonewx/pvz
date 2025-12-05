@@ -19,6 +19,7 @@ type CardPoolEntry struct {
 
 // ConveyorBeltSystem 传送带系统
 // Story 19.5: 管理传送带动画、卡片生成和交互
+// Story 19.12: 支持动态调节系统（三阶段权重/间隔、空带保底、满带降频、危机保底）
 //
 // 核心设计：
 // - 履带和卡片使用相同速度移动，保持相对静止
@@ -32,7 +33,7 @@ type ConveyorBeltSystem struct {
 	// beltEntity 传送带实体ID
 	beltEntity ecs.EntityID
 
-	// cardPool 卡片池配置
+	// cardPool 卡片池配置（默认值，被动态配置覆盖）
 	cardPool []CardPoolEntry
 
 	// 常量缓存
@@ -45,6 +46,10 @@ type ConveyorBeltSystem struct {
 	movingSpacing  float64 // 移动时的间距
 	stoppedSpacing float64 // 停止后的间距
 	startOffsetX   float64 // 卡片起始位置偏移
+
+	// Story 19.12: 动态调节配置
+	phaseConfigs      []config.PhaseConfig           // 各阶段配置
+	dynamicAdjustment *config.DynamicAdjustmentConfig // 动态调节参数
 }
 
 // NewConveyorBeltSystem 创建传送带系统
@@ -96,10 +101,20 @@ func (s *ConveyorBeltSystem) Update(dt float64) {
 	// 1. 更新传动动画（履带滚动）
 	s.updateBeltAnimation(dt, beltComp)
 
-	// 2. 更新卡片生成
+	// Story 19.12: 动态调节检测
+	// 2. 检查空带补发保底
+	s.checkEmptyBeltEmergency(dt, beltComp)
+
+	// 3. 检查满带降频调节
+	s.checkFullBeltThrottle(dt, beltComp)
+
+	// 4. 检查危机爆炸坚果保底
+	s.checkCrisisExplodeNut(beltComp)
+
+	// 5. 更新卡片生成（使用动态间隔）
 	s.updateCardGeneration(dt, beltComp)
 
-	// 3. 更新卡片移动（与履带同速度）
+	// 6. 更新卡片移动（与履带同速度）
 	s.updateCardMovement(dt, beltComp)
 }
 
@@ -116,16 +131,41 @@ func (s *ConveyorBeltSystem) updateBeltAnimation(dt float64, beltComp *component
 }
 
 // updateCardGeneration 更新卡片生成
-// 基于距离间隔生成卡片，而不是时间间隔
+// Story 19.12: 支持动态间隔和降频调节
 func (s *ConveyorBeltSystem) updateCardGeneration(dt float64, beltComp *components.ConveyorBeltComponent) {
 	if beltComp.IsFull() {
+		return
+	}
+
+	// Story 19.12: 使用缓存的生成间隔，避免每帧随机
+	// 如果 CurrentInterval <= 0，说明需要初始化
+	if beltComp.CurrentInterval <= 0 {
+		beltComp.CurrentInterval = s.getPhaseGenerationInterval()
+	}
+
+	currentInterval := beltComp.CurrentInterval
+
+	// Story 19.12: 如果处于降频状态，增加间隔
+	if beltComp.IsThrottled {
+		throttleMultiplier := 1.5 // 默认降频倍率
+		if s.dynamicAdjustment != nil && s.dynamicAdjustment.FullBeltThrottleMultiplier > 0 {
+			throttleMultiplier = s.dynamicAdjustment.FullBeltThrottleMultiplier
+		}
+		currentInterval *= throttleMultiplier
+	}
+
+	// 更新生成计时器
+	beltComp.GenerationTimer += dt
+
+	// 检查是否达到生成间隔
+	if beltComp.GenerationTimer < currentInterval {
 		return
 	}
 
 	// 计算新卡片的默认起始位置
 	defaultStartX := s.beltWidth + s.cardWidth + s.startOffsetX
 
-	// 检查是否可以生成新卡片
+	// 检查是否可以生成新卡片（确保有足够空间）
 	canGenerate := false
 
 	if len(beltComp.Cards) == 0 {
@@ -141,9 +181,6 @@ func (s *ConveyorBeltSystem) updateCardGeneration(dt float64, beltComp *componen
 		}
 
 		// 检查最右边卡片与新卡片起始位置之间是否有足够间距
-		// 新卡片左边缘 = defaultStartX
-		// 最右边卡片右边缘 = rightmostX + cardWidth
-		// 间距 = defaultStartX - (rightmostX + cardWidth)
 		gap := defaultStartX - (rightmostX + s.cardWidth)
 		if gap >= s.movingSpacing {
 			canGenerate = true
@@ -151,8 +188,11 @@ func (s *ConveyorBeltSystem) updateCardGeneration(dt float64, beltComp *componen
 	}
 
 	if canGenerate {
-		cardType := s.generateCard()
+		cardType := s.generateCard(beltComp)
 		s.addCard(beltComp, cardType)
+		// 重置计时器并计算下一次的生成间隔
+		beltComp.GenerationTimer = 0
+		beltComp.CurrentInterval = s.getPhaseGenerationInterval()
 	}
 }
 
@@ -208,26 +248,45 @@ func (s *ConveyorBeltSystem) calculateStopPosition(beltComp *components.Conveyor
 }
 
 // generateCard 按权重生成卡片类型
-func (s *ConveyorBeltSystem) generateCard() string {
+// Story 19.12: 支持动态卡片池和强制生成
+func (s *ConveyorBeltSystem) generateCard(beltComp *components.ConveyorBeltComponent) string {
+	// Story 19.12: 检查是否强制生成爆炸坚果
+	if beltComp.ForceExplodeNut {
+		beltComp.ForceExplodeNut = false
+		if s.gameState != nil {
+			beltComp.LastExplodeNutTime = s.gameState.LevelTime
+		}
+		log.Printf("[ConveyorBeltSystem] Forced explode-o-nut spawn (crisis response)")
+		return components.CardTypeExplodeONut
+	}
+
+	// Story 19.12: 使用动态卡片池
+	pool := s.getPhaseCardPool()
+
 	totalWeight := 0
-	for _, entry := range s.cardPool {
+	for _, entry := range pool {
 		totalWeight += entry.Weight
 	}
 
 	if totalWeight <= 0 {
-		return s.cardPool[0].Type
+		return pool[0].Type
 	}
 
 	roll := rand.Intn(totalWeight)
 	cumulative := 0
-	for _, entry := range s.cardPool {
+	for _, entry := range pool {
 		cumulative += entry.Weight
 		if roll < cumulative {
-			return entry.Type
+			cardType := entry.Type
+			// 记录爆炸坚果生成时间
+			if cardType == components.CardTypeExplodeONut && s.gameState != nil {
+				beltComp.LastExplodeNutTime = s.gameState.LevelTime
+			}
+			return cardType
 		}
 	}
 
-	return s.cardPool[0].Type
+	return pool[0].Type
 }
 
 // addCard 添加卡片到传送带
@@ -247,8 +306,8 @@ func (s *ConveyorBeltSystem) addCard(beltComp *components.ConveyorBeltComponent,
 
 	beltComp.Cards = append(beltComp.Cards, card)
 
-	log.Printf("[ConveyorBeltSystem] Generated card: %s, queue length: %d/%d, startX=%.1f, movingSpacing=%.1f",
-		cardType, len(beltComp.Cards), beltComp.Capacity, startX, s.movingSpacing)
+	log.Printf("[ConveyorBeltSystem] Generated card: %s, queue length: %d/%d, startX=%.1f, timer=%.2f, interval=%.2f",
+		cardType, len(beltComp.Cards), beltComp.Capacity, startX, beltComp.GenerationTimer, beltComp.CurrentInterval)
 
 	return true
 }
@@ -427,7 +486,14 @@ func (s *ConveyorBeltSystem) Activate() {
 
 	beltComp.IsActive = true
 	beltComp.GenerationTimer = 0
-	log.Printf("[ConveyorBeltSystem] Activated")
+	// Story 19.12: 激活时初始化生成间隔
+	beltComp.CurrentInterval = s.getPhaseGenerationInterval()
+
+	// 激活时立即生成第一张卡，让玩家可以立即开始操作
+	cardType := s.generateCard(beltComp)
+	s.addCard(beltComp, cardType)
+
+	log.Printf("[ConveyorBeltSystem] Activated, interval=%.2fs, first card generated", beltComp.CurrentInterval)
 }
 
 // Deactivate 停用传送带
@@ -486,5 +552,261 @@ func (s *ConveyorBeltSystem) IsPlacementValid(worldX float64) bool {
 func (s *ConveyorBeltSystem) SetCardWidth(width float64) {
 	if width > 0 {
 		s.cardWidth = width
+	}
+}
+
+// ========================================
+// Story 19.12: 动态调节系统方法
+// ========================================
+
+// SetDynamicConfig 设置动态调节配置
+// 在关卡加载时调用，从关卡配置中读取动态调节参数
+func (s *ConveyorBeltSystem) SetDynamicConfig(phaseConfigs []config.PhaseConfig, dynamicAdjustment *config.DynamicAdjustmentConfig) {
+	s.phaseConfigs = phaseConfigs
+	s.dynamicAdjustment = dynamicAdjustment
+	log.Printf("[ConveyorBeltSystem] Dynamic config set: %d phases, dynamicAdjustment=%v",
+		len(phaseConfigs), dynamicAdjustment != nil)
+}
+
+// getLevelProgress 获取关卡进度百分比
+// 返回 0.0 到 1.0 之间的值
+func (s *ConveyorBeltSystem) getLevelProgress() float64 {
+	currentWave, totalWaves := s.gameState.GetLevelProgress()
+	if totalWaves == 0 {
+		return 0.0
+	}
+	return float64(currentWave) / float64(totalWaves)
+}
+
+// getCurrentPhase 获取当前阶段
+// 返回 1（前期）、2（中期）或 3（终盘）
+func (s *ConveyorBeltSystem) getCurrentPhase() int {
+	_, totalWaves := s.gameState.GetLevelProgress()
+
+	// 简化波次支持：当波次过少时使用中期配置
+	if totalWaves <= 2 {
+		return 2 // 中期
+	}
+
+	progress := s.getLevelProgress()
+	switch {
+	case progress < 0.3:
+		return 1 // 前期
+	case progress < 0.7:
+		return 2 // 中期
+	default:
+		return 3 // 终盘
+	}
+}
+
+// getPhaseCardPool 获取当前阶段的卡片池
+// 根据阶段返回不同的爆炸坚果权重
+func (s *ConveyorBeltSystem) getPhaseCardPool() []CardPoolEntry {
+	// 如果没有配置阶段配置，使用默认卡片池
+	if len(s.phaseConfigs) == 0 {
+		return s.cardPool
+	}
+
+	// 如果 gameState 为 nil，使用默认卡片池
+	if s.gameState == nil {
+		return s.cardPool
+	}
+
+	progress := s.getLevelProgress()
+
+	// 查找当前进度对应的阶段配置
+	var currentConfig *config.PhaseConfig
+	for i := len(s.phaseConfigs) - 1; i >= 0; i-- {
+		if progress >= s.phaseConfigs[i].ProgressThreshold {
+			currentConfig = &s.phaseConfigs[i]
+			break
+		}
+	}
+
+	// 如果没有匹配的配置，使用第一个配置
+	if currentConfig == nil && len(s.phaseConfigs) > 0 {
+		currentConfig = &s.phaseConfigs[0]
+	}
+
+	// 如果仍然没有配置，使用默认卡片池
+	if currentConfig == nil {
+		return s.cardPool
+	}
+
+	// 构建卡片池：普通坚果 + 爆炸坚果
+	wallnutWeight := 100 - currentConfig.ExplodeNutWeight
+	return []CardPoolEntry{
+		{Type: components.CardTypeWallnutBowling, Weight: wallnutWeight},
+		{Type: components.CardTypeExplodeONut, Weight: currentConfig.ExplodeNutWeight},
+	}
+}
+
+// getPhaseGenerationInterval 获取当前阶段的生成间隔
+// 返回当前阶段配置的随机间隔
+func (s *ConveyorBeltSystem) getPhaseGenerationInterval() float64 {
+	// 如果没有配置阶段配置，返回默认间隔
+	if len(s.phaseConfigs) == 0 {
+		beltComp, ok := ecs.GetComponent[*components.ConveyorBeltComponent](s.entityManager, s.beltEntity)
+		if ok {
+			return beltComp.GenerationInterval
+		}
+		return components.DefaultCardGenerationInterval
+	}
+
+	// 如果 gameState 为 nil，返回默认间隔
+	if s.gameState == nil {
+		return components.DefaultCardGenerationInterval
+	}
+
+	progress := s.getLevelProgress()
+
+	// 查找当前进度对应的阶段配置
+	var currentConfig *config.PhaseConfig
+	for i := len(s.phaseConfigs) - 1; i >= 0; i-- {
+		if progress >= s.phaseConfigs[i].ProgressThreshold {
+			currentConfig = &s.phaseConfigs[i]
+			break
+		}
+	}
+
+	// 如果没有匹配的配置，使用第一个配置
+	if currentConfig == nil && len(s.phaseConfigs) > 0 {
+		currentConfig = &s.phaseConfigs[0]
+	}
+
+	// 如果仍然没有配置，返回默认间隔
+	if currentConfig == nil {
+		return components.DefaultCardGenerationInterval
+	}
+
+	// 在 intervalMin 和 intervalMax 之间随机
+	intervalRange := currentConfig.IntervalMax - currentConfig.IntervalMin
+	return currentConfig.IntervalMin + rand.Float64()*intervalRange
+}
+
+// checkEmptyBeltEmergency 检查空带补发保底
+// AC 3: 传送带连续 3 秒为空时，立即触发一次额外生成（必出普通坚果）
+func (s *ConveyorBeltSystem) checkEmptyBeltEmergency(dt float64, beltComp *components.ConveyorBeltComponent) {
+	// 获取空带阈值
+	threshold := 3.0 // 默认值
+	if s.dynamicAdjustment != nil && s.dynamicAdjustment.EmptyBeltThreshold > 0 {
+		threshold = s.dynamicAdjustment.EmptyBeltThreshold
+	}
+
+	if beltComp.IsEmpty() {
+		beltComp.EmptyDuration += dt
+		if beltComp.EmptyDuration >= threshold {
+			// 紧急补发普通坚果
+			s.addCard(beltComp, components.CardTypeWallnutBowling)
+			beltComp.EmptyDuration = 0
+			// 同步重置正常生成计时器，避免空带保底和正常生成在短时间内连续触发
+			beltComp.GenerationTimer = 0
+			beltComp.CurrentInterval = s.getPhaseGenerationInterval()
+			log.Printf("[ConveyorBeltSystem] Emergency: Belt empty for %.1fs, spawned wallnut", threshold)
+		}
+	} else {
+		beltComp.EmptyDuration = 0
+	}
+}
+
+// checkFullBeltThrottle 检查满带降频调节
+// AC 4: 传送带连续 8 秒处于满状态时，刷新间隔提高 50%
+func (s *ConveyorBeltSystem) checkFullBeltThrottle(dt float64, beltComp *components.ConveyorBeltComponent) {
+	// 获取满带阈值
+	threshold := 8.0 // 默认值
+	if s.dynamicAdjustment != nil && s.dynamicAdjustment.FullBeltThreshold > 0 {
+		threshold = s.dynamicAdjustment.FullBeltThreshold
+	}
+
+	if beltComp.IsFull() {
+		beltComp.FullDuration += dt
+		if beltComp.FullDuration >= threshold && !beltComp.IsThrottled {
+			beltComp.IsThrottled = true
+			log.Printf("[ConveyorBeltSystem] Throttle: Belt full for %.1fs, reducing spawn rate", threshold)
+		}
+	} else {
+		beltComp.FullDuration = 0
+		// 低于满容量 2 格时解除降频
+		if beltComp.CardCount() <= beltComp.Capacity-2 {
+			if beltComp.IsThrottled {
+				log.Printf("[ConveyorBeltSystem] Throttle released: CardCount=%d, Capacity=%d",
+					beltComp.CardCount(), beltComp.Capacity)
+			}
+			beltComp.IsThrottled = false
+		}
+	}
+}
+
+// checkCrisisExplodeNut 检查危机爆炸坚果保底
+// AC 5: 检测到同一行有 2+ 僵尸距离安全线 ≤ 阈值时，强制下次生成爆炸坚果
+func (s *ConveyorBeltSystem) checkCrisisExplodeNut(beltComp *components.ConveyorBeltComponent) {
+	// 如果已经标记强制生成，等待生成
+	if beltComp.ForceExplodeNut {
+		return
+	}
+
+	// 如果没有动态调节配置，跳过危机检测
+	if s.dynamicAdjustment == nil {
+		return
+	}
+
+	// 检查上次生成爆炸坚果是否超过冷却时间
+	levelTime := s.gameState.LevelTime
+	if levelTime-beltComp.LastExplodeNutTime < s.dynamicAdjustment.CrisisExplodeNutCooldown {
+		return
+	}
+
+	// 查询所有具有 BehaviorComponent 和 PositionComponent 的实体
+	entities := ecs.GetEntitiesWith2[*components.BehaviorComponent, *components.PositionComponent](s.entityManager)
+
+	// 安全线位置（家门口）
+	safeLineX := config.GridWorldStartX
+
+	// 按行统计接近安全线的僵尸数量
+	laneCounts := make(map[int]int)
+	for _, entity := range entities {
+		behaviorComp, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entity)
+		if !ok {
+			continue
+		}
+
+		// 检查是否为僵尸（排除死亡中的僵尸）
+		if !s.isActiveZombie(behaviorComp) {
+			continue
+		}
+
+		posComp, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entity)
+		if !ok {
+			continue
+		}
+
+		// 使用配置常量定义危机距离阈值
+		if posComp.X <= safeLineX+s.dynamicAdjustment.CrisisDistanceThreshold {
+			row := int((posComp.Y - config.GridWorldStartY) / config.CellHeight)
+			laneCounts[row]++
+		}
+	}
+
+	// 检查是否有行存在危机（使用配置常量定义僵尸数量阈值）
+	for _, count := range laneCounts {
+		if count >= s.dynamicAdjustment.CrisisZombieCount {
+			beltComp.ForceExplodeNut = true
+			log.Printf("[ConveyorBeltSystem] Crisis detected: forcing explode-o-nut spawn")
+			break
+		}
+	}
+}
+
+// isActiveZombie 检查实体是否为活动状态的僵尸
+func (s *ConveyorBeltSystem) isActiveZombie(behaviorComp *components.BehaviorComponent) bool {
+	switch behaviorComp.Type {
+	case components.BehaviorZombieBasic,
+		components.BehaviorZombieEating,
+		components.BehaviorZombieConehead,
+		components.BehaviorZombieBuckethead,
+		components.BehaviorZombieFlag:
+		return true
+	default:
+		return false
 	}
 }

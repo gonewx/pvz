@@ -39,6 +39,32 @@ type ConveyorBeltComponent struct {
 	// FinalWaveTriggered 最终波是否已触发
 	// 用于避免重复插入爆炸坚果
 	FinalWaveTriggered bool
+
+	// Story 19.12: 动态调节系统字段
+
+	// EmptyDuration 传送带为空的持续时间（秒）
+	// 用于空带补发保底逻辑
+	EmptyDuration float64
+
+	// FullDuration 传送带满载的持续时间（秒）
+	// 用于满带降频调节逻辑
+	FullDuration float64
+
+	// LastExplodeNutTime 上次生成爆炸坚果的时间（关卡时间）
+	// 用于危机爆炸坚果保底冷却判断
+	LastExplodeNutTime float64
+
+	// IsThrottled 是否处于降频状态
+	// 满带 8 秒后进入降频，刷新间隔 × 1.5
+	IsThrottled bool
+
+	// ForceExplodeNut 是否强制下次生成爆炸坚果
+	// 危机检测触发后设置为 true
+	ForceExplodeNut bool
+
+	// CurrentInterval 当前生成间隔（秒）
+	// 在每次生成卡片后重新计算，避免每帧随机
+	CurrentInterval float64
 }
 
 // ConveyorCard 传送带卡片

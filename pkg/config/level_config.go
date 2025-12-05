@@ -102,6 +102,30 @@ type ConveyorBeltConfig struct {
 	GenerationInterval float64         `yaml:"generationInterval"` // 卡片生成间隔（秒，默认 3.0）
 	CardWidth          float64         `yaml:"cardWidth"`          // 卡片宽度（像素），可选，默认使用 ConveyorCardScale 计算
 	CardHeight         float64         `yaml:"cardHeight"`         // 卡片高度（像素），可选，默认使用 ConveyorCardScale 计算
+
+	// Story 19.12: 动态调节系统配置
+	PhaseConfigs      []PhaseConfig           `yaml:"phaseConfigs"`      // 各阶段配置
+	DynamicAdjustment *DynamicAdjustmentConfig `yaml:"dynamicAdjustment"` // 动态调节参数
+}
+
+// PhaseConfig 阶段配置（Story 19.12）
+// 定义各阶段的爆炸坚果权重和生成间隔
+type PhaseConfig struct {
+	ProgressThreshold float64 `yaml:"progressThreshold"` // 进度阈值（0.0-1.0）
+	ExplodeNutWeight  int     `yaml:"explodeNutWeight"`  // 爆炸坚果权重（0-100）
+	IntervalMin       float64 `yaml:"intervalMin"`       // 最小生成间隔（秒）
+	IntervalMax       float64 `yaml:"intervalMax"`       // 最大生成间隔（秒）
+}
+
+// DynamicAdjustmentConfig 动态调节配置（Story 19.12）
+// 定义空带保底、满带降频、危机保底等参数
+type DynamicAdjustmentConfig struct {
+	EmptyBeltThreshold        float64 `yaml:"emptyBeltThreshold"`        // 空带保底阈值（秒），默认 3.0
+	FullBeltThreshold         float64 `yaml:"fullBeltThreshold"`         // 满带降频阈值（秒），默认 8.0
+	FullBeltThrottleMultiplier float64 `yaml:"fullBeltThrottleMultiplier"` // 降频倍率，默认 1.5
+	CrisisExplodeNutCooldown  float64 `yaml:"crisisExplodeNutCooldown"`  // 危机爆炸坚果冷却（秒），默认 5.0
+	CrisisZombieCount         int     `yaml:"crisisZombieCount"`         // 危机检测僵尸数量，默认 2
+	CrisisDistanceThreshold   float64 `yaml:"crisisDistanceThreshold"`   // 危机检测距离阈值（像素），默认 300
 }
 
 // CardPoolEntry 卡片池条目（Story 19.5）
