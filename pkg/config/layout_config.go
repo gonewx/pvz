@@ -489,8 +489,8 @@ const (
 	// ========== 传送带配置参数（Story 19.5）（可手工调节） ==========
 
 	// ConveyorBeltWidth 传送带宽度（像素）
-	// 容纳 10 张卡片 + 边框
-	ConveyorBeltWidth = 450.0
+	// 应与 ConveyorBelt_backdrop.png 实际宽度一致 (516 x 86)
+	ConveyorBeltWidth = 516.0
 
 	// ConveyorBeltTopPadding 传送带上边距微调（像素）
 	// 卡片在垂直居中基础上的额外偏移，正值向下，负值向上
@@ -504,8 +504,13 @@ const (
 
 	// ConveyorCardMovingSpacing 卡片移动时的间距（像素）
 	// 卡片在传送带上移动时与前面卡片保持的间距
-	// 建议值范围：30.0 - 100.0
+	// 建议值范围：5.0 - 50.0
 	ConveyorCardMovingSpacing = 5.0
+
+	// ConveyorCardStartOffsetX 卡片起始位置相对于传送带右边界的偏移（像素）
+	// 正值表示在传送带右边界外更远处开始，避免覆盖右边框
+	// 建议值范围：0.0 - 50.0
+	ConveyorCardStartOffsetX = 10.0
 
 	// ConveyorCardStoppedSpacing 卡片停止后的最终间距（像素）
 	// 卡片到达左边界或顶住前面卡片后的间距
@@ -513,8 +518,14 @@ const (
 	ConveyorCardStoppedSpacing = 3.0
 
 	// ConveyorBeltPadding 传送带内边距（像素）
-	// 卡片距离传送带边缘的距离
+	// 卡片距离传送带左边缘的距离
 	ConveyorBeltPadding = 5.0
+
+	// ConveyorBeltRightPadding 传送带右侧内边距（像素）
+	// 卡片距离传送带右边缘的距离，用于裁剪控制
+	// 增大此值可以让卡片更早被右边框遮挡，避免覆盖边框内侧
+	// 建议值范围：5.0 - 30.0
+	ConveyorBeltRightPadding = 8.0
 
 	// ConveyorBeltRowCount 传送带纹理行数
 	// ConveyorBelt.png 有 6 行交错纹理

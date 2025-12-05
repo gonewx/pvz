@@ -234,6 +234,26 @@ func (m *MainMenuScene) updateMouseCursor() {
 				break
 			}
 		}
+
+		// Check if hovering over any slider (settings panel)
+		sliders := ecs.GetEntitiesWith1[*components.SliderComponent](m.entityManager)
+		for _, entityID := range sliders {
+			slider, ok := ecs.GetComponent[*components.SliderComponent](m.entityManager, entityID)
+			if ok && slider.IsHovered {
+				cursorShape = ebiten.CursorShapePointer
+				break
+			}
+		}
+
+		// Check if hovering over any checkbox (settings panel)
+		checkboxes := ecs.GetEntitiesWith1[*components.CheckboxComponent](m.entityManager)
+		for _, entityID := range checkboxes {
+			checkbox, ok := ecs.GetComponent[*components.CheckboxComponent](m.entityManager, entityID)
+			if ok && checkbox.IsHovered {
+				cursorShape = ebiten.CursorShapePointer
+				break
+			}
+		}
 	}
 
 	// ✅ ECS 架构重构: 只读取组件状态,不进行碰撞检测

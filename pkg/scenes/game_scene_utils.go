@@ -116,6 +116,30 @@ func (s *GameScene) updateMouseCursor() {
 		}
 	}
 
+	// 1.5. Check if hovering over any slider (settings panel)
+	if cursorShape == ebiten.CursorShapeDefault {
+		sliders := ecs.GetEntitiesWith1[*components.SliderComponent](s.entityManager)
+		for _, entityID := range sliders {
+			slider, ok := ecs.GetComponent[*components.SliderComponent](s.entityManager, entityID)
+			if ok && slider.IsHovered {
+				cursorShape = ebiten.CursorShapePointer
+				break
+			}
+		}
+	}
+
+	// 1.6. Check if hovering over any checkbox (settings panel)
+	if cursorShape == ebiten.CursorShapeDefault {
+		checkboxes := ecs.GetEntitiesWith1[*components.CheckboxComponent](s.entityManager)
+		for _, entityID := range checkboxes {
+			checkbox, ok := ecs.GetComponent[*components.CheckboxComponent](s.entityManager, entityID)
+			if ok && checkbox.IsHovered {
+				cursorShape = ebiten.CursorShapePointer
+				break
+			}
+		}
+	}
+
 	// 2. Check if hovering over any dialog button (if there are any dialogs)
 	if cursorShape == ebiten.CursorShapeDefault {
 		dialogEntities := ecs.GetEntitiesWith1[*components.DialogComponent](s.entityManager)

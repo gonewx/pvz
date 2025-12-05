@@ -233,7 +233,7 @@ func (s *GameScene) drawConveyorCards(screen *ebiten.Image, conveyorX, conveyorY
 
 	// 传送带可见区域边界（用于裁剪）
 	beltLeftEdge := conveyorX + config.ConveyorBeltPadding
-	beltRightEdge := conveyorX + beltWidth - config.ConveyorBeltPadding
+	beltRightEdge := conveyorX + beltWidth - config.ConveyorBeltRightPadding
 
 	// 遍历绘制每张卡片
 	for i, card := range beltComp.Cards {

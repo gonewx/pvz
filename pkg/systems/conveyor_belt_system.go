@@ -44,6 +44,7 @@ type ConveyorBeltSystem struct {
 	leftPadding    float64 // 左侧内边距
 	movingSpacing  float64 // 移动时的间距
 	stoppedSpacing float64 // 停止后的间距
+	startOffsetX   float64 // 卡片起始位置偏移
 }
 
 // NewConveyorBeltSystem 创建传送带系统
@@ -58,6 +59,7 @@ func NewConveyorBeltSystem(em *ecs.EntityManager, gs *game.GameState, rm *game.R
 		leftPadding:     config.ConveyorBeltLeftPadding,
 		movingSpacing:   config.ConveyorCardMovingSpacing,
 		stoppedSpacing:  config.ConveyorCardStoppedSpacing,
+		startOffsetX:    config.ConveyorCardStartOffsetX,
 	}
 
 	// 初始化默认卡片池（85% 普通坚果，15% 爆炸坚果）
@@ -114,20 +116,43 @@ func (s *ConveyorBeltSystem) updateBeltAnimation(dt float64, beltComp *component
 }
 
 // updateCardGeneration 更新卡片生成
+// 基于距离间隔生成卡片，而不是时间间隔
 func (s *ConveyorBeltSystem) updateCardGeneration(dt float64, beltComp *components.ConveyorBeltComponent) {
 	if beltComp.IsFull() {
 		return
 	}
 
-	beltComp.GenerationTimer -= dt
+	// 计算新卡片的默认起始位置
+	defaultStartX := s.beltWidth + s.cardWidth + s.startOffsetX
 
-	if beltComp.GenerationTimer <= 0 {
+	// 检查是否可以生成新卡片
+	canGenerate := false
+
+	if len(beltComp.Cards) == 0 {
+		// 没有卡片，可以生成第一张
+		canGenerate = true
+	} else {
+		// 找到最右边的卡片
+		rightmostX := 0.0
+		for _, card := range beltComp.Cards {
+			if card.PositionX > rightmostX {
+				rightmostX = card.PositionX
+			}
+		}
+
+		// 检查最右边卡片与新卡片起始位置之间是否有足够间距
+		// 新卡片左边缘 = defaultStartX
+		// 最右边卡片右边缘 = rightmostX + cardWidth
+		// 间距 = defaultStartX - (rightmostX + cardWidth)
+		gap := defaultStartX - (rightmostX + s.cardWidth)
+		if gap >= s.movingSpacing {
+			canGenerate = true
+		}
+	}
+
+	if canGenerate {
 		cardType := s.generateCard()
 		s.addCard(beltComp, cardType)
-		beltComp.GenerationTimer = beltComp.GenerationInterval
-
-		log.Printf("[ConveyorBeltSystem] Generated card: %s, queue length: %d/%d",
-			cardType, len(beltComp.Cards), beltComp.Capacity)
 	}
 }
 
@@ -211,35 +236,8 @@ func (s *ConveyorBeltSystem) addCard(beltComp *components.ConveyorBeltComponent,
 		return false
 	}
 
-	// 计算新卡片的起始位置
-	// 新卡片从传送带右边界外开始，与最右边的卡片保持移动间距
-	var startX float64
-
-	// 默认起始位置（传送带右边界外）
-	defaultStartX := s.beltWidth + s.cardWidth
-
-	if len(beltComp.Cards) > 0 {
-		// 找到最右边的卡片
-		rightmostX := 0.0
-		for _, card := range beltComp.Cards {
-			if card.PositionX > rightmostX {
-				rightmostX = card.PositionX
-			}
-		}
-
-		// 新卡片位置 = 最右边卡片右边缘 + 移动间距
-		desiredX := rightmostX + s.cardWidth + s.movingSpacing
-
-		// 取两者中较大的值：确保新卡片至少在传送带外，同时保持间距
-		if desiredX > defaultStartX {
-			startX = desiredX
-		} else {
-			startX = defaultStartX
-		}
-	} else {
-		// 第一张卡片，从右侧外部开始
-		startX = defaultStartX
-	}
+	// 卡片始终从默认起始位置开始（传送带右边界外）
+	startX := s.beltWidth + s.cardWidth + s.startOffsetX
 
 	card := components.ConveyorCard{
 		CardType:  cardType,
@@ -248,6 +246,10 @@ func (s *ConveyorBeltSystem) addCard(beltComp *components.ConveyorBeltComponent,
 	}
 
 	beltComp.Cards = append(beltComp.Cards, card)
+
+	log.Printf("[ConveyorBeltSystem] Generated card: %s, queue length: %d/%d, startX=%.1f, movingSpacing=%.1f",
+		cardType, len(beltComp.Cards), beltComp.Capacity, startX, s.movingSpacing)
+
 	return true
 }
 
