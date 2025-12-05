@@ -130,15 +130,17 @@ func NewUserManagementDialogEntity(
 	dialogButtons := []components.DialogButton{
 		// 左上：重命名
 		{
-			Label:       "重命名",
-			X:           btnCol1X,
-			Y:           btnRow1Y,
-			Width:       btnTotalWidth,
-			Height:      btnHeight,
-			LeftImage:   btnLeftImg,
-			MiddleImage: btnMiddleImg,
-			RightImage:  btnRightImg,
-			MiddleWidth: btnMiddleWidth,
+			Label:          "重命名",
+			X:              btnCol1X,
+			Y:              btnRow1Y,
+			Width:          btnTotalWidth,
+			Height:         btnHeight,
+			LeftImage:      btnLeftImg,
+			MiddleImage:    btnMiddleImg,
+			RightImage:     btnRightImg,
+			MiddleWidth:    btnMiddleWidth,
+			ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
+			PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
 			OnClick: func() {
 				if callback != nil {
 					callback(UserManagementDialogResult{
@@ -150,15 +152,17 @@ func NewUserManagementDialogEntity(
 		},
 		// 右上：删除
 		{
-			Label:       "删除",
-			X:           btnCol2X,
-			Y:           btnRow1Y,
-			Width:       btnTotalWidth,
-			Height:      btnHeight,
-			LeftImage:   btnLeftImg,
-			MiddleImage: btnMiddleImg,
-			RightImage:  btnRightImg,
-			MiddleWidth: btnMiddleWidth,
+			Label:          "删除",
+			X:              btnCol2X,
+			Y:              btnRow1Y,
+			Width:          btnTotalWidth,
+			Height:         btnHeight,
+			LeftImage:      btnLeftImg,
+			MiddleImage:    btnMiddleImg,
+			RightImage:     btnRightImg,
+			MiddleWidth:    btnMiddleWidth,
+			ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
+			PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
 			OnClick: func() {
 				if callback != nil {
 					callback(UserManagementDialogResult{
@@ -170,15 +174,17 @@ func NewUserManagementDialogEntity(
 		},
 		// 左下：好
 		{
-			Label:       "好",
-			X:           btnCol1X,
-			Y:           btnRow2Y,
-			Width:       btnTotalWidth,
-			Height:      btnHeight,
-			LeftImage:   btnLeftImg,
-			MiddleImage: btnMiddleImg,
-			RightImage:  btnRightImg,
-			MiddleWidth: btnMiddleWidth,
+			Label:          "好",
+			X:              btnCol1X,
+			Y:              btnRow2Y,
+			Width:          btnTotalWidth,
+			Height:         btnHeight,
+			LeftImage:      btnLeftImg,
+			MiddleImage:    btnMiddleImg,
+			RightImage:     btnRightImg,
+			MiddleWidth:    btnMiddleWidth,
+			ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
+			PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
 			OnClick: func() {
 				if callback != nil {
 					callback(UserManagementDialogResult{
@@ -190,15 +196,17 @@ func NewUserManagementDialogEntity(
 		},
 		// 右下：取消
 		{
-			Label:       "取消",
-			X:           btnCol2X,
-			Y:           btnRow2Y,
-			Width:       btnTotalWidth,
-			Height:      btnHeight,
-			LeftImage:   btnLeftImg,
-			MiddleImage: btnMiddleImg,
-			RightImage:  btnRightImg,
-			MiddleWidth: btnMiddleWidth,
+			Label:          "取消",
+			X:              btnCol2X,
+			Y:              btnRow2Y,
+			Width:          btnTotalWidth,
+			Height:         btnHeight,
+			LeftImage:      btnLeftImg,
+			MiddleImage:    btnMiddleImg,
+			RightImage:     btnRightImg,
+			MiddleWidth:    btnMiddleWidth,
+			ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
+			PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
 			OnClick: func() {
 				log.Printf("[UserManagementDialog] 取消按钮被点击")
 				if callback != nil {
@@ -219,9 +227,10 @@ func NewUserManagementDialogEntity(
 		IsVisible:        true,
 		Width:            dialogWidth,
 		Height:           dialogHeight,
-		AutoClose:        false, // 用户管理对话框不自动关闭（需要显式关闭）
-		HoveredButtonIdx: -1,    // 初始化为未悬停状态
-		PressedButtonIdx: -1,    // 初始化为未按下状态
+		AutoClose:            false, // 用户管理对话框不自动关闭（需要显式关闭）
+		HoveredButtonIdx:     -1,    // 初始化为未悬停状态
+		PressedButtonIdx:     -1,    // 初始化为未按下状态
+		LastPressedButtonIdx: -1,    // Story 10.9: 初始化为未按下状态
 	})
 
 	// 添加 UI 组件标记

@@ -8,6 +8,11 @@ import (
 	"github.com/decker502/pvz/pkg/game"
 )
 
+// 僵尸手掌动画音效常量
+const (
+	SoundZombieHandLaugh = "SOUND_EVILLAUGH" // 邪恶笑声音效
+)
+
 // triggerZombieHandAnimation triggers the zombie hand rising animation and blocks interaction.
 // Story 12.6 Task 2.3: Trigger zombie hand animation on Adventure button click
 func (m *MainMenuScene) triggerZombieHandAnimation() {
@@ -62,6 +67,12 @@ func (m *MainMenuScene) triggerZombieHandAnimation() {
 
 	// Disable all buttons to prevent clicks during animation
 	m.disableAllButtons()
+
+	// 播放僵尸手掌邪恶笑声音效
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound(SoundZombieHandLaugh)
+		log.Printf("[MainMenuScene] 🔊 Playing zombie hand sound: %s", SoundZombieHandLaugh)
+	}
 
 	log.Printf("[MainMenuScene] Zombie hand animation started (FPS=%.1f, total frames≈25)",
 		reanimComp.AnimationFPS)

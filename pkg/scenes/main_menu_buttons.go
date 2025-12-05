@@ -604,6 +604,7 @@ func (m *MainMenuScene) calculateBottomButtonScreenPos(buttonType components.Bot
 // based on mouse position and input.
 //
 // Story 12.2: 底部功能栏重构（动画跟随版本）
+// Story 10.9: 添加悬停音效支持
 func (m *MainMenuScene) updateBottomButtons(mouseX, mouseY int, isMouseReleased bool) {
 	m.hoveredBottomButton = components.BottomButtonNone // Reset hover state
 
@@ -646,6 +647,17 @@ func (m *MainMenuScene) updateBottomButtons(mouseX, mouseY int, isMouseReleased 
 			}
 			break // Only one button can be hovered at a time
 		}
+	}
+
+	// Story 10.9: 检测悬停状态变化，播放音效
+	if m.hoveredBottomButton != m.lastHoveredBottomButton {
+		if m.hoveredBottomButton != components.BottomButtonNone {
+			// 新进入一个按钮，播放悬停音效
+			if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+				audioManager.PlaySound("SOUND_BLEEP")
+			}
+		}
+		m.lastHoveredBottomButton = m.hoveredBottomButton
 	}
 }
 

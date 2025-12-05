@@ -137,15 +137,17 @@ func NewNewUserDialogEntity(
 
 	dialogButtons := []components.DialogButton{
 		{
-			Label:       "好",
-			X:           btn1X,
-			Y:           btnY,
-			Width:       btnTotalWidth,
-			Height:      btnHeight,
-			LeftImage:   btnLeftImg,
-			MiddleImage: btnMiddleImg,
-			RightImage:  btnRightImg,
-			MiddleWidth: btnMiddleWidth,
+			Label:          "好",
+			X:              btn1X,
+			Y:              btnY,
+			Width:          btnTotalWidth,
+			Height:         btnHeight,
+			LeftImage:      btnLeftImg,
+			MiddleImage:    btnMiddleImg,
+			RightImage:     btnRightImg,
+			MiddleWidth:    btnMiddleWidth,
+			ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
+			PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
 			OnClick: func() {
 				// 确定回调（需要获取输入框的文本）
 				inputComp, ok := ecs.GetComponent[*components.TextInputComponent](em, inputEntity)
@@ -158,15 +160,17 @@ func NewNewUserDialogEntity(
 			},
 		},
 		{
-			Label:       "取消",
-			X:           btn2X,
-			Y:           btnY,
-			Width:       btnTotalWidth,
-			Height:      btnHeight,
-			LeftImage:   btnLeftImg,
-			MiddleImage: btnMiddleImg,
-			RightImage:  btnRightImg,
-			MiddleWidth: btnMiddleWidth,
+			Label:          "取消",
+			X:              btn2X,
+			Y:              btnY,
+			Width:          btnTotalWidth,
+			Height:         btnHeight,
+			LeftImage:      btnLeftImg,
+			MiddleImage:    btnMiddleImg,
+			RightImage:     btnRightImg,
+			MiddleWidth:    btnMiddleWidth,
+			ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
+			PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
 			OnClick: func() {
 				// 取消回调
 				if callback != nil {
@@ -188,10 +192,11 @@ func NewNewUserDialogEntity(
 		IsVisible:        true,
 		Width:            dialogWidth,
 		Height:           dialogHeight,
-		ChildEntities:    []ecs.EntityID{inputEntity}, // 输入框是对话框的子实体
-		AutoClose:        false,                       // 不自动关闭，由回调逻辑控制
-		HoveredButtonIdx: -1,                          // 初始化为未悬停状态
-		PressedButtonIdx: -1,                          // 初始化为未按下状态
+		ChildEntities:        []ecs.EntityID{inputEntity}, // 输入框是对话框的子实体
+		AutoClose:            false,                       // 不自动关闭，由回调逻辑控制
+		HoveredButtonIdx:     -1,                          // 初始化为未悬停状态
+		PressedButtonIdx:     -1,                          // 初始化为未按下状态
+		LastPressedButtonIdx: -1,                          // Story 10.9: 初始化为未按下状态
 	})
 
 	// 添加 UI 组件标记

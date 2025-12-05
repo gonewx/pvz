@@ -88,15 +88,17 @@ func NewGameOverDialogEntity(
 
 		dialogButtons = []components.DialogButton{
 			{
-				Label:       "再次尝试",
-				X:           btn1X,
-				Y:           btnY,
-				Width:       btnTotalWidth,
-				Height:      btnHeight,
-				LeftImage:   btnLeftImg,
-				MiddleImage: btnMiddleImg,
-				RightImage:  btnRightImg,
-				MiddleWidth: btnMiddleWidth,
+				Label:          "再次尝试",
+				X:              btn1X,
+				Y:              btnY,
+				Width:          btnTotalWidth,
+				Height:         btnHeight,
+				LeftImage:      btnLeftImg,
+				MiddleImage:    btnMiddleImg,
+				RightImage:     btnRightImg,
+				MiddleWidth:    btnMiddleWidth,
+				ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
+				PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
 				OnClick: func() {
 					if onRetry != nil {
 						onRetry()
@@ -104,15 +106,17 @@ func NewGameOverDialogEntity(
 				},
 			},
 			{
-				Label:       "返回主菜单",
-				X:           btn2X,
-				Y:           btnY,
-				Width:       btnTotalWidth,
-				Height:      btnHeight,
-				LeftImage:   btnLeftImg,
-				MiddleImage: btnMiddleImg,
-				RightImage:  btnRightImg,
-				MiddleWidth: btnMiddleWidth,
+				Label:          "返回主菜单",
+				X:              btn2X,
+				Y:              btnY,
+				Width:          btnTotalWidth,
+				Height:         btnHeight,
+				LeftImage:      btnLeftImg,
+				MiddleImage:    btnMiddleImg,
+				RightImage:     btnRightImg,
+				MiddleWidth:    btnMiddleWidth,
+				ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
+				PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
 				OnClick: func() {
 					if onMenu != nil {
 						onMenu()
@@ -127,15 +131,17 @@ func NewGameOverDialogEntity(
 
 		dialogButtons = []components.DialogButton{
 			{
-				Label:       "再次尝试",
-				X:           btnX,
-				Y:           btnY,
-				Width:       btnTotalWidth,
-				Height:      btnHeight,
-				LeftImage:   btnLeftImg,
-				MiddleImage: btnMiddleImg,
-				RightImage:  btnRightImg,
-				MiddleWidth: btnMiddleWidth,
+				Label:          "再次尝试",
+				X:              btnX,
+				Y:              btnY,
+				Width:          btnTotalWidth,
+				Height:         btnHeight,
+				LeftImage:      btnLeftImg,
+				MiddleImage:    btnMiddleImg,
+				RightImage:     btnRightImg,
+				MiddleWidth:    btnMiddleWidth,
+				ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
+				PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
 				OnClick: func() {
 					if onRetry != nil {
 						onRetry()
@@ -154,9 +160,10 @@ func NewGameOverDialogEntity(
 		IsVisible:        true,
 		Width:            dialogWidth,
 		Height:           dialogHeight,
-		AutoClose:        true, // 点击按钮后自动关闭
-		HoveredButtonIdx: -1,   // 初始化为未悬停状态
-		PressedButtonIdx: -1,   // 初始化为未按下状态
+		AutoClose:            true, // 点击按钮后自动关闭
+		HoveredButtonIdx:     -1,   // 初始化为未悬停状态
+		PressedButtonIdx:     -1,   // 初始化为未按下状态
+		LastPressedButtonIdx: -1,   // Story 10.9: 初始化为未按下状态
 	})
 
 	// 添加 UI 组件标记

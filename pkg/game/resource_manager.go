@@ -319,7 +319,7 @@ func (rm *ResourceManager) LoadAudio(path string) (*audio.Player, error) {
 	// Determine the file format by extension
 	ext := strings.ToLower(filepath.Ext(path))
 
-	// Decode based on format
+	// Decode based on format (with resampling to match AudioContext sample rate)
 	var stream interface {
 		io.ReadSeeker
 		Length() int64
@@ -327,13 +327,13 @@ func (rm *ResourceManager) LoadAudio(path string) (*audio.Player, error) {
 
 	switch ext {
 	case ".mp3":
-		decodedStream, err := mp3.DecodeWithoutResampling(reader)
+		decodedStream, err := mp3.DecodeWithSampleRate(rm.audioContext.SampleRate(), reader)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode MP3 audio %s: %w", path, err)
 		}
 		stream = decodedStream
 	case ".ogg":
-		decodedStream, err := vorbis.DecodeWithoutResampling(reader)
+		decodedStream, err := vorbis.DecodeWithSampleRate(rm.audioContext.SampleRate(), reader)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode OGG audio %s: %w", path, err)
 		}
@@ -401,18 +401,18 @@ func (rm *ResourceManager) LoadSoundEffect(path string) (*audio.Player, error) {
 	// Determine the file format by extension
 	ext := strings.ToLower(filepath.Ext(path))
 
-	// Decode based on format (without infinite loop)
+	// Decode based on format (with resampling to match AudioContext sample rate)
 	var stream io.ReadSeeker
 
 	switch ext {
 	case ".mp3":
-		decodedStream, err := mp3.DecodeWithoutResampling(reader)
+		decodedStream, err := mp3.DecodeWithSampleRate(rm.audioContext.SampleRate(), reader)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode MP3 sound effect %s: %w", path, err)
 		}
 		stream = decodedStream
 	case ".ogg":
-		decodedStream, err := vorbis.DecodeWithoutResampling(reader)
+		decodedStream, err := vorbis.DecodeWithSampleRate(rm.audioContext.SampleRate(), reader)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode OGG sound effect %s: %w", path, err)
 		}

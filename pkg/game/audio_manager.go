@@ -221,12 +221,14 @@ func (am *AudioManager) GetSoundVolume() float64 {
 func (am *AudioManager) getSoundPlayer(soundID string) *audio.Player {
 	// 检查缓存
 	if player, exists := am.soundPlayers[soundID]; exists {
+		log.Printf("[AudioManager] DEBUG: Sound %s found in cache", soundID)
 		return player
 	}
 
 	// 尝试从 ResourceManager 获取（可能已通过资源ID加载）
 	player := am.resourceManager.GetAudioPlayer(soundID)
 	if player != nil {
+		log.Printf("[AudioManager] DEBUG: Sound %s found in ResourceManager", soundID)
 		am.soundPlayers[soundID] = player
 		return player
 	}
@@ -234,6 +236,7 @@ func (am *AudioManager) getSoundPlayer(soundID string) *audio.Player {
 	// 尝试加载（通过资源ID查找路径）
 	if am.resourceManager.config != nil {
 		if filePath, exists := am.resourceManager.resourceMap[soundID]; exists {
+			log.Printf("[AudioManager] DEBUG: Loading sound %s from path: %s", soundID, filePath)
 			// 使用 LoadSoundEffect 加载（不循环）
 			loadedPlayer, err := am.resourceManager.LoadSoundEffect(filePath)
 			if err != nil {

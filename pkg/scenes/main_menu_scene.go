@@ -84,8 +84,9 @@ type MainMenuScene struct {
 	optionsPanelModule *modules.OptionsPanelModule // Options panel module
 
 	// Story 12.2: Bottom function bar (Options/Help/Quit buttons)
-	bottomButtonImages  map[components.BottomButtonType][2]*ebiten.Image // [0]=Normal, [1]=Hover
-	hoveredBottomButton components.BottomButtonType                      // Current hovered bottom button (-1 = none)
+	bottomButtonImages      map[components.BottomButtonType][2]*ebiten.Image // [0]=Normal, [1]=Hover
+	hoveredBottomButton     components.BottomButtonType                      // Current hovered bottom button (-1 = none)
+	lastHoveredBottomButton components.BottomButtonType                      // Story 10.9: 追踪上一帧的悬停状态（用于播放音效）
 
 	// Cursor state tracking
 	lastCursorShape ebiten.CursorShapeType // Track last cursor shape to avoid unnecessary updates
@@ -124,14 +125,15 @@ type MainMenuScene struct {
 // If the background image fails to load, the scene will fall back to a solid color background.
 func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenuScene {
 	scene := &MainMenuScene{
-		resourceManager:     rm,
-		sceneManager:        sm,
-		lastCursorShape:     -1, // 初始化为无效值，确保第一次更新光标
-		hoveredBottomButton: components.BottomButtonNone,
-		wasMousePressed:     ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft), // ✅ 初始化鼠标状态，防止场景切换时误触发点击
-		wasF1Pressed:        ebiten.IsKeyPressed(ebiten.KeyF1),                   // ✅ 初始化键盘状态
-		wasOPressed:         ebiten.IsKeyPressed(ebiten.KeyO),                    // ✅ 初始化键盘状态
-		menuState:           MainMenuStateNormal,                                 // Story 12.6: 初始化为正常状态
+		resourceManager:         rm,
+		sceneManager:            sm,
+		lastCursorShape:         -1, // 初始化为无效值，确保第一次更新光标
+		hoveredBottomButton:     components.BottomButtonNone,
+		lastHoveredBottomButton: components.BottomButtonNone, // Story 10.9: 初始化底部按钮悬停追踪
+		wasMousePressed:         ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft), // ✅ 初始化鼠标状态，防止场景切换时误触发点击
+		wasF1Pressed:            ebiten.IsKeyPressed(ebiten.KeyF1),                   // ✅ 初始化键盘状态
+		wasOPressed:             ebiten.IsKeyPressed(ebiten.KeyO),                    // ✅ 初始化键盘状态
+		menuState:               MainMenuStateNormal,                                 // Story 12.6: 初始化为正常状态
 	}
 
 	// Story 12.1: Initialize ECS systems for SelectorScreen Reanim
@@ -150,6 +152,11 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	// ✅ 修复：设置 ReanimSystem 引用，以便 RenderSystem 调用 GetRenderData()
 	scene.renderSystem.SetReanimSystem(scene.reanimSystem)
 	log.Printf("[MainMenuScene] Initialized ECS systems")
+
+	// 加载主菜单需要的音效资源组（包含 SOUND_EVILLAUGH 等）
+	if err := rm.LoadResourceGroup("LoadingSounds"); err != nil {
+		log.Printf("[MainMenuScene] Warning: Failed to load LoadingSounds group: %v", err)
+	}
 
 	// Story 12.4: Check if this is first launch (BEFORE creating SelectorScreen)
 	gameState := game.GetGameState()
@@ -243,7 +250,7 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 
 		// 播放泥土松动音效（开场动画开始时）
 		if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
-			audioManager.PlaySound("SOUND_DIRT_RISE")
+			audioManager.PlaySound("SOUND_GRAVESTONE_RUMBLE")
 		}
 
 		// 处理 AnimationCommand（立即初始化动画）

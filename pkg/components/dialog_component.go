@@ -20,6 +20,9 @@ type DialogComponent struct {
 	HoveredButtonIdx int            // 当前悬停的按钮索引（-1 表示没有悬停）- ECS 架构重构
 	PressedButtonIdx int            // 当前按下的按钮索引（-1 表示没有按下）- 用于按下效果
 	UseBigBottom     bool           // 是否使用大底部区域（用于两行按钮布局）
+
+	// Story 10.9: 音效状态跟踪
+	LastPressedButtonIdx int // 上一帧按下的按钮索引（用于检测按下状态变化，播放音效）
 }
 
 // DialogButton 对话框按钮
@@ -34,6 +37,10 @@ type DialogButton struct {
 	MiddleImage *ebiten.Image // 按钮中间图片（可拉伸）
 	RightImage  *ebiten.Image // 按钮右边图片
 	MiddleWidth float64       // 中间部分宽度
+
+	// Story 10.9: 音效支持
+	ClickSoundID   string // 点击释放时播放的音效ID（如 "SOUND_BUTTONCLICK"）
+	PressedSoundID string // 按下时播放的音效ID（如 "SOUND_GRAVEBUTTON"）
 }
 
 // DialogParts 九宫格对话框资源

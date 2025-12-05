@@ -8,6 +8,7 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/entities"
+	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/systems"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
@@ -396,6 +397,13 @@ func (m *MainMenuScene) updateUserSignHover(mouseX, mouseY int, isMouseReleased 
 	if userSignComp.IsHovered != mouseInSign {
 		userSignComp.IsHovered = mouseInSign
 
+		// Story 10.9: 悬停时播放音效
+		if mouseInSign {
+			if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+				audioManager.PlaySound("SOUND_BLEEP")
+			}
+		}
+
 		// Story 12.4 AC2: 悬停时切换 woodsign2 为 SignPressImage
 		if mouseInSign && userSignComp.SignPressImage != nil {
 			// 直接使用按下状态图片（不需要绘制用户名，woodsign2 是纯木板）
@@ -413,6 +421,10 @@ func (m *MainMenuScene) updateUserSignHover(mouseX, mouseY int, isMouseReleased 
 
 	// 如果点击木牌，打开用户管理对话框
 	if mouseInSign && isMouseReleased {
+		// Story 10.9: 点击时播放音效
+		if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+			audioManager.PlaySound("SOUND_TAP")
+		}
 		log.Printf("[MainMenuScene] User sign clicked, showing user management dialog")
 		m.showUserManagementDialog()
 	}

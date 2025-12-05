@@ -6,6 +6,7 @@ import (
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/game"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
@@ -116,6 +117,13 @@ func (s *DialogInputSystem) Update(deltaTime float64) {
 			// 检查是否点击了按钮
 			clickedButton := s.getClickedButton(mouseX, mouseY, dialogComp, posComp.X, posComp.Y)
 			if clickedButton != nil {
+				// Story 10.9: 播放释放音效
+				if clickedButton.ClickSoundID != "" {
+					if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+						audioManager.PlaySound(clickedButton.ClickSoundID)
+					}
+				}
+
 				// 触发按钮回调
 				log.Printf("[DialogInputSystem] ✅ 点击了按钮 '%s'", clickedButton.Label)
 				if clickedButton.OnClick != nil {
@@ -310,6 +318,21 @@ func (s *DialogInputSystem) updateDialogHoverStates(dialogEntities []ecs.EntityI
 			dialogComp.PressedButtonIdx = hoveredBtnIdx
 		} else {
 			dialogComp.PressedButtonIdx = -1
+		}
+
+		// Story 10.9: 检测按下状态变化，播放按下音效
+		if dialogComp.PressedButtonIdx != dialogComp.LastPressedButtonIdx {
+			// 有新的按钮被按下（从未按下变为按下）
+			if dialogComp.PressedButtonIdx >= 0 && dialogComp.LastPressedButtonIdx < 0 {
+				btn := &dialogComp.Buttons[dialogComp.PressedButtonIdx]
+				if btn.PressedSoundID != "" {
+					if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+						audioManager.PlaySound(btn.PressedSoundID)
+					}
+				}
+			}
+			// 更新上一帧状态
+			dialogComp.LastPressedButtonIdx = dialogComp.PressedButtonIdx
 		}
 
 		// 检查鼠标是否在对话框内（用于用户列表检测）

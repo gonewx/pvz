@@ -82,15 +82,17 @@ func NewDialogEntity(
 		btnY := dialogHeight - 65.0
 
 		dialogButtons = append(dialogButtons, components.DialogButton{
-			Label:       btnText,
-			X:           btnX,
-			Y:           btnY,
-			Width:       btnTotalWidth,
-			Height:      btnHeight,
-			LeftImage:   btnLeftImg,
-			MiddleImage: btnMiddleImg,
-			RightImage:  btnRightImg,
-			MiddleWidth: btnMiddleWidth,
+			Label:          btnText,
+			X:              btnX,
+			Y:              btnY,
+			Width:          btnTotalWidth,
+			Height:         btnHeight,
+			LeftImage:      btnLeftImg,
+			MiddleImage:    btnMiddleImg,
+			RightImage:     btnRightImg,
+			MiddleWidth:    btnMiddleWidth,
+			ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
+			PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
 			OnClick: func() {
 				// 点击回调将在 DialogInputSystem 中设置
 				// 这里设置为 nil，后续由系统负责关闭逻辑
@@ -109,9 +111,10 @@ func NewDialogEntity(
 		IsVisible:        true,
 		Width:            dialogWidth,
 		Height:           dialogHeight,
-		AutoClose:        true, // 错误对话框点击后自动关闭
-		HoveredButtonIdx: -1,   // 初始化为未悬停状态
-		PressedButtonIdx: -1,   // 初始化为未按下状态
+		AutoClose:            true, // 错误对话框点击后自动关闭
+		HoveredButtonIdx:     -1,   // 初始化为未悬停状态
+		PressedButtonIdx:     -1,   // 初始化为未按下状态
+		LastPressedButtonIdx: -1,   // Story 10.9: 初始化为未按下状态
 	})
 
 	// 添加 UI 组件标记
@@ -323,15 +326,17 @@ func NewDialogEntityWithCallback(
 		btnY := dialogHeight - 65.0
 
 		dialogButtons = append(dialogButtons, components.DialogButton{
-			Label:       btnText,
-			X:           btnX,
-			Y:           btnY,
-			Width:       btnTotalWidth,
-			Height:      btnHeight,
-			LeftImage:   btnLeftImg,
-			MiddleImage: btnMiddleImg,
-			RightImage:  btnRightImg,
-			MiddleWidth: btnMiddleWidth,
+			Label:          btnText,
+			X:              btnX,
+			Y:              btnY,
+			Width:          btnTotalWidth,
+			Height:         btnHeight,
+			LeftImage:      btnLeftImg,
+			MiddleImage:    btnMiddleImg,
+			RightImage:     btnRightImg,
+			MiddleWidth:    btnMiddleWidth,
+			ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
+			PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
 			OnClick: func() {
 				if callback != nil {
 					callback(btnIdx)
@@ -348,10 +353,11 @@ func NewDialogEntityWithCallback(
 		Parts:            parts,
 		IsVisible:        true,
 		Width:            dialogWidth,
-		Height:           dialogHeight,
-		AutoClose:        true, // 点击后自动关闭
-		HoveredButtonIdx: -1,
-		PressedButtonIdx: -1,
+		Height:               dialogHeight,
+		AutoClose:            true, // 点击后自动关闭
+		HoveredButtonIdx:     -1,
+		PressedButtonIdx:     -1,
+		LastPressedButtonIdx: -1, // Story 10.9: 初始化为未按下状态
 	})
 
 	// 添加 UI 组件标记
@@ -465,42 +471,48 @@ func NewContinueGameDialogEntity(
 	dialogButtons := []components.DialogButton{
 		// 按钮0: 继续（第一行左边）
 		{
-			Label:       "继续",
-			X:           row1StartX,
-			Y:           row1Y,
-			Width:       btnTotalWidth,
-			Height:      btnHeight,
-			LeftImage:   btnLeftImg,
-			MiddleImage: btnMiddleImg,
-			RightImage:  btnRightImg,
-			MiddleWidth: btnMiddleWidth,
-			OnClick:     onContinue,
+			Label:          "继续",
+			X:              row1StartX,
+			Y:              row1Y,
+			Width:          btnTotalWidth,
+			Height:         btnHeight,
+			LeftImage:      btnLeftImg,
+			MiddleImage:    btnMiddleImg,
+			RightImage:     btnRightImg,
+			MiddleWidth:    btnMiddleWidth,
+			ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
+			PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
+			OnClick:        onContinue,
 		},
 		// 按钮1: 重玩关卡（第一行右边）
 		{
-			Label:       "重玩关卡",
-			X:           row1StartX + btnTotalWidth + btnSpacing,
-			Y:           row1Y,
-			Width:       btnTotalWidth,
-			Height:      btnHeight,
-			LeftImage:   btnLeftImg,
-			MiddleImage: btnMiddleImg,
-			RightImage:  btnRightImg,
-			MiddleWidth: btnMiddleWidth,
-			OnClick:     onRestart,
+			Label:          "重玩关卡",
+			X:              row1StartX + btnTotalWidth + btnSpacing,
+			Y:              row1Y,
+			Width:          btnTotalWidth,
+			Height:         btnHeight,
+			LeftImage:      btnLeftImg,
+			MiddleImage:    btnMiddleImg,
+			RightImage:     btnRightImg,
+			MiddleWidth:    btnMiddleWidth,
+			ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
+			PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
+			OnClick:        onRestart,
 		},
 		// 按钮2: 取消（第二行居中）
 		{
-			Label:       "取消",
-			X:           row2StartX,
-			Y:           row2Y,
-			Width:       btnTotalWidth,
-			Height:      btnHeight,
-			LeftImage:   btnLeftImg,
-			MiddleImage: btnMiddleImg,
-			RightImage:  btnRightImg,
-			MiddleWidth: btnMiddleWidth,
-			OnClick:     onCancel,
+			Label:          "取消",
+			X:              row2StartX,
+			Y:              row2Y,
+			Width:          btnTotalWidth,
+			Height:         btnHeight,
+			LeftImage:      btnLeftImg,
+			MiddleImage:    btnMiddleImg,
+			RightImage:     btnRightImg,
+			MiddleWidth:    btnMiddleWidth,
+			ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
+			PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
+			OnClick:        onCancel,
 		},
 	}
 
@@ -512,11 +524,12 @@ func NewContinueGameDialogEntity(
 		Parts:            parts,
 		IsVisible:        true,
 		Width:            dialogWidth,
-		Height:           dialogHeight,
-		AutoClose:        true, // 点击后自动关闭
-		HoveredButtonIdx: -1,
-		PressedButtonIdx: -1,
-		UseBigBottom:     true, // 两行按钮布局，使用大底部区域
+		Height:               dialogHeight,
+		AutoClose:            true, // 点击后自动关闭
+		HoveredButtonIdx:     -1,
+		PressedButtonIdx:     -1,
+		LastPressedButtonIdx: -1,  // Story 10.9: 初始化为未按下状态
+		UseBigBottom:         true, // 两行按钮布局，使用大底部区域
 	})
 
 	// 添加 UI 组件标记
