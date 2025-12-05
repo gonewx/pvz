@@ -3,6 +3,7 @@ package systems
 import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/game"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
@@ -33,6 +34,7 @@ func (s *ButtonSystem) Update(deltaTime float64) {
 	// 获取鼠标位置
 	mouseX, mouseY := ebiten.CursorPosition()
 	mousePressed := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
+	mouseJustPressed := inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft)
 	mouseReleased := inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft)
 
 	// 查询所有按钮实体
@@ -53,11 +55,25 @@ func (s *ButtonSystem) Update(deltaTime float64) {
 
 		if isHovered {
 			// 鼠标在按钮内
-			if mousePressed {
-				// 按下状态（显示按下效果）
+			if mouseJustPressed {
+				// 刚按下时播放按下音效（墓碑按钮专用）
+				if button.PressedSoundID != "" {
+					if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+						audioManager.PlaySound(button.PressedSoundID)
+					}
+				}
+				button.State = components.UIClicked
+			} else if mousePressed {
+				// 持续按下状态（显示按下效果）
 				button.State = components.UIClicked
 			} else if mouseReleased {
-				// ✅ 释放时执行：释放瞬间触发回调
+				// ✅ 释放时执行：释放瞬间触发回调和音效
+				// 播放按钮释放音效
+				if button.ClickSoundID != "" {
+					if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+						audioManager.PlaySound(button.ClickSoundID)
+					}
+				}
 				if button.OnClick != nil {
 					button.OnClick()
 				}

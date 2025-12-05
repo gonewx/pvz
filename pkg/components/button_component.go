@@ -68,4 +68,13 @@ type ButtonComponent struct {
 	// ===== 点击回调 =====
 	// OnClick 点击回调函数
 	OnClick func()
+
+	// ===== 音效 =====
+	// ClickSoundID 点击释放时播放的音效ID（如 "SOUND_BUTTONCLICK"）
+	// 如果为空则不播放音效
+	ClickSoundID string
+
+	// PressedSoundID 按下时播放的音效ID（如 "SOUND_GRAVEBUTTON"）
+	// 用于墓碑样式按钮的按下音效，如果为空则不播放
+	PressedSoundID string
 }

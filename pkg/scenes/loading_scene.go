@@ -64,6 +64,10 @@ type LoadingScene struct {
 
 	// Mouse interaction state
 	isHoveringProgressBar bool // Whether mouse is hovering over progress bar
+
+	// Sound timing
+	lastSproutSoundTime float64  // Last time a sprout/zombie sound was played
+	pendingSounds       []string // Queue of pending sounds to play
 }
 
 // NewLoadingScene creates a new loading scene.
@@ -152,6 +156,11 @@ func NewLoadingScene(rm *game.ResourceManager, sm *game.SceneManager, configMana
 		}
 	}
 
+	// 播放背景音乐
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlayMusic("SOUND_MAINMUSIC")
+	}
+
 	return scene
 }
 
@@ -194,12 +203,33 @@ func (s *LoadingScene) Update(deltaTime float64) {
 	// Check and trigger sprout animations
 	s.checkSproutTriggers()
 
+	// Process pending sounds with minimum interval
+	s.processPendingSounds()
+
 	// Update ECS systems (for sprouts)
 	s.reanimSystem.Update(deltaTime)
 
 	// Check for click to transition to main menu (only when complete and hovering over progress bar)
 	if s.loadingComplete {
 		s.updateMouseInteraction()
+	}
+}
+
+// processPendingSounds plays pending sounds with minimum interval between them.
+func (s *LoadingScene) processPendingSounds() {
+	if len(s.pendingSounds) == 0 {
+		return
+	}
+
+	// Check if enough time has passed since last sound
+	if s.elapsedTime-s.lastSproutSoundTime >= config.LoadingSoundMinInterval {
+		if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+			// Play the first sound in queue
+			audioManager.PlaySound(s.pendingSounds[0])
+			s.lastSproutSoundTime = s.elapsedTime
+			// Remove from queue
+			s.pendingSounds = s.pendingSounds[1:]
+		}
 	}
 }
 
@@ -298,16 +328,22 @@ func (s *LoadingScene) spawnSproutAnimation(index int) {
 	// Determine animation type based on index
 	var resourceName string  // ResourceManager uses PascalCase names
 	var animationName string // Direct animation name to play
+	var soundID string       // Sound to play
 
 	if index == len(config.LoadingSproutTriggers)-1 {
 		// Last trigger: zombie head
 		resourceName = "LoadBar_Zombiehead"
 		animationName = "anim_zombie" // From loadbar_zombiehead.yaml default_animation
+		soundID = "SOUND_LOADINGBAR_ZOMBIE"
 	} else {
 		// Other triggers: sprout with variations
 		resourceName = "LoadBar_sprout"
 		animationName = "anim_sprout" // From loadbar_sprout.yaml default_animation
+		soundID = "SOUND_LOADINGBAR_FLOWER"
 	}
+
+	// 将音效加入待播放队列
+	s.pendingSounds = append(s.pendingSounds, soundID)
 
 	// Load Reanim data from ResourceManager
 	reanimXML := s.resourceManager.GetReanimXML(resourceName)
@@ -372,7 +408,10 @@ func (s *LoadingScene) spawnSproutAnimation(index int) {
 
 // onClickStart handles the click event when loading is complete.
 func (s *LoadingScene) onClickStart() {
-	// TODO: Play click sound (Task 6)
+	// 播放开始按钮点击音效
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_TAP2")
+	}
 
 	// Transition to main menu scene
 	mainMenuScene := NewMainMenuScene(s.resourceManager, s.sceneManager)

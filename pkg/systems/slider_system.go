@@ -3,6 +3,7 @@ package systems
 import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/game"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -94,6 +95,9 @@ func (s *SliderSystem) Update(deltaTime float64) {
 		// 更新悬停状态
 		slider.IsHovered = isInSlot
 
+		// 记录拖拽前的状态，用于检测释放
+		wasDragging := slider.IsDragging
+
 		if mousePressed {
 			// 如果鼠标按下且在滑槽内，或者正在拖拽
 			if isInSlot || slider.IsDragging {
@@ -121,6 +125,13 @@ func (s *SliderSystem) Update(deltaTime float64) {
 		} else {
 			// 鼠标释放，停止拖拽
 			slider.IsDragging = false
+
+			// 释放时播放音效（只在真正拖拽过后释放时播放）
+			if wasDragging && slider.ClickSoundID != "" {
+				if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+					audioManager.PlaySound(slider.ClickSoundID)
+				}
+			}
 		}
 	}
 }

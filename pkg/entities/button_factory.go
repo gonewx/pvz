@@ -64,17 +64,19 @@ func NewMenuButton(
 
 	// 添加按钮组件
 	ecs.AddComponent(em, entity, &components.ButtonComponent{
-		Type:        components.ButtonTypeNineSlice,
-		LeftImage:   leftImage,
-		MiddleImage: middleImage,
-		RightImage:  rightImage,
-		MiddleWidth: middleWidth,
-		Text:        text,
-		Font:        font,
-		TextColor:   textColor,
-		State:       components.UINormal,
-		Enabled:     true,
-		OnClick:     onClick,
+		Type:         components.ButtonTypeNineSlice,
+		LeftImage:    leftImage,
+		MiddleImage:  middleImage,
+		RightImage:   rightImage,
+		MiddleWidth:  middleWidth,
+		Text:         text,
+		Font:         font,
+		TextColor:    textColor,
+		State:          components.UINormal,
+		Enabled:        true,
+		OnClick:        onClick,
+		ClickSoundID:   "SOUND_BUTTONCLICK",  // 释放时播放的音效
+		PressedSoundID: "SOUND_GRAVEBUTTON",  // 按下时播放的音效（墓碑样式）
 	})
 
 	// 添加 UI 组件标记（方便过滤）

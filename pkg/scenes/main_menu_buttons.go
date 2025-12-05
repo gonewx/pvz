@@ -290,22 +290,14 @@ func (m *MainMenuScene) updateMouseCursor() {
 	}
 }
 
-// playGraveButtonSound plays the stone grinding sound effect for button hover.
+// playGraveButtonSound plays the button hover sound effect.
 //
 // Story 12.1 Task 5: Button Highlight Effect
 func (m *MainMenuScene) playGraveButtonSound() {
-	// Check if resource manager is available (nil in unit tests)
-	if m.resourceManager == nil {
-		return
+	// 使用 AudioManager 播放悬停音效
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_BLEEP")
 	}
-
-	player, err := m.resourceManager.LoadSoundEffect("assets/sounds/gravebutton.ogg")
-	if err != nil {
-		log.Printf("[MainMenuScene] Warning: Failed to load grave button sound: %v", err)
-		return
-	}
-	player.Rewind()
-	player.Play()
 }
 
 // updateButtonVisibility updates the visibility of SelectorScreen buttons based on unlock status.
@@ -428,13 +420,9 @@ func (m *MainMenuScene) onMenuButtonClicked(buttonType config.MenuButtonType) {
 	if !config.IsMenuModeUnlocked(buttonType, m.currentLevel) {
 		log.Printf("[MainMenuScene] Button is locked (requires higher level)")
 
-		// Play button click sound (shadow buttons also have click feedback)
-		player, err := m.resourceManager.LoadSoundEffect("assets/sounds/buttonclick.ogg")
-		if err != nil {
-			log.Printf("[MainMenuScene] Warning: Failed to load button click sound: %v", err)
-		} else {
-			player.Rewind()
-			player.Play()
+		// 播放按钮点击音效
+		if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+			audioManager.PlaySound("SOUND_TAP")
 		}
 
 		// Story 12.3: Show unlock dialog
@@ -443,14 +431,9 @@ func (m *MainMenuScene) onMenuButtonClicked(buttonType config.MenuButtonType) {
 		return
 	}
 
-	// Play button click sound
-	// Note: SOUND_BUTTONCLICK should be loaded in initialization
-	player, err := m.resourceManager.LoadSoundEffect("assets/sounds/buttonclick.ogg")
-	if err != nil {
-		log.Printf("[MainMenuScene] Warning: Failed to load button click sound: %v", err)
-	} else {
-		player.Rewind()
-		player.Play()
+	// 播放按钮点击音效
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_TAP")
 	}
 
 	// Route to appropriate handler based on button type
@@ -718,9 +701,9 @@ func (m *MainMenuScene) drawBottomButtons(screen *ebiten.Image) {
 //
 // Story 12.2: 底部功能栏重构
 func (m *MainMenuScene) onBottomButtonClicked(btnType components.BottomButtonType) {
-	// Play click sound effect
-	if player, err := m.resourceManager.LoadSoundEffect("assets/sounds/buttonclick.ogg"); err == nil {
-		player.Play()
+	// 播放按钮点击音效
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_TAP")
 	}
 
 	switch btnType {

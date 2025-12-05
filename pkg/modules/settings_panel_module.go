@@ -224,10 +224,11 @@ func (m *SettingsPanelModule) createUIElements(rm *game.ResourceManager) error {
 	knobImage, _ := rm.LoadImage("assets/images/options_sliderknob2.png")
 
 	ecs.AddComponent(m.entityManager, m.musicSliderEntity, &components.SliderComponent{
-		SlotImage: slotImage,
-		KnobImage: knobImage,
-		Value:     musicVolume, // Story 20.5: 从设置加载
-		Label:     "音乐",
+		SlotImage:    slotImage,
+		KnobImage:    knobImage,
+		Value:        musicVolume, // Story 20.5: 从设置加载
+		Label:        "音乐",
+		ClickSoundID: "SOUND_BUTTONCLICK", // 滑块点击音效
 		OnValueChange: func(value float64) {
 			log.Printf("[SettingsPanelModule] Music volume changed: %.2f", value)
 			// Story 20.5: 更新 SettingsManager
@@ -252,10 +253,11 @@ func (m *SettingsPanelModule) createUIElements(rm *game.ResourceManager) error {
 		Y: hiddenY,
 	})
 	ecs.AddComponent(m.entityManager, m.soundSliderEntity, &components.SliderComponent{
-		SlotImage: slotImage,
-		KnobImage: knobImage,
-		Value:     soundVolume, // Story 20.5: 从设置加载
-		Label:     "音效",
+		SlotImage:    slotImage,
+		KnobImage:    knobImage,
+		Value:        soundVolume, // Story 20.5: 从设置加载
+		Label:        "音效",
+		ClickSoundID: "SOUND_BUTTONCLICK", // 滑块点击音效
 		OnValueChange: func(value float64) {
 			log.Printf("[SettingsPanelModule] Sound volume changed: %.2f", value)
 			// Story 20.5: 更新 SettingsManager
@@ -288,6 +290,7 @@ func (m *SettingsPanelModule) createUIElements(rm *game.ResourceManager) error {
 		CheckedImage:   checkboxChecked,
 		IsChecked:      true, // 默认开启
 		Label:          "3D 加速",
+		ClickSoundID:   "SOUND_BUTTONCLICK", // 复选框点击音效
 		OnToggle: func(isChecked bool) {
 			log.Printf("[SettingsPanelModule] 3D acceleration toggled: %v", isChecked)
 			if m.on3DToggle != nil {
@@ -307,6 +310,7 @@ func (m *SettingsPanelModule) createUIElements(rm *game.ResourceManager) error {
 		CheckedImage:   checkboxChecked,
 		IsChecked:      fullscreen, // Story 20.5: 从设置加载
 		Label:          "全屏",
+		ClickSoundID:   "SOUND_BUTTONCLICK", // 复选框点击音效
 		OnToggle: func(isChecked bool) {
 			log.Printf("[SettingsPanelModule] Fullscreen toggled: %v", isChecked)
 			// Story 20.5: 更新 SettingsManager 并立即切换全屏
@@ -379,7 +383,9 @@ func (m *SettingsPanelModule) createBottomButton(rm *game.ResourceManager, butto
 		TextColor:    [4]uint8{0, 200, 0, 255}, // 绿色文字
 		State:        components.UINormal,
 		Enabled:      true,
-		OnClick:      buttonConfig.OnClick, // 使用配置的回调
+		OnClick:        buttonConfig.OnClick,   // 使用配置的回调
+		ClickSoundID:   "SOUND_BUTTONCLICK",    // 释放时播放的音效
+		PressedSoundID: "SOUND_GRAVEBUTTON",    // 按下时播放的音效（墓碑样式）
 	})
 
 	log.Printf("[SettingsPanelModule] Bottom button created with text: %s", buttonConfig.Text)

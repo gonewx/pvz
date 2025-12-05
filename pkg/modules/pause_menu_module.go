@@ -214,8 +214,10 @@ func (m *PauseMenuModule) createPauseMenuButtons(rm *game.ResourceManager) error
 		Text:         "返回游戏",
 		Font:         buttonFont,
 		TextColor:    [4]uint8{0, 200, 0, 255},
-		State:        components.UINormal,
-		Enabled:      true,
+		State:          components.UINormal,
+		Enabled:        true,
+		ClickSoundID:   "SOUND_BUTTONCLICK",  // 释放时播放的音效
+		PressedSoundID: "SOUND_GRAVEBUTTON",  // 按下时播放的音效（墓碑样式）
 		OnClick: func() {
 			log.Printf("[PauseMenuModule] Back to game button clicked!")
 			m.Hide()

@@ -19,4 +19,7 @@ type CheckboxComponent struct {
 
 	// 回调函数
 	OnToggle func(isChecked bool) // 状态切换时的回调
+
+	// 音效
+	ClickSoundID string // 点击时播放的音效ID
 }

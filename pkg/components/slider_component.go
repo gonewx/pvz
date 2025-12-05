@@ -28,4 +28,7 @@ type SliderComponent struct {
 
 	// 回调函数
 	OnValueChange func(value float64) // 值改变时的回调
+
+	// 音效
+	ClickSoundID string // 点击/开始拖拽时播放的音效ID
 }

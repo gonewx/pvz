@@ -32,6 +32,9 @@ const (
 
 	// LoadingTextFontSize 加载文字字体大小
 	LoadingTextFontSize float64 = 20
+
+	// LoadingSoundMinInterval 加载界面小花/僵尸头音效的最小播放间隔（秒）
+	LoadingSoundMinInterval float64 = 0.3
 )
 
 // LoadingSproutTriggers 小动画触发进度阈值

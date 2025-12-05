@@ -3,6 +3,7 @@ package systems
 import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/game"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
@@ -11,7 +12,7 @@ import (
 // 用于依赖注入，支持测试时 mock
 type CheckboxMouseInput interface {
 	CursorPosition() (int, int)
-	IsMouseButtonJustPressed(button ebiten.MouseButton) bool
+	IsMouseButtonJustReleased(button ebiten.MouseButton) bool
 }
 
 // ebitenCheckboxMouseInput Ebitengine 默认实现
@@ -21,8 +22,8 @@ func (e *ebitenCheckboxMouseInput) CursorPosition() (int, int) {
 	return ebiten.CursorPosition()
 }
 
-func (e *ebitenCheckboxMouseInput) IsMouseButtonJustPressed(button ebiten.MouseButton) bool {
-	return inpututil.IsMouseButtonJustPressed(button)
+func (e *ebitenCheckboxMouseInput) IsMouseButtonJustReleased(button ebiten.MouseButton) bool {
+	return inpututil.IsMouseButtonJustReleased(button)
 }
 
 // defaultCheckboxMouseInput 默认鼠标输入实例
@@ -63,8 +64,8 @@ func (s *CheckboxSystem) Update(deltaTime float64) {
 	// 获取鼠标位置
 	mouseX, mouseY := s.mouseInput.CursorPosition()
 
-	// 检测鼠标左键是否刚按下
-	mouseJustPressed := s.mouseInput.IsMouseButtonJustPressed(ebiten.MouseButtonLeft)
+	// 检测鼠标左键是否刚释放
+	mouseJustReleased := s.mouseInput.IsMouseButtonJustReleased(ebiten.MouseButtonLeft)
 
 	// 查询所有复选框实体
 	entities := ecs.GetEntitiesWith2[*components.CheckboxComponent, *components.PositionComponent](s.entityManager)
@@ -96,10 +97,17 @@ func (s *CheckboxSystem) Update(deltaTime float64) {
 		// 更新悬停状态
 		checkbox.IsHovered = isInCheckbox
 
-		// 点击处理
-		if mouseJustPressed && isInCheckbox {
+		// 释放时处理点击
+		if mouseJustReleased && isInCheckbox {
 			// 切换状态
 			checkbox.IsChecked = !checkbox.IsChecked
+
+			// 播放释放音效
+			if checkbox.ClickSoundID != "" {
+				if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+					audioManager.PlaySound(checkbox.ClickSoundID)
+				}
+			}
 
 			// 触发回调
 			if checkbox.OnToggle != nil {

@@ -11,17 +11,17 @@ import (
 
 // mockCheckboxMouseInput 用于测试的 mock 鼠标输入
 type mockCheckboxMouseInput struct {
-	mouseX      int
-	mouseY      int
-	justPressed bool
+	mouseX       int
+	mouseY       int
+	justReleased bool
 }
 
 func (m *mockCheckboxMouseInput) CursorPosition() (int, int) {
 	return m.mouseX, m.mouseY
 }
 
-func (m *mockCheckboxMouseInput) IsMouseButtonJustPressed(button ebiten.MouseButton) bool {
-	return m.justPressed
+func (m *mockCheckboxMouseInput) IsMouseButtonJustReleased(button ebiten.MouseButton) bool {
+	return m.justReleased
 }
 
 // createTestImage 创建测试用图片
@@ -204,7 +204,7 @@ func TestCheckboxSystem_Update_ClickInCheckbox(t *testing.T) {
 	mockInput := &mockCheckboxMouseInput{
 		mouseX:      115, // 在复选框内
 		mouseY:      65,
-		justPressed: true,
+		justReleased: true,
 	}
 	system := NewCheckboxSystemWithInput(em, mockInput)
 
@@ -249,7 +249,7 @@ func TestCheckboxSystem_Update_ClickOutsideCheckbox(t *testing.T) {
 	mockInput := &mockCheckboxMouseInput{
 		mouseX:      50, // 复选框外
 		mouseY:      65,
-		justPressed: true,
+		justReleased: true,
 	}
 	system := NewCheckboxSystemWithInput(em, mockInput)
 
@@ -289,7 +289,7 @@ func TestCheckboxSystem_Update_MouseNotJustPressed(t *testing.T) {
 	mockInput := &mockCheckboxMouseInput{
 		mouseX:      115, // 在复选框内
 		mouseY:      65,
-		justPressed: false, // 鼠标未刚按下
+		justReleased: false, // 鼠标未刚按下
 	}
 	system := NewCheckboxSystemWithInput(em, mockInput)
 
@@ -329,7 +329,7 @@ func TestCheckboxSystem_Update_Toggle(t *testing.T) {
 	mockInput := &mockCheckboxMouseInput{
 		mouseX:      115,
 		mouseY:      65,
-		justPressed: true,
+		justReleased: true,
 	}
 	system := NewCheckboxSystemWithInput(em, mockInput)
 
@@ -374,7 +374,7 @@ func TestCheckboxSystem_Update_NoCallback(t *testing.T) {
 	mockInput := &mockCheckboxMouseInput{
 		mouseX:      115,
 		mouseY:      65,
-		justPressed: true,
+		justReleased: true,
 	}
 	system := NewCheckboxSystemWithInput(em, mockInput)
 
@@ -405,7 +405,7 @@ func TestCheckboxSystem_Update_NoImage(t *testing.T) {
 	mockInput := &mockCheckboxMouseInput{
 		mouseX:      115,
 		mouseY:      65,
-		justPressed: true,
+		justReleased: true,
 	}
 	system := NewCheckboxSystemWithInput(em, mockInput)
 
@@ -439,7 +439,7 @@ func TestCheckboxSystem_Update_MultipleCheckboxes(t *testing.T) {
 	mockInput := &mockCheckboxMouseInput{
 		mouseX:      115, // 在第一个复选框范围内
 		mouseY:      65,
-		justPressed: true,
+		justReleased: true,
 	}
 	system := NewCheckboxSystemWithInput(em, mockInput)
 
@@ -482,7 +482,7 @@ func TestCheckboxSystem_Update_NoEntities(t *testing.T) {
 	mockInput := &mockCheckboxMouseInput{
 		mouseX:      115,
 		mouseY:      65,
-		justPressed: true,
+		justReleased: true,
 	}
 	system := NewCheckboxSystemWithInput(em, mockInput)
 
@@ -499,7 +499,7 @@ func TestCheckboxSystem_Update_UsesCorrectImageForSize(t *testing.T) {
 		mockInput := &mockCheckboxMouseInput{
 			mouseX:      115,
 			mouseY:      65,
-			justPressed: true,
+			justReleased: true,
 		}
 		system := NewCheckboxSystemWithInput(em, mockInput)
 
@@ -528,7 +528,7 @@ func TestCheckboxSystem_Update_UsesCorrectImageForSize(t *testing.T) {
 		mockInput := &mockCheckboxMouseInput{
 			mouseX:      140, // 在 CheckedImage 范围内但超出 UncheckedImage
 			mouseY:      90,
-			justPressed: true,
+			justReleased: true,
 		}
 		system := NewCheckboxSystemWithInput(em, mockInput)
 
