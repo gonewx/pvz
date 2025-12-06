@@ -528,6 +528,17 @@ func (ras *RewardAnimationSystem) updateWaitingPhase(dt float64, rewardComp *com
 
 	if clicked {
 		log.Printf("[RewardAnimationSystem] 玩家点击卡片包，切换到 expanding")
+
+		// 播放点击卡包音效
+		if player, err := ras.resourceManager.LoadSoundEffect(config.RewardTapSoundPath); err == nil {
+			player.Play()
+		}
+
+		// 播放胜利音乐（点击卡包后开始播放）
+		if player, err := ras.resourceManager.LoadSoundEffect(config.LevelWinMusicPath); err == nil {
+			player.Play()
+		}
+
 		rewardComp.Phase = "expanding"
 		rewardComp.ElapsedTime = 0
 
@@ -711,6 +722,12 @@ func (ras *RewardAnimationSystem) updateShowingPhaseInternal(dt float64) {
 		// 检查是否点击了"下一关"按钮
 		if ras.isNextLevelButtonClicked(float64(mouseX), float64(mouseY)) {
 			log.Printf("[RewardAnimationSystem] 玩家点击\"下一关\"按钮，准备切换场景")
+
+			// 播放点击按钮音效
+			if player, err := ras.resourceManager.LoadSoundEffect(config.RewardTapSoundPath); err == nil {
+				player.Play()
+			}
+
 			ras.currentPhase = "closing"
 			ras.phaseElapsed = 0
 		}
@@ -800,6 +817,11 @@ func (ras *RewardAnimationSystem) updateClosingPhaseInternal(dt float64) {
 // createRewardPanel 创建奖励面板实体。
 func (ras *RewardAnimationSystem) createRewardPanel(rewardType string, plantID string, toolID string) {
 	ras.panelEntity = ras.entityManager.CreateEntity()
+
+	// 播放雷声音效（奖励面板显示时的震撼效果）
+	if player, err := ras.resourceManager.LoadSoundEffect(config.ThunderSoundPath); err == nil {
+		player.Play()
+	}
 
 	var rewardName, rewardDesc string
 	var sunCost int

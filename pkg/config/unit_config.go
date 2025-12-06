@@ -199,6 +199,11 @@ const (
 
 	// ThunderSoundPath 雷电效果音效
 	ThunderSoundPath = "assets/sounds/thunder.ogg"
+
+	// === 奖励动画音效 ===
+
+	// RewardTapSoundPath 奖励界面点击音效（点击卡包、下一关按钮）
+	RewardTapSoundPath = "assets/sounds/tap2.ogg"
 )
 
 // Plant Configuration (植物配置)
