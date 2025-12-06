@@ -381,7 +381,8 @@ func (s *RenderSystem) drawEntityWithClipping(screen *ebiten.Image, id ecs.Entit
 		behaviorComp.Type == components.BehaviorZombieDying ||
 		behaviorComp.Type == components.BehaviorZombieSquashing ||
 		behaviorComp.Type == components.BehaviorZombieConehead ||
-		behaviorComp.Type == components.BehaviorZombieBuckethead)
+		behaviorComp.Type == components.BehaviorZombieBuckethead ||
+		behaviorComp.Type == components.BehaviorZombieFlag)
 
 	if !isZombie {
 		// 非僵尸实体正常渲染
@@ -1371,7 +1372,8 @@ func (s *RenderSystem) drawZombieShadowsWithClipping(screen *ebiten.Image, zombi
 			behaviorComp.Type == components.BehaviorZombieDying ||
 			behaviorComp.Type == components.BehaviorZombieSquashing ||
 			behaviorComp.Type == components.BehaviorZombieConehead ||
-			behaviorComp.Type == components.BehaviorZombieBuckethead
+			behaviorComp.Type == components.BehaviorZombieBuckethead ||
+			behaviorComp.Type == components.BehaviorZombieFlag
 
 		if !isZombie {
 			continue
@@ -1383,13 +1385,21 @@ func (s *RenderSystem) drawZombieShadowsWithClipping(screen *ebiten.Image, zombi
 			continue
 		}
 
+		// 获取 ReanimComponent 以读取 CenterOffsetY（用于校正阴影位置）
+		reanimComp, hasReanim := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id)
+		centerOffsetCorrection := 0.0
+		if hasReanim {
+			// 计算 CenterOffsetY 校正值：当僵尸装备（路障/铁桶）向上延伸时，
+			// CenterOffsetY 会变小，僵尸渲染位置偏下，阴影需要相应下移
+			centerOffsetCorrection = config.ZombieBaseCenterOffsetY - reanimComp.CenterOffsetY
+		}
+
 		// 计算阴影位置：僵尸脚底中心
 		// 僵尸 pos.Y = 格子中心 + ZombieVerticalOffset
-		// 脚底位置 = pos.Y - ZombieVerticalOffset + CellHeight/2 + shadowOffsetY
-		// 简化为：格子底部 + shadowOffsetY
+		// 脚底位置 = pos.Y - ZombieVerticalOffset + CellHeight/2 + shadowOffsetY + centerOffsetCorrection
 		shadowOffsetX := config.ZombieShadowOffsetX // 可配置的 X 偏移量
 		shadowOffsetY := config.ZombieShadowOffsetY // 可配置的 Y 偏移量
-		footY := pos.Y - config.ZombieVerticalOffset + config.CellHeight/2 + shadowOffsetY
+		footY := pos.Y - config.ZombieVerticalOffset + config.CellHeight/2 + shadowOffsetY + centerOffsetCorrection
 		shadowWorldX := pos.X - shadowImgWidth/2 + shadowOffsetX
 		shadowWorldRightX := shadowWorldX + shadowImgWidth
 		screenX := shadowWorldX - cameraX

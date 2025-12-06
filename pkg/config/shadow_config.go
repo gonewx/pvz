@@ -124,3 +124,9 @@ const ZombieShadowOffsetX float64 = 10.0
 // 调整此值可以微调僵尸阴影的垂直位置
 // 建议值范围：-25.0 ~ 0.0
 const ZombieShadowOffsetY float64 = -25.0
+
+// ZombieBaseCenterOffsetY 僵尸基准 CenterOffsetY（像素）
+// 用于阴影位置计算：不同僵尸类型（如路障/铁桶）由于装备向上延伸，
+// 导致 CenterOffsetY 不同，需要基于基准值校正阴影位置。
+// 此值取自普通僵尸的 CenterOffsetY。
+const ZombieBaseCenterOffsetY float64 = 66.0

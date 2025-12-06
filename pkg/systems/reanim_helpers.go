@@ -175,6 +175,9 @@ func (s *ReanimSystem) analyzeTrackTypes(reanimXML *reanim.ReanimXML) (visualTra
 
 // calculateCenterOffset 计算并缓存 CenterOffset
 // 在第一帧计算所有可见部件的 bounding box 中心,避免每帧重新计算导致位置抖动
+//
+// 重要：计算时会临时禁用 Overlay 动画（如旗帜僵尸的旗杆），
+// 确保 CenterOffset 只基于基础动画计算，避免附加物影响位置。
 func (s *ReanimSystem) calculateCenterOffset(comp *components.ReanimComponent) {
 	// 确保已初始化
 	if comp.MergedTracks == nil || len(comp.VisualTracks) == 0 {
@@ -185,11 +188,19 @@ func (s *ReanimSystem) calculateCenterOffset(comp *components.ReanimComponent) {
 		return
 	}
 
+	// 临时禁用 Overlay 动画，确保只计算基础动画的 BBox
+	// 这样旗帜僵尸的旗杆不会影响 CenterOffset 计算
+	savedOverlay := comp.OverlayReanimXML
+	comp.OverlayReanimXML = nil
+
 	// 强制帧索引为 0,计算第一帧的 bounding box
 	comp.CurrentFrame = 0
 
-	// 准备第一帧的渲染数据
+	// 准备第一帧的渲染数据（不含 Overlay）
 	s.prepareRenderCache(comp)
+
+	// 恢复 Overlay 动画
+	comp.OverlayReanimXML = savedOverlay
 
 	if len(comp.CachedRenderData) == 0 {
 		log.Printf("[ReanimSystem] calculateCenterOffset: %s → 提前返回（CachedRenderData为空）", comp.ReanimName)
