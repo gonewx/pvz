@@ -130,13 +130,6 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 // 注意：手臂掉落粒子效果在 updateZombieDamageState 中触发（受伤时）
 
 func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
-	// 播放僵尸死亡音效（随机选择 splat 音效）
-	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
-		splatSounds := []string{"SOUND_SPLAT", "SOUND_SPLAT2", "SOUND_SPLAT3"}
-		randomIndex := rand.Intn(len(splatSounds))
-		audioManager.PlaySound(splatSounds[randomIndex])
-	}
-
 	// 1. 切换行为类型为 BehaviorZombieDying
 	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
 	if !ok {
@@ -171,6 +164,11 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 				angleOffset = 180.0
 			}
 			log.Printf("[BehaviorSystem] 僵尸 %d 方向: VX=%.1f → 粒子角度偏移=%.0f°", entityID, velocity.VX, angleOffset)
+		}
+
+		// 播放头部掉落音效
+		if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+			audioManager.PlaySound("SOUND_LIMBS_POP")
 		}
 
 		// 触发僵尸头部掉落粒子效果

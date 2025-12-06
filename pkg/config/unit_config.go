@@ -110,14 +110,13 @@ const (
 // Audio Configuration (音频配置)
 const (
 	// ZombieHitSoundPath 击中普通僵尸的音效
-	ZombieHitSoundPath = "assets/sounds/tap.ogg"
+	ZombieHitSoundPath = "assets/sounds/splat.ogg"
 
 	// ArmorBreakSoundPath 护甲破坏音效路径
 	ArmorBreakSoundPath = "assets/sounds/shieldhit.ogg"
 
 	// PeashooterShootSoundPath 豌豆射手发射子弹的音效
-	// 原版游戏中豌豆射手发射音效非常轻微，默认设置为空字符串（静音）
-	PeashooterShootSoundPath = ""
+	PeashooterShootSoundPath = "assets/sounds/throw.ogg"
 
 	// === 关卡结算音效 ===
 
