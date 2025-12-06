@@ -358,9 +358,14 @@ func (s *LevelSystem) checkVictoryCondition() {
 		s.gameState.SetGameResult("win")
 		log.Println("[LevelSystem] Victory! All zombies defeated!")
 
-		// 播放胜利音乐
+		// 淡出 BGM 后播放胜利音乐
+		if s.resourceManager != nil {
+			s.resourceManager.FadeOutMusic(0.3)
+		}
+
+		// 播放胜利音乐（单次播放，不循环）
 		if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
-			audioManager.PlayMusic("SOUND_WINMUSIC")
+			audioManager.PlaySound("SOUND_WINMUSIC")
 		}
 
 		// 清理场上所有阳光实体（避免在奖励动画阶段继续显示）

@@ -410,7 +410,7 @@ func (s *LoadingScene) spawnSproutAnimation(index int) {
 func (s *LoadingScene) onClickStart() {
 	// 播放开始按钮点击音效
 	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
-		audioManager.PlaySound("SOUND_TAP2")
+		audioManager.PlaySound("SOUND_BUTTONCLICK")
 	}
 
 	// Transition to main menu scene

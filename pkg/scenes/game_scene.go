@@ -910,6 +910,11 @@ func (s *GameScene) Update(deltaTime float64) {
 				// Story 10.2: 铺草皮完成后创建除草车（原版行为）
 				s.initLawnmowers()
 
+				// Story 10.9: 铺草皮完成后播放种子槽升起音效
+				if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+					audioManager.PlaySound("SOUND_SEEDLIFT")
+				}
+
 				// 铺草皮完成后播放 ReadySetPlant 动画（仅限配置启用的关卡）
 				// 此时 UI（植物选择栏、除草车）已显示
 				if s.readySetPlantSystem != nil && s.gameState.CurrentLevel.ShowReadySetPlant {
@@ -931,6 +936,11 @@ func (s *GameScene) Update(deltaTime float64) {
 			// 通知教学系统
 			if s.tutorialSystem != nil {
 				s.tutorialSystem.OnSoddingComplete()
+			}
+
+			// Story 10.9: 播放种子槽升起音效（无铺草皮动画的关卡也需要）
+			if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+				audioManager.PlaySound("SOUND_SEEDLIFT")
 			}
 
 			// 播放 ReadySetPlant 动画（仅限配置启用的关卡）
@@ -1004,6 +1014,11 @@ func (s *GameScene) Update(deltaTime float64) {
 					}
 					// Story 10.2: 铺草皮完成后创建除草车（原版行为）
 					s.initLawnmowers()
+
+					// Story 10.9: 铺草皮完成后播放种子槽升起音效
+					if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+						audioManager.PlaySound("SOUND_SEEDLIFT")
+					}
 				}, enabledLanes, animLanes, s.sodOverlayX, float64(s.sodHeight), enableParticles)
 
 				s.soddingAnimStarted = true
@@ -1032,6 +1047,11 @@ func (s *GameScene) Update(deltaTime float64) {
 			// 通知教学系统
 			if s.tutorialSystem != nil {
 				s.tutorialSystem.OnSoddingComplete()
+			}
+
+			// Story 10.9: 播放种子槽升起音效（预渲染草皮关卡也需要）
+			if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+				audioManager.PlaySound("SOUND_SEEDLIFT")
 			}
 		}
 	}

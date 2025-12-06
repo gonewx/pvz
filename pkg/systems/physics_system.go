@@ -206,8 +206,8 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 					if armor.CurrentArmor > 0 {
 						// 有护甲且护甲未破坏，优先扣除护甲
 						armor.CurrentArmor -= config.PeaBulletDamage
-						// 播放击中护甲音效
-						ps.playArmorHitSound()
+						// 播放击中护甲音效（根据僵尸类型选择不同音效）
+						ps.playArmorHitSound(zombieID)
 						// 方案A+：护甲受击也添加闪烁效果
 						ps.addFlashEffect(zombieID)
 						// 注意：护甲可以降到负数，BehaviorSystem 会检查 <= 0 的情况并处理护甲破坏
@@ -268,11 +268,30 @@ func (ps *PhysicsSystem) playHitSound() {
 }
 
 // playArmorHitSound 播放子弹击中护甲的音效
-// 使用配置文件中定义的音效（config.ArmorBreakSoundPath）
-// 用于路障僵尸和铁桶僵尸受到攻击时
-func (ps *PhysicsSystem) playArmorHitSound() {
+// 根据僵尸类型选择不同的音效：
+// - 路障僵尸：使用 config.ArmorBreakSoundPath (shieldhit.ogg)
+// - 铁桶僵尸：使用 config.ShieldHit2SoundPath (shieldhit2.ogg)
+// Story 10.9: 护甲击中音效差异化
+func (ps *PhysicsSystem) playArmorHitSound(zombieID ecs.EntityID) {
+	// 获取僵尸的行为组件，确定僵尸类型
+	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](ps.em, zombieID)
+	if !ok {
+		return
+	}
+
+	// 根据僵尸类型选择音效路径
+	var soundPath string
+	switch behavior.Type {
+	case components.BehaviorZombieBuckethead:
+		// 铁桶僵尸使用变体音效
+		soundPath = config.ShieldHit2SoundPath
+	default:
+		// 路障僵尸和其他护甲僵尸使用默认音效
+		soundPath = config.ArmorBreakSoundPath
+	}
+
 	// 加载击中护甲音效（如果已加载，会返回缓存的播放器）
-	armorSound, err := ps.rm.LoadSoundEffect(config.ArmorBreakSoundPath)
+	armorSound, err := ps.rm.LoadSoundEffect(soundPath)
 	if err != nil {
 		// 音效加载失败时不阻止游戏继续运行
 		return

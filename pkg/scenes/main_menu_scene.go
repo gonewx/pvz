@@ -110,6 +110,10 @@ type MainMenuScene struct {
 	zombieHandEntity ecs.EntityID  // Zombie hand entity ID
 	menuState        MainMenuState // Main menu state
 	pendingScene     string        // Pending scene to switch to after animation
+
+	// Story 10.9: 延迟播放音效
+	pendingSoundDelay float64 // 延迟时间（秒），0表示无待播放音效
+	pendingSoundID    string  // 待播放的音效ID
 }
 
 // NewMainMenuScene creates and returns a new MainMenuScene instance.
@@ -252,6 +256,11 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 		if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
 			audioManager.PlaySound("SOUND_DIRT_RISE")
 		}
+
+		// 设置木牌滚入音效延迟播放
+		// anim_sign 从第13帧开始（约0.65秒后），需要延迟播放
+		scene.pendingSoundDelay = 0.65
+		scene.pendingSoundID = "SOUND_ROLL_IN"
 
 		// 处理 AnimationCommand（立即初始化动画）
 		scene.reanimSystem.Update(0)
@@ -420,6 +429,19 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 
 	// 清理上一帧标记删除的实体（确保本帧开始前已删除）
 	m.entityManager.RemoveMarkedEntities()
+
+	// Story 10.9: 处理延迟播放音效
+	if m.pendingSoundDelay > 0 {
+		m.pendingSoundDelay -= deltaTime
+		if m.pendingSoundDelay <= 0 {
+			// 延迟时间到，播放音效
+			if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+				audioManager.PlaySound(m.pendingSoundID)
+			}
+			m.pendingSoundDelay = 0
+			m.pendingSoundID = ""
+		}
+	}
 
 	// Story 12.4: Check for first launch and show new user dialog
 	if m.isFirstLaunch && !m.newUserDialogShown {

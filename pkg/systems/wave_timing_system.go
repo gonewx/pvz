@@ -629,6 +629,15 @@ func (s *WaveTimingSystem) triggerNextWave() {
 	waveIndex := timer.CurrentWaveIndex
 	log.Printf("[WaveTimingSystem] ✅ Wave %d triggered at time %.2fs", waveIndex+1, timer.WaveStartedAt)
 
+	// Story 10.9: 第一波僵尸进场时播放警报音效 (siren.ogg + awooga.ogg)
+	if waveIndex == 0 {
+		if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+			audioManager.PlaySound("SOUND_SIREN")
+			audioManager.PlaySound("SOUND_AWOOGA")
+			log.Printf("[WaveTimingSystem] Playing SOUND_SIREN + SOUND_AWOOGA for first wave")
+		}
+	}
+
 	// 递增波次索引（下一次会触发下一波）
 	timer.CurrentWaveIndex++
 

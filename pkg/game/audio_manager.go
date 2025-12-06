@@ -61,10 +61,13 @@ func NewAudioManager(rm *ResourceManager, sm *SettingsManager) *AudioManager {
 // 返回：
 //   - bool: 是否成功播放
 func (am *AudioManager) PlaySound(soundID string) bool {
+	log.Printf("[AudioManager] DEBUG: PlaySound called with soundID: %s", soundID)
+
 	// 检查音效是否启用
 	if am.settingsManager != nil {
 		settings := am.settingsManager.GetSettings()
 		if !settings.SoundEnabled {
+			log.Printf("[AudioManager] DEBUG: Sound disabled, skipping %s", soundID)
 			return false // 音效已禁用
 		}
 	}
@@ -72,6 +75,7 @@ func (am *AudioManager) PlaySound(soundID string) bool {
 	// 获取或加载音效播放器
 	player := am.getSoundPlayer(soundID)
 	if player == nil {
+		log.Printf("[AudioManager] DEBUG: Failed to get player for %s", soundID)
 		return false
 	}
 
@@ -84,6 +88,7 @@ func (am *AudioManager) PlaySound(soundID string) bool {
 		log.Printf("[AudioManager] Warning: Failed to rewind sound %s: %v", soundID, err)
 	}
 	player.Play()
+	log.Printf("[AudioManager] DEBUG: Playing sound %s (volume: %.2f)", soundID, volume)
 
 	return true
 }
