@@ -323,6 +323,7 @@ func (oas *OpeningAnimationSystem) updateGameStartState(openingComp *components.
 // 预览僵尸与实际关卡僵尸完全独立，不会参与游戏逻辑。
 // 每种类型的预览僵尸数量不超过关卡配置中该类型的实际数量。
 // 确保每种非普通僵尸类型至少显示一次（如果预览数量允许）。
+// 优化：尽量避免僵尸站位重叠，分散到不同行和不同X位置。
 func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.OpeningAnimationComponent) {
 	// 获取每种僵尸类型在关卡配置中的数量
 	zombieTypeCounts := oas.getZombieTypeCounts()
@@ -340,8 +341,8 @@ func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.O
 
 	// 构建预览类型列表，确保非普通类型优先显示
 	// 1. 首先收集所有非 basic 类型（每种至少一个）
-	var priorityTypes []string   // 非普通类型（优先显示）
-	var remainingPool []string   // 剩余可用的僵尸池
+	var priorityTypes []string // 非普通类型（优先显示）
+	var remainingPool []string // 剩余可用的僵尸池
 
 	for zombieType, count := range zombieTypeCounts {
 		if zombieType != "basic" {
@@ -378,26 +379,27 @@ func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.O
 
 	log.Printf("[OpeningAnimationSystem] Spawning %d preview zombies (available types: %v, priority: %v)", previewCount, zombieTypeCounts, priorityTypes)
 
-	// 生成指定数量的预览僵尸
+	// 生成指定数量的预览僵尸，完全随机分配行和位置
 	for i := 0; i < previewCount; i++ {
 		zombieType := previewTypes[i]
 
-		// 随机选择一行（0-4）
-		randomLane := rand.Intn(config.GridRows)
+		// 完全随机选择行
+		lane := rand.Intn(config.GridRows)
 
-		// 计算Y坐标（使用网格行位置）
-		// 必须与僵尸工厂函数的Y坐标计算公式保持一致
-		y := config.GridWorldStartY + float64(randomLane)*config.CellHeight + config.CellHeight/2 + config.ZombieVerticalOffset
+		// 计算Y坐标，加入随机垂直偏移（±12像素）
+		baseY := config.GridWorldStartY + float64(lane)*config.CellHeight + config.CellHeight/2 + config.ZombieVerticalOffset
+		yJitter := (rand.Float64() - 0.5) * 24
+		y := baseY + yJitter
 
-		// Story 8.3.1: 预览僵尸随机分布在屏幕右侧区域 (X: 1050-1250)
-		randomX := config.ZombieSpawnMinX + rand.Float64()*(config.ZombieSpawnMaxX-config.ZombieSpawnMinX)
+		// X坐标完全随机
+		x := config.ZombieSpawnMinX + rand.Float64()*(config.ZombieSpawnMaxX-config.ZombieSpawnMinX)
 
 		// 创建僵尸实体
 		zombieEntity := oas.entityManager.CreateEntity()
 
 		// 添加位置组件
 		ecs.AddComponent(oas.entityManager, zombieEntity, &components.PositionComponent{
-			X: randomX,
+			X: x,
 			Y: y,
 		})
 
@@ -446,7 +448,7 @@ func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.O
 		// 保存僵尸实体ID
 		openingComp.ZombieEntities = append(openingComp.ZombieEntities, zombieEntity)
 
-		log.Printf("[OpeningAnimationSystem] Spawned preview zombie %d: type=%s, unitID=%s, lane=%d, x=%.0f, y=%.0f", i, zombieType, unitID, randomLane, randomX, y)
+		log.Printf("[OpeningAnimationSystem] Spawned preview zombie %d: type=%s, unitID=%s, lane=%d, x=%.0f, y=%.0f", i, zombieType, unitID, lane, x, y)
 	}
 }
 

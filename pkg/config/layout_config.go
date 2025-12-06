@@ -495,7 +495,7 @@ const (
 	// ConveyorBeltTopPadding 传送带上边距微调（像素）
 	// 卡片在垂直居中基础上的额外偏移，正值向下，负值向上
 	// 建议值范围：-10.0 - 10.0
-	ConveyorBeltTopPadding = 2.0
+	ConveyorBeltTopPadding = 0.0
 
 	// ConveyorBeltSpeed 传送带速度（像素/秒）
 	// 同时控制履带滚动和卡片移动，使两者保持相对静止
@@ -556,7 +556,7 @@ const (
 	// ConveyorCardScale 传送带卡片缩放比例
 	// 用于等比例缩小卡片，基于原始卡片背景尺寸（约 100x140）
 	// 建议值范围：0.3 - 0.6
-	ConveyorCardScale = 0.48
+	ConveyorCardScale = 0.53
 
 	// ConveyorCardSelectedOverlayAlpha 选中卡片遮罩透明度（0-255）
 	// 选中状态的传送带卡片添加的半透明灰色遮罩
