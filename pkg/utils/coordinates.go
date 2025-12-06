@@ -115,9 +115,24 @@ func GetRenderScreenOrigin(
 		effectiveCameraX = 0 // UI 元素使用屏幕坐标，不应用摄像机偏移
 	}
 
-	// 计算屏幕坐标（世界坐标 - 摄像机偏移 - 居中偏移）
-	screenX = pos.X - effectiveCameraX - reanimComp.CenterOffsetX
-	screenY = pos.Y - reanimComp.CenterOffsetY
+	// 获取实体整体缩放（ScaleComponent 和 ReanimComponent.ScaleX/Y）
+	entityScaleX := 1.0
+	entityScaleY := 1.0
+	if scaleComp, hasScale := ecs.GetComponent[*components.ScaleComponent](em, entityID); hasScale {
+		entityScaleX = scaleComp.ScaleX
+		entityScaleY = scaleComp.ScaleY
+	}
+	if reanimComp.ScaleX != 0 {
+		entityScaleX *= reanimComp.ScaleX
+	}
+	if reanimComp.ScaleY != 0 {
+		entityScaleY *= reanimComp.ScaleY
+	}
+
+	// 计算屏幕坐标（世界坐标 - 摄像机偏移 - 居中偏移 * 缩放）
+	// CenterOffset 是在 scale=1.0 时计算的，需要乘以当前缩放比例
+	screenX = pos.X - effectiveCameraX - reanimComp.CenterOffsetX*entityScaleX
+	screenY = pos.Y - reanimComp.CenterOffsetY*entityScaleY
 
 	return screenX, screenY, nil
 }
@@ -170,9 +185,24 @@ func GetClickableCenter(
 		return 0, 0, ErrNoReanimComponent
 	}
 
+	// 获取实体整体缩放（ScaleComponent 和 ReanimComponent.ScaleX/Y）
+	entityScaleX := 1.0
+	entityScaleY := 1.0
+	if scaleComp, hasScale := ecs.GetComponent[*components.ScaleComponent](em, entityID); hasScale {
+		entityScaleX = scaleComp.ScaleX
+		entityScaleY = scaleComp.ScaleY
+	}
+	if reanimComp.ScaleX != 0 {
+		entityScaleX *= reanimComp.ScaleX
+	}
+	if reanimComp.ScaleY != 0 {
+		entityScaleY *= reanimComp.ScaleY
+	}
+
 	// 计算视觉中心（世界坐标）
-	centerX = pos.X - reanimComp.CenterOffsetX
-	centerY = pos.Y - reanimComp.CenterOffsetY
+	// CenterOffset 是在 scale=1.0 时计算的，需要乘以当前缩放比例
+	centerX = pos.X - reanimComp.CenterOffsetX*entityScaleX
+	centerY = pos.Y - reanimComp.CenterOffsetY*entityScaleY
 
 	return centerX, centerY, nil
 }
@@ -219,9 +249,24 @@ func GetRenderOrigin(
 		return 0, 0, ErrNoReanimComponent
 	}
 
+	// 获取实体整体缩放（ScaleComponent 和 ReanimComponent.ScaleX/Y）
+	entityScaleX := 1.0
+	entityScaleY := 1.0
+	if scaleComp, hasScale := ecs.GetComponent[*components.ScaleComponent](em, entityID); hasScale {
+		entityScaleX = scaleComp.ScaleX
+		entityScaleY = scaleComp.ScaleY
+	}
+	if reanimComp.ScaleX != 0 {
+		entityScaleX *= reanimComp.ScaleX
+	}
+	if reanimComp.ScaleY != 0 {
+		entityScaleY *= reanimComp.ScaleY
+	}
+
 	// 计算渲染原点（世界坐标）
-	originX = pos.X - reanimComp.CenterOffsetX
-	originY = pos.Y - reanimComp.CenterOffsetY
+	// CenterOffset 是在 scale=1.0 时计算的，需要乘以当前缩放比例
+	originX = pos.X - reanimComp.CenterOffsetX*entityScaleX
+	originY = pos.Y - reanimComp.CenterOffsetY*entityScaleY
 
 	return originX, originY, nil
 }

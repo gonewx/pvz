@@ -480,6 +480,17 @@ func (s *ReanimSystem) PrepareStaticPreview(entityID ecs.EntityID, plantType typ
 		return errEntityNoReanimComponent(entityID)
 	}
 
+	// 应用配置中的整体缩放（从 reanim_config）
+	// 只在 PlayAnimation 路径下需要应用（PlayCombo 已经处理）
+	if s.configManager != nil && cfg.PreviewAnimation != "" {
+		if unitConfig, err := s.configManager.GetUnit(cfg.ConfigID); err == nil && unitConfig.Scale != 0 {
+			if comp.ScaleX == 0 {
+				comp.ScaleX = unitConfig.Scale
+				comp.ScaleY = unitConfig.Scale
+			}
+		}
+	}
+
 	// 应用 HiddenTracks 配置（黑名单模式）
 	if len(cfg.HiddenTracks) > 0 {
 		if comp.HiddenTracks == nil {
@@ -610,11 +621,41 @@ func (s *ReanimSystem) RenderToTexture(entityID ecs.EntityID, target *ebiten.Ima
 			scaleY = 1.0
 		}
 
-		// 计算部件的 bounding box（考虑图片尺寸）
-		partMinX := partX
-		partMaxX := partX + w*scaleX
-		partMinY := partY
-		partMaxY := partY + h*scaleY
+		// 获取倾斜参数
+		skewX := getFloat(frame.SkewX)
+		skewY := getFloat(frame.SkewY)
+
+		// 计算变换矩阵（与渲染时保持一致）
+		var a, b, c, d float64
+		if skewX == 0 && skewY == 0 {
+			a = scaleX
+			b = 0
+			c = 0
+			d = scaleY
+		} else {
+			skewXRad := skewX * math.Pi / 180.0
+			skewYRad := skewY * math.Pi / 180.0
+			cosKx := math.Cos(skewXRad)
+			sinKx := math.Sin(skewXRad)
+			cosKy := math.Cos(skewYRad)
+			sinKy := math.Sin(skewYRad)
+			a = cosKx * scaleX
+			b = sinKx * scaleX
+			c = -sinKy * scaleY
+			d = cosKy * scaleY
+		}
+
+		// 计算变换后的四个顶点
+		x0, y0 := partX, partY
+		x1, y1 := a*w+partX, b*w+partY
+		x2, y2 := c*h+partX, d*h+partY
+		x3, y3 := a*w+c*h+partX, b*w+d*h+partY
+
+		// 计算 bounding box（取四个顶点的最小/最大值）
+		partMinX := math.Min(math.Min(x0, x1), math.Min(x2, x3))
+		partMaxX := math.Max(math.Max(x0, x1), math.Max(x2, x3))
+		partMinY := math.Min(math.Min(y0, y1), math.Min(y2, y3))
+		partMaxY := math.Max(math.Max(y0, y1), math.Max(y2, y3))
 
 		if partMinX < minX {
 			minX = partMinX
@@ -632,18 +673,41 @@ func (s *ReanimSystem) RenderToTexture(entityID ecs.EntityID, target *ebiten.Ima
 		hasVisibleParts = true
 	}
 
-	// Step 2: 计算居中偏移
-	// 目标：将 bounding box 的中心对齐到实体的 Position
+	// Step 2: 计算居中偏移和适应缩放
+	// 目标：将 bounding box 居中显示在目标纹理内，必要时缩放以适应
 	centerOffsetX := 0.0
 	centerOffsetY := 0.0
+	fitScale := 1.0 // 适应缩放因子
+
 	if hasVisibleParts {
 		boundingWidth := maxX - minX
 		boundingHeight := maxY - minY
+
+		// 获取目标纹理尺寸
+		targetBounds := target.Bounds()
+		targetWidth := float64(targetBounds.Dx())
+		targetHeight := float64(targetBounds.Dy())
+
+		// 添加边距（留出一些空间，避免贴边）
+		margin := 4.0
+		availableWidth := targetWidth - margin*2
+		availableHeight := targetHeight - margin*2
+
+		// 计算适应缩放因子（如果 bounding box 超出目标尺寸）
+		if boundingWidth > availableWidth || boundingHeight > availableHeight {
+			scaleX := availableWidth / boundingWidth
+			scaleY := availableHeight / boundingHeight
+			fitScale = min(scaleX, scaleY) // 取较小值，保持宽高比
+			log.Printf("[RenderToTexture] Applying fit scale %.3f (bounding: %.1fx%.1f, target: %.1fx%.1f)",
+				fitScale, boundingWidth, boundingHeight, targetWidth, targetHeight)
+		}
+
+		// 居中偏移（基于缩放后的 bounding box）
 		centerOffsetX = -(minX + boundingWidth/2)
 		centerOffsetY = -(minY + boundingHeight/2)
 	}
 
-	// Step 3: 渲染所有部件（应用居中偏移）
+	// Step 3: 渲染所有部件（应用居中偏移和适应缩放）
 	for _, partData := range renderData {
 		if partData.Img == nil {
 			continue
@@ -660,10 +724,12 @@ func (s *ReanimSystem) RenderToTexture(entityID ecs.EntityID, target *ebiten.Ima
 		partX := getFloat(frame.X) + partData.OffsetX
 		partY := getFloat(frame.Y) + partData.OffsetY
 
-		// 应用变换
-		opts := &ebiten.DrawImageOptions{}
+		// 获取图片尺寸
+		bounds := partData.Img.Bounds()
+		w := float64(bounds.Dx())
+		h := float64(bounds.Dy())
 
-		// 1. 缩放（先应用缩放，再应用旋转和平移）
+		// 获取缩放参数
 		scaleX := getFloat(frame.ScaleX)
 		scaleY := getFloat(frame.ScaleY)
 		if scaleX == 0 {
@@ -672,20 +738,63 @@ func (s *ReanimSystem) RenderToTexture(entityID ecs.EntityID, target *ebiten.Ima
 		if scaleY == 0 {
 			scaleY = 1.0
 		}
-		opts.GeoM.Scale(scaleX, scaleY)
+		// 应用适应缩放
+		scaleX *= fitScale
+		scaleY *= fitScale
 
-		// 2. 旋转（如果需要）
-		// 注意：Reanim 使用弧度制
-		// 这里暂不处理旋转，因为大部分植物图标不需要
+		// 获取倾斜参数
+		skewX := getFloat(frame.SkewX)
+		skewY := getFloat(frame.SkewY)
 
-		// 3. 平移到最终位置（应用居中偏移）
-		// 使用 Position 作为基准点（离屏渲染，不减去摄像机偏移）
-		finalX := pos.X + partX + centerOffsetX
-		finalY := pos.Y + partY + centerOffsetY
-		opts.GeoM.Translate(finalX, finalY)
+		// 构建变换矩阵（与 renderReanimEntity 保持一致）
+		var a, b, c, d float64
+		if skewX == 0 && skewY == 0 {
+			// 无倾斜时使用简单的缩放
+			a = scaleX
+			b = 0
+			c = 0
+			d = scaleY
+		} else {
+			// 有倾斜，使用完整的变换矩阵
+			skewXRad := skewX * math.Pi / 180.0
+			skewYRad := skewY * math.Pi / 180.0
 
-		// 绘制部件
-		target.DrawImage(partData.Img, opts)
+			cosKx := math.Cos(skewXRad)
+			sinKx := math.Sin(skewXRad)
+			cosKy := math.Cos(skewYRad)
+			sinKy := math.Sin(skewYRad)
+
+			a = cosKx * scaleX
+			b = sinKx * scaleX
+			c = -sinKy * scaleY
+			d = cosKy * scaleY
+		}
+
+		// 计算最终位置（应用居中偏移和适应缩放）
+		tx := pos.X + (partX+centerOffsetX)*fitScale
+		ty := pos.Y + (partY+centerOffsetY)*fitScale
+
+		// 应用变换矩阵到图片的四个角
+		x0 := tx
+		y0 := ty
+		x1 := a*w + tx
+		y1 := b*w + ty
+		x2 := c*h + tx
+		y2 := d*h + ty
+		x3 := a*w + c*h + tx
+		y3 := b*w + d*h + ty
+
+		// 构建顶点数组
+		vs := []ebiten.Vertex{
+			{DstX: float32(x0), DstY: float32(y0), SrcX: 0, SrcY: 0, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
+			{DstX: float32(x1), DstY: float32(y1), SrcX: float32(w), SrcY: 0, ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
+			{DstX: float32(x2), DstY: float32(y2), SrcX: 0, SrcY: float32(h), ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
+			{DstX: float32(x3), DstY: float32(y3), SrcX: float32(w), SrcY: float32(h), ColorR: 1, ColorG: 1, ColorB: 1, ColorA: 1},
+		}
+		is := []uint16{0, 1, 2, 1, 3, 2}
+
+		// 使用 DrawTriangles 绘制（支持完整的变换矩阵）
+		target.DrawTriangles(vs, is, partData.Img, nil)
 	}
 
 	return nil

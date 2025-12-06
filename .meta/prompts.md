@@ -74,12 +74,17 @@
 
   - 加载界面、主菜单界面、level 1-1 至 level 1-5 关卡的的功能都已经实现，但有很多音效还没有加到游戏环节中，请查看音效资源目录(`assets/sounds`),并结合 docs/sound-effects-inventory.md, 实现完整的音效播放. 并且实现选项面板中, 滑动条控制音乐和音效音量大小的功能.
 
-  - 加载界面的进度条上四朵小花的出现和僵尸头的出现，也有音效loadingbar_flower.ogg loadingbar_zombie.ogg。 点击开始按钮点击后有音效 ( tap2.ogg ) 。 整体背景音乐：mainmusic.mo3
-  - 主菜单界面加载时有泥土松动的音效(gravestone_rumble.ogg)，所有按钮（用户管理按钮、墓碑上的四个按钮、右下角的3个按钮）要有悬停时的音效（bleep.ogg）和点击时的音效 (tap.ogg)
+  - 加载界面的进度条上四朵小花的出现和僵尸头的出现，也有音效loadingbar_flower.ogg loadingbar_zombie.ogg。 点击开始按钮点击后有音效 ( buttonclick.ogg ) 。 整体背景音乐：mainmusic.mo3
+  - 主菜单界面加载时有泥土松动的音效(dirt_rise.ogg)，所有按钮（用户管理按钮、墓碑上的四个按钮、右下角的3个按钮）要有悬停时的音效（bleep.ogg）和点击时的音效 (tap.ogg)
   - 主菜单界面,僵尸手掌动画的音效（evillaugh.ogg）
   - 选项面板中和用户管理面板及子面板中, 普通按钮、 墓碑样式按钮（确定、返回游戏、主菜单、重新开始）和滑块类的点击释放音效(buttonclick.ogg)， 墓碑样式按钮（确定、返回游戏、主菜单、重新开始）点击按下音效（gravebutton.ogg）
   
   - level 1-5 点击铲子的音效（shovel.ogg）， 铲除植物的音效和种植时一样
+
+  - 植物选中的音效（seedlift.ogg）
+  - 僵尸进场 siren.ogg 和 awooga.ogg 
+  - 开场动画中铺草皮时的音效 gravebusterchomp.ogg， 铺完后是没有音效的
+  - 植物吐出子弹时的音效 throw.ogg 和僵尸中弹的音效
 
 - [x] 暂停面板中能通过已经绘制`音乐``音效`调节声音大小，通过`全屏`复选框，指定打开时默认是否全屏。 `3d加速` 默认选中，不可修改。
 
@@ -203,6 +208,12 @@ assets/images/FlagMeterParts.png
 
 - 1-4 关卡胜利后，虽然解锁的是铲子，也需要有和前面关卡类似的奖励动画， 只是植物卡包换成铲子图片， 卡包背景的粒子效果换成 data/particles/AwardPickupArrow.xml。
 
+### level 1-6
+
+预览就是要用anim_glow, 确认无疑. 要检查的问题是: 种植后, 是使用其他动画实现  开始时一部分在地下(anim_idle) , 一定时间后从土里长出来(anim_rise  隐藏 PotatoMine_stem轨道) 的动画效果.
+  这时候才用anim_armed（隐藏anim_glow灯不亮， 不隐藏anim_glow灯亮展示头顶一闪一闪的效果）,当僵尸接近时,闪烁频率逐渐加快,直到爆炸 ( 爆炸粒子效果 PotatoMine )
+  anim_glow (头顶灯常 亮). 同时要检查 为什么 2个动画的大小是不同的.
+
 ## bugs
 
 目前存在的问题：
@@ -229,7 +240,7 @@ assets/images/FlagMeterParts.png
 
 - 我们之前重构动画系统时, 由中心锚点改为了左上角锚点,现在的问题和这个改动有关系吗?
 
-- [] epic 19 实现后，还有以下问题:
+- [x] epic 19 实现后，还有以下问题:
   - [x] 打开后，显示了植物选择栏 。 
   - [x] 没有显示dave的动画
   - [x] 整个关卡没有生成阳光的逻辑
@@ -262,6 +273,8 @@ assets/images/FlagMeterParts.png
 - [x] 进入主菜单界面后，有用户 ，但是用户显示用户 名是空的，下面用户管理的按钮也无法点击
 - [x] 全屏后分辨率会下降，就算恢复原来大小分辨率也有下降，而且左右两边有黑边，感觉没有恢复原来的大小或比例
 - [x] 选项面板中的滑块和复选框按钮悬停时鼠标要切换为手形
+
+- [x] 樱桃炸弹的爆炸粒子效果要和爆炸坚果一样
 
   日志(文件很大): /tmp/pvz.log 
 ## 架构

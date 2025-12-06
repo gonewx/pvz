@@ -3,6 +3,7 @@ package systems
 import (
 	"fmt"
 	"log"
+	"math"
 
 	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/components"
@@ -230,11 +231,41 @@ func (s *ReanimSystem) calculateCenterOffset(comp *components.ReanimComponent) {
 			scaleY = 1.0
 		}
 
-		// 计算部件的 bounding box（考虑图片尺寸）
-		partMinX := partX
-		partMaxX := partX + w*scaleX
-		partMinY := partY
-		partMaxY := partY + h*scaleY
+		// 获取倾斜参数
+		skewX := getFloat(frame.SkewX)
+		skewY := getFloat(frame.SkewY)
+
+		// 计算变换矩阵（与渲染时保持一致）
+		var a, b, c, d float64
+		if skewX == 0 && skewY == 0 {
+			a = scaleX
+			b = 0
+			c = 0
+			d = scaleY
+		} else {
+			skewXRad := skewX * math.Pi / 180.0
+			skewYRad := skewY * math.Pi / 180.0
+			cosKx := math.Cos(skewXRad)
+			sinKx := math.Sin(skewXRad)
+			cosKy := math.Cos(skewYRad)
+			sinKy := math.Sin(skewYRad)
+			a = cosKx * scaleX
+			b = sinKx * scaleX
+			c = -sinKy * scaleY
+			d = cosKy * scaleY
+		}
+
+		// 计算变换后的四个顶点
+		x0, y0 := partX, partY
+		x1, y1 := a*w+partX, b*w+partY
+		x2, y2 := c*h+partX, d*h+partY
+		x3, y3 := a*w+c*h+partX, b*w+d*h+partY
+
+		// 计算 bounding box（取四个顶点的最小/最大值）
+		partMinX := math.Min(math.Min(x0, x1), math.Min(x2, x3))
+		partMaxX := math.Max(math.Max(x0, x1), math.Max(x2, x3))
+		partMinY := math.Min(math.Min(y0, y1), math.Min(y2, y3))
+		partMaxY := math.Max(math.Max(y0, y1), math.Max(y2, y3))
 
 		if partMinX < minX {
 			minX = partMinX

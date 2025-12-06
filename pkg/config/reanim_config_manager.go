@@ -34,6 +34,7 @@ type AnimationUnitConfig struct {
 	Name                string                 `yaml:"name"`
 	ReanimFile          string                 `yaml:"reanim_file"`
 	DefaultAnimation    string                 `yaml:"default_animation"`
+	Scale               float64                `yaml:"scale"` // 整体缩放比例，默认 1.0
 	CenterOffset        []float64              `yaml:"center_offset,omitempty"` // 可选：手动指定 CenterOffset [x, y]，如果不指定则自动计算
 	Images              map[string]string      `yaml:"images"`
 	AvailableAnimations []AnimationInfo        `yaml:"available_animations"`
@@ -106,6 +107,10 @@ func loadFromFile(configPath string) (*ReanimConfigManager, error) {
 		if unit.ID == "" {
 			return nil, fmt.Errorf("动画单元 #%d 缺少 'id' 字段", i)
 		}
+		// 设置 Scale 默认值
+		if unit.Scale == 0 {
+			unit.Scale = 1.0
+		}
 		unitMap[unit.ID] = unit
 	}
 
@@ -157,6 +162,10 @@ func loadFromDirectory(dirPath string) (*ReanimConfigManager, error) {
 		unit := &animations[i]
 		if _, exists := unitMap[unit.ID]; exists {
 			return nil, fmt.Errorf("重复的动画单元 ID: %s", unit.ID)
+		}
+		// 设置 Scale 默认值
+		if unit.Scale == 0 {
+			unit.Scale = 1.0
 		}
 		unitMap[unit.ID] = unit
 	}

@@ -430,7 +430,9 @@ func NewPotatoMineEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.Game
 	})
 
 	// 使用 AnimationCommand 触发默认动画（anim_armed）
+	// 设置 UnitID 以便 PlayAnimationWithConfig 能从配置中获取 Scale
 	ecs.AddComponent(em, entityID, &components.AnimationCommandComponent{
+		UnitID:        "potatomine",
 		AnimationName: "anim_armed",
 		Processed:     false,
 	})

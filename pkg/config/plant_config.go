@@ -5,26 +5,29 @@ import "github.com/decker502/pvz/pkg/types"
 // PlantResourceConfig 植物资源配置（统一管理）
 // 将植物的资源名称、配置ID、预览帧、隐藏轨道等配置集中管理
 type PlantResourceConfig struct {
-	ResourceName string   // Reanim 资源名称（如 "SunFlower"）
-	ConfigID     string   // reanim_config.yaml 中的 ID（如 "sunflower"）
-	PreviewFrame int      // 预览帧索引（-1 表示自动选择）
-	HiddenTracks []string // 预览隐藏轨道（黑名单模式，nil 表示显示所有）
+	ResourceName     string   // Reanim 资源名称（如 "SunFlower"）
+	ConfigID         string   // reanim_config.yaml 中的 ID（如 "sunflower"）
+	PreviewFrame     int      // 预览帧索引（-1 表示自动选择）
+	PreviewAnimation string   // 预览动画名称（如 "anim_glow"），空则使用第一个 combo
+	HiddenTracks     []string // 预览隐藏轨道（黑名单模式，nil 表示显示所有）
 }
 
 // PlantConfigs 植物配置表（使用 types.PlantType 作为键）
 var PlantConfigs = map[types.PlantType]*PlantResourceConfig{
 	types.PlantSunflower: {
-		ResourceName: "SunFlower",
-		ConfigID:     "sunflower",
-		PreviewFrame: 8,
+		ResourceName:     "SunFlower",
+		ConfigID:         "sunflower",
+		PreviewFrame:     10,
+		PreviewAnimation: "anim_idle",
 		HiddenTracks: []string{
 			"anim_blink", // 隐藏眨眼轨道
 		},
 	},
 	types.PlantPeashooter: {
-		ResourceName: "PeaShooterSingle",
-		ConfigID:     "peashootersingle",
-		PreviewFrame: -1, // 自动选择
+		ResourceName:     "PeaShooterSingle",
+		ConfigID:         "peashootersingle",
+		PreviewFrame:     0,
+		PreviewAnimation: "anim_full_idle",
 		HiddenTracks: []string{
 			"anim_blink",       // 隐藏眨眼轨道
 			"idle_shoot_blink", // 隐藏射击眨眼轨道
@@ -45,9 +48,10 @@ var PlantConfigs = map[types.PlantType]*PlantResourceConfig{
 		HiddenTracks: nil, // 无需隐藏轨道
 	},
 	types.PlantPotatoMine: {
-		ResourceName: "PotatoMine",
-		ConfigID:     "potatomine",
-		PreviewFrame: 30, // 物理帧 25（anim_armed 可见范围 20-30）
+		ResourceName:     "PotatoMine",
+		ConfigID:         "potatomine",
+		PreviewFrame:     -1,          // 自动选择
+		PreviewAnimation: "anim_glow", // 与种植后动画一致
 		HiddenTracks: []string{
 			"anim_blink", // 隐藏眨眼轨道
 		},

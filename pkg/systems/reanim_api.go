@@ -132,6 +132,13 @@ func (s *ReanimSystem) PlayAnimationWithConfig(entityID ecs.EntityID, unitID, an
 	if s.configManager != nil {
 		unitConfig, err := s.configManager.GetUnit(unitID)
 		if err == nil {
+			// 应用配置中的整体缩放（Scale）
+			// 只在初次设置时应用，避免覆盖运行时调整
+			if unitConfig.Scale != 0 && comp.ScaleX == 0 {
+				comp.ScaleX = unitConfig.Scale
+				comp.ScaleY = unitConfig.Scale
+			}
+
 			// 查找动画配置
 			for _, animInfo := range unitConfig.AvailableAnimations {
 				if animInfo.Name == animName {
@@ -356,6 +363,13 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 	unitConfig, err := s.configManager.GetUnit(unitID)
 	if err != nil {
 		return fmt.Errorf("failed to get config for unit %s: %w", unitID, err)
+	}
+
+	// 应用配置中的整体缩放（Scale）
+	// 注意：只在初次设置或单位切换时应用，避免覆盖运行时调整
+	if unitConfig.Scale != 0 && (comp.ScaleX == 0 || unitSwitched) {
+		comp.ScaleX = unitConfig.Scale
+		comp.ScaleY = unitConfig.Scale
 	}
 
 	if unitConfig == nil {

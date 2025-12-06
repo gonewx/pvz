@@ -2,7 +2,7 @@ id: potatomine
 name: PotatoMine
 reanim_file: data/reanim/PotatoMine.reanim
 default_animation: anim_armed
-scale: 1
+scale: 0.75
 images:
     IMAGE_REANIM_POTATOMINE_BLINK1: assets/reanim/PotatoMine_blink1.png
     IMAGE_REANIM_POTATOMINE_BLINK2: assets/reanim/PotatoMine_blink2.png
