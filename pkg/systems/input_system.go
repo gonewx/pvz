@@ -424,6 +424,11 @@ func (s *InputSystem) handlePlantCardClick(mouseX, mouseY int, cameraX float64) 
 				log.Printf("[InputSystem] 进入种植模式: PlantType=%v", card.PlantType)
 				s.gameState.EnterPlantingMode(card.PlantType)
 
+				// Story 10.9: 播放选中植物卡片音效 (seedlift.ogg)
+				if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+					audioManager.PlaySound("SOUND_SEEDLIFT")
+				}
+
 				// 创建植物预览实体（转换为世界坐标）
 				mouseWorldX := float64(mouseX) + cameraX
 				mouseWorldY := float64(mouseY)
