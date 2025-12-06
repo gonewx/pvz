@@ -459,9 +459,19 @@ func (s *ReanimSystem) PrepareStaticPreview(entityID ecs.EntityID, plantType typ
 		return errNoPlantConfig(plantType)
 	}
 
-	// 使用 PlayCombo 播放默认动画
-	if err := s.PlayCombo(entityID, cfg.ConfigID, ""); err != nil {
-		return errPlayDefaultAnimation(err)
+	// 根据 PreviewAnimation 配置选择播放策略
+	if cfg.PreviewAnimation != "" {
+		// 使用配置的预览动画
+		if err := s.PlayAnimation(entityID, cfg.PreviewAnimation); err != nil {
+			return errPlayDefaultAnimation(err)
+		}
+		log.Printf("[ReanimSystem] PrepareStaticPreview: %s using PreviewAnimation: %s",
+			cfg.ConfigID, cfg.PreviewAnimation)
+	} else {
+		// 使用 PlayCombo 播放默认动画（第一个 combo）
+		if err := s.PlayCombo(entityID, cfg.ConfigID, ""); err != nil {
+			return errPlayDefaultAnimation(err)
+		}
 	}
 
 	// 获取组件
@@ -947,14 +957,12 @@ func (s *ReanimSystem) getInterpolatedFrame(
 	logicalFrame float64,
 	animVisibles []int,
 	mergedFrames []reanim.Frame,
-	loopParams ...int, // 可选参数：[0]=isLooping (0/1), [1]=startFrame
+	loopParams ...int, // 可选参数：[0]=isLooping (0/1), [1]=startFrame (未使用)
 ) reanim.Frame {
 	// 解析可选循环参数
 	isLooping := false
-	startFrame := 0
-	if len(loopParams) >= 2 {
+	if len(loopParams) >= 1 {
 		isLooping = loopParams[0] != 0
-		startFrame = loopParams[1]
 	}
 
 	// 1. 获取整数部分和小数部分
@@ -980,12 +988,10 @@ func (s *ReanimSystem) getInterpolatedFrame(
 	if isFrame2OutOfBounds || physicalFrame2 < 0 || physicalFrame2 >= len(mergedFrames) {
 		// 下一帧越界
 		if isLooping && visibleCount > 0 {
-			// 循环动画：插值到起始帧
-			physicalFrame2 = MapLogicalToPhysical(startFrame, animVisibles)
-			if physicalFrame2 < 0 || physicalFrame2 >= len(mergedFrames) {
-				// 起始帧也无效，直接返回当前帧
-				return mergedFrames[physicalFrame1]
-			}
+			// 循环边界：直接返回当前帧（最后一帧），不插值到起始帧
+			// 这避免了非无缝循环动画（如 Sun.reanim）在循环边界产生的跳动
+			// 当帧索引自然增加并超过边界时，会自动回到帧 0
+			return mergedFrames[physicalFrame1]
 		} else {
 			// 非循环动画：直接返回当前帧（不插值）
 			return mergedFrames[physicalFrame1]
@@ -1032,11 +1038,10 @@ func (s *ReanimSystem) getInterpolatedFrame(
 	}
 
 	// 插值倾斜角度 (SkewX, SkewY)
-	// 特殊处理：循环动画中 360° → 0° 的过渡需要使用最短路径插值
+	// 处理角度循环：如果差值超过 180°，使用最短路径插值
 	if f1.SkewX != nil && f2.SkewX != nil {
 		skew1 := *f1.SkewX
 		skew2 := *f2.SkewX
-		// 处理角度循环：如果差值超过 180°，调整 skew2 使差值最小化
 		diff := skew2 - skew1
 		if diff > 180 {
 			skew2 -= 360
@@ -1052,7 +1057,6 @@ func (s *ReanimSystem) getInterpolatedFrame(
 	if f1.SkewY != nil && f2.SkewY != nil {
 		skew1 := *f1.SkewY
 		skew2 := *f2.SkewY
-		// 处理角度循环：如果差值超过 180°，调整 skew2 使差值最小化
 		diff := skew2 - skew1
 		if diff > 180 {
 			skew2 -= 360
