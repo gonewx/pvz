@@ -250,7 +250,7 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 
 		// 播放泥土松动音效（开场动画开始时）
 		if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
-			audioManager.PlaySound("SOUND_GRAVESTONE_RUMBLE")
+			audioManager.PlaySound("SOUND_DIRT_RISE")
 		}
 
 		// 处理 AnimationCommand（立即初始化动画）
