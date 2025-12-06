@@ -2,6 +2,7 @@ package systems
 
 import (
 	"log"
+	"sort"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
@@ -127,6 +128,17 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 			zombies = append(zombies, entityID)
 		}
 	}
+
+	// 按 X 坐标排序僵尸列表，确保最前面的僵尸（X 值最小）先被检测
+	// 这样当多个僵尸重叠时，子弹只会击中最前面的那只
+	sort.Slice(zombies, func(i, j int) bool {
+		posI, okI := ecs.GetComponent[*components.PositionComponent](ps.em, zombies[i])
+		posJ, okJ := ecs.GetComponent[*components.PositionComponent](ps.em, zombies[j])
+		if !okI || !okJ {
+			return false
+		}
+		return posI.X < posJ.X
+	})
 
 	// 嵌套遍历检测碰撞
 	for _, bulletID := range bullets {
