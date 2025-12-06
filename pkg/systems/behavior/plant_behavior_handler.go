@@ -621,7 +621,7 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 	_, err := entities.CreateParticleEffect(
 		s.entityManager,
 		s.resourceManager,
-		"BossExplosion", // 粒子效果名称（不带.xml后缀）
+		config.ExplosiveNutParticleEffect, // 使用与爆炸坚果相同的 Powie 粒子效果
 		position.X, position.Y,
 	)
 	if err != nil {
