@@ -2,7 +2,6 @@ package behavior
 
 import (
 	"log"
-	"math/rand"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
@@ -489,13 +488,6 @@ func (s *BehaviorSystem) changeZombieAnimation(zombieID ecs.EntityID, newState c
 func (s *BehaviorSystem) startEatingPlant(zombieID, plantID ecs.EntityID) {
 	log.Printf("[BehaviorSystem] 僵尸 %d 开始啃食植物 %d", zombieID, plantID)
 
-	// 播放僵尸开始啃食音效（随机选择 chomp 音效）
-	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
-		chompSounds := []string{"SOUND_CHOMP", "SOUND_CHOMP2"}
-		randomIndex := rand.Intn(len(chompSounds))
-		audioManager.PlaySound(chompSounds[randomIndex])
-	}
-
 	// 1. 移除僵尸的 VelocityComponent（停止移动）
 	ecs.RemoveComponent[*components.VelocityComponent](s.entityManager, zombieID)
 
@@ -508,6 +500,8 @@ func (s *BehaviorSystem) startEatingPlant(zombieID, plantID ecs.EntityID) {
 
 	// 3. 切换 BehaviorComponent.Type 为 BehaviorZombieEating
 	behavior.Type = components.BehaviorZombieEating
+	// 初始化啃食动画帧跟踪（用于音效同步）
+	behavior.LastEatAnimFrame = -1
 
 	// 切换僵尸动画为啃食状态
 	s.changeZombieAnimation(zombieID, components.ZombieAnimEating)
@@ -590,6 +584,51 @@ func (s *BehaviorSystem) stopEatingAndResume(zombieID ecs.EntityID) {
 func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, deltaTime float64) {
 	// DEBUG: 添加日志确认函数被调用
 	log.Printf("[BehaviorSystem] 🍴 处理僵尸 %d 啃食行为", entityID)
+
+	// 获取行为组件和动画组件，用于音效同步
+	behavior, hasBehavior := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
+	reanim, hasReanim := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+
+	// 检测动画帧并播放音效（与动画同步）
+	// 普通僵尸（双手啃食）：在动画开始和中间点各播放一次音效
+	// 旗帜僵尸（单手啃食）：只在动画开始时播放一次音效
+	if hasBehavior && hasReanim {
+		currentFrame := reanim.CurrentFrame
+		lastFrame := behavior.LastEatAnimFrame
+
+		// 判断是否是单手僵尸（旗帜僵尸）
+		isSingleHand := behavior.UnitID == "zombie_flag"
+
+		// 获取动画总帧数（用于计算中间点）
+		totalFrames := 0
+		if animVisibles, ok := reanim.AnimVisiblesMap["anim_eat"]; ok {
+			for _, v := range animVisibles {
+				if v == 0 {
+					totalFrames++
+				}
+			}
+		}
+		midFrame := totalFrames / 2
+
+		// 检测动画循环：当前帧小于上一帧，说明动画循环了
+		// 或者第一次进入啃食状态（lastFrame == -1）
+		if lastFrame == -1 || currentFrame < lastFrame {
+			// 动画循环开始，播放第一次音效
+			s.playEatingSound()
+			log.Printf("[BehaviorSystem] 🔊 僵尸 %d 啃食动画循环，播放音效（帧 %d → %d）",
+				entityID, lastFrame, currentFrame)
+		} else if !isSingleHand && totalFrames > 0 {
+			// 双手僵尸：检测是否跨过中间点，播放第二次音效
+			if lastFrame < midFrame && currentFrame >= midFrame {
+				s.playEatingSound()
+				log.Printf("[BehaviorSystem] 🔊 僵尸 %d 双手啃食中间点，播放音效（帧 %d → %d，mid=%d）",
+					entityID, lastFrame, currentFrame, midFrame)
+			}
+		}
+
+		// 更新上一帧记录
+		behavior.LastEatAnimFrame = currentFrame
+	}
 
 	// 检查生命值并更新受伤状态（掉手臂、掉头）
 	health, ok := ecs.GetComponent[*components.HealthComponent](s.entityManager, entityID)
@@ -712,9 +751,6 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 
 				log.Printf("[BehaviorSystem] 僵尸 %d 啃食植物 %d，造成 %d 伤害，剩余生命值 %d",
 					entityID, plantID, config.ZombieEatingDamage, plantHealth.CurrentHealth)
-
-				// 播放啃食音效
-				s.playEatingSound()
 
 				// 检查植物是否死亡
 				if plantHealth.CurrentHealth <= 0 {

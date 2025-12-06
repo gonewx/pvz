@@ -1,6 +1,8 @@
 # BMAD (local only)
 .bmad-core/
 .bmad-*/
+.windsurf
+.agent/workflows
 
 .claude/settings.local.json
 
@@ -34,8 +36,7 @@ scenes.test
 /verify_reward_card
 /verify_reward_panel
 
-.windsurf
-.agent/workflows
+
 
 /verify_gameplay
 
