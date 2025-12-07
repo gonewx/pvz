@@ -36,6 +36,7 @@ type VerifyPanelGame struct {
 	entityManager         *ecs.EntityManager
 	gameState             *game.GameState
 	resourceManager       *game.ResourceManager
+	audioManager          *game.AudioManager               // 音频管理器
 	reanimSystem          *systems.ReanimSystem            // Reanim 动画系统（必须每帧更新）
 	panelRenderSystem     *systems.RewardPanelRenderSystem // 面板渲染系统
 	plantCardRenderSystem *systems.PlantCardRenderSystem   // 植物卡片渲染系统（新增）
@@ -83,6 +84,10 @@ func NewVerifyPanelGame() (*VerifyPanelGame, error) {
 	// 获取游戏状态单例
 	gs := game.GetGameState()
 	gs.CameraX = config.GameCameraX // 设置摄像机位置
+
+	// 创建音频管理器并设置到 GameState
+	audioManager := game.NewAudioManager(rm, nil)
+	gs.SetAudioManager(audioManager)
 
 	// 创建 Reanim 系统（用于渲染植物）
 	reanimSystem := systems.NewReanimSystem(em)
@@ -159,6 +164,7 @@ func NewVerifyPanelGame() (*VerifyPanelGame, error) {
 		entityManager:         em,
 		gameState:             gs,
 		resourceManager:       rm,
+		audioManager:          audioManager, // 音频管理器
 		reanimSystem:          reanimSystem, // 保存 ReanimSystem 引用
 		panelRenderSystem:     panelRenderSystem,
 		plantCardRenderSystem: plantCardRenderSystem, // 植物卡片渲染系统
@@ -175,11 +181,54 @@ func (vpg *VerifyPanelGame) Update() error {
 		return fmt.Errorf("quit")
 	}
 
+	// 检测鼠标位置，更新光标形状
+	mouseX, mouseY := ebiten.CursorPosition()
+	if vpg.isNextLevelButtonClicked(float64(mouseX), float64(mouseY)) {
+		// 悬停在按钮上时显示手形光标
+		ebiten.SetCursorShape(ebiten.CursorShapePointer)
+	} else {
+		// 恢复默认光标
+		ebiten.SetCursorShape(ebiten.CursorShapeDefault)
+	}
+
+	// 检测鼠标点击"下一关"按钮
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+		if vpg.isNextLevelButtonClicked(float64(mouseX), float64(mouseY)) {
+			// 播放点击音效
+			if vpg.audioManager != nil {
+				vpg.audioManager.PlaySound("SOUND_TAP2")
+			}
+			log.Println("[VerifyPanelGame] 点击了下一关按钮")
+		}
+	}
+
 	// 【关键修复】更新 Reanim 动画系统，使植物动画播放
 	// 使用固定时间步长 1.0/60.0 秒（60 FPS）
 	vpg.reanimSystem.Update(1.0 / 60.0)
 
 	return nil
+}
+
+// isNextLevelButtonClicked 检查鼠标点击是否在"下一关"按钮范围内
+func (vpg *VerifyPanelGame) isNextLevelButtonClicked(mouseX, mouseY float64) bool {
+	// 计算按钮位置（与 reward_panel_render_system.go 中的逻辑一致）
+	bgWidth := config.RewardPanelBackgroundWidth
+	bgHeight := config.RewardPanelBackgroundHeight
+	offsetX := (screenWidth - bgWidth) / 2
+	offsetY := (screenHeight - bgHeight) / 2
+
+	buttonX := offsetX + bgWidth/2
+	buttonY := offsetY + bgHeight*config.RewardPanelButtonY
+
+	// 按钮尺寸
+	buttonWidth := 155.0
+	buttonHeight := 50.0
+
+	halfWidth := buttonWidth / 2
+	halfHeight := buttonHeight / 2
+
+	return mouseX >= buttonX-halfWidth && mouseX <= buttonX+halfWidth &&
+		mouseY >= buttonY-halfHeight && mouseY <= buttonY+halfHeight
 }
 
 // Draw 绘制游戏画面

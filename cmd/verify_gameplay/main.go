@@ -137,6 +137,10 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 	gs.CameraX = config.GameCameraX
 	gs.Sun = 9990 // 设置大量阳光用于测试
 
+	// 创建音频管理器并设置到 GameState
+	audioManager := game.NewAudioManager(rm, nil)
+	gs.SetAudioManager(audioManager)
+
 	// 创建系统
 	reanimSystem := systems.NewReanimSystem(em)
 	reanimSystem.SetConfigManager(reanimConfigManager)

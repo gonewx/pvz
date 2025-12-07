@@ -614,7 +614,7 @@ func (rprs *RewardPanelRenderSystem) isHoveringNextButton() bool {
 }
 
 // drawNextLevelButton 绘制"下一关"按钮（在面板底部）。
-// 当鼠标悬停时，使用高亮版本的按钮图片
+// 当鼠标悬停时，在普通按钮上叠加半透明的光晕效果
 func (rprs *RewardPanelRenderSystem) drawNextLevelButton(screen *ebiten.Image, alpha float64) {
 	if alpha < 0.5 {
 		return
@@ -623,20 +623,10 @@ func (rprs *RewardPanelRenderSystem) drawNextLevelButton(screen *ebiten.Image, a
 	// 检查是否悬停
 	isHovered := rprs.isHoveringNextButton()
 
-	// 根据悬停状态选择按钮图片
-	var buttonImage *ebiten.Image
-	if isHovered {
-		// 悬停时使用高亮图片
-		buttonImage = rprs.resourceManager.GetImageByID("IMAGE_SEEDCHOOSER_BUTTON_GLOW")
-	}
-	if buttonImage == nil {
-		// 使用普通按钮图片
-		buttonImage = rprs.resourceManager.GetImageByID("IMAGE_SEEDCHOOSER_BUTTON")
-	}
-
+	// 获取普通按钮图片
+	buttonImage := rprs.resourceManager.GetImageByID("IMAGE_SEEDCHOOSER_BUTTON")
 	if buttonImage == nil {
 		log.Printf("[RewardPanelRenderSystem] WARNING: IMAGE_SEEDCHOOSER_BUTTON not loaded! Drawing fallback button")
-		// 如果资源未加载，绘制简单的矩形按钮作为后备
 		rprs.drawFallbackButton(screen, alpha)
 		return
 	}
@@ -651,7 +641,7 @@ func (rprs *RewardPanelRenderSystem) drawNextLevelButton(screen *ebiten.Image, a
 	buttonX := offsetX + bgWidth/2
 	buttonY := offsetY + bgHeight*config.RewardPanelButtonY // 使用配置的Y位置
 
-	// 绘制按钮图片
+	// 绘制普通按钮图片
 	buttonWidth := float64(buttonImage.Bounds().Dx())
 	buttonHeight := float64(buttonImage.Bounds().Dy())
 
@@ -659,6 +649,28 @@ func (rprs *RewardPanelRenderSystem) drawNextLevelButton(screen *ebiten.Image, a
 	op.GeoM.Translate(buttonX-buttonWidth/2, buttonY-buttonHeight/2)
 	op.ColorScale.ScaleAlpha(float32(alpha))
 	screen.DrawImage(buttonImage, op)
+
+	// 悬停时叠加半透明光晕效果（减弱版）
+	if isHovered {
+		glowImage := rprs.resourceManager.GetImageByID("IMAGE_SEEDCHOOSER_BUTTON_GLOW")
+		if glowImage != nil {
+			glowWidth := float64(glowImage.Bounds().Dx())
+			glowHeight := float64(glowImage.Bounds().Dy())
+
+			// 光晕缩小到 90% 并居中显示
+			glowScale := 0.9
+			glowOp := &ebiten.DrawImageOptions{}
+			// 先平移到中心点
+			glowOp.GeoM.Translate(-glowWidth/2, -glowHeight/2)
+			// 缩放
+			glowOp.GeoM.Scale(glowScale, glowScale)
+			// 移动到按钮位置
+			glowOp.GeoM.Translate(buttonX, buttonY)
+			// 设置透明度（0.4 = 40% 透明度，减弱光晕强度）
+			glowOp.ColorScale.ScaleAlpha(float32(alpha) * 0.4)
+			screen.DrawImage(glowImage, glowOp)
+		}
+	}
 
 	// 绘制按钮文字（"下一关"，带阴影效果）
 	if rprs.buttonFont != nil {

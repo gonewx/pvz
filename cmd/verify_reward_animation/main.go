@@ -96,6 +96,10 @@ func NewVerifyRewardAnimationGame() (*VerifyRewardAnimationGame, error) {
 	gs := game.GetGameState()
 	gs.CameraX = config.GameCameraX // 设置摄像机位置
 
+	// 创建音频管理器并设置到 GameState
+	audioManager := game.NewAudioManager(rm, nil)
+	gs.SetAudioManager(audioManager)
+
 	// 创建系统
 	reanimSystem := systems.NewReanimSystem(em)
 	// 设置配置管理器（必须在 PlayCombo 之前设置）

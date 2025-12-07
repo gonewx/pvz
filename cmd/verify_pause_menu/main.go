@@ -69,6 +69,10 @@ func NewVerifyPauseMenuGame() (*VerifyPauseMenuGame, error) {
 	gs := game.GetGameState()
 	gs.CameraX = config.GameCameraX // 设置摄像机位置
 
+	// 创建音频管理器并设置到 GameState
+	audioManager := game.NewAudioManager(rm, nil)
+	gs.SetAudioManager(audioManager)
+
 	// 创建按钮系统（暂停菜单需要）
 	buttonSystem := systems.NewButtonSystem(em)
 	buttonRenderSystem := systems.NewButtonRenderSystem(em)

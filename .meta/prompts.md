@@ -94,7 +94,7 @@
   - 在僵尸进入房子动画时要播放 losemusic.ogg
   - level 1-5 中，dave 对话时都有相应的音效，请找到正确的音效，并修正逻辑。 crazydavecrazy.ogg crazydaveextralong1.ogg crazydaveextralong2.ogg crazydaveextralong3.ogg crazydavelong1.ogg crazydavelong2.ogg crazydavelong3.ogg crazydavescream.ogg crazydavescream2.ogg crazydaveshort1.ogg crazydaveshort2.ogg crazydaveshort3.ogg
 
-- [] level 1-5 中，在`拿好这个坚果墙`的对话时，dave的手上要显示坚果
+- [x] level 1-5 中，在`拿好这个坚果墙`的对话时，dave的手上要显示坚果
 
 - [x] 暂停面板中能通过已经绘制`音乐``音效`调节声音大小，通过`全屏`复选框，指定打开时默认是否全屏。 `3d加速` 默认选中，不可修改。
 
@@ -107,7 +107,7 @@
 
 - [x] 编写运维类脚本（包括 github ci/cd 脚本 ），方便发布、编译各平台运行二进制 。支持的平台 Linux\Windows\MacOS\Android\iOS\Web(WASM)。  
 
-- [] 僵尸和除草车的碰撞检测不合适，看起来僵尸已经走到车上了，才发生攻击
+- [x] 僵尸和除草车的碰撞检测不合适，看起来僵尸已经走到车上了，才发生攻击
 
 ## 5.3
 
