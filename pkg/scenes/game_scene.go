@@ -46,9 +46,9 @@ type GameScene struct {
 	conveyorBelt         *ebiten.Image // Conveyor belt animation (传送带传动动画，6行纹理)
 
 	// 传送带卡片渲染资源（复用植物卡片渲染逻辑）
-	conveyorCardBackground  *ebiten.Image // 卡片背景框（SeedPacket_Larger）
-	conveyorWallnutIcon     *ebiten.Image // 普通坚果图标
-	conveyorExplodeNutIcon  *ebiten.Image // 爆炸坚果图标（红色版本）
+	conveyorCardBackground *ebiten.Image // 卡片背景框（SeedPacket_Larger）
+	conveyorWallnutIcon    *ebiten.Image // 普通坚果图标
+	conveyorExplodeNutIcon *ebiten.Image // 爆炸坚果图标（红色版本）
 
 	// Story 8.2 QA改进：草皮叠加层（随动画进度渐进显示）
 	sodRowImage        *ebiten.Image // 草皮叠加图片（sod1row.jpg 或 sod3row.jpg）
@@ -129,9 +129,9 @@ type GameScene struct {
 	flashEffectSystem *systems.FlashEffectSystem // 闪烁效果系统（僵尸受击闪烁）
 
 	// Story 8.2: Tutorial System
-	tutorialSystem       *systems.TutorialSystem // 教学系统（关卡 1-1 教学引导）
-	tutorialFont         interface{}             // 教学文本字体（*utils.BitmapFont 或 *text.GoTextFace）
-	bowlingTutorialFont  interface{}             // Level 1-5 保龄球教学字体（42px）
+	tutorialSystem      *systems.TutorialSystem // 教学系统（关卡 1-1 教学引导）
+	tutorialFont        interface{}             // 教学文本字体（*utils.BitmapFont 或 *text.GoTextFace）
+	bowlingTutorialFont interface{}             // Level 1-5 保龄球教学字体（42px）
 
 	// Story 8.2 QA改进：完整的铺草皮动画系统
 	soddingSystem *systems.SoddingSystem // 铺草皮动画系统（SodRoll 滚动动画）
@@ -206,6 +206,9 @@ type GameScene struct {
 
 	// Story 19.1: 疯狂戴夫对话系统
 	daveDialogueSystem *systems.DaveDialogueSystem // 疯狂戴夫对话系统
+
+	// 僵尸呻吟音效系统（环境音效，增强游戏氛围）
+	zombieGroanSystem *systems.ZombieGroanSystem
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -620,6 +623,10 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	// Story 19.1: 初始化疯狂戴夫对话系统
 	scene.daveDialogueSystem = systems.NewDaveDialogueSystem(scene.entityManager, scene.gameState, rm)
 	log.Printf("[GameScene] Initialized Dave dialogue system")
+
+	// 初始化僵尸呻吟音效系统（环境音效）
+	scene.zombieGroanSystem = systems.NewZombieGroanSystem(scene.entityManager, scene.gameState)
+	log.Printf("[GameScene] Initialized zombie groan system")
 
 	// Story 19.5: 根据关卡配置初始化传送带参数
 	if scene.gameState.CurrentLevel != nil && scene.gameState.CurrentLevel.ConveyorBelt != nil {
@@ -1164,6 +1171,10 @@ func (s *GameScene) Update(deltaTime float64) {
 	// Story 19.1: Dave dialogue system (dialogue progression)
 	if s.daveDialogueSystem != nil {
 		s.daveDialogueSystem.Update(deltaTime) // 9.10. Update Dave dialogue
+	}
+	// 僵尸呻吟音效系统 - 环境音效
+	if s.zombieGroanSystem != nil {
+		s.zombieGroanSystem.Update(deltaTime)
 	}
 	// Story 3.2: 植物预览系统 - 更新预览位置（双图像支持）
 	s.plantPreviewSystem.Update(deltaTime) // 10. Update plant preview position (dual-image support)

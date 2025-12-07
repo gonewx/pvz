@@ -58,6 +58,14 @@ const (
 
 	// BucketheadZombieEatAnimationFrames 铁桶僵尸啃食动画帧数
 	BucketheadZombieEatAnimationFrames = 11
+
+	// ZombieGroanMinInterval 僵尸呻吟音效最小间隔（秒）
+	// 控制呻吟音效不要太频繁
+	ZombieGroanMinInterval = 5.0
+
+	// ZombieGroanMaxInterval 僵尸呻吟音效最大间隔（秒）
+	// 增加随机性，避免呻吟过于规律
+	ZombieGroanMaxInterval = 10.0
 )
 
 // Projectile Configuration (子弹配置)
