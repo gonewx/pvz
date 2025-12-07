@@ -269,8 +269,8 @@ func (ps *PhysicsSystem) playHitSound() {
 
 // playArmorHitSound 播放子弹击中护甲的音效
 // 根据僵尸类型选择不同的音效：
-// - 路障僵尸：使用 SOUND_SHIELDHIT (shieldhit.ogg)
-// - 铁桶僵尸：使用 SOUND_SHIELDHIT2 (shieldhit2.ogg)
+// - 路障僵尸：使用 SOUND_PLASTICHIT (plastichit.ogg) - 塑料路障音效
+// - 铁桶僵尸：使用 SOUND_SHIELDHIT (shieldhit.ogg) - 金属铁桶音效
 // Story 10.9: 护甲击中音效差异化
 func (ps *PhysicsSystem) playArmorHitSound(zombieID ecs.EntityID) {
 	// 获取僵尸的行为组件，确定僵尸类型
@@ -287,11 +287,14 @@ func (ps *PhysicsSystem) playArmorHitSound(zombieID ecs.EntityID) {
 
 	// 根据僵尸类型选择音效
 	switch behavior.Type {
+	case components.BehaviorZombieConehead:
+		// 路障僵尸使用塑料音效
+		audioManager.PlaySound("SOUND_PLASTICHIT2")
 	case components.BehaviorZombieBuckethead:
-		// 铁桶僵尸使用变体音效
-		audioManager.PlaySound("SOUND_SHIELDHIT2")
+		// 铁桶僵尸使用金属音效
+		audioManager.PlaySound("SOUND_SHIELDHIT")
 	default:
-		// 路障僵尸和其他护甲僵尸使用默认音效
+		// 其他护甲僵尸使用金属音效
 		audioManager.PlaySound("SOUND_SHIELDHIT")
 	}
 }
