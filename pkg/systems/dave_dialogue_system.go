@@ -4,6 +4,7 @@ import (
 	"image/color"
 	"log"
 	"math"
+	"math/rand"
 	"regexp"
 	"strings"
 
@@ -39,6 +40,36 @@ const (
 	// 文本长度阈值（按 rune 计数，中文每个字符为 1）
 	DaveShortTextThreshold  = 8  // ≤8 字符使用 anim_smalltalk (9帧)
 	DaveMediumTextThreshold = 12 // ≤12 字符使用 anim_mediumtalk (18帧)，>12 使用 anim_blahblah (31帧)
+)
+
+// Dave 音效 ID 常量
+// 根据文本长度和表情指令选择对应的音效
+var (
+	// 短对话音效（对应 anim_smalltalk）
+	DaveShortSounds = []string{
+		"SOUND_CRAZYDAVESHORT1",
+		"SOUND_CRAZYDAVESHORT2",
+		"SOUND_CRAZYDAVESHORT3",
+	}
+	// 中等对话音效（对应 anim_mediumtalk）
+	DaveLongSounds = []string{
+		"SOUND_CRAZYDAVELONG1",
+		"SOUND_CRAZYDAVELONG2",
+		"SOUND_CRAZYDAVELONG3",
+	}
+	// 长对话音效（对应 anim_blahblah）
+	DaveExtraLongSounds = []string{
+		"SOUND_CRAZYDAVEEXTRALONG1",
+		"SOUND_CRAZYDAVEEXTRALONG2",
+		"SOUND_CRAZYDAVEEXTRALONG3",
+	}
+	// 疯狂音效（对应 {SHAKE} 表情）
+	DaveCrazySound = "SOUND_CRAZYDAVECRAZY"
+	// 尖叫音效（对应 {SCREAM} 表情）
+	DaveScreamSounds = []string{
+		"SOUND_CRAZYDAVESCREAM",
+		"SOUND_CRAZYDAVESCREAM2",
+	}
 )
 
 // DaveDialogueSystem 疯狂戴夫对话系统
@@ -390,8 +421,9 @@ func (s *DaveDialogueSystem) applyExpressions(
 	dialogueComp.IsHoldingItem = false
 	dialogueComp.HeldItemType = ""
 
-	// 检查是否需要特殊动画
+	// 检查是否需要特殊动画和特殊音效
 	hasSpecialAnimation := false
+	hasSpecialSound := false
 
 	for _, expr := range dialogueComp.CurrentExpressions {
 		switch expr {
@@ -411,19 +443,23 @@ func (s *DaveDialogueSystem) applyExpressions(
 			s.setMouthTrack(entityID, "IMAGE_REANIM_CRAZYDAVE_MOUTH5")
 
 		case "SHAKE":
-			// 播放 anim_crazy 动画 + 启用文字抖动效果
+			// 播放 anim_crazy 动画 + 启用文字抖动效果 + 播放疯狂音效
 			dialogueComp.Expression = "SHAKE"
 			dialogueComp.TextShaking = true
 			dialogueComp.TextShakeTime = 0.0
 			s.playAnimation(entityID, "anim_crazy", false)
+			s.playDaveSound(DaveCrazySound)
 			hasSpecialAnimation = true
+			hasSpecialSound = true
 
 		case "SCREAM":
-			// 切换到 MOUTH1 轨道 + 播放 anim_crazy
+			// 切换到 MOUTH1 轨道 + 播放 anim_crazy + 播放尖叫音效
 			dialogueComp.Expression = "SCREAM"
 			s.setMouthTrack(entityID, "IMAGE_REANIM_CRAZYDAVE_MOUTH1")
 			s.playAnimation(entityID, "anim_crazy", false)
+			s.playRandomDaveSound(DaveScreamSounds)
 			hasSpecialAnimation = true
+			hasSpecialSound = true
 
 		case "SHOW_WALLNUT":
 			// 显示拿坚果的动画
@@ -449,6 +485,11 @@ func (s *DaveDialogueSystem) applyExpressions(
 		}
 		// 播放计算好的说话动画（非循环，到达目标帧后暂停）
 		s.playTalkAnimation(entityID, dialogueComp)
+	}
+
+	// 如果没有特殊音效，根据文本长度播放对应的说话音效
+	if !hasSpecialSound {
+		s.playTalkSound(dialogueComp)
 	}
 }
 
@@ -736,4 +777,50 @@ func (s *DaveDialogueSystem) measureTextWidth(textStr string) float64 {
 
 	width, _ := text.Measure(textStr, s.dialogueFont, config.DaveDialogueLineHeight)
 	return width
+}
+
+// ==========================================================================
+// 音效播放方法 (Sound Playback Methods)
+// ==========================================================================
+
+// playTalkSound 根据文本长度播放对应的说话音效
+// 短文本 → DaveShortSounds
+// 中等文本 → DaveLongSounds
+// 长文本 → DaveExtraLongSounds
+func (s *DaveDialogueSystem) playTalkSound(dialogueComp *components.DaveDialogueComponent) {
+	var soundList []string
+
+	switch dialogueComp.CurrentTalkAnimation {
+	case "anim_smalltalk":
+		soundList = DaveShortSounds
+	case "anim_mediumtalk":
+		soundList = DaveLongSounds
+	case "anim_blahblah":
+		soundList = DaveExtraLongSounds
+	default:
+		// 默认使用短音效
+		soundList = DaveShortSounds
+	}
+
+	s.playRandomDaveSound(soundList)
+}
+
+// playRandomDaveSound 从音效列表中随机选择一个播放
+func (s *DaveDialogueSystem) playRandomDaveSound(soundList []string) {
+	if len(soundList) == 0 {
+		return
+	}
+
+	soundID := soundList[rand.Intn(len(soundList))]
+	s.playDaveSound(soundID)
+}
+
+// playDaveSound 播放指定的 Dave 音效
+func (s *DaveDialogueSystem) playDaveSound(soundID string) {
+	if audioManager := s.gameState.GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound(soundID)
+		log.Printf("[DaveDialogueSystem] Playing sound: %s", soundID)
+	} else {
+		log.Printf("[DaveDialogueSystem] Warning: AudioManager not available for %s", soundID)
+	}
 }
