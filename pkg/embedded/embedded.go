@@ -10,12 +10,18 @@
 package embedded
 
 import (
+	"bytes"
 	"embed"
 	"fmt"
+	"image"
+	_ "image/jpeg" // JPEG 解码器
+	_ "image/png"  // PNG 解码器
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 var (
@@ -171,5 +177,25 @@ func Stat(path string) (fs.FileInfo, error) {
 	}
 	defer file.Close()
 	return file.Stat()
+}
+
+// LoadImage 从嵌入资源或文件系统加载图片并返回 *ebiten.Image
+// 路径必须以 "assets/" 或 "data/" 开头
+// 兼容移动端构建，不依赖 ebitenutil.NewImageFromFile
+func LoadImage(path string) (*ebiten.Image, error) {
+	// 读取文件内容
+	data, err := ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read image file %s: %w", path, err)
+	}
+
+	// 解码图片
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode image %s: %w", path, err)
+	}
+
+	// 转换为 ebiten.Image
+	return ebiten.NewImageFromImage(img), nil
 }
 

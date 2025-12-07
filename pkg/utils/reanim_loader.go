@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/decker502/pvz/internal/reanim"
+	"github.com/decker502/pvz/pkg/embedded"
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
 // LoadReanimImages loads all sprite part images referenced in a Reanim animation.
@@ -56,8 +56,8 @@ func LoadReanimImages(reanimData *reanim.ReanimXML, imagesPath string) (map[stri
 		// Build full path
 		fullPath := filepath.Join(imagesPath, fileName)
 
-		// Load image
-		img, _, err := ebitenutil.NewImageFromFile(fullPath)
+		// Load image using embedded resource loader (mobile-compatible)
+		img, err := embedded.LoadImage(fullPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load image '%s' (ref: %s): %w", fullPath, ref, err)
 		}
