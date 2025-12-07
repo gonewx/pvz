@@ -6,7 +6,7 @@
 
 .claude/settings.local.json
 
-
+# 编译生成的二进制文件
 /pvz-go
 /pvz
 pvz-test
@@ -14,6 +14,12 @@ coverage.out
 pvz-debug
 coverage_*.out
 pvz-game
+# 通用二进制文件规则 (排除特定扩展名和路径)
+**/verify_*
+!**/*.go
+!**/*.sh
+!**/*.md
+pvz_test
 
 # /assets
 # !/assets/config/
