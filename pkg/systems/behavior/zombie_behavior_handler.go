@@ -726,11 +726,16 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 
 				// 释放网格占用状态，允许重新种植
 				if plantComp, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, plantID); ok {
-					err := s.lawnGridSystem.ReleaseCell(s.lawnGridEntityID, plantComp.GridCol, plantComp.GridRow)
-					if err != nil {
-						log.Printf("[BehaviorSystem] 警告：释放网格占用失败: %v", err)
+					if s.lawnGridSystem != nil && s.lawnGridEntityID != 0 {
+						err := s.lawnGridSystem.ReleaseCell(s.lawnGridEntityID, plantComp.GridCol, plantComp.GridRow)
+						if err != nil {
+							log.Printf("[BehaviorSystem] 警告：释放网格占用失败: %v", err)
+						} else {
+							log.Printf("[BehaviorSystem] 网格 (%d, %d) 已释放", plantComp.GridCol, plantComp.GridRow)
+						}
 					} else {
-						log.Printf("[BehaviorSystem] 网格 (%d, %d) 已释放", plantComp.GridCol, plantComp.GridRow)
+						log.Printf("[BehaviorSystem] 警告：无法释放网格，lawnGridSystem=%v, lawnGridEntityID=%d",
+							s.lawnGridSystem != nil, s.lawnGridEntityID)
 					}
 				}
 
@@ -745,11 +750,16 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 
 			// Bug Fix: 释放网格占用状态，允许重新种植
 			if plantComp, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, plantID); ok {
-				err := s.lawnGridSystem.ReleaseCell(s.lawnGridEntityID, plantComp.GridCol, plantComp.GridRow)
-				if err != nil {
-					log.Printf("[BehaviorSystem] 警告：释放网格占用失败: %v", err)
+				if s.lawnGridSystem != nil && s.lawnGridEntityID != 0 {
+					err := s.lawnGridSystem.ReleaseCell(s.lawnGridEntityID, plantComp.GridCol, plantComp.GridRow)
+					if err != nil {
+						log.Printf("[BehaviorSystem] 警告：释放网格占用失败: %v", err)
+					} else {
+						log.Printf("[BehaviorSystem] 网格 (%d, %d) 已释放", plantComp.GridCol, plantComp.GridRow)
+					}
 				} else {
-					log.Printf("[BehaviorSystem] 网格 (%d, %d) 已释放", plantComp.GridCol, plantComp.GridRow)
+					log.Printf("[BehaviorSystem] 警告：无法释放网格，lawnGridSystem=%v, lawnGridEntityID=%d",
+						s.lawnGridSystem != nil, s.lawnGridEntityID)
 				}
 			}
 

@@ -31,6 +31,7 @@ const LogOutputFrameInterval = 100 // 日志输出间隔（每N帧输出一次�
 //   - lgs: LawnGridSystem 实例 (用于植物死亡时释放网格占用)
 //   - lawnGridID: 草坪网格实体ID
 func NewBehaviorSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.GameState, lgs *systems.LawnGridSystem, lawnGridID ecs.EntityID) *BehaviorSystem {
+	log.Printf("[BehaviorSystem] NewBehaviorSystem: lawnGridSystem=%v, lawnGridEntityID=%d", lgs != nil, lawnGridID)
 	return &BehaviorSystem{
 		entityManager:    em,
 		resourceManager:  rm,
