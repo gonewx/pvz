@@ -257,6 +257,12 @@ endif
 build-mobile: build-android build-ios ## 构建所有移动端平台
 	@echo "==> 移动端构建完成"
 
+build-apk: ## 构建 Android APK (需要 JDK)
+	@./scripts/build-apk.sh
+
+sign-apk: ## 签名 APK 文件 (用法: make sign-apk APK=path/to/app.apk)
+	@./scripts/sign-apk.sh $(APK)
+
 # ============================================================================
 # 全平台构建
 # ============================================================================

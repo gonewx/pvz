@@ -236,6 +236,144 @@ xattr -d com.apple.quarantine pvz-go-macos
 1. 将文件添加到 Windows Defender 例外列表
 2. 使用 `go run .` 直接运行源代码
 
+## 📱 移动端构建
+
+### Android APK 构建
+
+#### 环境要求
+
+| 组件 | 说明 | 安装方法 |
+|------|------|---------|
+| **Android SDK** | Android 开发工具包 | [下载 Android Studio](https://developer.android.com/studio) |
+| **Android NDK** | 原生开发工具包 | 通过 SDK Manager 安装 |
+| **JDK** | Java 开发工具包 (8+) | `sudo apt install openjdk-17-jdk` |
+| **ebitenmobile** | Ebitengine 移动端工具 | `go install github.com/hajimehoshi/ebiten/v2/cmd/ebitenmobile@latest` |
+
+#### 设置环境变量
+
+```bash
+# 设置 Android SDK 路径
+export ANDROID_HOME=/path/to/android-sdk
+export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/<version>
+
+# 验证环境
+echo $ANDROID_HOME
+javac -version
+ebitenmobile version
+```
+
+#### 构建 APK（一键构建）
+
+```bash
+# 设置环境变量后，运行一键构建脚本
+export ANDROID_HOME=/home/decker/app/android/sdk
+export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018
+
+# 构建未签名 APK（用于测试）
+make build-apk
+```
+
+**构建流程**:
+1. ✅ 编译 Go 代码为 AAR 库
+2. ✅ 创建 Android 项目结构
+3. ✅ 生成 AndroidManifest.xml 和 MainActivity
+4. ✅ 使用 Gradle 构建 APK
+
+**输出文件**: `build/pvz-unsigned.apk`
+
+#### 安装测试
+
+```bash
+# 通过 adb 安装到 Android 设备
+adb install -r build/pvz-unsigned.apk
+
+# 查看设备列表
+adb devices
+```
+
+#### 签名 APK（发布版本）
+
+```bash
+# 生成签名 APK
+make sign-apk APK=build/pvz-unsigned.apk
+
+# 或使用脚本
+./scripts/sign-apk.sh build/pvz-unsigned.apk
+```
+
+**输出文件**: `build/pvz-unsigned-signed.apk`
+
+**注意**: 签名使用测试密钥库（密码: `android`），发布到商店前需要使用正式密钥。
+
+#### 手动构建（分步）
+
+如果需要自定义构建流程：
+
+```bash
+# 1. 仅构建 AAR 库
+make prepare-mobile
+make build-android
+
+# 2. 手动创建 Android 项目并集成 AAR
+# （参考 scripts/build-apk.sh）
+
+# 3. 使用 Gradle 构建
+cd build/android-project
+./gradlew assembleRelease
+```
+
+#### 常见问题
+
+**Q: "javac: command not found"**
+```bash
+# 安装 JDK
+sudo apt install openjdk-17-jdk
+
+# 验证安装
+javac -version
+```
+
+**Q: "Android SDK not found"**
+```bash
+# 设置正确的 ANDROID_HOME
+export ANDROID_HOME=/path/to/android/sdk
+
+# 或安装 Android Studio 后使用默认路径
+export ANDROID_HOME=$HOME/Android/Sdk  # Linux
+```
+
+**Q: "ebitenmobile: command not found"**
+```bash
+# 安装 ebitenmobile
+go install github.com/hajimehoshi/ebiten/v2/cmd/ebitenmobile@latest
+
+# 确保 $GOPATH/bin 在 PATH 中
+export PATH=$PATH:$(go env GOPATH)/bin
+```
+
+**Q: APK 安装失败**
+```bash
+# 卸载旧版本
+adb uninstall com.decker.pvz
+
+# 重新安装
+adb install -r build/pvz-unsigned.apk
+
+# 查看详细错误
+adb logcat | grep pvz
+```
+
+### iOS 构建（仅 macOS）
+
+```bash
+# 构建 iOS Framework
+make build-ios
+
+# 输出: build/ios/PVZ.xcframework
+```
+
+**注意**: iOS 构建仅支持在 macOS 系统上运行，需要 Xcode。
+
 ## 🎮 下一步
 
 环境设置完成后，您可以：
