@@ -44,7 +44,7 @@ func NewLawnmowerEntity(
 
 	// Y坐标：对应行的中心Y坐标
 	// 行中心 = GridWorldStartY + (lane-1)*CellHeight + CellHeight/2.0
-	posY := config.GridWorldStartY + float64(lane-1)*config.CellHeight + config.CellHeight/2.0
+	posY := config.GridWorldStartY + float64(lane-1)*config.CellHeight + config.CellHeight/2.0 + config.LawnmowerStartOffsetY
 
 	// 入场动画起始位置（屏幕左侧外）
 	startX := config.LawnmowerEnterStartX

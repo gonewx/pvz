@@ -611,7 +611,8 @@ func isZombieType(behaviorType components.BehaviorType) bool {
 	return behaviorType == components.BehaviorZombieBasic ||
 		behaviorType == components.BehaviorZombieEating ||
 		behaviorType == components.BehaviorZombieConehead ||
-		behaviorType == components.BehaviorZombieBuckethead
+		behaviorType == components.BehaviorZombieBuckethead ||
+		behaviorType == components.BehaviorZombieFlag
 }
 
 // triggerFinalWaveWarning 已废弃：统一由 FlagWaveWarningSystem 处理

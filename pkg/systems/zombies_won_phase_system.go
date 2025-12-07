@@ -315,6 +315,12 @@ func (s *ZombiesWonPhaseSystem) updatePhase2ZombieEntry(
 					velComp.VX = -Phase2ZombieHorizontalSpeed
 					velComp.VY = 0
 					phaseComp.ZombieReachedTarget1 = true
+					// 僵尸到达房门口时播放一次啃食音效
+					if !phaseComp.DoorChompPlayed {
+						s.playChompSound()
+						phaseComp.DoorChompPlayed = true
+						log.Printf("[ZombiesWonPhaseSystem] Phase 2: Door chomp sound played")
+					}
 					log.Printf("[ZombiesWonPhaseSystem] Phase 2: Zombie reached target 1 (door position X=%.2f), keeping Y=%.2f, now walking into door", posComp.X, posComp.Y)
 				} else {
 					// 计算单位方向向量，沿直线走向第1个目标

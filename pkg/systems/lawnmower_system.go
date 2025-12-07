@@ -2,7 +2,6 @@ package systems
 
 import (
 	"log"
-	"math"
 
 	"github.com/decker502/pvz/internal/reanim"
 	"github.com/decker502/pvz/pkg/components"
@@ -120,36 +119,72 @@ func (s *LawnmowerSystem) updateEnterAnimations(deltaTime float64) {
 	}
 }
 
-// checkTriggerConditions 检测是否有僵尸到达左侧，触发除草车
-// 对应 Task 5: 实现除草车触发逻辑
+// checkTriggerConditions 检测僵尸与静止除草车的碰撞，触发除草车
+// 使用 AABB 碰撞检测替代简单的边界检测
 func (s *LawnmowerSystem) checkTriggerConditions() {
-	// 查询所有僵尸实体
+	// 获取所有未触发的除草车
+	lawnmowers := ecs.GetEntitiesWith2[
+		*components.LawnmowerComponent,
+		*components.PositionComponent,
+	](s.entityManager)
+
+	// 获取所有僵尸实体
 	zombieEntities := ecs.GetEntitiesWith2[
 		*components.BehaviorComponent,
 		*components.PositionComponent,
 	](s.entityManager)
 
-	for _, zombieID := range zombieEntities {
-		behavior, _ := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
-		pos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
+	for _, lawnmowerID := range lawnmowers {
+		lawnmower, _ := ecs.GetComponent[*components.LawnmowerComponent](s.entityManager, lawnmowerID)
+		lawnmowerPos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, lawnmowerID)
 
-		// 只检查僵尸类型（跳过植物等其他实体）
-		if !isZombieType(behavior.Type) {
+		// 只检查未触发且非入场中的除草车
+		if lawnmower.IsTriggered || lawnmower.IsEntering {
 			continue
 		}
 
-		// 僵尸到达左侧边界
-		if pos.X < config.LawnmowerTriggerBoundary {
-			// 计算僵尸所在行（1-5）
-			lane := s.getEntityLane(pos.Y)
+		// 计算除草车的碰撞边界
+		lawnmowerLeft := lawnmowerPos.X - config.LawnmowerWidth/2
+		lawnmowerRight := lawnmowerPos.X + config.LawnmowerWidth/2
+		laneTop := config.GridWorldStartY + float64(lawnmower.Lane-1)*config.CellHeight
+		laneBottom := laneTop + config.CellHeight
 
-			// 触发该行的除草车
-			s.triggerLawnmower(lane)
+		// 检测该除草车与所有僵尸的碰撞
+		for _, zombieID := range zombieEntities {
+			behavior, _ := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
+			zombiePos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
+
+			// 只检查僵尸类型（跳过植物等其他实体）
+			if !isZombieType(behavior.Type) {
+				continue
+			}
+
+			// 只检查已激活的僵尸
+			waveState, hasWaveState := ecs.GetComponent[*components.ZombieWaveStateComponent](s.entityManager, zombieID)
+			if hasWaveState && !waveState.IsActivated {
+				continue
+			}
+
+			// Y 方向碰撞检测：检查僵尸是否在同一行
+			if zombiePos.Y < laneTop || zombiePos.Y > laneBottom {
+				continue
+			}
+
+			// X 方向碰撞检测：使用 AABB 碰撞检测
+			zombieLeft := zombiePos.X - config.ZombieCollisionWidth/2
+			zombieRight := zombiePos.X + config.ZombieCollisionWidth/2
+
+			// 碰撞条件：除草车与僵尸在 X 方向有重叠
+			if lawnmowerRight >= zombieLeft && lawnmowerLeft <= zombieRight {
+				// 触发该除草车
+				s.triggerLawnmowerByID(lawnmowerID, lawnmower)
+				break // 该除草车已触发，跳出僵尸循环
+			}
 		}
 	}
 }
 
-// triggerLawnmower 触发指定行的除草车
+// triggerLawnmower 触发指定行的除草车（通过行号查找）
 // 参数:
 //   - lane: 行号（1-5）
 func (s *LawnmowerSystem) triggerLawnmower(lane int) {
@@ -168,32 +203,40 @@ func (s *LawnmowerSystem) triggerLawnmower(lane int) {
 		}
 
 		if lawnmower.Lane == lane && !lawnmower.IsTriggered {
-			// 触发除草车
-			lawnmower.IsTriggered = true
-			lawnmower.IsMoving = true
-
-			// 播放音效（使用资源 ID 而不是相对路径）
-			if s.resourceManager != nil {
-				player := s.resourceManager.GetAudioPlayer("SOUND_LAWNMOWER")
-				if player != nil {
-					player.Rewind()
-					player.Play()
-				} else {
-					log.Printf("[LawnmowerSystem] Warning: Lawnmower audio (SOUND_LAWNMOWER) not loaded")
-				}
-			}
-
-			// 恢复动画播放（触发后开始播放车轮滚动动画）
-			// 注意：不切换动画，继续使用 anim_normal，只是取消暂停
-			if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, lawnmowerID); ok {
-				reanim.IsPaused = false // 恢复播放，车轮开始滚动、轻微晃动
-				log.Printf("[LawnmowerSystem] Resumed animation for lawnmower on lane %d", lane)
-			}
-
-			log.Printf("[LawnmowerSystem] Lawnmower triggered on lane %d", lane)
+			s.triggerLawnmowerByID(lawnmowerID, lawnmower)
 			break
 		}
 	}
+}
+
+// triggerLawnmowerByID 通过实体ID直接触发除草车
+// 参数:
+//   - lawnmowerID: 除草车实体ID
+//   - lawnmower: 除草车组件（已获取，避免重复查询）
+func (s *LawnmowerSystem) triggerLawnmowerByID(lawnmowerID ecs.EntityID, lawnmower *components.LawnmowerComponent) {
+	// 触发除草车
+	lawnmower.IsTriggered = true
+	lawnmower.IsMoving = true
+
+	// 播放音效（使用资源 ID 而不是相对路径）
+	if s.resourceManager != nil {
+		player := s.resourceManager.GetAudioPlayer("SOUND_LAWNMOWER")
+		if player != nil {
+			player.Rewind()
+			player.Play()
+		} else {
+			log.Printf("[LawnmowerSystem] Warning: Lawnmower audio (SOUND_LAWNMOWER) not loaded")
+		}
+	}
+
+	// 恢复动画播放（触发后开始播放车轮滚动动画）
+	// 注意：不切换动画，继续使用 anim_normal，只是取消暂停
+	if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, lawnmowerID); ok {
+		reanim.IsPaused = false // 恢复播放，车轮开始滚动、轻微晃动
+		log.Printf("[LawnmowerSystem] Resumed animation for lawnmower on lane %d", lawnmower.Lane)
+	}
+
+	log.Printf("[LawnmowerSystem] Lawnmower triggered on lane %d (collision detected)", lawnmower.Lane)
 }
 
 // updateLawnmowerPositions 更新移动中的除草车位置
@@ -264,17 +307,26 @@ func (s *LawnmowerSystem) checkZombieCollisions() {
 				continue
 			}
 
-			// 计算僵尸所在行
-			zombieLane := s.getEntityLane(zombiePos.Y)
+			// Y 方向碰撞检测：检查僵尸中心点是否在除草车所在行的网格范围内
+			// 除草车所在行的 Y 范围
+			laneTop := config.GridWorldStartY + float64(lawnmower.Lane-1)*config.CellHeight
+			laneBottom := laneTop + config.CellHeight
 
-			// 检查是否在同一行
-			if zombieLane != lawnmower.Lane {
+			// 使用僵尸中心点判断是否在同一行
+			if zombiePos.Y < laneTop || zombiePos.Y > laneBottom {
 				continue
 			}
 
-			// 碰撞检测：僵尸 X 坐标在除草车 X ± CollisionRange 范围内
-			distance := math.Abs(zombiePos.X - lawnmowerPos.X)
-			if distance < config.LawnmowerCollisionRange {
+			// X 方向碰撞检测：使用 AABB 碰撞检测，考虑实体的实际宽度
+			// 除草车前沿（右边缘）= lawnmowerPos.X + LawnmowerWidth/2
+			// 僵尸身体左边缘 = zombiePos.X - ZombieCollisionWidth/2
+			lawnmowerFront := lawnmowerPos.X + config.LawnmowerWidth/2
+			lawnmowerBack := lawnmowerPos.X - config.LawnmowerWidth/2
+			zombieLeft := zombiePos.X - config.ZombieCollisionWidth/2
+			zombieRight := zombiePos.X + config.ZombieCollisionWidth/2
+
+			// 碰撞条件：除草车与僵尸在 X 方向有重叠
+			if lawnmowerFront >= zombieLeft && lawnmowerBack <= zombieRight {
 				// 除草车碾压僵尸，触发死亡动画
 				// 不再直接删除，而是播放死亡动画和粒子效果
 

@@ -341,18 +341,13 @@ const (
 	// 设置为 230，屏幕坐标 = 230 - 220 = 10（刚好在屏幕左边缘）
 	// 原建议值范围：30.0 - 100.0（错误，会在视野外）
 	// 正确范围：220.0 - 260.0（在摄像机视野内，草坪左侧）
-	LawnmowerStartX = 225.0
+	LawnmowerStartX       = 223.0
+	LawnmowerStartOffsetY = 20.0
 
 	// LawnmowerSpeed 除草车移动速度（像素/秒）
 	// 原版除草车快速向右移动的速度
 	// 建议值范围：200.0 - 400.0
 	LawnmowerSpeed = 300.0
-
-	// LawnmowerTriggerBoundary 除草车触发边界（世界坐标，像素）
-	// 僵尸X坐标小于此值时触发除草车
-	// 应该在除草车右侧，当僵尸靠近除草车时触发
-	// 设置为 240（比除草车位置 230 稍右），给除草车留出启动空间
-	LawnmowerTriggerBoundary = 240.0
 
 	// LawnmowerDeletionBoundary 除草车删除边界（世界坐标，像素）
 	// 除草车X坐标超过此值时删除实体
