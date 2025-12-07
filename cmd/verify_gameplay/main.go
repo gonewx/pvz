@@ -152,11 +152,15 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 	enabledLanes := []int{1, 2, 3, 4, 5}
 	lawnGridSystem := systems.NewLawnGridSystem(em, enabledLanes)
 
+	// Bug Fix: 先创建草坪网格实体，再传给 BehaviorSystem
+	lawnGridEntityID := em.CreateEntity()
+	ecs.AddComponent(em, lawnGridEntityID, &components.LawnGridComponent{})
+
 	// 创建除草车系统
 	lawnmowerSystem := systems.NewLawnmowerSystem(em, rm, gs)
 
-	// 创建行为系统（传入草坪网格系统）
-	behaviorSystem := behavior.NewBehaviorSystem(em, rm, gs, lawnGridSystem, 0)
+	// 创建行为系统（传入草坪网格系统和实体ID）
+	behaviorSystem := behavior.NewBehaviorSystem(em, rm, gs, lawnGridSystem, lawnGridEntityID)
 
 	// 创建物理系统
 	physicsSystem := systems.NewPhysicsSystem(em, rm)
@@ -246,6 +250,7 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 		rewardSystem:             rewardSystem,
 		particleSystem:           particleSystem,
 		lawnGridSystem:           lawnGridSystem,
+		lawnGridEntityID:         lawnGridEntityID, // Bug Fix: 设置正确的实体ID
 		sunCollectionSystem:      sunCollectionSystem,
 		sunMovementSystem:        sunMovementSystem,
 		flashEffectSystem:        flashEffectSystem,
@@ -267,13 +272,10 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 
 // setupScene 设置测试场景
 func (vg *VerifyGameplayGame) setupScene() {
-	// 创建草坪网格实体
-	vg.lawnGridEntityID = vg.entityManager.CreateEntity()
+	// Bug Fix: lawnGridEntityID 和 LawnGridComponent 已在 NewVerifyGameplayGame 中创建
 
 	// 创建植物卡片（所有可用植物）
 	vg.createPlantCards()
-
-	ecs.AddComponent(vg.entityManager, vg.lawnGridEntityID, &components.LawnGridComponent{})
 
 	// 创建除草车（每行一台）
 	vg.createLawnmowers()
