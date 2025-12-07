@@ -635,29 +635,26 @@ func (s *BowlingNutSystem) playImpactSound() {
 }
 
 // startRollingSound 开始播放滚动音效
-// 注意：滚动音效需要循环播放并跟踪每个实体，暂保留 ResourceManager 方式
-// TODO: 后续可在 AudioManager 中添加循环音效支持
+// 使用 AudioManager 统一管理音效
 func (s *BowlingNutSystem) startRollingSound(entityID ecs.EntityID) {
-	if s.resourceManager == nil {
-		return
-	}
-
 	// 检查是否已有播放器
 	if _, exists := s.soundPlayers[entityID]; exists {
 		return
 	}
 
-	// 加载音效（循环音效需要保留 ResourceManager 方式）
-	soundPath := config.BowlingRollSoundPath
-	player, err := s.resourceManager.LoadSoundEffect(soundPath)
-	if err != nil {
-		log.Printf("[BowlingNutSystem] 加载滚动音效失败: %v", err)
+	// 通过 AudioManager 获取音效播放器
+	audioManager := game.GetGameState().GetAudioManager()
+	if audioManager == nil {
 		return
 	}
 
-	// 设置循环播放
-	// 注意：Ebitengine 的 audio.Player 不直接支持循环
-	// 需要在音效结束时重新播放
+	player := audioManager.GetSoundPlayer("SOUND_BOWLING")
+	if player == nil {
+		log.Printf("[BowlingNutSystem] 获取滚动音效播放器失败")
+		return
+	}
+
+	// 重置并播放
 	player.Rewind()
 	player.Play()
 

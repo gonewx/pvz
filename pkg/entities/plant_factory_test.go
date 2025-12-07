@@ -630,13 +630,6 @@ func TestCherryBombConfiguration(t *testing.T) {
 		})
 	}
 
-	// 验证爆炸音效路径不为空
-	t.Run("爆炸音效路径应已配置", func(t *testing.T) {
-		if config.CherryBombExplodeSoundPath == "" {
-			t.Error("CherryBombExplodeSoundPath should not be empty")
-		}
-	})
-
 	// 验证爆炸伤害足以秒杀所有MVP范围内的僵尸
 	t.Run("爆炸伤害应足以秒杀铁桶僵尸", func(t *testing.T) {
 		// 铁桶僵尸：270生命值 + 1100护甲 = 1370总生命值

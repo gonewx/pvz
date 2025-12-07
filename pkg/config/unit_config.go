@@ -115,105 +115,6 @@ const (
 	HitEffectDuration = 0.2
 )
 
-// Audio Configuration (音频配置)
-const (
-	// ZombieHitSoundPath 击中普通僵尸的音效
-	ZombieHitSoundPath = "assets/sounds/splat.ogg"
-
-	// ArmorBreakSoundPath 护甲破坏音效路径
-	ArmorBreakSoundPath = "assets/sounds/shieldhit.ogg"
-
-	// PeashooterShootSoundPath 豌豆射手发射子弹的音效
-	PeashooterShootSoundPath = "assets/sounds/throw.ogg"
-
-	// === 关卡结算音效 ===
-
-	// LevelWinMusicPath 关卡胜利音乐
-	LevelWinMusicPath = "assets/sounds/winmusic.ogg"
-
-	// LevelLoseMusicPath 关卡失败音乐
-	LevelLoseMusicPath = "assets/sounds/losemusic.ogg"
-
-	// === 波次警告音效 ===
-
-	// FinalWaveSoundPath 最后一波警告音效
-	FinalWaveSoundPath = "assets/sounds/finalwave.ogg"
-
-	// HugeWaveSoundPath 大波僵尸来袭音效
-	HugeWaveSoundPath = "assets/sounds/hugewave.ogg"
-
-	// SirenSoundPath 警报音效
-	SirenSoundPath = "assets/sounds/siren.ogg"
-
-	// === 割草机音效 ===
-
-	// LawnmowerSoundPath 割草机触发音效
-	LawnmowerSoundPath = "assets/sounds/lawnmower.ogg"
-
-	// === 僵尸音效 ===
-
-	// ZombieLimbsPopSoundPath 僵尸肢体脱落音效
-	ZombieLimbsPopSoundPath = "assets/sounds/limbs_pop.ogg"
-
-	// ZombieChompAltSoundPath 僵尸啃食变体音效
-	ZombieChompAltSoundPath = "assets/sounds/chomp2.ogg"
-
-	// === 游戏界面音效 ===
-
-	// PauseSoundPath 暂停游戏音效
-	PauseSoundPath = "assets/sounds/pause.ogg"
-
-	// SeedLiftSoundPath 种子槽升起音效
-	SeedLiftSoundPath = "assets/sounds/seedlift.ogg"
-
-	// CoinSoundPath 金币收集音效
-	CoinSoundPath = "assets/sounds/coin.ogg"
-
-	// === 植物相关音效 ===
-
-	// PotatoMineExplodeSoundPath 土豆地雷爆炸音效
-	PotatoMineExplodeSoundPath = "assets/sounds/potato_mine.ogg"
-
-	// PuffShroomAttackSoundPath 喷射蘑菇攻击音效
-	PuffShroomAttackSoundPath = "assets/sounds/puff.ogg"
-
-	// FumeShroomAttackSoundPath 大喷菇攻击音效
-	FumeShroomAttackSoundPath = "assets/sounds/fume.ogg"
-
-	// SnowPeaAttackSoundPath 寒冰射手攻击音效
-	SnowPeaAttackSoundPath = "assets/sounds/snow_pea_sparkles.ogg"
-
-	// FrozenEffectSoundPath 冰冻效果音效
-	FrozenEffectSoundPath = "assets/sounds/frozen.ogg"
-
-	// PlantGrowSoundPath 植物生长完成音效
-	PlantGrowSoundPath = "assets/sounds/plantgrow.ogg"
-
-	// === 护甲/碰撞音效 ===
-
-	// ShieldHit2SoundPath 铁桶击中音效（变体）
-	ShieldHit2SoundPath = "assets/sounds/shieldhit2.ogg"
-
-	// BonkSoundPath 硬物碰撞音效
-	BonkSoundPath = "assets/sounds/bonk.ogg"
-
-	// === 环境/特效音效 ===
-
-	// GravestoneRumbleSoundPath 墓碑颤动预警音效
-	GravestoneRumbleSoundPath = "assets/sounds/gravestone_rumble.ogg"
-
-	// DirtRiseSoundPath 僵尸出土音效
-	DirtRiseSoundPath = "assets/sounds/dirt_rise.ogg"
-
-	// ThunderSoundPath 雷电效果音效
-	ThunderSoundPath = "assets/sounds/thunder.ogg"
-
-	// === 奖励动画音效 ===
-
-	// RewardTapSoundPath 奖励界面点击音效（点击卡包、下一关按钮）
-	RewardTapSoundPath = "assets/sounds/tap2.ogg"
-)
-
 // Plant Configuration (植物配置)
 const (
 	// Sunflower (向日葵)
@@ -312,9 +213,6 @@ const (
 	// 需要根据实际资源文件确定
 	ZombieEatAnimationFrames = 21
 
-	// ZombieEatingSoundPath 僵尸啃食音效路径
-	ZombieEatingSoundPath = "assets/sounds/chomp.ogg"
-
 	// ZombieEatParticleOffsetX 僵尸啃食粒子效果 X 偏移量
 	// 僵尸面朝左，嘴巴在身体前方（左侧）
 	// 负值表示向左偏移（朝向植物方向，即僵尸嘴巴位置）
@@ -364,30 +262,12 @@ const (
 	// CherryBombCooldown 樱桃炸弹的冷却时间（秒）
 	CherryBombCooldown = 50.0
 
-	// CherryBombExplodeSoundPath 樱桃炸弹爆炸音效路径
-	CherryBombExplodeSoundPath = "assets/sounds/cherrybomb.ogg"
-
-	// BowlingRollSoundPath 保龄球坚果滚动音效路径
-	// Story 19.6: 坚果滚动时循环播放
-	BowlingRollSoundPath = "assets/sounds/bowling.ogg"
-
-	// BowlingImpactSoundPath 保龄球坚果碰撞撞击音效路径
-	// Story 19.7: 坚果碰撞僵尸时播放
-	BowlingImpactSoundPath = "assets/sounds/bowlingimpact.ogg"
-
-	// BowlingImpact2SoundPath 保龄球坚果碰撞撞击音效路径（变体）
-	// Story 19.7: 随机选择以增加变化
-	BowlingImpact2SoundPath = "assets/sounds/bowlingimpact2.ogg"
-
 	// ExplosiveNutDamage 爆炸坚果爆炸伤害值
 	// Story 19.8: 与樱桃炸弹相同（1800），足以秒杀所有僵尸
 	ExplosiveNutDamage = 1800
-
-	// ExplosiveNutExplosionSoundPath 爆炸坚果爆炸音效路径
-	// Story 19.8: 爆炸坚果爆炸时播放
-	ExplosiveNutExplosionSoundPath = "assets/sounds/explosion.ogg"
 
 	// ExplosiveNutParticleEffect 爆炸坚果粒子效果名称
 	// Story 19.8: 使用 Powie.xml 粒子配置（3个发射器）
 	ExplosiveNutParticleEffect = "Powie"
 )
+

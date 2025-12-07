@@ -222,6 +222,18 @@ func (am *AudioManager) GetSoundVolume() float64 {
 	return am.getSoundVolume()
 }
 
+// GetSoundPlayer 获取音效播放器（公开方法）
+// 用于需要手动控制播放的场景（如循环音效）
+//
+// 参数：
+//   - soundID: 音效资源ID（如 "SOUND_BOWLING"）
+//
+// 返回：
+//   - *audio.Player: 音效播放器（失败返回 nil）
+func (am *AudioManager) GetSoundPlayer(soundID string) *audio.Player {
+	return am.getSoundPlayer(soundID)
+}
+
 // getSoundPlayer 获取或加载音效播放器
 func (am *AudioManager) getSoundPlayer(soundID string) *audio.Player {
 	// 检查缓存
