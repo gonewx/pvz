@@ -8,6 +8,7 @@ import (
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/entities"
+	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/utils"
 )
 
@@ -33,9 +34,9 @@ func (s *BehaviorSystem) handleSunflowerBehavior(entityID ecs.EntityID, deltaTim
 		_, hasGlow := ecs.GetComponent[*components.SunflowerGlowComponent](s.entityManager, entityID)
 		if !hasGlow {
 			ecs.AddComponent(s.entityManager, entityID, &components.SunflowerGlowComponent{
-				Intensity:    0.0,           // 从 0 开始，逐渐亮起
-				MaxIntensity: 1.0,           // 最大强度
-				IsRising:     true,          // 开始亮起阶段
+				Intensity:    0.0,  // 从 0 开始，逐渐亮起
+				MaxIntensity: 1.0,  // 最大强度
+				IsRising:     true, // 开始亮起阶段
 				RiseSpeed:    config.SunflowerGlowRiseSpeed,
 				FadeSpeed:    config.SunflowerGlowFadeSpeed,
 				ColorR:       config.SunflowerGlowColorR,
@@ -604,16 +605,10 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 
 	log.Printf("[BehaviorSystem] 樱桃炸弹爆炸影响了 %d 个僵尸", affectedZombies)
 
-	// 播放爆炸音效
-	if config.CherryBombExplodeSoundPath != "" {
-		soundPlayer, err := s.resourceManager.LoadSoundEffect(config.CherryBombExplodeSoundPath)
-		if err != nil {
-			log.Printf("[BehaviorSystem] 警告：加载樱桃炸弹爆炸音效失败: %v", err)
-		} else {
-			soundPlayer.Rewind()
-			soundPlayer.Play()
-			log.Printf("[BehaviorSystem] 播放樱桃炸弹爆炸音效")
-		}
+	// 播放爆炸音效（使用 AudioManager 统一管理 - Story 10.9）
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_CHERRYBOMB")
+		log.Printf("[BehaviorSystem] 播放樱桃炸弹爆炸音效")
 	}
 
 	// 创建爆炸粒子效果

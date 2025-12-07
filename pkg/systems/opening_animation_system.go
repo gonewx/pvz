@@ -292,19 +292,11 @@ func (oas *OpeningAnimationSystem) clearReadySetPlantAnimation(openingComp *comp
 
 // playReadySetPlantSound 播放 ReadySetPlant 音效。
 func (oas *OpeningAnimationSystem) playReadySetPlantSound() {
-	if oas.resourceManager == nil {
-		return
+	// 使用 AudioManager 统一管理音效（Story 10.9）
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_READYSETPLANT")
+		log.Println("[OpeningAnimationSystem] Playing ReadySetPlant sound effect")
 	}
-
-	// 尝试播放 readysetplant 音效
-	player, err := oas.resourceManager.LoadSoundEffect("assets/sounds/readysetplant.ogg")
-	if err != nil {
-		log.Printf("[OpeningAnimationSystem] ⚠️ Failed to load ReadySetPlant sound: %v", err)
-		return
-	}
-
-	player.Play()
-	log.Println("[OpeningAnimationSystem] Playing ReadySetPlant sound effect")
 }
 
 // updateGameStartState 处理游戏开始状态。

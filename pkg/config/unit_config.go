@@ -303,18 +303,14 @@ const (
 // Zombie Eating Configuration (僵尸啃食配置)
 const (
 	// ZombieEatingDamage 僵尸每次啃食造成的伤害
+	// 伤害触发时机由动画帧控制（与音效同步）：
+	// - 普通僵尸（双手啃食）：每次动画循环触发 2 次（开始和中间点）
+	// - 旗帜僵尸（单手啃食）：每次动画循环触发 1 次（开始）
 	ZombieEatingDamage = 100
-
-	// ZombieEatingDamageInterval 僵尸啃食伤害间隔（秒）
-	// 僵尸每 1.5 秒对植物造成一次伤害
-	ZombieEatingDamageInterval = 1.5
 
 	// ZombieEatAnimationFrames 僵尸啃食动画帧数
 	// 需要根据实际资源文件确定
 	ZombieEatAnimationFrames = 21
-
-	// ZombieEatFrameSpeed 僵尸啃食动画帧速率（秒/帧）
-	ZombieEatFrameSpeed = 0.1
 
 	// ZombieEatingSoundPath 僵尸啃食音效路径
 	ZombieEatingSoundPath = "assets/sounds/chomp.ogg"

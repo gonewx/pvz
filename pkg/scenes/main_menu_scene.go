@@ -19,7 +19,6 @@ import (
 	"github.com/decker502/pvz/pkg/modules"
 	"github.com/decker502/pvz/pkg/systems"
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/audio"
 )
 
 const (
@@ -43,7 +42,7 @@ type MainMenuScene struct {
 	resourceManager *game.ResourceManager
 	sceneManager    *game.SceneManager
 	backgroundImage *ebiten.Image
-	bgmPlayer       *audio.Player
+	bgmStarted      bool // 背景音乐是否已启动
 	buttons         []components.Button
 	wasMousePressed bool // Track mouse state from previous frame to detect click edges
 
@@ -133,7 +132,7 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 		sceneManager:            sm,
 		lastCursorShape:         -1, // 初始化为无效值，确保第一次更新光标
 		hoveredBottomButton:     components.BottomButtonNone,
-		lastHoveredBottomButton: components.BottomButtonNone, // Story 10.9: 初始化底部按钮悬停追踪
+		lastHoveredBottomButton: components.BottomButtonNone,                         // Story 10.9: 初始化底部按钮悬停追踪
 		wasMousePressed:         ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft), // ✅ 初始化鼠标状态，防止场景切换时误触发点击
 		wasF1Pressed:            ebiten.IsKeyPressed(ebiten.KeyF1),                   // ✅ 初始化键盘状态
 		wasOPressed:             ebiten.IsKeyPressed(ebiten.KeyO),                    // ✅ 初始化键盘状态
@@ -308,14 +307,8 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 		scene.initUserSign()
 	}
 
-	// Load background music (using titlescreen music from loaderbar group)
-	player, err := rm.LoadSoundEffect("assets/sounds/titlescreen.ogg")
-	if err != nil {
-		log.Printf("Warning: Failed to load main menu music: %v", err)
-		// Continue without music
-	} else {
-		scene.bgmPlayer = player
-	}
+	// 背景音乐由 AudioManager 统一管理（Story 10.9）
+	// 音乐将在 Update() 中首次播放
 
 	// Story 12.3: Initialize dialog systems
 	// 加载不同大小的字体用于对话框渲染
@@ -454,9 +447,12 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 		m.textInputSystem.Update(deltaTime)
 	}
 
-	// Ensure background music is playing
-	if m.bgmPlayer != nil && !m.bgmPlayer.IsPlaying() {
-		m.bgmPlayer.Play()
+	// 确保背景音乐正在播放（使用 AudioManager 统一管理 - Story 10.9）
+	if !m.bgmStarted {
+		if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+			audioManager.PlayMusic("SOUND_TITLESCREEN")
+			m.bgmStarted = true
+		}
 	}
 
 	// Story 12.1: Update Reanim system (animate clouds, flowers, etc.)

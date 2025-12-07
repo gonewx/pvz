@@ -187,8 +187,8 @@ func (ras *RewardAnimationSystem) TriggerReward(rewardType string, rewardID stri
 		targetY = lawnTopY + 50.0
 
 		// 植物奖励使用标准卡片缩放
-		startScale = config.PlantCardScale   // 0.50
-		endScale = RewardExpandScaleEnd      // 1.0
+		startScale = config.PlantCardScale // 0.50
+		endScale = RewardExpandScaleEnd    // 1.0
 	}
 
 	log.Printf("[RewardAnimationSystem] ===== 位置计算调试信息 =====")
@@ -206,7 +206,7 @@ func (ras *RewardAnimationSystem) TriggerReward(rewardType string, rewardID stri
 		StartY:         startY,
 		TargetX:        targetX,
 		TargetY:        targetY,
-		Scale:          startScale,     // 使用计算的初始缩放
+		Scale:          startScale, // 使用计算的初始缩放
 		RewardType:     rewardType,
 		PlantID:        rewardID,
 		ToolID:         rewardID,
@@ -529,14 +529,12 @@ func (ras *RewardAnimationSystem) updateWaitingPhase(dt float64, rewardComp *com
 	if clicked {
 		log.Printf("[RewardAnimationSystem] 玩家点击卡片包，切换到 expanding")
 
-		// 播放点击卡包音效
-		if player, err := ras.resourceManager.LoadSoundEffect(config.RewardTapSoundPath); err == nil {
-			player.Play()
-		}
-
-		// 播放胜利音乐（点击卡包后开始播放）
-		if player, err := ras.resourceManager.LoadSoundEffect(config.LevelWinMusicPath); err == nil {
-			player.Play()
+		// 使用 AudioManager 统一管理音效（Story 10.9）
+		if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+			// 播放点击卡包音效
+			audioManager.PlaySound("SOUND_TAP2")
+			// 播放胜利音乐
+			audioManager.PlaySound("SOUND_WINMUSIC")
 		}
 
 		rewardComp.Phase = "expanding"
@@ -723,9 +721,9 @@ func (ras *RewardAnimationSystem) updateShowingPhaseInternal(dt float64) {
 		if ras.isNextLevelButtonClicked(float64(mouseX), float64(mouseY)) {
 			log.Printf("[RewardAnimationSystem] 玩家点击\"下一关\"按钮，准备切换场景")
 
-			// 播放点击按钮音效
-			if player, err := ras.resourceManager.LoadSoundEffect(config.RewardTapSoundPath); err == nil {
-				player.Play()
+			// 播放点击按钮音效（使用 AudioManager 统一管理 - Story 10.9）
+			if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+				audioManager.PlaySound("SOUND_TAP2")
 			}
 
 			ras.currentPhase = "closing"
@@ -818,9 +816,9 @@ func (ras *RewardAnimationSystem) updateClosingPhaseInternal(dt float64) {
 func (ras *RewardAnimationSystem) createRewardPanel(rewardType string, plantID string, toolID string) {
 	ras.panelEntity = ras.entityManager.CreateEntity()
 
-	// 播放雷声音效（奖励面板显示时的震撼效果）
-	if player, err := ras.resourceManager.LoadSoundEffect(config.ThunderSoundPath); err == nil {
-		player.Play()
+	// 播放雷声音效（奖励面板显示时的震撼效果，使用 AudioManager - Story 10.9）
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_THUNDER")
 	}
 
 	var rewardName, rewardDesc string

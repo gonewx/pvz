@@ -270,13 +270,14 @@ func (s *BehaviorSystem) queryMovingZombies() []ecs.EntityID {
 // queryEatingZombies 查询所有啃食中的僵尸实体
 //
 // 返回所有处于啃食状态的僵尸（BehaviorType == BehaviorZombieEating）
+// 啃食伤害现在基于动画帧触发（需要 ReanimComponent），而非独立计时器
 func (s *BehaviorSystem) queryEatingZombies() []ecs.EntityID {
-	// 查询所有拥有 BehaviorComponent, PositionComponent, TimerComponent 的实体
-	// 注意：这个查询会同时匹配啃食僵尸和豌豆射手植物（植物也有 TimerComponent）
+	// 查询所有拥有 BehaviorComponent, PositionComponent, ReanimComponent 的实体
+	// 啃食伤害和音效都基于动画帧同步触发
 	candidates := ecs.GetEntitiesWith3[
 		*components.BehaviorComponent,
 		*components.PositionComponent,
-		*components.TimerComponent,
+		*components.ReanimComponent,
 	](s.entityManager)
 
 	// 过滤出真正处于啃食状态的僵尸

@@ -48,6 +48,7 @@ available_animations:
       display_name: walk
     - name: anim_eat
       display_name: eat
+      speed: 2.0  # 加速啃食动画，使伤害频率与原版一致（约 0.4 秒/次）
     - name: anim_death
       display_name: death
 

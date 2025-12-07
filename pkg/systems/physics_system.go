@@ -260,29 +260,17 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 }
 
 // playHitSound 播放子弹击中僵尸的音效
-// 使用配置文件中定义的音效（config.ZombieHitSoundPath）
-// 注意：音效每次都会重新开始播放，不会等待上一次播放结束
+// 使用 AudioManager 统一管理音效（Story 10.9）
 func (ps *PhysicsSystem) playHitSound() {
-	// 加载击中音效（如果已加载，会返回缓存的播放器）
-	// 音效路径在 pkg/config/unit_config.go 中配置，可根据需要切换测试
-	hitSound, err := ps.rm.LoadSoundEffect(config.ZombieHitSoundPath)
-	if err != nil {
-		// 音效加载失败时不阻止游戏继续运行
-		// 在实际项目中可以使用日志系统记录错误
-		return
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_SPLAT")
 	}
-
-	// 重置播放器位置到开头（允许快速连续播放）
-	hitSound.Rewind()
-
-	// 播放音效
-	hitSound.Play()
 }
 
 // playArmorHitSound 播放子弹击中护甲的音效
 // 根据僵尸类型选择不同的音效：
-// - 路障僵尸：使用 config.ArmorBreakSoundPath (shieldhit.ogg)
-// - 铁桶僵尸：使用 config.ShieldHit2SoundPath (shieldhit2.ogg)
+// - 路障僵尸：使用 SOUND_SHIELDHIT (shieldhit.ogg)
+// - 铁桶僵尸：使用 SOUND_SHIELDHIT2 (shieldhit2.ogg)
 // Story 10.9: 护甲击中音效差异化
 func (ps *PhysicsSystem) playArmorHitSound(zombieID ecs.EntityID) {
 	// 获取僵尸的行为组件，确定僵尸类型
@@ -291,29 +279,21 @@ func (ps *PhysicsSystem) playArmorHitSound(zombieID ecs.EntityID) {
 		return
 	}
 
-	// 根据僵尸类型选择音效路径
-	var soundPath string
-	switch behavior.Type {
-	case components.BehaviorZombieBuckethead:
-		// 铁桶僵尸使用变体音效
-		soundPath = config.ShieldHit2SoundPath
-	default:
-		// 路障僵尸和其他护甲僵尸使用默认音效
-		soundPath = config.ArmorBreakSoundPath
-	}
-
-	// 加载击中护甲音效（如果已加载，会返回缓存的播放器）
-	armorSound, err := ps.rm.LoadSoundEffect(soundPath)
-	if err != nil {
-		// 音效加载失败时不阻止游戏继续运行
+	// 使用 AudioManager 统一管理音效（Story 10.9）
+	audioManager := game.GetGameState().GetAudioManager()
+	if audioManager == nil {
 		return
 	}
 
-	// 重置播放器位置到开头（允许快速连续播放）
-	armorSound.Rewind()
-
-	// 播放音效
-	armorSound.Play()
+	// 根据僵尸类型选择音效
+	switch behavior.Type {
+	case components.BehaviorZombieBuckethead:
+		// 铁桶僵尸使用变体音效
+		audioManager.PlaySound("SOUND_SHIELDHIT2")
+	default:
+		// 路障僵尸和其他护甲僵尸使用默认音效
+		audioManager.PlaySound("SOUND_SHIELDHIT")
+	}
 }
 
 // addFlashEffect 为僵尸添加受击闪烁效果（方案A+）

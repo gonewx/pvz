@@ -8,7 +8,6 @@ import (
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
@@ -21,17 +20,16 @@ import (
 //   - 检测左键点击事件，播放音效并移除植物
 //   - 渲染铲子光标和植物高亮效果
 type ShovelInteractionSystem struct {
-	entityManager          *ecs.EntityManager
-	gameState              *game.GameState
-	resourceManager        *game.ResourceManager
-	removePlantSoundPlayer *audio.Player         // 铲除植物音效播放器（与种植音效相同）
-	cursorImage            *ebiten.Image         // 铲子光标图片
-	cursorAnchorX          float64               // 光标锚点X偏移
-	cursorAnchorY          float64               // 光标锚点Y偏移
-	shovelEntity           ecs.EntityID          // 铲子交互实体ID
-	lastCursorMode         ebiten.CursorModeType // 上一次的光标模式
-	justActivated          bool                  // 刚刚被激活，跳过本帧的取消检测
-	lastHighlightedPlant   ecs.EntityID          // 上一帧高亮的植物实体ID（用于移除闪烁效果）
+	entityManager        *ecs.EntityManager
+	gameState            *game.GameState
+	resourceManager      *game.ResourceManager
+	cursorImage          *ebiten.Image         // 铲子光标图片
+	cursorAnchorX        float64               // 光标锚点X偏移
+	cursorAnchorY        float64               // 光标锚点Y偏移
+	shovelEntity         ecs.EntityID          // 铲子交互实体ID
+	lastCursorMode       ebiten.CursorModeType // 上一次的光标模式
+	justActivated        bool                  // 刚刚被激活，跳过本帧的取消检测
+	lastHighlightedPlant ecs.EntityID          // 上一帧高亮的植物实体ID（用于移除闪烁效果）
 }
 
 // ShovelStateProvider 铲子状态提供者接口
@@ -68,13 +66,7 @@ func NewShovelInteractionSystem(em *ecs.EntityManager, gs *game.GameState, rm *g
 		lastCursorMode:  ebiten.CursorModeVisible,
 	}
 
-	// 加载铲除植物音效（与种植音效相同）
-	removePlantPlayer, err := rm.LoadSoundEffect("assets/sounds/plant.ogg")
-	if err != nil {
-		log.Printf("[ShovelInteractionSystem] Warning: Failed to load remove plant sound: %v", err)
-	} else {
-		system.removePlantSoundPlayer = removePlantPlayer
-	}
+	// 音效统一由 AudioManager 管理（Story 10.9）
 
 	// 加载铲子光标图片（使用 Shovel.png，与卡槽中的铲子一致）
 	cursorImg, err := rm.LoadImage("assets/images/Shovel.png")
@@ -258,10 +250,9 @@ func (s *ShovelInteractionSystem) removePlant(entityID ecs.EntityID) {
 		}
 	}
 
-	// 播放铲除植物音效（与种植音效相同）
-	if s.removePlantSoundPlayer != nil {
-		s.removePlantSoundPlayer.Rewind()
-		s.removePlantSoundPlayer.Play()
+	// 播放铲除植物音效（使用 AudioManager 统一管理 - Story 10.9）
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_PLANT")
 	}
 
 	// 移除植物实体（不返还阳光）

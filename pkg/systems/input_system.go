@@ -10,7 +10,6 @@ import (
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
@@ -22,11 +21,8 @@ type InputSystem struct {
 	reanimSystem       entities.ReanimSystemInterface // Reanim 系统（用于初始化植物动画）
 	sunCounterX        float64                        // 阳光计数器X坐标（收集动画目标）
 	sunCounterY        float64                        // 阳光计数器Y坐标（收集动画目标）
-	collectSoundPlayer *audio.Player                  // 收集阳光音效播放器
 	lawnGridSystem     *LawnGridSystem                // 草坪网格管理系统
 	lawnGridEntityID   ecs.EntityID                   // 草坪网格实体ID
-	plantSoundPlayer   *audio.Player                  // 种植音效播放器
-	buzzerSoundPlayer  *audio.Player                  // 无效操作音效播放器 (Story 10.8)
 	lastBuzzerPlayTime float64                        // 上次播放无效操作音效的时间 (Story 10.8)
 	buzzerCooldownTime float64                        // 无效操作音效冷却时间（秒）(Story 10.8)
 	gameTime           float64                        // 游戏时间累计（秒）(Story 10.8)
@@ -48,31 +44,7 @@ func NewInputSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.Ga
 		buzzerCooldownTime: 0.5, // Story 10.8: 0.5秒冷却时间，防止连续点击播放多次
 	}
 
-	// 加载收集阳光音效（使用 LoadSoundEffect 而非 LoadAudio 以避免循环播放）
-	// Note: Using hardcoded path as sound resource ID loading not yet implemented
-	player, err := rm.LoadSoundEffect("assets/sounds/points.ogg")
-	if err != nil {
-		log.Printf("Warning: Failed to load sun collect sound: %v", err)
-	} else {
-		system.collectSoundPlayer = player
-	}
-
-	// 加载种植音效
-	// Note: Using hardcoded path as sound resource ID loading not yet implemented
-	plantPlayer, err := rm.LoadSoundEffect("assets/sounds/plant.ogg")
-	if err != nil {
-		log.Printf("Warning: Failed to load plant sound: %v", err)
-	} else {
-		system.plantSoundPlayer = plantPlayer
-	}
-
-	// Story 10.8: 加载无效操作音效（buzzer）
-	buzzerPlayer, err := rm.LoadSoundEffect("assets/sounds/buzzer.ogg")
-	if err != nil {
-		log.Printf("Warning: Failed to load buzzer sound: %v", err)
-	} else {
-		system.buzzerSoundPlayer = buzzerPlayer
-	}
+	// 音效统一由 AudioManager 管理（Story 10.9）
 
 	return system
 }
@@ -290,12 +262,9 @@ func (s *InputSystem) handleSunClick(sunID ecs.EntityID, pos *components.Positio
 	clickable, _ := ecs.GetComponent[*components.ClickableComponent](s.entityManager, sunID)
 	clickable.IsEnabled = false
 
-	// 3. 播放收集音效（单次播放，不循环）
-	if s.collectSoundPlayer != nil {
-		// 重置播放位置到开头（如果之前播放过）
-		s.collectSoundPlayer.Rewind()
-		// 播放音效（会自动播放到结束后停止）
-		s.collectSoundPlayer.Play()
+	// 3. 播放收集音效（使用 AudioManager 统一管理 - Story 10.9）
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_POINTS")
 		log.Printf("[InputSystem] 播放收集音效")
 	}
 
@@ -385,21 +354,16 @@ func (s *InputSystem) handlePlantCardClick(mouseX, mouseY int, cameraX float64) 
 				log.Printf("[InputSystem] 阳光不足: 需要 %d, 当前 %d", plantCost, currentSun)
 				s.gameState.TriggerSunFlash()
 
-				// Story 10.8: 播放无效操作音效（带冷却）
-				if s.buzzerSoundPlayer != nil {
-					timeSinceLastBuzzer := s.gameTime - s.lastBuzzerPlayTime
-					if timeSinceLastBuzzer >= s.buzzerCooldownTime {
-						// 重置音效播放器
-						if err := s.buzzerSoundPlayer.Rewind(); err != nil {
-							log.Printf("[InputSystem] 警告: 重置buzzer音效失败: %v", err)
-						}
-						// 播放音效
-						s.buzzerSoundPlayer.Play()
+				// Story 10.8: 播放无效操作音效（带冷却，使用 AudioManager - Story 10.9）
+				timeSinceLastBuzzer := s.gameTime - s.lastBuzzerPlayTime
+				if timeSinceLastBuzzer >= s.buzzerCooldownTime {
+					if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+						audioManager.PlaySound("SOUND_BUZZER")
 						s.lastBuzzerPlayTime = s.gameTime
 						log.Printf("[InputSystem] 播放无效操作音效 (buzzer)")
-					} else {
-						log.Printf("[InputSystem] 无效操作音效冷却中 (%.2f/%.2f)", timeSinceLastBuzzer, s.buzzerCooldownTime)
 					}
+				} else {
+					log.Printf("[InputSystem] 无效操作音效冷却中 (%.2f/%.2f)", timeSinceLastBuzzer, s.buzzerCooldownTime)
 				}
 
 				return true // 已处理点击，但阻止卡片选择
@@ -589,10 +553,9 @@ func (s *InputSystem) handleLawnClick(mouseX, mouseY int) bool {
 		return true
 	}
 
-	// 播放种植音效
-	if s.plantSoundPlayer != nil {
-		s.plantSoundPlayer.Rewind()
-		s.plantSoundPlayer.Play()
+	// 播放种植音效（使用 AudioManager 统一管理 - Story 10.9）
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_PLANT")
 		log.Printf("[InputSystem] 播放种植音效")
 	}
 

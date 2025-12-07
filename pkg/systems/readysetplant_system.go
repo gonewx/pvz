@@ -150,18 +150,11 @@ func (s *ReadySetPlantSystem) stop() {
 
 // playSound 播放 ReadySetPlant 音效。
 func (s *ReadySetPlantSystem) playSound() {
-	if s.resourceManager == nil {
-		return
+	// 使用 AudioManager 统一管理音效（Story 10.9）
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_READYSETPLANT")
+		log.Println("[ReadySetPlantSystem] Playing sound effect")
 	}
-
-	player, err := s.resourceManager.LoadSoundEffect("assets/sounds/readysetplant.ogg")
-	if err != nil {
-		log.Printf("[ReadySetPlantSystem] ⚠️ Failed to load sound: %v", err)
-		return
-	}
-
-	player.Play()
-	log.Println("[ReadySetPlantSystem] Playing sound effect")
 }
 
 // IsPlaying 返回动画是否正在播放。

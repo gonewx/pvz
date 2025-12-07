@@ -623,9 +623,9 @@ func (s *LevelSystem) triggerFinalWaveWarning() {
 
 	s.gameState.ShowingFinalWave = true
 
-	if audioPlayer := s.resourceManager.GetAudioPlayer("SOUND_AWOOGA"); audioPlayer != nil {
-		audioPlayer.Rewind()
-		audioPlayer.Play()
+	// 使用 AudioManager 统一管理音效（Story 10.9）
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_AWOOGA")
 	}
 
 	centerX := float64(config.ScreenWidth) / 2

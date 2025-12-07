@@ -56,20 +56,22 @@ func TestPlantDeathReleasesGrid(t *testing.T) {
 	// 创建僵尸并模拟啃食植物至死亡
 	zombieID := em.CreateEntity()
 	ecs.AddComponent(em, zombieID, &components.BehaviorComponent{
-		Type: components.BehaviorZombieEating,
+		Type:             components.BehaviorZombieEating,
+		LastEatAnimFrame: -1, // 首次进入啃食状态，会触发伤害
 	})
-	ecs.AddComponent(em, zombieID, &components.TimerComponent{
-		Name:        "eating_damage",
-		TargetTime:  config.ZombieEatingDamageInterval,
-		CurrentTime: config.ZombieEatingDamageInterval, // 计时器已满
-		IsReady:     true,
+	// 添加 ReanimComponent 模拟动画帧变化触发伤害
+	ecs.AddComponent(em, zombieID, &components.ReanimComponent{
+		CurrentFrame: 0,
+		AnimVisiblesMap: map[string][]int{
+			"anim_eat": {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // 10 帧可见
+		},
 	})
 	ecs.AddComponent(em, zombieID, &components.PositionComponent{
 		X: config.GridWorldStartX + 2*config.CellWidth + config.CellWidth/2,   // 与植物同列
 		Y: config.GridWorldStartY + 3*config.CellHeight + config.CellHeight/2, // 与植物同行
 	})
 
-	// 模拟僵尸啃食，造成足够伤害杀死植物
+	// 模拟僵尸啃食，当 LastEatAnimFrame=-1 时首次进入会触发伤害
 	// 植物生命值 100，每次伤害 100，需要 1 次更新
 	bs.Update(0.1)
 
@@ -132,13 +134,15 @@ func TestMultiplePlantsDeathReleasesGrid(t *testing.T) {
 		col, row := pos[0], pos[1]
 		zombieID := em.CreateEntity()
 		ecs.AddComponent(em, zombieID, &components.BehaviorComponent{
-			Type: components.BehaviorZombieEating,
+			Type:             components.BehaviorZombieEating,
+			LastEatAnimFrame: -1, // 首次进入啃食状态，会触发伤害
 		})
-		ecs.AddComponent(em, zombieID, &components.TimerComponent{
-			Name:        "eating_damage",
-			TargetTime:  config.ZombieEatingDamageInterval,
-			CurrentTime: config.ZombieEatingDamageInterval,
-			IsReady:     true,
+		// 添加 ReanimComponent 模拟动画帧变化触发伤害
+		ecs.AddComponent(em, zombieID, &components.ReanimComponent{
+			CurrentFrame: 0,
+			AnimVisiblesMap: map[string][]int{
+				"anim_eat": {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // 10 帧可见
+			},
 		})
 		ecs.AddComponent(em, zombieID, &components.PositionComponent{
 			X: config.GridWorldStartX + float64(col)*config.CellWidth + config.CellWidth/2,

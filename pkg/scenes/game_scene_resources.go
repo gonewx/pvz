@@ -61,13 +61,7 @@ func (s *GameScene) loadResources() {
 		s.shovel = shovel
 	}
 
-	// Load shovel click sound effect (铲子槽点击音效)
-	shovelClickPlayer, err := s.resourceManager.LoadSoundEffect("assets/sounds/shovel.ogg")
-	if err != nil {
-		log.Printf("Warning: Failed to load shovel click sound: %v", err)
-	} else {
-		s.shovelClickSoundPlayer = shovelClickPlayer
-	}
+	// 铲子槽点击音效由 AudioManager 统一管理（Story 10.9）
 
 	// Load font for sun counter (使用黑体)
 	font, err := s.resourceManager.LoadFont("assets/fonts/SimHei.ttf", config.SunCounterFontSize)

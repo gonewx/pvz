@@ -372,10 +372,6 @@ func (s *BehaviorSystem) updateZombieDamageState(entityID ecs.EntityID, health *
 	}
 }
 
-// playShootSound 播放豌豆射手发射子弹的音效
-// 使用配置文件中定义的音效（config.PeashooterShootSoundPath）
-// 如果配置为空字符串，则不播放音效（静音模式）
-
 func (s *BehaviorSystem) detectPlantCollision(zombieRow, zombieCol int) (ecs.EntityID, bool) {
 	// 查询所有植物实体（拥有 PlantComponent）
 	plantEntityList := ecs.GetEntitiesWith1[*components.PlantComponent](s.entityManager)
@@ -500,19 +496,12 @@ func (s *BehaviorSystem) startEatingPlant(zombieID, plantID ecs.EntityID) {
 
 	// 3. 切换 BehaviorComponent.Type 为 BehaviorZombieEating
 	behavior.Type = components.BehaviorZombieEating
-	// 初始化啃食动画帧跟踪（用于音效同步）
+	// 初始化啃食动画帧跟踪（用于伤害和音效同步）
+	// -1 表示尚未开始，首次进入会触发伤害
 	behavior.LastEatAnimFrame = -1
 
 	// 切换僵尸动画为啃食状态
 	s.changeZombieAnimation(zombieID, components.ZombieAnimEating)
-
-	// 4. 添加 TimerComponent 用于伤害间隔
-	ecs.AddComponent(s.entityManager, zombieID, &components.TimerComponent{
-		Name:        "eating_damage",
-		TargetTime:  config.ZombieEatingDamageInterval,
-		CurrentTime: 0,
-		IsReady:     false,
-	})
 
 	// 待迁移到 ReanimComponent
 	// 5. 根据原始僵尸类型加载对应的啃食动画
@@ -556,16 +545,15 @@ func (s *BehaviorSystem) startEatingPlant(zombieID, plantID ecs.EntityID) {
 func (s *BehaviorSystem) stopEatingAndResume(zombieID ecs.EntityID) {
 	log.Printf("[BehaviorSystem] 僵尸 %d 结束啃食，恢复移动", zombieID)
 
-	// 1. 移除 TimerComponent
-	ecs.RemoveComponent[*components.TimerComponent](s.entityManager, zombieID)
-
-	// 2. 切换 BehaviorComponent.Type 回 BehaviorZombieBasic
+	// 1. 切换 BehaviorComponent.Type 回 BehaviorZombieBasic
 	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
 	if ok {
 		behavior.Type = components.BehaviorZombieBasic
+		// 重置啃食动画帧跟踪
+		behavior.LastEatAnimFrame = -1
 	}
 
-	// 切换僵尸动画回行走状态
+	// 2. 切换僵尸动画回行走状态
 	s.changeZombieAnimation(zombieID, components.ZombieAnimWalking)
 
 	// 3. 恢复 VelocityComponent
@@ -573,7 +561,6 @@ func (s *BehaviorSystem) stopEatingAndResume(zombieID ecs.EntityID) {
 		VX: config.ZombieWalkSpeed,
 		VY: 0,
 	})
-
 }
 
 // handleZombieEatingBehavior 处理僵尸啃食植物的行为
@@ -585,13 +572,14 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 	// DEBUG: 添加日志确认函数被调用
 	log.Printf("[BehaviorSystem] 🍴 处理僵尸 %d 啃食行为", entityID)
 
-	// 获取行为组件和动画组件，用于音效同步
+	// 获取行为组件和动画组件，用于伤害和音效同步
 	behavior, hasBehavior := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
 	reanim, hasReanim := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 
-	// 检测动画帧并播放音效（与动画同步）
-	// 普通僵尸（双手啃食）：在动画开始和中间点各播放一次音效
-	// 旗帜僵尸（单手啃食）：只在动画开始时播放一次音效
+	// 基于动画帧触发伤害和音效（完全同步）
+	// 普通僵尸（双手啃食）：在动画开始和中间点各触发一次
+	// 旗帜僵尸（单手啃食）：只在动画开始时触发一次
+	shouldDealDamage := false
 	if hasBehavior && hasReanim {
 		currentFrame := reanim.CurrentFrame
 		lastFrame := behavior.LastEatAnimFrame
@@ -613,15 +601,17 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 		// 检测动画循环：当前帧小于上一帧，说明动画循环了
 		// 或者第一次进入啃食状态（lastFrame == -1）
 		if lastFrame == -1 || currentFrame < lastFrame {
-			// 动画循环开始，播放第一次音效
+			// 动画循环开始，触发伤害和音效
+			shouldDealDamage = true
 			s.playEatingSound()
-			log.Printf("[BehaviorSystem] 🔊 僵尸 %d 啃食动画循环，播放音效（帧 %d → %d）",
+			log.Printf("[BehaviorSystem] 🔊 僵尸 %d 啃食动画循环，触发伤害+音效（帧 %d → %d）",
 				entityID, lastFrame, currentFrame)
 		} else if !isSingleHand && totalFrames > 0 {
-			// 双手僵尸：检测是否跨过中间点，播放第二次音效
+			// 双手僵尸：检测是否跨过中间点，触发第二次伤害和音效
 			if lastFrame < midFrame && currentFrame >= midFrame {
+				shouldDealDamage = true
 				s.playEatingSound()
-				log.Printf("[BehaviorSystem] 🔊 僵尸 %d 双手啃食中间点，播放音效（帧 %d → %d，mid=%d）",
+				log.Printf("[BehaviorSystem] 🔊 僵尸 %d 双手啃食中间点，触发伤害+音效（帧 %d → %d，mid=%d）",
 					entityID, lastFrame, currentFrame, midFrame)
 			}
 		}
@@ -654,157 +644,111 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 	// 检查护甲状态（护甲僵尸即使在啃食也需要检测护甲破坏）
 	armor, hasArmor := ecs.GetComponent[*components.ArmorComponent](s.entityManager, entityID)
 	if hasArmor {
-		// 待迁移到 ReanimComponent
-		// 如果护甲已破坏，切换为普通僵尸动画
-		// if armor.CurrentArmor <= 0 {
-		// 	// 加载普通僵尸啃食动画
-		// 	normalEatFrames := utils.LoadZombieEatAnimation(s.resourceManager)
-		// 	animComp, ok := s.entityManager.GetComponent(entityID, reflect.TypeOf(&components.AnimationComponent{}))
-		// 	if ok {
-		// 		anim := animComp.(*components.AnimationComponent)
-		// 		// 检查是否已经是普通僵尸动画(避免重复切换)
-		// 		if len(anim.Frames) != config.ZombieEatAnimationFrames {
-		// 			anim.Frames = normalEatFrames
-		// 			anim.CurrentFrame = 0
-		// 			anim.FrameCounter = 0
-		// 			log.Printf("[BehaviorSystem] 啃食中的护甲僵尸 %d 护甲耗尽，切换为普通僵尸啃食动画", entityID)
-		// 		}
-		// 	}
-		// }
 		_ = armor // 临时避免未使用警告
 	}
 
-	// 获取僵尸的 TimerComponent
-	timer, ok := ecs.GetComponent[*components.TimerComponent](s.entityManager, entityID)
+	// 获取僵尸当前网格位置
+	pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
 	if !ok {
-		// 没有计时器，恢复移动
+		return
+	}
+
+	// 获取碰撞组件，用于计算碰撞盒中心
+	collision, hasCollisionComp := ecs.GetComponent[*components.CollisionComponent](s.entityManager, entityID)
+	collisionOffsetX := 0.0
+	if hasCollisionComp {
+		collisionOffsetX = collision.OffsetX
+	}
+
+	// 计算僵尸碰撞盒中心所在格子
+	// 使用碰撞盒中心而非实体位置，确保旗帜僵尸等有偏移的僵尸正确检测
+	zombieCol := int((pos.X + collisionOffsetX - config.GridWorldStartX) / config.CellWidth)
+	zombieRow := int((pos.Y - config.GridWorldStartY - config.ZombieVerticalOffset - config.CellHeight/2.0) / config.CellHeight)
+
+	// 检测植物
+	plantID, hasPlant := s.detectPlantCollision(zombieRow, zombieCol)
+
+	if !hasPlant {
+		// 植物不存在（可能被其他僵尸吃掉），恢复移动
 		s.stopEatingAndResume(entityID)
 		return
 	}
 
-	// 更新计时器
-	timer.CurrentTime += deltaTime
+	// 基于动画帧触发伤害（与音效同步）
+	if shouldDealDamage {
+		// 植物存在，造成伤害
+		plantHealth, ok := ecs.GetComponent[*components.HealthComponent](s.entityManager, plantID)
+		if ok {
+			plantHealth.CurrentHealth -= config.ZombieEatingDamage
 
-	// 检查计时器是否完成
-	if timer.CurrentTime >= timer.TargetTime {
-		timer.IsReady = true
-	}
+			// 坚果墙被啃食时触发小碎屑粒子效果和发光效果
+			// WallnutEatSmall: 每次啃食伤害时触发
+			// WallnutEatLarge: 在受损状态变化时触发（在 handleWallnutBehavior 中）
+			if plantComp, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, plantID); ok {
+				if plantComp.PlantType == components.PlantWallnut {
+					// 粒子位置：僵尸嘴巴位置（啃食接触点）
+					particleX := pos.X + config.ZombieEatParticleOffsetX
+					particleY := pos.Y + config.ZombieEatParticleOffsetY
+					_, err := entities.CreateParticleEffect(
+						s.entityManager,
+						s.resourceManager,
+						"WallnutEatSmall",
+						particleX,
+						particleY,
+					)
+					if err != nil {
+						log.Printf("[BehaviorSystem] 警告：创建坚果墙小碎屑粒子效果失败: %v", err)
+					}
 
-	// 如果计时器完成，造成伤害
-	if timer.IsReady {
-		// 获取僵尸当前网格位置
-		pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
-		if !ok {
-			return
-		}
+					// 添加发光效果（一闪一闪）
+					ecs.AddComponent(s.entityManager, plantID, &components.WallnutHitGlowComponent{
+						Intensity: 1.0,
+						FadeSpeed: config.WallnutHitGlowFadeSpeed,
+						ColorR:    config.WallnutHitGlowColorR,
+						ColorG:    config.WallnutHitGlowColorG,
+						ColorB:    config.WallnutHitGlowColorB,
+					})
+				}
+			}
 
-		// 获取碰撞组件，用于计算碰撞盒中心
-		collision, hasCollisionComp := ecs.GetComponent[*components.CollisionComponent](s.entityManager, entityID)
-		collisionOffsetX := 0.0
-		if hasCollisionComp {
-			collisionOffsetX = collision.OffsetX
-		}
+			log.Printf("[BehaviorSystem] 僵尸 %d 啃食植物 %d，造成 %d 伤害，剩余生命值 %d",
+				entityID, plantID, config.ZombieEatingDamage, plantHealth.CurrentHealth)
 
-		// 计算僵尸碰撞盒中心所在格子
-		// 使用碰撞盒中心而非实体位置，确保旗帜僵尸等有偏移的僵尸正确检测
-		zombieCol := int((pos.X + collisionOffsetX - config.GridWorldStartX) / config.CellWidth)
-		zombieRow := int((pos.Y - config.GridWorldStartY - config.ZombieVerticalOffset - config.CellHeight/2.0) / config.CellHeight)
+			// 检查植物是否死亡
+			if plantHealth.CurrentHealth <= 0 {
+				log.Printf("[BehaviorSystem] 植物 %d 被吃掉，删除实体", plantID)
 
-		// 检测植物
-		plantID, hasPlant := s.detectPlantCollision(zombieRow, zombieCol)
-
-		if hasPlant {
-			// 植物存在，造成伤害
-			plantHealth, ok := ecs.GetComponent[*components.HealthComponent](s.entityManager, plantID)
-			if ok {
-				plantHealth.CurrentHealth -= config.ZombieEatingDamage
-
-				// 坚果墙被啃食时触发小碎屑粒子效果和发光效果
-				// WallnutEatSmall: 每次啃食伤害时触发
-				// WallnutEatLarge: 在受损状态变化时触发（在 handleWallnutBehavior 中）
+				// 释放网格占用状态，允许重新种植
 				if plantComp, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, plantID); ok {
-					if plantComp.PlantType == components.PlantWallnut {
-						// 粒子位置：僵尸嘴巴位置（啃食接触点）
-						particleX := pos.X + config.ZombieEatParticleOffsetX
-						particleY := pos.Y + config.ZombieEatParticleOffsetY
-						_, err := entities.CreateParticleEffect(
-							s.entityManager,
-							s.resourceManager,
-							"WallnutEatSmall",
-							particleX,
-							particleY,
-						)
-						if err != nil {
-							log.Printf("[BehaviorSystem] 警告：创建坚果墙小碎屑粒子效果失败: %v", err)
-						}
-
-						// 添加发光效果（一闪一闪）
-						ecs.AddComponent(s.entityManager, plantID, &components.WallnutHitGlowComponent{
-							Intensity: 1.0,
-							FadeSpeed: config.WallnutHitGlowFadeSpeed,
-							ColorR:    config.WallnutHitGlowColorR,
-							ColorG:    config.WallnutHitGlowColorG,
-							ColorB:    config.WallnutHitGlowColorB,
-						})
+					err := s.lawnGridSystem.ReleaseCell(s.lawnGridEntityID, plantComp.GridCol, plantComp.GridRow)
+					if err != nil {
+						log.Printf("[BehaviorSystem] 警告：释放网格占用失败: %v", err)
+					} else {
+						log.Printf("[BehaviorSystem] 网格 (%d, %d) 已释放", plantComp.GridCol, plantComp.GridRow)
 					}
 				}
 
-				log.Printf("[BehaviorSystem] 僵尸 %d 啃食植物 %d，造成 %d 伤害，剩余生命值 %d",
-					entityID, plantID, config.ZombieEatingDamage, plantHealth.CurrentHealth)
-
-				// 检查植物是否死亡
-				if plantHealth.CurrentHealth <= 0 {
-					log.Printf("[BehaviorSystem] 植物 %d 被吃掉，删除实体", plantID)
-
-					// 释放网格占用状态，允许重新种植
-					if plantComp, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, plantID); ok {
-						err := s.lawnGridSystem.ReleaseCell(s.lawnGridEntityID, plantComp.GridCol, plantComp.GridRow)
-						if err != nil {
-							log.Printf("[BehaviorSystem] 警告：释放网格占用失败: %v", err)
-						} else {
-							log.Printf("[BehaviorSystem] 网格 (%d, %d) 已释放", plantComp.GridCol, plantComp.GridRow)
-						}
-					}
-
-					s.entityManager.DestroyEntity(plantID)
-					// 恢复僵尸移动
-					s.stopEatingAndResume(entityID)
-					return
-				}
-			} else {
-				// 植物没有 HealthComponent（不应该发生，但作为保护措施）
-				log.Printf("[BehaviorSystem] 警告：植物 %d 没有 HealthComponent，直接删除", plantID)
 				s.entityManager.DestroyEntity(plantID)
+				// 恢复僵尸移动
 				s.stopEatingAndResume(entityID)
 				return
 			}
 		} else {
-			// 植物不存在（可能被其他僵尸吃掉），恢复移动
+			// 植物没有 HealthComponent（不应该发生，但作为保护措施）
+			log.Printf("[BehaviorSystem] 警告：植物 %d 没有 HealthComponent，直接删除", plantID)
+			s.entityManager.DestroyEntity(plantID)
 			s.stopEatingAndResume(entityID)
 			return
 		}
-
-		// 重置计时器
-		timer.CurrentTime = 0
-		timer.IsReady = false
 	}
 }
 
 // playEatingSound 播放僵尸啃食音效
-
 func (s *BehaviorSystem) playEatingSound() {
-	// 加载啃食音效
-	eatingSound, err := s.resourceManager.LoadSoundEffect(config.ZombieEatingSoundPath)
-	if err != nil {
-		// 音效加载失败时不阻止游戏继续运行
-		return
+	// 使用 AudioManager 统一管理音效（Story 10.9）
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_CHOMP")
 	}
-
-	// 重置播放器位置到开头
-	eatingSound.Rewind()
-
-	// 播放音效
-	eatingSound.Play()
 }
 
 // handleWallnutBehavior 处理坚果墙的行为逻辑

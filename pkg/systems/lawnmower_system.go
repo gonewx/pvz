@@ -218,15 +218,9 @@ func (s *LawnmowerSystem) triggerLawnmowerByID(lawnmowerID ecs.EntityID, lawnmow
 	lawnmower.IsTriggered = true
 	lawnmower.IsMoving = true
 
-	// 播放音效（使用资源 ID 而不是相对路径）
-	if s.resourceManager != nil {
-		player := s.resourceManager.GetAudioPlayer("SOUND_LAWNMOWER")
-		if player != nil {
-			player.Rewind()
-			player.Play()
-		} else {
-			log.Printf("[LawnmowerSystem] Warning: Lawnmower audio (SOUND_LAWNMOWER) not loaded")
-		}
+	// 播放音效（使用 AudioManager 统一管理 - Story 10.9）
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_LAWNMOWER")
 	}
 
 	// 恢复动画播放（触发后开始播放车轮滚动动画）

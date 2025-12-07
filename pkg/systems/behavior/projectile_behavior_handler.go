@@ -6,6 +6,7 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/game"
 )
 
 func (s *BehaviorSystem) handlePeaProjectileBehavior(entityID ecs.EntityID, deltaTime float64) {
@@ -52,29 +53,12 @@ func (s *BehaviorSystem) handleHitEffectBehavior(entityID ecs.EntityID, deltaTim
 	}
 }
 
-// handleZombieDyingBehavior 处理僵尸死亡动画播放
-// 当死亡动画完成后，删除僵尸实体
-
+// playShootSound 播放豌豆射手发射子弹的音效
+// 使用 AudioManager 统一管理音效（Story 10.9）
 func (s *BehaviorSystem) playShootSound() {
-	// 如果配置为空字符串，不播放音效（保持原版静音风格）
-	if config.PeashooterShootSoundPath == "" {
-		return
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_THROW")
 	}
-
-	// 加载发射音效（如果已加载，会返回缓存的播放器）
-	// 音效路径在 pkg/config/unit_config.go 中配置，可根据需要切换测试
-	shootSound, err := s.resourceManager.LoadSoundEffect(config.PeashooterShootSoundPath)
-	if err != nil {
-		// 音效加载失败时不阻止游戏继续运行
-		// 在实际项目中可以使用日志系统记录错误
-		return
-	}
-
-	// 重置播放器位置到开头（允许快速连续播放）
-	shootSound.Rewind()
-
-	// 播放音效
-	shootSound.Play()
 }
 
 // detectPlantCollision 检测僵尸是否与植物发生网格碰撞

@@ -431,18 +431,11 @@ func (s *BowlingNutSystem) playExplosionParticle(x, y float64) {
 // playExplosionSound 播放爆炸音效
 // Story 19.8: 使用 explosion.ogg 音效
 func (s *BowlingNutSystem) playExplosionSound() {
-	if s.resourceManager == nil {
-		return
+	// 使用 AudioManager 统一管理音效（Story 10.9）
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_EXPLOSION")
+		log.Printf("[BowlingNutSystem] 爆炸音效播放")
 	}
-
-	player, err := s.resourceManager.LoadSoundEffect(config.ExplosiveNutExplosionSoundPath)
-	if err != nil {
-		log.Printf("[BowlingNutSystem] 加载爆炸音效失败: %v", err)
-		return
-	}
-	player.Rewind()
-	player.Play()
-	log.Printf("[BowlingNutSystem] 爆炸音效播放")
 }
 
 // findNearestZombieDistance 查找指定行最近僵尸的 X 轴距离
@@ -627,28 +620,23 @@ func (s *BowlingNutSystem) continueBounce(
 
 // playImpactSound 播放撞击音效
 func (s *BowlingNutSystem) playImpactSound() {
-	if s.resourceManager == nil {
+	// 使用 AudioManager 统一管理音效（Story 10.9）
+	audioManager := game.GetGameState().GetAudioManager()
+	if audioManager == nil {
 		return
 	}
 
 	// 随机选择音效
-	var soundPath string
 	if rand.Float32() < 0.5 {
-		soundPath = config.BowlingImpactSoundPath
+		audioManager.PlaySound("SOUND_BOWLINGIMPACT")
 	} else {
-		soundPath = config.BowlingImpact2SoundPath
+		audioManager.PlaySound("SOUND_BOWLINGIMPACT2")
 	}
-
-	player, err := s.resourceManager.LoadSoundEffect(soundPath)
-	if err != nil {
-		log.Printf("[BowlingNutSystem] 加载撞击音效失败: %v", err)
-		return
-	}
-	player.Rewind()
-	player.Play()
 }
 
 // startRollingSound 开始播放滚动音效
+// 注意：滚动音效需要循环播放并跟踪每个实体，暂保留 ResourceManager 方式
+// TODO: 后续可在 AudioManager 中添加循环音效支持
 func (s *BowlingNutSystem) startRollingSound(entityID ecs.EntityID) {
 	if s.resourceManager == nil {
 		return
@@ -659,7 +647,7 @@ func (s *BowlingNutSystem) startRollingSound(entityID ecs.EntityID) {
 		return
 	}
 
-	// 加载音效
+	// 加载音效（循环音效需要保留 ResourceManager 方式）
 	soundPath := config.BowlingRollSoundPath
 	player, err := s.resourceManager.LoadSoundEffect(soundPath)
 	if err != nil {

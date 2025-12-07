@@ -14,7 +14,6 @@ import (
 	"github.com/decker502/pvz/pkg/systems"
 	"github.com/decker502/pvz/pkg/systems/behavior"
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
@@ -190,7 +189,6 @@ type GameScene struct {
 	// Story 19.2: 铲子交互系统
 	shovelSelected          bool                             // 铲子是否被选中
 	shovelInteractionSystem *systems.ShovelInteractionSystem // 铲子交互系统
-	shovelClickSoundPlayer  *audio.Player                    // 铲子槽点击音效播放器
 
 	// Story 19.3: 强引导教学系统
 	guidedTutorialSystem *systems.GuidedTutorialSystem // 强引导教学系统（Level 1-5 铲子教学）
@@ -1585,10 +1583,9 @@ func (s *GameScene) updateShovelSlotClick() {
 			// Story 19.3: 通知系统操作发生
 			s.NotifyOperation("click_shovel")
 
-			// 播放铲子点击音效
-			if s.shovelClickSoundPlayer != nil {
-				s.shovelClickSoundPlayer.Rewind()
-				s.shovelClickSoundPlayer.Play()
+			// 播放铲子点击音效（使用 AudioManager 统一管理 - Story 10.9）
+			if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+				audioManager.PlaySound("SOUND_SHOVEL")
 			}
 
 			// 切换铲子选中状态
