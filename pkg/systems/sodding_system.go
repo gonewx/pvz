@@ -95,8 +95,8 @@ func (s *SoddingSystem) StartAnimation(onComplete func(), enabledLanes, animLane
 
 	// Story 10.9: 播放铺草皮音效 (gravebusterchomp.ogg)
 	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
-		audioManager.PlaySound("SOUND_GRAVEBUSTERCHOMP")
-		log.Printf("[SoddingSystem] 播放铺草皮音效: SOUND_GRAVEBUSTERCHOMP")
+		audioManager.PlaySound("SOUND_GRAVESTONE_RUMBLE")
+		log.Printf("[SoddingSystem] 播放铺草皮音效: SOUND_GRAVESTONE_RUMBLE")
 	}
 
 	// 加载 SodRoll Reanim 资源

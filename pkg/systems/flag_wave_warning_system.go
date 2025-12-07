@@ -179,11 +179,21 @@ func (s *FlagWaveWarningSystem) createFinalWaveWarningEntity() {
 		Processed: false,
 	})
 
-	// 播放音效：SOUND_AWOOGA（僵尸来袭音效）+ SOUND_FINALWAVE（最后一波特有音效）
+	// 播放音效：SOUND_FINALWAVE（最后一波特有音效）
+	// Bug Fix: 如果警告队列中包含 "huge_wave"，说明 SOUND_AWOOGA 已在「一大波僵尸」阶段播放过，
+	// 不需要重复播放
 	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
-		audioManager.PlaySound("SOUND_AWOOGA")
+		// 检查是否需要播放 SOUND_AWOOGA（仅当队列中没有 huge_wave 时才播放）
+		shouldPlayAwooga := !s.hasHugeWaveInQueue()
+		if shouldPlayAwooga {
+			audioManager.PlaySound("SOUND_AWOOGA")
+		}
 		audioManager.PlaySound("SOUND_FINALWAVE")
-		log.Printf("[FlagWaveWarningSystem] Playing SOUND_AWOOGA + SOUND_FINALWAVE for final wave")
+		if shouldPlayAwooga {
+			log.Printf("[FlagWaveWarningSystem] Playing SOUND_AWOOGA + SOUND_FINALWAVE for final wave")
+		} else {
+			log.Printf("[FlagWaveWarningSystem] Playing SOUND_FINALWAVE only (SOUND_AWOOGA already played for huge wave)")
+		}
 	}
 
 	log.Printf("[FlagWaveWarningSystem] Created final wave warning entity (ID: %d) - queued after huge wave",
@@ -512,4 +522,25 @@ func (s *FlagWaveWarningSystem) DismissWarning() {
 	}
 
 	s.destroyWarningEntity()
+}
+
+// hasHugeWaveInQueue 检查警告队列中是否包含 "huge_wave"
+//
+// Bug Fix: 用于判断最终波警告时是否需要播放 SOUND_AWOOGA
+// 如果队列中包含 "huge_wave"，说明已经播放过该音效
+//
+// 返回：
+//   - bool: true 表示队列中包含 "huge_wave"
+func (s *FlagWaveWarningSystem) hasHugeWaveInQueue() bool {
+	if s.waveTimingSystem == nil {
+		return false
+	}
+
+	pendingWarnings, _ := s.waveTimingSystem.GetPendingWarnings()
+	for _, warning := range pendingWarnings {
+		if warning == "huge_wave" {
+			return true
+		}
+	}
+	return false
 }

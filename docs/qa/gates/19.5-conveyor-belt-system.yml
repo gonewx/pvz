@@ -44,10 +44,3 @@ recommendations:
       refs: ["pkg/systems/conveyor_belt_system_test.go"]
     - action: "AC6 提示文本待教学系统集成后完善"
       refs: ["pkg/scenes/game_scene_conveyor.go:380-384"]
-
-
-
-
-
-
-
