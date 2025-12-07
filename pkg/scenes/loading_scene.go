@@ -39,6 +39,7 @@ type LoadingScene struct {
 	dirtBarImage    *ebiten.Image // Progress bar dirt base
 	grassBarImage   *ebiten.Image // Progress bar grass fill
 	logoComposited  bool          // Whether logo has been composited
+	debugImage      *ebiten.Image // Debug 1x1 white pixel
 
 	// Font resources
 	textFontFace *text.GoTextFace // Font for loading messages
@@ -160,6 +161,10 @@ func NewLoadingScene(rm *game.ResourceManager, sm *game.SceneManager, configMana
 	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
 		audioManager.PlayMusic("SOUND_MAINMUSIC")
 	}
+
+	// Initialize debug image (1x1 white pixel)
+	scene.debugImage = ebiten.NewImage(1, 1)
+	scene.debugImage.Fill(color.White)
 
 	return scene
 }
@@ -442,6 +447,35 @@ func (s *LoadingScene) Draw(screen *ebiten.Image) {
 
 	// Draw text messages
 	s.drawText(screen)
+
+	// --- Visual Debugging ---
+	if s.debugImage != nil {
+		// RED Square at (0,0): Draw is being called
+		opRed := &ebiten.DrawImageOptions{}
+		opRed.GeoM.Scale(50, 50) // 50x50 square
+		opRed.GeoM.Translate(0, 0)
+		opRed.ColorScale.Scale(1, 0, 0, 1) // Red
+		screen.DrawImage(s.debugImage, opRed)
+
+		// GREEN Square at (100,0): Background asset loaded
+		if s.backgroundImage != nil {
+			opGreen := &ebiten.DrawImageOptions{}
+			opGreen.GeoM.Scale(50, 50)
+			opGreen.GeoM.Translate(60, 0)        // Offset
+			opGreen.ColorScale.Scale(0, 1, 0, 1) // Green
+			screen.DrawImage(s.debugImage, opGreen)
+		}
+
+		// BLUE Square at (200,0): Logo asset loaded
+		if s.logoRGB != nil { // Check base logo image
+			opBlue := &ebiten.DrawImageOptions{}
+			opBlue.GeoM.Scale(50, 50)
+			opBlue.GeoM.Translate(120, 0)       // Offset
+			opBlue.ColorScale.Scale(0, 0, 1, 1) // Blue
+			screen.DrawImage(s.debugImage, opBlue)
+		}
+	}
+
 }
 
 // drawBackground draws the background image.

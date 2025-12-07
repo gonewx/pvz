@@ -4,15 +4,19 @@
 
 set -e  # 遇到错误立即退出
 
+# 获取项目根目录的绝对路径
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 # 配置变量
 ANDROID_HOME="${ANDROID_HOME:-/home/decker/app/android/sdk}"
 ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-$ANDROID_HOME/ndk/27.2.12479018}"
-BUILD_TOOLS_VERSION="36.1.0"
-PLATFORM_VERSION="android-36"
+BUILD_TOOLS_VERSION="34.0.0"
+PLATFORM_VERSION="android-34"
 APP_NAME="pvz"
 PACKAGE_NAME="com.decker.pvz"
 MIN_SDK=23
-TARGET_SDK=36
+TARGET_SDK=34
 
 # 颜色输出
 GREEN='\033[0;32m'
@@ -50,9 +54,10 @@ export ANDROID_NDK_HOME
 
 # 2. 构建 AAR 库
 echo_info "步骤 1/4: 构建 AAR 库..."
+cd "$PROJECT_ROOT"
 ANDROID_HOME="$ANDROID_HOME" ANDROID_NDK_HOME="$ANDROID_NDK_HOME" make build-android
 
-AAR_FILE="build/android/${APP_NAME}.aar"
+AAR_FILE="$PROJECT_ROOT/build/android/${APP_NAME}.aar"
 if [ ! -f "$AAR_FILE" ]; then
     echo_error "AAR 文件未生成: $AAR_FILE"
     exit 1
@@ -60,15 +65,22 @@ fi
 
 # 3. 创建 Android 项目结构
 echo_info "步骤 2/4: 创建 Android 项目..."
-ANDROID_PROJECT="build/android-project"
+ANDROID_PROJECT="$PROJECT_ROOT/build/android-project"
 rm -rf "$ANDROID_PROJECT"
-mkdir -p "$ANDROID_PROJECT"/{app/src/main/{java/${PACKAGE_NAME//.//},res/{values,drawable,mipmap-hdpi,mipmap-mdpi,mipmap-xhdpi,mipmap-xxhdpi,mipmap-xxxhdpi}},app/libs,gradle/wrapper}
+mkdir -p "$ANDROID_PROJECT/app/src/main/java/${PACKAGE_NAME//.//}"
+mkdir -p "$ANDROID_PROJECT/app/src/main/res"
+mkdir -p "$ANDROID_PROJECT/app/src/main/res/values"
+mkdir -p "$ANDROID_PROJECT/app/src/main/res/drawable"
+for dpi in hdpi mdpi xhdpi xxhdpi xxxhdpi; do
+    mkdir -p "$ANDROID_PROJECT/app/src/main/res/mipmap-$dpi"
+done
+mkdir -p "$ANDROID_PROJECT/app/libs"
+mkdir -p "$ANDROID_PROJECT/gradle/wrapper"
 
 # 4. 生成 AndroidManifest.xml
 cat > "$ANDROID_PROJECT/app/src/main/AndroidManifest.xml" <<EOF
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="$PACKAGE_NAME"
     android:versionCode="1"
     android:versionName="1.0">
 
@@ -105,13 +117,28 @@ package $PACKAGE_NAME;
 
 import android.app.Activity;
 import android.os.Bundle;
-import ${PACKAGE_NAME}.ebitenmobileview.Ebitenmobileview;
+import ${PACKAGE_NAME}.mobile.EbitenView;
 
 public class MainActivity extends Activity {
+    private EbitenView view;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(Ebitenmobileview.createGameView(this));
+        view = new EbitenView(this);
+        setContentView(view);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        view.suspendGame();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        view.resumeGame();
     }
 }
 EOF
@@ -123,6 +150,7 @@ plugins {
 }
 
 android {
+    namespace "$PACKAGE_NAME"
     compileSdkVersion $TARGET_SDK
 
     defaultConfig {
@@ -154,6 +182,8 @@ EOF
 cat > "$ANDROID_PROJECT/build.gradle" <<EOF
 buildscript {
     repositories {
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
         google()
         mavenCentral()
     }
@@ -164,6 +194,8 @@ buildscript {
 
 allprojects {
     repositories {
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/public' }
         google()
         mavenCentral()
     }
@@ -186,61 +218,125 @@ EOF
 # 10. 复制 AAR 文件
 cp "$AAR_FILE" "$ANDROID_PROJECT/app/libs/"
 
-# 11. 创建简单图标 (可选)
+# 11. 创建简单图标
 echo_info "步骤 3/4: 生成应用图标..."
-# 这里使用 Android SDK 默认图标，你可以替换为自己的图标
-for dpi in hdpi mdpi xhdpi xxhdpi xxxhdpi; do
-    cp -f "$ANDROID_HOME/platforms/$PLATFORM_VERSION/data/res/drawable-$dpi/sym_def_app_icon.png" \
-       "$ANDROID_PROJECT/app/src/main/res/mipmap-$dpi/ic_launcher.png" 2>/dev/null || true
-done
+ICON_SOURCE="$PROJECT_ROOT/assets/images/Store_PvZIcon.png"
+
+if [ -f "$ICON_SOURCE" ]; then
+    echo_info "使用项目图标: $ICON_SOURCE"
+    for dpi in hdpi mdpi xhdpi xxhdpi xxxhdpi; do
+        cp -f "$ICON_SOURCE" "$ANDROID_PROJECT/app/src/main/res/mipmap-$dpi/ic_launcher.png"
+    done
+else
+    echo_warn "项目图标未找到 ($ICON_SOURCE)，尝试使用 Android SDK 默认图标"
+    for dpi in hdpi mdpi xhdpi xxhdpi xxxhdpi; do
+        SDK_ICON="$ANDROID_HOME/platforms/$PLATFORM_VERSION/data/res/drawable-$dpi/sym_def_app_icon.png"
+        if [ -f "$SDK_ICON" ]; then
+            cp -f "$SDK_ICON" "$ANDROID_PROJECT/app/src/main/res/mipmap-$dpi/ic_launcher.png"
+        fi
+    done
+fi
+
+# 最后的兜底：如果图标仍然不存在，复制任意一个 PNG 或报错
+if [ ! -f "$ANDROID_PROJECT/app/src/main/res/mipmap-hdpi/ic_launcher.png" ]; then
+    echo_warn "图标生成仍然失败，尝试使用兜底图片..."
+    FALLBACK_ICON="$PROJECT_ROOT/assets/images/Almanac_ZombieBlank.png"
+    if [ -f "$FALLBACK_ICON" ]; then
+        for dpi in hdpi mdpi xhdpi xxhdpi xxxhdpi; do
+            cp -f "$FALLBACK_ICON" "$ANDROID_PROJECT/app/src/main/res/mipmap-$dpi/ic_launcher.png"
+        done
+    else
+        echo_error "无法生成应用图标，构建可能会失败 (missing mipmap/ic_launcher)"
+    fi
+fi
 
 # 12. 使用 Gradle Wrapper 构建 APK
 echo_info "步骤 4/4: 构建 APK (这可能需要几分钟)..."
 
-# 下载 Gradle Wrapper
-cd "$ANDROID_PROJECT"
-if ! command -v gradle &> /dev/null; then
-    echo_warn "Gradle 未安装，下载 Gradle Wrapper..."
-    # 使用代理下载（如果配置了）
-    export http_proxy="${http_proxy:-http://127.0.0.1:2080}"
-    export https_proxy="${https_proxy:-http://127.0.0.1:2080}"
-    curl -L https://services.gradle.org/distributions/gradle-8.1-bin.zip -o gradle.zip || {
-        echo_error "下载 Gradle 失败，请检查网络连接或代理设置"
-        echo "提示: 如需使用代理，设置环境变量: export http_proxy=http://127.0.0.1:2080"
-        exit 1
-    }
-    unzip -q gradle.zip
-    GRADLE_CMD="./gradle-8.1/bin/gradle"
-else
+# Gradle 缓存目录（使用绝对路径）
+GRADLE_CACHE_DIR="$PROJECT_ROOT/build/gradle-cache"
+GRADLE_VERSION="8.5"
+GRADLE_DIR="$GRADLE_CACHE_DIR/gradle-$GRADLE_VERSION"
+
+# 检查系统是否已安装 gradle
+if command -v gradle &> /dev/null; then
     GRADLE_CMD="gradle"
+    echo_info "使用系统安装的 Gradle"
+else
+    # 检查缓存的 Gradle
+    if [ -d "$GRADLE_DIR" ] && [ -f "$GRADLE_DIR/bin/gradle" ]; then
+        echo_info "使用缓存的 Gradle $GRADLE_VERSION"
+        GRADLE_CMD="$GRADLE_DIR/bin/gradle"
+    else
+        echo_warn "Gradle 未安装，下载 Gradle $GRADLE_VERSION 到缓存目录..."
+        mkdir -p "$GRADLE_CACHE_DIR"
+        
+        # 使用代理下载（如果配置了）
+        export http_proxy="${http_proxy:-http://127.0.0.1:2080}"
+        export https_proxy="${https_proxy:-http://127.0.0.1:2080}"
+        
+        GRADLE_ZIP="$GRADLE_CACHE_DIR/gradle-$GRADLE_VERSION-bin.zip"
+        curl -L "https://services.gradle.org/distributions/gradle-$GRADLE_VERSION-bin.zip" -o "$GRADLE_ZIP" || {
+            echo_error "下载 Gradle 失败，请检查网络连接或代理设置"
+            echo "提示: 如需使用代理，设置环境变量: export http_proxy=http://127.0.0.1:2080"
+            exit 1
+        }
+        
+        echo_info "解压 Gradle 到缓存目录..."
+        unzip -q "$GRADLE_ZIP" -d "$GRADLE_CACHE_DIR"
+        rm -f "$GRADLE_ZIP"  # 删除 zip 文件，节省空间
+        
+        GRADLE_CMD="$GRADLE_DIR/bin/gradle"
+        echo_info "Gradle $GRADLE_VERSION 已缓存到: $GRADLE_DIR"
+    fi
 fi
 
 # 生成 Gradle Wrapper
-$GRADLE_CMD wrapper --gradle-version 8.1
+cd "$ANDROID_PROJECT"
+
+# 隔离 Gradle 环境
+unset GRADLE_HOME
+export GRADLE_USER_HOME="$PROJECT_ROOT/build/gradle-user-home"
+mkdir -p "$GRADLE_USER_HOME"
+
+# 解析并配置代理
+if [ -n "$http_proxy" ]; then
+    PROXY_HOST=$(echo $http_proxy | sed -E 's|http://||; s|:| |g' | awk '{print $1}')
+    PROXY_PORT=$(echo $http_proxy | sed -E 's|http://||; s|:| |g' | awk '{print $2}')
+    GRADLE_PROXY_ARGS="-Dhttp.proxyHost=$PROXY_HOST -Dhttp.proxyPort=$PROXY_PORT -Dhttps.proxyHost=$PROXY_HOST -Dhttps.proxyPort=$PROXY_PORT"
+    echo_info "应用代理设置: host=$PROXY_HOST port=$PROXY_PORT"
+else
+    GRADLE_PROXY_ARGS=""
+fi
+
+echo_info "生成 Gradle Wrapper..."
+"$GRADLE_CMD" wrapper --gradle-version $GRADLE_VERSION --no-daemon $GRADLE_PROXY_ARGS
 
 # 构建 APK
-./gradlew assembleRelease
+echo_info "执行 Gradle 构建..."
+./gradlew assembleRelease --no-daemon --stacktrace
 
 cd - > /dev/null
 
 # 13. 输出结果
 APK_FILE="$ANDROID_PROJECT/app/build/outputs/apk/release/app-release-unsigned.apk"
+OUTPUT_APK="$PROJECT_ROOT/build/${APP_NAME}-unsigned.apk"
 if [ -f "$APK_FILE" ]; then
     # 复制到 build 目录
-    cp "$APK_FILE" "build/${APP_NAME}-unsigned.apk"
+    cp "$APK_FILE" "$OUTPUT_APK"
 
     echo_info "✅ APK 构建成功!"
     echo ""
     echo "生成文件:"
-    echo "  - 未签名 APK: build/${APP_NAME}-unsigned.apk"
+    echo "  - 未签名 APK: $OUTPUT_APK"
     echo ""
     echo_warn "注意: 此 APK 未签名，仅供测试使用"
     echo ""
     echo "安装方法 (需要 adb):"
-    echo "  adb install -r build/${APP_NAME}-unsigned.apk"
+    echo "  adb install -r $OUTPUT_APK"
     echo ""
     echo "如需发布，请使用以下命令签名:"
-    echo "  ./scripts/sign-apk.sh build/${APP_NAME}-unsigned.apk"
+    echo "  ./scripts/sign-apk.sh $OUTPUT_APK"
 else
     echo_error "APK 构建失败"
     exit 1

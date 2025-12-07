@@ -36,7 +36,7 @@ func init() {
 
 	// 创建游戏应用，使用默认配置
 	cfg := app.Config{
-		Verbose:          false,
+		Verbose:          true,  // Enable verbose logging for debugging
 		Level:            "",    // 使用存档或默认关卡
 		SkipLoadingScene: false, // 显示加载场景
 	}
