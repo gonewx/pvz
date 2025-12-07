@@ -629,12 +629,19 @@ func (s *WaveTimingSystem) triggerNextWave() {
 	waveIndex := timer.CurrentWaveIndex
 	log.Printf("[WaveTimingSystem] ✅ Wave %d triggered at time %.2fs", waveIndex+1, timer.WaveStartedAt)
 
-	// Story 10.9: 第一波僵尸进场时播放警报音效 (siren.ogg + awooga.ogg)
-	if waveIndex == 0 {
-		if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+	// Story 10.9: 僵尸入场时播放音效
+	// - 第一波：SOUND_SIREN + SOUND_AWOOGA
+	// - 旗帜波/最终波：SOUND_AWOOGA（hugewave/finalwave 音效在提示文本出现时播放）
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		if waveIndex == 0 {
+			// 第一波：播放 siren + awooga
 			audioManager.PlaySound("SOUND_SIREN")
 			audioManager.PlaySound("SOUND_AWOOGA")
 			log.Printf("[WaveTimingSystem] Playing SOUND_SIREN + SOUND_AWOOGA for first wave")
+		} else if timer.IsFlagWaveApproaching || timer.IsFinalWave {
+			// 旗帜波或最终波：僵尸入场时只播放 awooga
+			audioManager.PlaySound("SOUND_AWOOGA")
+			log.Printf("[WaveTimingSystem] Playing SOUND_AWOOGA for flag/final wave entry")
 		}
 	}
 
