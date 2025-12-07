@@ -72,7 +72,7 @@ waves:
     zombies:
       - type: "basic"
         lanes: [2, 3, 4]
-        count: 1
+        count: 2
         spawnInterval: 2.0
 
   - waveNum: 5
@@ -80,13 +80,17 @@ waves:
     zombies:
       - type: "conehead"
         lanes: [2, 3, 4]
-        count: 1
+        count: 2
         spawnInterval: 2.0
 
   - waveNum: 6
     type: "Fixed"
     zombies:
       - type: "basic"
+        lanes: [2, 3, 4]
+        count: 1
+        spawnInterval: 2.0
+      - type: "conehead"
         lanes: [2, 3, 4]
         count: 1
         spawnInterval: 2.0

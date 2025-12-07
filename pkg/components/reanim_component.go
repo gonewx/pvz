@@ -21,6 +21,23 @@ type RenderPartData struct {
 	OffsetY float64
 }
 
+// InterlayerDrawRequest 中间层绘制请求
+// 用于在特定轨道渲染之后插入额外的图片绘制（如 Dave 手持的坚果）
+type InterlayerDrawRequest struct {
+	// AfterImageKey 触发绘制的图片 key（如 "IMAGE_REANIM_CRAZYDAVE_HANDINGHAND"）
+	// 当渲染完此图片后，会绘制 Image
+	AfterImageKey string
+
+	// Image 要绘制的图片
+	Image *ebiten.Image
+
+	// OffsetX 相对于触发图片位置的 X 偏移
+	OffsetX float64
+
+	// OffsetY 相对于触发图片位置的 Y 偏移
+	OffsetY float64
+}
+
 // ReanimComponent 是 Reanim 动画组件（纯数据，无方法）
 // 基于 animation_showcase/AnimationCell 重写，简化并修复 Epic 13 遗留问题
 //
@@ -172,8 +189,19 @@ type ReanimComponent struct {
 	// ImageOverrides 图片覆盖
 	// Key: 图片引用名（如 "IMAGE_REANIM_ZOMBIE_FLAGHAND"）
 	// Value: 覆盖后的图片对象
-	// 用于动态替换轨道图片（如损坏的旗帜）
+	// 用于动态替换轨道图片（如损坏的旗帜、Dave 手持的坚果）
 	ImageOverrides map[string]*ebiten.Image
+
+	// ImageOverrideOffsets 图片覆盖的偏移量
+	// Key: 图片引用名（与 ImageOverrides 相同）
+	// Value: [2]float64{offsetX, offsetY} - 用于调整替换图片的位置
+	// 当替换图片与原图片大小不同时，需要设置偏移来调整位置
+	ImageOverrideOffsets map[string][2]float64
+
+	// InterlayerDrawRequests 中间层绘制请求
+	// 用于在特定轨道渲染之后插入额外的图片绘制（如 Dave 手持的坚果）
+	// 渲染完 AfterImageKey 指定的图片后，会在该位置绘制 Image
+	InterlayerDrawRequests []InterlayerDrawRequest
 
 	// CenterOffsetX/Y 是 bounding box 中心的坐标（相对于 Reanim 原点）
 	// 用于渲染时居中对齐：screenPos = worldPos - CenterOffset

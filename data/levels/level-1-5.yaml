@@ -18,6 +18,7 @@ initialSun: 0                   # 保龄球模式不使用阳光
 
 # === 特殊规则 ===
 specialRules: "bowling"         # 保龄球模式
+firstWaveDelay: 0               # 传送带开始后僵尸立即进攻（与 level-1-1 类似）
 
 # === 预设植物（铲子教学阶段）===
 # Story 19.4: 关卡加载时自动生成的植物
@@ -44,7 +45,7 @@ rewardPlant: "potatomine"       # 完成后奖励土豆地雷（注意：无下�
 conveyorBelt:
   enabled: true
   capacity: 10
-  generationInterval: 3.0
+  generationInterval: 3.5
   cardPool:
     - type: "wallnut_bowling"
       weight: 85
@@ -54,8 +55,8 @@ conveyorBelt:
   phaseConfigs:
     - progressThreshold: 0.0   # 前期 (0%-30%)
       explodeNutWeight: 3
-      intervalMin: 3.0
-      intervalMax: 3.5
+      intervalMin: 3.5
+      intervalMax: 4.0
     - progressThreshold: 0.3   # 中期 (30%-70%)
       explodeNutWeight: 5
       intervalMin: 3.0

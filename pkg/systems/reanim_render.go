@@ -303,6 +303,14 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 				}
 			}
 
+			// 应用 ImageOverrides 偏移（用于调整替换图片的位置，如 Dave 手持的坚果）
+			if comp.ImageOverrideOffsets != nil && selectedFrame.ImagePath != "" {
+				if offset, ok := comp.ImageOverrideOffsets[selectedFrame.ImagePath]; ok {
+					selectedOffsetX += offset[0]
+					selectedOffsetY += offset[1]
+				}
+			}
+
 			comp.CachedRenderData = append(comp.CachedRenderData, components.RenderPartData{
 				Img:     selectedImg,
 				Frame:   selectedFrame,

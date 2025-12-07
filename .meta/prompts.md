@@ -92,6 +92,9 @@
   - 有僵尸在网格内时，随机的播放音效 ， 但不要太频繁。 groan.ogg groan2.ogg groan3.ogg groan4.ogg groan5.ogg groan6.ogg
 
   - 在僵尸进入房子动画时要播放 losemusic.ogg
+  - level 1-5 中，dave 对话时都有相应的音效，请找到正确的音效，并修正逻辑。 crazydavecrazy.ogg crazydaveextralong1.ogg crazydaveextralong2.ogg crazydaveextralong3.ogg crazydavelong1.ogg crazydavelong2.ogg crazydavelong3.ogg crazydavescream.ogg crazydavescream2.ogg crazydaveshort1.ogg crazydaveshort2.ogg crazydaveshort3.ogg
+
+- [] level 1-5 中，在`拿好这个坚果墙`的对话时，dave的手上要显示坚果
 
 - [x] 暂停面板中能通过已经绘制`音乐``音效`调节声音大小，通过`全屏`复选框，指定打开时默认是否全屏。 `3d加速` 默认选中，不可修改。
 

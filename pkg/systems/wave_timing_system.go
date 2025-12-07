@@ -170,9 +170,14 @@ func (s *WaveTimingSystem) InitializeTimer(isFirstPlaythrough bool) {
 // 首次游戏：20 秒延迟（让玩家有时间布置防线）
 // 非首次：6 秒延迟
 //
+// 关卡配置可通过 FirstWaveDelay 字段覆盖默认值：
+//   - 设置为 0 表示立即开始（传送带/保龄球关卡）
+//   - 设置为正数表示指定延迟时间（秒）
+//   - 未设置（nil）表示使用默认值
+//
 // 参数：
 //   - isFirstPlaythrough: 是否为首次游戏（一周目首次）
-//   - levelConfig: 关卡配置（保留参数用于将来扩展）
+//   - levelConfig: 关卡配置
 func (s *WaveTimingSystem) InitializeTimerWithDelay(isFirstPlaythrough bool, levelConfig *config.LevelConfig) {
 	timer := s.getTimerComponent()
 	if timer == nil {
@@ -180,9 +185,13 @@ func (s *WaveTimingSystem) InitializeTimerWithDelay(isFirstPlaythrough bool, lev
 		return
 	}
 
-	// Story 17.6: delay 字段已从 WaveConfig 移除，使用默认延迟
+	// 检查关卡配置是否指定了首波延迟
 	var firstWaveDelaySec float64
-	if isFirstPlaythrough {
+	if levelConfig != nil && levelConfig.FirstWaveDelay != nil {
+		// 使用关卡配置的首波延迟
+		firstWaveDelaySec = *levelConfig.FirstWaveDelay
+		log.Printf("[WaveTimingSystem] Using level-configured first wave delay: %.1f sec", firstWaveDelaySec)
+	} else if isFirstPlaythrough {
 		// 首次游戏默认 20 秒延迟（让玩家有时间布置防线）
 		firstWaveDelaySec = 20.0
 	} else {

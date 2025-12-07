@@ -1335,12 +1335,6 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	// 红字警告 "A Huge Wave of Zombies is Approaching!"
 	s.drawHugeWaveWarning(screen)
 
-	// Layer 10.2: Draw Dave dialogue (Story 19.1)
-	// 疯狂戴夫对话气泡和文本
-	if s.daveDialogueSystem != nil {
-		s.daveDialogueSystem.Draw(screen)
-	}
-
 	// Layer 10.5: Draw reward panel (Story 8.3 + 8.4)
 	// Story 8.4重构：RewardAnimationSystem完全封装奖励面板渲染
 	// 内部自动管理面板和植物卡片的渲染，调用者只需调用Draw方法
@@ -1358,8 +1352,15 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	s.drawGridDebug(screen)
 
 	// Story 8.8: Draw UI elements (ZombiesWon animation, dialogs, etc.)
-	// 渲染所有标记为 UIComponent 的实体（在暂停菜单之前）
+	// 渲染所有标记为 UIComponent 的实体（包括 Dave Reanim）
+	// 手持物品（坚果）通过 InterlayerDrawRequests 在 Reanim 渲染过程中绘制
 	s.renderSystem.DrawUIElements(screen)
+
+	// Layer 10.2: Draw Dave dialogue bubble (Story 19.1)
+	// 对话气泡在 Dave Reanim 之后绘制
+	if s.daveDialogueSystem != nil {
+		s.daveDialogueSystem.Draw(screen)
+	}
 
 	// Story 8.8: Draw dialog boxes (game over dialog, etc.)
 	// 对话框在 UI 元素之后渲染，确保显示在最上层

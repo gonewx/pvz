@@ -68,7 +68,7 @@ waves:
   - waveNum: 4
     type: "Fixed"
     zombies:
-      - type: "basic"
+      - type: "conehead"
         lanes: [1, 2, 3, 4, 5]
         count: 1
         spawnInterval: 2.0
@@ -76,7 +76,7 @@ waves:
   - waveNum: 5
     type: "Fixed"
     zombies:
-      - type: "basic"
+      - type: "conehead"
         lanes: [1, 2, 3, 4, 5]
         count: 1
         spawnInterval: 2.0
@@ -84,7 +84,7 @@ waves:
   - waveNum: 6
     type: "Fixed"
     zombies:
-      - type: "basic"
+      - type: "conehead"
         lanes: [1, 2, 3, 4, 5]
         count: 1
         spawnInterval: 2.0
@@ -94,7 +94,7 @@ waves:
     zombies:
       - type: "basic"
         lanes: [1, 2, 3, 4, 5]
-        count: 1
+        count: 3
         spawnInterval: 2.0
 
   - waveNum: 8
@@ -103,7 +103,7 @@ waves:
     zombies:
       - type: "basic"
         lanes: [1, 2, 3, 4, 5]
-        count: 5
+        count: 1
         spawnInterval: 1.5
 
   - waveNum: 9
@@ -114,8 +114,20 @@ waves:
         lanes: [1, 2, 3, 4, 5]
         count: 1
         spawnInterval: 1.5
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 2.0
 
   - waveNum: 10
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 3
+        spawnInterval: 2.0
+
+  - waveNum: 11
     type: "Final"
     isFlag: true
     flagIndex: 1
@@ -126,5 +138,5 @@ waves:
         spawnInterval: 1.0
       - type: "conehead"
         lanes: [1, 2, 3, 4, 5]
-        count: 1
+        count: 2
         spawnInterval: 1.2

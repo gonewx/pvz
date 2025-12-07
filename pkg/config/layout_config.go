@@ -425,7 +425,7 @@ const (
 	// DaveBubbleOffsetX 对话气泡相对于 Dave 位置的X偏移（像素）
 	// Dave 静止位置约 X=-55 到 X=298，中心约 X=121
 	// 气泡放在 Dave 右侧
-	DaveBubbleOffsetX = 300.0
+	DaveBubbleOffsetX = 295.0
 
 	// DaveBubbleOffsetY 对话气泡相对于 Dave 位置的Y偏移（像素）
 	DaveBubbleOffsetY = 20.0
@@ -448,6 +448,21 @@ const (
 
 	// DaveContinueTextOffsetY 「点击继续」文字距气泡底部的偏移（像素）
 	DaveContinueTextOffsetY = 10.0
+
+	// DaveHeldItemOffsetX 手持物品的 X 偏移（像素）
+	// 相对于 Dave_handinghand 轨道位置的 X 偏移
+	// 负值向左，正值向右
+	DaveHeldItemOffsetX = 62.0
+
+	// DaveHeldItemOffsetY 手持物品的 Y 偏移（像素）
+	// 相对于 Dave_handinghand 轨道位置的 Y 偏移
+	// 负值向上，正值向下
+	DaveHeldItemOffsetY = 5.0
+
+	// DaveHeldItemScale 手持物品的缩放比例
+	// 用于手动绘制模式（目前未使用）
+	// 建议值范围：0.5 - 1.5
+	DaveHeldItemScale = 0.95
 
 	// ========== 强引导教学系统配置参数（Story 19.3）（可手工调节） ==========
 
@@ -495,7 +510,7 @@ const (
 	// ConveyorBeltSpeed 传送带速度（像素/秒）
 	// 同时控制履带滚动和卡片移动，使两者保持相对静止
 	// 建议值范围：30.0 - 100.0
-	ConveyorBeltSpeed = 30.0
+	ConveyorBeltSpeed = 25.0
 
 	// ConveyorCardStartOffsetX 卡片起始位置相对于传送带右边界的偏移（像素）
 	// 正值表示在传送带右边界外更远处开始，避免覆盖右边框

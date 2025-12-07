@@ -93,6 +93,10 @@ type DaveDialogueSystem struct {
 
 	// 表情指令正则表达式（预编译优化性能）
 	expressionRegex *regexp.Regexp
+
+	// 手持物品图片缓存
+	// 当 Dave 显示 {SHOW_WALLNUT} 等标签时，缓存手持物品的图片
+	heldItemImage *ebiten.Image
 }
 
 // NewDaveDialogueSystem 创建疯狂戴夫对话系统
@@ -533,13 +537,9 @@ func (s *DaveDialogueSystem) setMouthTrack(entityID ecs.EntityID, mouthImageKey 
 }
 
 // setHandingItemImage 设置手持物品图片
-// 将指定图片设置到 Dave 的手部轨道上
+// 使用 InterlayerDrawRequests 机制在 Dave_handinghand 轨道之后、Dave_handinghand2/3 之前绘制坚果
+// 这样坚果会在手掌之后、手指之前渲染
 func (s *DaveDialogueSystem) setHandingItemImage(entityID ecs.EntityID, imagePath string) {
-	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-	if !ok {
-		return
-	}
-
 	// 加载物品图片
 	itemImage, err := s.resourceManager.LoadImage(imagePath)
 	if err != nil {
@@ -547,29 +547,67 @@ func (s *DaveDialogueSystem) setHandingItemImage(entityID ecs.EntityID, imagePat
 		return
 	}
 
-	// 使用 ImageOverrides 将手部图片覆盖为物品图片
-	// handinghand3 是手掌上方的图层，适合放置物品
-	if reanimComp.ImageOverrides == nil {
-		reanimComp.ImageOverrides = make(map[string]*ebiten.Image)
+	// 应用缩放
+	scaledImage := s.createScaledImage(itemImage, config.DaveHeldItemScale)
+
+	// 使用 InterlayerDrawRequests 机制在特定轨道后绘制坚果
+	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if ok {
+		// 设置中间层绘制请求：在 Dave_handinghand 轨道渲染后绘制坚果
+		reanimComp.InterlayerDrawRequests = []components.InterlayerDrawRequest{
+			{
+				AfterImageKey: "IMAGE_REANIM_CRAZYDAVE_HANDINGHAND",
+				Image:         scaledImage,
+				OffsetX:       config.DaveHeldItemOffsetX,
+				OffsetY:       config.DaveHeldItemOffsetY,
+			},
+		}
+		log.Printf("[DaveDialogueSystem] Entity %d: Set InterlayerDrawRequest for wallnut after HANDINGHAND (scale=%.2f, offset=(%.1f, %.1f))",
+			entityID, config.DaveHeldItemScale, config.DaveHeldItemOffsetX, config.DaveHeldItemOffsetY)
 	}
 
-	// 将物品图片设置到 handinghand3 轨道（手掌上方）
-	reanimComp.ImageOverrides["IMAGE_REANIM_CRAZYDAVE_HANDINGHAND3"] = itemImage
+	// 同时缓存图片用于后备
+	s.heldItemImage = scaledImage
+}
 
-	log.Printf("[DaveDialogueSystem] Entity %d: Set handing item image to %s", entityID, imagePath)
+// createScaledImage 创建缩放后的图片
+func (s *DaveDialogueSystem) createScaledImage(src *ebiten.Image, scale float64) *ebiten.Image {
+	if scale == 1.0 {
+		return src
+	}
+
+	bounds := src.Bounds()
+	srcWidth := bounds.Dx()
+	srcHeight := bounds.Dy()
+
+	// 计算缩放后的尺寸
+	newWidth := int(float64(srcWidth) * scale)
+	newHeight := int(float64(srcHeight) * scale)
+
+	if newWidth <= 0 || newHeight <= 0 {
+		return src
+	}
+
+	// 创建新图片
+	scaledImg := ebiten.NewImage(newWidth, newHeight)
+
+	// 绘制缩放后的图片
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Scale(scale, scale)
+	scaledImg.DrawImage(src, op)
+
+	return scaledImg
 }
 
 // clearHandingItemImage 清除手持物品图片
 func (s *DaveDialogueSystem) clearHandingItemImage(entityID ecs.EntityID) {
+	// 清除 InterlayerDrawRequests
 	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
-	if !ok {
-		return
+	if ok {
+		reanimComp.InterlayerDrawRequests = nil
 	}
 
-	if reanimComp.ImageOverrides != nil {
-		delete(reanimComp.ImageOverrides, "IMAGE_REANIM_CRAZYDAVE_HANDINGHAND3")
-	}
-
+	s.heldItemImage = nil
 	log.Printf("[DaveDialogueSystem] Entity %d: Cleared handing item image", entityID)
 }
 
@@ -610,7 +648,27 @@ func (s *DaveDialogueSystem) playTalkAnimation(entityID ecs.EntityID, dialogueCo
 		entityID, animName, dialogueComp.TalkAnimationTargetFrame)
 }
 
-// Draw 渲染对话气泡和文本
+// DrawHeldItem 绘制手持物品（在 Reanim 渲染之前调用）
+// 这样 Dave 的手（包括所有手指）会自然覆盖在坚果上面
+func (s *DaveDialogueSystem) DrawHeldItem(screen *ebiten.Image) {
+	// 查询所有 Dave 对话实体
+	daveEntities := ecs.GetEntitiesWith2[
+		*components.DaveDialogueComponent,
+		*components.PositionComponent,
+	](s.entityManager)
+
+	for _, entityID := range daveEntities {
+		dialogueComp, _ := ecs.GetComponent[*components.DaveDialogueComponent](s.entityManager, entityID)
+		posComp, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+
+		// 绘制手持物品（在 Dave Reanim 渲染之前）
+		if dialogueComp.IsHoldingItem && s.heldItemImage != nil {
+			s.drawHeldItem(screen, entityID, posComp.X, posComp.Y)
+		}
+	}
+}
+
+// Draw 渲染对话气泡和文本（在 Reanim 渲染之后调用）
 func (s *DaveDialogueSystem) Draw(screen *ebiten.Image) {
 	// 查询所有 Dave 对话实体
 	daveEntities := ecs.GetEntitiesWith2[
@@ -622,7 +680,7 @@ func (s *DaveDialogueSystem) Draw(screen *ebiten.Image) {
 		dialogueComp, _ := ecs.GetComponent[*components.DaveDialogueComponent](s.entityManager, entityID)
 		posComp, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
 
-		// 只在对话可见时渲染
+		// 只在对话可见时渲染气泡
 		if !dialogueComp.IsVisible {
 			continue
 		}
@@ -641,6 +699,70 @@ func (s *DaveDialogueSystem) Draw(screen *ebiten.Image) {
 		// 渲染「点击继续」提示
 		s.drawContinueHint(screen, bubbleX, bubbleY)
 	}
+}
+
+// drawHeldItem 绘制手持物品
+// 从 ReanimComponent 获取 Dave_handinghand 轨道的实际位置，让坚果跟随手部动画移动
+func (s *DaveDialogueSystem) drawHeldItem(screen *ebiten.Image, entityID ecs.EntityID, daveX, daveY float64) {
+	if s.heldItemImage == nil {
+		return
+	}
+
+	// 从 ReanimComponent 获取 Dave_handinghand 轨道的实际位置
+	itemX, itemY := s.getHandingTrackPosition(entityID, daveX, daveY)
+
+	// 获取图片尺寸，用于居中绘制
+	bounds := s.heldItemImage.Bounds()
+	imgWidth := float64(bounds.Dx())
+	imgHeight := float64(bounds.Dy())
+
+	op := &ebiten.DrawImageOptions{}
+	// 平移（居中绘制）
+	op.GeoM.Translate(itemX-imgWidth/2, itemY-imgHeight/2)
+
+	screen.DrawImage(s.heldItemImage, op)
+}
+
+// getHandingTrackPosition 获取 Dave_handinghand 轨道的当前位置
+// 通过从 CachedRenderData 中查找 handinghand 图片的渲染位置
+// 返回坚果应该绘制的屏幕坐标
+func (s *DaveDialogueSystem) getHandingTrackPosition(entityID ecs.EntityID, daveX, daveY float64) (float64, float64) {
+	reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !ok {
+		return daveX + config.DaveHeldItemOffsetX, daveY + config.DaveHeldItemOffsetY
+	}
+
+	// 获取 handinghand 图片引用
+	handingImg, exists := reanimComp.PartImages["IMAGE_REANIM_CRAZYDAVE_HANDINGHAND"]
+	if !exists || handingImg == nil {
+		return daveX + config.DaveHeldItemOffsetX, daveY + config.DaveHeldItemOffsetY
+	}
+
+	// 在 CachedRenderData 中查找 handinghand 轨道
+	for _, renderData := range reanimComp.CachedRenderData {
+		if renderData.Img == handingImg {
+			// 找到了 handinghand 轨道
+			var frameX, frameY float64
+			if renderData.Frame.X != nil {
+				frameX = *renderData.Frame.X
+			}
+			if renderData.Frame.Y != nil {
+				frameY = *renderData.Frame.Y
+			}
+			frameX += renderData.OffsetX
+			frameY += renderData.OffsetY
+
+			// 转换为屏幕坐标
+			// Dave 实体位置 (0,0) + 帧位置 - CenterOffset + 微调偏移
+			screenX := daveX + frameX - reanimComp.CenterOffsetX + config.DaveHeldItemOffsetX
+			screenY := daveY + frameY - reanimComp.CenterOffsetY + config.DaveHeldItemOffsetY
+
+			return screenX, screenY
+		}
+	}
+
+	// 没找到，使用固定偏移作为后备
+	return daveX + config.DaveHeldItemOffsetX, daveY + config.DaveHeldItemOffsetY
 }
 
 // drawBubble 渲染对话气泡背景

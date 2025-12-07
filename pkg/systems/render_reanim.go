@@ -385,6 +385,29 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		is := []uint16{0, 1, 2, 1, 3, 2}
 		screen.DrawTriangles(vs, is, partData.Img, nil)
 
+		// 中间层绘制：在特定轨道渲染之后插入额外的图片（如 Dave 手持的坚果）
+		// 坚果会在手掌 (Dave_handinghand) 之后、手指 (Dave_handinghand2/3) 之前渲染
+		if len(reanimComp.InterlayerDrawRequests) > 0 && frame.ImagePath != "" {
+			for _, req := range reanimComp.InterlayerDrawRequests {
+				if req.AfterImageKey == frame.ImagePath && req.Image != nil {
+					// 在当前部件位置绘制中间层图片
+					interlayerBounds := req.Image.Bounds()
+					interlayerW := float64(interlayerBounds.Dx())
+					interlayerH := float64(interlayerBounds.Dy())
+
+					// 计算中间层图片位置（相对于当前部件位置 + 偏移）
+					// 使用 tx, ty 作为基准位置（已经是屏幕坐标）
+					interlayerTx := tx + req.OffsetX - interlayerW/2
+					interlayerTy := ty + req.OffsetY - interlayerH/2
+
+					// 使用简单的绘制（无变换）
+					interlayerOp := &ebiten.DrawImageOptions{}
+					interlayerOp.GeoM.Translate(interlayerTx, interlayerTy)
+					screen.DrawImage(req.Image, interlayerOp)
+				}
+			}
+		}
+
 		// 向日葵脸部发光效果：使用加法混合绘制金色光层
 		if sunflowerGlow != nil && sunflowerGlow.Intensity > 0 {
 			glowIntensity := float32(sunflowerGlow.Intensity)

@@ -83,6 +83,12 @@ type LevelConfig struct {
 	// Story 19.5: 传送带配置
 	// 传送带系统参数（保龄球关卡等）
 	ConveyorBelt *ConveyorBeltConfig `yaml:"conveyorBelt"`
+
+	// FirstWaveDelay 首波僵尸延迟时间（秒）
+	// 默认值：首次游戏 20 秒，非首次游戏 6 秒
+	// 设置为 0 表示立即开始（传送带关卡等特殊关卡）
+	// 设置为 -1 表示使用默认值（不覆盖）
+	FirstWaveDelay *float64 `yaml:"firstWaveDelay"`
 }
 
 // PresetPlant 预设植物配置（Story 19.4）
@@ -104,7 +110,7 @@ type ConveyorBeltConfig struct {
 	CardHeight         float64         `yaml:"cardHeight"`         // 卡片高度（像素），可选，默认使用 ConveyorCardScale 计算
 
 	// Story 19.12: 动态调节系统配置
-	PhaseConfigs      []PhaseConfig           `yaml:"phaseConfigs"`      // 各阶段配置
+	PhaseConfigs      []PhaseConfig            `yaml:"phaseConfigs"`      // 各阶段配置
 	DynamicAdjustment *DynamicAdjustmentConfig `yaml:"dynamicAdjustment"` // 动态调节参数
 }
 
@@ -120,12 +126,12 @@ type PhaseConfig struct {
 // DynamicAdjustmentConfig 动态调节配置（Story 19.12）
 // 定义空带保底、满带降频、危机保底等参数
 type DynamicAdjustmentConfig struct {
-	EmptyBeltThreshold        float64 `yaml:"emptyBeltThreshold"`        // 空带保底阈值（秒），默认 3.0
-	FullBeltThreshold         float64 `yaml:"fullBeltThreshold"`         // 满带降频阈值（秒），默认 8.0
+	EmptyBeltThreshold         float64 `yaml:"emptyBeltThreshold"`         // 空带保底阈值（秒），默认 3.0
+	FullBeltThreshold          float64 `yaml:"fullBeltThreshold"`          // 满带降频阈值（秒），默认 8.0
 	FullBeltThrottleMultiplier float64 `yaml:"fullBeltThrottleMultiplier"` // 降频倍率，默认 1.5
-	CrisisExplodeNutCooldown  float64 `yaml:"crisisExplodeNutCooldown"`  // 危机爆炸坚果冷却（秒），默认 5.0
-	CrisisZombieCount         int     `yaml:"crisisZombieCount"`         // 危机检测僵尸数量，默认 2
-	CrisisDistanceThreshold   float64 `yaml:"crisisDistanceThreshold"`   // 危机检测距离阈值（像素），默认 300
+	CrisisExplodeNutCooldown   float64 `yaml:"crisisExplodeNutCooldown"`   // 危机爆炸坚果冷却（秒），默认 5.0
+	CrisisZombieCount          int     `yaml:"crisisZombieCount"`          // 危机检测僵尸数量，默认 2
+	CrisisDistanceThreshold    float64 `yaml:"crisisDistanceThreshold"`    // 危机检测距离阈值（像素），默认 300
 }
 
 // CardPoolEntry 卡片池条目（Story 19.5）

@@ -488,9 +488,12 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 		comp.FrozenTracks = nil
 	}
 
-	// 5. 应用图片覆盖
+	// 5. 应用图片覆盖（保留运行时动态设置的覆盖）
+	// 不清除现有的 ImageOverrides，以支持 DaveDialogueSystem 等运行时设置的图片覆盖
 	if len(combo.ImageOverrides) > 0 && s.resourceLoader != nil {
-		comp.ImageOverrides = make(map[string]*ebiten.Image)
+		if comp.ImageOverrides == nil {
+			comp.ImageOverrides = make(map[string]*ebiten.Image)
+		}
 		for imgRef, imgPath := range combo.ImageOverrides {
 			img, err := s.resourceLoader.LoadImage(imgPath)
 			if err == nil && img != nil {
@@ -500,9 +503,8 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 				log.Printf("[ReanimSystem] PlayCombo: 警告：无法加载覆盖图片 %s: %v", imgPath, err)
 			}
 		}
-	} else {
-		comp.ImageOverrides = nil
 	}
+	// 注意：不再清除 ImageOverrides，以保留运行时动态设置的覆盖（如 Dave 手持坚果）
 
 	// 6. 重建动画数据
 	s.rebuildAnimationData(comp)
