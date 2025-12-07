@@ -383,6 +383,12 @@ func (s *BehaviorSystem) detectPlantCollision(zombieRow, zombieCol int) (ecs.Ent
 			continue
 		}
 
+		// 跳过一次性爆炸植物（樱桃炸弹）
+		// 僵尸不应该吃这类植物，而是让它们自然爆炸
+		if plant.PlantType == components.PlantCherryBomb {
+			continue
+		}
+
 		// 检查是否在同一格子
 		if plant.GridRow == zombieRow && plant.GridCol == zombieCol {
 			return plantID, true
@@ -736,6 +742,17 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 		} else {
 			// 植物没有 HealthComponent（不应该发生，但作为保护措施）
 			log.Printf("[BehaviorSystem] 警告：植物 %d 没有 HealthComponent，直接删除", plantID)
+
+			// Bug Fix: 释放网格占用状态，允许重新种植
+			if plantComp, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, plantID); ok {
+				err := s.lawnGridSystem.ReleaseCell(s.lawnGridEntityID, plantComp.GridCol, plantComp.GridRow)
+				if err != nil {
+					log.Printf("[BehaviorSystem] 警告：释放网格占用失败: %v", err)
+				} else {
+					log.Printf("[BehaviorSystem] 网格 (%d, %d) 已释放", plantComp.GridCol, plantComp.GridRow)
+				}
+			}
+
 			s.entityManager.DestroyEntity(plantID)
 			s.stopEatingAndResume(entityID)
 			return
