@@ -19,6 +19,9 @@ availablePlants:              # 可用植物
 skipOpening: false            # 不跳过开场
 initialSun: 50               # 初始阳光500（调试用）
 
+# "Ready Set Plant" 提示动画
+showReadySetPlant: true
+
 # Story 8.6: 工具解锁
 unlockTools: ["shovel"]       # 完成后解锁铲子工具
 
