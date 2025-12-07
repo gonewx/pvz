@@ -459,6 +459,29 @@ func (rm *ResourceManager) GetAudioPlayer(path string) *audio.Player {
 	return rm.audioCache[path]
 }
 
+// GetAudioPlayerByID retrieves a previously loaded audio player using its resource ID.
+// If the audio has not been loaded yet, it returns nil.
+//
+// Parameters:
+//   - resourceID: The resource ID (e.g., "SOUND_SCREAM", "SOUND_CHOMP")
+//
+// Returns:
+//   - A pointer to the cached audio.Player, or nil if not found
+func (rm *ResourceManager) GetAudioPlayerByID(resourceID string) *audio.Player {
+	if rm.config == nil {
+		return nil
+	}
+
+	// Look up the file path
+	filePath, exists := rm.resourceMap[resourceID]
+	if !exists {
+		return nil
+	}
+
+	// Get from cache
+	return rm.audioCache[filePath]
+}
+
 // LoadFont loads a TrueType/OpenType font from the specified path and creates a text face with the given size.
 // The font face is cached for future use with a cache key combining path and size.
 // Supported formats: .ttf, .otf

@@ -100,6 +100,10 @@ func NewVerifyZombiesWonGame() (*VerifyZombiesWonGame, error) {
 	gs := game.GetGameState()
 	gs.CameraX = config.GameCameraX // 设置摄像机位置
 
+	// 创建并设置音频管理器（Story 10.9 统一音效管理）
+	audioManager := game.NewAudioManager(rm, nil)
+	gs.SetAudioManager(audioManager)
+
 	// 创建系统
 	reanimSystem := systems.NewReanimSystem(em)
 	reanimSystem.SetConfigManager(reanimConfigManager)

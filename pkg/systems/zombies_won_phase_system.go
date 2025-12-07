@@ -225,6 +225,16 @@ func (s *ZombiesWonPhaseSystem) updatePhase2ZombieEntry(
 	phaseComp *components.ZombiesWonPhaseComponent,
 	deltaTime float64,
 ) {
+
+	// 播放失败音乐（只播放一次，使用 AudioManager 统一管理 - Story 10.9）
+	if !phaseComp.LoseMusicPlayed {
+		if audioManager := s.gameState.GetAudioManager(); audioManager != nil {
+			audioManager.PlaySound("SOUND_LOSEMUSIC")
+			phaseComp.LoseMusicPlayed = true
+			log.Printf("[ZombiesWonPhaseSystem] Phase 2: Lose music played")
+		}
+	}
+
 	// 第一次进入 Phase 2：初始化状态
 	if phaseComp.PhaseTimer == deltaTime { // 刚进入 Phase 2
 		phaseComp.InitialCameraX = s.gameState.CameraX
@@ -242,6 +252,7 @@ func (s *ZombiesWonPhaseSystem) updatePhase2ZombieEntry(
 				log.Printf("[ZombiesWonPhaseSystem] Phase 2: 成功加载房门图片资源")
 			}
 		}
+
 	}
 
 	// ========================================
@@ -449,11 +460,6 @@ func (s *ZombiesWonPhaseSystem) updatePhase4Dialog(
 	if !phaseComp.DialogShown {
 		log.Printf("[ZombiesWonPhaseSystem] Phase 4: Showing game over dialog immediately")
 
-		// 播放失败音乐（单次播放，不循环）
-		if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
-			audioManager.PlaySound("SOUND_LOSEMUSIC")
-		}
-
 		// 直接创建游戏结束对话框（只有"再次尝试"按钮）
 		_, err := entities.NewGameOverDialogEntity(
 			s.entityManager,
@@ -480,23 +486,21 @@ func (s *ZombiesWonPhaseSystem) updatePhase4Dialog(
 
 // playScreamSound 播放惨叫音效
 func (s *ZombiesWonPhaseSystem) playScreamSound() {
-	player := s.resourceManager.GetAudioPlayer("SOUND_SCREAM")
-	if player != nil {
-		player.Rewind()
-		player.Play()
+	// 使用 AudioManager 统一管理音效播放（Story 10.9）
+	if audioManager := s.gameState.GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_SCREAM")
 	} else {
-		log.Printf("[ZombiesWonPhaseSystem] Warning: SOUND_SCREAM not loaded")
+		log.Printf("[ZombiesWonPhaseSystem] Warning: AudioManager not available for SOUND_SCREAM")
 	}
 }
 
 // playChompSound 播放咀嚼音效
 func (s *ZombiesWonPhaseSystem) playChompSound() {
-	player := s.resourceManager.GetAudioPlayer("SOUND_CHOMP")
-	if player != nil {
-		player.Rewind()
-		player.Play()
+	// 使用 AudioManager 统一管理音效播放（Story 10.9）
+	if audioManager := s.gameState.GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_CHOMP")
 	} else {
-		log.Printf("[ZombiesWonPhaseSystem] Warning: SOUND_CHOMP not loaded")
+		log.Printf("[ZombiesWonPhaseSystem] Warning: AudioManager not available for SOUND_CHOMP")
 	}
 }
 

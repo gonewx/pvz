@@ -41,6 +41,7 @@ type ZombiesWonPhaseComponent struct {
 	ZombieReachedTarget1 bool         // 僵尸是否已到达第1个目标位置（房门口）
 	ZombieReachedTarget  bool         // 僵尸是否已到达第2个目标位置（即将进入房子，触发 Phase 3）
 	DoorChompPlayed      bool         // 僵尸到达房门口时是否已播放啃食音效
+	LoseMusicPlayed      bool         // 是否已播放失败音乐
 
 	// Phase 3 专用字段
 	ScreamPlayed    bool    // 是否已播放惨叫音效
