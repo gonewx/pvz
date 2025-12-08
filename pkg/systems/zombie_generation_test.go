@@ -42,8 +42,9 @@ type TestEnvironment struct {
 //   - *TestEnvironment: 测试环境实例
 //   - error: 加载失败时返回错误
 func SetupTestEnvironment(levelID string) (*TestEnvironment, error) {
-	// 1. 加载关卡配置
-	levelPath := "data/levels/level-" + levelID + ".yaml"
+	// 1. 加载测试专用关卡配置（从 testdata 目录）
+	// 使用独立的测试配置，与正式配置隔离，确保测试稳定性
+	levelPath := "pkg/systems/testdata/levels/level-" + levelID + ".yaml"
 	levelConfig, err := config.LoadLevelConfig(levelPath)
 	if err != nil {
 		return nil, err

@@ -1,0 +1,114 @@
+# 测试专用配置：Level 1-4
+# 此文件用于单元测试，与正式配置隔离，确保测试稳定性
+id: "1-4"
+name: "测试关卡 1-4"
+description: "测试用标准关卡，包含10波和1面旗帜"
+
+# 顶层字段
+flags: 1
+sceneType: "day"
+rowMax: 5
+
+# 开场配置
+openingType: "standard"
+enabledLanes: [1, 2, 3, 4, 5]
+availablePlants:
+  - "peashooter"
+  - "sunflower"
+  - "cherrybomb"
+  - "wallnut"
+skipOpening: false
+initialSun: 50
+
+# 波次配置（固定10波，旗帜波在第10波，符合测试预期）
+waves:
+  - waveNum: 1
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 2.0
+
+  - waveNum: 2
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 2.0
+
+  - waveNum: 3
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 1.5
+
+  - waveNum: 4
+    type: "Fixed"
+    zombies:
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 2.0
+
+  - waveNum: 5
+    type: "Fixed"
+    zombies:
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 2.0
+
+  - waveNum: 6
+    type: "Fixed"
+    zombies:
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 2.0
+
+  - waveNum: 7
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 3
+        spawnInterval: 2.0
+
+  - waveNum: 8
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 1.5
+
+  - waveNum: 9
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 1.5
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 2.0
+
+  # 第10波：旗帜波（最终波）
+  - waveNum: 10
+    type: "Final"
+    isFlag: true
+    flagIndex: 1
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 6
+        spawnInterval: 1.0
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 2
+        spawnInterval: 1.2

@@ -1,0 +1,53 @@
+# 测试专用配置：Level 1-1
+# 此文件用于单元测试，与正式配置隔离，确保测试稳定性
+id: "1-1"
+name: "测试关卡 1-1"
+description: "测试用教学关卡"
+
+# 顶层字段
+flags: 0
+sceneType: "day"
+rowMax: 5
+
+# 开场配置
+openingType: "tutorial"
+enabledLanes: [3]
+availablePlants:
+  - "peashooter"
+rewardPlant: "sunflower"
+skipOpening: false
+initialSun: 150
+
+# 波次配置（固定4波，符合测试预期）
+waves:
+  - waveNum: 1
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [3]
+        count: 1
+        spawnInterval: 2.0
+
+  - waveNum: 2
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [3]
+        count: 1
+        spawnInterval: 2.0
+
+  - waveNum: 3
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [3]
+        count: 1
+        spawnInterval: 2.0
+
+  - waveNum: 4
+    type: "Final"
+    zombies:
+      - type: "basic"
+        lanes: [3]
+        count: 2
+        spawnInterval: 2.0
