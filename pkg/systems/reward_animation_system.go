@@ -523,9 +523,9 @@ func (ras *RewardAnimationSystem) updateAppearingPhase(dt float64, rewardComp *c
 // - 卡片包静止，显示光晕和箭头粒子效果
 // - 等待玩家点击后进入展开阶段
 func (ras *RewardAnimationSystem) updateWaitingPhase(dt float64, rewardComp *components.RewardAnimationComponent) {
-	// 检测玩家点击（鼠标或空格键）
-	clicked := inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) ||
-		inpututil.IsKeyJustPressed(ebiten.KeySpace)
+	// 检测玩家点击（支持触摸、鼠标或空格键）
+	justPressed, _, _ := utils.IsPointerJustPressed()
+	clicked := justPressed || inpututil.IsKeyJustPressed(ebiten.KeySpace)
 
 	if clicked {
 		log.Printf("[RewardAnimationSystem] 玩家点击卡片包，切换到 expanding")
@@ -713,8 +713,9 @@ func (ras *RewardAnimationSystem) updateShowingPhaseInternal(dt float64) {
 		}
 	}
 
-	// 检测鼠标点击（只响应左键）
-	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+	// 检测点击（支持触摸和鼠标）
+	justPressed, _, _ := utils.IsPointerJustPressed()
+	if justPressed {
 		// 获取鼠标点击位置
 		mouseX, mouseY := utils.GetPointerPosition()
 
@@ -1214,18 +1215,18 @@ func (ras *RewardAnimationSystem) isParticleEffectCompleted() bool {
 // Story 8.4重构：完全封装渲染逻辑，调用者只需调用此方法
 //
 // 内部自动处理：
-// - Reanim 实体（卡片包的 Reanim 动画）
 // - 粒子效果（SeedPacket 背景框 + Award 爆炸特效）
 // - 植物卡片（Phase 1-3 的卡片包）
 // - 奖励面板（Phase 4）
 //
 // 渲染顺序（从下到上）：
-// 1. Reanim 实体
-// 2. 粒子效果（装饰层）
-// 3. 植物卡片 / 奖励面板（最上层，不被粒子遮挡）
+// 1. 粒子效果（装饰层）
+// 2. 植物卡片 / 奖励面板（最上层，不被粒子遮挡）
 //
-// 注意：奖励动画的粒子标记为 UIComponent（isUIParticle=true）
-// GameScene Layer 6 会过滤掉 UI 粒子，只渲染游戏世界粒子
+// 注意：
+// - 游戏世界实体（植物、僵尸、阴影）由 GameScene.Draw() 的 Layer 4 渲染
+// - 奖励动画的粒子标记为 UIComponent（isUIParticle=true）
+// - GameScene Layer 6 会过滤掉 UI 粒子，只渲染游戏世界粒子
 func (ras *RewardAnimationSystem) Draw(screen *ebiten.Image) {
 	if !ras.isActive {
 		return
@@ -1233,14 +1234,16 @@ func (ras *RewardAnimationSystem) Draw(screen *ebiten.Image) {
 
 	cameraOffsetX := ras.gameState.CameraX
 
-	// 1. 绘制 Reanim 实体（如果有的话）
-	ras.renderSystem.Draw(screen, cameraOffsetX)
+	// 注意：不再调用 renderSystem.Draw()，因为：
+	// 1. 游戏世界实体（植物、僵尸、阴影）已经在 GameScene.Draw() 的 Layer 4 渲染过了
+	// 2. renderSystem.Draw() 会渲染所有实体，导致阴影等重复绘制
+	// 奖励动画只需要渲染自己的粒子效果和卡片/面板
 
-	// 2. 绘制粒子效果（SeedPacket 背景框 + Award 爆炸）
+	// 1. 绘制粒子效果（SeedPacket 背景框 + Award 爆炸）
 	//    只渲染 UI 粒子（奖励动画的粒子），不渲染游戏世界粒子
 	ras.renderSystem.DrawParticles(screen, cameraOffsetX)
 
-	// 3a. Phase 1-3: 渲染奖励卡片/工具图标（appearing/waiting/expanding/pausing/disappearing）在最上层
+	// 2a. Phase 1-3: 渲染奖励卡片/工具图标（appearing/waiting/expanding/pausing/disappearing）在最上层
 	// 直接渲染自己管理的卡片实体（符合 ECS 原则：系统负责自己的实体）
 	if ras.currentPhase != "showing" && ras.currentPhase != "closing" && ras.rewardEntity != 0 {
 		// 植物奖励：渲染植物卡片
@@ -1280,7 +1283,7 @@ func (ras *RewardAnimationSystem) Draw(screen *ebiten.Image) {
 		}
 	}
 
-	// 3b. Phase 4: 渲染奖励面板（showing）在最上层
+	// 2b. Phase 4: 渲染奖励面板（showing）在最上层
 	if ras.currentPhase == "showing" || ras.panelEntity != 0 {
 		ras.panelRenderSystem.Draw(screen)
 	}
