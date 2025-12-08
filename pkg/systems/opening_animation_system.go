@@ -13,6 +13,7 @@ import (
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/types"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
@@ -38,6 +39,7 @@ type OpeningAnimationSystem struct {
 	cameraSystem    *CameraSystem
 	openingEntity   ecs.EntityID
 	usernameFont    *text.GoTextFace // 用户名字体（24号）
+	skipKeyConsumed bool             // 跳过按键是否已被消费（防止同一帧 ESC 触发暂停）
 }
 
 // NewOpeningAnimationSystem 创建开场动画系统。
@@ -71,6 +73,7 @@ func NewOpeningAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *ga
 		cameraSystem:    cameraSystem,
 		openingEntity:   0,
 		usernameFont:    nil,
+		skipKeyConsumed: false,
 	}
 
 	// 加载用户名显示字体
@@ -115,11 +118,9 @@ func (oas *OpeningAnimationSystem) Update(dt float64) {
 		return
 	}
 
-	// 检查快捷键跳过（ESC 或 Space）
-	if oas.checkSkipInput() {
-		oas.Skip()
-		return
-	}
+	// 注意：开场动画期间不响应任何按键（ESC/Space）
+	// 玩家必须等待动画完成后才能操作
+	// 原因：跳过动画可能导致游戏流程异常
 
 	// 更新已用时间
 	openingComp.ElapsedTime += dt
@@ -523,8 +524,9 @@ func (oas *OpeningAnimationSystem) getUniqueZombieTypes() []string {
 }
 
 // checkSkipInput 检查是否按下跳过快捷键。
+// 使用 IsKeyJustPressed 确保只在按键按下的瞬间触发一次
 func (oas *OpeningAnimationSystem) checkSkipInput() bool {
-	return ebiten.IsKeyPressed(ebiten.KeyEscape) || ebiten.IsKeyPressed(ebiten.KeySpace)
+	return inpututil.IsKeyJustPressed(ebiten.KeyEscape) || inpututil.IsKeyJustPressed(ebiten.KeySpace)
 }
 
 // Skip 跳过开场动画。
@@ -535,6 +537,9 @@ func (oas *OpeningAnimationSystem) Skip() {
 	}
 
 	log.Println("[OpeningAnimationSystem] Skipping opening animation")
+
+	// 标记跳过按键已被消费（防止同一帧 ESC 触发暂停）
+	oas.skipKeyConsumed = true
 
 	// 停止镜头动画
 	oas.cameraSystem.StopAnimation()
@@ -573,6 +578,19 @@ func (oas *OpeningAnimationSystem) GetEntity() ecs.EntityID {
 		return 0
 	}
 	return oas.openingEntity
+}
+
+// WasSkipKeyConsumed 检查跳过按键是否已被消费（用于防止同一帧 ESC 触发暂停）
+// 调用此方法后会自动重置状态
+func (oas *OpeningAnimationSystem) WasSkipKeyConsumed() bool {
+	if oas == nil {
+		return false
+	}
+	if oas.skipKeyConsumed {
+		oas.skipKeyConsumed = false
+		return true
+	}
+	return false
 }
 
 // Draw 绘制开场动画UI元素。

@@ -255,9 +255,6 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 		}
 	}
 
-	// Load all UI resources
-	scene.loadResources()
-
 	// Story 6.3: Load all Reanim resources (XML and part images)
 	// CRITICAL: Reanim resources are required for all entity animations.
 	// If loading fails in production, log fatal error.
@@ -278,9 +275,10 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	// Story 5.5 & 8.1 & 8.6: Load level configuration FIRST (before creating systems that depend on it)
 	// Story 8.6: Convert levelID to file path (e.g., "1-2" → "data/levels/level-1-2.yaml")
 	// CRITICAL: This must happen before:
-	//   1. LawnGridSystem (needs EnabledLanes)
-	//   2. initPlantCardSystems() (needs AvailablePlants)
-	//   3. WaveSpawnSystem (needs wave configuration)
+	//   1. loadResources() (needs BackgroundImage)
+	//   2. LawnGridSystem (needs EnabledLanes)
+	//   3. initPlantCardSystems() (needs AvailablePlants)
+	//   4. WaveSpawnSystem (needs wave configuration)
 	levelFilePath := fmt.Sprintf("data/levels/level-%s.yaml", levelID)
 	levelConfig, err := config.LoadLevelConfig(levelFilePath)
 	if err != nil {
@@ -309,6 +307,10 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 			}
 		}
 	}
+
+	// Load all UI resources
+	// CRITICAL: 必须在关卡配置加载之后调用，因为需要读取 BackgroundImage 配置
+	scene.loadResources()
 
 	// Initialize systems
 	scene.renderSystem = systems.NewRenderSystem(scene.entityManager)
@@ -862,6 +864,14 @@ func (s *GameScene) Update(deltaTime float64) {
 		return // 暂停其他游戏系统
 	}
 
+	// 检查开场动画是否刚被跳过（ESC/Space）
+	// 如果是，跳过当前帧的输入处理，防止同一按键触发暂停菜单
+	skipInputThisFrame := false
+	if s.openingSystem != nil && s.openingSystem.WasSkipKeyConsumed() {
+		log.Printf("[GameScene] 开场动画跳过按键已消费，当前帧跳过输入处理")
+		skipInputThisFrame = true
+	}
+
 	// 开场动画刚完成，触发铺草皮动画（如果配置了且还未启动）
 	// 修正：检查 ShowSoddingAnim 和 SodRollAnimation 配置
 	if s.openingSystem != nil && s.openingSystem.IsCompleted() && !s.soddingAnimStarted && s.soddingSystem != nil {
@@ -1118,7 +1128,11 @@ func (s *GameScene) Update(deltaTime float64) {
 		s.shovelInteractionSystem.Update(deltaTime, s.cameraX)
 	}
 
-	s.inputSystem.Update(deltaTime, s.cameraX) // 2. Process player input (highest priority, 传递摄像机位置)
+	// 2. Process player input (highest priority, 传递摄像机位置)
+	// 如果开场动画跳过按键刚被消费，跳过输入处理（防止 ESC 同时跳过动画和触发暂停）
+	if !skipInputThisFrame {
+		s.inputSystem.Update(deltaTime, s.cameraX)
+	}
 
 	// 3. Generate new suns
 	// 教学关卡：在第一次收集阳光后启用自动生成（由 TutorialSystem 控制）
