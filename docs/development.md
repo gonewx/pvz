@@ -79,6 +79,51 @@ go build .
 go test ./...
 ```
 
+### 构建工具
+
+项目使用 Makefile 管理构建流程，运行 `make help` 查看所有可用命令：
+
+```bash
+make help           # 显示帮助信息
+make build          # 构建当前平台
+make build-linux    # 构建 Linux 版本
+make build-windows  # 构建 Windows 版本
+make build-darwin   # 构建 macOS 版本 (需要 macOS)
+make build-wasm     # 构建 WebAssembly 版本
+```
+
+### 图标和资源
+
+项目图标位于 `assets/icons/` 目录，包含各平台所需的图标格式：
+
+```bash
+# 生成 Windows .syso 图标资源
+make generate-icons
+
+# 打包 Linux 发布包（含图标和 .desktop 文件）
+make package-linux
+
+# 构建 macOS .app 包 (需要 macOS)
+make build-darwin-app
+
+# 构建 Android APK
+make build-apk
+
+# 查看 iOS 图标使用说明
+make ios-icons-info
+```
+
+**图标目录结构**：
+```
+assets/icons/
+├── windows/        # Windows ico 和多尺寸 png
+├── macos/          # macOS icon.iconset (可转换为 .icns)
+├── linux/          # Linux 多尺寸 png
+├── ios/            # iOS AppIcon.appiconset
+├── android/        # Android mipmap 图标
+└── web/            # Web favicon 和 PWA 图标
+```
+
 ---
 
 ## 🏗️ 项目架构

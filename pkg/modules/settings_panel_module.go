@@ -372,6 +372,10 @@ func (m *SettingsPanelModule) createBottomButton(rm *game.ResourceManager, butto
 		Y: hiddenY,
 	})
 
+	// 计算按钮尺寸（从图片获取）
+	buttonWidth := float64(backToGameNormal.Bounds().Dx())
+	buttonHeight := float64(backToGameNormal.Bounds().Dy())
+
 	// 添加按钮组件
 	ecs.AddComponent(m.entityManager, m.bottomButtonEntity, &components.ButtonComponent{
 		Type:         components.ButtonTypeSimple,
@@ -381,6 +385,8 @@ func (m *SettingsPanelModule) createBottomButton(rm *game.ResourceManager, butto
 		Text:         buttonConfig.Text,        // 使用配置的文字
 		Font:         buttonFont,               // 中文字体
 		TextColor:    [4]uint8{0, 200, 0, 255}, // 绿色文字
+		Width:        buttonWidth,              // ✅ 初始化按钮尺寸
+		Height:       buttonHeight,             // ✅ 初始化按钮尺寸
 		State:        components.UINormal,
 		Enabled:      true,
 		OnClick:        buttonConfig.OnClick,   // 使用配置的回调

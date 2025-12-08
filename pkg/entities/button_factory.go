@@ -53,6 +53,12 @@ func NewMenuButton(
 		return 0, err
 	}
 
+	// 计算按钮总尺寸（三段式：左边缘 + 中间拉伸 + 右边缘）
+	leftWidth := float64(leftImage.Bounds().Dx())
+	rightWidth := float64(rightImage.Bounds().Dx())
+	totalWidth := leftWidth + middleWidth + rightWidth
+	totalHeight := float64(leftImage.Bounds().Dy())
+
 	// 创建按钮实体
 	entity := em.CreateEntity()
 
@@ -72,6 +78,8 @@ func NewMenuButton(
 		Text:         text,
 		Font:         font,
 		TextColor:    textColor,
+		Width:          totalWidth,  // ✅ 初始化按钮尺寸
+		Height:         totalHeight, // ✅ 初始化按钮尺寸
 		State:          components.UINormal,
 		Enabled:        true,
 		OnClick:        onClick,

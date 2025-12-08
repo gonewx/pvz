@@ -6,6 +6,7 @@ import (
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
+	"github.com/decker502/pvz/pkg/utils"
 	"github.com/quasilyte/gdata/v2"
 )
 
@@ -91,6 +92,14 @@ func GetGameState() *GameState {
 
 		// Story 20.1: 初始化 gdata Manager（跨平台存储）
 		// 注意：必须在 SaveManager 之前初始化，因为 SaveManager 需要 gdataManager
+
+		// Story 21.4: 确保 Android 存储目录存在
+		// gdata 在 Android 上不会自动创建存储目录，需要预先创建
+		if err := utils.EnsureStorageDir(); err != nil {
+			log.Printf("[GameState] Warning: Failed to ensure storage directory: %v", err)
+		}
+
+		log.Printf("[GameState] Initializing gdata Manager...")
 		gdataManager, err := gdata.Open(gdata.Config{
 			AppName: "pvz_newx",
 		})
@@ -98,6 +107,10 @@ func GetGameState() *GameState {
 			log.Printf("[GameState] Warning: Failed to initialize gdata Manager: %v", err)
 			// 降级方案：gdataManager 为 nil，游戏继续运行
 			gdataManager = nil
+		} else {
+			// 记录存储路径（用于调试）
+			testPath := gdataManager.ObjectPropPath("_test", "_test")
+			log.Printf("[GameState] gdata initialized successfully, storage path: %s", testPath)
 		}
 
 		// Story 20.3: 初始化保存管理器（必须在 gdataManager 之后）

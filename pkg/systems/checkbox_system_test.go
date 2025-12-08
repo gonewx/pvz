@@ -20,8 +20,9 @@ func (m *mockCheckboxMouseInput) CursorPosition() (int, int) {
 	return m.mouseX, m.mouseY
 }
 
-func (m *mockCheckboxMouseInput) IsMouseButtonJustReleased(button ebiten.MouseButton) bool {
-	return m.justReleased
+func (m *mockCheckboxMouseInput) IsMouseButtonJustReleased(button ebiten.MouseButton) (bool, int, int) {
+	// 返回释放状态和释放位置（测试中释放位置与当前位置相同）
+	return m.justReleased, m.mouseX, m.mouseY
 }
 
 // createTestImage 创建测试用图片

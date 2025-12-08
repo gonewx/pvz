@@ -199,3 +199,31 @@ func LoadImage(path string) (*ebiten.Image, error) {
 	return ebiten.NewImageFromImage(img), nil
 }
 
+// LoadWindowIcons 加载多尺寸窗口图标
+// 返回多个尺寸的 image.Image 切片，用于 ebiten.SetWindowIcon
+func LoadWindowIcons() ([]image.Image, error) {
+	sizes := []int{16, 32, 48, 64, 128, 256}
+	icons := make([]image.Image, 0, len(sizes))
+
+	for _, size := range sizes {
+		path := fmt.Sprintf("assets/icons/linux/icon_%d.png", size)
+		data, err := ReadFile(path)
+		if err != nil {
+			// 跳过不存在的尺寸
+			continue
+		}
+
+		img, _, err := image.Decode(bytes.NewReader(data))
+		if err != nil {
+			continue
+		}
+		icons = append(icons, img)
+	}
+
+	if len(icons) == 0 {
+		return nil, fmt.Errorf("no window icons found")
+	}
+
+	return icons, nil
+}
+

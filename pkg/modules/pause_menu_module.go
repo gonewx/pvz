@@ -206,6 +206,9 @@ func (m *PauseMenuModule) createPauseMenuButtons(rm *game.ResourceManager) error
 		X: hiddenX,
 		Y: hiddenY,
 	})
+	// 计算按钮尺寸（从图片获取）
+	backToGameWidth := float64(backToGameNormal.Bounds().Dx())
+	backToGameHeight := float64(backToGameNormal.Bounds().Dy())
 	ecs.AddComponent(m.entityManager, backToGameEntity, &components.ButtonComponent{
 		Type:         components.ButtonTypeSimple,
 		NormalImage:  backToGameNormal,
@@ -214,6 +217,8 @@ func (m *PauseMenuModule) createPauseMenuButtons(rm *game.ResourceManager) error
 		Text:         "返回游戏",
 		Font:         buttonFont,
 		TextColor:    [4]uint8{0, 200, 0, 255},
+		Width:          backToGameWidth,  // ✅ 初始化按钮尺寸
+		Height:         backToGameHeight, // ✅ 初始化按钮尺寸
 		State:          components.UINormal,
 		Enabled:        true,
 		ClickSoundID:   "SOUND_BUTTONCLICK",  // 释放时播放的音效

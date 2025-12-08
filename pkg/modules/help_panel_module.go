@@ -201,6 +201,10 @@ func (m *HelpPanelModule) createConfirmButton(rm *game.ResourceManager) error {
 		Y: hiddenY,
 	})
 
+	// 计算按钮尺寸（从图片获取）
+	buttonWidth := float64(buttonImage.Bounds().Dx())
+	buttonHeight := float64(buttonImage.Bounds().Dy())
+
 	// 添加按钮组件（简单图片按钮，与奖励面板样式一致）
 	ecs.AddComponent(m.entityManager, m.confirmButtonEntity, &components.ButtonComponent{
 		Type:         components.ButtonTypeSimple,
@@ -210,6 +214,8 @@ func (m *HelpPanelModule) createConfirmButton(rm *game.ResourceManager) error {
 		Text:         "主菜单",                      // 文字改为"主菜单"
 		Font:         buttonFont,                 // 中文字体
 		TextColor:    [4]uint8{255, 200, 0, 255}, // 橙黄色文字（与奖励面板一致）
+		Width:        buttonWidth,                // ✅ 初始化按钮尺寸
+		Height:       buttonHeight,               // ✅ 初始化按钮尺寸
 		State:        components.UINormal,
 		Enabled:      true,
 		OnClick: func() {
