@@ -161,6 +161,7 @@ func NewGameOverDialogEntity(
 		Width:            dialogWidth,
 		Height:           dialogHeight,
 		AutoClose:            true, // 点击按钮后自动关闭
+		Modal:                true, // 模态对话框，点击遮罩不关闭
 		HoveredButtonIdx:     -1,   // 初始化为未悬停状态
 		PressedButtonIdx:     -1,   // 初始化为未按下状态
 		LastPressedButtonIdx: -1,   // Story 10.9: 初始化为未按下状态

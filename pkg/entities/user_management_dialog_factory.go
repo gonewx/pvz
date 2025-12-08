@@ -228,6 +228,7 @@ func NewUserManagementDialogEntity(
 		Width:            dialogWidth,
 		Height:           dialogHeight,
 		AutoClose:            false, // 用户管理对话框不自动关闭（需要显式关闭）
+		Modal:                true,  // 模态对话框，点击遮罩不关闭
 		HoveredButtonIdx:     -1,    // 初始化为未悬停状态
 		PressedButtonIdx:     -1,    // 初始化为未按下状态
 		LastPressedButtonIdx: -1,    // Story 10.9: 初始化为未按下状态

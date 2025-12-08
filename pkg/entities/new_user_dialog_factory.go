@@ -194,6 +194,7 @@ func NewNewUserDialogEntity(
 		Height:           dialogHeight,
 		ChildEntities:        []ecs.EntityID{inputEntity}, // 输入框是对话框的子实体
 		AutoClose:            false,                       // 不自动关闭，由回调逻辑控制
+		Modal:                true,                        // 模态对话框，点击遮罩不关闭
 		HoveredButtonIdx:     -1,                          // 初始化为未悬停状态
 		PressedButtonIdx:     -1,                          // 初始化为未按下状态
 		LastPressedButtonIdx: -1,                          // Story 10.9: 初始化为未按下状态

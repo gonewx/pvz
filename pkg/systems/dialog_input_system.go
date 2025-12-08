@@ -145,6 +145,12 @@ func (s *DialogInputSystem) Update(deltaTime float64) {
 			if !s.isClickInDialog(mouseX, mouseY, dialogComp, posComp.X, posComp.Y) {
 				log.Printf("[DialogInputSystem] 点击了对话框外部")
 
+				// 如果对话框是模态的（Modal=true），则不关闭，只消费点击事件
+				if dialogComp.Modal {
+					log.Printf("[DialogInputSystem] 对话框是模态的，忽略遮罩点击")
+					return
+				}
+
 				// 如果对话框设置了 AutoClose=false，查找"取消"按钮并触发回调
 				if !dialogComp.AutoClose {
 					for i := range dialogComp.Buttons {

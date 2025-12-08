@@ -17,6 +17,7 @@ type DialogComponent struct {
 	Height           float64        // 对话框高度
 	ChildEntities    []ecs.EntityID // 关联的子实体（如输入框），对话框销毁时一起销毁
 	AutoClose        bool           // 点击按钮后是否自动关闭对话框（默认 true，新用户对话框设为 false）
+	Modal            bool           // 是否为模态对话框（true=点击遮罩不关闭，阻止背景交互）
 	HoveredButtonIdx int            // 当前悬停的按钮索引（-1 表示没有悬停）- ECS 架构重构
 	PressedButtonIdx int            // 当前按下的按钮索引（-1 表示没有按下）- 用于按下效果
 	UseBigBottom     bool           // 是否使用大底部区域（用于两行按钮布局）

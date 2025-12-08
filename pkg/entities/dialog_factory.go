@@ -111,10 +111,11 @@ func NewDialogEntity(
 		IsVisible:        true,
 		Width:            dialogWidth,
 		Height:           dialogHeight,
-		AutoClose:            true, // 错误对话框点击后自动关闭
-		HoveredButtonIdx:     -1,   // 初始化为未悬停状态
-		PressedButtonIdx:     -1,   // 初始化为未按下状态
-		LastPressedButtonIdx: -1,   // Story 10.9: 初始化为未按下状态
+		AutoClose:            true,  // 错误对话框点击后自动关闭
+		Modal:                true,  // 模态对话框，点击遮罩不关闭
+		HoveredButtonIdx:     -1,    // 初始化为未悬停状态
+		PressedButtonIdx:     -1,    // 初始化为未按下状态
+		LastPressedButtonIdx: -1,    // Story 10.9: 初始化为未按下状态
 	})
 
 	// 添加 UI 组件标记
@@ -355,6 +356,7 @@ func NewDialogEntityWithCallback(
 		Width:            dialogWidth,
 		Height:               dialogHeight,
 		AutoClose:            true, // 点击后自动关闭
+		Modal:                true, // 模态对话框，点击遮罩不关闭
 		HoveredButtonIdx:     -1,
 		PressedButtonIdx:     -1,
 		LastPressedButtonIdx: -1, // Story 10.9: 初始化为未按下状态
@@ -526,6 +528,7 @@ func NewContinueGameDialogEntity(
 		Width:            dialogWidth,
 		Height:               dialogHeight,
 		AutoClose:            true, // 点击后自动关闭
+		Modal:                true, // 模态对话框，点击遮罩不关闭
 		HoveredButtonIdx:     -1,
 		PressedButtonIdx:     -1,
 		LastPressedButtonIdx: -1,  // Story 10.9: 初始化为未按下状态
