@@ -155,6 +155,9 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 		}
 	}
 
+	// 处理植物选择快捷键（数字键 1-9）
+	s.handlePlantCardHotkeys(cameraX)
+
 	// 检测鼠标右键取消种植模式
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight) {
 		if s.gameState.IsPlantingMode {
@@ -800,6 +803,150 @@ func (s *InputSystem) getPlantName(plantType components.PlantType) string {
 	default:
 		return "未知植物"
 	}
+}
+
+// handlePlantCardHotkeys 处理植物卡片快捷键（数字键 1-9）
+// 按卡片在卡槽中的位置从左到右对应数字键 1-9
+func (s *InputSystem) handlePlantCardHotkeys(cameraX float64) {
+	// 定义快捷键映射
+	hotkeys := []ebiten.Key{
+		ebiten.Key1, ebiten.Key2, ebiten.Key3,
+		ebiten.Key4, ebiten.Key5, ebiten.Key6,
+		ebiten.Key7, ebiten.Key8, ebiten.Key9,
+	}
+
+	// 检测按下的数字键
+	pressedIndex := -1
+	for i, key := range hotkeys {
+		if inpututil.IsKeyJustPressed(key) {
+			pressedIndex = i
+			break
+		}
+	}
+
+	if pressedIndex < 0 {
+		return // 没有按下快捷键
+	}
+
+	// 查询所有植物卡片实体，按 X 坐标排序
+	cardEntities := ecs.GetEntitiesWith4[
+		*components.PlantCardComponent,
+		*components.ClickableComponent,
+		*components.PositionComponent,
+		*components.UIComponent,
+	](s.entityManager)
+
+	// 过滤并收集非奖励卡片
+	type cardInfo struct {
+		entityID ecs.EntityID
+		posX     float64
+		card     *components.PlantCardComponent
+		ui       *components.UIComponent
+	}
+	var cards []cardInfo
+
+	for _, entityID := range cardEntities {
+		// 跳过奖励卡片
+		if _, isRewardCard := ecs.GetComponent[*components.RewardCardComponent](s.entityManager, entityID); isRewardCard {
+			continue
+		}
+
+		card, _ := ecs.GetComponent[*components.PlantCardComponent](s.entityManager, entityID)
+		pos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+		ui, _ := ecs.GetComponent[*components.UIComponent](s.entityManager, entityID)
+
+		cards = append(cards, cardInfo{
+			entityID: entityID,
+			posX:     pos.X,
+			card:     card,
+			ui:       ui,
+		})
+	}
+
+	// 按 X 坐标排序（从左到右）
+	for i := 0; i < len(cards)-1; i++ {
+		for j := i + 1; j < len(cards); j++ {
+			if cards[i].posX > cards[j].posX {
+				cards[i], cards[j] = cards[j], cards[i]
+			}
+		}
+	}
+
+	// 检查索引是否有效
+	if pressedIndex >= len(cards) {
+		log.Printf("[InputSystem] 快捷键 %d 无效：只有 %d 张卡片", pressedIndex+1, len(cards))
+		return
+	}
+
+	// 获取对应卡片
+	targetCard := cards[pressedIndex]
+
+	log.Printf("[InputSystem] 快捷键选择卡片: 按键=%d, 植物类型=%v", pressedIndex+1, targetCard.card.PlantType)
+
+	// 检查卡片状态（与鼠标点击逻辑保持一致）
+	// 1. 冷却中 - 不做任何反应
+	if targetCard.card.CurrentCooldown > 0 {
+		log.Printf("[InputSystem] 卡片冷却中，跳过 (剩余 %.1f 秒)", targetCard.card.CurrentCooldown)
+		return
+	}
+
+	// 2. 阳光不足 - 触发闪烁反馈
+	currentSun := s.gameState.GetSun()
+	plantCost := targetCard.card.SunCost
+	if currentSun < plantCost {
+		log.Printf("[InputSystem] 阳光不足: 需要 %d, 当前 %d", plantCost, currentSun)
+		s.gameState.TriggerSunFlash()
+
+		// 播放无效操作音效（带冷却）
+		timeSinceLastBuzzer := s.gameTime - s.lastBuzzerPlayTime
+		if timeSinceLastBuzzer >= s.buzzerCooldownTime {
+			if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+				audioManager.PlaySound("SOUND_BUZZER")
+				s.lastBuzzerPlayTime = s.gameTime
+			}
+		}
+		return
+	}
+
+	// 3. 卡片不可用 - 跳过
+	if !targetCard.card.IsAvailable {
+		log.Printf("[InputSystem] 卡片不可用，跳过")
+		return
+	}
+
+	// 检查当前是否已在种植模式
+	if s.gameState.IsPlantingMode {
+		// 如果选择的是同一种植物，退出种植模式
+		_, currentPlantType := s.gameState.GetPlantingMode()
+		if currentPlantType == targetCard.card.PlantType {
+			log.Printf("[InputSystem] 快捷键退出种植模式（重复选择同一卡片）")
+			s.gameState.ExitPlantingMode()
+			s.destroyPlantPreview()
+			targetCard.ui.State = components.UINormal
+			return
+		}
+		// 如果选择不同植物，切换到新植物
+		log.Printf("[InputSystem] 快捷键切换种植模式: %v -> %v", currentPlantType, targetCard.card.PlantType)
+		s.destroyPlantPreview()
+	}
+
+	// 进入种植模式
+	log.Printf("[InputSystem] 快捷键进入种植模式: PlantType=%v", targetCard.card.PlantType)
+	s.gameState.EnterPlantingMode(targetCard.card.PlantType)
+
+	// 播放选中植物卡片音效
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_SEEDLIFT")
+	}
+
+	// 创建植物预览实体（使用鼠标位置）
+	mouseX, mouseY := ebiten.CursorPosition()
+	mouseWorldX := float64(mouseX) + cameraX
+	mouseWorldY := float64(mouseY)
+	s.createPlantPreview(targetCard.card.PlantType, mouseWorldX, mouseWorldY)
+
+	// 设置卡片状态为 Clicked（视觉反馈）
+	targetCard.ui.State = components.UIClicked
 }
 
 // updateSunHover 更新阳光的悬停状态

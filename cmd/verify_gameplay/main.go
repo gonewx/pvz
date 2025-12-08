@@ -228,13 +228,14 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 	log.Println("  - 行4: 铁桶僵尸")
 	log.Println()
 	log.Println("【快捷键】")
-	log.Println("  1-5       - 触发对应行的除草车")
+	log.Println("  1-5       - 选择对应植物卡片")
+	log.Println("  F1-F5     - 触发对应行的除草车")
 	log.Println("  Shift+1-5 - 在对应行生成一个僵尸")
 	log.Println("  R         - 触发奖励动画")
 	log.Println("  H         - 触发「一大波僵尸正在接近」提示")
 	log.Println("  P         - 开启/关闭自动生成僵尸")
 	log.Println("  C         - 清除所有僵尸")
-	log.Println("  Q         - 退出程序")
+	log.Println("  ESC       - 退出程序")
 	log.Println("  右键      - 取消植物选择")
 	log.Println("════════════════════════════════════════════════════════")
 
@@ -453,23 +454,43 @@ func (vg *VerifyGameplayGame) Update() error {
 	dt := 1.0 / 60.0
 
 	// 快捷键处理
-	// 1-5 触发对应行的除草车（不按Shift时）
-	if !ebiten.IsKeyPressed(ebiten.KeyShift) {
+	// F1-F5 触发对应行的除草车
+	if inpututil.IsKeyJustPressed(ebiten.KeyF1) {
+		vg.triggerLawnmower(1)
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyF2) {
+		vg.triggerLawnmower(2)
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyF3) {
+		vg.triggerLawnmower(3)
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyF4) {
+		vg.triggerLawnmower(4)
+	}
+	if inpututil.IsKeyJustPressed(ebiten.KeyF5) {
+		vg.triggerLawnmower(5)
+	}
+
+	// Shift+1-5 在指定行手动生成一个僵尸
+	if ebiten.IsKeyPressed(ebiten.KeyShift) {
 		if inpututil.IsKeyJustPressed(ebiten.Key1) {
-			vg.triggerLawnmower(1)
+			vg.spawnZombie(0)
 		}
 		if inpututil.IsKeyJustPressed(ebiten.Key2) {
-			vg.triggerLawnmower(2)
+			vg.spawnZombie(1)
 		}
 		if inpututil.IsKeyJustPressed(ebiten.Key3) {
-			vg.triggerLawnmower(3)
+			vg.spawnZombie(2)
 		}
 		if inpututil.IsKeyJustPressed(ebiten.Key4) {
-			vg.triggerLawnmower(4)
+			vg.spawnZombie(3)
 		}
 		if inpututil.IsKeyJustPressed(ebiten.Key5) {
-			vg.triggerLawnmower(5)
+			vg.spawnZombie(4)
 		}
+	} else {
+		// 数字键 1-5 选择对应植物卡片（不按 Shift 时）
+		vg.handlePlantCardHotkeys()
 	}
 
 	// R 触发奖励动画
@@ -504,27 +525,8 @@ func (vg *VerifyGameplayGame) Update() error {
 		vg.clearAllZombies()
 	}
 
-	// Shift+1-5 在指定行手动生成一个僵尸
-	if ebiten.IsKeyPressed(ebiten.KeyShift) {
-		if inpututil.IsKeyJustPressed(ebiten.Key1) {
-			vg.spawnZombie(0)
-		}
-		if inpututil.IsKeyJustPressed(ebiten.Key2) {
-			vg.spawnZombie(1)
-		}
-		if inpututil.IsKeyJustPressed(ebiten.Key3) {
-			vg.spawnZombie(2)
-		}
-		if inpututil.IsKeyJustPressed(ebiten.Key4) {
-			vg.spawnZombie(3)
-		}
-		if inpututil.IsKeyJustPressed(ebiten.Key5) {
-			vg.spawnZombie(4)
-		}
-	}
-
-	// Q 退出
-	if inpututil.IsKeyJustPressed(ebiten.KeyQ) {
+	// ESC 退出
+	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
 		log.Println("[VerifyGameplay] Exiting...")
 		return fmt.Errorf("quit")
 	}
@@ -788,6 +790,60 @@ func (vg *VerifyGameplayGame) getSunCost(plantType components.PlantType) int {
 	}
 }
 
+// handlePlantCardHotkeys 处理植物卡片快捷键（数字键 1-5）
+func (vg *VerifyGameplayGame) handlePlantCardHotkeys() {
+	// 定义快捷键映射
+	hotkeys := []ebiten.Key{
+		ebiten.Key1, ebiten.Key2, ebiten.Key3,
+		ebiten.Key4, ebiten.Key5,
+	}
+
+	// 检测按下的数字键
+	pressedIndex := -1
+	for i, key := range hotkeys {
+		if inpututil.IsKeyJustPressed(key) {
+			pressedIndex = i
+			break
+		}
+	}
+
+	if pressedIndex < 0 {
+		return // 没有按下快捷键
+	}
+
+	// 检查索引是否在卡片范围内
+	if pressedIndex >= len(vg.plantCards) {
+		log.Printf("[VerifyGameplay] 快捷键 %d 无效：只有 %d 张卡片", pressedIndex+1, len(vg.plantCards))
+		return
+	}
+
+	// 获取对应卡片
+	cardID := vg.plantCards[pressedIndex]
+	card, ok := ecs.GetComponent[*components.PlantCardComponent](vg.entityManager, cardID)
+	if !ok {
+		return
+	}
+
+	log.Printf("[VerifyGameplay] 快捷键选择卡片: 按键=%d, 植物类型=%v", pressedIndex+1, card.PlantType)
+
+	// 如果点击同一个卡片，取消选择
+	if vg.selectedPlantType == card.PlantType {
+		vg.cancelPlantSelection()
+		return
+	}
+
+	// 选择新植物前，先销毁旧的预览实体
+	if vg.previewEntityID != 0 {
+		vg.entityManager.DestroyEntity(vg.previewEntityID)
+		vg.previewEntityID = 0
+	}
+
+	vg.selectedPlantType = card.PlantType
+
+	// 创建预览实体
+	vg.createPlantPreview(card.PlantType)
+}
+
 // Draw 绘制游戏画面
 func (vg *VerifyGameplayGame) Draw(screen *ebiten.Image) {
 	// 清空屏幕
@@ -943,7 +999,7 @@ func (vg *VerifyGameplayGame) drawDebugInfo(screen *ebiten.Image) {
 
 	// 快捷键提示
 	hints := []string{
-		"1-5=除草车 | Shift+1-5=生成僵尸 | R=奖励 | H=一大波僵尸 | P=自动生成 | C=清除 | Q=退出 | 右键=取消",
+		"1-5=选择植物 | F1-F5=除草车 | Shift+1-5=生成僵尸 | R=奖励 | H=一大波 | P=自动生成 | C=清除 | ESC=退出",
 	}
 
 	if vg.selectedPlantType != components.PlantUnknown {

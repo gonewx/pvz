@@ -1568,6 +1568,12 @@ func (s *GameScene) updateShovelSlotClick() {
 		return
 	}
 
+	// Q 键快捷键切换铲子模式
+	if inpututil.IsKeyJustPressed(ebiten.KeyQ) {
+		s.toggleShovelMode()
+		return
+	}
+
 	// 检测左键点击
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
 		mouseX, mouseY := ebiten.CursorPosition()
@@ -1576,33 +1582,7 @@ func (s *GameScene) updateShovelSlotClick() {
 		// 检查是否点击了铲子槽位
 		if mouseX >= bounds.Min.X && mouseX <= bounds.Max.X &&
 			mouseY >= bounds.Min.Y && mouseY <= bounds.Max.Y {
-			// Story 19.3: 检查操作是否被允许
-			if !s.IsOperationAllowed("click_shovel") {
-				return // 静默忽略
-			}
-
-			// Story 19.3: 通知系统操作发生
-			s.NotifyOperation("click_shovel")
-
-			// 播放铲子点击音效（使用 AudioManager 统一管理 - Story 10.9）
-			if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
-				audioManager.PlaySound("SOUND_SHOVEL")
-			}
-
-			// 切换铲子选中状态
-			s.SetShovelSelected(!s.shovelSelected)
-			if s.shovelSelected {
-				// 激活时隐藏系统光标（铲子图标会作为光标显示）
-				ebiten.SetCursorMode(ebiten.CursorModeHidden)
-				log.Printf("[GameScene] 铲子模式激活")
-			} else {
-				// 取消时恢复系统光标并清除高亮
-				ebiten.SetCursorMode(ebiten.CursorModeVisible)
-				if s.shovelInteractionSystem != nil {
-					s.shovelInteractionSystem.ClearHighlight()
-				}
-				log.Printf("[GameScene] 铲子模式取消")
-			}
+			s.toggleShovelMode()
 		}
 	}
 
@@ -1617,5 +1597,36 @@ func (s *GameScene) updateShovelSlotClick() {
 			}
 			log.Printf("[GameScene] 右键取消铲子模式")
 		}
+	}
+}
+
+// toggleShovelMode 切换铲子模式
+func (s *GameScene) toggleShovelMode() {
+	// Story 19.3: 检查操作是否被允许
+	if !s.IsOperationAllowed("click_shovel") {
+		return // 静默忽略
+	}
+
+	// Story 19.3: 通知系统操作发生
+	s.NotifyOperation("click_shovel")
+
+	// 播放铲子点击音效（使用 AudioManager 统一管理 - Story 10.9）
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_SHOVEL")
+	}
+
+	// 切换铲子选中状态
+	s.SetShovelSelected(!s.shovelSelected)
+	if s.shovelSelected {
+		// 激活时隐藏系统光标（铲子图标会作为光标显示）
+		ebiten.SetCursorMode(ebiten.CursorModeHidden)
+		log.Printf("[GameScene] 铲子模式激活")
+	} else {
+		// 取消时恢复系统光标并清除高亮
+		ebiten.SetCursorMode(ebiten.CursorModeVisible)
+		if s.shovelInteractionSystem != nil {
+			s.shovelInteractionSystem.ClearHighlight()
+		}
+		log.Printf("[GameScene] 铲子模式取消")
 	}
 }
