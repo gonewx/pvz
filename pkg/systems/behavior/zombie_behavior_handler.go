@@ -562,7 +562,19 @@ func (s *BehaviorSystem) stopEatingAndResume(zombieID ecs.EntityID) {
 	// 2. 切换僵尸动画回行走状态
 	s.changeZombieAnimation(zombieID, components.ZombieAnimWalking)
 
-	// 3. 恢复 VelocityComponent
+	// 3. 重置根运动状态（防止动画切换导致位移跳变）
+	// 当从啃食动画切换回行走动画时，_ground 轨道的坐标会发生跳变
+	// 如果不重置这些状态，会导致僵尸瞬间后退
+	if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, zombieID); ok {
+		reanim.LastGroundX = 0
+		reanim.LastGroundY = 0
+		reanim.LastAnimFrame = -1
+		reanim.AccumulatedDeltaX = 0
+		reanim.AccumulatedDeltaY = 0
+		log.Printf("[BehaviorSystem] 僵尸 %d 重置根运动状态", zombieID)
+	}
+
+	// 4. 恢复 VelocityComponent
 	ecs.AddComponent(s.entityManager, zombieID, &components.VelocityComponent{
 		VX: config.ZombieWalkSpeed,
 		VY: 0,

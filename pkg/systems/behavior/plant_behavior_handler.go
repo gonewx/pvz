@@ -2,6 +2,7 @@ package behavior
 
 import (
 	"log"
+	"math"
 	"math/rand"
 
 	"github.com/decker502/pvz/pkg/components"
@@ -507,6 +508,12 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 		return
 	}
 
+	// 获取樱桃炸弹的网格位置用于调试
+	plantComp, _ := ecs.GetComponent[*components.PlantComponent](s.entityManager, entityID)
+	if plantComp != nil {
+		log.Printf("[BehaviorSystem] 樱桃炸弹 %d 网格位置: col=%d, row=%d", entityID, plantComp.GridCol, plantComp.GridRow)
+	}
+
 	// 计算爆炸圆心：植物位置 + 偏移量
 	// 修正：PositionComponent 已经是网格中心，偏移量已在配置中归零
 	explosionCenterX := position.X + config.CherryBombExplosionCenterOffsetX
@@ -514,8 +521,8 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 	explosionRadius := config.CherryBombExplosionRadius
 	explosionRadiusSq := explosionRadius * explosionRadius // 预计算半径平方，避免开方运算
 
-	log.Printf("[BehaviorSystem] 樱桃炸弹爆炸范围 (圆形): 圆心(%.1f, %.1f), 半径%.1f",
-		explosionCenterX, explosionCenterY, explosionRadius)
+	log.Printf("[BehaviorSystem] 樱桃炸弹爆炸范围 (圆形): 圆心(%.1f, %.1f), 半径%.1f, position.Y=%.1f",
+		explosionCenterX, explosionCenterY, explosionRadius, position.Y)
 
 	// 查询所有僵尸实体（移动中和啃食中的僵尸）
 	allZombies := ecs.GetEntitiesWith2[*components.BehaviorComponent, *components.PositionComponent](s.entityManager)
@@ -547,15 +554,30 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 			continue
 		}
 
-		// 使用圆形范围检测：计算僵尸到爆炸圆心的距离平方
-		// 修正：僵尸的 PositionComponent.Y 包含了 ZombieVerticalOffset (-25.0)
-		// 这导致上行僵尸距离变远 (100 - (-25) = 125 > 115)，下行僵尸距离变近 (100 + (-25) = 75 < 115)
-		// 为了保证上下行对称判定，我们需要还原到格子中心进行距离计算
-		zombieEffectiveY := zombiePos.Y - config.ZombieVerticalOffset
+		// 计算爆炸圆心到僵尸碰撞盒的最近距离
+		// 僵尸碰撞盒：以 zombiePos 为中心，宽 ZombieCollisionWidth，高 ZombieCollisionHeight
+		// 僵尸的 PositionComponent.Y 已包含 ZombieVerticalOffset，需要还原到格子中心进行计算
+		zombieCenterY := zombiePos.Y - config.ZombieVerticalOffset
 
-		dx := zombiePos.X - explosionCenterX
-		dy := zombieEffectiveY - explosionCenterY
+		// 计算僵尸碰撞盒边界
+		zombieLeft := zombiePos.X - config.ZombieCollisionWidth/2
+		zombieRight := zombiePos.X + config.ZombieCollisionWidth/2
+		zombieTop := zombieCenterY - config.ZombieCollisionHeight/2
+		zombieBottom := zombieCenterY + config.ZombieCollisionHeight/2
+
+		// 计算爆炸圆心到碰撞盒的最近点
+		// 如果圆心在盒子内部或边缘，最近距离为0
+		closestX := math.Max(zombieLeft, math.Min(explosionCenterX, zombieRight))
+		closestY := math.Max(zombieTop, math.Min(explosionCenterY, zombieBottom))
+
+		dx := closestX - explosionCenterX
+		dy := closestY - explosionCenterY
 		distanceSq := dx*dx + dy*dy
+
+		// 计算僵尸所在行（用于调试）
+		zombieRow := int((zombiePos.Y - config.GridWorldStartY - config.ZombieVerticalOffset) / config.CellHeight)
+		log.Printf("[BehaviorSystem] 检测僵尸 %d: pos=(%.1f, %.1f), 碰撞盒中心Y=%.1f, row=%d, 到碰撞盒距离=%.1f, 半径=%.1f",
+			zombieID, zombiePos.X, zombiePos.Y, zombieCenterY, zombieRow, math.Sqrt(distanceSq), explosionRadius)
 
 		// 如果距离平方 <= 半径平方，则在爆炸范围内
 		if distanceSq <= explosionRadiusSq {

@@ -324,21 +324,30 @@ func (s *BowlingNutSystem) triggerExplosion(entityID ecs.EntityID, posComp *comp
 
 		zombiePos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
 
-		// 计算距离（使用距离平方优化性能）
-		// 修正：僵尸的 PositionComponent.Y 包含了 ZombieVerticalOffset (-25.0)
-		// 这导致上行僵尸距离变远，下行僵尸距离变近
-		// 为了保证上下行对称判定，需要还原到格子中心进行距离计算
-		zombieEffectiveY := zombiePos.Y - config.ZombieVerticalOffset
+		// 计算爆炸圆心到僵尸碰撞盒的最近距离
+		// 僵尸碰撞盒：以 zombiePos 为中心，宽 ZombieCollisionWidth，高 ZombieCollisionHeight
+		// 僵尸的 PositionComponent.Y 已包含 ZombieVerticalOffset，需要还原到格子中心进行计算
+		zombieCenterY := zombiePos.Y - config.ZombieVerticalOffset
 
-		dx := zombiePos.X - posComp.X
-		dy := zombieEffectiveY - posComp.Y
+		// 计算僵尸碰撞盒边界
+		zombieLeft := zombiePos.X - config.ZombieCollisionWidth/2
+		zombieRight := zombiePos.X + config.ZombieCollisionWidth/2
+		zombieTop := zombieCenterY - config.ZombieCollisionHeight/2
+		zombieBottom := zombieCenterY + config.ZombieCollisionHeight/2
+
+		// 计算爆炸圆心到碰撞盒的最近点
+		closestX := math.Max(zombieLeft, math.Min(posComp.X, zombieRight))
+		closestY := math.Max(zombieTop, math.Min(posComp.Y, zombieBottom))
+
+		dx := closestX - posComp.X
+		dy := closestY - posComp.Y
 		distSq := dx*dx + dy*dy
 
 		// 检查是否在爆炸范围内
 		if distSq <= explosionRadiusSq {
 			s.applyExplosionDamageToZombie(zombieID)
 			damageCount++
-			log.Printf("[BowlingNutSystem] 僵尸在爆炸范围内: zombieID=%d, 距离=%.1f像素",
+			log.Printf("[BowlingNutSystem] 僵尸在爆炸范围内: zombieID=%d, 到碰撞盒距离=%.1f像素",
 				zombieID, math.Sqrt(distSq))
 		}
 	}

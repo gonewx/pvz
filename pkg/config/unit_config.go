@@ -256,7 +256,6 @@ const (
 	CherryBombExplosionCenterOffsetY = 0.0
 
 	// CherryBombExplosionRadius 爆炸范围半径（像素）
-	// 精确数据: 半径 115 像素的圆形范围
 	CherryBombExplosionRadius = 115.0
 
 	// CherryBombCooldown 樱桃炸弹的冷却时间（秒）
@@ -270,4 +269,3 @@ const (
 	// Story 19.8: 使用 Powie.xml 粒子配置（3个发射器）
 	ExplosiveNutParticleEffect = "Powie"
 )
-
