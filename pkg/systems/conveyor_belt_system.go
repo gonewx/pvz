@@ -345,6 +345,13 @@ func (s *ConveyorBeltSystem) insertCardToFront(beltComp *components.ConveyorBelt
 }
 
 // GetCardAtPosition 获取指定屏幕位置的卡片索引
+// 参数说明：
+//   - x, y: 屏幕点击位置
+//   - conveyorX: 传送带左边缘的屏幕 X 坐标
+//   - conveyorY: 卡片区域的屏幕 Y 坐标
+//   - cardWidth, cardHeight: 卡片尺寸
+//
+// 注意：只检测传送带可见区域内的卡片部分，被裁剪的部分不响应点击
 func (s *ConveyorBeltSystem) GetCardAtPosition(x, y float64, conveyorX, conveyorY float64, cardWidth, cardHeight float64) int {
 	beltComp, ok := ecs.GetComponent[*components.ConveyorBeltComponent](s.entityManager, s.beltEntity)
 	if !ok {
@@ -366,10 +373,28 @@ func (s *ConveyorBeltSystem) GetCardAtPosition(x, y float64, conveyorX, conveyor
 	// 计算点击位置相对于传送带的 X
 	relativeX := x - conveyorX
 
+	// 计算传送带可见区域边界（相对于传送带左边缘）
+	// 与绘制逻辑保持一致：beltRightEdge = beltWidth - rightPadding
+	rightBoundary := s.beltWidth - config.ConveyorBeltRightPadding
+
 	// 检查每张卡片（包括移动中的卡片）
 	for i, card := range beltComp.Cards {
-		// 检查点击是否在卡片范围内
-		if relativeX >= card.PositionX && relativeX <= card.PositionX+cardWidth {
+		// 计算卡片的可见范围
+		cardLeft := card.PositionX
+		cardRight := card.PositionX + cardWidth
+
+		// 右侧裁剪：如果卡片右边缘超出可见区域，截断到右边界
+		if cardRight > rightBoundary {
+			cardRight = rightBoundary
+		}
+
+		// 跳过完全不可见的卡片（卡片左边缘 >= 右边界）
+		if cardLeft >= rightBoundary {
+			continue
+		}
+
+		// 检查点击是否在卡片的可见范围内
+		if relativeX >= cardLeft && relativeX <= cardRight {
 			return i
 		}
 	}

@@ -591,9 +591,10 @@ func (s *GameScene) isMouseOverConveyorCard() bool {
 	mouseX, mouseY := utils.GetPointerPosition()
 
 	// 检测是否悬停在任意卡片上（包括移动中的卡片）
+	// 注意：card.PositionX 是相对于传送带左边缘的位置（已包含 leftPadding 偏移）
 	cardIndex := s.conveyorBeltSystem.GetCardAtPositionForHover(
 		float64(mouseX), float64(mouseY),
-		conveyorX+config.ConveyorBeltLeftPadding,
+		conveyorX,
 		cardStartY,
 		cardWidth, cardHeight,
 	)
@@ -642,10 +643,11 @@ func (s *GameScene) handleConveyorBeltClick(mouseX, mouseY int) bool {
 	cardStartY := conveyorY + (beltHeight-cardHeight)/2
 
 	// 检查点击是否在传送带卡片上
-	// 使用左侧内边距配置
+	// 注意：card.PositionX 是相对于传送带左边缘的位置（已包含 leftPadding 偏移）
+	// 所以这里传入 conveyorX，而不是 conveyorX + leftPadding
 	cardIndex := s.conveyorBeltSystem.GetCardAtPosition(
 		float64(mouseX), float64(mouseY),
-		conveyorX+config.ConveyorBeltLeftPadding,
+		conveyorX,
 		cardStartY,
 		cardWidth, cardHeight,
 	)

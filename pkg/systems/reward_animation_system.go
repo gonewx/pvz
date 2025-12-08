@@ -805,8 +805,11 @@ func (ras *RewardAnimationSystem) updateClosingPhaseInternal(dt float64) {
 			}
 		} else {
 			log.Printf("[RewardAnimationSystem] 没有下一关，返回主菜单")
-
-			// ras.sceneManager.SwitchToMainMenu()
+			if ras.sceneManager != nil {
+				ras.sceneManager.SwitchToMainMenu()
+			} else {
+				log.Printf("[RewardAnimationSystem] SceneManager 为 nil，跳过主菜单切换（可能在测试环境）")
+			}
 		}
 
 		log.Printf("[RewardAnimationSystem] 奖励动画完成")

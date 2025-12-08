@@ -196,13 +196,15 @@ func (gs *GameState) GetNextLevelID() string {
 		return ""
 	}
 
-	// 简单递增关卡号（假设当前只有 1-1 到 1-4）
+	// 简单递增关卡号
 	nextLevel := level + 1
 	nextLevelID := fmt.Sprintf("%d-%d", chapter, nextLevel)
 
-	// TODO: 未来可以从配置文件读取关卡顺序，支持章节切换
-	// 目前只支持第一章的 1-1 到 1-4
-	if chapter == 1 && nextLevel > 4 {
+	// 检查下一关配置文件是否存在
+	// 如果不存在，返回空字符串表示没有下一关
+	nextLevelPath := fmt.Sprintf("data/levels/level-%s.yaml", nextLevelID)
+	if _, err := config.LoadLevelConfig(nextLevelPath); err != nil {
+		log.Printf("[GameState] No next level found: %s (error: %v)", nextLevelID, err)
 		return "" // 没有下一关了
 	}
 

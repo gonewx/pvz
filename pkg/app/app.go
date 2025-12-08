@@ -85,6 +85,9 @@ func NewApp(cfg Config) (*App, error) {
 	sceneManager.SetSceneFactory(func(levelID string) game.Scene {
 		return scenes.NewGameScene(resourceManager, sceneManager, levelID)
 	})
+	sceneManager.SetMainMenuFactory(func() game.Scene {
+		return scenes.NewMainMenuScene(resourceManager, sceneManager)
+	})
 
 	// 确定加载哪个关卡
 	levelToLoad := cfg.Level

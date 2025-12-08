@@ -29,9 +29,9 @@ type InputSystem struct {
 	tooltipEntity      ecs.EntityID                   // Tooltip 实体ID (Story 10.8)
 
 	// 拖拽种植模式状态（移动端触摸拖拽支持）
-	isDragPlanting     bool                   // 是否处于拖拽种植模式
-	dragPlantType      components.PlantType   // 拖拽中的植物类型
-	dragStartCardEntity ecs.EntityID          // 拖拽开始时的卡片实体ID
+	isDragPlanting      bool                 // 是否处于拖拽种植模式
+	dragPlantType       components.PlantType // 拖拽中的植物类型
+	dragStartCardEntity ecs.EntityID         // 拖拽开始时的卡片实体ID
 }
 
 // NewInputSystem 创建一个新的输入系统
@@ -178,10 +178,14 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 	}
 
 	// ========================================================================
-	// 拖拽种植处理（移动端触摸拖拽支持）
+	// 拖拽种植处理（仅移动端触摸拖拽支持）
+	// 桌面端使用传统点击模式，不触发拖拽逻辑
 	// ========================================================================
-	if s.handleDragPlanting(cameraX) {
-		return // 拖拽种植已处理，跳过传统点击逻辑
+	if dragManager.IsTouchDrag() || s.isDragPlanting {
+		// 只有触摸输入或已经处于拖拽种植模式才处理拖拽逻辑
+		if s.handleDragPlanting(cameraX) {
+			return // 拖拽种植已处理，跳过传统点击逻辑
+		}
 	}
 
 	// ========================================================================
@@ -1019,9 +1023,9 @@ func (s *InputSystem) updateSunHover(cameraX float64) {
 
 // handleDragPlanting 处理拖拽种植逻辑
 // 移动端触摸拖拽流程：
-//   1. 触摸植物卡片 → 开始拖拽，显示预览
-//   2. 拖拽过程中 → 预览跟随手指移动
-//   3. 释放手指 → 如果在有效草坪格子上则放置，否则取消
+//  1. 触摸植物卡片 → 开始拖拽，显示预览
+//  2. 拖拽过程中 → 预览跟随手指移动
+//  3. 释放手指 → 如果在有效草坪格子上则放置，否则取消
 //
 // 返回 true 表示正在处理拖拽种植，应跳过传统点击逻辑
 func (s *InputSystem) handleDragPlanting(cameraX float64) bool {
@@ -1052,9 +1056,14 @@ func (s *InputSystem) handleDragPlanting(cameraX float64) bool {
 }
 
 // handleDragStart 处理拖拽开始
-// 检测拖拽是否从有效的植物卡片开始
+// 检测拖拽是否从有效的植物卡片开始（仅触摸输入）
 func (s *InputSystem) handleDragStart(dragInfo utils.DragInfo, cameraX float64) bool {
-	// 检测触摸/点击位置是否在植物卡片上
+	// 只处理触摸输入的拖拽，桌面端鼠标使用传统点击模式
+	if !dragInfo.IsTouchInput {
+		return false
+	}
+
+	// 检测触摸位置是否在植物卡片上
 	cardEntity, plantCard := s.getPlantCardAtPosition(dragInfo.StartX, dragInfo.StartY)
 	if cardEntity == 0 || plantCard == nil {
 		return false // 不是从植物卡片开始的拖拽
