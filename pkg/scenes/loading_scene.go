@@ -448,34 +448,6 @@ func (s *LoadingScene) Draw(screen *ebiten.Image) {
 	// Draw text messages
 	s.drawText(screen)
 
-	// --- Visual Debugging ---
-	if s.debugImage != nil {
-		// RED Square at (0,0): Draw is being called
-		opRed := &ebiten.DrawImageOptions{}
-		opRed.GeoM.Scale(50, 50) // 50x50 square
-		opRed.GeoM.Translate(0, 0)
-		opRed.ColorScale.Scale(1, 0, 0, 1) // Red
-		screen.DrawImage(s.debugImage, opRed)
-
-		// GREEN Square at (100,0): Background asset loaded
-		if s.backgroundImage != nil {
-			opGreen := &ebiten.DrawImageOptions{}
-			opGreen.GeoM.Scale(50, 50)
-			opGreen.GeoM.Translate(60, 0)        // Offset
-			opGreen.ColorScale.Scale(0, 1, 0, 1) // Green
-			screen.DrawImage(s.debugImage, opGreen)
-		}
-
-		// BLUE Square at (200,0): Logo asset loaded
-		if s.logoRGB != nil { // Check base logo image
-			opBlue := &ebiten.DrawImageOptions{}
-			opBlue.GeoM.Scale(50, 50)
-			opBlue.GeoM.Translate(120, 0)       // Offset
-			opBlue.ColorScale.Scale(0, 0, 1, 1) // Blue
-			screen.DrawImage(s.debugImage, opBlue)
-		}
-	}
-
 }
 
 // drawBackground draws the background image.
