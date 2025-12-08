@@ -606,14 +606,21 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 
 	// 基于动画帧触发伤害和音效（完全同步）
 	// 普通僵尸（双手啃食）：在动画开始和中间点各触发一次
-	// 旗帜僵尸（单手啃食）：只在动画开始时触发一次
+	// 旗帜僵尸（单手啃食）或掉了手臂的僵尸：只在动画开始时触发一次
 	shouldDealDamage := false
 	if hasBehavior && hasReanim {
 		currentFrame := reanim.CurrentFrame
 		lastFrame := behavior.LastEatAnimFrame
 
-		// 判断是否是单手僵尸（旗帜僵尸）
+		// 判断是否是单手僵尸：
+		// 1. 旗帜僵尸天生单手（拿旗的手不用于啃食）
+		// 2. 任何僵尸掉了手臂后都变成单手
 		isSingleHand := behavior.UnitID == "zombie_flag"
+		if health, ok := ecs.GetComponent[*components.HealthComponent](s.entityManager, entityID); ok {
+			if health.ArmLost {
+				isSingleHand = true
+			}
+		}
 
 		// 获取动画总帧数（用于计算中间点）
 		totalFrames := 0
