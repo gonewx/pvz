@@ -13,16 +13,20 @@ type SceneFactory func(levelID string) Scene
 // SceneManager manages the game's high-level state by controlling which scene is active.
 // It ensures only one scene's Update and Draw methods are called at any given time.
 type SceneManager struct {
-	currentScene Scene
-	sceneFactory SceneFactory // 场景工厂函数，用于创建新场景
+	currentScene       Scene
+	sceneFactory       SceneFactory // 场景工厂函数，用于创建新场景
+	pendingLevelID     string       // 待加载的关卡ID（延迟加载机制）
+	hasPendingLevelChange bool      // 是否有待处理的关卡切换
 }
 
 // NewSceneManager creates and returns a new SceneManager instance.
 // The manager starts with no active scene; use SwitchTo to set the initial scene.
 func NewSceneManager() *SceneManager {
 	return &SceneManager{
-		currentScene: nil,
-		sceneFactory: nil,
+		currentScene:          nil,
+		sceneFactory:          nil,
+		pendingLevelID:        "",
+		hasPendingLevelChange: false,
 	}
 }
 
@@ -49,8 +53,18 @@ func (sm *SceneManager) GetCurrentScene() Scene {
 
 // LoadLevel 加载指定ID的关卡场景
 // levelID: 关卡ID，如 "1-1", "1-2"
+//
+// 注意：此方法现在使用延迟加载机制，场景切换会在下一帧开始时执行，
+// 避免在当前场景的 Update() 执行期间切换场景导致的状态混乱。
 func (sm *SceneManager) LoadLevel(levelID string) {
-	log.Printf("[SceneManager] 加载关卡: %s", levelID)
+	log.Printf("[SceneManager] 请求加载关卡: %s (延迟到下一帧执行)", levelID)
+	sm.pendingLevelID = levelID
+	sm.hasPendingLevelChange = true
+}
+
+// loadLevelImmediate 立即加载关卡（内部方法，仅在安全时机调用）
+func (sm *SceneManager) loadLevelImmediate(levelID string) {
+	log.Printf("[SceneManager] 执行关卡加载: %s", levelID)
 
 	if sm.sceneFactory == nil {
 		log.Printf("[SceneManager] 错误: SceneFactory 未设置")
@@ -71,6 +85,16 @@ func (sm *SceneManager) LoadLevel(levelID string) {
 // If no scene is active, this method does nothing.
 // deltaTime is the time elapsed since the last update in seconds.
 func (sm *SceneManager) Update(deltaTime float64) {
+	// 在场景 Update 之前处理待加载的关卡
+	// 这确保场景切换发生在帧边界，而不是在当前场景的 Update 中间
+	if sm.hasPendingLevelChange {
+		sm.hasPendingLevelChange = false
+		levelID := sm.pendingLevelID
+		sm.pendingLevelID = ""
+		sm.loadLevelImmediate(levelID)
+		// 新场景已加载，继续执行新场景的 Update
+	}
+
 	if sm.currentScene != nil {
 		sm.currentScene.Update(deltaTime)
 	}
@@ -79,6 +103,10 @@ func (sm *SceneManager) Update(deltaTime float64) {
 // Draw renders the currently active scene to the provided screen.
 // If no scene is active, this method does nothing.
 func (sm *SceneManager) Draw(screen *ebiten.Image) {
+	// 如果有待切换的场景，跳过当前帧的渲染，避免闪现旧场景
+	if sm.hasPendingLevelChange {
+		return
+	}
 	if sm.currentScene != nil {
 		sm.currentScene.Draw(screen)
 	}
