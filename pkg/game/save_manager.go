@@ -641,15 +641,28 @@ func (sm *SaveManager) DeleteUser(username string) error {
 	// 从用户列表中移除
 	sm.userList.Users = append(sm.userList.Users[:userIndex], sm.userList.Users[userIndex+1:]...)
 
-	// 如果删除的是当前用户，清空当前用户
+	// 如果删除的是当前用户，自动切换到其他用户
 	if sm.currentUser == username {
-		sm.currentUser = ""
-		sm.userList.CurrentUser = ""
-		sm.data = &SaveData{
-			HighestLevel:   "",
-			UnlockedPlants: []string{},
-			UnlockedTools:  []string{},
-			HasStartedGame: false,
+		if len(sm.userList.Users) > 0 {
+			// 自动切换到第一个用户
+			newUser := sm.userList.Users[0].Username
+			sm.currentUser = newUser
+			sm.userList.CurrentUser = newUser
+			// 加载新用户的存档数据
+			if err := sm.Load(); err != nil {
+				log.Printf("[SaveManager] Warning: Failed to load data for user %s: %v", newUser, err)
+			}
+			log.Printf("[SaveManager] Auto-switched to user '%s' after deletion", newUser)
+		} else {
+			// 没有其他用户，清空当前用户
+			sm.currentUser = ""
+			sm.userList.CurrentUser = ""
+			sm.data = &SaveData{
+				HighestLevel:   "",
+				UnlockedPlants: []string{},
+				UnlockedTools:  []string{},
+				HasStartedGame: false,
+			}
 		}
 	}
 
