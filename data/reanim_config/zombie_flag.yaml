@@ -58,6 +58,7 @@ available_animations:
       display_name: walk
     - name: anim_eat
       display_name: eat
+      speed: 2.5 
     - name: anim_death
       display_name: death
 
