@@ -1551,6 +1551,12 @@ func (s *GameScene) NotifyOperation(operation string) {
 // Story 19.3: 强引导模式下检查操作限制
 // Story 19.x QA: 铲子教学关卡（有预设植物）强制启用铲子点击
 func (s *GameScene) updateShovelSlotClick() {
+	// Bug Fix: Dave 对话期间禁止铲子槽位点击
+	// 对话期间点击屏幕是推进对话，不应触发其他交互
+	if s.isDaveDialogueActive() {
+		return
+	}
+
 	// 检查铲子是否可用
 	// Story 19.x QA: 铲子教学关卡（有预设植物）强制启用铲子
 	isShovelTutorialLevel := s.gameState.CurrentLevel != nil && len(s.gameState.CurrentLevel.PresetPlants) > 0

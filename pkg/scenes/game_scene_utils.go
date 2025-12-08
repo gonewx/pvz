@@ -59,6 +59,22 @@ func (s *GameScene) easeOutQuad(t float64) float64 {
 	return 1 - (1-t)*(1-t)
 }
 
+// isDaveDialogueActive 检测 Dave 对话是否正在进行
+// 对话期间（Entering/Talking/Leaving 状态）返回 true
+// 用于在对话期间屏蔽其他交互（如铲子槽位点击）
+func (s *GameScene) isDaveDialogueActive() bool {
+	daveEntities := ecs.GetEntitiesWith1[*components.DaveDialogueComponent](s.entityManager)
+	for _, entityID := range daveEntities {
+		daveComp, ok := ecs.GetComponent[*components.DaveDialogueComponent](s.entityManager, entityID)
+		if ok && (daveComp.State == components.DaveStateTalking ||
+			daveComp.State == components.DaveStateEntering ||
+			daveComp.State == components.DaveStateLeaving) {
+			return true
+		}
+	}
+	return false
+}
+
 // updateMouseCursor 根据组件状态更新鼠标光标形状
 //
 // ECS 架构原则:
@@ -90,19 +106,13 @@ func (s *GameScene) updateMouseCursor() {
 
 	// 0.5. Story 19.x QA: Dave 对话期间强制使用默认光标
 	// Dave 对话时不检测其他元素的悬停状态，直接使用默认光标
-	daveEntities := ecs.GetEntitiesWith1[*components.DaveDialogueComponent](s.entityManager)
-	for _, entityID := range daveEntities {
-		daveComp, ok := ecs.GetComponent[*components.DaveDialogueComponent](s.entityManager, entityID)
-		if ok && (daveComp.State == components.DaveStateTalking ||
-			daveComp.State == components.DaveStateEntering ||
-			daveComp.State == components.DaveStateLeaving) {
-			// Dave 对话期间，跳过其他检测，直接设置默认光标
-			if cursorShape != s.lastCursorShape {
-				ebiten.SetCursorShape(ebiten.CursorShapeDefault)
-				s.lastCursorShape = ebiten.CursorShapeDefault
-			}
-			return
+	if s.isDaveDialogueActive() {
+		// Dave 对话期间，跳过其他检测，直接设置默认光标
+		if cursorShape != s.lastCursorShape {
+			ebiten.SetCursorShape(ebiten.CursorShapeDefault)
+			s.lastCursorShape = ebiten.CursorShapeDefault
 		}
+		return
 	}
 
 	// 1. Check if hovering over any panel button (pause menu, settings panel, menu button)
