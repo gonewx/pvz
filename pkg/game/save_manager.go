@@ -268,6 +268,14 @@ func (sm *SaveManager) SetHighestLevel(levelID string) {
 	}
 }
 
+// ResetHighestLevel 重置最高完成关卡为空
+//
+// 用于重置游戏进度，使玩家可以从 1-1 重新开始
+func (sm *SaveManager) ResetHighestLevel() {
+	sm.data.HighestLevel = ""
+	log.Printf("[SaveManager] HighestLevel reset to empty")
+}
+
 // GetNextLevelToPlay 获取下一个应该加载的关卡
 //
 // 逻辑：

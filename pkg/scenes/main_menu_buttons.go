@@ -1,6 +1,7 @@
 package scenes
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/decker502/pvz/pkg/components"
@@ -439,8 +440,24 @@ func (m *MainMenuScene) onMenuButtonClicked(buttonType config.MenuButtonType) {
 	// Route to appropriate handler based on button type
 	switch buttonType {
 	case config.MenuButtonAdventure:
+		// 检查下一关是否超出已实现的关卡范围（1-5）
+		saveManager := game.GetGameState().GetSaveManager()
+		nextLevel := saveManager.GetNextLevelToPlay()
+		log.Printf("[MainMenuScene] Adventure button clicked - next level: %s", nextLevel)
+
+		// 解析关卡ID，检查是否超过 1-5
+		var chapter, level int
+		if _, err := fmt.Sscanf(nextLevel, "%d-%d", &chapter, &level); err == nil {
+			if chapter == 1 && level > 5 {
+				// 关卡超出已实现范围，弹出"敬请期待"对话框
+				log.Printf("[MainMenuScene] Level %s not implemented yet, showing coming soon dialog", nextLevel)
+				m.showComingSoonDialog()
+				return
+			}
+		}
+
 		// Story 12.6: Trigger zombie hand animation before starting adventure
-		log.Printf("[MainMenuScene] Adventure button clicked - triggering zombie hand animation")
+		log.Printf("[MainMenuScene] Starting adventure - triggering zombie hand animation")
 		m.triggerZombieHandAnimation()
 
 	case config.MenuButtonChallenges:

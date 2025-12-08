@@ -92,6 +92,71 @@ func (m *MainMenuScene) showErrorDialog(title, message string) {
 	log.Printf("[MainMenuScene] Error dialog created (entity ID: %d)", dialogID)
 }
 
+// showComingSoonDialog 显示"敬请期待"对话框
+// 当玩家通关 1-5 后点击冒险模式按钮时显示此对话框
+// 按钮功能：
+//   - 确定：将当前关卡重置为 1-1，重新加载主菜单界面
+//   - 取消：关闭对话框
+func (m *MainMenuScene) showComingSoonDialog() {
+	// Close existing dialog (if any)
+	if m.currentDialog != 0 {
+		m.entityManager.DestroyEntity(m.currentDialog)
+		m.currentDialog = 0
+	}
+
+	// Create dialog with callback
+	dialogEntity, err := entities.NewDialogEntityWithCallback(
+		m.entityManager,
+		m.resourceManager,
+		"敬请期待",
+		"后续关卡还未实现，点击确定可以从头开玩",
+		[]string{"确定", "取消"},
+		WindowWidth,
+		WindowHeight,
+		func(buttonIndex int) {
+			log.Printf("[MainMenuScene] Coming soon dialog button clicked: %d", buttonIndex)
+			if buttonIndex == 0 {
+				// "确定" 按钮：重置关卡到 1-1，重新加载界面
+				m.resetToFirstLevel()
+			}
+			// buttonIndex == 1 是"取消"按钮，对话框会自动关闭，无需额外操作
+		},
+	)
+
+	if err != nil {
+		log.Printf("[MainMenuScene] Warning: Failed to create coming soon dialog: %v", err)
+		return
+	}
+
+	m.currentDialog = dialogEntity
+	log.Printf("[MainMenuScene] Coming soon dialog created")
+}
+
+// resetToFirstLevel 重置游戏进度到 1-1 并重新加载主菜单
+func (m *MainMenuScene) resetToFirstLevel() {
+	log.Printf("[MainMenuScene] Resetting game progress to level 1-1")
+
+	gameState := game.GetGameState()
+	saveManager := gameState.GetSaveManager()
+
+	// 重置最高关卡为空（相当于新开始）
+	saveManager.ResetHighestLevel()
+
+	// 保存存档
+	if err := saveManager.Save(); err != nil {
+		log.Printf("[MainMenuScene] Warning: Failed to save after reset: %v", err)
+	}
+
+	// 更新主菜单场景的当前关卡显示
+	m.currentLevel = "1-1"
+
+	// 重新加载主菜单场景以刷新界面
+	newScene := NewMainMenuScene(m.resourceManager, m.sceneManager)
+	m.sceneManager.SwitchTo(newScene)
+
+	log.Printf("[MainMenuScene] Game progress reset complete, reloading main menu")
+}
+
 // onExitClicked handles the "Exit Game" button click.
 // It terminates the application.
 func (m *MainMenuScene) onExitClicked() {
