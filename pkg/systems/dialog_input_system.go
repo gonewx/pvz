@@ -33,6 +33,9 @@ func NewDialogInputSystem(em *ecs.EntityManager) *DialogInputSystem {
 
 // Update 更新对话框输入处理
 func (s *DialogInputSystem) Update(deltaTime float64) {
+	// 更新最后触摸位置（用于触摸释放时获取位置）
+	utils.UpdateLastTouchPosition()
+
 	// 查询所有对话框实体
 	dialogEntities := ecs.GetEntitiesWith2[*components.DialogComponent, *components.PositionComponent](s.entityManager)
 
@@ -45,17 +48,23 @@ func (s *DialogInputSystem) Update(deltaTime float64) {
 
 	// 检测 ESC 键按下
 	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
-		// 关闭���有对话框
+		// 关闭所有对话框
 		for _, entityID := range dialogEntities {
 			s.destroyDialogAndChildren(entityID)
 		}
 		return
 	}
 
-	// ✅ 修改为释放时执行：检测鼠标左键释放（而不是按下）
-	if inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft) {
-		mouseX, mouseY := utils.GetPointerPosition()
-		log.Printf("[DialogInputSystem] 检测到鼠标释放: (%d, %d)", mouseX, mouseY)
+	// ✅ 检查虚拟键盘是否消费了本帧输入（阻止事件穿透）
+	if s.isInputConsumedByKeyboard() {
+		log.Printf("[DialogInputSystem] Input consumed by virtual keyboard, skipping")
+		return
+	}
+
+	// ✅ 修改为释放时执行：检测指针释放（支持触摸和鼠标）
+	released, mouseX, mouseY := utils.IsPointerJustReleased()
+	if released {
+		log.Printf("[DialogInputSystem] 检测到指针释放: (%d, %d)", mouseX, mouseY)
 
 		// ✅ Story 12.4: 按 ID 倒序排序，优先处理最上层（ID 最大）的对话框
 		sort.Slice(dialogEntities, func(i, j int) bool {
@@ -286,6 +295,28 @@ func (s *DialogInputSystem) getClickedUserListItem(mouseX, mouseY int, entityID 
 // updateDialogHoverStates 更新所有对话框的悬停状态和按下状态
 // 每帧调用,负责更新用户列表的 HoveredIndex 和对话框按钮的 HoveredButtonIdx 和 PressedButtonIdx
 func (s *DialogInputSystem) updateDialogHoverStates(dialogEntities []ecs.EntityID) {
+	// ✅ 虚拟键盘可见时，重置所有悬停和按下状态，不播放音效
+	if s.isInputConsumedByKeyboard() {
+		for _, entityID := range dialogEntities {
+			dialogComp, ok := ecs.GetComponent[*components.DialogComponent](s.entityManager, entityID)
+			if !ok || !dialogComp.IsVisible {
+				continue
+			}
+			// 重置按钮悬停和按下状态
+			dialogComp.HoveredButtonIdx = -1
+			dialogComp.PressedButtonIdx = -1
+			// 重置上一帧状态以避免误触发音效
+			dialogComp.LastPressedButtonIdx = -1
+
+			// 重置用户列表悬停状态
+			userList, ok := ecs.GetComponent[*components.UserListComponent](s.entityManager, entityID)
+			if ok {
+				userList.HoveredIndex = -1
+			}
+		}
+		return
+	}
+
 	mouseX, mouseY := utils.GetPointerPosition()
 	mx := float64(mouseX)
 	my := float64(mouseY)
@@ -378,4 +409,17 @@ func (s *DialogInputSystem) updateDialogHoverStates(dialogEntities []ecs.EntityI
 			}
 		}
 	}
+}
+
+// isInputConsumedByKeyboard 检查虚拟键盘是否可见或消费了本帧输入
+// 当虚拟键盘可见时，阻断所有下层输入事件
+func (s *DialogInputSystem) isInputConsumedByKeyboard() bool {
+	keyboards := ecs.GetEntitiesWith1[*components.VirtualKeyboardComponent](s.entityManager)
+	for _, kbEntity := range keyboards {
+		kb, ok := ecs.GetComponent[*components.VirtualKeyboardComponent](s.entityManager, kbEntity)
+		if ok && (kb.IsVisible || kb.InputConsumedThisFrame) {
+			return true
+		}
+	}
+	return false
 }

@@ -467,12 +467,23 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 	}
 
 	// 3. 应用隐藏轨道
-	if len(combo.HiddenTracks) > 0 {
+	// 重要修复：保留运行时动态设置的隐藏轨道（如僵尸掉手臂、掉头），
+	// 同时应用配置中的 hidden_tracks
+	existingHiddenTracks := comp.HiddenTracks
+	if len(combo.HiddenTracks) > 0 || len(existingHiddenTracks) > 0 {
 		comp.HiddenTracks = make(map[string]bool)
+		// 先应用配置中的隐藏轨道
 		for _, track := range combo.HiddenTracks {
 			comp.HiddenTracks[track] = true
 		}
-		log.Printf("[ReanimSystem] PlayCombo: hiding %d tracks", len(combo.HiddenTracks))
+		// 保留运行时动态设置的隐藏轨道（如手臂、头部掉落）
+		for track, hidden := range existingHiddenTracks {
+			if hidden {
+				comp.HiddenTracks[track] = true
+			}
+		}
+		log.Printf("[ReanimSystem] PlayCombo: hiding %d tracks (config: %d, preserved: %d)",
+			len(comp.HiddenTracks), len(combo.HiddenTracks), len(existingHiddenTracks))
 	} else {
 		comp.HiddenTracks = nil
 	}

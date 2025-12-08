@@ -200,6 +200,11 @@ type GameScene struct {
 	// Story 19.5: 传送带系统
 	conveyorBeltSystem *systems.ConveyorBeltSystem // 传送带系统（卡片生成与管理）
 
+	// Story 21.4: 传送带卡片拖拽种植状态（移动端触摸拖拽支持）
+	isDragConveyorPlanting bool   // 是否处于传送带卡片拖拽种植模式
+	dragConveyorCardIndex  int    // 拖拽中的传送带卡片索引
+	dragConveyorCardType   string // 拖拽中的传送带卡片类型
+
 	// Story 19.6: 保龄球坚果滚动系统
 	bowlingNutSystem *systems.BowlingNutSystem // 保龄球坚果滚动系统
 

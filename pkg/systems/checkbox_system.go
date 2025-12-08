@@ -6,7 +6,6 @@ import (
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
 // CheckboxMouseInput 复选框系统鼠标输入接口
@@ -24,7 +23,9 @@ func (e *ebitenCheckboxMouseInput) CursorPosition() (int, int) {
 }
 
 func (e *ebitenCheckboxMouseInput) IsMouseButtonJustReleased(button ebiten.MouseButton) bool {
-	return inpututil.IsMouseButtonJustReleased(button)
+	// 使用支持触摸的释放检测
+	released, _, _ := utils.IsPointerJustReleased()
+	return released
 }
 
 // defaultCheckboxMouseInput 默认鼠标输入实例

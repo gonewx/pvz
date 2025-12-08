@@ -9,7 +9,6 @@ import (
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
 // ShovelInteractionSystem 铲子交互系统
@@ -163,8 +162,9 @@ func (s *ShovelInteractionSystem) Update(deltaTime float64, cameraX float64) {
 	s.updatePlantHighlight(highlightedPlant)
 	shovelComp.HighlightedPlantEntity = highlightedPlant
 
-	// 检测左键点击事件
-	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+	// 检测左键点击事件（支持触摸和鼠标）
+	justPressed, _, _ := utils.IsPointerJustPressed()
+	if justPressed {
 		// 如果刚刚被激活，跳过本次点击检测（避免同一次点击被处理两次）
 		if s.justActivated {
 			s.justActivated = false

@@ -851,13 +851,14 @@ func (s *GameScene) destroyConveyorCardPreview() {
 
 // updateConveyorBeltClick 处理传送带点击和卡片放置
 // Story 19.5: 卡片选中和放置逻辑
+// Story 21.4: 添加移动端拖拽种植支持
 func (s *GameScene) updateConveyorBeltClick() {
 	// 检查传送带是否激活
 	if s.conveyorBeltSystem == nil || !s.conveyorBeltSystem.IsActive() {
 		return
 	}
 
-	// 右键取消选中的卡片
+	// 右键取消选中的卡片（仅桌面端，移动端无右键）
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight) {
 		if s.isConveyorCardSelected() {
 			s.conveyorBeltSystem.DeselectCard()
@@ -867,17 +868,33 @@ func (s *GameScene) updateConveyorBeltClick() {
 		}
 	}
 
-	// 检测左键点击
-	if !inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
-		return
+	// 获取拖拽管理器
+	dragManager := utils.GetDragManager()
+
+	// ========================================================================
+	// 拖拽种植处理（移动端触摸拖拽支持）
+	// ========================================================================
+	if dragManager.IsTouchDrag() || s.isDragConveyorPlanting {
+		if s.handleConveyorDragPlanting() {
+			return // 拖拽种植已处理，跳过传统点击逻辑
+		}
 	}
 
+	// ========================================================================
+	// 传统点击处理（桌面端鼠标点击）
+	// ========================================================================
 	// 如果铲子被选中，跳过传送带卡片点击处理（避免同时选中）
 	if s.shovelSelected {
 		return
 	}
 
-	mouseX, mouseY := utils.GetPointerPosition()
+	// 检测点击（支持触摸和鼠标）
+	justPressed, pressX, pressY := utils.IsPointerJustPressed()
+	if !justPressed {
+		return
+	}
+
+	mouseX, mouseY := pressX, pressY
 
 	// 如果已选中卡片，检测是否在草坪上放置
 	if s.isConveyorCardSelected() {
@@ -916,4 +933,214 @@ func (s *GameScene) drawConveyorCardPreview(screen *ebiten.Image) {
 	// PlantPreviewRenderSystem 会自动渲染所有 PlantPreviewComponent 实体
 	// 包括：鼠标光标处的不透明图像 + 网格格子中心的半透明预览图像
 	// 无需在此重复渲染
+}
+
+// ============================================================================
+// 传送带卡片拖拽种植处理（移动端触摸拖拽支持）
+// Story 21.4: 实现与普通植物卡片相同的拖拽种植逻辑
+// ============================================================================
+
+// handleConveyorDragPlanting 处理传送带卡片的拖拽种植逻辑
+// 移动端触摸拖拽流程：
+//  1. 触摸传送带卡片 → 开始拖拽，显示预览
+//  2. 拖拽过程中 → 预览跟随手指移动
+//  3. 释放手指 → 如果在有效草坪格子上则放置，否则取消
+//
+// 返回 true 表示正在处理拖拽种植，应跳过传统点击逻辑
+func (s *GameScene) handleConveyorDragPlanting() bool {
+	dragManager := utils.GetDragManager()
+	dragInfo := dragManager.GetInfo()
+
+	switch dragInfo.State {
+	case utils.DragStateStarted:
+		// 拖拽刚开始，检测是否从传送带卡片开始
+		return s.handleConveyorDragStart(dragInfo)
+
+	case utils.DragStateDragging:
+		// 拖拽进行中，更新预览位置
+		if s.isDragConveyorPlanting {
+			s.updateConveyorDragPreview(dragInfo)
+			return true
+		}
+
+	case utils.DragStateEnded:
+		// 拖拽结束，尝试放置或取消
+		if s.isDragConveyorPlanting {
+			s.handleConveyorDragEnd(dragInfo)
+			return true
+		}
+	}
+
+	return false
+}
+
+// handleConveyorDragStart 处理传送带卡片拖拽开始
+// 检测拖拽是否从有效的传送带卡片开始（仅触摸输入）
+func (s *GameScene) handleConveyorDragStart(dragInfo utils.DragInfo) bool {
+	// 只处理触摸输入的拖拽，桌面端鼠标使用传统点击模式
+	if !dragInfo.IsTouchInput {
+		return false
+	}
+
+	// 如果铲子被选中，跳过传送带卡片拖拽处理
+	if s.shovelSelected {
+		return false
+	}
+
+	// 获取传送带边界
+	conveyorX, conveyorY, _, _ := s.getConveyorBeltBounds()
+	if conveyorX == 0 && conveyorY == 0 {
+		return false
+	}
+
+	// 使用缩放比例计算卡片尺寸
+	var originalCardWidth, originalCardHeight float64
+	if s.conveyorCardBackground != nil {
+		bgBounds := s.conveyorCardBackground.Bounds()
+		originalCardWidth = float64(bgBounds.Dx())
+		originalCardHeight = float64(bgBounds.Dy())
+	} else {
+		originalCardWidth = 100.0
+		originalCardHeight = 140.0
+	}
+	cardScale := config.ConveyorCardScale
+	cardWidth := originalCardWidth * cardScale
+	cardHeight := originalCardHeight * cardScale
+
+	// 获取传送带背景高度
+	var beltHeight float64
+	if s.conveyorBeltBackdrop != nil {
+		beltHeight = float64(s.conveyorBeltBackdrop.Bounds().Dy())
+	} else {
+		beltHeight = 80.0
+	}
+	cardStartY := conveyorY + (beltHeight-cardHeight)/2 + config.ConveyorBeltTopPadding
+
+	// 检测触摸位置是否在传送带卡片上
+	cardIndex := s.conveyorBeltSystem.GetCardAtPosition(
+		float64(dragInfo.StartX), float64(dragInfo.StartY),
+		conveyorX,
+		cardStartY,
+		cardWidth, cardHeight,
+	)
+
+	if cardIndex < 0 {
+		return false // 不是从传送带卡片开始的拖拽
+	}
+
+	// 获取卡片类型
+	beltEntity := s.conveyorBeltSystem.GetBeltEntity()
+	beltComp, ok := ecs.GetComponent[*components.ConveyorBeltComponent](s.entityManager, beltEntity)
+	if !ok || cardIndex >= len(beltComp.Cards) {
+		return false
+	}
+
+	cardType := beltComp.Cards[cardIndex].CardType
+
+	// 开始拖拽种植模式
+	s.isDragConveyorPlanting = true
+	s.dragConveyorCardIndex = cardIndex
+	s.dragConveyorCardType = cardType
+
+	// 选中卡片
+	s.conveyorBeltSystem.SelectCard(cardIndex)
+
+	// 创建植物预览实体
+	s.createConveyorCardPreview()
+
+	log.Printf("[GameScene] 传送带卡片拖拽开始: cardIndex=%d, cardType=%s, 起点=(%d, %d)",
+		cardIndex, cardType, dragInfo.StartX, dragInfo.StartY)
+
+	return true
+}
+
+// updateConveyorDragPreview 更新传送带卡片拖拽预览位置
+func (s *GameScene) updateConveyorDragPreview(dragInfo utils.DragInfo) {
+	// 更新预览实体的位置
+	previewEntities := ecs.GetEntitiesWith1[*components.PlantPreviewComponent](s.entityManager)
+	for _, entityID := range previewEntities {
+		pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+		if ok {
+			pos.X = float64(dragInfo.CurrentX) + s.cameraX
+			pos.Y = float64(dragInfo.CurrentY)
+		}
+	}
+}
+
+// handleConveyorDragEnd 处理传送带卡片拖拽结束
+func (s *GameScene) handleConveyorDragEnd(dragInfo utils.DragInfo) {
+	defer s.cancelConveyorDragPlanting()
+
+	// 转换为世界坐标
+	worldX := float64(dragInfo.CurrentX) + s.cameraX
+	worldY := float64(dragInfo.CurrentY)
+
+	// 检查是否在草坪区域
+	if worldY < config.GridWorldStartY || worldY >= config.GridWorldStartY+float64(config.GridRows)*config.CellHeight {
+		log.Printf("[GameScene] 传送带卡片拖拽结束: 位置在草坪外，取消种植")
+		return
+	}
+
+	// 检查放置位置是否有效（红线左侧）
+	if !s.conveyorBeltSystem.IsPlacementValid(worldX) {
+		s.showPlacementHint()
+		log.Printf("[GameScene] 传送带卡片拖拽结束: 位置在红线右侧，取消种植")
+		return
+	}
+
+	// 计算放置的行列
+	col := int((worldX - config.GridWorldStartX) / config.CellWidth)
+	row := int((worldY - config.GridWorldStartY) / config.CellHeight)
+
+	// 验证行列有效性
+	if row < 0 || row >= config.GridRows || col < 0 || col >= config.GridColumns {
+		log.Printf("[GameScene] 传送带卡片拖拽结束: 行列无效 row=%d, col=%d", row, col)
+		return
+	}
+
+	// 移除卡片
+	removedCardType := s.conveyorBeltSystem.RemoveCard(s.dragConveyorCardIndex)
+	if removedCardType == "" {
+		log.Printf("[GameScene] 传送带卡片拖拽结束: 移除卡片失败")
+		return
+	}
+
+	// 创建保龄球坚果实体
+	isExplosive := removedCardType == components.CardTypeExplodeONut
+
+	entityID, err := entities.NewBowlingNutEntity(
+		s.entityManager,
+		s.resourceManager,
+		row,
+		col,
+		isExplosive,
+	)
+
+	if err != nil {
+		log.Printf("[GameScene] 传送带卡片拖拽结束: 创建保龄球坚果失败: %v", err)
+		return
+	}
+
+	log.Printf("[GameScene] 传送带卡片拖拽种植成功: entityID=%d, type=%s, row=%d, col=%d",
+		entityID, removedCardType, row+1, col+1)
+}
+
+// cancelConveyorDragPlanting 取消传送带卡片拖拽种植模式
+func (s *GameScene) cancelConveyorDragPlanting() {
+	if !s.isDragConveyorPlanting {
+		return
+	}
+
+	// 取消选中状态
+	s.conveyorBeltSystem.DeselectCard()
+
+	// 销毁预览
+	s.destroyConveyorCardPreview()
+
+	// 重置拖拽状态
+	s.isDragConveyorPlanting = false
+	s.dragConveyorCardIndex = -1
+	s.dragConveyorCardType = ""
+
+	log.Printf("[GameScene] 传送带卡片拖拽取消")
 }

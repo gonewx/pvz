@@ -22,14 +22,25 @@ func (s *GameScene) loadResources() {
 	}
 
 	// Load lawn background
-	bg, err := s.resourceManager.LoadImageByID(backgroundImageID)
+	// CRITICAL: 创建背景副本，避免修改缓存中的原始图片
+	// 问题说明：ResourceManager 会缓存加载的图片，如果直接在缓存图片上预渲染草皮，
+	// 当从 Level 1-4 过渡到 Level 1-5 时，IMAGE_BACKGROUND1 仍然包含 1-4 预渲染的草皮
+	// 解决方案：每个场景都使用独立的背景副本
+	cachedBg, err := s.resourceManager.LoadImageByID(backgroundImageID)
 	if err != nil {
 		log.Printf("Warning: Failed to load lawn background %s: %v", backgroundImageID, err)
 		log.Printf("Will use fallback solid color background")
 	} else {
-		s.background = bg
+		// 创建背景副本
+		bounds := cachedBg.Bounds()
+		bgCopy := ebiten.NewImage(bounds.Dx(), bounds.Dy())
+		op := &ebiten.DrawImageOptions{}
+		bgCopy.DrawImage(cachedBg, op)
+		s.background = bgCopy
+		log.Printf("[GameScene] 创建背景副本: %s (%dx%d)", backgroundImageID, bounds.Dx(), bounds.Dy())
+
 		// Calculate maximum camera position (rightmost edge)
-		bgWidth := bg.Bounds().Dx()
+		bgWidth := bounds.Dx()
 		s.maxCameraX = float64(bgWidth - WindowWidth)
 		if s.maxCameraX < 0 {
 			s.maxCameraX = 0 // Background is smaller than window
@@ -201,19 +212,26 @@ func (s *GameScene) loadSoddingResources() {
 	}
 
 	// 重新加载背景（如果需要切换到未铺草皮背景）
+	// CRITICAL: 同样需要创建副本，避免修改缓存中的原始图片
 	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.BackgroundImage == "IMAGE_BACKGROUND1UNSODDED" {
-		bg, err := s.resourceManager.LoadImageByID("IMAGE_BACKGROUND1UNSODDED")
+		cachedBg, err := s.resourceManager.LoadImageByID("IMAGE_BACKGROUND1UNSODDED")
 		if err != nil {
 			log.Printf("Warning: Failed to load unsodded background: %v", err)
 		} else {
-			s.background = bg
+			// 创建背景副本
+			bounds := cachedBg.Bounds()
+			bgCopy := ebiten.NewImage(bounds.Dx(), bounds.Dy())
+			op := &ebiten.DrawImageOptions{}
+			bgCopy.DrawImage(cachedBg, op)
+			s.background = bgCopy
+
 			// 重新计算摄像机边界
-			bgWidth := bg.Bounds().Dx()
+			bgWidth := bounds.Dx()
 			s.maxCameraX = float64(bgWidth - WindowWidth)
 			if s.maxCameraX < 0 {
 				s.maxCameraX = 0
 			}
-			log.Printf("[GameScene] 切换到未铺草皮背景")
+			log.Printf("[GameScene] 切换到未铺草皮背景副本: (%dx%d)", bounds.Dx(), bounds.Dy())
 		}
 	}
 

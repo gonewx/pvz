@@ -12,8 +12,8 @@ import (
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
@@ -235,8 +235,9 @@ func (s *DaveDialogueSystem) updateTalkingState(
 		}
 	}
 
-	// 检测点击输入
-	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+	// 检测点击输入（支持触摸和鼠标）
+	justPressed, _, _ := utils.IsPointerJustPressed()
+	if justPressed {
 		s.advanceDialogue(entityID, dialogueComp)
 	}
 }

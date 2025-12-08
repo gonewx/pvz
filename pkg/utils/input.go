@@ -119,6 +119,58 @@ func IsTouchDevice() bool {
 	return len(touchIDs) > 0
 }
 
+// 保存最后一次触摸位置（用于触摸释放时获取位置）
+var lastTouchX, lastTouchY int
+
+// UpdateLastTouchPosition 更新最后一次触摸位置
+// 应该在每帧更新时调用
+func UpdateLastTouchPosition() {
+	touchIDs := ebiten.AppendTouchIDs(nil)
+	if len(touchIDs) > 0 {
+		lastTouchX, lastTouchY = ebiten.TouchPosition(touchIDs[0])
+	}
+}
+
+// IsPointerJustReleased 检查是否刚刚释放指针（触摸或鼠标）
+// 返回是否释放以及释放位置
+func IsPointerJustReleased() (bool, int, int) {
+	// 检查触摸释放
+	releasedTouchIDs := inpututil.AppendJustReleasedTouchIDs(nil)
+	if len(releasedTouchIDs) > 0 {
+		// 触摸释放时使用保存的最后触摸位置
+		return true, lastTouchX, lastTouchY
+	}
+
+	// 检查鼠标释放
+	if inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft) {
+		x, y := ebiten.CursorPosition()
+		return true, x, y
+	}
+
+	return false, 0, 0
+}
+
+// IsPointerJustPressed 检查是否刚刚按下指针（触摸或鼠标）
+// 返回是否按下以及按下位置
+func IsPointerJustPressed() (bool, int, int) {
+	// 检查触摸按下
+	touchIDs := inpututil.AppendJustPressedTouchIDs(nil)
+	if len(touchIDs) > 0 {
+		x, y := ebiten.TouchPosition(touchIDs[0])
+		// 同时更新最后触摸位置
+		lastTouchX, lastTouchY = x, y
+		return true, x, y
+	}
+
+	// 检查鼠标按下
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+		x, y := ebiten.CursorPosition()
+		return true, x, y
+	}
+
+	return false, 0, 0
+}
+
 // ============================================================================
 // 拖拽状态管理器 - 用于移动端植物放置的拖拽交互
 // ============================================================================

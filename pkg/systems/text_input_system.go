@@ -5,6 +5,7 @@ import (
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
@@ -42,7 +43,12 @@ func (s *TextInputSystem) Update(deltaTime float64) {
 		// 更新光标闪烁
 		s.updateCursorBlink(input, deltaTime)
 
-		// 处理键盘输入
+		// 移动端：跳过物理键盘输入，由 VirtualKeyboardSystem 处理
+		if utils.IsMobile() {
+			continue
+		}
+
+		// 桌面端：处理键盘输入
 		s.handleKeyboardInput(input)
 	}
 }

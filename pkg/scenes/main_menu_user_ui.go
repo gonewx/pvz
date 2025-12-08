@@ -10,6 +10,7 @@ import (
 	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/systems"
+	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
@@ -53,6 +54,11 @@ func (m *MainMenuScene) showNewUserDialogForFirstLaunch() {
 	m.currentInputBoxID = inputBoxID
 	m.currentDialog = dialogID // 设置 currentDialog 以触发背景交互阻止
 	log.Printf("[MainMenuScene] New user dialog created (entity ID: %d)", dialogID)
+
+	// Story 21.4: 移动端显示虚拟键盘
+	if utils.IsMobile() && m.virtualKeyboardSystem != nil {
+		m.virtualKeyboardSystem.ShowKeyboard(inputBoxID)
+	}
 }
 
 // onNewUserCreated 处理新用户创建成功的回调
@@ -157,6 +163,11 @@ func (m *MainMenuScene) closeCurrentDialog() {
 	}
 	// 清除 currentDialog 以允许背景交互
 	m.currentDialog = 0
+
+	// Story 21.4: 隐藏虚拟键盘
+	if m.virtualKeyboardSystem != nil {
+		m.virtualKeyboardSystem.HideKeyboard()
+	}
 }
 
 // initUserSign 初始化木牌UI实体（显示用户名）
@@ -603,6 +614,11 @@ func (m *MainMenuScene) showNewUserDialog(force bool) {
 	m.currentInputBoxID = inputBoxID
 	m.currentDialog = dialogID
 	log.Printf("[MainMenuScene] New user dialog opened (force=%v)", force)
+
+	// Story 21.4: 移动端显示虚拟键盘
+	if utils.IsMobile() && m.virtualKeyboardSystem != nil {
+		m.virtualKeyboardSystem.ShowKeyboard(inputBoxID)
+	}
 }
 
 // showRenameUserDialog 显示重命名用户对话框
@@ -666,6 +682,11 @@ func (m *MainMenuScene) showRenameUserDialog(oldUsername string) {
 	m.currentDialog = dialogID
 	log.Printf("[MainMenuScene] Rename user dialog opened for: %s (dialogID=%d, keeping userDialogID=%d)",
 		oldUsername, dialogID, m.currentUserDialogID)
+
+	// Story 21.4: 移动端显示虚拟键盘
+	if utils.IsMobile() && m.virtualKeyboardSystem != nil {
+		m.virtualKeyboardSystem.ShowKeyboard(inputBoxID)
+	}
 }
 
 // showDeleteUserDialog 显示删除用户确认对话框
@@ -806,6 +827,11 @@ func (m *MainMenuScene) showNewUserDialogAfterDeleteAll() {
 	m.currentInputBoxID = inputBoxID
 	m.currentDialog = dialogID
 	log.Printf("[MainMenuScene] New user dialog opened after deleting all users (entity ID: %d)", dialogID)
+
+	// Story 21.4: 移动端显示虚拟键盘
+	if utils.IsMobile() && m.virtualKeyboardSystem != nil {
+		m.virtualKeyboardSystem.ShowKeyboard(inputBoxID)
+	}
 }
 
 // onNewUserCreatedAfterDeleteAll 处理删除所有用户后新建用户的回调

@@ -189,12 +189,11 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 	}
 
 	// ========================================================================
-	// 传统点击处理（桌面端鼠标点击支持）
+	// 传统点击处理（桌面端鼠标点击 + 移动端触摸支持）
 	// ========================================================================
-	// 检测鼠标左键是否刚被按下
-	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
-		mouseScreenX, mouseScreenY := utils.GetPointerPosition()
-
+	// 检测指针是否刚被按下（支持触摸和鼠标）
+	justPressed, mouseScreenX, mouseScreenY := utils.IsPointerJustPressed()
+	if justPressed {
 		// 将鼠标屏幕坐标转换为世界坐标
 		// worldX = screenX + cameraX (摄像机向右移动时，世界坐标增大)
 		mouseWorldX := float64(mouseScreenX) + cameraX

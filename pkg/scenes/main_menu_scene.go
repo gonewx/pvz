@@ -114,6 +114,11 @@ type MainMenuScene struct {
 	// Story 10.9: 延迟播放音效
 	pendingSoundDelay float64 // 延迟时间（秒），0表示无待播放音效
 	pendingSoundID    string  // 待播放的音效ID
+
+	// Story 21.4: 移动端虚拟键盘
+	virtualKeyboardEntity       ecs.EntityID                       // 虚拟键盘实体
+	virtualKeyboardSystem       *systems.VirtualKeyboardSystem     // 虚拟键盘系统
+	virtualKeyboardRenderSystem *systems.VirtualKeyboardRenderSystem // 虚拟键盘渲染系统
 }
 
 // NewMainMenuScene creates and returns a new MainMenuScene instance.
@@ -409,6 +414,24 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 			zombieHandEntity, config.ZombieHandOffsetX, config.ZombieHandOffsetY)
 	}
 
+	// Story 21.4: 初始化虚拟键盘（仅移动端）
+	if utils.IsMobile() {
+		kbEntity, err := entities.NewVirtualKeyboardEntity(
+			scene.entityManager,
+			rm,
+			WindowWidth,
+			WindowHeight,
+		)
+		if err != nil {
+			log.Printf("[MainMenuScene] Warning: Failed to create virtual keyboard: %v", err)
+		} else {
+			scene.virtualKeyboardEntity = kbEntity
+			scene.virtualKeyboardSystem = systems.NewVirtualKeyboardSystem(scene.entityManager)
+			scene.virtualKeyboardRenderSystem = systems.NewVirtualKeyboardRenderSystem(scene.entityManager, rm)
+			log.Printf("[MainMenuScene] Virtual keyboard initialized for mobile (ID=%d)", kbEntity)
+		}
+	}
+
 	return scene
 }
 
@@ -446,6 +469,11 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 	// Story 12.4: Update text input system (for user dialogs)
 	if m.textInputSystem != nil {
 		m.textInputSystem.Update(deltaTime)
+	}
+
+	// Story 21.4: 更新虚拟键盘系统（移动端）
+	if m.virtualKeyboardSystem != nil {
+		m.virtualKeyboardSystem.Update(deltaTime)
 	}
 
 	// 确保背景音乐正在播放（使用 AudioManager 统一管理 - Story 10.9）
@@ -530,14 +558,22 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 		}
 	}
 
+	// 更新最后触摸位置（用于触摸释放时获取位置）
+	utils.UpdateLastTouchPosition()
+
 	// Get pointer position (supports both mouse and touch)
 	mouseX, mouseY := utils.GetPointerPosition()
 
 	// Check if pointer is currently pressed (mouse or touch)
 	isMousePressed := utils.IsPointerPressed()
 
-	// ✅ 修改为释放时执行：检测指针释放边缘（刚释放的瞬间）
-	isMouseReleased := !isMousePressed && m.wasMousePressed
+	// ✅ 检测指针释放（支持触摸和鼠标）
+	pointerReleased, releaseX, releaseY := utils.IsPointerJustReleased()
+	// 如果有释放事件，使用释放位置；否则使用当前指针位置
+	if pointerReleased {
+		mouseX, mouseY = releaseX, releaseY
+	}
+	isMouseReleased := pointerReleased
 
 	// Story 12.2: 键盘快捷键触发面板（临时验证方案）
 	// 检查是否有面板或对话框打开
@@ -882,5 +918,10 @@ func (m *MainMenuScene) Draw(screen *ebiten.Image) {
 	}
 	if m.optionsPanelModule != nil {
 		m.optionsPanelModule.Draw(screen)
+	}
+
+	// Story 21.4: 渲染虚拟键盘（最上层）
+	if m.virtualKeyboardRenderSystem != nil {
+		m.virtualKeyboardRenderSystem.Draw(screen)
 	}
 }

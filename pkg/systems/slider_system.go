@@ -23,7 +23,8 @@ func (e *ebitenSliderMouseInput) CursorPosition() (int, int) {
 }
 
 func (e *ebitenSliderMouseInput) IsMouseButtonPressed(button ebiten.MouseButton) bool {
-	return ebiten.IsMouseButtonPressed(button)
+	// 使用支持触摸的按下检测
+	return utils.IsPointerPressed()
 }
 
 // defaultSliderMouseInput 默认鼠标输入实例
