@@ -7,7 +7,7 @@
 sudo apt install openjdk-17-jdk
 
 # 2. 设置环境变量
-export ANDROID_HOME=/home/decker/app/android/sdk
+export ANDROID_HOME=/path/android/sdk
 export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018
 
 # 3. 构建 APK

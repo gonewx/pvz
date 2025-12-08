@@ -18,6 +18,7 @@ import (
 	"github.com/decker502/pvz/pkg/game"
 	"github.com/decker502/pvz/pkg/modules"
 	"github.com/decker502/pvz/pkg/systems"
+	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -132,11 +133,11 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 		sceneManager:            sm,
 		lastCursorShape:         -1, // 初始化为无效值，确保第一次更新光标
 		hoveredBottomButton:     components.BottomButtonNone,
-		lastHoveredBottomButton: components.BottomButtonNone,                         // Story 10.9: 初始化底部按钮悬停追踪
-		wasMousePressed:         ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft), // ✅ 初始化鼠标状态，防止场景切换时误触发点击
-		wasF1Pressed:            ebiten.IsKeyPressed(ebiten.KeyF1),                   // ✅ 初始化键盘状态
-		wasOPressed:             ebiten.IsKeyPressed(ebiten.KeyO),                    // ✅ 初始化键盘状态
-		menuState:               MainMenuStateNormal,                                 // Story 12.6: 初始化为正常状态
+		lastHoveredBottomButton: components.BottomButtonNone,       // Story 10.9: 初始化底部按钮悬停追踪
+		wasMousePressed:         utils.IsPointerPressed(),          // ✅ 初始化指针状态，支持触摸和鼠标
+		wasF1Pressed:            ebiten.IsKeyPressed(ebiten.KeyF1), // ✅ 初始化键盘状态
+		wasOPressed:             ebiten.IsKeyPressed(ebiten.KeyO),  // ✅ 初始化键盘状态
+		menuState:               MainMenuStateNormal,               // Story 12.6: 初始化为正常状态
 	}
 
 	// Story 12.1: Initialize ECS systems for SelectorScreen Reanim
@@ -529,13 +530,13 @@ func (m *MainMenuScene) Update(deltaTime float64) {
 		}
 	}
 
-	// Get mouse position (needed for both dialog and background interaction)
-	mouseX, mouseY := ebiten.CursorPosition()
+	// Get pointer position (supports both mouse and touch)
+	mouseX, mouseY := utils.GetPointerPosition()
 
-	// Check if mouse button is currently pressed
-	isMousePressed := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
+	// Check if pointer is currently pressed (mouse or touch)
+	isMousePressed := utils.IsPointerPressed()
 
-	// ✅ 修改为释放时执行：检测鼠标释放边缘（刚释放的瞬间）
+	// ✅ 修改为释放时执行：检测指针释放边缘（刚释放的瞬间）
 	isMouseReleased := !isMousePressed && m.wasMousePressed
 
 	// Story 12.2: 键盘快捷键触发面板（临时验证方案）

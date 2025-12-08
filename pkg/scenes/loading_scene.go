@@ -14,7 +14,6 @@ import (
 	"github.com/decker502/pvz/pkg/systems"
 	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
@@ -279,8 +278,8 @@ func (s *LoadingScene) updateProgress(deltaTime float64) {
 
 // updateMouseInteraction handles mouse hover and click interaction with progress bar.
 func (s *LoadingScene) updateMouseInteraction() {
-	// Get mouse position
-	mouseX, mouseY := ebiten.CursorPosition()
+	// Get pointer position (supports both mouse and touch)
+	pointerX, pointerY := utils.GetPointerPosition()
 
 	// Calculate progress bar bounds
 	// Dirt bar position and size
@@ -289,22 +288,30 @@ func (s *LoadingScene) updateMouseInteraction() {
 	dirtBarWidth := 321.0 // LoadBar_dirt.png width
 	dirtBarHeight := 53.0 // LoadBar_dirt.png height
 
-	// Check if mouse is hovering over progress bar
-	s.isHoveringProgressBar = float64(mouseX) >= dirtBarX &&
-		float64(mouseX) <= dirtBarX+dirtBarWidth &&
-		float64(mouseY) >= dirtBarY &&
-		float64(mouseY) <= dirtBarY+dirtBarHeight
+	// Check if pointer is hovering over progress bar
+	s.isHoveringProgressBar = float64(pointerX) >= dirtBarX &&
+		float64(pointerX) <= dirtBarX+dirtBarWidth &&
+		float64(pointerY) >= dirtBarY &&
+		float64(pointerY) <= dirtBarY+dirtBarHeight
 
-	// Set cursor type based on hover state
+	// Set cursor type based on hover state (only for desktop)
 	if s.isHoveringProgressBar {
 		ebiten.SetCursorShape(ebiten.CursorShapePointer) // Hand cursor
 	} else {
 		ebiten.SetCursorShape(ebiten.CursorShapeDefault) // Normal cursor
 	}
 
-	// Check for click (only when hovering)
-	if s.isHoveringProgressBar && inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
-		s.onClickStart()
+	// Check for click or touch (supports both mouse and touch)
+	justPressed, clickX, clickY := utils.IsJustTouchedOrClicked()
+	if justPressed {
+		// Check if the click/touch is within progress bar bounds
+		isInProgressBar := float64(clickX) >= dirtBarX &&
+			float64(clickX) <= dirtBarX+dirtBarWidth &&
+			float64(clickY) >= dirtBarY &&
+			float64(clickY) <= dirtBarY+dirtBarHeight
+		if isInProgressBar {
+			s.onClickStart()
+		}
 	}
 }
 

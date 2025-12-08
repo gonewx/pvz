@@ -4,6 +4,7 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
@@ -32,8 +33,8 @@ func NewButtonSystem(em *ecs.EntityManager) *ButtonSystem {
 // 检测鼠标位置和释放，更新按钮状态并触发回调
 func (s *ButtonSystem) Update(deltaTime float64) {
 	// 获取鼠标位置
-	mouseX, mouseY := ebiten.CursorPosition()
-	mousePressed := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
+	mouseX, mouseY := utils.GetPointerPosition()
+	mousePressed := utils.IsPointerPressed()
 	mouseJustPressed := inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft)
 	mouseReleased := inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft)
 

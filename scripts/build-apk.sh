@@ -117,7 +117,11 @@ package $PACKAGE_NAME;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.widget.FrameLayout;
 import ${PACKAGE_NAME}.mobile.EbitenView;
+import go.Seq;
 
 public class MainActivity extends Activity {
     private EbitenView view;
@@ -125,7 +129,22 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Initialize Go context - MUST be called before any Go code runs
+        Seq.setContext(getApplicationContext());
+
+        // Keep screen on
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
         view = new EbitenView(this);
+
+        // Explicitly set layout params to MATCH_PARENT
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        );
+        view.setLayoutParams(params);
+
         setContentView(view);
     }
 

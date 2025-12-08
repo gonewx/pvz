@@ -10,6 +10,7 @@ import (
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/entities"
+	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -587,7 +588,7 @@ func (s *GameScene) isMouseOverConveyorCard() bool {
 	cardStartY := conveyorY + (beltHeight-cardHeight)/2 + config.ConveyorBeltTopPadding
 
 	// 获取鼠标位置
-	mouseX, mouseY := ebiten.CursorPosition()
+	mouseX, mouseY := utils.GetPointerPosition()
 
 	// 检测是否悬停在任意卡片上（包括移动中的卡片）
 	cardIndex := s.conveyorBeltSystem.GetCardAtPositionForHover(
@@ -804,7 +805,7 @@ func (s *GameScene) createConveyorCardPreview() {
 	}
 
 	// 获取鼠标位置（世界坐标）
-	mouseX, mouseY := ebiten.CursorPosition()
+	mouseX, mouseY := utils.GetPointerPosition()
 	worldX := float64(mouseX) + s.cameraX
 	worldY := float64(mouseY)
 
@@ -874,7 +875,7 @@ func (s *GameScene) updateConveyorBeltClick() {
 		return
 	}
 
-	mouseX, mouseY := ebiten.CursorPosition()
+	mouseX, mouseY := utils.GetPointerPosition()
 
 	// 如果已选中卡片，检测是否在草坪上放置
 	if s.isConveyorCardSelected() {

@@ -6,6 +6,7 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -201,7 +202,7 @@ func (s *GameScene) updateMouseCursor() {
 	// 5. Story 19.x QA: Check if hovering over shovel slot
 	// 铲子槽位悬停时显示手形光标
 	if cursorShape == ebiten.CursorShapeDefault && !s.shovelSelected {
-		mouseX, mouseY := ebiten.CursorPosition()
+		mouseX, mouseY := utils.GetPointerPosition()
 		bounds := s.GetShovelSlotBounds()
 		if mouseX >= bounds.Min.X && mouseX <= bounds.Max.X &&
 			mouseY >= bounds.Min.Y && mouseY <= bounds.Max.Y {

@@ -13,6 +13,7 @@ import (
 	"github.com/decker502/pvz/pkg/modules"
 	"github.com/decker502/pvz/pkg/systems"
 	"github.com/decker502/pvz/pkg/systems/behavior"
+	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
@@ -1574,9 +1575,9 @@ func (s *GameScene) updateShovelSlotClick() {
 		return
 	}
 
-	// 检测左键点击
-	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
-		mouseX, mouseY := ebiten.CursorPosition()
+	// 检测左键点击或触摸
+	justPressed, mouseX, mouseY := utils.IsJustTouchedOrClicked()
+	if justPressed {
 		bounds := s.GetShovelSlotBounds()
 
 		// 检查是否点击了铲子槽位

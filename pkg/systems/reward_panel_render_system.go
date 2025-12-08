@@ -589,7 +589,7 @@ func (rprs *RewardPanelRenderSystem) drawHint(screen *ebiten.Image, alpha float6
 // isHoveringNextButton 检查鼠标是否悬停在"下一关"按钮上
 func (rprs *RewardPanelRenderSystem) isHoveringNextButton() bool {
 	// 获取鼠标位置
-	mouseX, mouseY := ebiten.CursorPosition()
+	mouseX, mouseY := utils.GetPointerPosition()
 
 	// 计算按钮位置（与 drawNextLevelButton 逻辑一致）
 	bgWidth := config.RewardPanelBackgroundWidth

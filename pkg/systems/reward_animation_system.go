@@ -11,6 +11,7 @@ import (
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/entities"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
@@ -715,7 +716,7 @@ func (ras *RewardAnimationSystem) updateShowingPhaseInternal(dt float64) {
 	// 检测鼠标点击（只响应左键）
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
 		// 获取鼠标点击位置
-		mouseX, mouseY := ebiten.CursorPosition()
+		mouseX, mouseY := utils.GetPointerPosition()
 
 		// 检查是否点击了"下一关"按钮
 		if ras.isNextLevelButtonClicked(float64(mouseX), float64(mouseY)) {
@@ -909,7 +910,7 @@ func (ras *RewardAnimationSystem) IsHoveringReward() bool {
 	}
 
 	// 获取鼠标位置
-	mouseX, mouseY := ebiten.CursorPosition()
+	mouseX, mouseY := utils.GetPointerPosition()
 
 	// 获取位置组件
 	posComp, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.rewardEntity)
@@ -953,7 +954,7 @@ func (ras *RewardAnimationSystem) IsHoveringNextButton() bool {
 	}
 
 	// 获取鼠标位置
-	mouseX, mouseY := ebiten.CursorPosition()
+	mouseX, mouseY := utils.GetPointerPosition()
 
 	// 使用与 isNextLevelButtonClicked 相同的按钮位置计算
 	return ras.isNextLevelButtonClicked(float64(mouseX), float64(mouseY))

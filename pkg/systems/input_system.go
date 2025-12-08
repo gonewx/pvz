@@ -27,6 +27,11 @@ type InputSystem struct {
 	buzzerCooldownTime float64                        // 无效操作音效冷却时间（秒）(Story 10.8)
 	gameTime           float64                        // 游戏时间累计（秒）(Story 10.8)
 	tooltipEntity      ecs.EntityID                   // Tooltip 实体ID (Story 10.8)
+
+	// 拖拽种植模式状态（移动端触摸拖拽支持）
+	isDragPlanting     bool                   // 是否处于拖拽种植模式
+	dragPlantType      components.PlantType   // 拖拽中的植物类型
+	dragStartCardEntity ecs.EntityID          // 拖拽开始时的卡片实体ID
 }
 
 // NewInputSystem 创建一个新的输入系统
@@ -56,6 +61,10 @@ func NewInputSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.Ga
 func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 	// Story 10.8: 更新游戏时间（用于音效冷却）
 	s.gameTime += deltaTime
+
+	// 更新拖拽管理器状态（支持移动端拖拽种植）
+	dragManager := utils.GetDragManager()
+	dragManager.Update()
 
 	// ESC 键切换暂停/恢复
 	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
@@ -87,7 +96,7 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 
 	// DEBUG: 按 P 键在鼠标位置生成 PeaSplat 粒子效果（测试用）
 	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
-		mouseScreenX, mouseScreenY := ebiten.CursorPosition()
+		mouseScreenX, mouseScreenY := utils.GetPointerPosition()
 		mouseWorldX := float64(mouseScreenX) + cameraX
 		mouseWorldY := float64(mouseScreenY)
 
@@ -101,7 +110,7 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 
 	// DEBUG: 按 B 键在鼠标位置生成 BossExplosion 粒子效果（测试用）
 	if inpututil.IsKeyJustPressed(ebiten.KeyB) {
-		mouseScreenX, mouseScreenY := ebiten.CursorPosition()
+		mouseScreenX, mouseScreenY := utils.GetPointerPosition()
 		mouseWorldX := float64(mouseScreenX) + cameraX
 		mouseWorldY := float64(mouseScreenY)
 
@@ -115,7 +124,7 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 
 	// DEBUG: 按 A 键在鼠标位置生成 Award 粒子效果（测试用）
 	if inpututil.IsKeyJustPressed(ebiten.KeyA) {
-		mouseScreenX, mouseScreenY := ebiten.CursorPosition()
+		mouseScreenX, mouseScreenY := utils.GetPointerPosition()
 		mouseWorldX := float64(mouseScreenX) + cameraX
 		mouseWorldY := float64(mouseScreenY)
 
@@ -129,7 +138,7 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 
 	// DEBUG: 按 Z 键在鼠标位置生成 ZombieHead 粒子效果（测试用）
 	if inpututil.IsKeyJustPressed(ebiten.KeyZ) {
-		mouseScreenX, mouseScreenY := ebiten.CursorPosition()
+		mouseScreenX, mouseScreenY := utils.GetPointerPosition()
 		mouseWorldX := float64(mouseScreenX) + cameraX
 		mouseWorldY := float64(mouseScreenY)
 
@@ -143,7 +152,7 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 
 	// DEBUG: 按 L 键在鼠标位置生成 Planting 粒子效果（测试种植粒子）
 	if inpututil.IsKeyJustPressed(ebiten.KeyL) {
-		mouseScreenX, mouseScreenY := ebiten.CursorPosition()
+		mouseScreenX, mouseScreenY := utils.GetPointerPosition()
 		mouseWorldX := float64(mouseScreenX) + cameraX
 		mouseWorldY := float64(mouseScreenY)
 
@@ -164,12 +173,23 @@ func (s *InputSystem) Update(deltaTime float64, cameraX float64) {
 			log.Printf("[InputSystem] 右键取消种植模式")
 			s.gameState.ExitPlantingMode()
 			s.destroyPlantPreview()
+			s.cancelDragPlanting()
 		}
 	}
 
+	// ========================================================================
+	// 拖拽种植处理（移动端触摸拖拽支持）
+	// ========================================================================
+	if s.handleDragPlanting(cameraX) {
+		return // 拖拽种植已处理，跳过传统点击逻辑
+	}
+
+	// ========================================================================
+	// 传统点击处理（桌面端鼠标点击支持）
+	// ========================================================================
 	// 检测鼠标左键是否刚被按下
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
-		mouseScreenX, mouseScreenY := ebiten.CursorPosition()
+		mouseScreenX, mouseScreenY := utils.GetPointerPosition()
 
 		// 将鼠标屏幕坐标转换为世界坐标
 		// worldX = screenX + cameraX (摄像机向右移动时，世界坐标增大)
@@ -653,7 +673,7 @@ func (s *InputSystem) resetPlantCardSelection(plantType components.PlantType) {
 // Story 8.2.1: 每帧检测鼠标是否悬停在植物卡片上，设置 UIComponent.State 为 UIHovered
 // Story 10.8: 添加 Tooltip 显示和鼠标光标切换
 func (s *InputSystem) updatePlantCardHover() {
-	mouseX, mouseY := ebiten.CursorPosition()
+	mouseX, mouseY := utils.GetPointerPosition()
 
 	// 查询所有植物卡片实体
 	entities := ecs.GetEntitiesWith4[
@@ -940,7 +960,7 @@ func (s *InputSystem) handlePlantCardHotkeys(cameraX float64) {
 	}
 
 	// 创建植物预览实体（使用鼠标位置）
-	mouseX, mouseY := ebiten.CursorPosition()
+	mouseX, mouseY := utils.GetPointerPosition()
 	mouseWorldX := float64(mouseX) + cameraX
 	mouseWorldY := float64(mouseY)
 	s.createPlantPreview(targetCard.card.PlantType, mouseWorldX, mouseWorldY)
@@ -953,7 +973,7 @@ func (s *InputSystem) handlePlantCardHotkeys(cameraX float64) {
 // 检测鼠标是否悬停在可点击的阳光上，更新 ClickableComponent.IsHovered 状态
 // 用于 updateMouseCursor() 读取状态以设置手形光标
 func (s *InputSystem) updateSunHover(cameraX float64) {
-	mouseScreenX, mouseScreenY := ebiten.CursorPosition()
+	mouseScreenX, mouseScreenY := utils.GetPointerPosition()
 	mouseWorldX := float64(mouseScreenX) + cameraX
 	mouseWorldY := float64(mouseScreenY)
 
@@ -991,4 +1011,269 @@ func (s *InputSystem) updateSunHover(cameraX float64) {
 
 		clickable.IsHovered = isHovered
 	}
+}
+
+// ============================================================================
+// 拖拽种植处理（移动端触摸拖拽支持）
+// ============================================================================
+
+// handleDragPlanting 处理拖拽种植逻辑
+// 移动端触摸拖拽流程：
+//   1. 触摸植物卡片 → 开始拖拽，显示预览
+//   2. 拖拽过程中 → 预览跟随手指移动
+//   3. 释放手指 → 如果在有效草坪格子上则放置，否则取消
+//
+// 返回 true 表示正在处理拖拽种植，应跳过传统点击逻辑
+func (s *InputSystem) handleDragPlanting(cameraX float64) bool {
+	dragManager := utils.GetDragManager()
+	dragInfo := dragManager.GetInfo()
+
+	switch dragInfo.State {
+	case utils.DragStateStarted:
+		// 拖拽刚开始，检测是否从植物卡片开始
+		return s.handleDragStart(dragInfo, cameraX)
+
+	case utils.DragStateDragging:
+		// 拖拽进行中，更新预览位置
+		if s.isDragPlanting {
+			s.updateDragPreview(dragInfo, cameraX)
+			return true
+		}
+
+	case utils.DragStateEnded:
+		// 拖拽结束，尝试放置或取消
+		if s.isDragPlanting {
+			s.handleDragEnd(dragInfo, cameraX)
+			return true
+		}
+	}
+
+	return false
+}
+
+// handleDragStart 处理拖拽开始
+// 检测拖拽是否从有效的植物卡片开始
+func (s *InputSystem) handleDragStart(dragInfo utils.DragInfo, cameraX float64) bool {
+	// 检测触摸/点击位置是否在植物卡片上
+	cardEntity, plantCard := s.getPlantCardAtPosition(dragInfo.StartX, dragInfo.StartY)
+	if cardEntity == 0 || plantCard == nil {
+		return false // 不是从植物卡片开始的拖拽
+	}
+
+	// Story 19.3: 检查强引导模式是否阻止卡片点击
+	if IsGuidedTutorialBlocking("click_plant_card") {
+		return false
+	}
+
+	// 检查卡片状态
+	currentSun := s.gameState.GetSun()
+	plantCost := plantCard.SunCost
+
+	// 1. 冷却中 - 不做任何反应
+	if plantCard.CurrentCooldown > 0 {
+		log.Printf("[InputSystem] 拖拽开始: 卡片冷却中，忽略")
+		return false
+	}
+
+	// 2. 阳光不足 - 触发闪烁反馈
+	if currentSun < plantCost {
+		log.Printf("[InputSystem] 拖拽开始: 阳光不足 (需要 %d, 当前 %d)", plantCost, currentSun)
+		s.gameState.TriggerSunFlash()
+
+		// 播放无效操作音效（带冷却）
+		timeSinceLastBuzzer := s.gameTime - s.lastBuzzerPlayTime
+		if timeSinceLastBuzzer >= s.buzzerCooldownTime {
+			if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+				audioManager.PlaySound("SOUND_BUZZER")
+				s.lastBuzzerPlayTime = s.gameTime
+			}
+		}
+		return false
+	}
+
+	// 3. 卡片不可用 - 跳过
+	if !plantCard.IsAvailable {
+		log.Printf("[InputSystem] 拖拽开始: 卡片不可用，忽略")
+		return false
+	}
+
+	// 开始拖拽种植模式
+	s.isDragPlanting = true
+	s.dragPlantType = plantCard.PlantType
+	s.dragStartCardEntity = cardEntity
+
+	// 进入种植模式
+	s.gameState.EnterPlantingMode(plantCard.PlantType)
+
+	// 播放选中植物卡片音效
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_SEEDLIFT")
+	}
+
+	// 创建植物预览实体
+	mouseWorldX := float64(dragInfo.StartX) + cameraX
+	mouseWorldY := float64(dragInfo.StartY)
+	s.createPlantPreview(plantCard.PlantType, mouseWorldX, mouseWorldY)
+
+	// 设置卡片状态为 Clicked（视觉反馈）
+	if ui, ok := ecs.GetComponent[*components.UIComponent](s.entityManager, cardEntity); ok {
+		ui.State = components.UIClicked
+	}
+
+	log.Printf("[InputSystem] 拖拽种植开始: PlantType=%v, 起点=(%d, %d)", plantCard.PlantType, dragInfo.StartX, dragInfo.StartY)
+
+	return true
+}
+
+// updateDragPreview 更新拖拽预览位置
+func (s *InputSystem) updateDragPreview(dragInfo utils.DragInfo, cameraX float64) {
+	// 更新预览实体的位置
+	previewEntities := ecs.GetEntitiesWith1[*components.PlantPreviewComponent](s.entityManager)
+	for _, entityID := range previewEntities {
+		pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+		if ok {
+			pos.X = float64(dragInfo.CurrentX) + cameraX
+			pos.Y = float64(dragInfo.CurrentY)
+		}
+	}
+}
+
+// handleDragEnd 处理拖拽结束
+func (s *InputSystem) handleDragEnd(dragInfo utils.DragInfo, cameraX float64) {
+	defer s.cancelDragPlanting()
+
+	// 检测释放位置是否在有效的草坪格子上
+	col, row, isValid := utils.MouseToGridCoords(
+		dragInfo.CurrentX, dragInfo.CurrentY,
+		cameraX,
+		config.GridWorldStartX, config.GridWorldStartY,
+		config.GridColumns, config.GridRows,
+		config.CellWidth, config.CellHeight,
+	)
+
+	if !isValid {
+		log.Printf("[InputSystem] 拖拽结束: 位置在网格外，取消种植")
+		return
+	}
+
+	// 检查该行是否启用
+	lane := row + 1
+	if !s.lawnGridSystem.IsLaneEnabled(lane) {
+		log.Printf("[InputSystem] 拖拽结束: 行 %d 已被禁用，取消种植", lane)
+		return
+	}
+
+	// 检查格子是否已被占用
+	if s.lawnGridSystem.IsOccupied(s.lawnGridEntityID, col, row) {
+		log.Printf("[InputSystem] 拖拽结束: 格子 (%d, %d) 已被占用，取消种植", col, row)
+		return
+	}
+
+	// 获取植物消耗
+	sunCost := s.getPlantCost(s.dragPlantType)
+
+	// 尝试扣除阳光
+	if !s.gameState.SpendSun(sunCost) {
+		log.Printf("[InputSystem] 拖拽结束: 阳光不足，需要 %d，当前 %d", sunCost, s.gameState.GetSun())
+		return
+	}
+
+	log.Printf("[InputSystem] 拖拽结束: 扣除阳光 %d，剩余 %d", sunCost, s.gameState.GetSun())
+
+	// 创建植物实体
+	plantID, err := s.createPlantEntity(s.dragPlantType, col, row)
+	if err != nil {
+		log.Printf("[InputSystem] 拖拽结束: 创建植物实体失败: %v", err)
+		s.gameState.AddSun(sunCost) // 创建失败，返还阳光
+		return
+	}
+
+	log.Printf("[InputSystem] 拖拽结束: 成功创建植物实体 (ID: %d, Type: %v) 在 (%d, %d)", plantID, s.dragPlantType, col, row)
+
+	// 触发种植粒子效果
+	worldX, worldY := utils.GridToWorldCoords(
+		col, row,
+		config.GridWorldStartX, config.GridWorldStartY,
+		config.CellWidth, config.CellHeight,
+	)
+	_, err = entities.NewPlantingParticleEffect(s.entityManager, s.resourceManager, worldX, worldY)
+	if err != nil {
+		log.Printf("[InputSystem] 警告：创建种植粒子效果失败: %v", err)
+	}
+
+	// 标记格子为占用
+	err = s.lawnGridSystem.OccupyCell(s.lawnGridEntityID, col, row, plantID)
+	if err != nil {
+		log.Printf("[InputSystem] 标记格子占用失败: %v", err)
+		s.entityManager.DestroyEntity(plantID)
+		s.gameState.AddSun(sunCost)
+		return
+	}
+
+	// 播放种植音效
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_PLANT")
+	}
+
+	// 触发植物卡片冷却
+	s.triggerPlantCardCooldown(s.dragPlantType)
+
+	log.Printf("[InputSystem] 拖拽种植完成: PlantType=%v, 位置=(%d, %d)", s.dragPlantType, col, row)
+}
+
+// cancelDragPlanting 取消拖拽种植模式
+func (s *InputSystem) cancelDragPlanting() {
+	if !s.isDragPlanting {
+		return
+	}
+
+	// 删除预览实体
+	s.destroyPlantPreview()
+
+	// 重置植物卡片的选择状态
+	if s.dragStartCardEntity != 0 {
+		s.resetPlantCardSelection(s.dragPlantType)
+	}
+
+	// 退出种植模式
+	s.gameState.ExitPlantingMode()
+
+	// 重置拖拽状态
+	s.isDragPlanting = false
+	s.dragPlantType = 0
+	s.dragStartCardEntity = 0
+
+	log.Printf("[InputSystem] 拖拽种植取消")
+}
+
+// getPlantCardAtPosition 获取指定位置的植物卡片
+// 返回卡片实体ID和卡片组件，如果位置上没有卡片则返回 0 和 nil
+func (s *InputSystem) getPlantCardAtPosition(screenX, screenY int) (ecs.EntityID, *components.PlantCardComponent) {
+	// 查询所有植物卡片实体
+	cardEntities := ecs.GetEntitiesWith4[
+		*components.PlantCardComponent,
+		*components.ClickableComponent,
+		*components.PositionComponent,
+		*components.UIComponent,
+	](s.entityManager)
+
+	for _, entityID := range cardEntities {
+		// 跳过奖励卡片
+		if _, isRewardCard := ecs.GetComponent[*components.RewardCardComponent](s.entityManager, entityID); isRewardCard {
+			continue
+		}
+
+		// 获取组件
+		card, _ := ecs.GetComponent[*components.PlantCardComponent](s.entityManager, entityID)
+		clickable, _ := ecs.GetComponent[*components.ClickableComponent](s.entityManager, entityID)
+		pos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+
+		// AABB 碰撞检测
+		if float64(screenX) >= pos.X && float64(screenX) <= pos.X+clickable.Width &&
+			float64(screenY) >= pos.Y && float64(screenY) <= pos.Y+clickable.Height {
+			return entityID, card
+		}
+	}
+
+	return 0, nil
 }

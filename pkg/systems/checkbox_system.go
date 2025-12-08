@@ -4,6 +4,7 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
@@ -19,7 +20,7 @@ type CheckboxMouseInput interface {
 type ebitenCheckboxMouseInput struct{}
 
 func (e *ebitenCheckboxMouseInput) CursorPosition() (int, int) {
-	return ebiten.CursorPosition()
+	return utils.GetPointerPosition()
 }
 
 func (e *ebitenCheckboxMouseInput) IsMouseButtonJustReleased(button ebiten.MouseButton) bool {

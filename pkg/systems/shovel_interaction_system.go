@@ -7,6 +7,7 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
@@ -151,7 +152,7 @@ func (s *ShovelInteractionSystem) Update(deltaTime float64, cameraX float64) {
 	}
 
 	// 获取鼠标位置
-	mouseScreenX, mouseScreenY := ebiten.CursorPosition()
+	mouseScreenX, mouseScreenY := utils.GetPointerPosition()
 	mouseWorldX := float64(mouseScreenX) + cameraX
 	mouseWorldY := float64(mouseScreenY)
 
@@ -372,7 +373,7 @@ func (s *ShovelInteractionSystem) drawShovelCursor(screen *ebiten.Image) {
 	}
 
 	// 获取鼠标位置
-	mouseX, mouseY := ebiten.CursorPosition()
+	mouseX, mouseY := utils.GetPointerPosition()
 
 	// 绘制铲子图标
 	op := &ebiten.DrawImageOptions{}

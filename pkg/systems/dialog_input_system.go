@@ -7,6 +7,7 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
@@ -53,7 +54,7 @@ func (s *DialogInputSystem) Update(deltaTime float64) {
 
 	// ✅ 修改为释放时执行：检测鼠标左键释放（而不是按下）
 	if inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft) {
-		mouseX, mouseY := ebiten.CursorPosition()
+		mouseX, mouseY := utils.GetPointerPosition()
 		log.Printf("[DialogInputSystem] 检测到鼠标释放: (%d, %d)", mouseX, mouseY)
 
 		// ✅ Story 12.4: 按 ID 倒序排序，优先处理最上层（ID 最大）的对话框
@@ -285,12 +286,12 @@ func (s *DialogInputSystem) getClickedUserListItem(mouseX, mouseY int, entityID 
 // updateDialogHoverStates 更新所有对话框的悬停状态和按下状态
 // 每帧调用,负责更新用户列表的 HoveredIndex 和对话框按钮的 HoveredButtonIdx 和 PressedButtonIdx
 func (s *DialogInputSystem) updateDialogHoverStates(dialogEntities []ecs.EntityID) {
-	mouseX, mouseY := ebiten.CursorPosition()
+	mouseX, mouseY := utils.GetPointerPosition()
 	mx := float64(mouseX)
 	my := float64(mouseY)
 
 	// ✅ 检测鼠标左键是否按下
-	isMousePressed := ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft)
+	isMousePressed := utils.IsPointerPressed()
 
 	// 遍历所有对话框
 	for _, entityID := range dialogEntities {

@@ -27,8 +27,9 @@ if [ ! -f "$UNSIGNED_APK" ]; then
 fi
 
 KEYSTORE="build/pvz-release.keystore"
-SIGNED_APK="${UNSIGNED_APK%.apk}-signed.apk"
-ALIGNED_APK="${UNSIGNED_APK%.apk}-aligned.apk"
+APK_DIR=$(dirname "$UNSIGNED_APK")
+ALIGNED_APK="${APK_DIR}/.aligned-temp.apk"
+SIGNED_APK="${APK_DIR}/pvz.apk"
 
 # 1. 生成密钥库（如果不存在）
 if [ ! -f "$KEYSTORE" ]; then

@@ -4,6 +4,7 @@ import (
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
+	"github.com/decker502/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -18,7 +19,7 @@ type SliderMouseInput interface {
 type ebitenSliderMouseInput struct{}
 
 func (e *ebitenSliderMouseInput) CursorPosition() (int, int) {
-	return ebiten.CursorPosition()
+	return utils.GetPointerPosition()
 }
 
 func (e *ebitenSliderMouseInput) IsMouseButtonPressed(button ebiten.MouseButton) bool {
