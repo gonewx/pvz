@@ -2,7 +2,6 @@ package systems
 
 import (
 	"log"
-	"sort"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
@@ -129,17 +128,6 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 		}
 	}
 
-	// 按 X 坐标排序僵尸列表，确保最前面的僵尸（X 值最小）先被检测
-	// 这样当多个僵尸重叠时，子弹只会击中最前面的那只
-	sort.Slice(zombies, func(i, j int) bool {
-		posI, okI := ecs.GetComponent[*components.PositionComponent](ps.em, zombies[i])
-		posJ, okJ := ecs.GetComponent[*components.PositionComponent](ps.em, zombies[j])
-		if !okI || !okJ {
-			return false
-		}
-		return posI.X < posJ.X
-	})
-
 	// 嵌套遍历检测碰撞
 	for _, bulletID := range bullets {
 		// 获取子弹的位置和碰撞组件
@@ -155,7 +143,12 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 		}
 		// 泛型 API 已提供类型安全
 
-		// 检查子弹与所有僵尸的碰撞
+		// 找出与子弹碰撞的所有僵尸中 X 坐标最小（最靠前）的那个
+		// 这样确保在同一行多个僵尸位置接近时，只有最前面的僵尸被击中
+		var hitZombieID ecs.EntityID
+		var hitZombieX float64 = 1e9 // 初始化为一个很大的值
+
+		// 检查子弹与所有僵尸的碰撞，找出 X 最小的碰撞目标
 		for _, zombieID := range zombies {
 			// 获取僵尸的位置和碰撞组件
 			zombiePos, ok := ecs.GetComponent[*components.PositionComponent](ps.em, zombieID)
@@ -170,77 +163,75 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 
 			// 执行AABB碰撞检测
 			if ps.checkAABBCollision(bulletPos, bulletCol, zombiePos, zombieCol) {
-				// 碰撞发生！
-				// 1. 创建击中效果实体（在子弹位置）
-				_, err := entities.NewPeaBulletHitEffect(ps.em, ps.rm, bulletPos.X, bulletPos.Y)
-				if err != nil {
-					// 如果创建击中效果失败，记录错误但继续处理碰撞
-					// 在实际项目中可以使用日志系统记录错误
-					// 这里为了简化，忽略错误
+				// 碰撞发生！记录这个僵尸，但只选择 X 最小的
+				if zombiePos.X < hitZombieX {
+					hitZombieID = zombieID
+					hitZombieX = zombiePos.X
 				}
+			}
+		}
 
-				// 触发豌豆击中溅射粒子效果
-				// 获取子弹的 BehaviorComponent 以确定子弹类型
-				bulletBehavior, ok := ecs.GetComponent[*components.BehaviorComponent](ps.em, bulletID)
-				if ok {
+		// 如果找到了碰撞的僵尸，处理碰撞
+		if hitZombieID != 0 {
+			zombieID := hitZombieID
 
-					// 根据子弹类型选择粒子效果
-					var particleEffectName string
-					if bulletBehavior.Type == components.BehaviorPeaProjectile {
-						particleEffectName = "PeaSplat" // 豌豆溅射效果
-					}
-					// 未来扩展: 卷心菜子弹类型
-					// else if bulletBehavior.Type == components.BehaviorCabbageProjectile {
-					//     particleEffectName = "CabbageSplat"
-					// }
+			// 1. 创建击中效果实体（在子弹位置）
+			_, err := entities.NewPeaBulletHitEffect(ps.em, ps.rm, bulletPos.X, bulletPos.Y)
+			if err != nil {
+				// 如果创建击中效果失败，记录错误但继续处理碰撞
+				// 在实际项目中可以使用日志系统记录错误
+				// 这里为了简化，忽略错误
+			}
 
-					// 触发粒子效果
-					if particleEffectName != "" {
-						_, err := entities.CreateParticleEffect(
-							ps.em,
-							ps.rm,
-							particleEffectName,
-							bulletPos.X, bulletPos.Y,
-						)
-						if err != nil {
-							log.Printf("[PhysicsSystem] 警告：创建击中粒子效果失败: %v", err)
-							// 不阻塞游戏逻辑，游戏继续运行
-						} else {
-							log.Printf("[PhysicsSystem] 子弹 %d 击中僵尸 %d，触发粒子效果 '%s'，位置: (%.1f, %.1f)",
-								bulletID, zombieID, particleEffectName, bulletPos.X, bulletPos.Y)
-						}
-					}
+			// 触发豌豆击中溅射粒子效果
+			// 获取子弹的 BehaviorComponent 以确定子弹类型
+			bulletBehavior, ok := ecs.GetComponent[*components.BehaviorComponent](ps.em, bulletID)
+			if ok {
+
+				// 根据子弹类型选择粒子效果
+				var particleEffectName string
+				if bulletBehavior.Type == components.BehaviorPeaProjectile {
+					particleEffectName = "PeaSplat" // 豌豆溅射效果
 				}
+				// 未来扩展: 卷心菜子弹类型
+				// else if bulletBehavior.Type == components.BehaviorCabbageProjectile {
+				//     particleEffectName = "CabbageSplat"
+				// }
 
-				// 2. 处理护甲伤害（优先扣除护甲值）
-				armor, hasArmor := ecs.GetComponent[*components.ArmorComponent](ps.em, zombieID)
-				if hasArmor {
-					if armor.CurrentArmor > 0 {
-						// 有护甲且护甲未破坏，优先扣除护甲
-						armor.CurrentArmor -= config.PeaBulletDamage
-						// 播放击中护甲音效（根据僵尸类型选择不同音效）
-						ps.playArmorHitSound(zombieID)
-						// 方案A+：护甲受击也添加闪烁效果
-						ps.addFlashEffect(zombieID)
-						// 注意：护甲可以降到负数，BehaviorSystem 会检查 <= 0 的情况并处理护甲破坏
+				// 触发粒子效果
+				if particleEffectName != "" {
+					_, err := entities.CreateParticleEffect(
+						ps.em,
+						ps.rm,
+						particleEffectName,
+						bulletPos.X, bulletPos.Y,
+					)
+					if err != nil {
+						log.Printf("[PhysicsSystem] 警告：创建击中粒子效果失败: %v", err)
+						// 不阻塞游戏逻辑，游戏继续运行
 					} else {
-						// 护甲已破坏，扣除身体生命值
-						zombieHealth, ok := ecs.GetComponent[*components.HealthComponent](ps.em, zombieID)
-						if ok {
-							zombieHealth.CurrentHealth -= config.PeaBulletDamage
-
-							// 方案A+：添加受击闪烁效果
-							ps.addFlashEffect(zombieID)
-						}
-						// 播放击中身体音效
-						ps.playHitSound()
+						log.Printf("[PhysicsSystem] 子弹 %d 击中僵尸 %d，触发粒子效果 '%s'，位置: (%.1f, %.1f)",
+							bulletID, zombieID, particleEffectName, bulletPos.X, bulletPos.Y)
 					}
+				}
+			}
+
+			// 2. 处理护甲伤害（优先扣除护甲值）
+			armor, hasArmor := ecs.GetComponent[*components.ArmorComponent](ps.em, zombieID)
+			if hasArmor {
+				if armor.CurrentArmor > 0 {
+					// 有护甲且护甲未破坏，优先扣除护甲
+					armor.CurrentArmor -= config.PeaBulletDamage
+					// 播放击中护甲音效（根据僵尸类型选择不同音效）
+					ps.playArmorHitSound(zombieID)
+					// 方案A+：护甲受击也添加闪烁效果
+					ps.addFlashEffect(zombieID)
+					// 注意：护甲可以降到负数，BehaviorSystem 会检查 <= 0 的情况并处理护甲破坏
 				} else {
-					// 3. 没有护甲，直接减少僵尸生命值（伤害计算）
+					// 护甲已破坏，扣除身体生命值
 					zombieHealth, ok := ecs.GetComponent[*components.HealthComponent](ps.em, zombieID)
 					if ok {
 						zombieHealth.CurrentHealth -= config.PeaBulletDamage
-						// 注意：生命值可以降到负数，BehaviorSystem 会检查 <= 0 的情况
 
 						// 方案A+：添加受击闪烁效果
 						ps.addFlashEffect(zombieID)
@@ -248,13 +239,22 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 					// 播放击中身体音效
 					ps.playHitSound()
 				}
+			} else {
+				// 3. 没有护甲，直接减少僵尸生命值（伤害计算）
+				zombieHealth, ok := ecs.GetComponent[*components.HealthComponent](ps.em, zombieID)
+				if ok {
+					zombieHealth.CurrentHealth -= config.PeaBulletDamage
+					// 注意：生命值可以降到负数，BehaviorSystem 会检查 <= 0 的情况
 
-				// 4. 标记子弹实体待删除
-				ps.em.DestroyEntity(bulletID)
-
-				// 5. 一个子弹只能击中一个僵尸，跳出内层循环
-				break
+					// 方案A+：添加受击闪烁效果
+					ps.addFlashEffect(zombieID)
+				}
+				// 播放击中身体音效
+				ps.playHitSound()
 			}
+
+			// 4. 标记子弹实体待删除
+			ps.em.DestroyEntity(bulletID)
 		}
 	}
 }
@@ -268,13 +268,13 @@ func (ps *PhysicsSystem) playHitSound() {
 }
 
 // playArmorHitSound 播放子弹击中护甲的音效
-// 根据僵尸类型选择不同的音效：
-// - 路障僵尸：使用 SOUND_PLASTICHIT (plastichit.ogg) - 塑料路障音效
-// - 铁桶僵尸：使用 SOUND_SHIELDHIT (shieldhit.ogg) - 金属铁桶音效
+// 根据护甲材质类型选择不同的音效：
+// - 塑料护甲（路障）：使用 SOUND_PLASTICHIT - 塑料路障音效
+// - 金属护甲（铁桶）：使用 SOUND_SHIELDHIT - 金属铁桶音效
 // Story 10.9: 护甲击中音效差异化
 func (ps *PhysicsSystem) playArmorHitSound(zombieID ecs.EntityID) {
-	// 获取僵尸的行为组件，确定僵尸类型
-	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](ps.em, zombieID)
+	// 获取僵尸的护甲组件，确定护甲材质类型
+	armor, ok := ecs.GetComponent[*components.ArmorComponent](ps.em, zombieID)
 	if !ok {
 		return
 	}
@@ -285,17 +285,17 @@ func (ps *PhysicsSystem) playArmorHitSound(zombieID ecs.EntityID) {
 		return
 	}
 
-	// 根据僵尸类型选择音效
-	switch behavior.Type {
-	case components.BehaviorZombieConehead:
-		// 路障僵尸使用塑料音效
-		audioManager.PlaySound("SOUND_PLASTICHIT2")
-	case components.BehaviorZombieBuckethead:
-		// 铁桶僵尸使用金属音效
+	// 根据护甲材质类型选择音效
+	switch armor.Type {
+	case components.ArmorTypePlastic:
+		// 塑料护甲（路障）使用塑料音效
+		audioManager.PlaySound("SOUND_PLASTICHIT")
+	case components.ArmorTypeMetal:
+		// 金属护甲（铁桶）使用金属音效
 		audioManager.PlaySound("SOUND_SHIELDHIT")
 	default:
-		// 其他护甲僵尸使用金属音效
-		audioManager.PlaySound("SOUND_SHIELDHIT")
+		// 默认使用塑料音效（兜底）
+		audioManager.PlaySound("SOUND_PLASTICHIT")
 	}
 }
 

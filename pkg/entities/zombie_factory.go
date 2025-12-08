@@ -211,6 +211,7 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, 
 	em.AddComponent(entityID, &components.ArmorComponent{
 		CurrentArmor: config.ConeheadZombieArmorHealth,
 		MaxArmor:     config.ConeheadZombieArmorHealth,
+		Type:         components.ArmorTypePlastic, // 塑料护甲
 	})
 
 	// 添加生命值组件（身体生命值270）
@@ -328,6 +329,7 @@ func NewBucketheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int
 	em.AddComponent(entityID, &components.ArmorComponent{
 		CurrentArmor: config.BucketheadZombieArmorHealth,
 		MaxArmor:     config.BucketheadZombieArmorHealth,
+		Type:         components.ArmorTypeMetal, // 金属护甲
 	})
 
 	// 添加生命值组件（身体生命值270）

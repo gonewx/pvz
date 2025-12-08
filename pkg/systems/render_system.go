@@ -209,11 +209,11 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 	}
 
 	// 按Y坐标排序（从小到大，即从上到下）
-	// 当Y坐标相同时，按X坐标排序（从大到小，即从右到左）
+	// 当Y坐标相同时，按网格列排序（从大到小，即从右到左）
 	// 这样可以确保：
 	//   1. 上方行的僵尸先绘制，下方行的僵尸后绘制会正确遮挡
 	//   2. 同一行中，右侧的僵尸先绘制，左侧的僵尸后绘制会遮挡右侧（符合透视效果）
-	//   3. 避免同行僵尸重叠时的渲染闪烁
+	//   3. 使用网格列而非连续坐标，避免同列僵尸因微小位置差异导致的渲染闪烁
 	sort.Slice(zombiesAndProjectiles, func(i, j int) bool {
 		posI, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombiesAndProjectiles[i])
 		posJ, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombiesAndProjectiles[j])
@@ -252,7 +252,14 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 			return isSquashedI
 		}
 
-		// 二级排序：当Y坐标相同时，按X坐标（从大到小，右侧先渲染）
+		// 二级排序：当Y坐标相同时，按网格列排序（从大到小，右侧先渲染）
+		// 使用网格列而非连续坐标，避免同列内僵尸因微小位置差异导致渲染顺序抖动
+		colI := int((posI.X - config.GridWorldStartX) / config.CellWidth)
+		colJ := int((posJ.X - config.GridWorldStartX) / config.CellWidth)
+		if colI != colJ {
+			return colI > colJ
+		}
+		// 同一网格列内，按 X 坐标排序（右侧先渲染）
 		return posI.X > posJ.X
 	})
 
