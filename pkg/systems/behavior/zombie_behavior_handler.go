@@ -493,14 +493,24 @@ func (s *BehaviorSystem) startEatingPlant(zombieID, plantID ecs.EntityID) {
 	// 1. 移除僵尸的 VelocityComponent（停止移动）
 	ecs.RemoveComponent[*components.VelocityComponent](s.entityManager, zombieID)
 
-	// 2. 在切换类型之前，先记住原始僵尸类型（用于选择正确的啃食动画）
+	// 2. 重置根运动状态（防止动画切换导致位移跳变）
+	// 虽然啃食时僵尸不移动，但重置状态确保恢复移动时不会发生问题
+	if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, zombieID); ok {
+		reanim.LastGroundX = 0
+		reanim.LastGroundY = 0
+		reanim.LastAnimFrame = -1
+		reanim.AccumulatedDeltaX = 0
+		reanim.AccumulatedDeltaY = 0
+	}
+
+	// 3. 在切换类型之前，先记住原始僵尸类型（用于选择正确的啃食动画）
 	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
 	if !ok {
 		return
 	}
 	originalZombieType := behavior.Type // 记住原始类型
 
-	// 3. 切换 BehaviorComponent.Type 为 BehaviorZombieEating
+	// 4. 切换 BehaviorComponent.Type 为 BehaviorZombieEating
 	behavior.Type = components.BehaviorZombieEating
 	// 初始化啃食动画帧跟踪（用于伤害和音效同步）
 	// -1 表示尚未开始，首次进入会触发伤害
