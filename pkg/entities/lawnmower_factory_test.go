@@ -66,7 +66,8 @@ func TestNewLawnmowerEntity(t *testing.T) {
 	}
 	// 入场动画起始位置在屏幕左侧外
 	expectedX := config.LawnmowerEnterStartX
-	expectedY := config.GridWorldStartY + float64(lane-1)*config.CellHeight + config.CellHeight/2.0
+	// Y坐标：行中心 + 偏移量（与工厂实现一致）
+	expectedY := config.GridWorldStartY + float64(lane-1)*config.CellHeight + config.CellHeight/2.0 + config.LawnmowerStartOffsetY
 	if pos.X != expectedX {
 		t.Errorf("Expected X=%.1f, got %.1f", expectedX, pos.X)
 	}
