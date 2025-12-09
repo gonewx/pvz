@@ -30,10 +30,10 @@ jobs:
         run: |
           # Ebitengine 在 Linux 上需要这些依赖
           sudo apt-get update
-          sudo apt-get install -y libgl1-mesa-dev xorg-dev libasound2-dev
+          sudo apt-get install -y libgl1-mesa-dev xorg-dev libasound2-dev xvfb
 
       - name: Vet
         run: go vet ./...
 
       - name: Test
-        run: go test -v ./...
+        run: xvfb-run -a go test -v ./...
