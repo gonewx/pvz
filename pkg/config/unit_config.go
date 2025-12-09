@@ -43,21 +43,9 @@ const (
 	// 路障僵尸拥有370点护甲，护甲破坏后变为普通僵尸
 	ConeheadZombieArmorHealth = 370
 
-	// ConeheadZombieWalkAnimationFrames 路障僵尸走路动画帧数
-	ConeheadZombieWalkAnimationFrames = 21
-
-	// ConeheadZombieEatAnimationFrames 路障僵尸啃食动画帧数
-	ConeheadZombieEatAnimationFrames = 11
-
 	// BucketheadZombieArmorHealth 铁桶僵尸护甲值
 	// 铁桶僵尸拥有1100点护甲，护甲破坏后变为普通僵尸
 	BucketheadZombieArmorHealth = 1100
-
-	// BucketheadZombieWalkAnimationFrames 铁桶僵尸走路动画帧数
-	BucketheadZombieWalkAnimationFrames = 15
-
-	// BucketheadZombieEatAnimationFrames 铁桶僵尸啃食动画帧数
-	BucketheadZombieEatAnimationFrames = 11
 
 	// ZombieGroanMinInterval 僵尸呻吟音效最小间隔（秒）
 	// 控制呻吟音效不要太频繁

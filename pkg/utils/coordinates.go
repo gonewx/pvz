@@ -49,8 +49,10 @@ package utils
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/decker502/pvz/pkg/components"
+	"github.com/decker502/pvz/pkg/config"
 	"github.com/decker502/pvz/pkg/ecs"
 )
 
@@ -132,9 +134,26 @@ func GetRenderScreenOrigin(
 	// 计算屏幕坐标（世界坐标 - 摄像机偏移 - 居中偏移 * 缩放）
 	// CenterOffset 是在 scale=1.0 时计算的，需要乘以当前缩放比例
 	screenX = pos.X - effectiveCameraX - reanimComp.CenterOffsetX*entityScaleX
-	screenY = pos.Y - reanimComp.CenterOffsetY*entityScaleY
+
+	// 僵尸类型需要校正 Y 坐标：装备（路障/铁桶）向上延伸导致 CenterOffsetY 变小
+	// 使用基准值校正，确保所有僵尸类型渲染在相同 Y 位置
+	centerOffsetY := reanimComp.CenterOffsetY
+	if isZombieReanim(reanimComp.ReanimName) {
+		// 校正值 = 基准值 - 当前值（装备僵尸的 CenterOffsetY 较小，校正值为正）
+		correction := config.ZombieBaseCenterOffsetY - reanimComp.CenterOffsetY
+		centerOffsetY = reanimComp.CenterOffsetY + correction // 等价于使用基准值
+	}
+	screenY = pos.Y - centerOffsetY*entityScaleY
 
 	return screenX, screenY, nil
+}
+
+// isZombieReanim 检查 ReanimName 是否是僵尸类型
+// 用于判断是否需要应用 CenterOffsetY 校正
+func isZombieReanim(reanimName string) bool {
+	name := strings.ToLower(reanimName)
+	// 检查是否以 "zombie" 开头（包括 zombie, zombie_conehead, zombie_buckethead, zombie_flag 等）
+	return strings.HasPrefix(name, "zombie")
 }
 
 // GetClickableCenter 计算 Reanim 实体的点击中心（世界坐标）
