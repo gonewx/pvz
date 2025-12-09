@@ -9,7 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # 配置变量
-ANDROID_HOME="${ANDROID_HOME:-/home/decker/app/android/sdk}"
+ANDROID_HOME="${ANDROID_HOME:-${HOME}/Android/Sdk}"
 ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-$ANDROID_HOME/ndk/27.2.12479018}"
 BUILD_TOOLS_VERSION="34.0.0"
 PLATFORM_VERSION="android-34"
@@ -285,11 +285,7 @@ else
     else
         echo_warn "Gradle 未安装，下载 Gradle $GRADLE_VERSION 到缓存目录..."
         mkdir -p "$GRADLE_CACHE_DIR"
-        
-        # 使用代理下载（如果配置了）
-        export http_proxy="${http_proxy:-http://127.0.0.1:2080}"
-        export https_proxy="${https_proxy:-http://127.0.0.1:2080}"
-        
+
         GRADLE_ZIP="$GRADLE_CACHE_DIR/gradle-$GRADLE_VERSION-bin.zip"
         curl -L "https://services.gradle.org/distributions/gradle-$GRADLE_VERSION-bin.zip" -o "$GRADLE_ZIP" || {
             echo_error "下载 Gradle 失败，请检查网络连接或代理设置"

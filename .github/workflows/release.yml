@@ -28,7 +28,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: '1.24'
           cache: true
 
       - name: Get version from tag
@@ -98,6 +98,64 @@ jobs:
             ${{ env.APP_NAME }}-wasm.zip
 
   # ==========================================================================
+  # 构建 Android APK
+  # ==========================================================================
+  build-android:
+    name: Build Android
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        run: |
+          sdkmanager --install "ndk;27.2.12479018"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> $GITHUB_ENV
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev xorg-dev libasound2-dev zip
+
+      - name: Install ebitenmobile
+        run: go install github.com/hajimehoshi/ebiten/v2/cmd/ebitenmobile@latest
+
+      - name: Build Android AAR
+        run: make build-android
+
+      - name: Build APK
+        run: |
+          # 创建 Android 项目
+          ./scripts/build-apk.sh
+
+      - name: Package APK
+        run: |
+          mkdir -p dist
+          cp build/pvz-unsigned.apk dist/${{ env.APP_NAME }}-android.apk
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: builds-android
+          path: dist/${{ env.APP_NAME }}-android.apk
+
+  # ==========================================================================
   # 构建 macOS (在 macOS runner 上，需要 CGO)
   # ==========================================================================
   build-macos:
@@ -111,7 +169,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: '1.24'
           cache: true
 
       - name: Get version from tag
@@ -161,7 +219,7 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [build-linux-windows-wasm, build-macos]
+    needs: [build-linux-windows-wasm, build-macos, build-android]
     permissions:
       contents: write
 
@@ -179,6 +237,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: builds-macos
+          path: ./artifacts
+
+      - name: Download Android artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: builds-android
           path: ./artifacts
 
       - name: List artifacts
@@ -199,4 +263,5 @@ jobs:
             ./artifacts/${{ env.APP_NAME }}-darwin-amd64.tar.gz
             ./artifacts/${{ env.APP_NAME }}-darwin-arm64.tar.gz
             ./artifacts/${{ env.APP_NAME }}-darwin-universal.tar.gz
+            ./artifacts/${{ env.APP_NAME }}-android.apk
             ./artifacts/${{ env.APP_NAME }}-wasm.zip
