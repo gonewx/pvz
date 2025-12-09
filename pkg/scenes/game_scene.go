@@ -205,6 +205,9 @@ type GameScene struct {
 	dragConveyorCardIndex  int    // 拖拽中的传送带卡片索引
 	dragConveyorCardType   string // 拖拽中的传送带卡片类型
 
+	// 铲子拖拽状态（移动端触摸拖拽支持）
+	isDragShovel bool // 是否处于铲子拖拽模式
+
 	// Story 19.6: 保龄球坚果滚动系统
 	bowlingNutSystem *systems.BowlingNutSystem // 保龄球坚果滚动系统
 
@@ -1569,6 +1572,7 @@ func (s *GameScene) NotifyOperation(operation string) {
 // Story 19.2: 点击铲子槽位切换铲子模式
 // Story 19.3: 强引导模式下检查操作限制
 // Story 19.x QA: 铲子教学关卡（有预设植物）强制启用铲子点击
+// 移动端拖拽：支持从铲子槽位拖拽到植物直接铲除
 func (s *GameScene) updateShovelSlotClick() {
 	// Bug Fix: Dave 对话期间禁止铲子槽位点击
 	// 对话期间点击屏幕是推进对话，不应触发其他交互
@@ -1600,6 +1604,19 @@ func (s *GameScene) updateShovelSlotClick() {
 		return
 	}
 
+	// ========================================================================
+	// 移动端拖拽处理：从铲子槽位拖拽到植物直接铲除
+	// ========================================================================
+	dragManager := utils.GetDragManager()
+	if dragManager.IsTouchDrag() || s.isDragShovel {
+		if s.handleShovelDrag() {
+			return // 拖拽处理中，跳过传统点击逻辑
+		}
+	}
+
+	// ========================================================================
+	// 传统点击处理（桌面端鼠标点击）
+	// ========================================================================
 	// 检测左键点击或触摸
 	justPressed, mouseX, mouseY := utils.IsJustTouchedOrClicked()
 	if justPressed {
@@ -1624,6 +1641,196 @@ func (s *GameScene) updateShovelSlotClick() {
 			log.Printf("[GameScene] 右键取消铲子模式")
 		}
 	}
+}
+
+// handleShovelDrag 处理铲子的拖拽交互（移动端触摸拖拽支持）
+// 流程：
+//  1. 触摸铲子槽位 → 开始拖拽，激活铲子模式
+//  2. 拖拽过程中 → 铲子图标跟随手指，检测悬停植物
+//  3. 释放手指 → 如果在植物上则铲除，否则取消铲子模式
+//
+// 返回 true 表示正在处理拖拽，应跳过传统点击逻辑
+func (s *GameScene) handleShovelDrag() bool {
+	dragManager := utils.GetDragManager()
+	dragInfo := dragManager.GetInfo()
+
+	switch dragInfo.State {
+	case utils.DragStateStarted:
+		// 拖拽刚开始，检测是否从铲子槽位开始
+		return s.handleShovelDragStart(dragInfo)
+
+	case utils.DragStateDragging:
+		// 拖拽进行中，更新铲子位置和植物高亮
+		if s.isDragShovel {
+			s.updateShovelDragPreview(dragInfo)
+			return true
+		}
+
+	case utils.DragStateEnded:
+		// 拖拽结束，尝试铲除植物或取消
+		if s.isDragShovel {
+			s.handleShovelDragEnd(dragInfo)
+			return true
+		}
+	}
+
+	return false
+}
+
+// handleShovelDragStart 处理铲子拖拽开始
+// 检测拖拽是否从铲子槽位开始（仅触摸输入）
+func (s *GameScene) handleShovelDragStart(dragInfo utils.DragInfo) bool {
+	// 只处理触摸输入的拖拽，桌面端鼠标使用传统点击模式
+	if !dragInfo.IsTouchInput {
+		return false
+	}
+
+	// 检测触摸位置是否在铲子槽位上
+	bounds := s.GetShovelSlotBounds()
+	if dragInfo.StartX < bounds.Min.X || dragInfo.StartX > bounds.Max.X ||
+		dragInfo.StartY < bounds.Min.Y || dragInfo.StartY > bounds.Max.Y {
+		return false // 不是从铲子槽位开始的拖拽
+	}
+
+	// Story 19.3: 检查操作是否被允许
+	if !s.IsOperationAllowed("click_shovel") {
+		return false
+	}
+
+	// Story 19.3: 通知系统操作发生
+	s.NotifyOperation("click_shovel")
+
+	// 开始铲子拖拽模式
+	s.isDragShovel = true
+	s.SetShovelSelected(true)
+
+	// 播放铲子点击音效
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_SHOVEL")
+	}
+
+	log.Printf("[GameScene] 铲子拖拽开始: 起点=(%d, %d)", dragInfo.StartX, dragInfo.StartY)
+
+	return true
+}
+
+// updateShovelDragPreview 更新铲子拖拽预览
+// 铲子图标跟随手指移动，并检测悬停的植物
+func (s *GameScene) updateShovelDragPreview(dragInfo utils.DragInfo) {
+	// 铲子光标的渲染由 ShovelInteractionSystem 处理
+	// 这里只需要确保铲子模式保持激活状态
+	// ShovelInteractionSystem.Update() 会自动检测鼠标/触摸位置下的植物并高亮
+}
+
+// handleShovelDragEnd 处理铲子拖拽结束
+func (s *GameScene) handleShovelDragEnd(dragInfo utils.DragInfo) {
+	defer s.cancelShovelDrag()
+
+	// 转换为世界坐标
+	worldX := float64(dragInfo.CurrentX) + s.cameraX
+	worldY := float64(dragInfo.CurrentY)
+
+	// 检测释放位置是否有植物
+	plantEntity := s.detectPlantAtPosition(worldX, worldY)
+	if plantEntity != 0 {
+		// 找到植物，执行铲除操作
+		s.removePlantWithShovel(plantEntity)
+		log.Printf("[GameScene] 铲子拖拽结束: 铲除植物 EntityID=%d", plantEntity)
+	} else {
+		log.Printf("[GameScene] 铲子拖拽结束: 未找到植物，取消铲子模式")
+	}
+}
+
+// cancelShovelDrag 取消铲子拖拽模式
+func (s *GameScene) cancelShovelDrag() {
+	if !s.isDragShovel {
+		return
+	}
+
+	// 取消铲子选中状态
+	s.SetShovelSelected(false)
+
+	// 清除高亮效果
+	if s.shovelInteractionSystem != nil {
+		s.shovelInteractionSystem.ClearHighlight()
+	}
+
+	// 恢复系统光标
+	ebiten.SetCursorMode(ebiten.CursorModeVisible)
+
+	// 重置拖拽状态
+	s.isDragShovel = false
+
+	log.Printf("[GameScene] 铲子拖拽取消")
+}
+
+// detectPlantAtPosition 检测指定世界坐标位置的植物
+// 返回植物实体ID，如果没有则返回 0
+func (s *GameScene) detectPlantAtPosition(worldX, worldY float64) ecs.EntityID {
+	// 查询所有植物实体
+	plantEntities := ecs.GetEntitiesWith1[*components.PlantComponent](s.entityManager)
+
+	for _, entity := range plantEntities {
+		// 获取植物位置
+		posComp, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entity)
+		if !ok {
+			continue
+		}
+
+		// 计算植物边界（与 ShovelInteractionSystem 保持一致）
+		plantWidth := 60.0
+		plantHeight := 80.0
+
+		plantLeft := posComp.X - plantWidth/2
+		plantRight := posComp.X + plantWidth/2
+		plantTop := posComp.Y - plantHeight/2
+		plantBottom := posComp.Y + plantHeight/2
+
+		// 检测坐标是否在植物边界内
+		if worldX >= plantLeft && worldX <= plantRight &&
+			worldY >= plantTop && worldY <= plantBottom {
+			return entity
+		}
+	}
+
+	return 0
+}
+
+// removePlantWithShovel 使用铲子移除植物
+// 复用 ShovelInteractionSystem 的逻辑
+func (s *GameScene) removePlantWithShovel(entityID ecs.EntityID) {
+	// Story 19.3: 通知强引导系统发生了植物点击操作
+	systems.NotifyGuidedTutorialOperation("click_plant")
+
+	// 获取植物信息（用于日志和网格更新）
+	plantComp, hasPlant := ecs.GetComponent[*components.PlantComponent](s.entityManager, entityID)
+	posComp, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+
+	if hasPlant && hasPos {
+		log.Printf("[GameScene] 拖拽铲除植物: 类型=%v, 位置=(%.1f, %.1f), 网格=(%d, %d)",
+			plantComp.PlantType, posComp.X, posComp.Y, plantComp.GridRow, plantComp.GridCol)
+
+		// 更新草坪网格，释放该格子
+		lawnGridEntities := ecs.GetEntitiesWith1[*components.LawnGridComponent](s.entityManager)
+		if len(lawnGridEntities) > 0 {
+			gridComp, ok := ecs.GetComponent[*components.LawnGridComponent](s.entityManager, lawnGridEntities[0])
+			if ok && plantComp.GridRow >= 0 && plantComp.GridRow < 5 &&
+				plantComp.GridCol >= 0 && plantComp.GridCol < 9 {
+				gridComp.Occupancy[plantComp.GridRow][plantComp.GridCol] = 0 // 0 表示空格子
+				log.Printf("[GameScene] 释放网格 (%d, %d)", plantComp.GridRow, plantComp.GridCol)
+			}
+		}
+	}
+
+	// 播放铲除植物音效
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_PLANT")
+	}
+
+	// 移除植物实体（不返还阳光）
+	s.entityManager.DestroyEntity(entityID)
+
+	log.Printf("[GameScene] 植物已移除 (Entity ID: %d)", entityID)
 }
 
 // toggleShovelMode 切换铲子模式

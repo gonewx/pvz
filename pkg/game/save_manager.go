@@ -86,6 +86,8 @@ const (
 //   - *SaveManager: 新创建的保存管理器实例
 //   - error: 如果创建失败返回错误
 func NewSaveManager(gdataManager *gdata.Manager) (*SaveManager, error) {
+	log.Printf("[SaveManager] Creating SaveManager, gdataManager=%v", gdataManager != nil)
+
 	sm := &SaveManager{
 		gdataManager: gdataManager,
 		currentUser:  "",
@@ -114,6 +116,8 @@ func NewSaveManager(gdataManager *gdata.Manager) (*SaveManager, error) {
 			log.Printf("[SaveManager] Warning: Failed to load save data for user %s: %v (using defaults)", sm.currentUser, err)
 		}
 	}
+
+	log.Printf("[SaveManager] SaveManager created, users=%d, currentUser=%q", len(sm.userList.Users), sm.currentUser)
 
 	return sm, nil
 }

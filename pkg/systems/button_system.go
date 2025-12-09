@@ -1,6 +1,8 @@
 package systems
 
 import (
+	"log"
+
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/ecs"
 	"github.com/decker502/pvz/pkg/game"
@@ -53,6 +55,13 @@ func (s *ButtonSystem) Update(deltaTime float64) {
 	justPressed, pressX, pressY := utils.IsPointerJustPressed()
 	justReleased, releaseX, releaseY := utils.IsPointerJustReleased()
 
+	// ✅ 移动端触摸释放修复：当触摸释放时，GetPointerPosition() 返回 (0,0)
+	// 因为触摸点已不存在。此时应使用释放位置来判断悬停状态
+	hoverX, hoverY := mouseX, mouseY
+	if justReleased && releaseX != 0 && releaseY != 0 {
+		hoverX, hoverY = releaseX, releaseY
+	}
+
 	// 查询所有按钮实体
 	entities := ecs.GetEntitiesWith2[*components.ButtonComponent, *components.PositionComponent](s.entityManager)
 
@@ -66,11 +75,17 @@ func (s *ButtonSystem) Update(deltaTime float64) {
 			continue
 		}
 
-		// 检测鼠标是否在按钮范围内
-		isHovered := s.isMouseInButton(float64(mouseX), float64(mouseY), pos.X, pos.Y, button.Width, button.Height)
+		// DEBUG: 打印按钮位置和尺寸信息
+		if button.Text != "" && (justPressed || justReleased) {
+			log.Printf("[ButtonSystem] DEBUG: Button '%s' at (%.1f, %.1f), size: %.1fx%.1f, hover: (%d, %d), pressed=%v, released=%v, releasePos=(%d,%d)",
+				button.Text, pos.X, pos.Y, button.Width, button.Height, hoverX, hoverY, justPressed, justReleased, releaseX, releaseY)
+		}
+
+		// 检测指针是否在按钮范围内（使用修正后的悬停位置）
+		isHovered := s.isMouseInButton(float64(hoverX), float64(hoverY), pos.X, pos.Y, button.Width, button.Height)
 
 		if isHovered {
-			// 鼠标在按钮内
+			// 指针在按钮内
 			if justPressed {
 				// 检查按下位置是否也在按钮内
 				isPressInButton := s.isMouseInButton(float64(pressX), float64(pressY), pos.X, pos.Y, button.Width, button.Height)
@@ -108,7 +123,7 @@ func (s *ButtonSystem) Update(deltaTime float64) {
 				button.State = components.UIHovered
 			}
 		} else {
-			// 鼠标不在按钮内，恢复正常状态
+			// 指针不在按钮内，恢复正常状态
 			button.State = components.UINormal
 		}
 	}
