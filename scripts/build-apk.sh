@@ -318,15 +318,15 @@ fi
 echo_info "生成 Gradle Wrapper..."
 "$GRADLE_CMD" wrapper --gradle-version $GRADLE_VERSION --no-daemon $GRADLE_PROXY_ARGS
 
-# 构建 APK
+# 构建 APK (使用 debug 签名，可以直接安装)
 echo_info "执行 Gradle 构建..."
-./gradlew assembleRelease --no-daemon --stacktrace
+./gradlew assembleDebug --no-daemon --stacktrace
 
 cd - > /dev/null
 
 # 13. 输出结果
-APK_FILE="$ANDROID_PROJECT/app/build/outputs/apk/release/app-release-unsigned.apk"
-OUTPUT_APK="$PROJECT_ROOT/build/${APP_NAME}-unsigned.apk"
+APK_FILE="$ANDROID_PROJECT/app/build/outputs/apk/debug/app-debug.apk"
+OUTPUT_APK="$PROJECT_ROOT/build/${APP_NAME}.apk"
 if [ -f "$APK_FILE" ]; then
     # 复制到 build 目录
     cp "$APK_FILE" "$OUTPUT_APK"
@@ -334,15 +334,13 @@ if [ -f "$APK_FILE" ]; then
     echo_info "✅ APK 构建成功!"
     echo ""
     echo "生成文件:"
-    echo "  - 未签名 APK: $OUTPUT_APK"
-    echo ""
-    echo_warn "注意: 此 APK 未签名，仅供测试使用"
+    echo "  - Debug APK: $OUTPUT_APK"
     echo ""
     echo "安装方法 (需要 adb):"
     echo "  adb install -r $OUTPUT_APK"
     echo ""
-    echo "如需发布，请使用以下命令签名:"
-    echo "  ./scripts/sign-apk.sh $OUTPUT_APK"
+    echo "注意: 此 APK 使用 debug 签名，可直接安装测试"
+    echo "如需发布到应用商店，请使用 release 签名"
 else
     echo_error "APK 构建失败"
     exit 1

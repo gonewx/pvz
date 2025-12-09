@@ -147,7 +147,7 @@ jobs:
       - name: Package APK
         run: |
           mkdir -p dist
-          cp build/pvz-unsigned.apk dist/${{ env.APP_NAME }}-android.apk
+          cp build/pvz.apk dist/${{ env.APP_NAME }}-android.apk
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
