@@ -156,6 +156,41 @@ jobs:
           path: dist/${{ env.APP_NAME }}-android.apk
 
   # ==========================================================================
+  # 构建 iOS XCFramework (在 macOS runner 上)
+  # 注意: 这只构建 xcframework，不包含签名，开发者需要自己集成到 Xcode 项目
+  # ==========================================================================
+  build-ios:
+    name: Build iOS
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Install ebitenmobile
+        run: go install github.com/hajimehoshi/ebiten/v2/cmd/ebitenmobile@latest
+
+      - name: Build iOS XCFramework
+        run: make build-ios
+
+      - name: Package iOS XCFramework
+        run: |
+          cd build/ios
+          zip -r ../../${{ env.APP_NAME }}-ios-xcframework.zip PVZ.xcframework
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: builds-ios
+          path: ${{ env.APP_NAME }}-ios-xcframework.zip
+
+  # ==========================================================================
   # 构建 macOS (在 macOS runner 上，需要 CGO)
   # ==========================================================================
   build-macos:
@@ -219,7 +254,7 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [build-linux-windows-wasm, build-macos, build-android]
+    needs: [build-linux-windows-wasm, build-macos, build-android, build-ios]
     permissions:
       contents: write
 
@@ -245,6 +280,12 @@ jobs:
           name: builds-android
           path: ./artifacts
 
+      - name: Download iOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: builds-ios
+          path: ./artifacts
+
       - name: List artifacts
         run: ls -la ./artifacts/
 
@@ -264,4 +305,5 @@ jobs:
             ./artifacts/${{ env.APP_NAME }}-darwin-arm64.tar.gz
             ./artifacts/${{ env.APP_NAME }}-darwin-universal.tar.gz
             ./artifacts/${{ env.APP_NAME }}-android.apk
+            ./artifacts/${{ env.APP_NAME }}-ios-xcframework.zip
             ./artifacts/${{ env.APP_NAME }}-wasm.zip
