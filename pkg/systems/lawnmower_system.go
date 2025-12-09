@@ -418,6 +418,24 @@ func (s *LawnmowerSystem) HasActiveLawnmowers() bool {
 	return false
 }
 
+// AreAllEntered 检查所有除草车是否已完成入场动画
+// 用于控制暂停按钮和植物选择栏的显示时机
+// 返回:
+//   - bool: 如果所有除草车都已完成入场动画（IsEntering=false），返回 true
+//   - 如果没有除草车，也返回 true
+func (s *LawnmowerSystem) AreAllEntered() bool {
+	lawnmowers := ecs.GetEntitiesWith1[*components.LawnmowerComponent](s.entityManager)
+
+	for _, lawnmowerID := range lawnmowers {
+		lawnmower, ok := ecs.GetComponent[*components.LawnmowerComponent](s.entityManager, lawnmowerID)
+		if ok && lawnmower.IsEntering {
+			return false
+		}
+	}
+
+	return true
+}
+
 // triggerZombieDeath 触发僵尸压扁动画
 // 除草车碾压僵尸时调用此方法，不再直接切换为死亡状态
 // 而是先播放压扁动画，动画结束后再触发死亡

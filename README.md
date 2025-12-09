@@ -66,7 +66,7 @@
 ### 环境要求
 
 - **Go 版本**: 1.24 或更高
-- **操作系统**: Windows / macOS / Linux / Android
+- **操作系统**: Windows / macOS / Linux / Android / WASM
 - **内存**: 至少 2GB RAM
 - **显卡**: 支持 OpenGL 2.1+
 

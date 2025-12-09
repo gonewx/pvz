@@ -58,6 +58,11 @@ type GameScene struct {
 	soddingAnimTimer   float64       // 铺草皮动画延迟计时器
 	sodDebugPrinted    bool          // 草皮叠加图调试日志是否已打印
 
+	// 植物选择栏滑入动画状态
+	seedBankSlideInProgress  float64 // 滑入动画进度 (0.0 - 1.0)
+	seedBankSlideInStarted   bool    // 滑入动画是否已启动
+	seedBankSlideInCompleted bool    // 滑入动画是否已完成
+
 	// Story 8.6 QA修正: 预渲染草皮支持
 	preSoddedImage *ebiten.Image // 预渲染的草皮图片(仅包含指定行的草皮)
 
@@ -1120,6 +1125,10 @@ func (s *GameScene) Update(deltaTime float64) {
 	}
 	s.zombieLaneTransitionSystem.Update(deltaTime) // 0.5. Update zombie lane transitions (move to target lane before attacking)
 
+	// 植物选择栏滑入动画更新
+	// 在开场动画、��草皮动画、除草车入场动画、ReadySetPlant 动画全部完成后启动
+	s.updateSeedBankSlideIn(deltaTime)
+
 	// Story 3.1 架构优化：使用模块化方式更新植物选择栏
 	if s.plantSelectionModule != nil {
 		s.plantSelectionModule.Update(deltaTime) // 1. Update plant card states (before input)
@@ -1254,6 +1263,12 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	isWaitingForSodding := s.openingSystem != nil && s.openingSystem.IsCompleted() && !s.soddingAnimStarted
 	hideUI := isOpeningPlaying || isSoddingPlaying || isWaitingForSodding
 
+	// 暂停菜单按钮需要在所有开场动画完成后才显示
+	// 包括：开场动画、铺草皮动画、除草车入场动画、ReadySetPlant 动画
+	isLawnmowerEntering := s.lawnmowerSystem != nil && !s.lawnmowerSystem.AreAllEntered()
+	isReadySetPlantPlaying := s.readySetPlantSystem != nil && s.readySetPlantSystem.IsPlaying()
+	hideMenuButton := hideUI || isLawnmowerEntering || isReadySetPlantPlaying
+
 	// Layer 2: Draw UI base elements (seed bank, shovel, plant cards)
 	// 按照原版PVZ设计，UI元素在游戏世界实体下方渲染
 	if !hideUI {
@@ -1264,16 +1279,20 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 		s.drawConveyorBelt(screen)
 
 		// 使用 ECS 按钮系统渲染菜单按钮
-		if s.buttonRenderSystem != nil {
+		// 菜单按钮需要等待所有开场动画完成后才显示
+		if s.buttonRenderSystem != nil && !hideMenuButton {
 			s.buttonRenderSystem.Draw(screen)
 		}
 
 		// Layer 3: Draw plant cards (Story 3.1 架构优化)
 		// 在植物和僵尸下方渲染，符合原版PVZ设计
 		// Story 19.5: 保龄球模式不显示植物选择模块（使用传送带）
+		// 滑入动画：计算 Y 偏移量，与植物选择栏同步滑入
 		if s.plantSelectionModule != nil {
 			if s.gameState.CurrentLevel == nil || s.gameState.CurrentLevel.InitialSun != 0 {
-				s.plantSelectionModule.Draw(screen)
+				// 计算滑入动画 Y 偏移
+				yOffset := s.getSeedBankCurrentY() - float64(config.SeedBankY)
+				s.plantSelectionModule.DrawWithOffset(screen, yOffset)
 			}
 		}
 	}
@@ -1855,11 +1874,76 @@ func (s *GameScene) toggleShovelMode() {
 		ebiten.SetCursorMode(ebiten.CursorModeHidden)
 		log.Printf("[GameScene] 铲子模式激活")
 	} else {
-		// 取消时恢复系统光标并清除高亮
+		// ��消时恢复系统光标并清除高亮
 		ebiten.SetCursorMode(ebiten.CursorModeVisible)
 		if s.shovelInteractionSystem != nil {
 			s.shovelInteractionSystem.ClearHighlight()
 		}
 		log.Printf("[GameScene] 铲子模式取消")
 	}
+}
+
+// ========== 辅助函数 ==========
+
+// easeOutQuad 二次缓动函数（快速开始，缓慢结束）
+// 用于植物��择栏滑入动画
+func easeOutQuad(t float64) float64 {
+	return 1.0 - (1.0-t)*(1.0-t)
+}
+
+// updateSeedBankSlideIn 更新植物选择栏滑入动画
+// 在铺草皮动画完成后立即启动，与除草车入场动画同时播放
+func (s *GameScene) updateSeedBankSlideIn(deltaTime float64) {
+	// 如果动画已完成，不需要更新
+	if s.seedBankSlideInCompleted {
+		return
+	}
+
+	// 检查铺草皮动画是否完成（与除草车创建时机一致）
+	isOpeningComplete := s.openingSystem == nil || s.openingSystem.IsCompleted()
+	isSoddingComplete := s.soddingSystem == nil || !s.soddingSystem.IsPlaying()
+
+	// 必须等待铺草皮动画启动后才能判断（避免过早启动）
+	if !s.soddingAnimStarted {
+		return
+	}
+
+	// 铺草皮完成后，与除草车入场动画同时启动滑入动画
+	if isOpeningComplete && isSoddingComplete {
+		if !s.seedBankSlideInStarted {
+			s.seedBankSlideInStarted = true
+			s.seedBankSlideInProgress = 0
+			log.Printf("[GameScene] 植物选择栏滑入动画启动（与除草车入场同时）")
+		}
+
+		// 更新动画进度
+		duration := config.SeedBankSlideInDuration
+		s.seedBankSlideInProgress += deltaTime / duration
+
+		if s.seedBankSlideInProgress >= 1.0 {
+			s.seedBankSlideInProgress = 1.0
+			s.seedBankSlideInCompleted = true
+			log.Printf("[GameScene] 植物选择栏滑入动画完成")
+		}
+	}
+}
+
+// getSeedBankCurrentY 获取植物选择栏当前 Y 位置
+// 根据滑入动画进度计算
+func (s *GameScene) getSeedBankCurrentY() float64 {
+	// 如果动画已完成，返回最终位置
+	if s.seedBankSlideInCompleted {
+		return float64(config.SeedBankY)
+	}
+
+	// 如果动画未启动，返回起始位置（屏幕外，不显示）
+	if !s.seedBankSlideInStarted {
+		return config.SeedBankSlideInStartY
+	}
+
+	// 使用 ease-out 缓动计算 Y 位置
+	progress := easeOutQuad(s.seedBankSlideInProgress)
+	startY := config.SeedBankSlideInStartY
+	targetY := float64(config.SeedBankY)
+	return startY + (targetY-startY)*progress
 }

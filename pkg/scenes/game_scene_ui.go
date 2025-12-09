@@ -36,6 +36,7 @@ func getSunFlashColor(timer float64, cycle float64) color.Color {
 // drawSeedBank renders the plant selection bar at the top left of the screen.
 // If the seed bank image is not loaded, it draws a simple rectangle as fallback.
 // Story 19.5: 保龄球模式使用传送带，不显示植物选择栏
+// 滑入动画：从上向下滑入，类似传送带入场效果
 func (s *GameScene) drawSeedBank(screen *ebiten.Image) {
 	// Story 19.5: 保龄球模式（initialSun == 0）不显示植物选择栏
 	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.InitialSun == 0 {
@@ -48,15 +49,18 @@ func (s *GameScene) drawSeedBank(screen *ebiten.Image) {
 		return
 	}
 
+	// 获取当前滑入动画 Y 位置
+	currentY := s.getSeedBankCurrentY()
+
 	if s.seedBank != nil {
 		// Draw the seed bank image at the top left corner
 		op := &ebiten.DrawImageOptions{}
-		op.GeoM.Translate(config.SeedBankX, config.SeedBankY)
+		op.GeoM.Translate(config.SeedBankX, currentY)
 		screen.DrawImage(s.seedBank, op)
 	} else {
 		// Fallback: Draw a dark brown rectangle
 		ebitenutil.DrawRect(screen,
-			config.SeedBankX, config.SeedBankY,
+			config.SeedBankX, currentY,
 			config.SeedBankWidth, config.SeedBankHeight,
 			color.RGBA{R: 101, G: 67, B: 33, A: 255}) // Dark brown
 	}
@@ -68,6 +72,7 @@ func (s *GameScene) drawSeedBank(screen *ebiten.Image) {
 // The text is horizontally centered to accommodate dynamic value lengths (e.g., 50, 150, 9990).
 // Story 10.8: 添加阳光不足时的闪烁效果（红黑闪烁）
 // Story 19.10: 保龄球关卡（initialSun == 0）不显示阳光槽
+// 滑入动画：与植物选择栏同步滑入
 func (s *GameScene) drawSunCounter(screen *ebiten.Image) {
 	// Story 19.10: 保龄球关卡（initialSun == 0）不显示阳光槽
 	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.InitialSun == 0 {
@@ -80,6 +85,9 @@ func (s *GameScene) drawSunCounter(screen *ebiten.Image) {
 		return
 	}
 
+	// 获取当前滑入动画 Y 位置
+	currentSeedBankY := s.getSeedBankCurrentY()
+
 	// Get current sun value from game state
 	sunValue := s.gameState.GetSun()
 	sunText := fmt.Sprintf("%d", sunValue)
@@ -89,9 +97,9 @@ func (s *GameScene) drawSunCounter(screen *ebiten.Image) {
 		textWidth, _ := text.Measure(sunText, s.sunCounterFont, 0)
 
 		// Calculate centered position
-		// Base position is relative to SeedBank
+		// Base position is relative to SeedBank (使用动态 Y 位置)
 		centerX := float64(config.SeedBankX + config.SunCounterOffsetX)
-		centerY := float64(config.SeedBankY + config.SunCounterOffsetY)
+		centerY := currentSeedBankY + float64(config.SunCounterOffsetY)
 
 		// Adjust X to center the text horizontally
 		sunDisplayX := centerX - textWidth/2
@@ -119,7 +127,7 @@ func (s *GameScene) drawSunCounter(screen *ebiten.Image) {
 		// Fallback: Use debug text if font failed to load
 		// Note: Debug text doesn't support centering easily
 		sunDisplayX := config.SeedBankX + config.SunCounterOffsetX
-		sunDisplayY := config.SeedBankY + config.SunCounterOffsetY
+		sunDisplayY := int(currentSeedBankY) + config.SunCounterOffsetY
 		ebitenutil.DebugPrintAt(screen, sunText, sunDisplayX, sunDisplayY)
 	}
 }
@@ -131,6 +139,7 @@ func (s *GameScene) drawSunCounter(screen *ebiten.Image) {
 // Story 19.5: 保龄球模式使用固定位置，不依赖选择栏
 // Story 19.x QA: 铲子教学关卡（有预设植物）强制显示铲子
 // 铲子位置紧挨选择栏右侧，与选择栏上对齐
+// 滑入动画：与植物选择栏同步滑入（非保龄球模式）
 func (s *GameScene) drawShovel(screen *ebiten.Image) {
 	// 教学关卡不显示铲子（玩家还不需要学习移除植物）
 	// 但是：铲子教学关卡（Level 1-5，有预设植物）需要显示铲子
@@ -151,6 +160,7 @@ func (s *GameScene) drawShovel(screen *ebiten.Image) {
 
 	// 计算铲子位置
 	var shovelX float64
+	var shovelY float64
 	// Story 19.5: 保龄球模式（initialSun == 0）使用相对于菜单按钮的位置
 	// Story 19.x QA: 铲子位置相对于菜单按钮偏左 10px
 	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.InitialSun == 0 {
@@ -159,16 +169,18 @@ func (s *GameScene) drawShovel(screen *ebiten.Image) {
 		// 铲子右边缘到菜单按钮左边缘的距离为 BowlingShovelGapFromMenuButton
 		// 铲子 X = 菜单按钮 X - 间距 - 铲子宽度
 		shovelX = menuButtonX - float64(config.BowlingShovelGapFromMenuButton) - float64(config.ShovelWidth)
+		// 保龄球模式使用固定 Y 位置
+		shovelY = float64(config.BowlingShovelY)
 	} else if s.seedBank != nil {
 		// 普通模式根据选择栏图片宽度动态计算
 		seedBankWidth := float64(s.seedBank.Bounds().Dx())
 		shovelX = float64(config.SeedBankX) + seedBankWidth + float64(config.ShovelGapFromSeedBank)
+		// 普通模式：与植物选择栏同步滑入
+		shovelY = s.getSeedBankCurrentY() + float64(config.ShovelY-config.SeedBankY)
 	} else {
 		shovelX = float64(config.ShovelX) // 默认值
+		shovelY = s.getSeedBankCurrentY() + float64(config.ShovelY-config.SeedBankY)
 	}
-
-	// 铲子 Y 位置：与选择栏上对齐
-	shovelY := float64(config.BowlingShovelY)
 
 	// Draw shovel slot background first
 	if s.shovelSlot != nil {

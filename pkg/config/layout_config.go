@@ -488,6 +488,16 @@ const (
 	// 与铲子卡槽上对齐（BowlingShovelY = 0）
 	ConveyorBeltTargetY = 0.0
 
+	// ========== 植物选择栏滑入动画配置参数（可手工调节） ==========
+
+	// SeedBankSlideInDuration 植物选择栏滑入时长（秒）
+	// 与传送带滑入时长一致
+	SeedBankSlideInDuration = 0.5
+
+	// SeedBankSlideInStartY 植物选择栏滑入起始 Y 位置（屏幕外）
+	// 与 SeedBankHeight (87) 相关，从屏幕上方外侧开始
+	SeedBankSlideInStartY = -100.0
+
 	// BowlingRedLineColumn 红线位置（第 3 列和第 4 列之间）
 	// 红线 X 坐标 = GridWorldStartX + BowlingRedLineColumn * CellWidth
 	BowlingRedLineColumn = 3

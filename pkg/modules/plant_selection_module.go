@@ -228,6 +228,15 @@ func (m *PlantSelectionModule) Draw(screen *ebiten.Image) {
 	m.cardRenderSystem.Draw(screen)
 }
 
+// DrawWithOffset 渲染所有植物卡片到屏幕，支持 Y 轴偏移
+// 用于植物选择栏滑入动画
+// 参数:
+//   - screen: 目标渲染屏幕
+//   - yOffset: Y 轴偏移量（正值向下，负值向上）
+func (m *PlantSelectionModule) DrawWithOffset(screen *ebiten.Image, yOffset float64) {
+	m.cardRenderSystem.DrawWithOffset(screen, yOffset)
+}
+
 // GetSelectedPlants 获取当前已选择的植物列表
 // 返回:
 //   - []string: 已选择的植物ID列表（如 ["peashooter", "sunflower"]）

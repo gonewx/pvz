@@ -40,6 +40,15 @@ func NewPlantCardRenderSystem(em *ecs.EntityManager, sunFont *text.GoTextFace) *
 // 自动过滤奖励卡片（有 RewardCardComponent 标记的卡片）
 // 奖励卡片由各自的系统（如 RewardAnimationSystem）自行渲染
 func (s *PlantCardRenderSystem) Draw(screen *ebiten.Image) {
+	s.DrawWithOffset(screen, 0)
+}
+
+// DrawWithOffset 渲染所有植物卡片到屏幕，支持 Y 轴偏移
+// 用于植物选择栏滑入动画
+// 参数:
+//   - screen: 目标屏幕
+//   - yOffset: Y 轴偏移量（正值向下，负值向上）
+func (s *PlantCardRenderSystem) DrawWithOffset(screen *ebiten.Image, yOffset float64) {
 	// 检查游戏是否冻结（僵尸获胜流程期间）
 	// 冻结时隐藏植物选择栏
 	freezeEntities := ecs.GetEntitiesWith1[*components.GameFreezeComponent](s.entityManager)
@@ -71,6 +80,7 @@ func (s *PlantCardRenderSystem) Draw(screen *ebiten.Image) {
 		}
 
 		// 调用工厂的统一渲染函数（所有渲染逻辑封装在工厂中）
-		entities.RenderPlantCard(screen, card, pos.X, pos.Y, s.sunFont, s.sunFontSize)
+		// 应用 Y 偏移量用于滑入动画
+		entities.RenderPlantCard(screen, card, pos.X, pos.Y+yOffset, s.sunFont, s.sunFontSize)
 	}
 }
