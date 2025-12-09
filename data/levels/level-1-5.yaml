@@ -45,7 +45,7 @@ rewardPlant: "potatomine"       # 完成后奖励土豆地雷（注意：无下�
 conveyorBelt:
   enabled: true
   capacity: 10
-  generationInterval: 3.5
+  generationInterval: 4
   cardPool:
     - type: "wallnut_bowling"
       weight: 85
@@ -54,17 +54,17 @@ conveyorBelt:
   # Story 19.12: 三阶段动态配置
   phaseConfigs:
     - progressThreshold: 0.0   # 前期 (0%-30%)
-      explodeNutWeight: 3
-      intervalMin: 3.5
-      intervalMax: 4.0
-    - progressThreshold: 0.3   # 中期 (30%-70%)
       explodeNutWeight: 5
-      intervalMin: 3.0
-      intervalMax: 3.5
+      intervalMin: 4.5
+      intervalMax: 5.0
+    - progressThreshold: 0.3   # 中期 (30%-70%)
+      explodeNutWeight: 8
+      intervalMin: 4.5
+      intervalMax: 5
     - progressThreshold: 0.7   # 终盘 (70%-100%)
       explodeNutWeight: 10
-      intervalMin: 3.0
-      intervalMax: 3.5
+      intervalMin: 4.5
+      intervalMax: 5
   # Story 19.12: 动态调节参数
   dynamicAdjustment:
     emptyBeltThreshold: 8.0        # 空带保底阈值（秒）

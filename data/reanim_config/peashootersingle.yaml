@@ -20,20 +20,28 @@ images:
 available_animations:
     - name: anim_idle
       display_name: idle
+      speed: 1.2
     - name: anim_head_idle
       display_name: head_idle
+      speed: 1.2
     - name: anim_shooting
       display_name: shooting
+      speed: 1.2
     - name: anim_full_idle
       display_name: full_idle
+      speed: 1.2
     - name: anim_stem
       display_name: stem
+      speed: 1.2
     - name: anim_sprout
       display_name: sprout
+      speed: 1.2
     - name: anim_face
       display_name: face
+      speed: 1.2
     - name: anim_blink
       display_name: blink
+      speed: 1.2
 animation_combos:
     - name: idle
       display_name: 待机
