@@ -7,11 +7,11 @@ import (
 	"log"
 	"os"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/config"
-	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/game"
-	"github.com/decker502/pvz/pkg/systems"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/systems"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -37,9 +37,9 @@ type VerifyGame struct {
 	gameState       *game.GameState
 	resourceManager *game.ResourceManager
 	reanimSystem    *systems.ReanimSystem
-	particleSystem  *systems.ParticleSystem           // 粒子系统（用于光晕效果）
-	rewardSystem    *systems.RewardAnimationSystem    // 奖励动画系统（封装所有渲染逻辑）
-	renderSystem    *systems.RenderSystem             // Reanim 渲染系统
+	particleSystem  *systems.ParticleSystem        // 粒子系统（用于光晕效果）
+	rewardSystem    *systems.RewardAnimationSystem // 奖励动画系统（封装所有渲染逻辑）
+	renderSystem    *systems.RenderSystem          // Reanim 渲染系统
 
 	debugFont *text.GoTextFace // 中文调试字体
 

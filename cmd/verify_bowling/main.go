@@ -7,13 +7,13 @@ import (
 	"log"
 	"os"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/config"
-	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/entities"
-	"github.com/decker502/pvz/pkg/game"
-	"github.com/decker502/pvz/pkg/systems"
-	"github.com/decker502/pvz/pkg/systems/behavior"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/entities"
+	"github.com/gonewx/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/systems"
+	"github.com/gonewx/pvz/pkg/systems/behavior"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -61,9 +61,9 @@ type VerifyBowlingGame struct {
 	zombieSpawnTimers [5]float64
 
 	// 统计信息
-	bowlingNutCount   int
-	zombieKillCount   int
-	totalBounceCount  int
+	bowlingNutCount  int
+	zombieKillCount  int
+	totalBounceCount int
 }
 
 // NewVerifyBowlingGame 创建验证游戏实例
