@@ -1050,6 +1050,62 @@ func TestResumeWaveTiming_InitializesTimer(t *testing.T) {
 	}
 }
 
+// TestResumeWaveTiming_ShovelTutorialPhase 测试铲子教学阶段暂停恢复不会初始化计时器
+// Bug Fix: Level 1-5 在铲子教学阶段暂停恢复后不应该触发僵尸刷新
+func TestResumeWaveTiming_ShovelTutorialPhase(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := &game.GameState{}
+
+	// 创建保龄球关卡配置
+	levelConfig := &config.LevelConfig{
+		ID:          "1-5",
+		OpeningType: "special",
+		Waves: []config.WaveConfig{
+			{Zombies: []config.ZombieGroup{{Type: "basic", Count: 1, Lanes: []int{1}}}},
+		},
+	}
+	gs.CurrentLevel = levelConfig
+
+	// 创建 LevelSystem（特殊关卡，计时器暂停）
+	ls := NewLevelSystem(em, gs, nil, nil, nil, nil)
+
+	// 模拟铲子教学阶段：创建 LevelPhaseComponent 并设置 CurrentPhase = 1
+	phaseEntity := em.CreateEntity()
+	phaseComp := &components.LevelPhaseComponent{
+		CurrentPhase: 1, // 铲子教学阶段
+		PhaseState:   components.PhaseStateActive,
+	}
+	em.AddComponent(phaseEntity, phaseComp)
+
+	// 获取计时器组件
+	timer, _ := ecs.GetComponent[*components.WaveTimerComponent](em, ls.waveTimingSystem.GetTimerEntityID())
+
+	// 验证初始状态：暂停且未初始化
+	if !timer.IsPaused {
+		t.Error("Timer should be paused initially")
+	}
+	if timer.CountdownCs != 0 {
+		t.Error("Timer CountdownCs should be 0 initially")
+	}
+
+	// 恢复波次计时（模拟暂停菜单恢复）
+	ls.ResumeWaveTiming()
+
+	// 重新获取计时器组件
+	timer, _ = ecs.GetComponent[*components.WaveTimerComponent](em, ls.waveTimingSystem.GetTimerEntityID())
+
+	// 验证计时器仍然处于未初始化状态（Bug Fix 验证点）
+	// 在铲子教学阶段，暂停恢复不应该初始化计时器
+	if timer.CountdownCs != 0 {
+		t.Errorf("Timer should NOT be initialized in shovel tutorial phase, got CountdownCs=%d", timer.CountdownCs)
+	}
+
+	// 验证计时器仍然暂停（因为未初始化，不会恢复）
+	if !timer.IsPaused {
+		t.Error("Timer should remain paused in shovel tutorial phase (not initialized)")
+	}
+}
+
 // TestLevelSystem_BowlingNoFlagWaveWarning 测试保龄球关卡不触发旗帜波警告
 func TestLevelSystem_BowlingNoFlagWaveWarning(t *testing.T) {
 	em := ecs.NewEntityManager()

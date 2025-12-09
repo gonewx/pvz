@@ -942,9 +942,30 @@ func (s *LevelSystem) PauseWaveTiming() {
 //
 // Story 17.6: 在游戏恢复时调用
 // Story 19.9: 特殊关卡（如保龄球）在阶段转场后调用，会自动初始化计时器
+// Bug Fix: 在铲子教学阶段（Phase 1）暂停恢复时，不应该初始化计时器
+//          只有在��龄球阶段（Phase 2）或转场完成后才应该初始化
 func (s *LevelSystem) ResumeWaveTiming() {
 	if s.waveTimingSystem == nil {
 		return
+	}
+
+	// Bug Fix: 检查是否处于铲子教学阶段（Phase 1）
+	// 如果存在 LevelPhaseComponent 且 CurrentPhase == 1，说明还在铲子教学阶段
+	// 此时不应该自动初始化波次计时器，只恢复暂停状态（如果已初始化）
+	phaseEntities := ecs.GetEntitiesWith1[*components.LevelPhaseComponent](s.entityManager)
+	if len(phaseEntities) > 0 {
+		phaseComp, ok := ecs.GetComponent[*components.LevelPhaseComponent](s.entityManager, phaseEntities[0])
+		if ok && phaseComp.CurrentPhase == 1 {
+			// 铲子教学阶段：只恢复暂停状态，不初始化计时器
+			// 计时器会在阶段转场完成后由 onActivateBowling 回调初始化
+			log.Printf("[LevelSystem] In shovel tutorial phase (Phase 1), skipping wave timer initialization on resume")
+			// 只有当计时器已经初始化（CountdownCs > 0）时才恢复
+			timer, timerOk := ecs.GetComponent[*components.WaveTimerComponent](s.entityManager, s.waveTimingSystem.GetTimerEntityID())
+			if timerOk && timer.CountdownCs > 0 {
+				s.waveTimingSystem.Resume()
+			}
+			return
+		}
 	}
 
 	// Story 19.9: 检查计时器是否需要初始化
