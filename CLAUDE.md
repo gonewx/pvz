@@ -110,12 +110,40 @@ pvz3/
 │   ├── config/                  # 配置加载
 │   └── utils/                   # 工具函数
 ├── assets/                      # 游戏资源（images/audio/fonts/effect）
+│   └── icons/                   # 应用图标（多平台）
+│       ├── windows/             # Windows ico + png
+│       ├── macos/               # macOS icon.iconset
+│       ├── linux/               # Linux 多尺寸 png
+│       ├── ios/                 # iOS AppIcon.appiconset
+│       ├── android/             # Android mipmap 图标
+│       └── web/                 # Web favicon + PWA 图标
 ├── data/                        # 外部化数据（YAML配置）
 │   ├── levels/                  # 关卡配置
 │   ├── reanim/                  # Reanim 动画定义
 │   └── reanim_config.yaml       # 动画配置
+├── scripts/                     # 构建脚本
+│   ├── build-apk.sh             # Android APK 构建
+│   ├── Info.plist               # macOS 应用配置
+│   └── pvz.desktop              # Linux 桌面入口
 ├── cmd/                         # 调试和验证工具
 └── docs/                        # 文档
+```
+
+## 构建命令
+
+使用 Makefile 管理构建流程：
+
+```bash
+make help              # 显示帮助
+make build             # 构建当前平台
+make build-windows     # 构建 Windows
+make build-linux       # 构建 Linux
+make build-darwin      # 构建 macOS (需要 macOS)
+make build-wasm        # 构建 WebAssembly
+make generate-icons    # 生成 Windows .syso 图标资源
+make package-linux     # 打包 Linux 发布包
+make build-darwin-app  # 构建 macOS .app 包
+make build-apk         # 构建 Android APK
 ```
 
 ## 编码规范

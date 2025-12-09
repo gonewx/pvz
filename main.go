@@ -44,6 +44,16 @@ func main() {
 	ebiten.SetWindowTitle("植物大战僵尸 - Go复刻版")
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
+	// 设置窗口图标
+	if icons, err := embedded.LoadWindowIcons(); err == nil {
+		ebiten.SetWindowIcon(icons)
+		if *verboseFlag {
+			log.Printf("[main] Window icons loaded: %d sizes", len(icons))
+		}
+	} else if *verboseFlag {
+		log.Printf("[main] Failed to load window icons: %v", err)
+	}
+
 	// 应用保存的全屏设置
 	gameState := game.GetGameState()
 	if settingsManager := gameState.GetSettingsManager(); settingsManager != nil {

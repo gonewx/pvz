@@ -237,36 +237,32 @@ EOF
 # 10. 复制 AAR 文件
 cp "$AAR_FILE" "$ANDROID_PROJECT/app/libs/"
 
-# 11. 创建简单图标
-echo_info "步骤 3/4: 生成应用图标..."
-ICON_SOURCE="$PROJECT_ROOT/assets/images/Store_PvZIcon.png"
+# 11. 复制应用图标
+echo_info "步骤 3/4: 复制应用图标..."
+ICON_DIR="$PROJECT_ROOT/assets/icons/android/res"
 
-if [ -f "$ICON_SOURCE" ]; then
-    echo_info "使用项目图标: $ICON_SOURCE"
+if [ -d "$ICON_DIR" ]; then
+    echo_info "使用项目图标: $ICON_DIR"
     for dpi in hdpi mdpi xhdpi xxhdpi xxxhdpi; do
-        cp -f "$ICON_SOURCE" "$ANDROID_PROJECT/app/src/main/res/mipmap-$dpi/ic_launcher.png"
-    done
-else
-    echo_warn "项目图标未找到 ($ICON_SOURCE)，尝试使用 Android SDK 默认图标"
-    for dpi in hdpi mdpi xhdpi xxhdpi xxxhdpi; do
-        SDK_ICON="$ANDROID_HOME/platforms/$PLATFORM_VERSION/data/res/drawable-$dpi/sym_def_app_icon.png"
-        if [ -f "$SDK_ICON" ]; then
-            cp -f "$SDK_ICON" "$ANDROID_PROJECT/app/src/main/res/mipmap-$dpi/ic_launcher.png"
+        SRC_ICON="$ICON_DIR/mipmap-$dpi/ic_launcher.png"
+        if [ -f "$SRC_ICON" ]; then
+            cp -f "$SRC_ICON" "$ANDROID_PROJECT/app/src/main/res/mipmap-$dpi/ic_launcher.png"
         fi
     done
+else
+    # 兜底：使用旧图标路径
+    echo_warn "新图标目录未找到，尝试使用旧图标..."
+    ICON_SOURCE="$PROJECT_ROOT/assets/images/Store_PvZIcon.png"
+    if [ -f "$ICON_SOURCE" ]; then
+        for dpi in hdpi mdpi xhdpi xxhdpi xxxhdpi; do
+            cp -f "$ICON_SOURCE" "$ANDROID_PROJECT/app/src/main/res/mipmap-$dpi/ic_launcher.png"
+        done
+    fi
 fi
 
-# 最后的兜底：如果图标仍然不存在，复制任意一个 PNG 或报错
+# 验证图标是否存在
 if [ ! -f "$ANDROID_PROJECT/app/src/main/res/mipmap-hdpi/ic_launcher.png" ]; then
-    echo_warn "图标生成仍然失败，尝试使用兜底图片..."
-    FALLBACK_ICON="$PROJECT_ROOT/assets/images/Almanac_ZombieBlank.png"
-    if [ -f "$FALLBACK_ICON" ]; then
-        for dpi in hdpi mdpi xhdpi xxhdpi xxxhdpi; do
-            cp -f "$FALLBACK_ICON" "$ANDROID_PROJECT/app/src/main/res/mipmap-$dpi/ic_launcher.png"
-        done
-    else
-        echo_error "无法生成应用图标，构建可能会失败 (missing mipmap/ic_launcher)"
-    fi
+    echo_error "图标复制失败，构建可能会失败"
 fi
 
 # 12. 使用 Gradle Wrapper 构建 APK

@@ -42,20 +42,15 @@
 - 🌱 豌豆射手 (Peashooter)
 - 🛡️ 坚果墙 (Wall-nut)
 - 💣 樱桃炸弹 (Cherry Bomb)
-- 🥶 寒冰射手 (Snow Pea)
-- 👄 大嘴花 (Chomper)
-- 🌱🌱 双发射手 (Repeater)
 
 #### 僵尸类型
 - 🧟 普通僵尸 (Normal Zombie)
 - 🚧 路障僵尸 (Conehead Zombie)
-- 🪣 铁桶僵尸 (Buckethead Zombie)
-- 🏃 撑杆僵尸 (Pole Vaulting Zombie)
 
 #### 关卡内容
-- ✅ **第一章（前院白天）** - 关卡 1-1 至 1-10
+- ✅ **第一章（前院白天）** - 关卡 1-1 至 1-5
 - ✅ **教学系统** - 1-1 单行草地引导
-- ✅ **特殊关卡** - 1-5 坚果保龄球、1-10 传送带模式
+- ✅ **特殊关卡** - 1-5 坚果保龄球
 - ✅ **开场动画** - 镜头平移、僵尸预告
 - ✅ **选卡界面** - 植物选择、解锁系统
 
@@ -70,8 +65,8 @@
 
 ### 环境要求
 
-- **Go 版本**: 1.21 或更高
-- **操作系统**: Windows / macOS / Linux
+- **Go 版本**: 1.24 或更高
+- **操作系统**: Windows / macOS / Linux / Android
 - **内存**: 至少 2GB RAM
 - **显卡**: 支持 OpenGL 2.1+
 
@@ -79,8 +74,8 @@
 
 ```bash
 # 1. 克隆仓库
-git clone <repository-url>
-cd pvz3
+git clone https://github.com/gonewx/pvz
+cd pvz
 
 # 2. 下载依赖
 go mod download
@@ -94,17 +89,37 @@ go run .
 ### 构建可执行文件
 
 ```bash
-# 构建当前平台
+# 使用 Makefile 构建（推荐）
+make build                # 构建当前平台
+make build-linux          # 构建 Linux (amd64 + arm64)
+make build-windows        # 构建 Windows (amd64 + arm64)
+make build-darwin         # 构建 macOS (需要 macOS 主机)
+make build-wasm           # 构建 WebAssembly
+
+# 手动构建
 go build -o pvz-go .
 
 # 构建优化版本（体积更小）
 go build -ldflags="-s -w" -o pvz-go .
+```
 
-# 交叉编译 Windows 版本
-GOOS=windows GOARCH=amd64 go build -o pvz-go.exe .
+### 构建带图标的发布版本
 
-# 交叉编译 macOS 版本
-GOOS=darwin GOARCH=amd64 go build -o pvz-go-mac .
+```bash
+# 生成 Windows 图标资源 (.syso)
+make generate-icons
+
+# 打包 Linux 发布包（含图标和 .desktop）
+make package-linux
+
+# 构建 macOS .app 包（需要 macOS）
+make build-darwin-app
+
+# 构建 Android APK
+make build-apk
+
+# 查看 iOS 图标使用说明
+make ios-icons-info
 ```
 
 详细说明请参见 **[快速开始指南](docs/quickstart.md)**
@@ -131,7 +146,14 @@ pvz3/
 │   ├── images/             # 图片资源（spritesheets）
 │   ├── audio/              # 音频资源
 │   ├── fonts/              # 字体文件
-│   └── effect/             # 粒子配置
+│   ├── effect/             # 粒子配置
+│   └── icons/              # 应用图标（多平台）
+│       ├── windows/        # Windows ico 和 png
+│       ├── macos/          # macOS iconset
+│       ├── linux/          # Linux 多尺寸 png
+│       ├── ios/            # iOS AppIcon.appiconset
+│       ├── android/        # Android mipmap 图标
+│       └── web/            # Web favicon 和 PWA 图标
 ├── data/                   # 外部化游戏数据
 │   ├── levels/             # 关卡配置（YAML）
 |   ├── reanim/             # Reanim 动画定义
@@ -145,6 +167,10 @@ pvz3/
 │   ├── game/               # 游戏核心管理器
 │   ├── utils/              # 通用工具函数
 │   └── config/             # 配置加载与管理
+├── scripts/                # 构建脚本
+│   ├── build-apk.sh        # Android APK 构建
+│   ├── Info.plist          # macOS 应用配置
+│   └── pvz.desktop         # Linux 桌面入口
 ├── docs/                   # 文档
 └── .meta/                  # 参考资料和元数据
 ```

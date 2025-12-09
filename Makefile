@@ -32,6 +32,10 @@ WASM_HTML_TEMPLATE := scripts/wasm_index.html
 ANDROID_API := 23
 JAVA_PKG := com.decker.pvz
 
+# 图标相关路径
+ICON_DIR := assets/icons
+SCRIPTS_DIR := scripts
+
 # ============================================================================
 # 默认目标
 # ============================================================================
@@ -71,6 +75,7 @@ help: ## 显示帮助信息
 	@echo "    all                构建所有桌面平台 + WASM"
 	@echo ""
 	@echo "  其他命令:"
+	@echo "    generate-icons     生成 Windows .syso 资源文件"
 	@echo "    clean              清理构建目录"
 	@echo "    clean-mobile       清理移动端资源副本"
 	@echo "    help               显示此帮助信息"
@@ -293,4 +298,85 @@ clean: clean-mobile ## 清理构建目录
 # 默认目标设置
 # ============================================================================
 .DEFAULT_GOAL := help
+
+# ============================================================================
+# 图标和资源生成
+# ============================================================================
+.PHONY: generate-icons generate-windows-syso build-darwin-app
+
+generate-icons: generate-windows-syso ## 生成所有平台图标资源
+
+generate-windows-syso: ## 生成 Windows .syso 资源文件 (需要 goversioninfo)
+	@echo "==> 生成 Windows 资源文件..."
+	@which goversioninfo > /dev/null || (echo "安装 goversioninfo..." && go install github.com/josephspurrier/goversioninfo/cmd/goversioninfo@latest)
+	@goversioninfo -64 -o resource_windows_amd64.syso
+	@goversioninfo -arm -o resource_windows_arm64.syso
+	@echo "==> 完成: resource_windows_amd64.syso, resource_windows_arm64.syso"
+
+build-darwin-app: build-darwin-universal ## 构建 macOS .app 包 (需要 macOS 主机)
+ifeq ($(GOOS_CURRENT),darwin)
+	@echo "==> 创建 macOS .app 包..."
+	@mkdir -p $(BUILD_DIR)/darwin-app/$(APP_NAME).app/Contents/MacOS
+	@mkdir -p $(BUILD_DIR)/darwin-app/$(APP_NAME).app/Contents/Resources
+	@cp $(BUILD_DIR)/darwin-universal/$(APP_NAME) $(BUILD_DIR)/darwin-app/$(APP_NAME).app/Contents/MacOS/
+	@cp $(SCRIPTS_DIR)/Info.plist $(BUILD_DIR)/darwin-app/$(APP_NAME).app/Contents/
+	@if [ -d "$(ICON_DIR)/macos/icon.iconset" ]; then \
+		iconutil -c icns $(ICON_DIR)/macos/icon.iconset -o $(BUILD_DIR)/darwin-app/$(APP_NAME).app/Contents/Resources/icon.icns; \
+	fi
+	@echo "==> 完成: $(BUILD_DIR)/darwin-app/$(APP_NAME).app"
+else
+	@echo "==> 跳过 macOS .app 构建 (需要在 macOS 主机上运行)"
+endif
+
+# ============================================================================
+# Linux 打包 (带图标和 .desktop 文件)
+# ============================================================================
+.PHONY: package-linux
+
+package-linux: build-linux-amd64 ## 打包 Linux 发布包 (包含图标和 .desktop)
+	@echo "==> 打包 Linux 发布包..."
+	@mkdir -p $(BUILD_DIR)/linux-package/usr/bin
+	@mkdir -p $(BUILD_DIR)/linux-package/usr/share/applications
+	@mkdir -p $(BUILD_DIR)/linux-package/usr/share/icons/hicolor/16x16/apps
+	@mkdir -p $(BUILD_DIR)/linux-package/usr/share/icons/hicolor/32x32/apps
+	@mkdir -p $(BUILD_DIR)/linux-package/usr/share/icons/hicolor/48x48/apps
+	@mkdir -p $(BUILD_DIR)/linux-package/usr/share/icons/hicolor/64x64/apps
+	@mkdir -p $(BUILD_DIR)/linux-package/usr/share/icons/hicolor/128x128/apps
+	@mkdir -p $(BUILD_DIR)/linux-package/usr/share/icons/hicolor/256x256/apps
+	@mkdir -p $(BUILD_DIR)/linux-package/usr/share/icons/hicolor/512x512/apps
+	@cp $(BUILD_DIR)/linux-amd64/$(APP_NAME) $(BUILD_DIR)/linux-package/usr/bin/
+	@cp $(SCRIPTS_DIR)/pvz.desktop $(BUILD_DIR)/linux-package/usr/share/applications/
+	@cp $(ICON_DIR)/linux/icon_16.png $(BUILD_DIR)/linux-package/usr/share/icons/hicolor/16x16/apps/pvz.png
+	@cp $(ICON_DIR)/linux/icon_32.png $(BUILD_DIR)/linux-package/usr/share/icons/hicolor/32x32/apps/pvz.png
+	@cp $(ICON_DIR)/linux/icon_48.png $(BUILD_DIR)/linux-package/usr/share/icons/hicolor/48x48/apps/pvz.png
+	@cp $(ICON_DIR)/linux/icon_64.png $(BUILD_DIR)/linux-package/usr/share/icons/hicolor/64x64/apps/pvz.png
+	@cp $(ICON_DIR)/linux/icon_128.png $(BUILD_DIR)/linux-package/usr/share/icons/hicolor/128x128/apps/pvz.png
+	@cp $(ICON_DIR)/linux/icon_256.png $(BUILD_DIR)/linux-package/usr/share/icons/hicolor/256x256/apps/pvz.png
+	@cp $(ICON_DIR)/linux/icon_512.png $(BUILD_DIR)/linux-package/usr/share/icons/hicolor/512x512/apps/pvz.png
+	@echo "==> 完成: $(BUILD_DIR)/linux-package/"
+	@echo "==> 可使用以下命令安装: sudo cp -r $(BUILD_DIR)/linux-package/* /"
+
+# ============================================================================
+# iOS 图标说明
+# ============================================================================
+.PHONY: ios-icons-info
+
+ios-icons-info: ## 显示 iOS 图标使用说明
+	@echo ""
+	@echo "iOS 图标使用说明"
+	@echo "============================================"
+	@echo ""
+	@echo "iOS 图标已生成在: $(ICON_DIR)/ios/AppIcon.appiconset/"
+	@echo ""
+	@echo "使用方法:"
+	@echo "  1. 在 Xcode 中打开你的 iOS 项目"
+	@echo "  2. 在项目导航器中找到 Assets.xcassets"
+	@echo "  3. 右键点击 Assets.xcassets -> Show in Finder"
+	@echo "  4. 将 $(ICON_DIR)/ios/AppIcon.appiconset 文件夹"
+	@echo "     复制到 Assets.xcassets 目录下"
+	@echo "  5. 返回 Xcode，图标应该自动显示"
+	@echo ""
+	@echo "或者使用以下命令复制 (在 macOS 上):"
+	@echo "  cp -r $(ICON_DIR)/ios/AppIcon.appiconset /path/to/YourProject/Assets.xcassets/"
+	@echo ""
 
