@@ -100,9 +100,10 @@ func TestLevel1_3_Configuration(t *testing.T) {
 	})
 }
 
-// TestLevel1_4_Configuration 测试关卡 1-4 配置（Sprint Change 2025-10-28）
+// TestLevel1_4_Configuration 测试关卡 1-4 配置解析逻辑
+// 使用 testdata 目录的测试数据，不依赖真实配置文件
 func TestLevel1_4_Configuration(t *testing.T) {
-	config, err := LoadLevelConfig("../../data/levels/level-1-4.yaml")
+	config, err := LoadLevelConfig("testdata/level-1-4-test.yaml")
 	if err != nil {
 		t.Fatalf("Failed to load level-1-4.yaml: %v", err)
 	}

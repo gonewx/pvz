@@ -1,0 +1,230 @@
+# 测试用关卡配置：模拟 1-5 保龄球关卡
+# 用于验证配置解析逻辑，与正式配置独立
+id: "1-5"
+name: "坚果保龄球"
+description: "铲子教学 + 保龄球迷你游戏"
+
+flags: 0                        # 保龄球关卡没有旗帜概念
+sceneType: "day"
+rowMax: 5
+openingType: "special"
+enabledLanes: [1, 2, 3, 4, 5]
+availablePlants: []             # 保龄球模式不使用植物卡片
+skipOpening: true
+initialSun: 0
+
+specialRules: "bowling"
+rewardPlant: "potatomine"
+
+# 传送带配置
+conveyorBelt:
+  enabled: true
+  capacity: 10
+  generationInterval: 4
+  cardPool:
+    - type: "wallnut_bowling"
+      weight: 85
+    - type: "explode_o_nut"
+      weight: 15
+
+# 16 波配置：无旗帜（保龄球关卡特殊规则）
+waves:
+  # 阶段一：热身（仅普通僵尸）
+  - waveNum: 1
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [2, 3, 4]
+        count: 1
+        spawnInterval: 2.5
+
+  - waveNum: 2
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 2
+        spawnInterval: 2.5
+
+  - waveNum: 3
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 2
+        spawnInterval: 2.5
+
+  # 阶段二：引入路障僵尸
+  - waveNum: 4
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 2.5
+      - type: "conehead"
+        lanes: [2, 3, 4]
+        count: 1
+        spawnInterval: 2.5
+
+  - waveNum: 5
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 2
+        spawnInterval: 2.5
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 2.5
+
+  - waveNum: 6
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 2
+        spawnInterval: 2.0
+      - type: "conehead"
+        lanes: [2, 4]
+        count: 2
+        spawnInterval: 2.0
+
+  - waveNum: 7
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 3
+        spawnInterval: 2.0
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 2.0
+
+  - waveNum: 8
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 3
+        spawnInterval: 2.0
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 2
+        spawnInterval: 2.0
+
+  # 阶段三：高压进攻
+  - waveNum: 9
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 4
+        spawnInterval: 1.8
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 2
+        spawnInterval: 1.8
+
+  - waveNum: 10
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 4
+        spawnInterval: 1.5
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 3
+        spawnInterval: 1.5
+
+  - waveNum: 11
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 5
+        spawnInterval: 1.5
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 3
+        spawnInterval: 1.5
+
+  - waveNum: 12
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 5
+        spawnInterval: 1.2
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 4
+        spawnInterval: 1.2
+
+  - waveNum: 13
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 6
+        spawnInterval: 1.2
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 4
+        spawnInterval: 1.2
+
+  - waveNum: 14
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 6
+        spawnInterval: 1.0
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 5
+        spawnInterval: 1.0
+
+  - waveNum: 15
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 7
+        spawnInterval: 1.0
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 5
+        spawnInterval: 1.0
+
+  # 阶段四：最终波
+  - waveNum: 16
+    type: "Final"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 8
+        spawnInterval: 0.8
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 6
+        spawnInterval: 0.8

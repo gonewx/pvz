@@ -66,6 +66,16 @@ const (
 	// ZombieGroanMaxInterval 僵尸呻吟音效最大间隔（秒）
 	// 增加随机性，避免呻吟过于规律
 	ZombieGroanMaxInterval = 10.0
+
+	// ZombieActivationDelayMin 僵尸激活延迟最小值（秒）
+	// 同一波次僵尸触发后，每个僵尸等待随机延迟后才开始移动
+	// 用于实现散落入场效果，避免同时进入画面显得整齐
+	ZombieActivationDelayMin = 0.0
+
+	// ZombieActivationDelayMax 僵尸激活延迟最大值（秒）
+	// 建议值范围：1.0 - 3.0
+	// 值越大，同一波僵尸入场时间差越明显
+	ZombieActivationDelayMax = 2.0
 )
 
 // Projectile Configuration (子弹配置)

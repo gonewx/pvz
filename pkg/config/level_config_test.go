@@ -1491,9 +1491,10 @@ func TestPresetPlant_Struct(t *testing.T) {
 
 // ========== Story 19.9: 保龄球关卡配置测试 ==========
 
-// TestLoadLevelConfig_Bowling_RealFile 测试加载实际的 level-1-5.yaml 配置
+// TestLoadLevelConfig_Bowling_RealFile 测试保龄球关卡配置解析逻辑
+// 使用 testdata 目录的测试数据，不依赖真实配置文件
 func TestLoadLevelConfig_Bowling_RealFile(t *testing.T) {
-	config, err := LoadLevelConfig("../../data/levels/level-1-5.yaml")
+	config, err := LoadLevelConfig("testdata/level-1-5-bowling-test.yaml")
 	if err != nil {
 		t.Fatalf("LoadLevelConfig() failed: %v", err)
 	}
@@ -1561,8 +1562,9 @@ func TestLoadLevelConfig_Bowling_RealFile(t *testing.T) {
 }
 
 // TestLoadLevelConfig_Bowling_WavePhases 测试保龄球关卡的四阶段波次结构
+// 使用 testdata 目录的测试数据，不依赖真实配置文件
 func TestLoadLevelConfig_Bowling_WavePhases(t *testing.T) {
-	config, err := LoadLevelConfig("../../data/levels/level-1-5.yaml")
+	config, err := LoadLevelConfig("testdata/level-1-5-bowling-test.yaml")
 	if err != nil {
 		t.Fatalf("LoadLevelConfig() failed: %v", err)
 	}

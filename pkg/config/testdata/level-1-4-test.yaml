@@ -1,0 +1,97 @@
+# 测试用关卡配置：模拟 1-4 关卡
+# 用于验证配置解析逻辑，与正式配置独立
+id: "1-4"
+name: "前院白天 1-4"
+description: "综合教学测试，引入铁桶僵尸"
+flags: 1
+sceneType: "day"
+rowMax: 5
+enabledLanes: [1, 2, 3, 4, 5]
+availablePlants:
+  - "peashooter"
+  - "sunflower"
+  - "cherrybomb"
+  - "wallnut"
+
+# 10 波配置：9 小波 + 1 旗帜波
+waves:
+  - waveNum: 1
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+
+  - waveNum: 2
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+
+  - waveNum: 3
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+
+  - waveNum: 4
+    type: "Fixed"
+    zombies:
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+
+  - waveNum: 5
+    type: "Fixed"
+    zombies:
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+
+  - waveNum: 6
+    type: "Fixed"
+    zombies:
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+
+  - waveNum: 7
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 3
+
+  - waveNum: 8
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 2
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+
+  - waveNum: 9
+    type: "Fixed"
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 3
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 2
+
+  - waveNum: 10
+    type: "Final"
+    isFlag: true
+    flagIndex: 1
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 6
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 2
