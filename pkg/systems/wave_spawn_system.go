@@ -236,7 +236,8 @@ func (s *WaveSpawnSystem) PreSpawnAllWaves() int {
 
 // ActivateWave 激活指定波次的僵尸
 //
-// 使该波次的所有僵尸开始向左移动（进攻）
+// 使该波次的所有僵尸开始等待激活（根据各自的延迟时间）
+// 僵尸会在延迟时间后才真正开始移动，实现散落入场效果
 //
 // 参数：
 //
@@ -244,7 +245,7 @@ func (s *WaveSpawnSystem) PreSpawnAllWaves() int {
 //
 // 返回：
 //
-//	激活的僵尸数量
+//	标记为等待激活的僵尸数量
 func (s *WaveSpawnSystem) ActivateWave(waveIndex int) int {
 	// 查询所有带 ZombieWaveStateComponent 的僵尸
 	zombieEntities := ecs.GetEntitiesWith1[*components.ZombieWaveStateComponent](s.entityManager)
@@ -256,86 +257,131 @@ func (s *WaveSpawnSystem) ActivateWave(waveIndex int) int {
 		audioManager.PlaySound(groanSounds[randomIndex])
 	}
 
-	activated := 0
+	pendingCount := 0
 	for _, entityID := range zombieEntities {
 		waveState, ok := ecs.GetComponent[*components.ZombieWaveStateComponent](s.entityManager, entityID)
 		if !ok {
 			continue
 		}
 
-		// 只激活指定波次且未激活的僵尸
-		if waveState.WaveIndex == waveIndex && !waveState.IsActivated {
-			// 标记为已激活
-			waveState.IsActivated = true
+		// 只处理指定波次且未激活的僵尸
+		if waveState.WaveIndex == waveIndex && !waveState.IsActivated && !waveState.IsPendingActivation {
+			// 标记为等待激活状态
+			waveState.IsPendingActivation = true
+			waveState.ActivationTimer = 0
+			pendingCount++
 
-			// 获取僵尸当前位置
-			pos, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
-			if hasPos {
-				// 计算当前所在行（0-4）
-				currentRow := int((pos.Y - config.GridWorldStartY - config.ZombieVerticalOffset - config.CellHeight/2.0) / config.CellHeight)
-				if currentRow < 0 {
-					currentRow = 0
-				}
-				if currentRow > 4 {
-					currentRow = 4
-				}
-
-				// 从 enabledLanes 中随机选择一个有效行作为目标行
-				targetRow := s.randomEnabledLane()
-
-				log.Printf("[WaveSpawnSystem] Zombie %d activating: currentRow=%d, targetRow=%d", entityID, currentRow, targetRow)
-
-				// 如果当前行不是目标行，添加目标行组件
-				if currentRow != targetRow {
-					s.addTargetLaneComponent(entityID, targetRow, pos.Y)
-					log.Printf("[WaveSpawnSystem] Zombie %d will transition from row %d to row %d", entityID, currentRow, targetRow)
-				}
-			}
-
-			// 启动僵尸移动（设置X轴速度）
-			if vel, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID); ok {
-				// 如果僵尸还在行转换中（VY != 0），保持Y轴速度不变
-				// 只设置X轴速度
-				if vel.VX == 0 {
-					vel.VX = -23.0 // 僵尸标准移动速度
-					log.Printf("[WaveSpawnSystem] Activated zombie %d (wave %d, index %d), VX=%.1f",
-						entityID, waveIndex, waveState.IndexInWave, vel.VX)
-				}
-			}
-
-			// 使用组件通信替代直接调用
-			// 僵尸使用配置驱动的动画组合（自动隐藏装备轨道）
-			if behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID); ok {
-				if behavior.ZombieAnimState == components.ZombieAnimIdle {
-					behavior.ZombieAnimState = components.ZombieAnimWalking
-					// Determine correct unit ID based on behavior type
-					unitID := types.UnitIDZombie
-					switch behavior.Type {
-					case components.BehaviorZombieConehead:
-						unitID = types.UnitIDZombieConehead
-					case components.BehaviorZombieBuckethead:
-						unitID = types.UnitIDZombieBuckethead
-					}
-
-					ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
-						UnitID:    unitID,
-						ComboName: "walk",
-						Processed: false,
-					})
-					log.Printf("[WaveSpawnSystem] Zombie %d 添加行走动画命令 (activated)", entityID)
-				}
-			}
-
-			activated++
-
-			// 增加已激活僵尸计数（用于计算场上僵尸数）
-			// zombiesOnField = TotalZombiesSpawned - ZombiesKilled
-			s.gameState.IncrementZombiesSpawned(1)
+			log.Printf("[WaveSpawnSystem] Zombie %d marked for pending activation (wave %d, delay=%.2fs)",
+				entityID, waveIndex, waveState.ActivationDelay)
 		}
 	}
 
-	log.Printf("[WaveSpawnSystem] Activated wave %d: %d zombies", waveIndex, activated)
-	return activated
+	log.Printf("[WaveSpawnSystem] Wave %d: %d zombies marked for pending activation", waveIndex, pendingCount)
+	return pendingCount
+}
+
+// activateZombieNow 立即激活单个僵尸
+//
+// 执行僵尸的实际激活逻辑：设置速度、切换动画、分配目标行
+func (s *WaveSpawnSystem) activateZombieNow(entityID ecs.EntityID, waveState *components.ZombieWaveStateComponent) {
+	// 标记为已激活
+	waveState.IsActivated = true
+	waveState.IsPendingActivation = false
+
+	// 获取僵尸当前位置
+	pos, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+	if hasPos {
+		// 计算当前所在行（0-4）
+		currentRow := int((pos.Y - config.GridWorldStartY - config.ZombieVerticalOffset - config.CellHeight/2.0) / config.CellHeight)
+		if currentRow < 0 {
+			currentRow = 0
+		}
+		if currentRow > 4 {
+			currentRow = 4
+		}
+
+		// 从 enabledLanes 中随机选择一个有效行作为目标行
+		targetRow := s.randomEnabledLane()
+
+		log.Printf("[WaveSpawnSystem] Zombie %d activating: currentRow=%d, targetRow=%d", entityID, currentRow, targetRow)
+
+		// 如果当前行不是目标行，添加目标行组件
+		if currentRow != targetRow {
+			s.addTargetLaneComponent(entityID, targetRow, pos.Y)
+			log.Printf("[WaveSpawnSystem] Zombie %d will transition from row %d to row %d", entityID, currentRow, targetRow)
+		}
+	}
+
+	// 启动僵尸移动（设置X轴速度）
+	if vel, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID); ok {
+		// 如果僵尸还在行转换中（VY != 0），保持Y轴速度不变
+		// 只设置X轴速度
+		if vel.VX == 0 {
+			vel.VX = -23.0 // 僵尸标准移动速度
+			log.Printf("[WaveSpawnSystem] Activated zombie %d (wave %d, index %d), VX=%.1f",
+				entityID, waveState.WaveIndex, waveState.IndexInWave, vel.VX)
+		}
+	}
+
+	// 使用组件通信替代直接调用
+	// 僵尸使用配置驱动的动画组合（自动隐藏装备轨道）
+	if behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID); ok {
+		if behavior.ZombieAnimState == components.ZombieAnimIdle {
+			behavior.ZombieAnimState = components.ZombieAnimWalking
+			// Determine correct unit ID based on behavior type
+			unitID := types.UnitIDZombie
+			switch behavior.Type {
+			case components.BehaviorZombieConehead:
+				unitID = types.UnitIDZombieConehead
+			case components.BehaviorZombieBuckethead:
+				unitID = types.UnitIDZombieBuckethead
+			}
+
+			ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
+				UnitID:    unitID,
+				ComboName: "walk",
+				Processed: false,
+			})
+			log.Printf("[WaveSpawnSystem] Zombie %d 添加行走动画命令 (activated)", entityID)
+		}
+	}
+
+	// 增加已激活僵尸计数（用于计算场上僵尸数）
+	// zombiesOnField = TotalZombiesSpawned - ZombiesKilled
+	s.gameState.IncrementZombiesSpawned(1)
+}
+
+// UpdatePendingActivations 更新等待激活的僵尸
+//
+// 每帧调用，检查所有等待激活的僵尸，当延迟时间到达时激活它���
+// 这样可以实现同一波次僵尸错开入场的散落效果
+//
+// 参数：
+//
+//	dt - 距离上一帧的时间间隔（秒）
+func (s *WaveSpawnSystem) UpdatePendingActivations(dt float64) {
+	// 查询所有带 ZombieWaveStateComponent 的僵尸
+	zombieEntities := ecs.GetEntitiesWith1[*components.ZombieWaveStateComponent](s.entityManager)
+
+	for _, entityID := range zombieEntities {
+		waveState, ok := ecs.GetComponent[*components.ZombieWaveStateComponent](s.entityManager, entityID)
+		if !ok {
+			continue
+		}
+
+		// 只处理等待激活中的僵尸
+		if waveState.IsPendingActivation && !waveState.IsActivated {
+			// 更新计时器
+			waveState.ActivationTimer += dt
+
+			// 检查是否达到激活延迟
+			if waveState.ActivationTimer >= waveState.ActivationDelay {
+				// 执行实际激活
+				s.activateZombieNow(entityID, waveState)
+				log.Printf("[WaveSpawnSystem] Zombie %d activated after %.2fs delay", entityID, waveState.ActivationDelay)
+			}
+		}
+	}
 }
 
 // SpawnWaveRealtime 实时生成并激活指定波次的僵尸
@@ -655,10 +701,17 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 	}
 
 	// 添加波次状态组件（标记为待命状态）
+	// 为每个僵尸分配随机激活延迟，实现散落入场效果
+	activationDelay := config.ZombieActivationDelayMin +
+		rand.Float64()*(config.ZombieActivationDelayMax-config.ZombieActivationDelayMin)
+
 	ecs.AddComponent(s.entityManager, entityID, &components.ZombieWaveStateComponent{
-		WaveIndex:   waveIndex,
-		IsActivated: false, // 初始状态：待命
-		IndexInWave: indexInWave,
+		WaveIndex:           waveIndex,
+		IsActivated:         false, // 初始状态：待命
+		IndexInWave:         indexInWave,
+		ActivationDelay:     activationDelay,
+		ActivationTimer:     0,
+		IsPendingActivation: false,
 	})
 
 	// 移除或清零速度组件（僵尸初始不移动）

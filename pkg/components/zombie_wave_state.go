@@ -15,4 +15,18 @@ type ZombieWaveStateComponent struct {
 	// IndexInWave 在本波中的索引（0, 1, 2...）
 	// 用于计算站位位置（避免重叠）
 	IndexInWave int
+
+	// ActivationDelay 激活延迟时间（秒）
+	// 波次触发后，僵尸需等待此时间后才开始移动
+	// 用于实现同一波次僵尸错开入场的散落效果
+	ActivationDelay float64
+
+	// ActivationTimer 激活计时器（秒）
+	// 波次触发后开始计时，达到 ActivationDelay 后激活
+	ActivationTimer float64
+
+	// IsPendingActivation 是否等待激活中
+	// true: 波次已触发但延迟未到，正在等待
+	// false: 尚未触发或已完成激活
+	IsPendingActivation bool
 }
