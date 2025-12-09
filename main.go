@@ -41,7 +41,7 @@ func main() {
 
 	// 设置窗口属性
 	ebiten.SetWindowSize(800, 600)
-	ebiten.SetWindowTitle("植物大战僵尸 - Go复刻版")
+	ebiten.SetWindowTitle("植物大战僵尸 - AI复刻版")
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 
 	// 设置窗口图标
