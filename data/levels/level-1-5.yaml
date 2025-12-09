@@ -58,11 +58,11 @@ conveyorBelt:
       intervalMin: 4.5
       intervalMax: 5.0
     - progressThreshold: 0.3   # 中期 (30%-70%)
-      explodeNutWeight: 8
+      explodeNutWeight: 10
       intervalMin: 4.5
       intervalMax: 5
     - progressThreshold: 0.7   # 终盘 (70%-100%)
-      explodeNutWeight: 10
+      explodeNutWeight: 20
       intervalMin: 4.5
       intervalMax: 5
   # Story 19.12: 动态调节参数
