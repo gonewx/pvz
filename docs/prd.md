@@ -1,4 +1,4 @@
-# 植物大战僵尸 Go 复刻版 Product Requirements Document (PRD)
+# 植物大战僵尸 AI 复刻版 Product Requirements Document (PRD)
 
 ## **1. Goals and Background Context (目标与背景上下文)**
 

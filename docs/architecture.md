@@ -1,4 +1,4 @@
-# 植物大战僵尸 Go 复刻版 Architecture Document
+# 植物大战僵尸 AI 复刻版 Architecture Document
 
 ## **1. High Level Architecture (高阶架构)**
 

@@ -1,4 +1,4 @@
-# Project Brief: 植物大战僵尸 Go 复刻版
+# Project Brief: 植物大战僵尸 AI 复刻版
 
 ## **1. Executive Summary (执行摘要)**
 

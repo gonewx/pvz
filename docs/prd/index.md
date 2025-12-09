@@ -1,8 +1,8 @@
-# 植物大战僵尸 Go 复刻版 Product Requirements Document (PRD)
+# 植物大战僵尸 AI 复刻版 Product Requirements Document (PRD)
 
 ## Table of Contents
 
-- [植物大战僵尸 Go 复刻版 Product Requirements Document (PRD)](#table-of-contents)
+- [植物大战僵尸 AI 复刻版 Product Requirements Document (PRD)](#table-of-contents)
   - [1. Goals and Background Context (目标与背景上下文)](#1-goals-and-background-context-目标与背景上下文)
   - [2. Requirements (需求)](#2-requirements-需求)
   - [3. User Interface Design Goals (用户界面设计目标)](#3-user-interface-design-goals-用户界面设计目标)
