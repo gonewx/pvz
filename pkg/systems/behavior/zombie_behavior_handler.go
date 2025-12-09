@@ -2,6 +2,7 @@ package behavior
 
 import (
 	"log"
+	"math/rand"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
@@ -32,11 +33,12 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 
 		if health.CurrentHealth <= 0 {
 			// 生命值 <= 0，触发死亡状态转换
-			// 检查是否被爆炸杀死（爆炸坚果、樱桃炸弹等），触发烧焦死亡动画
-			if health.KilledByExplosion {
+			// 根据死亡效果类型选择不同的死亡动画
+			switch health.DeathEffectType {
+			case components.DeathEffectExplosion:
 				log.Printf("[BehaviorSystem] 僵尸 %d 被爆炸杀死 (HP=%d)，触发烧焦死亡", entityID, health.CurrentHealth)
 				s.triggerZombieExplosionDeath(entityID)
-			} else {
+			default:
 				log.Printf("[BehaviorSystem] 僵尸 %d 生命值 <= 0 (HP=%d)，触发死亡", entityID, health.CurrentHealth)
 				s.triggerZombieDeath(entityID)
 			}
@@ -125,7 +127,9 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 
 // triggerZombieDeath 触发僵尸死亡状态转换
 // 当僵尸生命值 <= 0 时调用，将僵尸从正常行为状态切换到死亡动画播放状态
-// 添加僵尸死亡粒子效果触发（头部掉落）
+// 根据 DeathEffectType 决定是否触发肢体掉落粒子效果：
+// - DeathEffectNormal: 触发头部、旗帜掉落粒子效果
+// - DeathEffectInstant: 不触发肢体掉落效果（如坚果保龄球撞击）
 // 注意：手臂掉落粒子效果在 updateZombieDamageState 中触发（受伤时）
 
 func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
@@ -136,13 +140,18 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 		return
 	}
 	behavior.Type = components.BehaviorZombieDying
-	log.Printf("[BehaviorSystem] 僵尸 %d 行为切换为 BehaviorZombieDying", entityID)
+	log.Printf("[BehaviorSystem] ��尸 %d 行为切换为 BehaviorZombieDying", entityID)
+
+	// 获取生命组件，检查死亡效果类型
+	health, _ := ecs.GetComponent[*components.HealthComponent](s.entityManager, entityID)
+	showLimbEffects := health == nil || health.DeathEffectType == components.DeathEffectNormal
 
 	// 获取僵尸位置，用于触发粒子效果
 	position, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
 	if !ok {
 		log.Printf("[BehaviorSystem] 警告：僵尸 %d 缺少 PositionComponent，无法触发粒子效果", entityID)
-	} else {
+	} else if showLimbEffects {
+		// 只有普通死亡才触发肢体掉落效果
 		// 检测僵尸行进方向，计算粒子角度偏移
 		// 粒子效果应该在僵尸行进的反方向飞出
 		//
@@ -190,7 +199,7 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 			_, err := entities.CreateParticleEffect(
 				s.entityManager,
 				s.resourceManager,
-				"ZombieFlag", // 旗帜掉落粒子效果
+				"ZombieFlag", // ���帜掉落粒子效果
 				position.X, position.Y,
 				angleOffset, // 与头部掉落方向一致
 			)
@@ -200,21 +209,26 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 				log.Printf("[BehaviorSystem] 旗帜僵尸 %d 触发旗帜掉落粒子效果，位置: (%.1f, %.1f)", entityID, position.X, position.Y)
 			}
 		}
+	} else {
+		log.Printf("[BehaviorSystem] 僵尸 %d 瞬间死亡，跳过肢体掉落效果", entityID)
 	}
 
 	// 2. 隐藏头部轨道（头掉落效果）
 	// 直接修改 HiddenTracks 字段而不调用废弃的 HideTrack API
 	// 注意：旗帜僵尸的旗帜隐藏在 zombie_flag.yaml 的 death/death_damaged 配置中处理
-	if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
-		if reanim.HiddenTracks == nil {
-			reanim.HiddenTracks = make(map[string]bool)
+	// 只有普通死亡才隐藏头部轨道
+	if showLimbEffects {
+		if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
+			if reanim.HiddenTracks == nil {
+				reanim.HiddenTracks = make(map[string]bool)
+			}
+			// 隐藏所有头部相关轨道
+			headTracks := []string{"anim_head1", "anim_head2"}
+			for _, trackName := range headTracks {
+				reanim.HiddenTracks[trackName] = true
+			}
+			log.Printf("[BehaviorSystem] 僵尸 %d 头部掉落，隐藏轨道: %v", entityID, headTracks)
 		}
-		// 隐藏所有头部相关轨道
-		headTracks := []string{"anim_head1", "anim_head2"}
-		for _, trackName := range headTracks {
-			reanim.HiddenTracks[trackName] = true
-		}
-		log.Printf("[BehaviorSystem] 僵尸 %d 头部掉落，隐藏轨道: %v", entityID, headTracks)
 	}
 
 	// 3. 移除 VelocityComponent（停止移动）
@@ -225,7 +239,11 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 	// 使用组件通信替代直接调用
 	// 使用配置驱动的动画组合（自动隐藏装备轨道）
 	// 旗帜僵尸特殊处理：根据 ArmLost 选择死亡动画
+	// 随机选择 death 或 death2 动画
 	deathComboName := "death"
+	if rand.Float32() < 0.5 {
+		deathComboName = "death2"
+	}
 	unitID := behavior.UnitID
 	if unitID == "" {
 		unitID = types.UnitIDZombie // 后备默认值
@@ -233,8 +251,8 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 	if unitID == "zombie_flag" {
 		if health, ok := ecs.GetComponent[*components.HealthComponent](s.entityManager, entityID); ok {
 			if health.ArmLost {
-				deathComboName = "death_damaged"
-				log.Printf("[BehaviorSystem] 旗帜僵尸 %d 使用受损死亡动画 (death_damaged)", entityID)
+				deathComboName = deathComboName + "_damaged"
+				log.Printf("[BehaviorSystem] 旗帜僵尸 %d 使用受损死亡动画 (%s)", entityID, deathComboName)
 			}
 		}
 	}
@@ -434,11 +452,16 @@ func (s *BehaviorSystem) changeZombieAnimation(zombieID ecs.EntityID, newState c
 	case components.ZombieAnimIdle:
 		comboName = "idle"
 	case components.ZombieAnimWalking:
-		// 旗帜僵尸受损时使用 walk_damaged 动画
+		// 随机选择 walk 或 walk2 动画
+		baseWalk := "walk"
+		if rand.Float32() < 0.5 {
+			baseWalk = "walk2"
+		}
+		// 旗帜僵尸受损时使用 walk_damaged 或 walk2_damaged 动画
 		if isFlagZombieDamaged {
-			comboName = "walk_damaged"
+			comboName = baseWalk + "_damaged"
 		} else {
-			comboName = "walk"
+			comboName = baseWalk
 		}
 	case components.ZombieAnimEating:
 		// 旗帜僵尸受损时使用 eat_damaged 动画
@@ -454,13 +477,19 @@ func (s *BehaviorSystem) changeZombieAnimation(zombieID ecs.EntityID, newState c
 			unitID = "zombie" // 后备默认值
 		}
 
+		// 随机选择 death 或 death2 动画
+		deathCombo := "death"
+		if rand.Float32() < 0.5 {
+			deathCombo = "death2"
+		}
+
 		// 使用组件通信替代直接调用
 		ecs.AddComponent(s.entityManager, zombieID, &components.AnimationCommandComponent{
 			UnitID:    unitID,
-			ComboName: "death",
+			ComboName: deathCombo,
 			Processed: false,
 		})
-		log.Printf("[BehaviorSystem] 僵尸 %d (%s) 添加死亡动画命令", zombieID, unitID)
+		log.Printf("[BehaviorSystem] 僵尸 %d (%s) 添加死亡动画命令 (%s)", zombieID, unitID, deathCombo)
 		return
 	default:
 		return
@@ -664,11 +693,12 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 
 		// 检查生命值是否归零（即使在啃食状态也要检查）
 		if health.CurrentHealth <= 0 {
-			// 检查是否被爆炸杀死（爆炸坚果、樱桃炸弹等），触发烧焦死亡动画
-			if health.KilledByExplosion {
+			// 根据死亡效果类型选择不同的死亡动画
+			switch health.DeathEffectType {
+			case components.DeathEffectExplosion:
 				log.Printf("[BehaviorSystem] 啃食中的僵尸 %d 被爆炸杀死 (HP=%d)，触发烧焦死亡", entityID, health.CurrentHealth)
 				s.triggerZombieExplosionDeath(entityID)
-			} else {
+			default:
 				log.Printf("[BehaviorSystem] 啃食中的僵尸 %d 生命值 <= 0 (HP=%d)，触发死亡", entityID, health.CurrentHealth)
 				s.triggerZombieDeath(entityID)
 			}

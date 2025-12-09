@@ -247,6 +247,7 @@ func (s *BowlingNutSystem) isZombieType(behaviorType components.BehaviorType) bo
 // - 有护甲：移除护甲（打掉帽子/桶），不造成身体伤害
 // - 无护甲：秒杀僵尸（直接将血量设为0）
 // - 添加闪烁效果
+// - 使用 DeathEffectInstant 死亡效果（无肢体掉落）
 func (s *BowlingNutSystem) applyDamageToZombie(zombieID ecs.EntityID) {
 	// 检查是否有护甲
 	armor, hasArmor := ecs.GetComponent[*components.ArmorComponent](s.entityManager, zombieID)
@@ -260,6 +261,8 @@ func (s *BowlingNutSystem) applyDamageToZombie(zombieID ecs.EntityID) {
 		// 没有护甲或护甲已破坏：秒杀僵尸
 		log.Printf("[BowlingNutSystem] 僵尸被秒杀: zombieID=%d, 原血量=%d", zombieID, health.CurrentHealth)
 		health.CurrentHealth = 0
+		// 坚果保龄球撞击死亡：瞬间死亡，无肢体掉落效果
+		health.DeathEffectType = components.DeathEffectInstant
 	}
 
 	// 添加闪烁效果
@@ -395,7 +398,7 @@ func (s *BowlingNutSystem) applyExplosionDamageToZombie(zombieID ecs.EntityID) {
 			health.CurrentHealth -= overflowDamage
 			// 如果被杀死，标记为爆炸死亡
 			if health.CurrentHealth <= 0 {
-				health.KilledByExplosion = true
+				health.DeathEffectType = components.DeathEffectExplosion
 			}
 		}
 		log.Printf("[BowlingNutSystem] 爆炸伤害破坏护甲: zombieID=%d, 溢出伤害=%d", zombieID, overflowDamage)
@@ -404,7 +407,7 @@ func (s *BowlingNutSystem) applyExplosionDamageToZombie(zombieID ecs.EntityID) {
 		health.CurrentHealth -= damage
 		// 如果被杀死，标记为爆炸死亡
 		if health.CurrentHealth <= 0 {
-			health.KilledByExplosion = true
+			health.DeathEffectType = components.DeathEffectExplosion
 		}
 		log.Printf("[BowlingNutSystem] 爆炸伤害: zombieID=%d, 伤害=%d, 剩余血量=%d",
 			zombieID, damage, health.CurrentHealth)

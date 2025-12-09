@@ -312,39 +312,11 @@ func (s *WaveSpawnSystem) activateZombieNow(entityID ecs.EntityID, waveState *co
 		}
 	}
 
-	// 启动僵尸移动（设置X轴速度）
-	if vel, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID); ok {
-		// 如果僵尸还在行转换中（VY != 0），保持Y轴速度不变
-		// 只设置X轴速度
-		if vel.VX == 0 {
-			vel.VX = -23.0 // 僵尸标准移动速度
-			log.Printf("[WaveSpawnSystem] Activated zombie %d (wave %d, index %d), VX=%.1f",
-				entityID, waveState.WaveIndex, waveState.IndexInWave, vel.VX)
-		}
-	}
+	// 使用公共函数激活僵尸（复用正式逻辑：设置速度和动画）
+	entities.ActivateZombie(s.entityManager, entityID)
 
-	// 使用组件通信替代直接调用
-	// 僵尸使用配置驱动的动画组合（自动隐藏装备轨道）
-	if behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID); ok {
-		if behavior.ZombieAnimState == components.ZombieAnimIdle {
-			behavior.ZombieAnimState = components.ZombieAnimWalking
-			// Determine correct unit ID based on behavior type
-			unitID := types.UnitIDZombie
-			switch behavior.Type {
-			case components.BehaviorZombieConehead:
-				unitID = types.UnitIDZombieConehead
-			case components.BehaviorZombieBuckethead:
-				unitID = types.UnitIDZombieBuckethead
-			}
-
-			ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
-				UnitID:    unitID,
-				ComboName: "walk",
-				Processed: false,
-			})
-			log.Printf("[WaveSpawnSystem] Zombie %d 添加行走动画命令 (activated)", entityID)
-		}
-	}
+	log.Printf("[WaveSpawnSystem] Activated zombie %d (wave %d, index %d)",
+		entityID, waveState.WaveIndex, waveState.IndexInWave)
 
 	// 增加已激活僵尸计数（用于计算场上僵尸数）
 	// zombiesOnField = TotalZombiesSpawned - ZombiesKilled
@@ -559,29 +531,8 @@ func (s *WaveSpawnSystem) spawnAndActivateZombie(zombieType string, lane int, wa
 		IndexInWave: indexInWave,
 	})
 
-	// 设置移动速度（开始向左移动）
-	if vel, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID); ok {
-		vel.VX = -23.0 // 僵尸标准移动速度
-	}
-
-	// 设置行走动画
-	if behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID); ok {
-		behavior.ZombieAnimState = components.ZombieAnimWalking
-
-		unitID := types.UnitIDZombie
-		switch behavior.Type {
-		case components.BehaviorZombieConehead:
-			unitID = types.UnitIDZombieConehead
-		case components.BehaviorZombieBuckethead:
-			unitID = types.UnitIDZombieBuckethead
-		}
-
-		ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
-			UnitID:    unitID,
-			ComboName: "walk",
-			Processed: false,
-		})
-	}
+	// 使用公共函数激活僵尸（复用正式逻辑）
+	entities.ActivateZombie(s.entityManager, entityID)
 
 	log.Printf("[WaveSpawnSystem] Spawned and activated zombie %d: type=%s, wave=%d, index=%d, row=%d, pos=(%.1f, %.1f)",
 		entityID, zombieType, waveIndex+1, indexInWave, row, spawnX, spawnY)

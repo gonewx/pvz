@@ -2,6 +2,7 @@ package entities
 
 import (
 	"fmt"
+	"math/rand"
 
 	"github.com/decker502/pvz/pkg/components"
 	"github.com/decker502/pvz/pkg/config"
@@ -480,4 +481,48 @@ func NewFlagZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spaw
 	})
 
 	return entityID, nil
+}
+
+// ActivateZombie 激活僵尸实体，使其开始行走
+//
+// 该函数提供公共的僵尸激活逻辑，可被 WaveSpawnSystem 和验证程序等调用
+// 激活后，僵尸将：
+// - 设置行走速度
+// - 切换到行走动画状态
+// - 随机选择 walk 或 walk2 动画
+//
+// 参数:
+//   - em: 实体管理器
+//   - entityID: 僵尸实体ID
+//
+// 注意：此函数不处理波次状态（ZombieWaveStateComponent），
+// 波次相关逻辑由 WaveSpawnSystem 负责
+func ActivateZombie(em *ecs.EntityManager, entityID ecs.EntityID) {
+	// 设置行走速度
+	if vel, ok := ecs.GetComponent[*components.VelocityComponent](em, entityID); ok {
+		vel.VX = config.ZombieWalkSpeed
+	}
+
+	// 切换动画状态并添加行走动画命令
+	if behavior, ok := ecs.GetComponent[*components.BehaviorComponent](em, entityID); ok {
+		behavior.ZombieAnimState = components.ZombieAnimWalking
+
+		// 确定正确的 UnitID
+		unitID := behavior.UnitID
+		if unitID == "" {
+			unitID = types.UnitIDZombie
+		}
+
+		// 随机选择 walk 或 walk2 动画
+		walkCombo := "walk"
+		if rand.Float32() < 0.5 {
+			walkCombo = "walk2"
+		}
+
+		ecs.AddComponent(em, entityID, &components.AnimationCommandComponent{
+			UnitID:    unitID,
+			ComboName: walkCombo,
+			Processed: false,
+		})
+	}
 }

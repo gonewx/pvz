@@ -51,21 +51,59 @@ shared:
         - Zombie_outerarm_upper  # 左上臂掉落
         - Zombie_outerarm_lower  # 左下臂掉落
 
+    # 死亡状态：隐藏旗帜手
+    flag_zombie_death_hidden_tracks: &flag_zombie_death_hidden_tracks
+        - anim_bucket
+        - anim_cone
+        - anim_screendoor
+        - Zombie_innerarm_screendoor_hand
+        - Zombie_outerarm_screendoor
+        - Zombie_duckytube
+        - Zombie_mustache
+        - anim_innerarm3
+        - Zombie_flaghand  # 死亡时旗帜掉落，隐藏旗帜手
+
+    # 死亡受损状态：隐藏旗帜手和左手
+    flag_zombie_death_damaged_hidden_tracks: &flag_zombie_death_damaged_hidden_tracks
+        - anim_bucket
+        - anim_cone
+        - anim_screendoor
+        - Zombie_innerarm_screendoor_hand
+        - Zombie_outerarm_screendoor
+        - Zombie_duckytube
+        - Zombie_mustache
+        - anim_innerarm3
+        - Zombie_flaghand        # 死亡时旗帜掉落，隐藏旗帜手
+        - Zombie_outerarm_hand   # 左手掉落
+        - Zombie_outerarm_upper  # 左上臂掉落
+        - Zombie_outerarm_lower  # 左下臂掉落
+
+    # 啃食时冻结旗帜手相关轨道
+    flag_zombie_eat_frozen_tracks: &flag_zombie_eat_frozen_tracks
+        - Zombie_flaghand
+        - anim_innerarm1
+        - anim_innerarm2
+
+    # 受损旗帜图片覆盖
+    damaged_flag_image: &damaged_flag_image
+        IMAGE_REANIM_ZOMBIE_FLAG1: assets/reanim/Zombie_flag3.png
+
 available_animations:
     - name: anim_idle
       display_name: idle
     - name: anim_walk
       display_name: walk
+    - name: anim_walk2
+      display_name: walk2
     - name: anim_eat
       display_name: eat
-      speed: 2.5 
+      speed: 2.5
     - name: anim_death
       display_name: death
+    - name: anim_death2
+      display_name: death2
 
 # 动画组合配置：旗帜僵尸需要显示旗帜手，隐藏普通右臂（innerarm）
-# 注意：不隐藏 Zombie_flaghand（旗帜僵尸需要显示旗帜手）
-# 注意：不隐藏 Zombie_outerarm*（左臂需要正常显示）
-# 注意：不隐藏 anim_innerarm1/2（旗帜手只替换手部，保留上臂和下臂）
 animation_combos:
     - name: idle
       display_name: 待机
@@ -81,15 +119,28 @@ animation_combos:
       binding_strategy: auto
       hidden_tracks: *flag_zombie_hidden_tracks
 
+    - name: walk2
+      display_name: 行走2
+      animations:
+          - anim_walk2
+      binding_strategy: auto
+      hidden_tracks: *flag_zombie_hidden_tracks
+
     - name: walk_damaged
       display_name: 行走（受损，左手掉落）
       animations:
           - anim_walk
       binding_strategy: auto
       hidden_tracks: *flag_zombie_damaged_hidden_tracks
-      # 使用损坏的旗帜图片（覆盖叠加动画中的旗帜）
-      image_overrides:
-          IMAGE_REANIM_ZOMBIE_FLAG1: assets/reanim/Zombie_flag3.png
+      image_overrides: *damaged_flag_image
+
+    - name: walk2_damaged
+      display_name: 行走2（受损，左手掉落）
+      animations:
+          - anim_walk2
+      binding_strategy: auto
+      hidden_tracks: *flag_zombie_damaged_hidden_tracks
+      image_overrides: *damaged_flag_image
 
     - name: eat
       display_name: 啃食
@@ -97,11 +148,7 @@ animation_combos:
           - anim_eat
       binding_strategy: auto
       hidden_tracks: *flag_zombie_hidden_tracks
-      # 啃食时冻结右手（拿旗手）相关轨道，保持拿旗姿势
-      frozen_tracks:
-          - Zombie_flaghand
-          - anim_innerarm1
-          - anim_innerarm2
+      frozen_tracks: *flag_zombie_eat_frozen_tracks
 
     - name: eat_damaged
       display_name: 啃食（受损，左手掉落）
@@ -109,13 +156,8 @@ animation_combos:
           - anim_eat
       binding_strategy: auto
       hidden_tracks: *flag_zombie_damaged_hidden_tracks
-      frozen_tracks:
-          - Zombie_flaghand
-          - anim_innerarm1
-          - anim_innerarm2
-      # 使用损坏的旗帜图片（覆盖叠加动画中的旗帜）
-      image_overrides:
-          IMAGE_REANIM_ZOMBIE_FLAG1: assets/reanim/Zombie_flag3.png
+      frozen_tracks: *flag_zombie_eat_frozen_tracks
+      image_overrides: *damaged_flag_image
 
     - name: death
       display_name: 死亡
@@ -123,16 +165,15 @@ animation_combos:
           - anim_death
       loop: false
       binding_strategy: auto
-      hidden_tracks:
-          - anim_bucket
-          - anim_cone
-          - anim_screendoor
-          - Zombie_innerarm_screendoor_hand
-          - Zombie_outerarm_screendoor
-          - Zombie_duckytube
-          - Zombie_mustache
-          - anim_innerarm3
-          - Zombie_flaghand  # 死亡时旗帜掉落，隐藏旗帜手
+      hidden_tracks: *flag_zombie_death_hidden_tracks
+
+    - name: death2
+      display_name: 死亡2
+      animations:
+          - anim_death2
+      loop: false
+      binding_strategy: auto
+      hidden_tracks: *flag_zombie_death_hidden_tracks
 
     - name: death_damaged
       display_name: 死亡（受损，左手掉落）
@@ -140,19 +181,14 @@ animation_combos:
           - anim_death
       loop: false
       binding_strategy: auto
-      hidden_tracks:
-          - anim_bucket
-          - anim_cone
-          - anim_screendoor
-          - Zombie_innerarm_screendoor_hand
-          - Zombie_outerarm_screendoor
-          - Zombie_duckytube
-          - Zombie_mustache
-          - anim_innerarm3
-          - Zombie_flaghand        # 死亡时旗帜掉落，隐藏旗帜手
-          - Zombie_outerarm_hand   # 左手掉落
-          - Zombie_outerarm_upper  # 左上臂掉落
-          - Zombie_outerarm_lower  # 左下臂掉落
-      # 使用损坏的旗帜图片（覆盖叠加动画中的旗帜）
-      image_overrides:
-          IMAGE_REANIM_ZOMBIE_FLAG1: assets/reanim/Zombie_flag3.png
+      hidden_tracks: *flag_zombie_death_damaged_hidden_tracks
+      image_overrides: *damaged_flag_image
+
+    - name: death2_damaged
+      display_name: 死亡2（受损，左手掉落）
+      animations:
+          - anim_death2
+      loop: false
+      binding_strategy: auto
+      hidden_tracks: *flag_zombie_death_damaged_hidden_tracks
+      image_overrides: *damaged_flag_image

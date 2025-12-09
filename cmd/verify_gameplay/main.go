@@ -365,33 +365,8 @@ func (vg *VerifyGameplayGame) spawnZombie(row int) {
 		return
 	}
 
-	// 立即激活僵尸（设置速度）
-	vel, ok := ecs.GetComponent[*components.VelocityComponent](vg.entityManager, zombieID)
-	if ok {
-		vel.VX = config.ZombieWalkSpeed // 僵尸向左移动
-	}
-
-	// 切换到行走动画
-	behaviorComp, ok := ecs.GetComponent[*components.BehaviorComponent](vg.entityManager, zombieID)
-	if ok {
-		behaviorComp.ZombieAnimState = components.ZombieAnimWalking
-	}
-
-	// 播放行走动画
-	unitID := "zombie"
-	switch zombieType {
-	case "conehead":
-		unitID = "zombie_conehead"
-	case "buckethead":
-		unitID = "zombie_buckethead"
-	case "flag":
-		unitID = "zombie_flag"
-	}
-	ecs.AddComponent(vg.entityManager, zombieID, &components.AnimationCommandComponent{
-		UnitID:    unitID,
-		ComboName: "walk",
-		Processed: false,
-	})
+	// 使用公共函数激活僵尸（复用正式逻辑）
+	entities.ActivateZombie(vg.entityManager, zombieID)
 
 	if *verbose {
 		log.Printf("[VerifyGameplay] Spawned %s zombie on row %d (entity=%d)", zombieType, row, zombieID)
