@@ -1392,21 +1392,14 @@ func (s *RenderSystem) drawZombieShadowsWithClipping(screen *ebiten.Image, zombi
 			continue
 		}
 
-		// 获取 ReanimComponent 以读取 CenterOffsetY（用于校正阴影位置）
-		reanimComp, hasReanim := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id)
-		centerOffsetCorrection := 0.0
-		if hasReanim {
-			// 计算 CenterOffsetY 校正值：当僵尸装备（路障/铁桶）向上延伸时，
-			// CenterOffsetY 会变小，僵尸渲染位置偏下，阴影需要相应下移
-			centerOffsetCorrection = config.ZombieBaseCenterOffsetY - reanimComp.CenterOffsetY
-		}
-
 		// 计算阴影位置：僵尸脚底中心
 		// 僵尸 pos.Y = 格子中心 + ZombieVerticalOffset
-		// 脚底位置 = pos.Y - ZombieVerticalOffset + CellHeight/2 + shadowOffsetY + centerOffsetCorrection
+		// 脚底位置 = pos.Y - ZombieVerticalOffset + CellHeight/2 + shadowOffsetY
+		// 注：僵尸渲染的 CenterOffsetY 校正已在 coordinates.GetRenderScreenOrigin 中统一处理，
+		// 阴影位置基于 pos.Y 计算，无需额外校正
 		shadowOffsetX := config.ZombieShadowOffsetX // 可配置的 X 偏移量
 		shadowOffsetY := config.ZombieShadowOffsetY // 可配置的 Y 偏移量
-		footY := pos.Y - config.ZombieVerticalOffset + config.CellHeight/2 + shadowOffsetY + centerOffsetCorrection
+		footY := pos.Y - config.ZombieVerticalOffset + config.CellHeight/2 + shadowOffsetY
 		shadowWorldX := pos.X - shadowImgWidth/2 + shadowOffsetX
 		shadowWorldRightX := shadowWorldX + shadowImgWidth
 		screenX := shadowWorldX - cameraX
