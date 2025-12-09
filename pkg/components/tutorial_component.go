@@ -1,8 +1,8 @@
 package components
 
 import (
-	"github.com/decker502/pvz/pkg/config"
-	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/ecs"
 )
 
 // TutorialComponent 教学系统组件

@@ -3,7 +3,7 @@ package systems
 import (
 	"testing"
 
-	"github.com/decker502/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/config"
 )
 
 // 创建测试用的 ZombieStatsConfig
@@ -90,12 +90,12 @@ func TestCalculateLevelCapacity(t *testing.T) {
 		{"第20波，轮数0，非旗帜波", 20, 0, 20, false, 9},
 
 		// 旗帜波（× 2.5）
-		{"第10波，轮数0，旗帜波", 10, 0, 20, true, 12},  // 5 * 2.5 = 12.5 → 12
-		{"第20波，轮数0，旗帜波", 20, 0, 20, true, 22},  // 9 * 2.5 = 22.5 → 22
+		{"第10波，轮数0，旗帜波", 10, 0, 20, true, 12}, // 5 * 2.5 = 12.5 → 12
+		{"第20波，轮数0，旗帜波", 20, 0, 20, true, 22}, // 9 * 2.5 = 22.5 → 22
 
 		// 不同轮数
-		{"第1波，轮数1，非旗帜波", 1, 1, 20, false, 9},   // (1 + 1*20) * 0.8 / 2 + 1 = 9.4 → 9
-		{"第1波，轮数5，非旗帜波", 1, 5, 20, false, 41},  // (1 + 5*20) * 0.8 / 2 + 1 = 41.4 → 41
+		{"第1波，轮数1，非旗帜波", 1, 1, 20, false, 9},    // (1 + 1*20) * 0.8 / 2 + 1 = 9.4 → 9
+		{"第1波，轮数5，非旗帜波", 1, 5, 20, false, 41},   // (1 + 5*20) * 0.8 / 2 + 1 = 41.4 → 41
 		{"第10波，轮数1，非旗帜波", 10, 1, 20, false, 13}, // (10 + 1*20) * 0.8 / 2 + 1 = 13
 
 		// 负数轮数（一周目早期）
@@ -171,8 +171,8 @@ func TestCalculateTotalLevel(t *testing.T) {
 		{"两个普通僵尸", []string{"basic", "basic"}, 2},
 		{"一个路障僵尸", []string{"conehead"}, 2},
 		{"混合僵尸", []string{"basic", "conehead", "buckethead"}, 7}, // 1 + 2 + 4 = 7
-		{"包含巨人僵尸", []string{"basic", "gargantuar"}, 11},        // 1 + 10 = 11
-		{"多个铁桶僵尸", []string{"buckethead", "buckethead"}, 8},     // 4 + 4 = 8
+		{"包含巨人僵尸", []string{"basic", "gargantuar"}, 11},          // 1 + 10 = 11
+		{"多个铁桶僵尸", []string{"buckethead", "buckethead"}, 8},      // 4 + 4 = 8
 	}
 
 	for _, tt := range tests {

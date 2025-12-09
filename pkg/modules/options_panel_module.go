@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/game"
-	"github.com/decker502/pvz/pkg/systems"
+	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/systems"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 

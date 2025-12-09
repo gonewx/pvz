@@ -3,8 +3,8 @@ package systems
 import (
 	"testing"
 
-	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/game"
 )
 
 // TestCreateSodRollParticleEmitter 测试粒子发射器创建逻辑

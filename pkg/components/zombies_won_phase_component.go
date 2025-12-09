@@ -1,6 +1,6 @@
 package components
 
-import "github.com/decker502/pvz/pkg/ecs"
+import "github.com/gonewx/pvz/pkg/ecs"
 
 // ZombiesWonPhaseComponent 僵尸获胜流程阶段组件
 //

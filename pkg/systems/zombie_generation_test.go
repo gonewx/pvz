@@ -4,10 +4,10 @@ import (
 	"math"
 	"testing"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/config"
-	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/game"
 )
 
 // ========================================
@@ -501,8 +501,8 @@ func TestWaveTiming_AcceleratedRefresh(t *testing.T) {
 
 	// 设置接近旗帜波的状态
 	timer.IsFlagWaveApproaching = true
-	timer.WaveElapsedCs = 500       // > 401cs
-	timer.CountdownCs = 1000        // > 200cs
+	timer.WaveElapsedCs = 500 // > 401cs
+	timer.CountdownCs = 1000  // > 200cs
 
 	// 触发加速刷新
 	triggered := env.WaveTimingSystem.CheckAcceleratedRefresh(true)
@@ -548,14 +548,14 @@ func TestDifficultyCurve_RoundNumberProgression(t *testing.T) {
 	defer TeardownTestEnvironment(env)
 
 	testCases := []struct {
-		completedFlags  int
-		expectedRound   int
+		completedFlags int
+		expectedRound  int
 	}{
-		{0, -1},   // 一周目开始
-		{2, 0},    // 完成1个关卡（2旗）
-		{4, 1},    // 完成2个关卡
-		{10, 4},   // 完成5个关卡
-		{50, 24},  // 一周目结束
+		{0, -1},  // 一周目开始
+		{2, 0},   // 完成1个关卡（2旗）
+		{4, 1},   // 完成2个关卡
+		{10, 4},  // 完成5个关卡
+		{50, 24}, // 一周目结束
 	}
 
 	for _, tc := range testCases {

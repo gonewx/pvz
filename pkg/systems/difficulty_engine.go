@@ -1,7 +1,7 @@
 package systems
 
 import (
-	"github.com/decker502/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/config"
 )
 
 // DifficultyEngine 难度引擎

@@ -3,8 +3,8 @@ package entities
 import (
 	"testing"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/ecs"
 )
 
 // TestNewDialogEntityWithCallback_ButtonCount 测试带回调的对话框按钮数量
@@ -90,11 +90,11 @@ func TestNewDialogEntityWithCallback_CallbackInvocation(t *testing.T) {
 // TestCalculateDialogSize 测试对话框大小计算
 func TestCalculateDialogSize(t *testing.T) {
 	tests := []struct {
-		name       string
-		message    string
-		minWidth   float64
-		minHeight  float64
-		maxWidth   float64
+		name      string
+		message   string
+		minWidth  float64
+		minHeight float64
+		maxWidth  float64
 	}{
 		{
 			name:      "短消息",

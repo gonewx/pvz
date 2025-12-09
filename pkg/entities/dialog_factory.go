@@ -3,9 +3,9 @@ package entities
 import (
 	"fmt"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/game"
 )
 
 // NewDialogEntity 创建通用对话框实体
@@ -91,8 +91,8 @@ func NewDialogEntity(
 			MiddleImage:    btnMiddleImg,
 			RightImage:     btnRightImg,
 			MiddleWidth:    btnMiddleWidth,
-			ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
-			PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
+			ClickSoundID:   "SOUND_BUTTONCLICK", // Story 10.9: 释放时播放
+			PressedSoundID: "SOUND_GRAVEBUTTON", // Story 10.9: 按下时播放
 			OnClick: func() {
 				// 点击回调将在 DialogInputSystem 中设置
 				// 这里设置为 nil，后续由系统负责关闭逻辑
@@ -104,18 +104,18 @@ func NewDialogEntity(
 
 	// 添加对话框组件
 	ecs.AddComponent(em, entity, &components.DialogComponent{
-		Title:            title,
-		Message:          message,
-		Buttons:          dialogButtons,
-		Parts:            parts,
-		IsVisible:        true,
-		Width:            dialogWidth,
-		Height:           dialogHeight,
-		AutoClose:            true,  // 错误对话框点击后自动关闭
-		Modal:                true,  // 模态对话框，点击遮罩不关闭
-		HoveredButtonIdx:     -1,    // 初始化为未悬停状态
-		PressedButtonIdx:     -1,    // 初始化为未按下状态
-		LastPressedButtonIdx: -1,    // Story 10.9: 初始化为未按下状态
+		Title:                title,
+		Message:              message,
+		Buttons:              dialogButtons,
+		Parts:                parts,
+		IsVisible:            true,
+		Width:                dialogWidth,
+		Height:               dialogHeight,
+		AutoClose:            true, // 错误对话框点击后自动关闭
+		Modal:                true, // 模态对话框，点击遮罩不关闭
+		HoveredButtonIdx:     -1,   // 初始化为未悬停状态
+		PressedButtonIdx:     -1,   // 初始化为未按下状态
+		LastPressedButtonIdx: -1,   // Story 10.9: 初始化为未按下状态
 	})
 
 	// 添加 UI 组件标记
@@ -336,8 +336,8 @@ func NewDialogEntityWithCallback(
 			MiddleImage:    btnMiddleImg,
 			RightImage:     btnRightImg,
 			MiddleWidth:    btnMiddleWidth,
-			ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
-			PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
+			ClickSoundID:   "SOUND_BUTTONCLICK", // Story 10.9: 释放时播放
+			PressedSoundID: "SOUND_GRAVEBUTTON", // Story 10.9: 按下时播放
 			OnClick: func() {
 				if callback != nil {
 					callback(btnIdx)
@@ -348,12 +348,12 @@ func NewDialogEntityWithCallback(
 
 	// 添加对话框组件
 	ecs.AddComponent(em, entity, &components.DialogComponent{
-		Title:            title,
-		Message:          message,
-		Buttons:          dialogButtons,
-		Parts:            parts,
-		IsVisible:        true,
-		Width:            dialogWidth,
+		Title:                title,
+		Message:              message,
+		Buttons:              dialogButtons,
+		Parts:                parts,
+		IsVisible:            true,
+		Width:                dialogWidth,
 		Height:               dialogHeight,
 		AutoClose:            true, // 点击后自动关闭
 		Modal:                true, // 模态对话框，点击遮罩不关闭
@@ -482,8 +482,8 @@ func NewContinueGameDialogEntity(
 			MiddleImage:    btnMiddleImg,
 			RightImage:     btnRightImg,
 			MiddleWidth:    btnMiddleWidth,
-			ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
-			PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
+			ClickSoundID:   "SOUND_BUTTONCLICK", // Story 10.9: 释放时播放
+			PressedSoundID: "SOUND_GRAVEBUTTON", // Story 10.9: 按下时播放
 			OnClick:        onContinue,
 		},
 		// 按钮1: 重玩关卡（第一行右边）
@@ -497,8 +497,8 @@ func NewContinueGameDialogEntity(
 			MiddleImage:    btnMiddleImg,
 			RightImage:     btnRightImg,
 			MiddleWidth:    btnMiddleWidth,
-			ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
-			PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
+			ClickSoundID:   "SOUND_BUTTONCLICK", // Story 10.9: 释放时播放
+			PressedSoundID: "SOUND_GRAVEBUTTON", // Story 10.9: 按下时播放
 			OnClick:        onRestart,
 		},
 		// 按钮2: 取消（第二行居中）
@@ -512,26 +512,26 @@ func NewContinueGameDialogEntity(
 			MiddleImage:    btnMiddleImg,
 			RightImage:     btnRightImg,
 			MiddleWidth:    btnMiddleWidth,
-			ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
-			PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
+			ClickSoundID:   "SOUND_BUTTONCLICK", // Story 10.9: 释放时播放
+			PressedSoundID: "SOUND_GRAVEBUTTON", // Story 10.9: 按下时播放
 			OnClick:        onCancel,
 		},
 	}
 
 	// 添加对话框组件
 	ecs.AddComponent(em, entity, &components.DialogComponent{
-		Title:            "继续游戏?",
-		Message:          message,
-		Buttons:          dialogButtons,
-		Parts:            parts,
-		IsVisible:        true,
-		Width:            dialogWidth,
+		Title:                "继续游戏?",
+		Message:              message,
+		Buttons:              dialogButtons,
+		Parts:                parts,
+		IsVisible:            true,
+		Width:                dialogWidth,
 		Height:               dialogHeight,
 		AutoClose:            true, // 点击后自动关闭
 		Modal:                true, // 模态对话框，点击遮罩不关闭
 		HoveredButtonIdx:     -1,
 		PressedButtonIdx:     -1,
-		LastPressedButtonIdx: -1,  // Story 10.9: 初始化为未按下状态
+		LastPressedButtonIdx: -1,   // Story 10.9: 初始化为未按下状态
 		UseBigBottom:         true, // 两行按钮布局，使用大底部区域
 	})
 

@@ -1,6 +1,6 @@
 package components
 
-import "github.com/decker502/pvz/pkg/ecs"
+import "github.com/gonewx/pvz/pkg/ecs"
 
 // LawnGridComponent 标识草坪网格管理器实体
 // 用于跟踪哪些格子已被植物占用

@@ -3,7 +3,7 @@ package systems
 import (
 	"testing"
 
-	"github.com/decker502/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/components"
 )
 
 // ========== Story 19.10: 土豆地雷奖励支持测试 ==========

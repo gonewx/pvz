@@ -11,14 +11,14 @@ import (
 	"image/color"
 	"log"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/config"
-	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/entities"
-	"github.com/decker502/pvz/pkg/game"
-	"github.com/decker502/pvz/pkg/modules"
-	"github.com/decker502/pvz/pkg/systems"
-	"github.com/decker502/pvz/pkg/utils"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/entities"
+	"github.com/gonewx/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/modules"
+	"github.com/gonewx/pvz/pkg/systems"
+	"github.com/gonewx/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -116,8 +116,8 @@ type MainMenuScene struct {
 	pendingSoundID    string  // 待播放的音效ID
 
 	// Story 21.4: 移动端虚拟键盘
-	virtualKeyboardEntity       ecs.EntityID                       // 虚拟键盘实体
-	virtualKeyboardSystem       *systems.VirtualKeyboardSystem     // 虚拟键盘系统
+	virtualKeyboardEntity       ecs.EntityID                         // 虚拟键盘实体
+	virtualKeyboardSystem       *systems.VirtualKeyboardSystem       // 虚拟键盘系统
 	virtualKeyboardRenderSystem *systems.VirtualKeyboardRenderSystem // 虚拟键盘渲染系统
 }
 

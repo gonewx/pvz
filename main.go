@@ -6,9 +6,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/decker502/pvz/pkg/app"
-	"github.com/decker502/pvz/pkg/embedded"
-	"github.com/decker502/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/app"
+	"github.com/gonewx/pvz/pkg/embedded"
+	"github.com/gonewx/pvz/pkg/game"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 

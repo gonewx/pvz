@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 
-	"github.com/decker502/pvz/pkg/embedded"
+	"github.com/gonewx/pvz/pkg/embedded"
 	"gopkg.in/yaml.v3"
 )
 
@@ -24,15 +24,15 @@ type RedEyeRulesConfig struct {
 
 // SceneRestrictions 场景类型限制规则
 type SceneRestrictions struct {
-	WaterZombies        []string              `yaml:"waterZombies"`        // 水路专属僵尸列表
-	DancingRestrictions DancingRestrictions   `yaml:"dancingRestrictions"` // 舞王限制
-	WaterLaneConfig     map[string][]int      `yaml:"waterLaneConfig"`     // 场景 -> 水路行号列表
+	WaterZombies        []string            `yaml:"waterZombies"`        // 水路专属僵尸列表
+	DancingRestrictions DancingRestrictions `yaml:"dancingRestrictions"` // 舞王限制
+	WaterLaneConfig     map[string][]int    `yaml:"waterLaneConfig"`     // 场景 -> 水路行号列表
 }
 
 // DancingRestrictions 舞王僵尸限制规则
 type DancingRestrictions struct {
-	ProhibitedScenes       []string `yaml:"prohibitedScenes"`       // 禁止舞王的场景列表
-	RequiresAdjacentLanes  bool     `yaml:"requiresAdjacentLanes"`  // 是否需要上下相邻行都是草地
+	ProhibitedScenes      []string `yaml:"prohibitedScenes"`      // 禁止舞王的场景列表
+	RequiresAdjacentLanes bool     `yaml:"requiresAdjacentLanes"` // 是否需要上下相邻行都是草地
 }
 
 // HealthAccelerationConfig 血量触发加速刷新配置

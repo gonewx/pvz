@@ -1,4 +1,4 @@
-module github.com/decker502/pvz
+module github.com/gonewx/pvz
 
 go 1.24.0
 

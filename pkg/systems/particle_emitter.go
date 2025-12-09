@@ -7,9 +7,9 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 
-	particlePkg "github.com/decker502/pvz/internal/particle"
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/ecs"
+	particlePkg "github.com/gonewx/pvz/internal/particle"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/ecs"
 )
 
 // particle_emitter.go - 粒子发射器相关方法

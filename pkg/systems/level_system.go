@@ -3,11 +3,11 @@ package systems
 import (
 	"log"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/config"
-	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/entities"
-	"github.com/decker502/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/entities"
+	"github.com/gonewx/pvz/pkg/game"
 )
 
 // 关卡流程常量
@@ -943,7 +943,8 @@ func (s *LevelSystem) PauseWaveTiming() {
 // Story 17.6: 在游戏恢复时调用
 // Story 19.9: 特殊关卡（如保龄球）在阶段转场后调用，会自动初始化计时器
 // Bug Fix: 在铲子教学阶段（Phase 1）暂停恢复时，不应该初始化计时器
-//          只有在��龄球阶段（Phase 2）或转场完成后才应该初始化
+//
+//	只有在��龄球阶段（Phase 2）或转场完成后才应该初始化
 func (s *LevelSystem) ResumeWaveTiming() {
 	if s.waveTimingSystem == nil {
 		return

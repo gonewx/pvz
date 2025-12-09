@@ -3,7 +3,7 @@ package components
 import (
 	"testing"
 
-	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/ecs"
 )
 
 // TestGuidedTutorialComponent_Initialization 测试组件初始化

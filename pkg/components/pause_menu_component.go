@@ -1,6 +1,6 @@
 package components
 
-import "github.com/decker502/pvz/pkg/ecs"
+import "github.com/gonewx/pvz/pkg/ecs"
 
 // PauseMenuComponent - 暂停菜单状态组件
 // Story 10.1: 管理暂停菜单的激活状态和按钮实体ID

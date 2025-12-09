@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/game"
 )
 
 // UserManagementAction 用户管理对话框的操作类型
@@ -139,8 +139,8 @@ func NewUserManagementDialogEntity(
 			MiddleImage:    btnMiddleImg,
 			RightImage:     btnRightImg,
 			MiddleWidth:    btnMiddleWidth,
-			ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
-			PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
+			ClickSoundID:   "SOUND_BUTTONCLICK", // Story 10.9: 释放时播放
+			PressedSoundID: "SOUND_GRAVEBUTTON", // Story 10.9: 按下时播放
 			OnClick: func() {
 				if callback != nil {
 					callback(UserManagementDialogResult{
@@ -161,8 +161,8 @@ func NewUserManagementDialogEntity(
 			MiddleImage:    btnMiddleImg,
 			RightImage:     btnRightImg,
 			MiddleWidth:    btnMiddleWidth,
-			ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
-			PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
+			ClickSoundID:   "SOUND_BUTTONCLICK", // Story 10.9: 释放时播放
+			PressedSoundID: "SOUND_GRAVEBUTTON", // Story 10.9: 按下时播放
 			OnClick: func() {
 				if callback != nil {
 					callback(UserManagementDialogResult{
@@ -183,8 +183,8 @@ func NewUserManagementDialogEntity(
 			MiddleImage:    btnMiddleImg,
 			RightImage:     btnRightImg,
 			MiddleWidth:    btnMiddleWidth,
-			ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
-			PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
+			ClickSoundID:   "SOUND_BUTTONCLICK", // Story 10.9: 释放时播放
+			PressedSoundID: "SOUND_GRAVEBUTTON", // Story 10.9: 按下时播放
 			OnClick: func() {
 				if callback != nil {
 					callback(UserManagementDialogResult{
@@ -205,8 +205,8 @@ func NewUserManagementDialogEntity(
 			MiddleImage:    btnMiddleImg,
 			RightImage:     btnRightImg,
 			MiddleWidth:    btnMiddleWidth,
-			ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
-			PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
+			ClickSoundID:   "SOUND_BUTTONCLICK", // Story 10.9: 释放时播放
+			PressedSoundID: "SOUND_GRAVEBUTTON", // Story 10.9: 按下时播放
 			OnClick: func() {
 				log.Printf("[UserManagementDialog] 取消按钮被点击")
 				if callback != nil {
@@ -220,13 +220,13 @@ func NewUserManagementDialogEntity(
 
 	// 添加对话框组件
 	ecs.AddComponent(em, dialogEntity, &components.DialogComponent{
-		Title:            "你叫啥？",
-		Message:          "", // 用户列表由 UserListComponent 渲染，不需要 Message
-		Buttons:          dialogButtons,
-		Parts:            parts,
-		IsVisible:        true,
-		Width:            dialogWidth,
-		Height:           dialogHeight,
+		Title:                "你叫啥？",
+		Message:              "", // 用户列表由 UserListComponent 渲染，不需要 Message
+		Buttons:              dialogButtons,
+		Parts:                parts,
+		IsVisible:            true,
+		Width:                dialogWidth,
+		Height:               dialogHeight,
 		AutoClose:            false, // 用户管理对话框不自动关闭（需要显式关闭）
 		Modal:                true,  // 模态对话框，点击遮罩不关闭
 		HoveredButtonIdx:     -1,    // 初始化为未悬停状态

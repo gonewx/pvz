@@ -1,9 +1,9 @@
 package entities
 
 import (
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/game"
 )
 
 // NewMenuButton 创建菜单按钮实体（三段式可拉伸按钮）
@@ -70,21 +70,21 @@ func NewMenuButton(
 
 	// 添加按钮组件
 	ecs.AddComponent(em, entity, &components.ButtonComponent{
-		Type:         components.ButtonTypeNineSlice,
-		LeftImage:    leftImage,
-		MiddleImage:  middleImage,
-		RightImage:   rightImage,
-		MiddleWidth:  middleWidth,
-		Text:         text,
-		Font:         font,
-		TextColor:    textColor,
+		Type:           components.ButtonTypeNineSlice,
+		LeftImage:      leftImage,
+		MiddleImage:    middleImage,
+		RightImage:     rightImage,
+		MiddleWidth:    middleWidth,
+		Text:           text,
+		Font:           font,
+		TextColor:      textColor,
 		Width:          totalWidth,  // ✅ 初始化按钮尺寸
 		Height:         totalHeight, // ✅ 初始化按钮尺寸
 		State:          components.UINormal,
 		Enabled:        true,
 		OnClick:        onClick,
-		ClickSoundID:   "SOUND_BUTTONCLICK",  // 释放时播放的音效
-		PressedSoundID: "SOUND_GRAVEBUTTON",  // 按下时播放的音效（墓碑样式）
+		ClickSoundID:   "SOUND_BUTTONCLICK", // 释放时播放的音效
+		PressedSoundID: "SOUND_GRAVEBUTTON", // 按下时播放的音效（墓碑样式）
 	})
 
 	// 添加 UI 组件标记（方便过滤）

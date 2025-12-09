@@ -3,10 +3,10 @@ package systems
 import (
 	"testing"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/config"
-	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/game"
 )
 
 // createTestConveyorBeltSystem 创建测试用传送带系统
@@ -493,7 +493,7 @@ func TestConveyorBeltSystem_FullBeltThrottle(t *testing.T) {
 
 	// 设置动态调节配置
 	dynamicCfg := &config.DynamicAdjustmentConfig{
-		FullBeltThreshold:         8.0,
+		FullBeltThreshold:          8.0,
 		FullBeltThrottleMultiplier: 1.5,
 	}
 	system.SetDynamicConfig(nil, dynamicCfg)

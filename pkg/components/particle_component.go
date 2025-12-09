@@ -1,7 +1,7 @@
 package components
 
 import (
-	"github.com/decker502/pvz/internal/particle"
+	"github.com/gonewx/pvz/internal/particle"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 

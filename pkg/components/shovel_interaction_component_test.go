@@ -4,7 +4,7 @@ import (
 	"image"
 	"testing"
 
-	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/ecs"
 )
 
 // TestShovelInteractionComponent_DefaultValues 测试组件默认值

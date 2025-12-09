@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/config"
-	"github.com/decker502/pvz/pkg/utils"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/utils"
 	"github.com/quasilyte/gdata/v2"
 )
 

@@ -3,7 +3,7 @@ package utils
 import (
 	"testing"
 
-	"github.com/decker502/pvz/internal/reanim"
+	"github.com/gonewx/pvz/internal/reanim"
 )
 
 // TestMapImageNameToFile tests the image reference to file name mapping

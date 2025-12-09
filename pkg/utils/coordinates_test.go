@@ -4,9 +4,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/decker502/pvz/internal/reanim"
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/internal/reanim"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/ecs"
 )
 
 // TestGetRenderScreenOrigin 测试 GetRenderScreenOrigin 函数

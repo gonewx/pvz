@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/decker502/pvz/internal/reanim"
-	"github.com/decker502/pvz/pkg/embedded"
+	"github.com/gonewx/pvz/internal/reanim"
+	"github.com/gonewx/pvz/pkg/embedded"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 

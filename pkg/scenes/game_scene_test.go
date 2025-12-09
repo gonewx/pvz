@@ -3,8 +3,8 @@ package scenes
 import (
 	"testing"
 
-	"github.com/decker502/pvz/pkg/config"
-	"github.com/decker502/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/game"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 )
 

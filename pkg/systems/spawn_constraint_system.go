@@ -3,8 +3,8 @@ package systems
 import (
 	"fmt"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/config"
 )
 
 // SpawnConstraintSystem 僵尸生成限制检查系统
@@ -219,6 +219,7 @@ func CheckSceneTypeRestriction(
 //   - constraint: 生成限制组件（包含当前状态）
 //   - roundNumber: 当前轮数
 //   - spawnRules: 生成规则配置
+//
 // 返回：
 //   - bool: 是否通过验证
 //   - string: 失败原因（通过时为空字符串）

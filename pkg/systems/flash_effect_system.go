@@ -3,8 +3,8 @@ package systems
 import (
 	"math"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/ecs"
 )
 
 // FlashEffectSystem 闪烁效果系统（方案A+）

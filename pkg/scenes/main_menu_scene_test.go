@@ -3,7 +3,7 @@ package scenes
 import (
 	"testing"
 
-	"github.com/decker502/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/components"
 )
 
 // TestIsPointInRect tests the point-in-rectangle collision detection function.

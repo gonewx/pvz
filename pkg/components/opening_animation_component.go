@@ -1,6 +1,6 @@
 package components
 
-import "github.com/decker502/pvz/pkg/ecs"
+import "github.com/gonewx/pvz/pkg/ecs"
 
 // OpeningAnimationComponent 管理开场动画的状态机。
 // 用于控制开场流程：镜头右移 → 展示僵尸预告 → 镜头返回 → Ready Set Plant → 开始游戏。

@@ -5,7 +5,7 @@ import (
 	"log"
 	"strconv"
 
-	"github.com/decker502/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/game"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 

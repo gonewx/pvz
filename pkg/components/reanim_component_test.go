@@ -3,7 +3,7 @@ package components
 import (
 	"testing"
 
-	"github.com/decker502/pvz/internal/reanim"
+	"github.com/gonewx/pvz/internal/reanim"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 

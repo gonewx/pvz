@@ -3,9 +3,9 @@ package systems
 import (
 	"testing"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/game"
 )
 
 // TestSunSpawnIntervalFormula_Initial 测试 count=0 时间隔范围 (4.25-7.00秒)

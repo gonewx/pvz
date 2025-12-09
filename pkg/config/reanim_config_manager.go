@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/decker502/pvz/pkg/embedded"
+	"github.com/gonewx/pvz/pkg/embedded"
 	"gopkg.in/yaml.v3"
 )
 
@@ -34,7 +34,7 @@ type AnimationUnitConfig struct {
 	Name                string                 `yaml:"name"`
 	ReanimFile          string                 `yaml:"reanim_file"`
 	DefaultAnimation    string                 `yaml:"default_animation"`
-	Scale               float64                `yaml:"scale"` // 整体缩放比例，默认 1.0
+	Scale               float64                `yaml:"scale"`                   // 整体缩放比例，默认 1.0
 	CenterOffset        []float64              `yaml:"center_offset,omitempty"` // 可选：手动指定 CenterOffset [x, y]，如果不指定则自动计算
 	Images              map[string]string      `yaml:"images"`
 	AvailableAnimations []AnimationInfo        `yaml:"available_animations"`

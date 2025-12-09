@@ -3,8 +3,8 @@ package systems
 import (
 	"sync"
 
-	"github.com/decker502/pvz/internal/reanim"
-	"github.com/decker502/pvz/pkg/components"
+	"github.com/gonewx/pvz/internal/reanim"
+	"github.com/gonewx/pvz/pkg/components"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 )

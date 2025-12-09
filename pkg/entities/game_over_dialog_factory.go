@@ -3,9 +3,9 @@ package entities
 import (
 	"fmt"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/game"
 )
 
 // GameOverDialogCallback 游戏结束对话框的回调函数类型
@@ -97,8 +97,8 @@ func NewGameOverDialogEntity(
 				MiddleImage:    btnMiddleImg,
 				RightImage:     btnRightImg,
 				MiddleWidth:    btnMiddleWidth,
-				ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
-				PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
+				ClickSoundID:   "SOUND_BUTTONCLICK", // Story 10.9: 释放时播放
+				PressedSoundID: "SOUND_GRAVEBUTTON", // Story 10.9: 按下时播放
 				OnClick: func() {
 					if onRetry != nil {
 						onRetry()
@@ -115,8 +115,8 @@ func NewGameOverDialogEntity(
 				MiddleImage:    btnMiddleImg,
 				RightImage:     btnRightImg,
 				MiddleWidth:    btnMiddleWidth,
-				ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
-				PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
+				ClickSoundID:   "SOUND_BUTTONCLICK", // Story 10.9: 释放时播放
+				PressedSoundID: "SOUND_GRAVEBUTTON", // Story 10.9: 按下时播放
 				OnClick: func() {
 					if onMenu != nil {
 						onMenu()
@@ -140,8 +140,8 @@ func NewGameOverDialogEntity(
 				MiddleImage:    btnMiddleImg,
 				RightImage:     btnRightImg,
 				MiddleWidth:    btnMiddleWidth,
-				ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
-				PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
+				ClickSoundID:   "SOUND_BUTTONCLICK", // Story 10.9: 释放时播放
+				PressedSoundID: "SOUND_GRAVEBUTTON", // Story 10.9: 按下时播放
 				OnClick: func() {
 					if onRetry != nil {
 						onRetry()
@@ -153,13 +153,13 @@ func NewGameOverDialogEntity(
 
 	// 添加对话框组件
 	ecs.AddComponent(em, dialogEntity, &components.DialogComponent{
-		Title:            "游戏结束",
-		Message:          "", // 无描述文字
-		Buttons:          dialogButtons,
-		Parts:            parts,
-		IsVisible:        true,
-		Width:            dialogWidth,
-		Height:           dialogHeight,
+		Title:                "游戏结束",
+		Message:              "", // 无描述文字
+		Buttons:              dialogButtons,
+		Parts:                parts,
+		IsVisible:            true,
+		Width:                dialogWidth,
+		Height:               dialogHeight,
 		AutoClose:            true, // 点击按钮后自动关闭
 		Modal:                true, // 模态对话框，点击遮罩不关闭
 		HoveredButtonIdx:     -1,   // 初始化为未悬停状态

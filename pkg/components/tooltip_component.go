@@ -3,7 +3,7 @@ package components
 import (
 	"image/color"
 
-	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/ecs"
 )
 
 // TooltipComponent 提示框组件

@@ -635,7 +635,7 @@ for _, entity := range entities {
 // 在 systems 包中
 package systems
 
-import "github.com/decker502/pvz/pkg/ecs"
+import "github.com/gonewx/pvz/pkg/ecs"
 
 func (s *BehaviorSystem) Update(dt float64) {
     // 错误：直接使用 GetComponent（未指定包名）
@@ -649,7 +649,7 @@ func (s *BehaviorSystem) Update(dt float64) {
 ```go
 package systems
 
-import "github.com/decker502/pvz/pkg/ecs"
+import "github.com/gonewx/pvz/pkg/ecs"
 
 func (s *BehaviorSystem) Update(dt float64) {
     // 正确：使用 ecs.GetComponent

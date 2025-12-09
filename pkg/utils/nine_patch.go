@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"github.com/decker502/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/components"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -142,8 +142,8 @@ func RenderNinePatchWithBigBottom(screen *ebiten.Image, parts *components.Dialog
 	}
 
 	// 2. 计算拉伸区域大小
-	stretchWidth := width - cornerWidth*2                       // 中间区域宽度
-	stretchHeight := height - cornerHeight - bigBottomHeight   // 中间区域高度（使用大底部高度）
+	stretchWidth := width - cornerWidth*2                    // 中间区域宽度
+	stretchHeight := height - cornerHeight - bigBottomHeight // 中间区域高度（使用大底部高度）
 
 	// 确保拉伸区域不为负数
 	if stretchWidth < 0 {

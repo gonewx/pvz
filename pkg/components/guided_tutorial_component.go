@@ -1,6 +1,6 @@
 package components
 
-import "github.com/decker502/pvz/pkg/ecs"
+import "github.com/gonewx/pvz/pkg/ecs"
 
 // GuidedTutorialComponent 强引导教学组件
 // Story 19.3: 强引导教学系统

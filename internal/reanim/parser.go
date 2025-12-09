@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/decker502/pvz/pkg/embedded"
+	"github.com/gonewx/pvz/pkg/embedded"
 )
 
 // ParseReanimFile parses a Reanim XML file and returns the animation data.

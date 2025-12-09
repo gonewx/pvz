@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/config"
-	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/entities"
-	"github.com/decker502/pvz/pkg/game"
-	"github.com/decker502/pvz/pkg/systems"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/entities"
+	"github.com/gonewx/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/systems"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -210,19 +210,19 @@ func (m *PauseMenuModule) createPauseMenuButtons(rm *game.ResourceManager) error
 	backToGameWidth := float64(backToGameNormal.Bounds().Dx())
 	backToGameHeight := float64(backToGameNormal.Bounds().Dy())
 	ecs.AddComponent(m.entityManager, backToGameEntity, &components.ButtonComponent{
-		Type:         components.ButtonTypeSimple,
-		NormalImage:  backToGameNormal,
-		HoverImage:   backToGameNormal,  // ✅ 悬停时不换图（backtogamebutton 系列没有悬停状态）
-		PressedImage: backToGamePressed, // ✅ 按下时使用 button2（下陷效果）
-		Text:         "返回游戏",
-		Font:         buttonFont,
-		TextColor:    [4]uint8{0, 200, 0, 255},
+		Type:           components.ButtonTypeSimple,
+		NormalImage:    backToGameNormal,
+		HoverImage:     backToGameNormal,  // ✅ 悬停时不换图（backtogamebutton 系列没有悬停状态）
+		PressedImage:   backToGamePressed, // ✅ 按下时使用 button2（下陷效果）
+		Text:           "返回游戏",
+		Font:           buttonFont,
+		TextColor:      [4]uint8{0, 200, 0, 255},
 		Width:          backToGameWidth,  // ✅ 初始化按钮尺寸
 		Height:         backToGameHeight, // ✅ 初始化按钮尺寸
 		State:          components.UINormal,
 		Enabled:        true,
-		ClickSoundID:   "SOUND_BUTTONCLICK",  // 释放时播放的音效
-		PressedSoundID: "SOUND_GRAVEBUTTON",  // 按下时播放的音效（墓碑样式）
+		ClickSoundID:   "SOUND_BUTTONCLICK", // 释放时播放的音效
+		PressedSoundID: "SOUND_GRAVEBUTTON", // 按下时播放的音效（墓碑样式）
 		OnClick: func() {
 			log.Printf("[PauseMenuModule] Back to game button clicked!")
 			m.Hide()

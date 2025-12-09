@@ -3,9 +3,9 @@ package entities
 import (
 	"fmt"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/game"
 )
 
 // RenameUserDialogResult 重命名用户对话框的回调结果
@@ -148,8 +148,8 @@ func NewRenameUserDialogEntity(
 			MiddleImage:    btnMiddleImg,
 			RightImage:     btnRightImg,
 			MiddleWidth:    btnMiddleWidth,
-			ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
-			PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
+			ClickSoundID:   "SOUND_BUTTONCLICK", // Story 10.9: 释放时播放
+			PressedSoundID: "SOUND_GRAVEBUTTON", // Story 10.9: 按下时播放
 			OnClick: func() {
 				inputComp, ok := ecs.GetComponent[*components.TextInputComponent](em, inputEntity)
 				if ok && callback != nil {
@@ -171,8 +171,8 @@ func NewRenameUserDialogEntity(
 			MiddleImage:    btnMiddleImg,
 			RightImage:     btnRightImg,
 			MiddleWidth:    btnMiddleWidth,
-			ClickSoundID:   "SOUND_BUTTONCLICK",  // Story 10.9: 释放时播放
-			PressedSoundID: "SOUND_GRAVEBUTTON",  // Story 10.9: 按下时播放
+			ClickSoundID:   "SOUND_BUTTONCLICK", // Story 10.9: 释放时播放
+			PressedSoundID: "SOUND_GRAVEBUTTON", // Story 10.9: 按下时播放
 			OnClick: func() {
 				if callback != nil {
 					callback(RenameUserDialogResult{
@@ -187,13 +187,13 @@ func NewRenameUserDialogEntity(
 
 	// 添加对话框组件
 	ecs.AddComponent(em, dialogEntity, &components.DialogComponent{
-		Title:            "重命名用户",
-		Message:          "请输入新的用户名：",
-		Buttons:          dialogButtons,
-		Parts:            parts,
-		IsVisible:        true,
-		Width:            dialogWidth,
-		Height:           dialogHeight,
+		Title:                "重命名用户",
+		Message:              "请输入新的用户名：",
+		Buttons:              dialogButtons,
+		Parts:                parts,
+		IsVisible:            true,
+		Width:                dialogWidth,
+		Height:               dialogHeight,
 		ChildEntities:        []ecs.EntityID{inputEntity}, // 输入框是对话框的子实体
 		AutoClose:            false,                       // 需要验证后才关闭，由回调逻辑控制
 		Modal:                true,                        // 模态对话框，点击遮罩不关闭

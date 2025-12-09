@@ -3,7 +3,7 @@ package game
 import (
 	"sort"
 
-	"github.com/decker502/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/config"
 )
 
 // PlantUnlockManager 管理玩家的植物解锁进度

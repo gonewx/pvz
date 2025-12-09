@@ -175,8 +175,8 @@ NFR2: 忠实度
 package utils
 
 import (
-    "github.com/decker502/pvz/pkg/components"
-    "github.com/decker502/pvz/pkg/reanim"
+    "github.com/gonewx/pvz/pkg/components"
+    "github.com/gonewx/pvz/pkg/reanim"
 )
 
 // CalculateRootMotionDelta 计算根运动位移增量
@@ -409,8 +409,8 @@ import (
 	"log"
 	"math"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/reanim"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/reanim"
 )
 
 // CalculateRootMotionDelta 计算根运动位移增量
@@ -633,8 +633,8 @@ package utils
 import (
 	"testing"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/reanim"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/reanim"
 )
 
 // TestCalculateRootMotionDelta_NormalMovement 测试正常帧间位移

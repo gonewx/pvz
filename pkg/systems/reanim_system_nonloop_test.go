@@ -3,9 +3,9 @@ package systems
 import (
 	"testing"
 
-	"github.com/decker502/pvz/internal/reanim"
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/internal/reanim"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/ecs"
 )
 
 // TestNonLoopingAnimation_Completion 测试非循环动画完成后设置 IsFinished 标志

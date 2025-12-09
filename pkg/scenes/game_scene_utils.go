@@ -3,10 +3,10 @@ package scenes
 import (
 	"log"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/config"
-	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/utils"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -87,7 +87,7 @@ func (s *GameScene) isDaveDialogueActive() bool {
 //
 // 检查优先级:
 //  0. 奖励动画 (RewardAnimationSystem - 最高优先级，遮盖其他元素)
-//  0.5. Dave 对话 (DaveDialogueComponent - 对话期间强制默认光标)
+//     0.5. Dave 对话 (DaveDialogueComponent - 对话期间强制默认光标)
 //  1. 面板按钮 (ButtonComponent)
 //  2. 对话框按钮 (DialogComponent.HoveredButtonIdx)
 //  3. 植物卡片 (PlantCardComponent + UIComponent)

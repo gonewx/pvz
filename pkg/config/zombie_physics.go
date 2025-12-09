@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 
-	"github.com/decker502/pvz/pkg/embedded"
+	"github.com/gonewx/pvz/pkg/embedded"
 	"gopkg.in/yaml.v3"
 )
 

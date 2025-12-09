@@ -3,10 +3,11 @@ package entities
 import (
 	"fmt"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/config"
-	"github.com/decker502/pvz/pkg/ecs"
 	"log"
+
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/ecs"
 )
 
 // getAnimVisiblesMapKeys 辅助函数：获取 map 的 keys

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/decker502/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/components"
 )
 
 // TestCooldownProgressCalculation 测试冷却进度计算

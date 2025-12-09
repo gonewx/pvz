@@ -4,13 +4,13 @@ import (
 	"log"
 	"math/rand"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/config"
-	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/entities"
-	"github.com/decker502/pvz/pkg/game"
-	"github.com/decker502/pvz/pkg/types"
-	"github.com/decker502/pvz/pkg/utils"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/entities"
+	"github.com/gonewx/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/types"
+	"github.com/gonewx/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 

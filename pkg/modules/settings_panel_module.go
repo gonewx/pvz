@@ -5,11 +5,11 @@ import (
 	"image/color"
 	"log"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/config"
-	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/game"
-	"github.com/decker502/pvz/pkg/systems"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/systems"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
@@ -378,20 +378,20 @@ func (m *SettingsPanelModule) createBottomButton(rm *game.ResourceManager, butto
 
 	// 添加按钮组件
 	ecs.AddComponent(m.entityManager, m.bottomButtonEntity, &components.ButtonComponent{
-		Type:         components.ButtonTypeSimple,
-		NormalImage:  backToGameNormal,
-		HoverImage:   backToGameNormal,         // ✅ 悬停时不换图（backtogamebutton 系列没有悬停状态）
-		PressedImage: backToGamePressed,        // ✅ 按下时使用 button2（下陷效果）
-		Text:         buttonConfig.Text,        // 使用配置的文字
-		Font:         buttonFont,               // 中文字体
-		TextColor:    [4]uint8{0, 200, 0, 255}, // 绿色文字
-		Width:        buttonWidth,              // ✅ 初始化按钮尺寸
-		Height:       buttonHeight,             // ✅ 初始化按钮尺寸
-		State:        components.UINormal,
-		Enabled:      true,
-		OnClick:        buttonConfig.OnClick,   // 使用配置的回调
-		ClickSoundID:   "SOUND_BUTTONCLICK",    // 释放时播放的音效
-		PressedSoundID: "SOUND_GRAVEBUTTON",    // 按下时播放的音效（墓碑样式）
+		Type:           components.ButtonTypeSimple,
+		NormalImage:    backToGameNormal,
+		HoverImage:     backToGameNormal,         // ✅ 悬停时不换图（backtogamebutton 系列没有悬停状态）
+		PressedImage:   backToGamePressed,        // ✅ 按下时使用 button2（下陷效果）
+		Text:           buttonConfig.Text,        // 使用配置的文字
+		Font:           buttonFont,               // 中文字体
+		TextColor:      [4]uint8{0, 200, 0, 255}, // 绿色文字
+		Width:          buttonWidth,              // ✅ 初始化按钮尺寸
+		Height:         buttonHeight,             // ✅ 初始化按钮尺寸
+		State:          components.UINormal,
+		Enabled:        true,
+		OnClick:        buttonConfig.OnClick, // 使用配置的回调
+		ClickSoundID:   "SOUND_BUTTONCLICK",  // 释放时播放的音效
+		PressedSoundID: "SOUND_GRAVEBUTTON",  // 按下时播放的音效（墓碑样式）
 	})
 
 	log.Printf("[SettingsPanelModule] Bottom button created with text: %s", buttonConfig.Text)

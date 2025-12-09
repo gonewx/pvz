@@ -3,7 +3,7 @@ package systems
 import (
 	"testing"
 
-	"github.com/decker502/pvz/internal/reanim"
+	"github.com/gonewx/pvz/internal/reanim"
 )
 
 // TestWallnutAnimFaceMergedTracksRotation 测试 Wallnut anim_face 轨道的旋转数据
@@ -28,7 +28,7 @@ func TestWallnutAnimFaceMergedTracksRotation(t *testing.T) {
 
 	// 验证帧 43-55（滚动动画）的 kx/ky 值
 	expectedRotations := map[int]float64{
-		43: 0,      // 继承自帧 16
+		43: 0, // 继承自帧 16
 		44: 27.6,
 		45: 57.7,
 		46: 90,

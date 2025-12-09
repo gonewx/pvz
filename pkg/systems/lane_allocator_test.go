@@ -4,8 +4,8 @@ import (
 	"math"
 	"testing"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/ecs"
 )
 
 // TestCalculateWeightP 测试权重占比计算
@@ -331,9 +331,9 @@ func TestFilterLegalLanes(t *testing.T) {
 		{
 			name: "行号不合法",
 			laneStates: []*components.LaneStateComponent{
-				{LaneIndex: 0, Weight: 1.0},  // 行号 < 1
+				{LaneIndex: 0, Weight: 1.0}, // 行号 < 1
 				{LaneIndex: 2, Weight: 1.0},
-				{LaneIndex: 7, Weight: 1.0},  // 行号 > 6
+				{LaneIndex: 7, Weight: 1.0}, // 行号 > 6
 			},
 			expected: []int{1},
 		},
@@ -341,7 +341,7 @@ func TestFilterLegalLanes(t *testing.T) {
 			name: "权重为零的行不合法",
 			laneStates: []*components.LaneStateComponent{
 				{LaneIndex: 1, Weight: 1.0},
-				{LaneIndex: 2, Weight: 0.0},  // 权重为 0
+				{LaneIndex: 2, Weight: 0.0}, // 权重为 0
 				{LaneIndex: 3, Weight: 1.0},
 			},
 			expected: []int{0, 2},

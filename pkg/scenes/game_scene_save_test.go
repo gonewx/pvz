@@ -3,8 +3,8 @@ package scenes
 import (
 	"testing"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/game"
 )
 
 // TestStringToPlantType 测试植物类型字符串转换
@@ -384,9 +384,9 @@ func TestRestoreLawnmowers_DataMapping(t *testing.T) {
 func TestRestoreLawnmowers_SkipOffScreen(t *testing.T) {
 	windowWidth := 800.0
 	lawnmowers := []game.LawnmowerData{
-		{Lane: 1, X: 100, Triggered: false, Active: false},      // 应该恢复
+		{Lane: 1, X: 100, Triggered: false, Active: false},             // 应该恢复
 		{Lane: 2, X: windowWidth + 150, Triggered: true, Active: true}, // 移出屏幕，应该跳过
-		{Lane: 3, X: 300, Triggered: true, Active: true},        // 正在移动，应该恢复
+		{Lane: 3, X: 300, Triggered: true, Active: true},               // 正在移动，应该恢复
 	}
 
 	// 统计应该恢复的除草车数量
@@ -470,8 +470,8 @@ func TestZombieLaneCalculation(t *testing.T) {
 		{"row 3", 330.0, 3},
 		{"row 4", 430.0, 4},
 		{"row 5", 530.0, 5},
-		{"above grid", 50.0, 1},   // 应该限制为1
-		{"below grid", 700.0, 5},  // 应该限制为5
+		{"above grid", 50.0, 1},  // 应该限制为1
+		{"below grid", 700.0, 5}, // 应该限制为5
 	}
 
 	for _, tt := range tests {

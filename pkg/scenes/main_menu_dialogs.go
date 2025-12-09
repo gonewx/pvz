@@ -4,8 +4,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/decker502/pvz/pkg/entities"
-	"github.com/decker502/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/entities"
+	"github.com/gonewx/pvz/pkg/game"
 )
 
 // showUnlockDialog displays a dialog with a title and message

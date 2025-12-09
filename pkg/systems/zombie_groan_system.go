@@ -3,10 +3,10 @@ package systems
 import (
 	"math/rand"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/config"
-	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/game"
 )
 
 // ZombieGroanSystem 僵尸呻吟音效系统
@@ -104,4 +104,3 @@ func (s *ZombieGroanSystem) getRandomInterval() float64 {
 	maxInterval := config.ZombieGroanMaxInterval
 	return minInterval + rand.Float64()*(maxInterval-minInterval)
 }
-

@@ -30,7 +30,7 @@
 |------|------|
 | **技术栈** | Go 1.25.1 + Ebitengine v2.9.0 |
 | **资源嵌入** | Epic 20 已实现 `embed` 打包，可生成单一可执行文件 |
-| **模块路径** | `github.com/decker502/pvz` |
+| **模块路径** | `github.com/gonewx/pvz` |
 | **依赖管理** | Go Modules |
 
 ### 解决方案

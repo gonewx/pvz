@@ -328,7 +328,7 @@ var Data embed.FS
 // pkg/game/resource_manager.go
 
 import (
-    "github.com/decker502/pvz/pkg/embedded"
+    "github.com/gonewx/pvz/pkg/embedded"
     "io/fs"
 )
 

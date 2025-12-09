@@ -6,11 +6,11 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/decker502/pvz/internal/particle"
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/game"
-	"github.com/decker502/pvz/pkg/systems"
+	"github.com/gonewx/pvz/internal/particle"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/systems"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 

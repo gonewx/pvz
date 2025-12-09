@@ -7,7 +7,7 @@
 APP_NAME := pvz
 
 # Go 模块路径
-MODULE := github.com/decker502/pvz
+MODULE := github.com/gonewx/pvz
 
 # 构建输出目录
 BUILD_DIR := build

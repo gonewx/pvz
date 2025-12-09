@@ -3,8 +3,8 @@ package systems
 import (
 	"testing"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/ecs"
 )
 
 // TestReanimSystem_ProcessAnimationCommands_ComboMode 测试组合模式命令处理

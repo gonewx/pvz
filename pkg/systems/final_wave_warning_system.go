@@ -3,8 +3,8 @@ package systems
 import (
 	"log"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/ecs"
 )
 
 // FinalWaveWarningSystem 最后一波提示动画管理系统

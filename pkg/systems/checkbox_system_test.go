@@ -4,8 +4,8 @@ import (
 	"image"
 	"testing"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/ecs"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -203,8 +203,8 @@ func TestCheckboxSystem_EntityWithCheckboxComponent(t *testing.T) {
 func TestCheckboxSystem_Update_ClickInCheckbox(t *testing.T) {
 	em := ecs.NewEntityManager()
 	mockInput := &mockCheckboxMouseInput{
-		mouseX:      115, // 在复选框内
-		mouseY:      65,
+		mouseX:       115, // 在复选框内
+		mouseY:       65,
 		justReleased: true,
 	}
 	system := NewCheckboxSystemWithInput(em, mockInput)
@@ -248,8 +248,8 @@ func TestCheckboxSystem_Update_ClickInCheckbox(t *testing.T) {
 func TestCheckboxSystem_Update_ClickOutsideCheckbox(t *testing.T) {
 	em := ecs.NewEntityManager()
 	mockInput := &mockCheckboxMouseInput{
-		mouseX:      50, // 复选框外
-		mouseY:      65,
+		mouseX:       50, // 复选框外
+		mouseY:       65,
 		justReleased: true,
 	}
 	system := NewCheckboxSystemWithInput(em, mockInput)
@@ -288,8 +288,8 @@ func TestCheckboxSystem_Update_ClickOutsideCheckbox(t *testing.T) {
 func TestCheckboxSystem_Update_MouseNotJustPressed(t *testing.T) {
 	em := ecs.NewEntityManager()
 	mockInput := &mockCheckboxMouseInput{
-		mouseX:      115, // 在复选框内
-		mouseY:      65,
+		mouseX:       115, // 在复选框内
+		mouseY:       65,
 		justReleased: false, // 鼠标未刚按下
 	}
 	system := NewCheckboxSystemWithInput(em, mockInput)
@@ -328,8 +328,8 @@ func TestCheckboxSystem_Update_MouseNotJustPressed(t *testing.T) {
 func TestCheckboxSystem_Update_Toggle(t *testing.T) {
 	em := ecs.NewEntityManager()
 	mockInput := &mockCheckboxMouseInput{
-		mouseX:      115,
-		mouseY:      65,
+		mouseX:       115,
+		mouseY:       65,
 		justReleased: true,
 	}
 	system := NewCheckboxSystemWithInput(em, mockInput)
@@ -373,8 +373,8 @@ func TestCheckboxSystem_Update_Toggle(t *testing.T) {
 func TestCheckboxSystem_Update_NoCallback(t *testing.T) {
 	em := ecs.NewEntityManager()
 	mockInput := &mockCheckboxMouseInput{
-		mouseX:      115,
-		mouseY:      65,
+		mouseX:       115,
+		mouseY:       65,
 		justReleased: true,
 	}
 	system := NewCheckboxSystemWithInput(em, mockInput)
@@ -404,8 +404,8 @@ func TestCheckboxSystem_Update_NoCallback(t *testing.T) {
 func TestCheckboxSystem_Update_NoImage(t *testing.T) {
 	em := ecs.NewEntityManager()
 	mockInput := &mockCheckboxMouseInput{
-		mouseX:      115,
-		mouseY:      65,
+		mouseX:       115,
+		mouseY:       65,
 		justReleased: true,
 	}
 	system := NewCheckboxSystemWithInput(em, mockInput)
@@ -438,8 +438,8 @@ func TestCheckboxSystem_Update_NoImage(t *testing.T) {
 func TestCheckboxSystem_Update_MultipleCheckboxes(t *testing.T) {
 	em := ecs.NewEntityManager()
 	mockInput := &mockCheckboxMouseInput{
-		mouseX:      115, // 在第一个复选框范围内
-		mouseY:      65,
+		mouseX:       115, // 在第一个复选框范围内
+		mouseY:       65,
 		justReleased: true,
 	}
 	system := NewCheckboxSystemWithInput(em, mockInput)
@@ -481,8 +481,8 @@ func TestCheckboxSystem_Update_MultipleCheckboxes(t *testing.T) {
 func TestCheckboxSystem_Update_NoEntities(t *testing.T) {
 	em := ecs.NewEntityManager()
 	mockInput := &mockCheckboxMouseInput{
-		mouseX:      115,
-		mouseY:      65,
+		mouseX:       115,
+		mouseY:       65,
 		justReleased: true,
 	}
 	system := NewCheckboxSystemWithInput(em, mockInput)
@@ -498,8 +498,8 @@ func TestCheckboxSystem_Update_UsesCorrectImageForSize(t *testing.T) {
 	// 测试未选中状态使用 UncheckedImage 的尺寸
 	t.Run("使用UncheckedImage尺寸", func(t *testing.T) {
 		mockInput := &mockCheckboxMouseInput{
-			mouseX:      115,
-			mouseY:      65,
+			mouseX:       115,
+			mouseY:       65,
 			justReleased: true,
 		}
 		system := NewCheckboxSystemWithInput(em, mockInput)
@@ -527,8 +527,8 @@ func TestCheckboxSystem_Update_UsesCorrectImageForSize(t *testing.T) {
 	// 测试选中状态使用 CheckedImage 的尺寸
 	t.Run("使用CheckedImage尺寸", func(t *testing.T) {
 		mockInput := &mockCheckboxMouseInput{
-			mouseX:      140, // 在 CheckedImage 范围内但超出 UncheckedImage
-			mouseY:      90,
+			mouseX:       140, // 在 CheckedImage 范围内但超出 UncheckedImage
+			mouseY:       90,
 			justReleased: true,
 		}
 		system := NewCheckboxSystemWithInput(em, mockInput)

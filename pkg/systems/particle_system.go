@@ -4,10 +4,10 @@ import (
 	"log"
 	"math"
 
-	particlePkg "github.com/decker502/pvz/internal/particle"
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/game"
+	particlePkg "github.com/gonewx/pvz/internal/particle"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/game"
 )
 
 // ParticleSystem manages all particle emitters and individual particles.

@@ -5,15 +5,15 @@ import (
 	"image"
 	"log"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/config"
-	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/entities"
-	"github.com/decker502/pvz/pkg/game"
-	"github.com/decker502/pvz/pkg/modules"
-	"github.com/decker502/pvz/pkg/systems"
-	"github.com/decker502/pvz/pkg/systems/behavior"
-	"github.com/decker502/pvz/pkg/utils"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/entities"
+	"github.com/gonewx/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/modules"
+	"github.com/gonewx/pvz/pkg/systems"
+	"github.com/gonewx/pvz/pkg/systems/behavior"
+	"github.com/gonewx/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
@@ -1117,10 +1117,10 @@ func (s *GameScene) Update(deltaTime float64) {
 	}
 
 	// Update all ECS systems in order (order matters for correct game logic)
-	s.levelSystem.Update(deltaTime)                          // 0. Update level system (Story 5.5: wave spawning, victory/defeat)
-	s.waveSpawnSystem.UpdatePendingActivations(deltaTime)    // 0.05. Update pending zombie activations (散落入场效果)
-	s.rewardSystem.Update(deltaTime)                         // 0.1. Update reward animation system (Story 8.3: 卡片包动画)
-	s.finalWaveWarningSystem.Update(deltaTime) // 0.2. Update final wave warning (Story 11.3: 自动清理提示动画)
+	s.levelSystem.Update(deltaTime)                       // 0. Update level system (Story 5.5: wave spawning, victory/defeat)
+	s.waveSpawnSystem.UpdatePendingActivations(deltaTime) // 0.05. Update pending zombie activations (散落入场效果)
+	s.rewardSystem.Update(deltaTime)                      // 0.1. Update reward animation system (Story 8.3: 卡片包动画)
+	s.finalWaveWarningSystem.Update(deltaTime)            // 0.2. Update final wave warning (Story 11.3: 自动清理提示动画)
 	if s.zombiesWonPhaseSystem != nil {
 		s.zombiesWonPhaseSystem.Update(deltaTime) // 0.3. Update zombies won flow (Story 8.8: 僵尸获胜四阶段流程)
 	}

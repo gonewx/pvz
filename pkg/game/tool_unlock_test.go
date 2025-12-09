@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/decker502/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/config"
 	"github.com/quasilyte/gdata/v2"
 )
 

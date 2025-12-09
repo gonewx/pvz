@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/decker502/pvz/pkg/embedded"
+	"github.com/gonewx/pvz/pkg/embedded"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -358,7 +358,7 @@ func parseFontMeta(path string) ([]rune, []int, []image.Rectangle, error) {
 // parseCharList 解析字符列表
 // 格式：('A', 'B', 'C', ...)
 //
-// 注意：字体文件中第一个字符通常是空字符 ''，代表占位符而非空格。
+// 注意：字体文件中第一个字符通常是空字符 ”，代表占位符而非空格。
 // 空格字符通过 LayerSetCharWidths Main (' ') (9) 单独设置。
 // 我们跳过空字符，只解析实际的字符。
 func parseCharList(content string) ([]rune, error) {

@@ -51,9 +51,9 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/config"
-	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/ecs"
 )
 
 // ErrNoReanimComponent 表示实体缺少 ReanimComponent 组件

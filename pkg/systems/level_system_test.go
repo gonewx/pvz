@@ -4,10 +4,10 @@ import (
 	"math"
 	"testing"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/config"
-	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/game"
 )
 
 // TestCalculateTotalZombies 测试总僵尸数计算逻辑
@@ -1115,8 +1115,8 @@ func TestLevelSystem_BowlingNoFlagWaveWarning(t *testing.T) {
 	levelConfig := &config.LevelConfig{
 		ID:          "1-5",
 		OpeningType: "special",
-		Flags:       0,     // 无旗帜
-		FlagWaves:   nil,   // 无旗帜波
+		Flags:       0,   // 无旗帜
+		FlagWaves:   nil, // 无旗帜波
 		Waves: []config.WaveConfig{
 			{IsFlag: false, Zombies: []config.ZombieGroup{{Type: "basic", Count: 1, Lanes: []int{1}}}},
 			{IsFlag: false, Zombies: []config.ZombieGroup{{Type: "basic", Count: 1, Lanes: []int{2}}}},

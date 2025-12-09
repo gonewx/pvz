@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/decker502/pvz/pkg/embedded"
+	"github.com/gonewx/pvz/pkg/embedded"
 )
 
 // LawnStrings 游戏文本字符串管理器

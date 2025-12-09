@@ -1,6 +1,6 @@
 package components
 
-import "github.com/decker502/pvz/pkg/ecs"
+import "github.com/gonewx/pvz/pkg/ecs"
 
 // SquashAnimationComponent 压扁动画组件
 // 用于播放僵尸被除草车碾压时的压扁动画

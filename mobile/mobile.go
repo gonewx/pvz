@@ -28,9 +28,9 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/mobile"
 
-	"github.com/decker502/pvz/pkg/app"
-	"github.com/decker502/pvz/pkg/config"
-	"github.com/decker502/pvz/pkg/embedded"
+	"github.com/gonewx/pvz/pkg/app"
+	"github.com/gonewx/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/embedded"
 )
 
 // lazyGame 是一个延迟初始化的游戏包装器

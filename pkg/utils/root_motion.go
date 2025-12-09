@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/decker502/pvz/internal/reanim"
-	"github.com/decker502/pvz/pkg/components"
+	"github.com/gonewx/pvz/internal/reanim"
+	"github.com/gonewx/pvz/pkg/components"
 )
 
 // RootMotionMaxDelta 是瞬移检测阈值

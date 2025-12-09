@@ -3,9 +3,9 @@ package systems
 import (
 	"testing"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/config"
-	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/ecs"
 )
 
 // TestNewBowlingNutSystem 测试系统创建
@@ -1205,5 +1205,3 @@ func TestBowlingNutSystem_ContinueBounce_NoBounceWithoutDirection(t *testing.T) 
 		t.Error("Nut should not bounce when BounceDirection is 0")
 	}
 }
-
-

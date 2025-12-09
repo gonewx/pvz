@@ -5,7 +5,7 @@ import (
 	"image/color"
 	"log"
 
-	"github.com/decker502/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/config"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )

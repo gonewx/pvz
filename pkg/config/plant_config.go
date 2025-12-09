@@ -1,6 +1,6 @@
 package config
 
-import "github.com/decker502/pvz/pkg/types"
+import "github.com/gonewx/pvz/pkg/types"
 
 // PlantResourceConfig 植物资源配置（统一管理）
 // 将植物的资源名称、配置ID、预览帧、隐藏轨道等配置集中管理

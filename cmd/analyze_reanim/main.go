@@ -6,7 +6,7 @@ import (
 	"math"
 	"os"
 
-	"github.com/decker502/pvz/internal/reanim"
+	"github.com/gonewx/pvz/internal/reanim"
 )
 
 func main() {

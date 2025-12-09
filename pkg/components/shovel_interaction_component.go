@@ -3,7 +3,7 @@ package components
 import (
 	"image"
 
-	"github.com/decker502/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/ecs"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 

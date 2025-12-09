@@ -10,9 +10,9 @@ import (
 	"io"
 	"log"
 
-	"github.com/decker502/pvz/pkg/config"
-	"github.com/decker502/pvz/pkg/game"
-	"github.com/decker502/pvz/pkg/scenes"
+	"github.com/gonewx/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/scenes"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"

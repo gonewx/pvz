@@ -3,7 +3,7 @@ package utils
 import (
 	"testing"
 
-	"github.com/decker502/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/config"
 )
 
 // 测试用的摄像机位置常量
@@ -34,7 +34,7 @@ func TestMouseToGridCoords(t *testing.T) {
 		},
 		{
 			name:      "右下角最后一个格子",
-			mouseX:    35 + 8*80 + 40, // 屏幕坐标：GridScreenStartX + 8*CellWidth + CellWidth/2
+			mouseX:    35 + 8*80 + 40,  // 屏幕坐标：GridScreenStartX + 8*CellWidth + CellWidth/2
 			mouseY:    78 + 4*100 + 50, // 屏幕坐标：GridWorldStartY + 4*CellHeight + CellHeight/2
 			cameraX:   testCameraX,
 			wantCol:   8,
@@ -43,7 +43,7 @@ func TestMouseToGridCoords(t *testing.T) {
 		},
 		{
 			name:      "中间格子 (col=4, row=2)",
-			mouseX:    35 + 4*80 + 40, // 屏幕坐标：GridScreenStartX + 4*CellWidth + CellWidth/2
+			mouseX:    35 + 4*80 + 40,  // 屏幕坐标：GridScreenStartX + 4*CellWidth + CellWidth/2
 			mouseY:    78 + 2*100 + 50, // 屏幕坐标：GridWorldStartY + 2*CellHeight + CellHeight/2
 			cameraX:   testCameraX,
 			wantCol:   4,

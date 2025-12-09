@@ -1,7 +1,7 @@
 package components
 
 import (
-	"github.com/decker502/pvz/pkg/types"
+	"github.com/gonewx/pvz/pkg/types"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 

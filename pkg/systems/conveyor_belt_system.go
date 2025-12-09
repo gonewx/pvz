@@ -4,10 +4,10 @@ import (
 	"log"
 	"math/rand"
 
-	"github.com/decker502/pvz/pkg/components"
-	"github.com/decker502/pvz/pkg/config"
-	"github.com/decker502/pvz/pkg/ecs"
-	"github.com/decker502/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/game"
 )
 
 // CardPoolEntry 卡片池条目
@@ -40,14 +40,14 @@ type ConveyorBeltSystem struct {
 	beltSpeed float64 // 传送带速度（像素/秒），同时控制履带和卡片
 
 	// 布局参数缓存（需要在运行时计算）
-	cardWidth      float64 // 卡片宽度
-	beltWidth      float64 // 传送带宽度
-	leftPadding    float64 // 左侧内边距
-	minSpacing float64 // 卡片最小间距
-	startOffsetX   float64 // 卡片起始位置偏移
+	cardWidth    float64 // 卡片宽度
+	beltWidth    float64 // 传送带宽度
+	leftPadding  float64 // 左侧内边距
+	minSpacing   float64 // 卡片最小间距
+	startOffsetX float64 // 卡片起始位置偏移
 
 	// Story 19.12: 动态调节配置
-	phaseConfigs      []config.PhaseConfig           // 各阶段配置
+	phaseConfigs      []config.PhaseConfig            // 各阶段配置
 	dynamicAdjustment *config.DynamicAdjustmentConfig // 动态调节参数
 }
 

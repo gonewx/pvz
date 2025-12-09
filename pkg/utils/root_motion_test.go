@@ -4,8 +4,8 @@ import (
 	"math"
 	"testing"
 
-	"github.com/decker502/pvz/internal/reanim"
-	"github.com/decker502/pvz/pkg/components"
+	"github.com/gonewx/pvz/internal/reanim"
+	"github.com/gonewx/pvz/pkg/components"
 )
 
 // TestCalculateRootMotionDelta_NormalMovement 测试正常帧间位移计算（含插值）
