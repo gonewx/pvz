@@ -127,10 +127,10 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 
 // triggerZombieDeath 触发僵尸死亡状态转换
 // 当僵尸生命值 <= 0 时调用，将僵尸从正常行为状态切换到死亡动画播放状态
-// 根据 DeathEffectType 决定是否触发肢体掉落粒子效果：
-// - DeathEffectNormal: 触发头部、旗帜掉落粒子效果
-// - DeathEffectInstant: 不触发肢体掉落效果（如坚果保龄球撞击）
-// 注意：手臂掉落粒子效果在 updateZombieDamageState 中触发（受伤时）
+// 根据 DeathEffectType 决定死亡效果：
+// - DeathEffectNormal: 正常死亡，播放头部、手臂掉落效果
+// - DeathEffectInstant: 瞬间死亡（保龄球坚果撞击），跳过手臂掉落效果，但保留头部掉落
+// 注意：手臂掉落效果在 updateZombieDamageState 中根据 DeathEffectType 判断是否触发
 
 func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 	// 1. 切换行为类型为 BehaviorZombieDying
@@ -140,18 +140,14 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 		return
 	}
 	behavior.Type = components.BehaviorZombieDying
-	log.Printf("[BehaviorSystem] ��尸 %d 行为切换为 BehaviorZombieDying", entityID)
-
-	// 获取生命组件，检查死亡效果类型
-	health, _ := ecs.GetComponent[*components.HealthComponent](s.entityManager, entityID)
-	showLimbEffects := health == nil || health.DeathEffectType == components.DeathEffectNormal
+	log.Printf("[BehaviorSystem] 僵尸 %d 行为切换为 BehaviorZombieDying", entityID)
 
 	// 获取僵尸位置，用于触发粒子效果
 	position, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
 	if !ok {
 		log.Printf("[BehaviorSystem] 警告：僵尸 %d 缺少 PositionComponent，无法触发粒子效果", entityID)
-	} else if showLimbEffects {
-		// 只有普通死亡才触发肢体掉落效果
+	} else {
+		// 无论是普通死亡还是瞬间死亡，都播放头部掉落效果
 		// 检测僵尸行进方向，计算粒子角度偏移
 		// 粒子效果应该在僵尸行进的反方向飞出
 		//
@@ -199,7 +195,7 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 			_, err := entities.CreateParticleEffect(
 				s.entityManager,
 				s.resourceManager,
-				"ZombieFlag", // ���帜掉落粒子效果
+				"ZombieFlag", // 旗帜掉落粒子效果
 				position.X, position.Y,
 				angleOffset, // 与头部掉落方向一致
 			)
@@ -209,15 +205,13 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 				log.Printf("[BehaviorSystem] 旗帜僵尸 %d 触发旗帜掉落粒子效果，位置: (%.1f, %.1f)", entityID, position.X, position.Y)
 			}
 		}
-	} else {
-		log.Printf("[BehaviorSystem] 僵尸 %d 瞬间死亡，跳过肢体掉落效果", entityID)
 	}
 
 	// 2. 隐藏头部轨道（头掉落效果）
 	// 直接修改 HiddenTracks 字段而不调用废弃的 HideTrack API
 	// 注意：旗帜僵尸的旗帜隐藏在 zombie_flag.yaml 的 death/death_damaged 配置中处理
-	// 只有普通死亡才隐藏头部轨道
-	if showLimbEffects {
+	// 无论是普通死亡还是瞬间死亡，都隐藏头部轨道
+	{
 		if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
 			if reanim.HiddenTracks == nil {
 				reanim.HiddenTracks = make(map[string]bool)
@@ -303,6 +297,9 @@ func (s *BehaviorSystem) handleZombieDyingBehavior(entityID ecs.EntityID) {
 // 1. 健康（HP > 90）：完整外观
 // 2. 掉手臂（HP <= 90 且 HP > 0）：隐藏外侧手臂
 // 3. 掉头（HP <= 0）：无头状态（在 triggerZombieDeath 中处理）
+//
+// 特殊情况：
+// - DeathEffectInstant（保龄球坚果撞击）：跳过手臂掉落效果，直接进入死亡状态
 
 func (s *BehaviorSystem) updateZombieDamageState(entityID ecs.EntityID, health *components.HealthComponent) {
 	// 生命值阈值：90（33%，根据原版游戏数据）
@@ -312,6 +309,13 @@ func (s *BehaviorSystem) updateZombieDamageState(entityID ecs.EntityID, health *
 	if health.CurrentHealth <= armLostThreshold && !health.ArmLost {
 		// 标记手臂已掉落，防止重复触发
 		health.ArmLost = true
+
+		// 如果是瞬间死亡（保龄球坚果撞击），跳过手臂掉落的视觉效果
+		// 僵尸直接进入死亡状态，不需要播放手臂掉落动画和粒子
+		if health.DeathEffectType == components.DeathEffectInstant {
+			log.Printf("[BehaviorSystem] 僵尸 %d 瞬间死亡，跳过手臂掉落效果", entityID)
+			return
+		}
 
 		// 播放手臂掉落音效
 		if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
