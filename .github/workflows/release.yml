@@ -50,13 +50,14 @@ jobs:
           tar -czvf ../../${{ env.APP_NAME }}-linux-amd64.tar.gz ${{ env.APP_NAME }}
 
       # --- Linux arm64 ---
-      - name: Build Linux arm64
-        run: make build-linux-arm64
-
-      - name: Package Linux arm64
-        run: |
-          cd build/linux-arm64
-          tar -czvf ../../${{ env.APP_NAME }}-linux-arm64.tar.gz ${{ env.APP_NAME }}
+      # 注意: 由于 GitHub Actions ubuntu-latest 是 amd64，暂时跳过 arm64
+      # 如需 arm64 支持，可使用 self-hosted runner 或 QEMU 模拟
+      # - name: Build Linux arm64
+      #   run: make build-linux-arm64
+      # - name: Package Linux arm64
+      #   run: |
+      #     cd build/linux-arm64
+      #     tar -czvf ../../${{ env.APP_NAME }}-linux-arm64.tar.gz ${{ env.APP_NAME }}
 
       # --- Windows amd64 ---
       - name: Build Windows amd64
@@ -92,7 +93,6 @@ jobs:
           name: builds-linux-windows-wasm
           path: |
             ${{ env.APP_NAME }}-linux-amd64.tar.gz
-            ${{ env.APP_NAME }}-linux-arm64.tar.gz
             ${{ env.APP_NAME }}-windows-amd64.zip
             ${{ env.APP_NAME }}-windows-arm64.zip
             ${{ env.APP_NAME }}-wasm.zip
@@ -298,7 +298,6 @@ jobs:
           generate_release_notes: true
           files: |
             ./artifacts/${{ env.APP_NAME }}-linux-amd64.tar.gz
-            ./artifacts/${{ env.APP_NAME }}-linux-arm64.tar.gz
             ./artifacts/${{ env.APP_NAME }}-windows-amd64.zip
             ./artifacts/${{ env.APP_NAME }}-windows-arm64.zip
             ./artifacts/${{ env.APP_NAME }}-darwin-amd64.tar.gz

@@ -273,33 +273,28 @@ GRADLE_CACHE_DIR="$PROJECT_ROOT/build/gradle-cache"
 GRADLE_VERSION="8.5"
 GRADLE_DIR="$GRADLE_CACHE_DIR/gradle-$GRADLE_VERSION"
 
-# 检查系统是否已安装 gradle
-if command -v gradle &> /dev/null; then
-    GRADLE_CMD="gradle"
-    echo_info "使用系统安装的 Gradle"
+# 优先使用本地缓存的 Gradle 或下载指定版本
+# 避免使用系统 Gradle（可能版本不兼容）
+if [ -d "$GRADLE_DIR" ] && [ -f "$GRADLE_DIR/bin/gradle" ]; then
+    echo_info "使用缓存的 Gradle $GRADLE_VERSION"
+    GRADLE_CMD="$GRADLE_DIR/bin/gradle"
 else
-    # 检查缓存的 Gradle
-    if [ -d "$GRADLE_DIR" ] && [ -f "$GRADLE_DIR/bin/gradle" ]; then
-        echo_info "使用缓存的 Gradle $GRADLE_VERSION"
-        GRADLE_CMD="$GRADLE_DIR/bin/gradle"
-    else
-        echo_warn "Gradle 未安装，下载 Gradle $GRADLE_VERSION 到缓存目录..."
-        mkdir -p "$GRADLE_CACHE_DIR"
+    echo_info "下载 Gradle $GRADLE_VERSION 到缓存目录..."
+    mkdir -p "$GRADLE_CACHE_DIR"
 
-        GRADLE_ZIP="$GRADLE_CACHE_DIR/gradle-$GRADLE_VERSION-bin.zip"
-        curl -L "https://services.gradle.org/distributions/gradle-$GRADLE_VERSION-bin.zip" -o "$GRADLE_ZIP" || {
-            echo_error "下载 Gradle 失败，请检查网络连接或代理设置"
-            echo "提示: 如需使用代理，设置环境变量: export http_proxy=http://127.0.0.1:2080"
-            exit 1
-        }
-        
-        echo_info "解压 Gradle 到缓存目录..."
-        unzip -q "$GRADLE_ZIP" -d "$GRADLE_CACHE_DIR"
-        rm -f "$GRADLE_ZIP"  # 删除 zip 文件，节省空间
-        
-        GRADLE_CMD="$GRADLE_DIR/bin/gradle"
-        echo_info "Gradle $GRADLE_VERSION 已缓存到: $GRADLE_DIR"
-    fi
+    GRADLE_ZIP="$GRADLE_CACHE_DIR/gradle-$GRADLE_VERSION-bin.zip"
+    curl -L "https://services.gradle.org/distributions/gradle-$GRADLE_VERSION-bin.zip" -o "$GRADLE_ZIP" || {
+        echo_error "下载 Gradle 失败，请检查网络连接或代理设置"
+        echo "提示: 如需使用代理，设置环境变量: export http_proxy=http://127.0.0.1:2080"
+        exit 1
+    }
+
+    echo_info "解压 Gradle 到缓存目录..."
+    unzip -q "$GRADLE_ZIP" -d "$GRADLE_CACHE_DIR"
+    rm -f "$GRADLE_ZIP"  # 删除 zip 文件，节省空间
+
+    GRADLE_CMD="$GRADLE_DIR/bin/gradle"
+    echo_info "Gradle $GRADLE_VERSION 已缓存到: $GRADLE_DIR"
 fi
 
 # 生成 Gradle Wrapper
