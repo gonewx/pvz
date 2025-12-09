@@ -7,7 +7,7 @@ global:
   window:
     width: 1920
     height: 1080
-    title: "PVZ3 Animation Showcase"
+    title: "pvz Animation Showcase"
 
   # 网格布局配置
   grid:

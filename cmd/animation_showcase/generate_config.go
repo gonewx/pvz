@@ -37,7 +37,7 @@ func generateConfig() {
 	fmt.Println("  window:")
 	fmt.Println("    width: 1600")
 	fmt.Println("    height: 900")
-	fmt.Println("    title: \"PVZ3 Animation Showcase\"")
+	fmt.Println("    title: \"pvz Animation Showcase\"")
 	fmt.Println()
 	fmt.Println("  grid:")
 	fmt.Println("    columns: 6")

@@ -11,7 +11,7 @@ goroutine 1 [running, locked to thread]:
 github.com/hajimehoshi/ebiten/v2/audio.NewContext(0xbb80)
     /home/decker/go/pkg/mod/github.com/hajimehoshi/ebiten/v2@v2.9.0/audio/audio.go:90 +0x305
 main.main()
-    /mnt/disk0/project/game/pvz/pvz3/main.go:50 +0x97
+    /mnt/disk0/project/game/pvz/pvz/main.go:50 +0x97
 exit status 2
 ```
 

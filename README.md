@@ -140,7 +140,7 @@ make ios-icons-info
 ## 🏗️ 项目结构
 
 ```
-pvz3/
+pvz/
 ├── main.go                 # 游戏入口
 ├── assets/                 # 游戏资源
 │   ├── images/             # 图片资源（spritesheets）

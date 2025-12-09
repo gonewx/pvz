@@ -1177,7 +1177,7 @@ if reanimSystem.IsAnimationFinished(entityID) {
 - **Sprint Change Proposal**: `docs/qa/sprint-change-proposal-story-6.4-animation-mechanism.md`（本文档）
 - **Story 6.4**: `docs/stories/6.4.story.md`
 - **Story 10.3**: `docs/stories/10.3.story.md`
-- **CLAUDE.md**: `/mnt/disk0/project/game/pvz/pvz3/CLAUDE.md`（项目上下文文档）
+- **CLAUDE.md**: `/mnt/disk0/project/game/pvz/pvz/CLAUDE.md`（项目上下文文档）
 - **Epic 6**: `docs/prd/epic-6-animation-system-migration.md`
 - **Epic 10**: `docs/prd/epic-10-game-experience-polish.md`
 

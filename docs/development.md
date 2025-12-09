@@ -63,11 +63,11 @@
 # 1. Fork 仓库到您的 GitHub 账号
 
 # 2. 克隆您的 Fork
-git clone https://github.com/YOUR_USERNAME/pvz3.git
-cd pvz3
+git clone https://github.com/YOUR_USERNAME/pvz.git
+cd pvz
 
 # 3. 添加上游仓库
-git remote add upstream https://github.com/ORIGINAL_REPO/pvz3.git
+git remote add upstream https://github.com/ORIGINAL_REPO/pvz.git
 
 # 4. 下载依赖
 go mod download
@@ -164,7 +164,7 @@ ecs.AddComponent(em, peashooterID, &components.PlantComponent{
 ### 目录结构详解
 
 ```
-pvz3/
+pvz/
 ├── main.go                      # 游戏入口，初始化 Ebitengine
 │
 ├── pkg/                         # 核心代码库

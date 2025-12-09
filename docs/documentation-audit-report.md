@@ -41,7 +41,7 @@ pvz/
 
 **实际代码结构** (缺失记录):
 ```
-pvz3/
+pvz/
 ├── cmd/                 # ❌ 未记录 - 16个调试工具目录
 ├── internal/            # ❌ 未记录 - reanim/particle/audio 解析器
 ├── mobile/              # ❌ 未记录 - 移动平台适配

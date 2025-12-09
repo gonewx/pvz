@@ -12,5 +12,5 @@ global:
         scroll_speed: 30
     window:
         height: 900
-        title: PVZ3 Animation Showcase
+        title: pvz Animation Showcase
         width: 1600

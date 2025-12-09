@@ -54,7 +54,7 @@ global:
   window:
     width: 1600        # 窗口宽度
     height: 900        # 窗口高度
-    title: "PVZ3 Animation Showcase"
+    title: "pvz Animation Showcase"
 
   grid:
     columns: 6         # 每行单元数

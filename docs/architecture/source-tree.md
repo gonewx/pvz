@@ -9,7 +9,7 @@
 ## 项目根目录
 
 ```plaintext
-pvz3/
+pvz/
 ├── main.go                          # 游戏主入口文件
 ├── embed.go                         # Go embed 资源嵌入配置
 ├── go.mod / go.sum                  # Go 模块依赖管理

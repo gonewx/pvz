@@ -98,7 +98,7 @@ comp, ok := em.GetComponent(entity, reflect.TypeOf(&components.PlantComponent{})
 ## 项目结构
 
 ```
-pvz3/
+pvz/
 ├── main.go                      # 游戏入口
 ├── pkg/                         # 核心代码库
 │   ├── ecs/                     # ECS 框架（泛型实现）

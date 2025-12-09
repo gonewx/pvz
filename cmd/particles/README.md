@@ -120,7 +120,7 @@ SEARCH: pea_                               [搜索模式指示器]
 ### 程序无法启动
 ```bash
 # 检查是否在项目根目录
-pwd  # 应该显示 .../pvz3
+pwd  # 应该显示 .../pvz
 
 # 检查资源文件是否存在
 ls data/particles/*.xml | wc -l  # 应该显示 106

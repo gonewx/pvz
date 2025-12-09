@@ -43,7 +43,7 @@ go env GOPATH
 git clone <repository-url>
 
 # 进入项目目录
-cd pvz3
+cd pvz
 ```
 
 ### 步骤 2: 下载依赖

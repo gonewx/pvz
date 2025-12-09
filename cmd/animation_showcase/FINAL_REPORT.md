@@ -48,7 +48,7 @@
 
 ```bash
 # 1. 编译
-cd /path/to/pvz3
+cd /path/to/pvz
 go build -o animation_showcase ./cmd/animation_showcase
 
 # 2. 运行（140个动画）
