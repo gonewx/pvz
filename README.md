@@ -1,6 +1,16 @@
 # Plants vs. Zombies AI Recreation
 
-> A faithful recreation of "Plants vs. Zombies" developed with Go and Ebitengine
+> **A backend developer with ZERO game development experience** recreated "Plants vs. Zombies" using [BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD) + AI (Claude Code), achieving **120,000+ lines of Go code** with **99.9% AI-generated content**.
+
+| Metric | Value |
+|--------|-------|
+| Developer Background | Backend engineer, no game dev experience |
+| AI Code Generation Rate | 99.9% |
+| Go Source Code | 120,000+ lines (388 files) |
+| Development Approach | BMAD-METHOD workflow + Claude Code |
+| Manual Intervention | Architecture decisions, prompting, review |
+
+This project demonstrates that with proper AI workflow management (BMAD-METHOD), even developers without domain expertise can build complex, production-quality applications. The BMAD-METHOD provides structured PRD → Architecture → Epic → Story workflows that guide AI to generate consistent, maintainable code.
 
 [![CI](https://github.com/gonewx/pvz/actions/workflows/ci.yml/badge.svg)](https://github.com/gonewx/pvz/actions/workflows/ci.yml)
 [![Release](https://github.com/gonewx/pvz/actions/workflows/release.yml/badge.svg)](https://github.com/gonewx/pvz/actions/workflows/release.yml)
@@ -8,6 +18,8 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 [简体中文](README_zh.md) | English
+
+---
 
 ## 🎮 Introduction
 
@@ -267,6 +279,7 @@ See [DISCLAIMER.md](DISCLAIMER.md) for important legal notices.
 
 ## 🙏 Acknowledgments
 
+- **Workflow Engine**: [BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD)
 - **Original Game**: "Plants vs. Zombies" by PopCap Games
 - **Game Engine**: [Ebitengine](https://ebiten.org/) team
 - **Development Tool**: Claude Code AI

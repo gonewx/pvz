@@ -1,6 +1,16 @@
 # 植物大战僵尸 AI 复刻版
 
-> 使用 Go 语言和 Ebitengine 引擎开发的《植物大战僵尸》精确复刻项目
+> **一位零游戏开发经验的后端工程师**，使用 [BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD) + AI (Claude Code) 复刻《植物大战僵尸》，实现 **12万+ 行 Go 代码**，**99.9% 由 AI 生成**。
+
+| 指标 | 数值 |
+|------|------|
+| 开发者背景 | 后端工程师，零游戏开发经验 |
+| AI 代码生成率 | 99.9% |
+| Go 源代码 | 120,000+ 行 (388 个文件) |
+| 开发方法 | BMAD-METHOD 工作流 + Claude Code |
+| 人工干预 | 架构决策、提示词设计、代码审查 |
+
+借助合适的 AI 工作流管理方法 (BMAD-METHOD)，即使没有领域专业知识的开发者也能构建复杂的、生产级质量的应用。BMAD-METHOD 提供结构化的 PRD → 架构 → Epic → Story 工作流，引导 AI 生成一致、可维护的代码。
 
 [![CI](https://github.com/gonewx/pvz/actions/workflows/ci.yml/badge.svg)](https://github.com/gonewx/pvz/actions/workflows/ci.yml)
 [![Release](https://github.com/gonewx/pvz/actions/workflows/release.yml/badge.svg)](https://github.com/gonewx/pvz/actions/workflows/release.yml)
@@ -8,6 +18,8 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 简体中文 | [English](README.md)
+
+---
 
 ## 🎮 项目简介
 
@@ -267,6 +279,7 @@ go tool cover -html=coverage.out
 
 ## 🙏 致谢
 
+- **工作流引擎**: [BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD)
 - **原版游戏**: PopCap Games 的《植物大战僵尸》
 - **游戏引擎**: [Ebitengine](https://ebiten.org/) 团队
 - **开发工具**: Claude Code AI
