@@ -1126,6 +1126,32 @@ func (s *BehaviorSystem) handleZombieDyingExplosionBehavior(entityID ecs.EntityI
 	}
 }
 
+// triggerZombieInstantDeath 触发僵尸瞬间消失死亡
+//
+// 当僵尸被土豆地雷等爆炸攻击杀死时，直接删除实体
+// 不播放变焦动画，僵尸瞬间消失（爆炸粒子效果已在爆炸时播放）
+//
+// 参数:
+//   - entityID: 僵尸实体ID
+//   - x, y: 僵尸位置（用于日志）
+func (s *BehaviorSystem) triggerZombieInstantDeath(entityID ecs.EntityID, x, y float64) {
+	log.Printf("[BehaviorSystem] 僵尸 %d 瞬间消失，位置: (%.1f, %.1f)", entityID, x, y)
+
+	// 先将行为设置为"已删除"状态，防止同一帧内被其他系统重复处理
+	// 这样在后续的 handleZombieBasicBehavior 检测到 health <= 0 时会跳过
+	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
+	if ok {
+		behavior.Type = components.BehaviorZombieDying
+	}
+
+	// 增加僵尸消灭计数
+	s.gameState.IncrementZombiesKilled()
+
+	// 直接删除僵尸实体（不播放死亡动画，爆炸粒子效果已在爆炸时播放）
+	s.entityManager.DestroyEntity(entityID)
+	log.Printf("[BehaviorSystem] 僵尸 %d 已删除", entityID)
+}
+
 // updateArmorVisualState 更新护甲僵尸的外观状态
 // 根据护甲的受损程度（剩余百分比）切换不同的护甲图片
 // 支持路障僵尸（cone）和铁桶僵尸（bucket）
