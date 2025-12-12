@@ -412,6 +412,15 @@ func (s *InputSystem) handlePlantCardClick(mouseX, mouseY int, cameraX float64) 
 			} else {
 				// 如果不在种植模式，进入种植模式
 				log.Printf("[InputSystem] 进入种植模式: PlantType=%v", card.PlantType)
+
+				// Bug修复: 如果当前处于铲子模式，先取消铲子模式
+				if shovelStateProvider != nil && shovelStateProvider.IsShovelSelected() {
+					shovelStateProvider.SetShovelSelected(false)
+					// 恢复系统光标
+					ebiten.SetCursorMode(ebiten.CursorModeVisible)
+					log.Printf("[InputSystem] 取消铲子模式（选择植物卡片）")
+				}
+
 				s.gameState.EnterPlantingMode(card.PlantType)
 
 				// Story 10.9: 播放选中植物卡片音效 (seedlift.ogg)
@@ -612,6 +621,12 @@ func (s *InputSystem) createPlantEntity(plantType components.PlantType, col, row
 	if plantType == components.PlantCherryBomb {
 		return entities.NewCherryBombEntity(s.entityManager, s.resourceManager, s.gameState, col, row)
 	}
+	if plantType == components.PlantPotatoMine {
+		return entities.NewPotatoMineEntity(s.entityManager, s.resourceManager, s.gameState, col, row)
+	}
+	if plantType == components.PlantSnowPea {
+		return entities.NewSnowPeaEntity(s.entityManager, s.resourceManager, s.gameState, s.reanimSystem, col, row)
+	}
 	// 其他植物使用通用工厂函数
 	return entities.NewPlantEntity(s.entityManager, s.resourceManager, s.gameState, s.reanimSystem, plantType, col, row)
 }
@@ -627,6 +642,10 @@ func (s *InputSystem) getPlantCost(plantType components.PlantType) int {
 		return config.WallnutCost // 50
 	case components.PlantCherryBomb:
 		return config.CherryBombSunCost // 150
+	case components.PlantPotatoMine:
+		return config.PotatoMineSunCost // 25
+	case components.PlantSnowPea:
+		return config.SnowPeaSunCost // 175
 	default:
 		return 0
 	}
@@ -953,6 +972,14 @@ func (s *InputSystem) handlePlantCardHotkeys(cameraX float64) {
 		s.destroyPlantPreview()
 	}
 
+	// Bug修复: 如果当前处于铲子模式，先取消铲子模式
+	if shovelStateProvider != nil && shovelStateProvider.IsShovelSelected() {
+		shovelStateProvider.SetShovelSelected(false)
+		// 恢复系统光标
+		ebiten.SetCursorMode(ebiten.CursorModeVisible)
+		log.Printf("[InputSystem] 快捷键取消铲子模式（选择植物卡片）")
+	}
+
 	// 进入种植模式
 	log.Printf("[InputSystem] 快捷键进入种植模式: PlantType=%v", targetCard.card.PlantType)
 	s.gameState.EnterPlantingMode(targetCard.card.PlantType)
@@ -1109,6 +1136,14 @@ func (s *InputSystem) handleDragStart(dragInfo utils.DragInfo, cameraX float64) 
 	s.isDragPlanting = true
 	s.dragPlantType = plantCard.PlantType
 	s.dragStartCardEntity = cardEntity
+
+	// Bug修复: 如果当前处于铲子模式，先取消铲子模式
+	if shovelStateProvider != nil && shovelStateProvider.IsShovelSelected() {
+		shovelStateProvider.SetShovelSelected(false)
+		// 恢复系统光标
+		ebiten.SetCursorMode(ebiten.CursorModeVisible)
+		log.Printf("[InputSystem] 拖拽取消铲子模式（选择植物卡片）")
+	}
 
 	// 进入种植模式
 	s.gameState.EnterPlantingMode(plantCard.PlantType)

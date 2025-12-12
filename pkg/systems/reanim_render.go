@@ -95,6 +95,17 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 				logicalFrame = 0
 			}
 
+			// 检查轨道是否有帧覆盖（TrackFrameOverrides）
+			// 有帧覆盖的轨道直接使用指定的物理帧，跳过帧映射
+			// TODO: 此功能尚未完全实现，暂时保留代码结构
+			if comp.TrackFrameOverrides != nil {
+				if _, exists := comp.TrackFrameOverrides[trackName]; exists {
+					// useFrameOverride = true
+					// overridePhysicalFrame = frame
+					// 未来实现：直接使用 overridePhysicalFrame 跳过帧映射
+				}
+			}
+
 			// 获取动画的可见性数组
 			animVisibles, ok := comp.AnimVisiblesMap[animName]
 			if !ok {
@@ -251,10 +262,18 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 				if overrideImg, hasOverride := comp.ImageOverrides[frame.ImagePath]; hasOverride && overrideImg != nil {
 					img = overrideImg
 					imgOk = true
+					// Debug: 土豆地雷图片覆盖
+					if strings.EqualFold(comp.ReanimName, "potatomine") && strings.Contains(frame.ImagePath, "LIGHT") {
+						log.Printf("[ReanimSystem] 🔴 PotatoMine ImageOverride: track=%s, imagePath=%s, 使用覆盖图片", trackName, frame.ImagePath)
+					}
 				}
 			}
 			if !imgOk {
 				img, imgOk = comp.PartImages[frame.ImagePath]
+				// Debug: 土豆地雷使用原图
+				if strings.EqualFold(comp.ReanimName, "potatomine") && strings.Contains(frame.ImagePath, "LIGHT") {
+					log.Printf("[ReanimSystem] ⚪ PotatoMine 原图: track=%s, imagePath=%s, ImageOverrides=%v", trackName, frame.ImagePath, comp.ImageOverrides)
+				}
 			}
 			if !imgOk || img == nil {
 				if comp.ReanimName == "simple_pea" {
@@ -312,10 +331,11 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 			}
 
 			comp.CachedRenderData = append(comp.CachedRenderData, components.RenderPartData{
-				Img:     selectedImg,
-				Frame:   selectedFrame,
-				OffsetX: selectedOffsetX,
-				OffsetY: selectedOffsetY,
+				Img:       selectedImg,
+				Frame:     selectedFrame,
+				OffsetX:   selectedOffsetX,
+				OffsetY:   selectedOffsetY,
+				TrackName: trackName,
 			})
 			visibleCount++
 		}
@@ -929,10 +949,11 @@ func (s *ReanimSystem) renderOverlayAnimation(comp *components.ReanimComponent) 
 		}
 
 		comp.CachedRenderData = append(comp.CachedRenderData, components.RenderPartData{
-			Img:     img,
-			Frame:   renderFrame,
-			OffsetX: 0,
-			OffsetY: 0,
+			Img:       img,
+			Frame:     renderFrame,
+			OffsetX:   0,
+			OffsetY:   0,
+			TrackName: trackName, // Overlay 轨道，用于 CenterOffset 计算时排除
 		})
 	}
 }

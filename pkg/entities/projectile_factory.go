@@ -83,3 +83,65 @@ func NewPeaProjectile(em *ecs.EntityManager, rm ResourceLoader, startX, startY f
 
 	return entityID, nil
 }
+
+// NewSnowPeaProjectile 创建冰豌豆子弹实体
+// Story 8.9: 冰豌豆从寒冰射手口部发射，以恒定速度向右移动
+// 命中僵尸时造成伤害并附加减速效果
+//
+// 参数:
+//   - em: 实体管理器
+//   - rm: 资源管理器（用于加载子弹图像）
+//   - startX: 子弹起始世界坐标X位置
+//   - startY: 子弹起始世界坐标Y位置
+//
+// 返回:
+//   - ecs.EntityID: 创建的子弹实体ID，如果失败返回 0
+//   - error: 如果创建失败返回错误信息
+func NewSnowPeaProjectile(em *ecs.EntityManager, rm ResourceLoader, startX, startY float64) (ecs.EntityID, error) {
+	if em == nil {
+		return 0, fmt.Errorf("entity manager cannot be nil")
+	}
+	if rm == nil {
+		return 0, fmt.Errorf("resource manager cannot be nil")
+	}
+
+	// 加载冰豌豆子弹图像
+	snowPeaImage, err := rm.LoadImage("assets/images/ProjectileSnowPea.png")
+	if err != nil {
+		return 0, fmt.Errorf("failed to load snow pea projectile image: %w", err)
+	}
+
+	// 创建实体
+	entityID := em.CreateEntity()
+
+	// 添加位置组件（世界坐标）
+	em.AddComponent(entityID, &components.PositionComponent{
+		X: startX,
+		Y: startY,
+	})
+
+	// 为冰豌豆创建简化的 Reanim 包装（无动画轨道）
+	reanimComp := createSimpleReanimComponent(snowPeaImage, "snow_pea")
+	em.AddComponent(entityID, reanimComp)
+
+	log.Printf("[ProjectileFactory] 创建冰豌豆 %d: ReanimName=%s", entityID, reanimComp.ReanimName)
+
+	// 添加速度组件（向右移动，与普通豌豆速度相同）
+	em.AddComponent(entityID, &components.VelocityComponent{
+		VX: config.PeaBulletSpeed,
+		VY: 0,
+	})
+
+	// 添加行为组件（标识为冰豌豆子弹）
+	em.AddComponent(entityID, &components.BehaviorComponent{
+		Type: components.BehaviorSnowPeaProjectile,
+	})
+
+	// 添加碰撞组件（与普通豌豆相同尺寸）
+	em.AddComponent(entityID, &components.CollisionComponent{
+		Width:  config.PeaBulletWidth,
+		Height: config.PeaBulletHeight,
+	})
+
+	return entityID, nil
+}

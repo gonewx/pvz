@@ -230,7 +230,8 @@ func (s *BowlingNutSystem) isZombieType(behaviorType components.BehaviorType) bo
 		components.BehaviorZombieEating,
 		components.BehaviorZombieConehead,
 		components.BehaviorZombieBuckethead,
-		components.BehaviorZombieFlag:
+		components.BehaviorZombieFlag,
+		components.BehaviorZombiePolevaulter:
 		return true
 	default:
 		// 排除 BehaviorZombieDying, BehaviorZombieSquashing, BehaviorZombieDyingExplosion 等死亡状态

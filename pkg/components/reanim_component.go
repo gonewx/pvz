@@ -19,6 +19,9 @@ type RenderPartData struct {
 
 	// OffsetY 父子偏移 Y
 	OffsetY float64
+
+	// TrackName 轨道名称（用于识别装备轨道，在 CenterOffset 计算时排除）
+	TrackName string
 }
 
 // InterlayerDrawRequest 中间层绘制请求
@@ -144,6 +147,13 @@ type ReanimComponent struct {
 	// 用于在保持高 FPS（平滑）的同时控制动画播放速度
 	AnimationSpeedOverrides map[string]float64
 
+	// PhysicalFrameLoopStates 存储每个动画是否使用物理帧循环
+	// Key: 动画名称（如 "anim_armed"）
+	// Value: true 表示使用物理帧数（包含隐藏帧）来确定循环边界
+	// 如果某个动画不在此 map 中，默认使用逻辑帧数（只计算可见帧）
+	// 用于土豆地雷警告灯等需要"显示-隐藏"周期的闪烁效果
+	PhysicalFrameLoopStates map[string]bool
+
 	// ==========================================================================
 	// 动画数据 (Animation Data)
 	// ==========================================================================
@@ -186,6 +196,13 @@ type ReanimComponent struct {
 	// 用于旗帜僵尸啃食时保持右手拿旗的效果
 	FrozenTracks map[string]bool
 
+	// TrackFrameOverrides 轨道帧覆盖
+	// Key: 轨道名
+	// Value: 强制使用的物理帧索引
+	// 用于让特定轨道始终使用指定帧，而不是跟随动画帧索引
+	// 例如：土豆地雷的 anim_glow 轨道只有帧 20 有图像，需要始终使用帧 20
+	TrackFrameOverrides map[string]int
+
 	// ImageOverrides 图片覆盖
 	// Key: 图片引用名（如 "IMAGE_REANIM_ZOMBIE_FLAGHAND"）
 	// Value: 覆盖后的图片对象
@@ -208,6 +225,10 @@ type ReanimComponent struct {
 	// 在动画初始化时计算一次并缓存，避免每帧重新计算导致位置抖动
 	CenterOffsetX float64
 	CenterOffsetY float64
+
+	// CenterOffsetCalculated 标记 CenterOffset 是否已计算过
+	// 只在首次初始化时计算，后续动画切换时保持不变，避免位置跳动
+	CenterOffsetCalculated bool
 
 	// ==========================================================================
 	// 渲染缓存 (Render Cache)

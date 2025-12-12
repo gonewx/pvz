@@ -828,6 +828,23 @@ func (s *GameScene) restorePlants(plants []game.PlantData) {
 				plantData.GridCol,
 				plantData.GridRow,
 			)
+		case components.PlantPotatoMine:
+			entityID, err = entities.NewPotatoMineEntity(
+				s.entityManager,
+				s.resourceManager,
+				s.gameState,
+				plantData.GridCol,
+				plantData.GridRow,
+			)
+		case components.PlantSnowPea:
+			entityID, err = entities.NewSnowPeaEntity(
+				s.entityManager,
+				s.resourceManager,
+				s.gameState,
+				s.reanimSystem,
+				plantData.GridCol,
+				plantData.GridRow,
+			)
 		default:
 			log.Printf("[GameScene] Warning: Unsupported plant type '%s', skipping", plantData.PlantType)
 			continue
@@ -1193,6 +1210,10 @@ func stringToPlantType(s string) components.PlantType {
 		return components.PlantWallnut
 	case "CherryBomb", "cherrybomb":
 		return components.PlantCherryBomb
+	case "PotatoMine", "potatomine":
+		return components.PlantPotatoMine
+	case "SnowPea", "snowpea":
+		return components.PlantSnowPea
 	default:
 		return components.PlantUnknown
 	}

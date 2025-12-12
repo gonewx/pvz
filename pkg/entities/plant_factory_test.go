@@ -66,8 +66,9 @@ func TestNewPlantEntity(t *testing.T) {
 			} else {
 				pos := posComp.(*components.PositionComponent)
 				// Story 6.3: 实体位置使用世界坐标（不受摄像机影响）
+				// pos.Y = 格子中心 + PlantOffsetY（脚底位置）
 				expectedX := config.GridWorldStartX + float64(tt.col)*config.CellWidth + config.CellWidth/2
-				expectedY := config.GridWorldStartY + float64(tt.row)*config.CellHeight + config.CellHeight/2
+				expectedY := config.GridWorldStartY + float64(tt.row)*config.CellHeight + config.CellHeight/2 + config.PlantOffsetY
 				if pos.X != expectedX || pos.Y != expectedY {
 					t.Errorf("Position mismatch: got (%.1f, %.1f), want (%.1f, %.1f)",
 						pos.X, pos.Y, expectedX, expectedY)
@@ -183,8 +184,9 @@ func TestNewPlantEntity_PositionCalculation(t *testing.T) {
 
 			pos := posComp.(*components.PositionComponent)
 			// Story 6.3: 实体位置使用世界坐标（不受摄像机影响）
+			// pos.Y = 格子中心 + PlantOffsetY（脚底位置）
 			expectedX := config.GridWorldStartX + float64(corner.col)*config.CellWidth + config.CellWidth/2
-			expectedY := config.GridWorldStartY + float64(corner.row)*config.CellHeight + config.CellHeight/2
+			expectedY := config.GridWorldStartY + float64(corner.row)*config.CellHeight + config.CellHeight/2 + config.PlantOffsetY
 
 			if pos.X != expectedX || pos.Y != expectedY {
 				t.Errorf("%s position incorrect: got (%.1f, %.1f), want (%.1f, %.1f)",
@@ -297,7 +299,8 @@ func TestNewWallnutEntity(t *testing.T) {
 			} else {
 				pos := posComp.(*components.PositionComponent)
 				expectedX := config.GridWorldStartX + float64(tt.col)*config.CellWidth + config.CellWidth/2
-				expectedY := config.GridWorldStartY + float64(tt.row)*config.CellHeight + config.CellHeight/2
+				// Y 坐标 = 格子中心 + PlantOffsetY，使植物脚底对齐到格子底部
+				expectedY := config.GridWorldStartY + float64(tt.row)*config.CellHeight + config.CellHeight/2 + config.PlantOffsetY
 				if pos.X != expectedX || pos.Y != expectedY {
 					t.Errorf("Position mismatch: got (%.1f, %.1f), want (%.1f, %.1f)",
 						pos.X, pos.Y, expectedX, expectedY)
@@ -472,7 +475,8 @@ func TestNewCherryBombEntity(t *testing.T) {
 			} else {
 				pos := posComp.(*components.PositionComponent)
 				expectedX := config.GridWorldStartX + float64(tt.col)*config.CellWidth + config.CellWidth/2
-				expectedY := config.GridWorldStartY + float64(tt.row)*config.CellHeight + config.CellHeight/2
+				// Y 坐标 = 格子中心 + PlantOffsetY，使植物脚底对齐到格子底部
+				expectedY := config.GridWorldStartY + float64(tt.row)*config.CellHeight + config.CellHeight/2 + config.PlantOffsetY
 				if pos.X != expectedX || pos.Y != expectedY {
 					t.Errorf("Position mismatch: got (%.1f, %.1f), want (%.1f, %.1f)",
 						pos.X, pos.Y, expectedX, expectedY)

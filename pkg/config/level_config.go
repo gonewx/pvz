@@ -359,9 +359,10 @@ func validateLevelConfig(config *LevelConfig) error {
 			return fmt.Errorf("wave %d: type must be one of: Fixed, ExtraPoints, Final, got %q", i, wave.Type)
 		}
 
-		// 验证 ExtraPoints（仅在 Type="ExtraPoints" 时允许非零值）
-		if wave.ExtraPoints != 0 && wave.Type != "ExtraPoints" {
-			return fmt.Errorf("wave %d: extraPoints can only be set when type is 'ExtraPoints', got type %q with extraPoints %d", i, wave.Type, wave.ExtraPoints)
+		// 验证 ExtraPoints（仅在 Type="ExtraPoints" 或 "Fixed" 时允许非零值）
+		// Story 8.9: Fixed 类型支持混合模式 - 固定僵尸 + 额外点数动态分配
+		if wave.ExtraPoints != 0 && wave.Type != "ExtraPoints" && wave.Type != "Fixed" {
+			return fmt.Errorf("wave %d: extraPoints can only be set when type is 'ExtraPoints' or 'Fixed', got type %q with extraPoints %d", i, wave.Type, wave.ExtraPoints)
 		}
 
 		// 验证 ExtraPoints（必须 >= 0）
@@ -381,7 +382,8 @@ func validateLevelConfig(config *LevelConfig) error {
 		}
 
 		// Story 8.6: 支持 ZombieGroup 和旧格式 ZombieSpawn
-		if len(wave.Zombies) == 0 && len(wave.OldZombies) == 0 {
+		// Story 8.9: ExtraPoints 类型的波次允许空 zombies（僵尸由点数动态分配）
+		if len(wave.Zombies) == 0 && len(wave.OldZombies) == 0 && wave.Type != "ExtraPoints" {
 			return fmt.Errorf("wave %d: at least one zombie group or spawn is required", i)
 		}
 

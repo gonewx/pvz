@@ -6,10 +6,10 @@ package config
 // Zombie Configuration (僵尸配置)
 const (
 	// ZombieVerticalOffset 僵尸在格子中的垂直偏移量（像素）
-	// 用于微调僵尸在格子中的垂直位置
-	// 建议值范围：25.0 - 50.0
-	// 当前使用 CellHeight/2 (50.0) 使僵尸在格子中心
-	ZombieVerticalOffset = -25.0
+	// 使用 CellHeight/2 (50.0) 使僵尸脚底对齐到格子底部
+	// 渲染公式：screenY = pos.Y - CenterOffsetY，CenterOffsetY = maxY（脚底）
+	// 因此 pos.Y 需要指向脚底应该在的位置（格子底部）
+	ZombieVerticalOffset = PlantOffsetY
 
 	// ZombieWalkSpeed 普通僵尸的移动速度（像素/秒）
 	// 负值表示从右向左移动
@@ -64,6 +64,30 @@ const (
 	// 建议值范围：1.0 - 3.0
 	// 值越大，同一波僵尸入场时间差越明显
 	ZombieActivationDelayMax = 3.0
+)
+
+// Pole Vaulting Zombie Configuration (撑杆僵尸配置)
+// Story 8.9: Level 1-6 新增僵尸类型
+const (
+	// PolevaulterZombieHealth 撑杆僵尸的生命值
+	// 高于普通僵尸（270）的生命值
+	PolevaulterZombieHealth = 500
+
+	// PolevaulterZombieRunSpeed 撑杆僵尸持杆时的移动速度（像素/秒）
+	// 约为普通僵尸的 1.8 倍（30 * 1.8 ≈ 54）
+	// 负值表示从右向左移动
+	PolevaulterZombieRunSpeed = -54.0
+
+	// PolevaulterZombieWalkSpeed 撑杆僵尸跳跃后的移动速度（像素/秒）
+	// 与普通僵尸相同
+	PolevaulterZombieWalkSpeed = -30.0
+
+	// PolevaulterZombieJumpDistance 撑杆僵尸跳跃距离（像素）
+	// 约 1.5 格（1.5 * 80 = 120 像素）
+	PolevaulterZombieJumpDistance = 120.0
+
+	// PolevaulterZombieJumpDuration 撑杆僵尸跳跃动画持续时间（秒）
+	PolevaulterZombieJumpDuration = 0.8
 )
 
 // Projectile Configuration (子弹配置)
@@ -229,6 +253,64 @@ const (
 
 	// PotatoMineRechargeTime 土豆雷的冷却时间（秒）
 	PotatoMineRechargeTime = 30.0
+
+	// Story 8.9: 土豆地雷武装和爆炸配置
+	// PotatoMineArmingTime 土豆雷武装时间（秒）
+	PotatoMineArmingTime = 1.0
+
+	// PotatoMineExplosionDamage 土豆雷爆炸伤害
+	// 1800 点伤害，足以秒杀大多数普通僵尸
+	PotatoMineExplosionDamage = 1800
+
+	// PotatoMineExplosionRadius 土豆雷爆炸范围（格数）
+	// 1x1 格（单格）
+	PotatoMineExplosionRadius = 1.0
+
+	// PotatoMineWarningLightMinSpeed 警告灯最慢闪烁速度倍率
+	// 僵尸很远或没有僵尸时使用
+	// 注意：此常量已废弃，改用 PotatoMineBlinkIntervalMax/Min
+	PotatoMineWarningLightMinSpeed = 1.0
+
+	// PotatoMineWarningLightMaxSpeed 警告灯最快闪烁速度倍率
+	// 僵尸很近时使用
+	// 注意：此常量已废弃，改用 PotatoMineBlinkIntervalMax/Min
+	PotatoMineWarningLightMaxSpeed = 4.0
+
+	// PotatoMineWarningDistanceMax 开始检测僵尸的最大距离（像素）
+	// 超过此距离使用最慢速度
+	PotatoMineWarningDistanceMax = 400.0
+
+	// PotatoMineWarningDistanceMin 警告灯达到最快速度的距离（像素）
+	// 僵尸距离小于此值时使用最快速度
+	PotatoMineWarningDistanceMin = 50.0
+
+	// PotatoMineBlinkIntervalMax 警告灯最慢闪烁间隔（秒）
+	// 僵尸很远或没有僵尸时，每隔此时间切换一次灯的亮灭状态
+	PotatoMineBlinkIntervalMax = 0.5
+
+	// PotatoMineBlinkIntervalMin 警告灯最快闪烁间隔（秒）
+	// 僵尸很近时，每隔此时间切换一次灯的亮灭状态
+	PotatoMineBlinkIntervalMin = 0.1
+)
+
+// Snow Pea Configuration (寒冰射手配置)
+// Story 8.9: Level 1-6 解锁植物
+const (
+	// SnowPeaSunCost 寒冰射手的阳光消耗
+	// 比豌豆射手贵 75 阳光（100 + 75 = 175）
+	SnowPeaSunCost = 175
+
+	// SnowPeaRechargeTime 寒冰射手的冷却时间（秒）
+	// 与豌豆射手相同，属于快速冷却类型
+	SnowPeaRechargeTime = 7.5
+
+	// SnowPeaSlowDuration 冰豌豆减速效果持续时间（秒）
+	// 每次命中刷新计时器
+	SnowPeaSlowDuration = 10.0
+
+	// SnowPeaSlowMultiplier 冰豌豆减速效果倍率
+	// 0.5 表示减速 50%（速度变为原来的一半）
+	SnowPeaSlowMultiplier = 0.5
 )
 
 // Cherry Bomb Configuration (樱桃炸弹配置)

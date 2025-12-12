@@ -1,7 +1,7 @@
 id: potatomine
 name: PotatoMine
 reanim_file: data/reanim/PotatoMine.reanim
-default_animation: anim_armed
+default_animation: anim_idle
 scale: 0.75
 images:
     IMAGE_REANIM_POTATOMINE_BLINK1: assets/reanim/PotatoMine_blink1.png
@@ -23,12 +23,14 @@ available_animations:
       display_name: armed
     - name: anim_rise
       display_name: rise
+      loop: false
     - name: anim_idle
       display_name: idle
     - name: anim_blink
       display_name: blink
     - name: anim_mashed
       display_name: mashed
+      loop: false
     - name: anim_face
       display_name: face
     - name: anim_eye
@@ -42,4 +44,5 @@ animation_combos:
       display_name: 待机
       animations:
         - anim_armed
+        - anim_light
       binding_strategy: auto

@@ -49,10 +49,8 @@ package utils
 
 import (
 	"errors"
-	"strings"
 
 	"github.com/gonewx/pvz/pkg/components"
-	"github.com/gonewx/pvz/pkg/config"
 	"github.com/gonewx/pvz/pkg/ecs"
 )
 
@@ -133,27 +131,14 @@ func GetRenderScreenOrigin(
 
 	// 计算屏幕坐标（世界坐标 - 摄像机偏移 - 居中偏移 * 缩放）
 	// CenterOffset 是在 scale=1.0 时计算的，需要乘以当前缩放比例
+	//
+	// CenterOffsetY 使用 BBox 底部对齐策略（maxY）：
+	// - 所有站立角色的脚底自动对齐到 pos.Y
+	// - 无需对不同角色类型（僵尸/植物）做特殊校正
 	screenX = pos.X - effectiveCameraX - reanimComp.CenterOffsetX*entityScaleX
-
-	// 僵尸类型需要校正 Y 坐标：装备（路障/铁桶）向上延伸导致 CenterOffsetY 变小
-	// 使用基准值校正，确保所有僵尸类型渲染在相同 Y 位置
-	centerOffsetY := reanimComp.CenterOffsetY
-	if isZombieReanim(reanimComp.ReanimName) {
-		// 校正值 = 基准值 - 当前值（装备僵尸的 CenterOffsetY 较小，校正值为正）
-		correction := config.ZombieBaseCenterOffsetY - reanimComp.CenterOffsetY
-		centerOffsetY = reanimComp.CenterOffsetY + correction // 等价于使用基准值
-	}
-	screenY = pos.Y - centerOffsetY*entityScaleY
+	screenY = pos.Y - reanimComp.CenterOffsetY*entityScaleY
 
 	return screenX, screenY, nil
-}
-
-// isZombieReanim 检查 ReanimName 是否是僵尸类型
-// 用于判断是否需要应用 CenterOffsetY 校正
-func isZombieReanim(reanimName string) bool {
-	name := strings.ToLower(reanimName)
-	// 检查是否以 "zombie" 开头（包括 zombie, zombie_conehead, zombie_buckethead, zombie_flag 等）
-	return strings.HasPrefix(name, "zombie")
 }
 
 // GetClickableCenter 计算 Reanim 实体的点击中心（世界坐标）
@@ -376,4 +361,128 @@ func WorldToScreen(worldX, worldY float64, cameraX float64, isUI bool) (screenX,
 	screenY = worldY
 
 	return screenX, screenY
+}
+
+// GetFootPosition 获取实体脚底位置（世界坐标）
+//
+// 此函数用于阴影渲染等需要基于脚底位置计算的场景。
+// 由于 CenterOffsetY 使用 maxY（脚底位置）作为锚点，pos.Y 实际上就是脚底的世界坐标。
+//
+// # 坐标系统说明
+//
+// 本项目使用"脚底锚点"策略：
+//   - CenterOffsetY = maxY（BoundingBox 底部）
+//   - 渲染公式：screenY = pos.Y - CenterOffsetY
+//   - 因此，实体的脚底渲染到屏幕 Y=0 位置时，对应 pos.Y = CenterOffsetY
+//   - 这意味着 pos.Y 代表实体脚底在世界坐标系中的 Y 位置
+//
+// # 参数
+//
+//   - em: ECS 实体管理器，用于查询组件
+//   - entityID: 实体 ID
+//   - pos: 实体的位置组件（世界坐标）
+//
+// # 返回值
+//
+//   - footX, footY: 实体脚底的世界坐标
+//   - err: 如果实体缺少 ReanimComponent，返回 ErrNoReanimComponent
+//
+// # 计算公式
+//
+//	footX = pos.X  （脚底水平位置与实体中心相同）
+//	footY = pos.Y  （pos.Y 已经是脚底位置）
+//
+// # 使用示例
+//
+//	// 计算实体脚底位置（用于阴影渲染）
+//	footX, footY, err := GetFootPosition(em, entityID, pos)
+//	if err != nil {
+//	    continue // 跳过没有动画组件的实体
+//	}
+//	// 阴影绘制在脚底位置
+//	shadowY := footY + shadowOffsetY
+func GetFootPosition(
+	em *ecs.EntityManager,
+	entityID ecs.EntityID,
+	pos *components.PositionComponent,
+) (footX, footY float64, err error) {
+	// 验证实体有 ReanimComponent（确保使用脚底锚点策略）
+	_, ok := ecs.GetComponent[*components.ReanimComponent](em, entityID)
+	if !ok {
+		return 0, 0, ErrNoReanimComponent
+	}
+
+	// pos.X/Y 就是脚底位置（因为 CenterOffsetY = maxY）
+	footX = pos.X
+	footY = pos.Y
+
+	return footX, footY, nil
+}
+
+// GetShadowScreenPosition 计算阴影渲染位置（屏幕坐标）
+//
+// 此函数统一处理植物和僵尸的阴影位置计算，消除分散的手工计算和特殊补丁。
+// 阴影位置基于实体脚底位置，加上可配置的偏移量。
+//
+// # 坐标系统说明
+//
+// 阴影位置计算策略：
+//   - 基于脚底位置（pos.X/Y）而非渲染原点
+//   - 阴影图片以中心点对齐到脚底位置
+//   - 通过 offsetX/offsetY 参数微调阴影位置
+//
+// # 参数
+//
+//   - em: ECS 实体管理器，用于查询组件
+//   - entityID: 实体 ID
+//   - pos: 实体的位置组件（世界坐标）
+//   - cameraX: 摄像机水平偏移（游戏场景中通常 > 0）
+//   - shadowWidth, shadowHeight: 阴影图片尺寸（像素）
+//   - offsetX, offsetY: 阴影位置偏移量（像素）
+//
+// # 返回值
+//
+//   - screenX, screenY: 阴影渲染的屏幕坐标（左上角基准）
+//   - err: 如果实体缺少 ReanimComponent，返回 ErrNoReanimComponent
+//
+// # 计算公式
+//
+//	screenX = pos.X + offsetX - shadowWidth/2 - cameraX
+//	screenY = pos.Y + offsetY - shadowHeight/2
+//
+// # 使用示例
+//
+//	// 植物阴影
+//	screenX, screenY, err := GetShadowScreenPosition(
+//	    em, entityID, pos, cameraX,
+//	    shadowImgWidth, shadowImgHeight,
+//	    0, config.PlantShadowOffsetY,
+//	)
+//
+//	// 僵尸阴影
+//	screenX, screenY, err := GetShadowScreenPosition(
+//	    em, entityID, pos, cameraX,
+//	    shadowImgWidth, shadowImgHeight,
+//	    config.ZombieShadowOffsetX, config.ZombieShadowOffsetY,
+//	)
+func GetShadowScreenPosition(
+	em *ecs.EntityManager,
+	entityID ecs.EntityID,
+	pos *components.PositionComponent,
+	cameraX float64,
+	shadowWidth, shadowHeight float64,
+	offsetX, offsetY float64,
+) (screenX, screenY float64, err error) {
+	// 验证实体有 ReanimComponent
+	_, ok := ecs.GetComponent[*components.ReanimComponent](em, entityID)
+	if !ok {
+		return 0, 0, ErrNoReanimComponent
+	}
+
+	// 计算阴影屏幕坐标
+	// pos.X/Y 是脚底位置，阴影图片以中心对齐
+	screenX = pos.X + offsetX - shadowWidth/2 - cameraX
+	screenY = pos.Y + offsetY - shadowHeight/2
+
+	return screenX, screenY, nil
 }

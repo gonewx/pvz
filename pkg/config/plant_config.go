@@ -56,6 +56,16 @@ var PlantConfigs = map[types.PlantType]*PlantResourceConfig{
 			"anim_blink", // 隐藏眨眼轨道
 		},
 	},
+	types.PlantSnowPea: {
+		ResourceName:     "SnowPea",
+		ConfigID:         "snowpea",
+		PreviewFrame:     0,
+		PreviewAnimation: "anim_full_idle",
+		HiddenTracks: []string{
+			"anim_blink",       // 隐藏眨眼轨道
+			"idle_shoot_blink", // 隐藏射击眨眼轨道
+		},
+	},
 }
 
 // GetPlantConfig 获取植物配置
@@ -115,12 +125,19 @@ const (
 	// Story 10.5: 植物攻击动画帧事件同步
 	PeashooterShootingFireFrame = 10
 
+	// SnowPeaShootingFireFrame 寒冰射手攻击动画的子弹发射帧号
+	// Story 8.9: 寒冰射手与豌豆射手动画结构相同，使用相同的关键帧
+	SnowPeaShootingFireFrame = 10
+
 	// 未来扩展：其他射手植物的关键帧
-	// SnowPeaShootingFireFrame    = 5  // 寒冰射手（与豌豆射手动画相同）
 	// RepeaterShootingFireFrame1  = 5  // 双发射手（第一发）
 	// RepeaterShootingFireFrame2  = 8  // 双发射手（第二发，延迟约 0.25秒）
 
-	PlantOffsetY = 0.0
+	// PlantOffsetY 植物在格子中的垂直偏移量（像素）
+	// 使用 CellHeight/2 (50.0) 使植物脚底对齐到格子底部
+	// 渲染公式：screenY = pos.Y - CenterOffsetY，CenterOffsetY = maxY（脚底）
+	// 因此 pos.Y 需要指向脚底应该在的位置（格子底部）
+	PlantOffsetY = 35.0
 )
 
 // 天空掉落阳光生成范围配置

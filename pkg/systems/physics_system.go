@@ -89,7 +89,8 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 		bulletEntities := ecs.GetEntitiesWith1[*components.VelocityComponent](ps.em)
 		for _, bulletID := range bulletEntities {
 			behaviorComp, ok := ecs.GetComponent[*components.BehaviorComponent](ps.em, bulletID)
-			if ok && behaviorComp.Type == components.BehaviorPeaProjectile {
+			if ok && (behaviorComp.Type == components.BehaviorPeaProjectile ||
+				behaviorComp.Type == components.BehaviorSnowPeaProjectile) {
 				ps.em.DestroyEntity(bulletID)
 			}
 		}
@@ -114,15 +115,17 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 		}
 		// 泛型 API 已提供类型安全
 
-		if behavior.Type == components.BehaviorPeaProjectile {
+		if behavior.Type == components.BehaviorPeaProjectile ||
+			behavior.Type == components.BehaviorSnowPeaProjectile {
 			bullets = append(bullets, entityID)
 		} else if behavior.Type == components.BehaviorZombieBasic ||
 			behavior.Type == components.BehaviorZombieEating ||
 			behavior.Type == components.BehaviorZombieDying || // 死亡动画期间仍然检测碰撞
 			behavior.Type == components.BehaviorZombieConehead ||
 			behavior.Type == components.BehaviorZombieBuckethead ||
-			behavior.Type == components.BehaviorZombieFlag {
-			// 包括移动中的僵尸、啃食中的僵尸、死亡中的僵尸（普通、路障、铁桶、旗帜）
+			behavior.Type == components.BehaviorZombieFlag ||
+			behavior.Type == components.BehaviorZombiePolevaulter {
+			// 包括移动中的僵尸、啃食中的僵尸、死亡中的僵尸（普通、路障、铁桶、旗帜、撑杆）
 			// 死亡中的僵尸仍然需要碰撞检测，以便子弹不会穿透尸体
 			zombies = append(zombies, entityID)
 		}
@@ -192,6 +195,10 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 				var particleEffectName string
 				if bulletBehavior.Type == components.BehaviorPeaProjectile {
 					particleEffectName = "PeaSplat" // 豌豆溅射效果
+				} else if bulletBehavior.Type == components.BehaviorSnowPeaProjectile {
+					particleEffectName = "SnowPeaSplat" // 冰豌豆溅射效果（如果存在）
+					// Story 8.9: 冰豌豆命中时添加减速效果
+					ApplySlowEffect(ps.em, zombieID, components.DefaultSlowSpeedMultiplier, components.DefaultSlowDuration)
 				}
 				// 未来扩展: 卷心菜子弹类型
 				// else if bulletBehavior.Type == components.BehaviorCabbageProjectile {

@@ -11,6 +11,7 @@ import (
 	"github.com/gonewx/pvz/pkg/entities"
 	"github.com/gonewx/pvz/pkg/game"
 	"github.com/gonewx/pvz/pkg/utils"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 func (s *BehaviorSystem) handleSunflowerBehavior(entityID ecs.EntityID, deltaTime float64) {
@@ -716,25 +717,39 @@ func (s *BehaviorSystem) updatePlantAttackAnimation(entityID ecs.EntityID, delta
 			bulletStartX := pos.X + bulletOffsetX
 			bulletStartY := pos.Y + bulletOffsetY
 
-			log.Printf("[BehaviorSystem] 豌豆射手 %d 在关键帧发射子弹，位置: (%.1f, %.1f)",
+			log.Printf("[BehaviorSystem] 射手 %d 在关键帧发射子弹，位置: (%.1f, %.1f)",
 				entityID, bulletStartX, bulletStartY)
 
 			// 播放发射音效
 			s.playShootSound()
 
-			// 创建豌豆子弹实体
-			bulletID, err := entities.NewPeaProjectile(s.entityManager, s.resourceManager, bulletStartX, bulletStartY)
-			if err != nil {
-				log.Printf("[BehaviorSystem] 创建豌豆子弹失败: %v", err)
-			} else {
-				log.Printf("[BehaviorSystem] 豌豆射手 %d 发射子弹 %d（零延迟帧同步）", entityID, bulletID)
+			// Story 8.9: 根据植物类型创建不同的子弹
+			var bulletID ecs.EntityID
+			var err error
+			switch plant.PlantType {
+			case components.PlantSnowPea:
+				// 寒冰射手发射冰豌豆
+				bulletID, err = entities.NewSnowPeaProjectile(s.entityManager, s.resourceManager, bulletStartX, bulletStartY)
+				if err != nil {
+					log.Printf("[BehaviorSystem] 创建冰豌豆子弹失败: %v", err)
+				} else {
+					log.Printf("[BehaviorSystem] 寒冰射手 %d 发射冰豌豆 %d（零延迟帧同步）", entityID, bulletID)
+				}
+			default:
+				// 豌豆射手发射普通豌豆
+				bulletID, err = entities.NewPeaProjectile(s.entityManager, s.resourceManager, bulletStartX, bulletStartY)
+				if err != nil {
+					log.Printf("[BehaviorSystem] 创建豌豆子弹失败: %v", err)
+				} else {
+					log.Printf("[BehaviorSystem] 豌豆射手 %d 发射子弹 %d（零延迟帧同步）", entityID, bulletID)
+				}
 			}
 
 			// 清除"等待发射"状态
 			plant.PendingProjectile = false
 			// 记录本次发射的帧号，防止在同一帧内重复发射
 			plant.LastFiredFrame = currentFrame
-			log.Printf("[BehaviorSystem] ✅ 豌豆射手 %d 清除 PendingProjectile=false, LastFiredFrame=%d", entityID, currentFrame)
+			log.Printf("[BehaviorSystem] ✅ 射手 %d 清除 PendingProjectile=false, LastFiredFrame=%d", entityID, currentFrame)
 		}
 	}
 
@@ -796,4 +811,339 @@ func (s *BehaviorSystem) updateWallnutHitGlowEffects(deltaTime float64) {
 			ecs.RemoveComponent[*components.WallnutHitGlowComponent](s.entityManager, entityID)
 		}
 	}
+}
+
+// handlePotatoMineBehavior 处理土豆地雷行为
+// Story 8.9: 土豆地雷需要武装时间，武装完成后等待僵尸触发爆炸
+//
+// 行为阶段（根据 PotatoMine.reanim 动画定义）:
+//  1. 武装阶段: 播放 anim_idle（埋在地下，只显示泥土），计时
+//  2. 升起阶段: 播放 anim_rise，从地下升起
+//  3. 待机阶段: 播放 armed_with_light（武装就绪+警告灯闪烁），等待僵尸触发
+//     - 警告灯闪烁频率随僵尸距离动态变化，越近越快
+//  4. 爆炸阶段: 播放 anim_mashed，造成范围伤害后删除
+func (s *BehaviorSystem) handlePotatoMineBehavior(entityID ecs.EntityID, deltaTime float64) {
+	// 获取植物组件
+	plant, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, entityID)
+	if !ok {
+		return
+	}
+
+	// 防止重复爆炸
+	if plant.IsExploding {
+		return
+	}
+
+	// 阶段 1: 武装阶段（未武装状态）
+	if !plant.IsArmed {
+		// 更新武装计时器
+		plant.ArmingTimer += deltaTime
+
+		// 检查是否武装完成
+		if plant.ArmingTimer >= config.PotatoMineArmingTime {
+			plant.IsArmed = true
+			log.Printf("[BehaviorSystem] 土豆地雷 %d: 武装完成！播放 anim_rise 动画", entityID)
+
+			// 播放升起动画（anim_rise，非循环动画）
+			ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
+				UnitID:        "potatomine",
+				AnimationName: "anim_rise",
+				Processed:     false,
+			})
+		}
+		return
+	}
+
+	// 阶段 2: 升起阶段 - 检测升起动画是否播放完成
+	reanim, hasReanim := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if hasReanim && reanim.IsFinished && len(reanim.CurrentAnimations) > 0 && reanim.CurrentAnimations[0] == "anim_rise" {
+		log.Printf("[BehaviorSystem] 土豆地雷 %d: 升起完成！切换到 idle 待机", entityID)
+
+		// 切换到待机动画（idle 组合包含 anim_armed + anim_light + anim_glow）
+		ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
+			UnitID:    "potatomine",
+			ComboName: "idle",
+			Processed: false,
+		})
+
+		// 初始化闪烁状态
+		plant.WarningLightOn = false
+		plant.WarningLightTimer = config.PotatoMineBlinkIntervalMax
+		plant.WarningLightInterval = config.PotatoMineBlinkIntervalMax
+		return
+	}
+
+	// 如果正在播放升起动画，等待完成
+	if hasReanim && len(reanim.CurrentAnimations) > 0 && reanim.CurrentAnimations[0] == "anim_rise" {
+		return
+	}
+
+	// 阶段 3: 待机阶段 - 更新警告灯闪烁速度并检测僵尸触发爆炸
+	// 获取土豆地雷位置
+	plantPos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+	if !ok {
+		return
+	}
+
+	// 查询所有僵尸实体
+	zombieEntities := ecs.GetEntitiesWith2[*components.BehaviorComponent, *components.PositionComponent](s.entityManager)
+
+	// 计算同行僵尸中最近的距离
+	plantRow := plant.GridRow
+	nearestDistance := config.PotatoMineWarningDistanceMax + 100 // 初始化为一个很大的值
+
+	// 检测是否有僵尸在土豆地雷的格子内，同时计算最近距离
+	for _, zombieID := range zombieEntities {
+		behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
+		if !ok {
+			continue
+		}
+
+		// 只检测移动中或啃食中的僵尸（排除死亡中的僵尸）
+		if !s.isZombieBehaviorType(behavior.Type) {
+			continue
+		}
+		if behavior.Type == components.BehaviorZombieDying || behavior.Type == components.BehaviorZombieDyingExplosion {
+			continue
+		}
+
+		// 获取僵尸位置
+		zombiePos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
+		if !ok {
+			continue
+		}
+
+		// 计算僵尸所在行
+		zombieRow := int((zombiePos.Y - config.GridWorldStartY - config.ZombieVerticalOffset) / config.CellHeight)
+
+		// 只检测同一行的僵尸
+		if zombieRow != plantRow {
+			continue
+		}
+
+		// 获取僵尸碰撞盒（考虑偏移）
+		collision, hasCollision := ecs.GetComponent[*components.CollisionComponent](s.entityManager, zombieID)
+		collisionOffsetX := 0.0
+		if hasCollision {
+			collisionOffsetX = collision.OffsetX
+		}
+
+		// 计算僵尸碰撞盒中心
+		zombieCenterX := zombiePos.X + collisionOffsetX
+
+		// 计算距离（只考虑X轴距离）
+		distance := zombieCenterX - plantPos.X
+		if distance > 0 && distance < nearestDistance {
+			nearestDistance = distance
+		}
+
+		// 计算僵尸碰撞盒中心所在列
+		zombieCol := int((zombieCenterX - config.GridWorldStartX) / config.CellWidth)
+
+		// 如果僵尸在同一格，触发爆炸
+		if zombieCol == plant.GridCol {
+			log.Printf("[BehaviorSystem] 土豆地雷 %d: 检测到僵尸 %d 触发！位置: (%.1f, %.1f), 格子: (%d, %d)",
+				entityID, zombieID, zombiePos.X, zombiePos.Y, zombieCol, zombieRow)
+
+			// 触发爆炸
+			s.triggerPotatoMineExplosion(entityID, plantPos.X, plantPos.Y)
+			return
+		}
+	}
+
+	// 更新警告灯闪烁
+	// 根据最近僵尸距离计算闪烁间隔（线性插值）
+	var newInterval float64
+	if nearestDistance <= config.PotatoMineWarningDistanceMin {
+		// 僵尸很近，最快闪烁
+		newInterval = config.PotatoMineBlinkIntervalMin
+	} else if nearestDistance >= config.PotatoMineWarningDistanceMax {
+		// 僵尸很远或没有僵尸，最慢闪烁
+		newInterval = config.PotatoMineBlinkIntervalMax
+	} else {
+		// 线性插值计算间隔
+		t := (config.PotatoMineWarningDistanceMax - nearestDistance) /
+			(config.PotatoMineWarningDistanceMax - config.PotatoMineWarningDistanceMin)
+		newInterval = config.PotatoMineBlinkIntervalMax -
+			t*(config.PotatoMineBlinkIntervalMax-config.PotatoMineBlinkIntervalMin)
+	}
+
+	// 更新闪烁间隔
+	plant.WarningLightInterval = newInterval
+
+	// 更新闪烁计时器
+	plant.WarningLightTimer -= deltaTime
+	if plant.WarningLightTimer <= 0 {
+		// 切换灯的亮灭状态
+		plant.WarningLightOn = !plant.WarningLightOn
+		plant.WarningLightTimer = newInterval
+
+		log.Printf("[BehaviorSystem] 土豆地雷 %d: 警告灯切换 → %v (间隔=%.2fs)", entityID, plant.WarningLightOn, newInterval)
+
+		// 使用 ImageOverrides 切换警告灯图片
+		// anim_light 轨道使用 IMAGE_REANIM_POTATOMINE_LIGHT1（灰灯）或 LIGHT2（红灯）
+		if hasReanim {
+			if reanim.ImageOverrides == nil {
+				reanim.ImageOverrides = make(map[string]*ebiten.Image)
+			}
+
+			if plant.WarningLightOn {
+				// 红灯亮：将 LIGHT1 替换为 LIGHT2
+				light2Img, err := s.resourceManager.LoadImage("assets/reanim/PotatoMine_light2.png")
+				if err == nil && light2Img != nil {
+					reanim.ImageOverrides["IMAGE_REANIM_POTATOMINE_LIGHT1"] = light2Img
+					log.Printf("[BehaviorSystem] 土豆地雷 %d: 设置红灯图片覆盖", entityID)
+				} else {
+					log.Printf("[BehaviorSystem] 土豆地雷 %d: 加载红灯图片失败: %v", entityID, err)
+				}
+			} else {
+				// 红灯灭：恢复为 LIGHT1（移除覆盖）
+				delete(reanim.ImageOverrides, "IMAGE_REANIM_POTATOMINE_LIGHT1")
+				log.Printf("[BehaviorSystem] 土豆地雷 %d: 移除红灯图片覆盖", entityID)
+			}
+
+			// 强制缓存失效，确保下一帧重新渲染
+			reanim.LastRenderFrame = -1
+		}
+	}
+}
+
+// triggerPotatoMineExplosion 触发土豆地雷爆炸
+// Story 8.9: 土豆地雷爆炸造成 1800 伤害，1x1 格范围
+func (s *BehaviorSystem) triggerPotatoMineExplosion(entityID ecs.EntityID, explosionX, explosionY float64) {
+	log.Printf("[BehaviorSystem] 土豆地雷 %d: 开始爆炸！位置: (%.1f, %.1f)", entityID, explosionX, explosionY)
+
+	// 获取植物组件并标记为正在爆炸（防止重复触发）
+	plant, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, entityID)
+	if !ok {
+		return
+	}
+	plant.IsExploding = true
+
+	// 播放爆炸动画（anim_mashed）
+	ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
+		UnitID:        "potatomine",
+		AnimationName: "anim_mashed",
+		Processed:     false,
+	})
+
+	// 计算爆炸范围（1x1 格）
+	// 土豆地雷的爆炸范围比樱桃炸弹小，只影响同一格内的僵尸
+	explosionRadius := config.CellWidth * config.PotatoMineExplosionRadius / 2
+	explosionRadiusSq := explosionRadius * explosionRadius
+
+	log.Printf("[BehaviorSystem] 土豆地雷爆炸范围: 圆心(%.1f, %.1f), 半径%.1f",
+		explosionX, explosionY, explosionRadius)
+
+	// 查询所有僵尸实体
+	allZombies := ecs.GetEntitiesWith2[*components.BehaviorComponent, *components.PositionComponent](s.entityManager)
+
+	// 统计受影响的僵尸数量
+	affectedZombies := 0
+
+	// 对每个僵尸检查是否在爆炸范围内
+	for _, zombieID := range allZombies {
+		behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
+		if !ok {
+			continue
+		}
+
+		// 只处理活着的僵尸
+		if !s.isZombieBehaviorType(behavior.Type) {
+			continue
+		}
+		if behavior.Type == components.BehaviorZombieDying || behavior.Type == components.BehaviorZombieDyingExplosion {
+			continue
+		}
+
+		// 获取僵尸位置
+		zombiePos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
+		if !ok {
+			continue
+		}
+
+		// 计算僵尸到爆炸中心的距离
+		dx := zombiePos.X - explosionX
+		dy := (zombiePos.Y - config.ZombieVerticalOffset) - explosionY
+		distanceSq := dx*dx + dy*dy
+
+		// 如果在爆炸范围内
+		if distanceSq <= explosionRadiusSq {
+			affectedZombies++
+			log.Printf("[BehaviorSystem] 僵尸 %d 在土豆地雷爆炸范围内，应用 %d 伤害",
+				zombieID, config.PotatoMineExplosionDamage)
+
+			// 应用伤害
+			damage := config.PotatoMineExplosionDamage
+
+			// 检查是否有护甲组件
+			armor, hasArmor := ecs.GetComponent[*components.ArmorComponent](s.entityManager, zombieID)
+			if hasArmor && armor.CurrentArmor > 0 {
+				armorDamage := damage
+				if armorDamage > armor.CurrentArmor {
+					armorDamage = armor.CurrentArmor
+				}
+				armor.CurrentArmor -= armorDamage
+				damage -= armorDamage
+				log.Printf("[BehaviorSystem] 僵尸 %d 护甲受损：-%d，剩余护甲：%d",
+					zombieID, armorDamage, armor.CurrentArmor)
+			}
+
+			// 扣除生命值
+			if damage > 0 {
+				health, ok := ecs.GetComponent[*components.HealthComponent](s.entityManager, zombieID)
+				if ok {
+					health.CurrentHealth -= damage
+					if health.CurrentHealth < 0 {
+						health.CurrentHealth = 0
+					}
+					log.Printf("[BehaviorSystem] 僵尸 %d 生命值受损：剩余 %d",
+						zombieID, health.CurrentHealth)
+
+					// 如果僵尸被杀死，直接删除（不播放变焦动画）
+					if health.CurrentHealth <= 0 {
+						log.Printf("[PotatoMine] 僵尸 %d 被爆炸杀死，直接删除", zombieID)
+						s.triggerZombieInstantDeath(zombieID, zombiePos.X, zombiePos.Y)
+					}
+				}
+			}
+		}
+	}
+
+	log.Printf("[BehaviorSystem] 土豆地雷爆炸影响了 %d 个僵尸", affectedZombies)
+
+	// 播放爆炸音效
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_POTATO_MINE")
+		log.Printf("[BehaviorSystem] 播放土豆地雷爆炸音效")
+	}
+
+	// 创建爆炸粒子效果
+	_, err := entities.CreateParticleEffect(
+		s.entityManager,
+		s.resourceManager,
+		"PotatoMine", // 使用土豆地雷专用粒子效果
+		explosionX, explosionY,
+	)
+	if err != nil {
+		log.Printf("[BehaviorSystem] 警告：创建土豆地雷爆炸粒子效果失败: %v", err)
+	}
+
+	// 释放土豆地雷占用的网格
+	if s.lawnGridSystem != nil && s.lawnGridEntityID != 0 {
+		err := s.lawnGridSystem.ReleaseCell(s.lawnGridEntityID, plant.GridCol, plant.GridRow)
+		if err != nil {
+			log.Printf("[BehaviorSystem] 警告：释放土豆地雷网格占用失败: %v", err)
+		} else {
+			log.Printf("[BehaviorSystem] 土豆地雷网格 (%d, %d) 已释放", plant.GridCol, plant.GridRow)
+		}
+	}
+
+	// 设置延迟删除土豆地雷实体（等待爆炸动画播放完成）
+	// anim_mashed 动画大约 0.5 秒
+	ecs.AddComponent(s.entityManager, entityID, &components.LifetimeComponent{
+		MaxLifetime:     0.5,
+		CurrentLifetime: 0,
+		IsExpired:       false,
+	})
 }

@@ -124,6 +124,27 @@
 **优先级:** P2（可选优化）
 **估计工作量:** 1 天
 
+---
+
+### Story 16.4: 渲染偏移量统一化
+
+**描述:** 将分散在多处的渲染偏移量计算逻辑统一到坐标转换工具库中，消除硬编码的特殊实体偏移补丁。
+
+**背景:**
+- 当前阴影渲染使用独立的偏移计算，与 CenterOffset 机制不协调
+- 撑杆僵尸等装备僵尸需要硬编码补丁（如 `PolevaulterZombieShadowOffsetY = 15.0`）
+- 每新增装备僵尸类型可能都需要类似补丁，维护成本高
+
+**关键任务:**
+- 扩展 `pkg/utils/coordinates.go`：添加 `GetShadowScreenPosition()` 和 `GetFootPosition()` 函数
+- 重构 `pkg/systems/render_system.go` 阴影渲染逻辑
+- 删除 `PolevaulterZombieShadowOffsetY` 等硬编码补丁
+- 添加单元测试和集成测试（覆盖率 100%）
+- 手工验证各类僵尸阴影位置正确
+
+**优先级:** P1（重要改进）
+**估计工作量:** 1-2 天
+
 ## Compatibility Requirements
 
 - [x] **现有 API 保持不变**

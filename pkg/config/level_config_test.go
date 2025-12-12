@@ -880,9 +880,9 @@ func TestValidateLevelConfig_ExtraPointsValidation(t *testing.T) {
 		{"ExtraPoints type with points", "ExtraPoints", 100, false},
 		{"ExtraPoints type with zero", "ExtraPoints", 0, false},
 		{"Fixed type with zero", "Fixed", 0, false},
-		{"Fixed type with points", "Fixed", 100, true},
+		{"Fixed type with points", "Fixed", 100, false}, // Story 8.9: Fixed 类型支持混合模式
 		{"Final type with points", "Final", 50, true},
-		{"Empty type with points", "", 100, true},
+		{"Empty type with points", "", 100, false}, // 空类型默认转换为 Fixed，Fixed 支持混合模式
 	}
 
 	for _, tt := range tests {

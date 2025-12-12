@@ -152,10 +152,27 @@ func CalculateRootMotionDelta(
 			rawDeltaX, rawDeltaY = 0, 0
 		}
 
+		// 获取当前动画的速度倍率
+		speedMultiplier := 1.0
+		if len(reanimComp.CurrentAnimations) > 0 {
+			currentAnimName := reanimComp.CurrentAnimations[0]
+			if speed, ok := reanimComp.AnimationSpeedOverrides[currentAnimName]; ok && speed > 0 {
+				speedMultiplier = speed
+			}
+		}
+
+		// 应用速度倍率：动画速度加快时，位移也应该相应增加
+		rawDeltaX *= speedMultiplier
+		rawDeltaY *= speedMultiplier
+
 		// 计算每帧固定位移（线性均匀分配，避免指数衰减）
 		// 策略：假设每个动画帧持续 5 个游戏帧（60 FPS / 12 FPS = 5）
-		// 一次性计算每个游戏帧应该分配的固定位移量
-		const interpolationFrames = 5.0 // 60 FPS / 12 FPS
+		// 当动画速度加快时，有效 FPS 增加，interpolationFrames 减少
+		// interpolationFrames = 60 / (12 * speedMultiplier)
+		interpolationFrames := 60.0 / (12.0 * speedMultiplier)
+		if interpolationFrames < 1.0 {
+			interpolationFrames = 1.0 // 防止除以过小的值
+		}
 		reanimComp.AccumulatedDeltaX = rawDeltaX / interpolationFrames
 		reanimComp.AccumulatedDeltaY = rawDeltaY / interpolationFrames
 

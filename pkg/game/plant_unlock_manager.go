@@ -249,9 +249,9 @@ func GetPlantSunCost(plantID string) int {
 	case "cherrybomb":
 		return config.CherryBombSunCost
 	case "potatomine":
-		return 25 // TODO: 添加到 config 包
+		return config.PotatoMineSunCost
 	case "snowpea":
-		return 175 // TODO: 添加到 config 包
+		return config.SnowPeaSunCost
 	case "chomper":
 		return 150 // TODO: 添加到 config 包
 	case "repeater":

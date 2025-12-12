@@ -83,6 +83,12 @@ func NewWaveSpawnSystem(em *ecs.EntityManager, rm *game.ResourceManager, lc *con
 // createConstraintEntity 创建生成限制组件实体
 // Story 17.3: 用于存储关卡级别的生成限制状态
 func (s *WaveSpawnSystem) createConstraintEntity() ecs.EntityID {
+	// 如果没有关卡配置，返回 0（不创建限制实体）
+	if s.levelConfig == nil {
+		log.Printf("[WaveSpawnSystem] No level config, skipping constraint entity creation")
+		return 0
+	}
+
 	entityID := s.entityManager.CreateEntity()
 
 	// 从关卡配置中提取允许的僵尸类型
@@ -104,6 +110,11 @@ func (s *WaveSpawnSystem) createConstraintEntity() ecs.EntityID {
 
 // extractAllowedZombieTypes 从关卡配置中提取允许的僵尸类型
 func (s *WaveSpawnSystem) extractAllowedZombieTypes() []string {
+	// 如果没有关卡配置或波次配置，返回空列表
+	if s.levelConfig == nil || s.levelConfig.Waves == nil {
+		return []string{}
+	}
+
 	typeSet := make(map[string]bool)
 
 	// 从所有波次配置中提取僵尸类型
@@ -514,6 +525,13 @@ func (s *WaveSpawnSystem) spawnAndActivateZombie(zombieType string, lane int, wa
 			row,
 			spawnX,
 		)
+	case "polevaulter":
+		entityID, err = entities.NewPolevaulterZombieEntity(
+			s.entityManager,
+			s.resourceManager,
+			row,
+			spawnX,
+		)
 	default:
 		log.Printf("[WaveSpawnSystem] ERROR: Unknown zombie type '%s'", zombieType)
 		return 0
@@ -532,7 +550,12 @@ func (s *WaveSpawnSystem) spawnAndActivateZombie(zombieType string, lane int, wa
 	})
 
 	// 使用公共函数激活僵尸（复用正式逻辑）
-	entities.ActivateZombie(s.entityManager, entityID)
+	// Story 8.9: 撑杆僵尸使用专用激活函数
+	if zombieType == "polevaulter" {
+		entities.ActivatePolevaulterZombie(s.entityManager, entityID)
+	} else {
+		entities.ActivateZombie(s.entityManager, entityID)
+	}
 
 	log.Printf("[WaveSpawnSystem] Spawned and activated zombie %d: type=%s, wave=%d, index=%d, row=%d, pos=(%.1f, %.1f)",
 		entityID, zombieType, waveIndex+1, indexInWave, row, spawnX, spawnY)
@@ -636,6 +659,13 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 		)
 	case "buckethead":
 		entityID, err = entities.NewBucketheadZombieEntity(
+			s.entityManager,
+			s.resourceManager,
+			previewRow,
+			spawnX,
+		)
+	case "polevaulter":
+		entityID, err = entities.NewPolevaulterZombieEntity(
 			s.entityManager,
 			s.resourceManager,
 			previewRow,
@@ -778,6 +808,13 @@ func (s *WaveSpawnSystem) spawnZombieWithOffset(zombieType string, lane int, ind
 		)
 	case "buckethead":
 		entityID, err = entities.NewBucketheadZombieEntity(
+			s.entityManager,
+			s.resourceManager,
+			row,
+			spawnX,
+		)
+	case "polevaulter":
+		entityID, err = entities.NewPolevaulterZombieEntity(
 			s.entityManager,
 			s.resourceManager,
 			row,

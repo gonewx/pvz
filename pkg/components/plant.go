@@ -65,13 +65,46 @@ type PlantComponent struct {
 	// WallnutBlinkDuration 坚果墙眨眼动画剩余持续时间（秒）
 	// 当 > 0 时表示正在播放眨眼动画，递减到 0 后切换回静止状态
 	WallnutBlinkDuration float64
+
+	// Story 8.9: 土豆地雷相关字段
+	// ArmingTimer 武装计时器（秒）
+	// 土豆地雷种植后需要一定时间武装，武装完成后才能触发爆炸
+	ArmingTimer float64
+
+	// IsArmed 是否已武装
+	// true: 武装完成，可以被僵尸触发爆炸
+	// false: 正在武装中，无法触发爆炸
+	IsArmed bool
+
+	// IsExploding 是否正在爆炸
+	// 用于防止重复触发爆炸逻辑
+	IsExploding bool
+
+	// WarningLightSpeed 警告灯闪烁动画速度倍率
+	// 根据最近僵尸距离动态调整，僵尸越近速度越快
+	// 默认 1.0，最快可达 4.0
+	// 注意：此字段已废弃，改用 WarningLightTimer + WarningLightOn 实现
+	WarningLightSpeed float64
+
+	// WarningLightTimer 警告灯闪烁计时器（秒）
+	// 计时器到期时切换灯的亮灭状态
+	WarningLightTimer float64
+
+	// WarningLightOn 警告灯是否亮起（红灯状态）
+	// true: 显示 anim_glow（红灯），隐藏 anim_light（灰灯）
+	// false: 显示 anim_light（灰灯），隐藏 anim_glow（红灯）
+	WarningLightOn bool
+
+	// WarningLightInterval 当前闪烁间隔（秒）
+	// 根据最近僵尸距离动态计算，距离越近间隔越短（闪得越快）
+	WarningLightInterval float64
 }
 
 // Story 10.3: 射手类植物列表（用于判断是否需要攻击动画）
 var shooterPlants = map[PlantType]bool{
 	PlantPeashooter: true,
+	PlantSnowPea:    true, // Story 8.9: 寒冰射手
 	// 未来扩展：
-	// PlantSnowPea:    true,
 	// PlantRepeater:   true,
 	// PlantCabbagePult: true,
 }

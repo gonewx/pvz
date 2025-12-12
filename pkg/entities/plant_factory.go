@@ -184,8 +184,10 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 		shadowEntityType = "wallnut"
 	case components.PlantCherryBomb:
 		shadowEntityType = "cherrybomb"
+	case components.PlantSnowPea:
+		shadowEntityType = "snowpea"
 	default:
-		shadowEntityType = "" // 使用默认尺寸,暂不支持 repeater 和 snowpea
+		shadowEntityType = "" // 使用默认尺寸
 	}
 
 	shadowSize := config.GetShadowSize(shadowEntityType)
@@ -214,9 +216,10 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 //   - ecs.EntityID: 创建的坚果墙实体ID，如果失败返回 0
 //   - error: 如果创建失败返回错误信息
 func NewWallnutEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState, rs ReanimSystemInterface, col, row int) (ecs.EntityID, error) {
-	// 计算格子中心坐标（使用世界坐标系统）
+	// 计算植物位置坐标（使用世界坐标系统）
+	// Y 坐标 = 格子中心 + PlantOffsetY，使植物脚底对齐到格子底部
 	worldCenterX := config.GridWorldStartX + float64(col)*config.CellWidth + config.CellWidth/2
-	worldCenterY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+	worldCenterY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2 + config.PlantOffsetY
 
 	// 创建实体
 	entityID := em.CreateEntity()
@@ -310,9 +313,10 @@ func NewWallnutEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameSta
 //
 // Story 14.3: Epic 14 - 移除 ReanimSystem 依赖，动画通过 AnimationCommand 组件初始化
 func NewCherryBombEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState, col, row int) (ecs.EntityID, error) {
-	// 计算格子中心坐标（使用世界坐标系统）
+	// 计算植物位置坐标（使用世界坐标系统）
+	// Y 坐标 = 格子中心 + PlantOffsetY，使植物脚底对齐到格子底部
 	worldCenterX := config.GridWorldStartX + float64(col)*config.CellWidth + config.CellWidth/2
-	worldCenterY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+	worldCenterY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2 + config.PlantOffsetY
 
 	// 创建实体
 	entityID := em.CreateEntity()
@@ -401,9 +405,10 @@ func NewCherryBombEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.Game
 //   - ecs.EntityID: 创建的土豆雷实体ID，如果失败返回 0
 //   - error: 如果创建失败返回错误信息
 func NewPotatoMineEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState, col, row int) (ecs.EntityID, error) {
-	// 计算格子中心坐标（使用世界坐标系统）
+	// 计算植物位置坐标（使用世界坐标系统）
+	// Y 坐标 = 格子中心 + PlantOffsetY，使植物脚底对齐到格子底部
 	worldCenterX := config.GridWorldStartX + float64(col)*config.CellWidth + config.CellWidth/2
-	worldCenterY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+	worldCenterY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2 + config.PlantOffsetY
 
 	// 创建实体
 	entityID := em.CreateEntity()
@@ -429,11 +434,13 @@ func NewPotatoMineEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.Game
 		PartImages: partImages,
 	})
 
-	// 使用 AnimationCommand 触发默认动画（anim_armed）
-	// 设置 UnitID 以便 PlayAnimationWithConfig 能从配置中获取 Scale
+	// 使用 AnimationCommand 触发默认动画（anim_idle）
+	// anim_idle = 刚种植，埋在地下（只显示泥土）
+	// anim_rise = 15秒后升起
+	// anim_armed = 升起完成，武装就绪等待爆炸
 	ecs.AddComponent(em, entityID, &components.AnimationCommandComponent{
 		UnitID:        "potatomine",
-		AnimationName: "anim_armed",
+		AnimationName: "anim_idle",
 		Processed:     false,
 	})
 	log.Printf("[PlantFactory] 土豆雷 %d: 成功添加 ReanimComponent 并初始化动画", entityID)
@@ -459,6 +466,106 @@ func NewPotatoMineEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.Game
 
 	// 添加阴影组件
 	shadowSize := config.GetShadowSize("potatomine")
+	em.AddComponent(entityID, &components.ShadowComponent{
+		Width:   shadowSize.Width,
+		Height:  shadowSize.Height,
+		Alpha:   config.DefaultShadowAlpha,
+		OffsetY: 0,
+	})
+
+	return entityID, nil
+}
+
+// NewSnowPeaEntity 创建寒冰射手实体
+// Story 8.9: 寒冰射手是一种发射冰豌豆的攻击植物，命中僵尸后降低其移动速度
+//
+// 参数:
+//   - em: 实体管理器
+//   - rm: 资源管理器（用于加载寒冰射手图像和 Reanim 资源）
+//   - gs: 游戏状态（用于获取摄像机位置）
+//   - rs: Reanim 系统（用于初始化动画）
+//   - col: 网格列索引 (0-8)
+//   - row: 网格行索引 (0-4)
+//
+// 返回:
+//   - ecs.EntityID: 创建的寒冰射手实体ID，如果失败返回 0
+//   - error: 如果创建失败返回错误信息
+func NewSnowPeaEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState, rs ReanimSystemInterface, col, row int) (ecs.EntityID, error) {
+	// 计算植物原点坐标（使用世界坐标系统）
+	worldCenterX := config.GridWorldStartX + float64(col)*config.CellWidth + config.CellWidth/2
+	worldCenterY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2 + config.PlantOffsetY
+
+	// 创建实体
+	entityID := em.CreateEntity()
+
+	// 添加位置组件（使用世界坐标）
+	em.AddComponent(entityID, &components.PositionComponent{
+		X: worldCenterX,
+		Y: worldCenterY,
+	})
+
+	// 添加生命值组件（与豌豆射手相同）
+	em.AddComponent(entityID, &components.HealthComponent{
+		CurrentHealth: config.PeashooterDefaultHealth,
+		MaxHealth:     config.PeashooterDefaultHealth,
+	})
+
+	// 添加植物组件（用于攻击动画状态管理）
+	em.AddComponent(entityID, &components.PlantComponent{
+		PlantType:         components.PlantSnowPea,
+		GridRow:           row,
+		GridCol:           col,
+		AttackAnimState:   components.AttackAnimIdle,
+		PendingProjectile: false,
+		LastFiredFrame:    -1, // 初始化为 -1，表示还未发射过
+		LastMouthX:        0,
+		BlinkTimer:        3.0, // 初始化眨眼计时器
+	})
+
+	// 添加行为组件（寒冰射手行为）
+	em.AddComponent(entityID, &components.BehaviorComponent{
+		Type: components.BehaviorSnowPea,
+	})
+
+	// 添加攻击冷却计时器（与豌豆射手相同）
+	em.AddComponent(entityID, &components.TimerComponent{
+		Name:        "attack_cooldown",
+		TargetTime:  1.4, // 攻击间隔 1.4 秒
+		CurrentTime: 0,
+		IsReady:     false,
+	})
+
+	// 从 ResourceManager 获取寒冰射手的 Reanim 数据和部件图片
+	reanimXML := rm.GetReanimXML("SnowPea")
+	partImages := rm.GetReanimPartImages("SnowPea")
+
+	if reanimXML == nil || partImages == nil {
+		return 0, fmt.Errorf("failed to load SnowPea Reanim resources")
+	}
+
+	// 添加基础的 ReanimComponent
+	em.AddComponent(entityID, &components.ReanimComponent{
+		ReanimName: "SnowPea",
+		ReanimXML:  reanimXML,
+		PartImages: partImages,
+	})
+
+	// 使用 PlayCombo API 播放默认动画
+	// PlayCombo 会自动从 data/reanim_config.yaml 读取配置
+	if err := rs.PlayCombo(entityID, "snowpea", ""); err != nil {
+		return 0, fmt.Errorf("failed to play snowpea default animation: %w", err)
+	}
+
+	log.Printf("[PlantFactory] 寒冰射手 %d: 成功使用集中配置文件创建动画", entityID)
+
+	// 添加碰撞组件
+	em.AddComponent(entityID, &components.CollisionComponent{
+		Width:  config.CellWidth * 0.8,
+		Height: config.CellHeight * 0.8,
+	})
+
+	// 添加阴影组件
+	shadowSize := config.GetShadowSize("snowpea")
 	em.AddComponent(entityID, &components.ShadowComponent{
 		Width:   shadowSize.Width,
 		Height:  shadowSize.Height,

@@ -31,11 +31,11 @@ var (
 
 // 每行对应的僵尸类型（可配置）
 var zombieTypesByRow = []string{
-	"flag",       // 行0: 旗帜僵尸
-	"basic",      // 行1: 普通僵尸
-	"conehead",   // 行2: 路障僵尸
-	"conehead",   // 行3: 路障僵尸
-	"buckethead", // 行4: 铁桶僵尸
+	"flag",        // 行0: 旗帜僵尸
+	"basic",       // 行1: 普通僵尸
+	"polevaulter", // 行2: 撑杆跳僵尸
+	"conehead",    // 行3: 路障僵尸
+	"buckethead",  // 行4: 铁桶僵尸
 }
 
 // VerifyGameplayGame 统一验证游戏
@@ -59,6 +59,9 @@ type VerifyGameplayGame struct {
 
 	// 红字警告系统（一大波僵尸正在接近）
 	flagWaveWarningSystem *systems.FlagWaveWarningSystem
+
+	// 生命周期系统（处理过期实体销毁）
+	lifetimeSystem *systems.LifetimeSystem
 
 	// 植物预览系统
 	plantPreviewSystem       *systems.PlantPreviewSystem
@@ -187,6 +190,9 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 	// 传入 nil 作为 WaveTimingSystem，使用手动触发模式
 	flagWaveWarningSystem := systems.NewFlagWaveWarningSystem(em, nil, rm)
 
+	// 创建生命周期系统（处理过期实体销毁，如土豆雷爆炸后）
+	lifetimeSystem := systems.NewLifetimeSystem(em)
+
 	// 加载字体
 	sunCounterFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.SunCounterFontSize)
 	if err != nil {
@@ -224,7 +230,7 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 	log.Println("  - 植物选择栏：显示所有可用植物")
 	log.Println("  - 僵尸生成：每行固定类型，每2秒生成一个")
 	log.Println("  - 行0: 旗帜僵尸  行1: 普通僵尸")
-	log.Println("  - 行2: 路障僵尸  行3: 路障僵尸")
+	log.Println("  - 行2: 撑杆跳僵尸  行3: 路障僵尸")
 	log.Println("  - 行4: 铁桶僵尸")
 	log.Println()
 	log.Println("【快捷键】")
@@ -260,6 +266,7 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 		sunMovementSystem:        sunMovementSystem,
 		flashEffectSystem:        flashEffectSystem,
 		flagWaveWarningSystem:    flagWaveWarningSystem,
+		lifetimeSystem:           lifetimeSystem,
 		plantPreviewSystem:       plantPreviewSystem,
 		plantPreviewRenderSystem: plantPreviewRenderSystem,
 		plantCardRenderSystem:    plantCardRenderSystem,
@@ -356,6 +363,8 @@ func (vg *VerifyGameplayGame) spawnZombie(row int) {
 		zombieID, err = entities.NewBucketheadZombieEntity(vg.entityManager, vg.resourceManager, row, spawnX)
 	case "flag":
 		zombieID, err = entities.NewFlagZombieEntity(vg.entityManager, vg.resourceManager, row, spawnX)
+	case "polevaulter":
+		zombieID, err = entities.NewPolevaulterZombieEntity(vg.entityManager, vg.resourceManager, row, spawnX)
 	default:
 		zombieID, err = entities.NewZombieEntity(vg.entityManager, vg.resourceManager, row, spawnX)
 	}
@@ -365,8 +374,12 @@ func (vg *VerifyGameplayGame) spawnZombie(row int) {
 		return
 	}
 
-	// 使用公共函数激活僵尸（复用正式逻辑）
-	entities.ActivateZombie(vg.entityManager, zombieID)
+	// 根据僵尸类型使用对应的激活函数
+	if zombieType == "polevaulter" {
+		entities.ActivatePolevaulterZombie(vg.entityManager, zombieID)
+	} else {
+		entities.ActivateZombie(vg.entityManager, zombieID)
+	}
 
 	if *verbose {
 		log.Printf("[VerifyGameplay] Spawned %s zombie on row %d (entity=%d)", zombieType, row, zombieID)
@@ -412,7 +425,8 @@ func (vg *VerifyGameplayGame) clearAllZombies() {
 		if behavior.Type == components.BehaviorZombieBasic ||
 			behavior.Type == components.BehaviorZombieConehead ||
 			behavior.Type == components.BehaviorZombieBuckethead ||
-			behavior.Type == components.BehaviorZombieFlag {
+			behavior.Type == components.BehaviorZombieFlag ||
+			behavior.Type == components.BehaviorZombiePolevaulter {
 			vg.entityManager.DestroyEntity(entityID)
 			count++
 		}
@@ -540,6 +554,7 @@ func (vg *VerifyGameplayGame) Update() error {
 	vg.rewardSystem.Update(dt)
 	vg.flashEffectSystem.Update(dt)
 	vg.plantPreviewSystem.Update(dt)
+	vg.lifetimeSystem.Update(dt) // 处理过期实体（如土豆雷爆炸后）
 
 	// 清理已删除的实体（必须在所有系统更新后调用）
 	vg.entityManager.RemoveMarkedEntities()

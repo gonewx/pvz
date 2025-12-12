@@ -122,10 +122,17 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 			s.handleSunflowerBehavior(entityID, deltaTime)
 		case components.BehaviorPeashooter:
 			s.handlePeashooterBehavior(entityID, deltaTime, allZombieEntityList)
+		case components.BehaviorSnowPea:
+			// Story 8.9: 寒冰射手与豌豆射手共用相同的攻击逻辑
+			// 子弹类型由 updatePlantAttackAnimation 根据 PlantType 决定
+			s.handlePeashooterBehavior(entityID, deltaTime, allZombieEntityList)
 		case components.BehaviorWallnut:
 			s.handleWallnutBehavior(entityID, deltaTime)
 		case components.BehaviorCherryBomb:
 			s.handleCherryBombBehavior(entityID, deltaTime)
+		case components.BehaviorPotatoMine:
+			// Story 8.9: 土豆地雷行为处理
+			s.handlePotatoMineBehavior(entityID, deltaTime)
 		default:
 			// 未知行为类型，记录警告
 			if s.logFrameCounter%LogOutputFrameInterval == 1 {
@@ -159,6 +166,11 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 			s.handleBucketheadZombieBehavior(entityID, deltaTime)
 		case components.BehaviorZombieFlag:
 			s.handleZombieFlagBehavior(entityID, deltaTime)
+		case components.BehaviorZombiePolevaulter:
+			// Story 8.9: 撑杆僵尸行为处理
+			// 撑杆僵尸的移动和跳跃由 PoleVaultSystem 专门处理
+			// 这里复用普通僵尸的基础行为（如碰撞检测、攻击植物等）
+			s.handleZombieBasicBehavior(entityID, deltaTime)
 		default:
 			// 未知僵尸类型，忽略
 		}
@@ -410,6 +422,7 @@ func (s *BehaviorSystem) isZombieBehaviorType(behaviorType components.BehaviorTy
 		components.BehaviorZombieConehead,
 		components.BehaviorZombieBuckethead,
 		components.BehaviorZombieFlag,
+		components.BehaviorZombiePolevaulter,
 		components.BehaviorZombieEating,
 		components.BehaviorZombieDying:
 		return true

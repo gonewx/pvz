@@ -32,6 +32,7 @@ available_animations:
       display_name: idle
     - name: anim_run
       display_name: run
+      speed: 3
     - name: anim_jump
       display_name: jump
     - name: anim_walk
@@ -46,3 +47,42 @@ available_animations:
       display_name: head2
     - name: anim_hair
       display_name: hair
+
+animation_combos:
+    - name: idle
+      display_name: 待机
+      animations:
+          - anim_idle
+      binding_strategy: auto
+
+    - name: walk
+      display_name: 行走（无杆）
+      animations:
+          - anim_walk
+      binding_strategy: auto
+
+    - name: run
+      display_name: 跑步（持杆）
+      animations:
+          - anim_run
+      binding_strategy: auto
+
+    - name: jump
+      display_name: 跳跃
+      animations:
+          - anim_jump
+      loop: false
+      binding_strategy: auto
+
+    - name: eat
+      display_name: 啃食
+      animations:
+          - anim_eat
+      binding_strategy: auto
+
+    - name: death
+      display_name: 死亡
+      animations:
+          - anim_death
+      loop: false
+      binding_strategy: auto

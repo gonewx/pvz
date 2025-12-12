@@ -138,8 +138,7 @@ func (s *GameScene) drawSunCounter(screen *ebiten.Image) {
 // Story 8.6: 检查铲子是否已解锁（1-4关完成后才解锁）
 // Story 19.5: 保龄球模式使用固定位置，不依赖选择栏
 // Story 19.x QA: 铲子教学关卡（有预设植物）强制显示铲子
-// 铲子位置紧挨选择栏右侧，与选择栏上对齐
-// 滑入动画：与植物选择栏同步滑入（非保龄球模式）
+// Bug修复: 铲子Y位置固定在顶部，与菜单按钮显示时机一致，不跟随植物选择栏滑入动画
 func (s *GameScene) drawShovel(screen *ebiten.Image) {
 	// 教学关卡不显示铲子（玩家还不需要学习移除植物）
 	// 但是：铲子教学关卡（Level 1-5，有预设植物）需要显示铲子
@@ -160,27 +159,23 @@ func (s *GameScene) drawShovel(screen *ebiten.Image) {
 
 	// 计算铲子位置
 	var shovelX float64
-	var shovelY float64
 	// Story 19.5: 保龄球模式（initialSun == 0）使用相对于菜单按钮的位置
-	// Story 19.x QA: 铲子位置相对于菜单按钮偏左 10px
 	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.InitialSun == 0 {
 		// 菜单按钮 X 位置
 		menuButtonX := float64(WindowWidth) - config.MenuButtonOffsetFromRight
 		// 铲子右边缘到菜单按钮左边缘的距离为 BowlingShovelGapFromMenuButton
 		// 铲子 X = 菜单按钮 X - 间距 - 铲子宽度
 		shovelX = menuButtonX - float64(config.BowlingShovelGapFromMenuButton) - float64(config.ShovelWidth)
-		// 保龄球模式使用固定 Y 位置
-		shovelY = float64(config.BowlingShovelY)
 	} else if s.seedBank != nil {
 		// 普通模式根据选择栏图片宽度动态计算
 		seedBankWidth := float64(s.seedBank.Bounds().Dx())
 		shovelX = float64(config.SeedBankX) + seedBankWidth + float64(config.ShovelGapFromSeedBank)
-		// 普通模式：与植物选择栏同步滑入
-		shovelY = s.getSeedBankCurrentY() + float64(config.ShovelY-config.SeedBankY)
 	} else {
 		shovelX = float64(config.ShovelX) // 默认值
-		shovelY = s.getSeedBankCurrentY() + float64(config.ShovelY-config.SeedBankY)
 	}
+
+	// 铲子 Y 位置固定在顶部（与菜单按钮一致，不跟随植物选择栏滑入动画）
+	shovelY := config.MenuButtonOffsetFromTop
 
 	// Draw shovel slot background first
 	if s.shovelSlot != nil {

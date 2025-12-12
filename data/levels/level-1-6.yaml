@@ -1,0 +1,139 @@
+# Level 1-6: 前院白天 1-6 (Story 8.9)
+# 寒冰射手与撑杆僵尸关卡
+id: "1-6"
+name: "前院白天 1-6"
+description: "引入寒冰射手的减速效果和撑杆僵尸的跳跃机制"
+
+# === Story 17.2: 顶层字段 ===
+flags: 1                        # 1 面旗帜
+sceneType: "day"                # 场景类型: 白天前院
+rowMax: 5                       # 最大行数: 前院 5 行
+
+# === 开场配置 ===
+openingType: "standard"         # 标准开场动画（镜头右移预告僵尸 → 返回草坪）
+enabledLanes: [1, 2, 3, 4, 5]   # 完整 5 行草地
+availablePlants: ["peashooter", "sunflower", "cherrybomb", "wallnut", "potatomine"]
+skipOpening: false              # 使用标准开场动画
+initialSun: 50                  # 初始阳光 50
+
+# === 草皮配置 ===
+backgroundImage: "IMAGE_BACKGROUND1"
+sodRowImage: ""                 # 无草皮叠加
+showSoddingAnim: false          # 无铺草皮动画
+
+# === 通关奖励 ===
+rewardPlant: "snowpea"          # 完成后奖励寒冰射手
+
+# === 僵尸池 ===
+# 普通僵尸 (1 point)、路障僵尸 (2 points)、撑杆僵尸 (2 points)
+zombiePool: ["zombie", "conehead", "polevaulter"]
+
+# === 波次配置 (1 面旗帜，10 波) ===
+# 使用 Fixed + ExtraPoints 混合系统
+waves:
+  # Wave 1: Fixed - 1 普通僵尸
+  - waveNum: 1
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 2.5
+
+  # Wave 2: Fixed - 1 普通僵尸
+  - waveNum: 2
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 2.5
+
+  # Wave 3: Fixed - 1 普通僵尸
+  - waveNum: 3
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 2.5
+
+  # Wave 4: ExtraPoints - 2 点动态分配
+  # 可选：普通僵尸(1pt) x2 或 路障僵尸(2pt) 或 撑杆僵尸(2pt)
+  - waveNum: 4
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 2
+    zombies: []
+
+  # Wave 5: ExtraPoints - 2 点动态分配
+  - waveNum: 5
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 2
+    zombies: []
+
+  # Wave 6: Fixed - 1 普通僵尸
+  - waveNum: 6
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 2.5
+
+  # Wave 7: Fixed + ExtraPoints - 1 普通僵尸 + 2 点动态分配
+  - waveNum: 7
+    type: "Fixed"
+    isFlag: false
+    extraPoints: 2
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 2.5
+
+  # Wave 8: Fixed + ExtraPoints - 1 普通僵尸 + 2 点动态分配
+  - waveNum: 8
+    type: "Fixed"
+    isFlag: false
+    extraPoints: 2
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 2.5
+
+  # Wave 9: Fixed + ExtraPoints - 1 普通僵尸 + 2 点动态分配
+  - waveNum: 9
+    type: "Fixed"
+    isFlag: false
+    extraPoints: 2
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 2.5
+
+  # Wave 10: Final Wave (旗帜波) - 10 普通僵尸
+  - waveNum: 10
+    type: "Final"
+    isFlag: true
+    flagIndex: 1
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 6
+        spawnInterval: 1.0
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 1.0
+      - type: "polevaulter"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+        spawnInterval: 1.0

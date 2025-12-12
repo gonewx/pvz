@@ -58,8 +58,17 @@ const (
 	// BehaviorPotatoMine 土豆雷行为：种植后需要时间武装，武装完成后等待僵尸踩上触发爆炸
 	// 爆炸对踩上的僵尸造成巨额伤害（秒杀），爆炸后土豆雷实体被移除
 	BehaviorPotatoMine
+	// BehaviorSnowPea 寒冰射手行为：与豌豆射手类似，但发射冰豌豆
+	// Story 8.9: 冰豌豆命中僵尸时会附加减速效果
+	BehaviorSnowPea
+	// BehaviorSnowPeaProjectile 冰豌豆子弹行为：向右移动并检测碰撞
+	// 命中僵尸时造成 20 点伤害并附加 50% 减速效果持续 10 秒
+	BehaviorSnowPeaProjectile
 	// BehaviorZombiePreview 僵尸预告行为：开场动画中的僵尸预览，不移动、不攻击、只播放 idle 动画
 	BehaviorZombiePreview
+	// BehaviorZombiePolevaulter 撑杆僵尸行为：持杆时高速移动，遇到植物跳跃越过
+	// Story 8.9: 跳跃后丢弃撑杆，速度降为普通速度
+	BehaviorZombiePolevaulter
 )
 
 // ZombieAnimState 定义僵尸的动画状态

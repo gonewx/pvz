@@ -526,3 +526,149 @@ func ActivateZombie(em *ecs.EntityManager, entityID ecs.EntityID) {
 		})
 	}
 }
+
+// NewPolevaulterZombieEntity 创建撑杆僵尸实体
+// Story 8.9: 撑杆僵尸持杆时高速移动，遇到第一个植物时跳跃越过
+//
+// 特殊机制：
+// - 生命值：500（高于普通僵尸 270）
+// - 持杆时移动速度：54 像素/秒（普通僵尸的 1.8 倍）
+// - 跳跃后移动速度：30 像素/秒（与普通僵尸相同）
+// - 跳跃距离：约 1.5 格
+//
+// 参数:
+//   - em: 实体管理器
+//   - rm: 资源管理器（用于加载僵尸 Reanim 资源）
+//   - row: 生成行索引 (0-4)
+//   - spawnX: 生成的世界坐标X位置（通常在屏幕右侧外）
+//
+// 返回:
+//   - ecs.EntityID: 创建的撑杆僵尸实体ID，如果失败返回 0
+//   - error: 如果创建失败返回错误信息
+func NewPolevaulterZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spawnX float64) (ecs.EntityID, error) {
+	if em == nil {
+		return 0, fmt.Errorf("entity manager cannot be nil")
+	}
+	if rm == nil {
+		return 0, fmt.Errorf("resource manager cannot be nil")
+	}
+
+	// 计算僵尸Y坐标（世界坐标，基于行）
+	spawnY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2.0 + config.ZombieVerticalOffset
+
+	// 创建实体
+	entityID := em.CreateEntity()
+
+	// 添加位置组件（世界坐标）
+	ecs.AddComponent(em, entityID, &components.PositionComponent{
+		X: spawnX,
+		Y: spawnY,
+	})
+
+	// 从 ResourceManager 获取撑杆僵尸的 Reanim 数据和部件图片
+	reanimXML := rm.GetReanimXML("Zombie_polevaulter")
+	partImages := rm.GetReanimPartImages("Zombie_polevaulter")
+
+	if reanimXML == nil || partImages == nil {
+		return 0, fmt.Errorf("failed to load Zombie_polevaulter Reanim resources")
+	}
+
+	// 添加 ReanimComponent
+	ecs.AddComponent(em, entityID, &components.ReanimComponent{
+		ReanimName:        "Zombie_polevaulter",
+		ReanimXML:         reanimXML,
+		PartImages:        partImages,
+		LastGroundX:       0.0,
+		LastGroundY:       0.0,
+		LastAnimFrame:     -1,
+		AccumulatedDeltaX: 0.0,
+		AccumulatedDeltaY: 0.0,
+	})
+
+	// 使用 AnimationCommand 触发 idle 动画
+	ecs.AddComponent(em, entityID, &components.AnimationCommandComponent{
+		UnitID:    types.UnitIDZombiePolevaulter,
+		ComboName: "idle",
+		Processed: false,
+	})
+
+	// 添加速度组件（初始速度为0，待命状态）
+	ecs.AddComponent(em, entityID, &components.VelocityComponent{
+		VX: 0.0,
+		VY: 0.0,
+	})
+
+	// 添加行为组件（标识为撑杆僵尸，初始为 idle 状态）
+	ecs.AddComponent(em, entityID, &components.BehaviorComponent{
+		Type:            components.BehaviorZombiePolevaulter,
+		ZombieAnimState: components.ZombieAnimIdle,
+		UnitID:          types.UnitIDZombiePolevaulter,
+	})
+
+	// 添加撑杆组件（初始持有撑杆）
+	ecs.AddComponent(em, entityID, &components.PoleVaultComponent{
+		HasPole:     true,
+		IsJumping:   false,
+		JumpProgress: 0.0,
+	})
+
+	// 添加生命值组件（500 点）
+	ecs.AddComponent(em, entityID, &components.HealthComponent{
+		CurrentHealth: config.PolevaulterZombieHealth,
+		MaxHealth:     config.PolevaulterZombieHealth,
+	})
+
+	// 添加碰撞组件（用于检测子弹碰撞）
+	ecs.AddComponent(em, entityID, &components.CollisionComponent{
+		Width:  config.ZombieCollisionWidth,
+		Height: config.ZombieCollisionHeight,
+	})
+
+	// 添加阴影组件
+	// Story 16.4: 使用统一的阴影偏移量，不再需要特殊补丁
+	shadowSize := config.GetShadowSize("zombie")
+	ecs.AddComponent(em, entityID, &components.ShadowComponent{
+		Width:  shadowSize.Width,
+		Height: shadowSize.Height,
+		Alpha:  config.DefaultShadowAlpha,
+	})
+
+	return entityID, nil
+}
+
+// ActivatePolevaulterZombie 激活撑杆僵尸实体，使其开始奔跑
+// Story 8.9: 撑杆僵尸激活后以高速奔跑
+//
+// 参数:
+//   - em: 实体管理器
+//   - entityID: 僵尸实体ID
+func ActivatePolevaulterZombie(em *ecs.EntityManager, entityID ecs.EntityID) {
+	// 检查是否有撑杆组件
+	poleVault, hasPole := ecs.GetComponent[*components.PoleVaultComponent](em, entityID)
+
+	// 设置移动速度（持杆时高速，否则普通速度）
+	if vel, ok := ecs.GetComponent[*components.VelocityComponent](em, entityID); ok {
+		if hasPole && poleVault.HasPole {
+			vel.VX = config.PolevaulterZombieRunSpeed // 高速奔跑
+		} else {
+			vel.VX = config.PolevaulterZombieWalkSpeed // 普通速度
+		}
+	}
+
+	// 切换动画状态并添加动画命令
+	if behavior, ok := ecs.GetComponent[*components.BehaviorComponent](em, entityID); ok {
+		behavior.ZombieAnimState = components.ZombieAnimWalking
+
+		// 持杆时使用 run 动画，否则使用 walk 动画
+		comboName := "walk"
+		if hasPole && poleVault.HasPole {
+			comboName = "run"
+		}
+
+		ecs.AddComponent(em, entityID, &components.AnimationCommandComponent{
+			UnitID:    types.UnitIDZombiePolevaulter,
+			ComboName: comboName,
+			Processed: false,
+		})
+	}
+}

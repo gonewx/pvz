@@ -1314,11 +1314,11 @@ func (s *RenderSystem) drawPlantShadows(screen *ebiten.Image, entities []ecs.Ent
 			continue
 		}
 
-		// 计算阴影位置：格子底部中心，稍微上移让阴影在脚下
-		// 格子底部 Y = pos.Y + CellHeight/2
-		// 阴影上移偏移量，让阴影看起来在植物脚下而不是脚后面
-		shadowOffsetY := config.PlantShadowOffsetY // 可配置的偏移量
-		footY := pos.Y + config.CellHeight/2 + shadowOffsetY
+		// 计算阴影位置：跟随植物本体
+		// 植物 pos.Y 是本体位置，阴影应该在本体脚下
+		// PlantShadowOffsetY 用于微调阴影相对于本体的垂直偏移
+		shadowOffsetY := config.PlantShadowOffsetY
+		footY := pos.Y + shadowOffsetY
 		screenX := pos.X - shadowImgWidth/2 - cameraX
 		screenY := footY - shadowImgHeight/2
 
@@ -1380,7 +1380,8 @@ func (s *RenderSystem) drawZombieShadowsWithClipping(screen *ebiten.Image, zombi
 			behaviorComp.Type == components.BehaviorZombieSquashing ||
 			behaviorComp.Type == components.BehaviorZombieConehead ||
 			behaviorComp.Type == components.BehaviorZombieBuckethead ||
-			behaviorComp.Type == components.BehaviorZombieFlag
+			behaviorComp.Type == components.BehaviorZombieFlag ||
+			behaviorComp.Type == components.BehaviorZombiePolevaulter
 
 		if !isZombie {
 			continue
@@ -1392,14 +1393,12 @@ func (s *RenderSystem) drawZombieShadowsWithClipping(screen *ebiten.Image, zombi
 			continue
 		}
 
-		// 计算阴影位置：僵尸脚底中心
-		// 僵尸 pos.Y = 格子中心 + ZombieVerticalOffset
-		// 脚底位置 = pos.Y - ZombieVerticalOffset + CellHeight/2 + shadowOffsetY
-		// 注：僵尸渲染的 CenterOffsetY 校正已在 coordinates.GetRenderScreenOrigin 中统一处理，
-		// 阴影位置基于 pos.Y 计算，无需额外校正
-		shadowOffsetX := config.ZombieShadowOffsetX // 可配置的 X 偏移量
-		shadowOffsetY := config.ZombieShadowOffsetY // 可配置的 Y 偏移量
-		footY := pos.Y - config.ZombieVerticalOffset + config.CellHeight/2 + shadowOffsetY
+		// 计算阴影位置：跟随僵尸本体
+		// 僵尸 pos.Y 是本体位置，阴影应该在本体脚下
+		// ZombieShadowOffsetX/Y 用于微调阴影相对于本体的偏移
+		shadowOffsetX := config.ZombieShadowOffsetX
+		shadowOffsetY := config.ZombieShadowOffsetY
+		footY := pos.Y + shadowOffsetY
 		shadowWorldX := pos.X - shadowImgWidth/2 + shadowOffsetX
 		shadowWorldRightX := shadowWorldX + shadowImgWidth
 		screenX := shadowWorldX - cameraX

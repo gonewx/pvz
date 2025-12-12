@@ -43,11 +43,12 @@ type AnimationUnitConfig struct {
 
 // AnimationInfo 动画信息
 type AnimationInfo struct {
-	Name        string  `yaml:"name"`
-	DisplayName string  `yaml:"display_name"`
-	Loop        *bool   `yaml:"loop,omitempty"`  // 可选：是否循环播放，nil=默认true，显式false=不循环
-	FPS         float64 `yaml:"fps,omitempty"`   // 可选：该动画的独立 FPS，若未指定则使用全局/Reanim 文件的 FPS
-	Speed       float64 `yaml:"speed,omitempty"` // 可选：动画速度倍率（0.0-1.0），1.0=正常速度，0.5=50%速度，默认 1.0
+	Name              string  `yaml:"name"`
+	DisplayName       string  `yaml:"display_name"`
+	Loop              *bool   `yaml:"loop,omitempty"`                // 可选：是否循环播放，nil=默认true，显式false=不循环
+	FPS               float64 `yaml:"fps,omitempty"`                 // 可选：该动画的独立 FPS，若未指定则使用全局/Reanim 文件的 FPS
+	Speed             float64 `yaml:"speed,omitempty"`               // 可选：动画速度倍率（0.0-1.0），1.0=正常速度，0.5=50%速度，默认 1.0
+	PhysicalFrameLoop *bool   `yaml:"physical_frame_loop,omitempty"` // 可选：使用物理帧数（包括隐藏帧）循环，用于土豆地雷闪烁灯等需要"显示-隐藏"周期的动画
 }
 
 // 注意：AnimationComboConfig 已在 reanim_config.go 中定义，这里直接使用

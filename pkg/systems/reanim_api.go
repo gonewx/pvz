@@ -528,10 +528,11 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 		// 使用配置指定的 CenterOffset
 		comp.CenterOffsetX = unitConfig.CenterOffset[0]
 		comp.CenterOffsetY = unitConfig.CenterOffset[1]
+		comp.CenterOffsetCalculated = true
 		log.Printf("[ReanimSystem] PlayCombo: 使用配置的 CenterOffset: %s → (%.1f, %.1f)",
 			unitID, comp.CenterOffsetX, comp.CenterOffsetY)
 	} else {
-		// 自动计算 CenterOffset
+		// 自动计算 CenterOffset（只在首次计算，后续调用会跳过）
 		s.calculateCenterOffset(comp)
 	}
 

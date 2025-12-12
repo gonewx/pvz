@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"strings"
 
 	"github.com/gonewx/pvz/internal/reanim"
 	"github.com/gonewx/pvz/pkg/components"
@@ -45,6 +46,35 @@ func getFloat(p *float64) float64 {
 		return 0
 	}
 	return *p
+}
+
+// isEquipmentTrack 判断轨道是否为装备轨道
+// 装备轨道（如头盔、旗帜、撑杆等）会向上延伸，不应影响 CenterOffset 计算
+// 基于轨道命名规则识别，无需硬编码具体数值
+func isEquipmentTrack(trackName string) bool {
+	// 转换为小写进行匹配
+	lowerName := strings.ToLower(trackName)
+
+	// 装备轨道的命名模式
+	// 这些装备会向上延伸，影响 BBox 的 minY
+	equipmentKeywords := []string{
+		"bucket",     // 铁桶
+		"cone",       // 路障
+		"flag",       // 旗帜
+		"pole",       // 撑杆
+		"screendoor", // 铁门
+		"duckytube",  // 游泳圈
+		"mustache",   // 胡子
+		"tie",        // 领带
+	}
+
+	for _, keyword := range equipmentKeywords {
+		if strings.Contains(lowerName, keyword) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // ==================================================================
@@ -174,11 +204,25 @@ func (s *ReanimSystem) analyzeTrackTypes(reanimXML *reanim.ReanimXML) (visualTra
 }
 
 // calculateCenterOffset 计算并缓存 CenterOffset
-// 在第一帧计算所有可见部件的 bounding box 中心,避免每帧重新计算导致位置抖动
+// 在第一帧计算所有可见部件的 bounding box,避免每帧重新计算导致位置抖动
 //
-// 重要：计算时会临时禁用 Overlay 动画（如旗帜僵尸的旗杆），
-// 确保 CenterOffset 只基于基础动画计算，避免附加物影响位置。
+// 渲染锚点策略：
+// - CenterOffsetX: 使用几何中心（水平居中）
+// - CenterOffsetY: 使用 maxY（脚底位置）作为锚点
+//
+// 以脚底为锚点的优势：
+// - 脚底位置是最稳定的参考点，不受任何装备影响
+// - 装备（路障、铁桶、旗帜、撑杆等）只会向上延伸，不会改变脚底位置
+// - 无需维护装备轨道列表，无需硬编码任何数值
+// - 所有实体的脚底自然对齐，无论是否有装备
+//
+// 注意：只在首次调用时计算，后续调用直接返回，避免动画切换时位置跳动
 func (s *ReanimSystem) calculateCenterOffset(comp *components.ReanimComponent) {
+	// 如果已经计算过，直接返回，避免动画切换时位置跳动
+	if comp.CenterOffsetCalculated {
+		return
+	}
+
 	// 确保已初始化
 	if comp.MergedTracks == nil || len(comp.VisualTracks) == 0 {
 		log.Printf("[ReanimSystem] calculateCenterOffset: %s → 提前返回（MergedTracks=%v, VisualTracks=%d）",
@@ -189,7 +233,6 @@ func (s *ReanimSystem) calculateCenterOffset(comp *components.ReanimComponent) {
 	}
 
 	// 临时禁用 Overlay 动画，确保只计算基础动画的 BBox
-	// 这样旗帜僵尸的旗杆不会影响 CenterOffset 计算
 	savedOverlay := comp.OverlayReanimXML
 	comp.OverlayReanimXML = nil
 
@@ -210,8 +253,14 @@ func (s *ReanimSystem) calculateCenterOffset(comp *components.ReanimComponent) {
 	}
 
 	// 计算 bounding box
+	// 需要分别计算：
+	// - 全部部件的 BBox（用于 CenterOffsetY，因为脚底位置不受装备影响）
+	// - 非装备部件的 BBox（用于 CenterOffsetX，排除撑杆等装备）
 	minX, maxX := 9999.0, -9999.0
 	minY, maxY := 9999.0, -9999.0
+	// 非装备部件的 X 范围（用于 CenterOffsetX 计算）
+	nonEquipMinX, nonEquipMaxX := 9999.0, -9999.0
+	hasNonEquipPart := false
 
 	for _, partData := range comp.CachedRenderData {
 		if partData.Img == nil {
@@ -222,6 +271,9 @@ func (s *ReanimSystem) calculateCenterOffset(comp *components.ReanimComponent) {
 		if frame.FrameNum != nil && *frame.FrameNum == -1 {
 			continue
 		}
+
+		// 检查是否为装备轨道
+		isEquipment := isEquipmentTrack(partData.TrackName)
 
 		// 计算部件位置
 		partX := getFloat(frame.X) + partData.OffsetX
@@ -278,6 +330,7 @@ func (s *ReanimSystem) calculateCenterOffset(comp *components.ReanimComponent) {
 		partMinY := math.Min(math.Min(y0, y1), math.Min(y2, y3))
 		partMaxY := math.Max(math.Max(y0, y1), math.Max(y2, y3))
 
+		// 更新全局 BBox（用于 CenterOffsetY）
 		if partMinX < minX {
 			minX = partMinX
 		}
@@ -290,15 +343,47 @@ func (s *ReanimSystem) calculateCenterOffset(comp *components.ReanimComponent) {
 		if partMaxY > maxY {
 			maxY = partMaxY
 		}
+
+		// 更新非装备部件的 X 范围（用于 CenterOffsetX）
+		if !isEquipment {
+			hasNonEquipPart = true
+			if partMinX < nonEquipMinX {
+				nonEquipMinX = partMinX
+			}
+			if partMaxX > nonEquipMaxX {
+				nonEquipMaxX = partMaxX
+			}
+		}
 	}
 
-	// 计算中心点坐标
-	comp.CenterOffsetX = (minX + maxX) / 2
-	comp.CenterOffsetY = (minY + maxY) / 2
+	// 计算 CenterOffset
+	// X: 使用非装备部件的几何中心（水平居中）
+	// 如果没有非装备部件，则使用全部部件的中心
+	if hasNonEquipPart {
+		comp.CenterOffsetX = (nonEquipMinX + nonEquipMaxX) / 2
+	} else {
+		comp.CenterOffsetX = (minX + maxX) / 2
+	}
+
+	// Y: 使用 maxY（脚底位置）作为锚点
+	// 这是最优雅的解决方案：
+	// - 脚底位置是最稳定的，不受任何装备影响
+	// - 无需判断哪些是装备轨道，无需硬编码任何数值
+	// - 所有实体的脚底自然对齐
+	comp.CenterOffsetY = maxY
+
+	// 标记已计算，后续动画切换时不再重新计算
+	comp.CenterOffsetCalculated = true
 
 	// DEBUG: 输出 CenterOffset 计算结果
-	log.Printf("[ReanimSystem] calculateCenterOffset: %s → CenterOffset=(%.1f, %.1f), BBox=(%.1f,%.1f)-(%.1f,%.1f)",
-		comp.ReanimName, comp.CenterOffsetX, comp.CenterOffsetY, minX, minY, maxX, maxY)
+	if hasNonEquipPart && (nonEquipMinX != minX || nonEquipMaxX != maxX) {
+		// 有装备轨道被排除
+		log.Printf("[ReanimSystem] calculateCenterOffset: %s → CenterOffset=(%.1f, %.1f), BBox=(%.1f,%.1f)-(%.1f,%.1f), NonEquipX=(%.1f,%.1f)",
+			comp.ReanimName, comp.CenterOffsetX, comp.CenterOffsetY, minX, minY, maxX, maxY, nonEquipMinX, nonEquipMaxX)
+	} else {
+		log.Printf("[ReanimSystem] calculateCenterOffset: %s → CenterOffset=(%.1f, %.1f), BBox=(%.1f,%.1f)-(%.1f,%.1f)",
+			comp.ReanimName, comp.CenterOffsetX, comp.CenterOffsetY, minX, minY, maxX, maxY)
+	}
 }
 
 // ==================================================================

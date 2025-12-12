@@ -32,16 +32,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 代码中尽量不要添加历史追溯性注释。代码注释应该解释"为什么"，而不是"什么时候修改的"
 
 - reanim 定义中豌豆射手的名称是 `peashootersingle` , 双发豌豆射手是 `peashooter`, 我们游戏定义中使用的是 `peashooter` 和 `repeater` , 注意区别。
-- 原版《植物大战僵尸》使用固定时间步长 **0.01秒（1厘秒）** 作为物理更新基准（相当于100FPS）。粒子配置文件中的某些值基于这个时间步长定义，而非真实的"每秒"单位。
-- assets/effect 下的所有配置文件都不能修改
+- data/{particles,reanim} 下的所有配置文件都不能修改
 - 所有涉及大小 、位置的常量，都需要在配置常量文件中设置，以方便后续手工调整
 - 如果要查看日志，需要添加参数 `--verbose`
-- 绘制任何元素时，都要考虑是否需要坐标转换。
+- 没有特别说明的话，默认的运行日志在 `/tmp/pvz.log`, 文件很大，要考虑正确的访问方式
 - 验证粒子系统的实现， 可以使用类似 `go run cmd/particles/main.go --verbose --effect="Planting"  > /tmp/p.log 2>&1` 的命令运行，并查看日志
-- 如果没有动画轨道,那可能是简单的动画组件,应该按配置的名称,直接播放就行
-- 将刚刚的经验记录起来
-- 单动画文件（如 Zombie_hand.reanim）创建 visiblesArray 时，应该填充全 0 数组 [0, 0, 0, ...]
-  表示所有帧可见，而不是序列索引 [0, 1, 2, ...]，因为 mapLogicalToPhysical 函数通 animVisibles[i] == 0 判断帧是否可见
+
 
 ---
 
