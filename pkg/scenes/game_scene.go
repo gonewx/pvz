@@ -887,7 +887,7 @@ func (s *GameScene) Update(deltaTime float64) {
 
 	// 开场动画刚完成，触发铺草皮动画（如果配置了且还未启动）
 	// 修正：检查 ShowSoddingAnim 和 SodRollAnimation 配置
-	if s.openingSystem != nil && s.openingSystem.IsCompleted() && !s.soddingAnimStarted && s.soddingSystem != nil {
+	if s.openingSystem != nil && s.openingSystem.IsCompleted() && !s.soddingAnimStarted && s.soddingSystem != nil && s.gameState.CurrentLevel != nil {
 		// 实时生成模式：不再预生成僵尸，由 WaveTimingSystem 触发时实时生成
 
 		// 检查是否应该播放铺草皮动画
@@ -982,7 +982,7 @@ func (s *GameScene) Update(deltaTime float64) {
 
 	// 如果没有开场动画，使用延迟启动铺草皮动画（原逻辑）
 	// 修正：检查 ShowSoddingAnim 和 SodRollAnimation 配置
-	if s.openingSystem == nil && s.soddingSystem != nil && !s.soddingAnimStarted {
+	if s.openingSystem == nil && s.soddingSystem != nil && !s.soddingAnimStarted && s.gameState.CurrentLevel != nil {
 		// 检查是否应该播放铺草皮动画
 		shouldPlayAnim := s.gameState.CurrentLevel.ShowSoddingAnim || s.gameState.CurrentLevel.SodRollAnimation
 
@@ -1274,15 +1274,17 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	// 按照原版PVZ设计，UI元素在游戏世界实体下方渲染
 	if !hideUI {
 		s.drawSeedBank(screen)
-		s.drawShovel(screen)
 
 		// Story 19.5: 绘制传送带（在铲子和植物卡片之间）
 		s.drawConveyorBelt(screen)
 
-		// 使用 ECS 按钮系统渲染菜单按钮
-		// 菜单按钮需要等待所有开场动画完成后才显示
-		if s.buttonRenderSystem != nil && !hideMenuButton {
-			s.buttonRenderSystem.Draw(screen)
+		// 使用 ECS 按钮系统渲染菜单按钮和铲子
+		// 菜单按钮和铲子需要等待所有开场动画完成后才显示（包括除草车入场和 ReadySetPlant）
+		if !hideMenuButton {
+			s.drawShovel(screen)
+			if s.buttonRenderSystem != nil {
+				s.buttonRenderSystem.Draw(screen)
+			}
 		}
 
 		// Layer 3: Draw plant cards (Story 3.1 架构优化)
@@ -1478,23 +1480,37 @@ func (s *GameScene) IsShovelSelected() bool {
 
 // SetShovelSelected 设置铲子选中状态
 // 实现 systems.ShovelStateProvider 接口
+// Bug修复: 选中铲子时需要清理植物预览实体，避免铲子光标与植物预览同时显示
 func (s *GameScene) SetShovelSelected(selected bool) {
 	s.shovelSelected = selected
 	// 如果取消铲子模式，同时取消种植模式（避免状态冲突）
 	if !selected && s.gameState.IsPlantingMode {
 		// 不需要操作，铲子模式和种植模式互斥
 	}
-	// 如果选中铲子，取消种植模式
+	// 如果选中铲子，取消种植模式并清理预览
 	if selected && s.gameState.IsPlantingMode {
 		s.gameState.ExitPlantingMode()
-		log.Printf("[GameScene] 铲子模式激活，取消种植模式")
+		// 销毁植物预览实体，避免铲子光标与植物预览同时显示
+		s.destroyAllPlantPreviews()
+		log.Printf("[GameScene] 铲子模式激活，取消种植模式并清理植物预览")
 	}
+}
+
+// destroyAllPlantPreviews 销毁所有植物预览实体
+// 用于切换到铲子模式时清理残留的植物预览
+func (s *GameScene) destroyAllPlantPreviews() {
+	previewEntities := ecs.GetEntitiesWith1[*components.PlantPreviewComponent](s.entityManager)
+	for _, entityID := range previewEntities {
+		s.entityManager.DestroyEntity(entityID)
+	}
+	// 立即清理标记删除的实体
+	s.entityManager.RemoveMarkedEntities()
 }
 
 // GetShovelSlotBounds 获取铲子槽位边界（屏幕坐标）
 // 实现 systems.ShovelStateProvider 接口
 // Story 19.5: 保龄球模式使用相对于菜单按钮的位置
-// Story 19.x QA: 铲子位置相对于菜单按钮偏左 10px
+// Bug修复: 铲子Y位置固定在顶部，与菜单按钮显示时机一致，不跟随植物选择栏滑入动画
 func (s *GameScene) GetShovelSlotBounds() image.Rectangle {
 	// 计算铲子位置
 	var shovelX int
@@ -1513,8 +1529,8 @@ func (s *GameScene) GetShovelSlotBounds() image.Rectangle {
 		shovelX = config.ShovelX // 默认值
 	}
 
-	// 铲子 Y 位置
-	shovelY := config.BowlingShovelY
+	// 铲子 Y 位置固定在顶部（与菜单按钮一致，不跟随植物选择栏滑入动画）
+	shovelY := int(config.MenuButtonOffsetFromTop)
 
 	return image.Rect(
 		shovelX,
