@@ -67,8 +67,8 @@ func TestPlantDeathReleasesGrid(t *testing.T) {
 		},
 	})
 	ecs.AddComponent(em, zombieID, &components.PositionComponent{
-		X: config.GridWorldStartX + 2*config.CellWidth + config.CellWidth/2,   // 与植物同列
-		Y: config.GridWorldStartY + 3*config.CellHeight + config.CellHeight/2, // 与植物同行
+		X: config.GridWorldStartX + 2*config.CellWidth + config.CellWidth/2,                              // 与植物同列
+		Y: config.GridWorldStartY + 3*config.CellHeight + config.CellHeight/2 + config.ZombieVerticalOffset, // 与植物同行（需加上僵尸垂直偏移）
 	})
 
 	// 模拟僵尸啃食，当 LastEatAnimFrame=-1 时首次进入会触发伤害
@@ -146,7 +146,7 @@ func TestMultiplePlantsDeathReleasesGrid(t *testing.T) {
 		})
 		ecs.AddComponent(em, zombieID, &components.PositionComponent{
 			X: config.GridWorldStartX + float64(col)*config.CellWidth + config.CellWidth/2,
-			Y: config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2,
+			Y: config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2 + config.ZombieVerticalOffset,
 		})
 
 		t.Logf("Zombie %d eating plant %d at grid (%d, %d)", i, plantIDs[i], col, row)
