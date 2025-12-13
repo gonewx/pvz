@@ -8,13 +8,13 @@ package config
 // SodRollParticleOffsetX 粒子发射器X轴偏移量（相对于草皮卷中心，世界坐标）
 // 正值向右偏移，负值向左偏移
 // 默认值：0（与草皮卷中心对齐）
-const SodRollParticleOffsetX float64 = 40
+const SodRollParticleOffsetX float64 = 0.0
 
 // SodRollParticleOffsetY 粒子发射器Y轴偏移量（相对于草皮卷中心，世界坐标）
 // 正值向下偏移，负值向上偏移
 // 默认值：-30（向上偏移 30 像素，因为 SystemPosition 会在初始时添加 +30 的偏移）
 // 这样应用 SystemPosition 后，发射器正好在草皮卷中心
-const SodRollParticleOffsetY float64 = 30
+const SodRollParticleOffsetY float64 = 0.0
 
 // 注释说明：
 // - 粒子发射器位置 = 草皮卷中心位置 + 偏移量

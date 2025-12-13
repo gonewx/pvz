@@ -70,7 +70,7 @@ const (
 
 	// SodRoll 动画Y偏移（相对于目标行中心）
 	// 调整此值可以改变草皮卷的垂直位置
-	SodRollOffsetY = -8.0 // 相对于行中心的Y偏移量
+	SodRollOffsetY = 60.0 // 相对于行中心的Y偏移量
 
 	// 草皮叠加图X偏移（相对于网格起点）
 	// 调整此值可以改变草皮显示的水平位置
@@ -342,7 +342,7 @@ const (
 	// 原建议值范围：30.0 - 100.0（错误，会在视野外）
 	// 正确范围：220.0 - 260.0（在摄像机视野内，草坪左侧）
 	LawnmowerStartX       = 223.0
-	LawnmowerStartOffsetY = 20.0
+	LawnmowerStartOffsetY = 50.0
 
 	// LawnmowerSpeed 除草车移动速度（像素/秒）
 	// 原版除草车快速向右移动的速度
