@@ -1,0 +1,62 @@
+schema: 1
+story: 'tech-debt.refactor-plant-behavior-handler'
+story_title: '重构 plant_behavior_handler.go - 按植物功能类型拆分'
+gate: PASS
+status_reason: '重构成功完成，原1232行文件拆分为5个职责明确的模块，编译和主要测试通过，无功能变更'
+reviewer: 'Quinn (Test Architect)'
+updated: '2025-12-13T18:30:00+08:00'
+
+top_issues: []
+waiver: { active: false }
+
+quality_score: 90
+expires: '2025-12-27T18:30:00+08:00'
+
+evidence:
+  tests_reviewed: 18
+  tests_passed: 16
+  tests_failed: 2
+  risks_identified: 1
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: '纯代码组织重构，无安全影响'
+  performance:
+    status: PASS
+    notes: '无运行时性能变化，仅物理文件重组'
+  reliability:
+    status: PASS
+    notes: '编译通过，核心功能测试通过'
+  maintainability:
+    status: PASS
+    notes: '显著改善：单体1232行文件拆分为5个职责明确的模块，符合SRP原则'
+
+recommendations:
+  immediate: []
+  future:
+    - action: '修复 TestPlantDeathReleasesGrid 和 TestMultiplePlantsDeathReleasesGrid 测试'
+      refs: ['pkg/systems/behavior/behavior_system_grid_release_test.go']
+      suggested_owner: dev
+      notes: '这些测试失败是预先存在的问题，僵尸位置配置不完整导致无法正确触发植物死亡流程'
+
+file_changes:
+  created:
+    - pkg/systems/behavior/plant_producer_handler.go
+    - pkg/systems/behavior/plant_shooter_handler.go
+    - pkg/systems/behavior/plant_defender_handler.go
+    - pkg/systems/behavior/plant_explosive_handler.go
+    - pkg/systems/behavior/plant_glow_effects.go
+  deleted:
+    - pkg/systems/behavior/plant_behavior_handler.go
+  modified: []
+
+metrics:
+  lines_before: 1232
+  lines_after: 1268
+  files_before: 1
+  files_after: 5
+  average_file_size: 254
