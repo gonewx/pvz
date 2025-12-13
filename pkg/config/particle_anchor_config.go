@@ -37,14 +37,8 @@ const (
 	// 当主配置加载失败时使用
 	PlantingParticleBackup = "SodRoll"
 
-	// PlantingParticleAngleOffset 种植粒子效果的角度偏移（度）
-	// 用于调整粒子发射方向，例如：
-	//   -90: 向左偏转 90 度
-	//     0: 不偏转（使用 XML 原始角度）
-	//    90: 向右偏转 90 度
-	//   180: 反向（上下翻转）
-	// 注：原版 Planting.xml 的 LaunchAngle 为 [110 250]（向上飞溅）
-	PlantingParticleAngleOffset = -90.0
+	// 注：角度偏移常量已移除，粒子系统现在使用正确的 PvZ 坐标系
+	// （0°=下，90°=右，180°=上，270°=左），不再需要业务层偏移
 )
 
 // ParticleAnchorOffsets 粒子效果锚点偏移配置表

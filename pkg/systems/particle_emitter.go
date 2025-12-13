@@ -410,25 +410,30 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 	// Business logic (BehaviorSystem) calculates offset based on entity direction
 	angle += emitter.AngleOffset
 
-	// Story 10.4 修正：PvZ 使用数学标准坐标系（Y轴向上）
-	// 角度定义（基于数学坐标系）：
-	//   0° = 向右，90° = 向上，180° = 向左，270° = 向下
-	// 证据：SodRoll.md 明确说 "90度（正上方）到180度（正左方）"
+	// Story 10.4 修正：原版 PvZ 使用特殊的角度坐标系
+	// 角度定义（PvZ 坐标系，0°=下，逆时针递增）：
+	//   0° = 向下，90° = 向右，180° = 向上，270° = 向左
 	//
-	// 转换到屏幕坐标（Y轴向下）：
-	//   - velocityX = speed * cos(angle) （无需转换）
-	//   - velocityY = -speed * sin(angle) （取反！因为屏幕Y轴向下）
+	// 证据（通过分析多个原版粒子效果）：
+	//   - Planting [110,250]：110°=右上，250°=左上 → "向上和两侧飞溅" ✓
+	//   - ZombieArm [90,185]：90°=向右，185°=上偏左 → "向后和向上飞" ✓
+	//   - PottedZenGlow [90,270]：90°=右，270°=左 → "上半圆光晕" ✓
 	//
-	// 验证示例：
-	//   - SodRoll [90-180°]：90°→上，135°→左上，180°→左 ✓ "向上和向左"
-	//   - Planting [110-250°]：110°→左上，180°→左，250°→左下 ✓ "向上和两侧"
-	//   - ZombieHead [150-185°]：150°→左上，185°→左 ✓ "向左后方"
+	// 转换公式（PvZ角度 → 屏幕速度）：
+	//   velocityX = speed * sin(angle)
+	//   velocityY = speed * cos(angle)
+	//
+	// 验证：
+	//   - 0° (下): sin=0, cos=1 → (0,1) → 向下 ✓
+	//   - 90° (右): sin=1, cos=0 → (1,0) → 向右 ✓
+	//   - 180° (上): sin=0, cos=-1 → (0,-1) → 向上 ✓
+	//   - 270° (左): sin=-1, cos=0 → (-1,0) → 向左 ✓
 
 	// Convert angle to radians and calculate velocity components
 	// LaunchSpeed is in pixels/second, use directly (no conversion needed)
 	angleRad := angle * math.Pi / 180.0
-	velocityX := speed * math.Cos(angleRad)
-	velocityY := -speed * math.Sin(angleRad) // Y轴取反：数学坐标系→屏幕坐标系
+	velocityX := speed * math.Sin(angleRad) // PvZ: 0°=下，90°=右
+	velocityY := speed * math.Cos(angleRad) // PvZ: 0°=下，180°=上
 
 	// Initial rotation and spin speed
 	spinAngleMin, spinAngleMax, _, _ := particlePkg.ParseValue(config.ParticleSpinAngle)

@@ -246,15 +246,15 @@ func NewPlantingParticleEffect(
 	// 参数说明：
 	//   - effectName: "Planting"（原版配置）
 	//   - anchorX, anchorY: 粒子锚点坐标（植物根部位置）
-	//   - config.PlantingParticleAngleOffset: 角度偏移（从配置系统读取）
-	entityID, err := CreateParticleEffect(em, rm, effectName, anchorX, anchorY, config.PlantingParticleAngleOffset)
+	// 注：不再需要角度偏移，粒子系统已使用正确的 PvZ 坐标系
+	entityID, err := CreateParticleEffect(em, rm, effectName, anchorX, anchorY)
 	if err != nil {
 		// 如果原版配置加载失败，尝试备用配置
 		log.Printf("[EffectFactory] 警告：加载 '%s' 失败，尝试备用配置: %v", effectName, err)
 
 		// 备用配置：尝试其他土粒效果
 		effectName = config.PlantingParticleBackup
-		entityID, err = CreateParticleEffect(em, rm, effectName, anchorX, anchorY, config.PlantingParticleAngleOffset)
+		entityID, err = CreateParticleEffect(em, rm, effectName, anchorX, anchorY)
 		if err != nil {
 			// 所有配置都失败，返回错误
 			return 0, fmt.Errorf("创建种植粒子效果失败（所有备用配置都失败）: %w", err)
