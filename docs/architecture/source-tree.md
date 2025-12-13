@@ -236,6 +236,10 @@ pkg/
 │   ├── scene.go                     # 场景基类
 │   └── lawn_strings.go              # 草坪字符串常量
 │
+├── managers/                        # 高级管理器（Story 22.1）
+│   ├── system_manager.go            # ECS 系统统一管理器
+│   └── system_manager_test.go       # 单元测试
+│
 ├── config/                          # 配置加载与管理（30+ 个文件）
 │   ├── level_config.go              # 关卡配置
 │   ├── spawn_rules.go               # 僵尸生成规则

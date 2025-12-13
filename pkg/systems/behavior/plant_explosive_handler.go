@@ -548,6 +548,7 @@ func (s *BehaviorSystem) triggerPotatoMineExplosion(entityID ecs.EntityID, explo
 	}
 
 	// 创建爆炸粒子效果
+	// 注：不再需要角度偏移，粒子系统已使用正确的 PvZ 坐标系
 	_, err := entities.CreateParticleEffect(
 		s.entityManager,
 		s.resourceManager,

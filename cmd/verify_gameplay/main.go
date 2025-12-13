@@ -12,8 +12,8 @@ import (
 	"github.com/gonewx/pvz/pkg/ecs"
 	"github.com/gonewx/pvz/pkg/entities"
 	"github.com/gonewx/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/managers"
 	"github.com/gonewx/pvz/pkg/systems"
-	"github.com/gonewx/pvz/pkg/systems/behavior"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -39,33 +39,23 @@ var zombieTypesByRow = []string{
 }
 
 // VerifyGameplayGame 统一验证游戏
+// Story 22.1: 使用 SystemManager 统一管理 ECS 系统
 type VerifyGameplayGame struct {
 	entityManager   *ecs.EntityManager
 	gameState       *game.GameState
 	resourceManager *game.ResourceManager
 
-	// 核心系统
-	reanimSystem        *systems.ReanimSystem
-	renderSystem        *systems.RenderSystem
-	behaviorSystem      *behavior.BehaviorSystem
-	physicsSystem       *systems.PhysicsSystem
-	lawnmowerSystem     *systems.LawnmowerSystem
-	rewardSystem        *systems.RewardAnimationSystem
-	particleSystem      *systems.ParticleSystem
-	lawnGridSystem      *systems.LawnGridSystem
-	sunCollectionSystem *systems.SunCollectionSystem
-	sunMovementSystem   *systems.SunMovementSystem
-	flashEffectSystem   *systems.FlashEffectSystem
+	// Story 22.1: SystemManager 统一管理所有 ECS 系统
+	// 新增系统时只需在 SystemManager 中添加，无需修改此文件
+	systemManager *managers.SystemManager
 
-	// 红字警告系统（一大波僵尸正在接近）
+	// 需要直接访问的系统引用（从 SystemManager 获取）
+	reanimSystem          *systems.ReanimSystem
+	renderSystem          *systems.RenderSystem
+	rewardSystem          *systems.RewardAnimationSystem
+	plantPreviewSystem    *systems.PlantPreviewSystem
 	flagWaveWarningSystem *systems.FlagWaveWarningSystem
-
-	// 生命周期系统（处理过期实体销毁）
-	lifetimeSystem *systems.LifetimeSystem
-
-	// 植物预览系统
-	plantPreviewSystem       *systems.PlantPreviewSystem
-	plantPreviewRenderSystem *systems.PlantPreviewRenderSystem
+	lawnGridSystem        *systems.LawnGridSystem
 
 	// 植物卡片渲染
 	plantCardRenderSystem *systems.PlantCardRenderSystem
@@ -95,6 +85,7 @@ type VerifyGameplayGame struct {
 }
 
 // NewVerifyGameplayGame 创建验证游戏实例
+// Story 22.1: 使用 SystemManager 创建所有系统
 func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 	// 创建 ECS 管理器
 	em := ecs.NewEntityManager()
@@ -134,6 +125,9 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to load Reanim config: %w", err)
 	}
+	// 关键：将 ReanimConfigManager 设置到 ResourceManager 中
+	// 这样 SystemManager 创建 ReanimSystem 时才能获取配置
+	rm.SetReanimConfigManager(reanimConfigManager)
 
 	// 获取游戏状态单例
 	gs := game.GetGameState()
@@ -144,54 +138,38 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 	audioManager := game.NewAudioManager(rm, nil)
 	gs.SetAudioManager(audioManager)
 
-	// 创建系统
-	reanimSystem := systems.NewReanimSystem(em)
-	reanimSystem.SetConfigManager(reanimConfigManager)
-	reanimSystem.SetResourceLoader(rm) // 设置资源加载器，用于运行时单位切换
-
-	renderSystem := systems.NewRenderSystem(em)
-	renderSystem.SetReanimSystem(reanimSystem)
-	renderSystem.SetResourceManager(rm)
-
-	particleSystem := systems.NewParticleSystem(em, rm)
-
-	// 创建草坪网格系统（启用所有行）
-	enabledLanes := []int{1, 2, 3, 4, 5}
-	lawnGridSystem := systems.NewLawnGridSystem(em, enabledLanes)
-
-	// Bug Fix: 先创建草坪网格实体，再传给 BehaviorSystem
+	// 创建草坪网格实体（在创建 SystemManager 之前）
 	lawnGridEntityID := em.CreateEntity()
 	ecs.AddComponent(em, lawnGridEntityID, &components.LawnGridComponent{})
 
-	// 创建除草车系统
-	lawnmowerSystem := systems.NewLawnmowerSystem(em, rm, gs)
+	// Story 22.1: 使用 SystemManager 创建所有系统
+	// 配置系统依赖
+	deps := managers.SystemDependencies{
+		EntityManager:        em,
+		ResourceManager:      rm,
+		GameState:            gs,
+		SceneManager:         nil, // verify_gameplay 不需要场景管理
+		LawnGridEntityID:     lawnGridEntityID,
+		EnabledLanes:         []int{1, 2, 3, 4, 5},
+		SunCollectionTargetX: float64(config.SeedBankX + config.SunPoolOffsetX),
+		SunCollectionTargetY: float64(config.SeedBankY + config.SunPoolOffsetY),
+		SunSpawnMinX:         config.SkyDropSunMinX,
+		SunSpawnMaxX:         config.SkyDropSunMaxX,
+		SunSpawnMinTargetY:   config.SkyDropSunMinTargetY,
+		SunSpawnMaxTargetY:   config.SkyDropSunMaxTargetY,
+		LevelConfig:          nil, // verify_gameplay 不需要关卡配置
+		SpawnRulesConfig:     nil,
+		ZombiePhysicsConfig:  nil,
+		WindowWidth:          screenWidth,
+		WindowHeight:         screenHeight,
+	}
 
-	// 创建行为系统（传入草坪网格系统和实体ID）
-	behaviorSystem := behavior.NewBehaviorSystem(em, rm, gs, lawnGridSystem, lawnGridEntityID)
+	// 使用 verify_gameplay 专用的系统选项
+	opts := managers.VerifyGameplayOptions()
 
-	// 创建物理系统
-	physicsSystem := systems.NewPhysicsSystem(em, rm)
-
-	// 创建奖励动画系统
-	rewardSystem := systems.NewRewardAnimationSystem(em, gs, rm, nil, reanimSystem, particleSystem, renderSystem)
-
-	// 计算阳光收集目标位置
-	sunTargetX := float64(config.SeedBankX + config.SunPoolOffsetX)
-	sunTargetY := float64(config.SeedBankY + config.SunPoolOffsetY)
-
-	// 创建阳光收集和移动系统
-	sunCollectionSystem := systems.NewSunCollectionSystem(em, gs, sunTargetX, sunTargetY)
-	sunMovementSystem := systems.NewSunMovementSystem(em)
-
-	// 创建闪烁效果系统
-	flashEffectSystem := systems.NewFlashEffectSystem(em)
-
-	// 创建红字警告系统（一大波僵尸正在接近）
-	// 传入 nil 作为 WaveTimingSystem，使用手动触发模式
-	flagWaveWarningSystem := systems.NewFlagWaveWarningSystem(em, nil, rm)
-
-	// 创建生命周期系统（处理过期实体销毁，如土豆雷爆炸后）
-	lifetimeSystem := systems.NewLifetimeSystem(em)
+	// 创建 SystemManager
+	systemManager := managers.NewSystemManager(deps, opts)
+	log.Println("[VerifyGameplay] SystemManager created with all systems")
 
 	// 加载字体
 	sunCounterFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.SunCounterFontSize)
@@ -222,8 +200,12 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 		log.Printf("Warning: Failed to load seed bank: %v", err)
 	}
 
+	// 创建 FlagWaveWarningSystem（手动触发模式）
+	flagWaveWarningSystem := systems.NewFlagWaveWarningSystem(em, nil, rm)
+
 	log.Println("╔════════════════════════════════════════════════════════╗")
 	log.Println("║              统一游戏验证程序                          ║")
+	log.Println("║        Story 22.1: SystemManager 统一管理             ║")
 	log.Println("╚════════════════════════════════════════════════════════╝")
 	log.Println()
 	log.Println("【功能说明】")
@@ -245,35 +227,31 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 	log.Println("  右键      - 取消植物选择")
 	log.Println("════════════════════════════════════════════════════════")
 
-	// 创建植物预览系统
-	plantPreviewSystem := systems.NewPlantPreviewSystem(em, gs, lawnGridSystem)
-	plantPreviewRenderSystem := systems.NewPlantPreviewRenderSystem(em, plantPreviewSystem)
-
 	vg := &VerifyGameplayGame{
-		entityManager:            em,
-		gameState:                gs,
-		resourceManager:          rm,
-		reanimSystem:             reanimSystem,
-		renderSystem:             renderSystem,
-		behaviorSystem:           behaviorSystem,
-		physicsSystem:            physicsSystem,
-		lawnmowerSystem:          lawnmowerSystem,
-		rewardSystem:             rewardSystem,
-		particleSystem:           particleSystem,
-		lawnGridSystem:           lawnGridSystem,
-		lawnGridEntityID:         lawnGridEntityID, // Bug Fix: 设置正确的实体ID
-		sunCollectionSystem:      sunCollectionSystem,
-		sunMovementSystem:        sunMovementSystem,
-		flashEffectSystem:        flashEffectSystem,
-		flagWaveWarningSystem:    flagWaveWarningSystem,
-		lifetimeSystem:           lifetimeSystem,
-		plantPreviewSystem:       plantPreviewSystem,
-		plantPreviewRenderSystem: plantPreviewRenderSystem,
-		plantCardRenderSystem:    plantCardRenderSystem,
-		sunCounterFont:           sunCounterFont,
-		debugFont:                debugFont,
-		background:               background,
-		seedBank:                 seedBank,
+		entityManager:   em,
+		gameState:       gs,
+		resourceManager: rm,
+
+		// Story 22.1: SystemManager 统一管理
+		systemManager: systemManager,
+
+		// 从 SystemManager 获取需要直接访问的系统
+		reanimSystem:       systemManager.GetReanimSystem(),
+		renderSystem:       systemManager.GetRenderSystem(),
+		rewardSystem:       systemManager.GetRewardSystem(),
+		plantPreviewSystem: systemManager.GetPlantPreviewSystem(),
+		lawnGridSystem:     systemManager.GetLawnGridSystem(),
+
+		// 手动创建的系统（不在 SystemManager 中）
+		flagWaveWarningSystem: flagWaveWarningSystem,
+
+		// 其他字段
+		plantCardRenderSystem: plantCardRenderSystem,
+		sunCounterFont:        sunCounterFont,
+		debugFont:             debugFont,
+		background:            background,
+		seedBank:              seedBank,
+		lawnGridEntityID:      lawnGridEntityID,
 	}
 
 	// 初始化场景
@@ -284,8 +262,6 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 
 // setupScene 设置测试场景
 func (vg *VerifyGameplayGame) setupScene() {
-	// Bug Fix: lawnGridEntityID 和 LawnGridComponent 已在 NewVerifyGameplayGame 中创建
-
 	// 创建植物卡片（所有可用植物）
 	vg.createPlantCards()
 
@@ -439,6 +415,7 @@ func (vg *VerifyGameplayGame) clearAllZombies() {
 var zombieSpawnEnabled = false // 默认关闭自动生成
 
 // Update 更新游戏逻辑
+// Story 22.1: 使用 SystemManager.Update() 统一更新所有系统
 func (vg *VerifyGameplayGame) Update() error {
 	dt := 1.0 / 60.0
 
@@ -542,22 +519,12 @@ func (vg *VerifyGameplayGame) Update() error {
 		}
 	}
 
-	// 更新各个系统
-	vg.reanimSystem.Update(dt)
-	vg.behaviorSystem.Update(dt)
-	vg.physicsSystem.Update(dt)
-	vg.lawnmowerSystem.Update(dt)
-	vg.particleSystem.Update(dt)
-	vg.lawnGridSystem.Update(dt)
-	vg.sunCollectionSystem.Update(dt)
-	vg.sunMovementSystem.Update(dt)
-	vg.rewardSystem.Update(dt)
-	vg.flashEffectSystem.Update(dt)
-	vg.plantPreviewSystem.Update(dt)
-	vg.lifetimeSystem.Update(dt) // 处理过期实体（如土豆雷爆炸后）
+	// Story 22.1: 使用 SystemManager 统一更新所有系统
+	// 这确保了所有系统都会被更新，不会遗漏任何系统
+	vg.systemManager.Update(dt)
 
-	// 清理已删除的实体（必须在所有系统更新后调用）
-	vg.entityManager.RemoveMarkedEntities()
+	// 更新手动管理的系统
+	vg.flagWaveWarningSystem.Update(dt)
 
 	// 更新鼠标光标
 	cursorShape := vg.rewardSystem.GetCursorShape()
@@ -862,7 +829,10 @@ func (vg *VerifyGameplayGame) Draw(screen *ebiten.Image) {
 	vg.drawHugeWaveWarning(screen)
 
 	// 绘制植物预览（选择植物后跟随鼠标的预览图像）
-	vg.plantPreviewRenderSystem.Draw(screen, vg.gameState.CameraX)
+	// 使用 SystemManager 提供的 PlantPreviewRenderSystem
+	if plantPreviewRenderSystem := vg.systemManager.GetPlantPreviewRenderSystem(); plantPreviewRenderSystem != nil {
+		plantPreviewRenderSystem.Draw(screen, vg.gameState.CameraX)
+	}
 
 	// 绘制奖励动画
 	vg.rewardSystem.Draw(screen)
@@ -1028,7 +998,7 @@ func main() {
 		log.Fatalf("Failed to create verify game: %v", err)
 	}
 
-	ebiten.SetWindowTitle("统一游戏验证程序")
+	ebiten.SetWindowTitle("统一游戏验证程序 (Story 22.1: SystemManager)")
 	ebiten.SetWindowSize(screenWidth, screenHeight)
 
 	if err := ebiten.RunGame(verifyGame); err != nil {

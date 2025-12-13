@@ -1,0 +1,51 @@
+schema: 1
+story: "22.1"
+story_title: "SystemManager 统一 ECS 系统管理"
+gate: PASS
+status_reason: "实现完整，代码质量高，所有测试通过，文档更新到位。verify_gameplay 成功迁移到 SystemManager，游戏主程序编译正常。"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-12-13T12:00:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 95
+
+expires: "2025-12-27T00:00:00Z"
+
+evidence:
+  tests_reviewed: 4
+  risks_identified: 1
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "无安全相关变更"
+  performance:
+    status: PASS
+    notes: "SystemManager 统一调用不增加额外开销"
+  reliability:
+    status: PASS
+    notes: "所有系统 nil 检查到位，可选系统安全处理"
+  maintainability:
+    status: PASS
+    notes: "代码结构清晰，文档完善，系统创建和更新顺序明确"
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 1, low: 0 }
+  recommendations:
+    must_fix: []
+    monitor:
+      - "GameScene 完全迁移到 SystemManager（延迟到后续 Story）"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "考虑为 SystemManager 添加更完整的集成测试"
+      refs: ["pkg/managers/system_manager_test.go"]
+    - action: "GameScene 逐步迁移到使用 SystemManager"
+      refs: ["pkg/scenes/game_scene.go"]

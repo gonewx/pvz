@@ -22,6 +22,15 @@ import (
 // GameScene represents the main gameplay screen.
 // This is where the actual Plants vs Zombies gameplay will occur.
 // It manages the game state, UI elements, and the ECS system.
+//
+// Architecture Note (Story 22.1):
+// GameScene currently manages ECS systems with distributed fields.
+// For new tools like verify_gameplay, use pkg/managers.SystemManager
+// for unified system creation and updates.
+//
+// Future migration: Consider migrating to SystemManager for system creation
+// while keeping scene-specific control logic (opening animation, sodding,
+// tutorial flow, etc.) in GameScene.
 type GameScene struct {
 	resourceManager *game.ResourceManager
 	sceneManager    *game.SceneManager
@@ -221,6 +230,12 @@ type GameScene struct {
 
 	// 僵尸呻吟音效系统（环境音效，增强游戏氛围）
 	zombieGroanSystem *systems.ZombieGroanSystem
+
+	// Story 8.9: 撑杆僵尸跳跃系统
+	poleVaultSystem *systems.PoleVaultSystem
+
+	// Story 8.9: 减速效果系统
+	slowEffectSystem *systems.SlowEffectSystem
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -641,6 +656,14 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	// 初始化僵尸呻吟音效系统（环境音效）
 	scene.zombieGroanSystem = systems.NewZombieGroanSystem(scene.entityManager, scene.gameState)
 	log.Printf("[GameScene] Initialized zombie groan system")
+
+	// Story 8.9: 初始化撑杆僵尸跳跃系统
+	scene.poleVaultSystem = systems.NewPoleVaultSystem(scene.entityManager)
+	log.Printf("[GameScene] Initialized pole vault system")
+
+	// Story 8.9: 初始化减速效果系统
+	scene.slowEffectSystem = systems.NewSlowEffectSystem(scene.entityManager)
+	log.Printf("[GameScene] Initialized slow effect system")
 
 	// Story 19.5: 根据关卡配置初始化传送带参数
 	if scene.gameState.CurrentLevel != nil && scene.gameState.CurrentLevel.ConveyorBelt != nil {
@@ -1159,12 +1182,24 @@ func (s *GameScene) Update(deltaTime float64) {
 
 	s.sunMovementSystem.Update(deltaTime)   // 4. Move suns (includes collection animation)
 	s.sunCollectionSystem.Update(deltaTime) // 5. Check if collection is complete
-	s.behaviorSystem.Update(deltaTime)      // 6. Update plant behaviors (Story 3.4)
+
+	// Story 8.9: 撑杆僵尸跳跃系统（必须在 BehaviorSystem 之前，检测植物触发跳跃）
+	if s.poleVaultSystem != nil {
+		s.poleVaultSystem.Update(deltaTime) // 5.5. Check pole vault jumps
+	}
+
+	s.behaviorSystem.Update(deltaTime) // 6. Update plant behaviors (Story 3.4)
 	// Story 10.2: Update lawnmower system (除草车系统)
 	if s.lawnmowerSystem != nil {
 		s.lawnmowerSystem.Update(deltaTime) // 6.5. Check lawnmower triggers and move lawnmowers
 	}
 	s.physicsSystem.Update(deltaTime) // 7. Check collisions (Story 4.3)
+
+	// Story 8.9: 减速效果系统（处理冰豌豆减速效果持续时间）
+	if s.slowEffectSystem != nil {
+		s.slowEffectSystem.Update(deltaTime) // 7.5. Update slow effects
+	}
+
 	// Story 6.3: Reanim 动画系统（替代旧的 AnimationSystem）
 	s.reanimSystem.Update(deltaTime) // 8. Update Reanim animation frames
 	// Story 8.3: ReadySetPlant 动画系统（铺草皮完成后播放）
