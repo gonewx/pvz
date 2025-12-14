@@ -190,6 +190,19 @@ type ZombieSpawn struct {
 	Count int    `yaml:"count"` // 生成数量
 }
 
+// LevelConfigExists 检查指定关卡的配置文件是否存在
+// 参数：
+//
+//	levelID - 关卡ID，如 "1-1", "2-5"
+//
+// 返回：
+//
+//	bool - 如果关卡配置文件存在返回 true，否则返回 false
+func LevelConfigExists(levelID string) bool {
+	filepath := fmt.Sprintf("data/levels/level-%s.yaml", levelID)
+	return embedded.Exists(filepath)
+}
+
 // LoadLevelConfig 从YAML文件加载关卡配置
 // 参数：
 //

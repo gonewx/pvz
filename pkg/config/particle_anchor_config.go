@@ -87,7 +87,7 @@ var ParticleAnchorOffsets = map[string]ParticleAnchorOffset{
 	//   - OffsetY = +50.0（向下移动到根部）
 	"Planting": {
 		OffsetX: 0,
-		OffsetY: 30.0, // CellHeight / 2，从格子中心移动到底部（根部）
+		OffsetY: 40.0, // CellHeight / 2，从格子中心移动到底部（根部）
 		Comment: "土粒从植物根部（格子底部）飞溅",
 	},
 

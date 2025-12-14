@@ -279,8 +279,9 @@ const (
 	ZombieEatParticleOffsetX = -30.0
 
 	// ZombieEatParticleOffsetY 僵尸啃食粒子效果 Y 偏移量
-	// 嘴巴位置相对于僵尸中心略微偏上（头部位置）
-	ZombieEatParticleOffsetY = -20.0
+	// 僵尸 pos.Y 指向脚底位置，嘴巴位置在脚底上方约 80 像素（头部位置）
+	// 负值表示向上偏移
+	ZombieEatParticleOffsetY = -80.0
 )
 
 // Potato Mine Configuration (土豆雷配置)
