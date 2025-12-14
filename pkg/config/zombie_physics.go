@@ -17,10 +17,41 @@ type ZombiePhysicsConfig struct {
 	// SpawnX 出生点X坐标配置
 	SpawnX SpawnXConfig `yaml:"spawnX"`
 
+	// SpawnDispersion 僵尸出场分散配置
+	SpawnDispersion SpawnDispersionConfig `yaml:"spawnDispersion"`
+
 	// DefeatBoundary 进家判定X坐标映射表
 	// key: 僵尸类型字符串 (如 "basic", "polevaulter", "gargantuar")
 	// value: 相对于网格原点的X偏移量（负值表示在网格左侧）
 	DefeatBoundary map[string]float64 `yaml:"defeatBoundary"`
+}
+
+// SpawnDispersionConfig 僵尸出场分散配置
+//
+// 用于避免同一波次僵尸扎堆，实现视觉上的杂乱效果
+type SpawnDispersionConfig struct {
+	// Enabled 启用分散机制
+	Enabled bool `yaml:"enabled"`
+
+	// ===== 同行时间分散（核心：避免同行僵尸重叠）=====
+
+	// SameRowDelayStep 同行僵尸激活间隔基础值（秒）
+	// 同一行的第N个僵尸延迟 = 基础延迟 + (N-1) * SameRowDelayStep
+	SameRowDelayStep float64 `yaml:"sameRowDelayStep"`
+
+	// SameRowDelayJitter 同行延迟随机抖动（秒）
+	// 在累加延迟上再加 [0, jitter] 的随机值
+	SameRowDelayJitter float64 `yaml:"sameRowDelayJitter"`
+
+	// ===== 跨行空间错开（辅助：避免列对齐感）=====
+
+	// RowOffsetBase 跨行错开基础偏移（像素）
+	// 每行的基础 X 偏移 = (行号 % 3) * RowOffsetBase（交错模式）
+	RowOffsetBase float64 `yaml:"rowOffsetBase"`
+
+	// RowOffsetJitter 跨行错开随机抖动范围（像素）
+	// 在基础偏移上再加 [-jitter, +jitter] 的随机值
+	RowOffsetJitter float64 `yaml:"rowOffsetJitter"`
 }
 
 // SpawnXConfig 出生点X坐标配置

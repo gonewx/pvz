@@ -22,6 +22,74 @@ var zombiePointCost = map[string]int{
 	"polevaulter": 2, // 撑杆僵尸
 }
 
+// WaveDispersionAllocator 波次分散分配器
+//
+// 用于跟踪同一波次中每行已分配的僵尸数量，
+// 以便计算分散的激活延迟和X坐标偏移
+type WaveDispersionAllocator struct {
+	// rowZombieCount 每行已分配的僵尸数量 (key: row 0-4)
+	rowZombieCount map[int]int
+
+	// dispersionConfig 分散配置
+	dispersionConfig *config.SpawnDispersionConfig
+}
+
+// NewWaveDispersionAllocator 创建波次分散分配器
+func NewWaveDispersionAllocator(dispersionConfig *config.SpawnDispersionConfig) *WaveDispersionAllocator {
+	return &WaveDispersionAllocator{
+		rowZombieCount:   make(map[int]int),
+		dispersionConfig: dispersionConfig,
+	}
+}
+
+// Reset 重置分配器（每波开始时调用）
+func (a *WaveDispersionAllocator) Reset() {
+	a.rowZombieCount = make(map[int]int)
+}
+
+// AllocateZombie 为指定行分配一个僵尸，返回该僵尸的激活延迟和X偏移
+//
+// 参数:
+//   - row: 行号（0-4）
+//
+// 返回:
+//   - activationDelay: 激活延迟（秒）
+//   - xOffset: X坐标偏移（像素，网格相对坐标）
+func (a *WaveDispersionAllocator) AllocateZombie(row int) (activationDelay float64, xOffset float64) {
+	// 获取该行当前已分配的僵尸数量
+	countInRow := a.rowZombieCount[row]
+
+	// 计算激活延迟：基础延迟 + 同行累加延迟 + 随机抖动
+	baseDelay := config.ZombieActivationDelayMin
+	if a.dispersionConfig != nil && a.dispersionConfig.Enabled {
+		// 同行第N个僵尸的额外延迟 = (N-1) * step + random(0, jitter)
+		sameRowDelay := float64(countInRow) * a.dispersionConfig.SameRowDelayStep
+		jitter := rand.Float64() * a.dispersionConfig.SameRowDelayJitter
+		activationDelay = baseDelay + sameRowDelay + jitter
+	} else {
+		// 未启用分散时，使用原来的随机延迟
+		activationDelay = baseDelay + rand.Float64()*(config.ZombieActivationDelayMax-config.ZombieActivationDelayMin)
+	}
+
+	// 计算X坐标偏移：行交错偏移 + 随机抖动
+	if a.dispersionConfig != nil && a.dispersionConfig.Enabled {
+		// 使用交错模式：行0、3用偏移0，行1、4用偏移1，行2用偏移2
+		rowPattern := row % 3
+		baseOffset := float64(rowPattern) * a.dispersionConfig.RowOffsetBase
+		// 随机抖动 [-jitter, +jitter]
+		jitter := (rand.Float64()*2 - 1) * a.dispersionConfig.RowOffsetJitter
+		xOffset = baseOffset + jitter
+	}
+
+	// 增加该行的僵尸计数
+	a.rowZombieCount[row]++
+
+	log.Printf("[WaveDispersionAllocator] Row %d: zombie #%d, delay=%.2fs, xOffset=%.1f",
+		row, countInRow+1, activationDelay, xOffset)
+
+	return activationDelay, xOffset
+}
+
 // WaveSpawnSystem 波次生成系统
 //
 // 职责：
@@ -32,6 +100,7 @@ var zombiePointCost = map[string]int{
 //   - Story 17.3: 验证僵尸生成是否符合限制规则
 //   - Story 17.9: 使用精确的僵尸出生坐标
 //   - Story 8.9: 支持 ExtraPoints 波次类型的动态僵尸分配
+//   - 僵尸出场分散：同行时间错开 + 跨行空间错开
 //
 // 架构说明：
 //   - 作为 LevelSystem 的依赖，由 LevelSystem 调用
@@ -42,14 +111,15 @@ var zombiePointCost = map[string]int{
 //  1. PreSpawnAllWaves() 在关卡开始时调用，预生成所有僵尸
 //  2. ActivateWave(waveIndex) 在波次时间到达时调用，激活指定波次的僵尸
 type WaveSpawnSystem struct {
-	entityManager   *ecs.EntityManager
-	resourceManager *game.ResourceManager
-	levelConfig     *config.LevelConfig         // 关卡配置（用于验证行数限制）
-	gameState       *game.GameState             // 用于更新僵尸生成计数
-	spawnRules      *config.SpawnRulesConfig    // Story 17.3: 僵尸生成规则配置
-	constraintID    ecs.EntityID                // Story 17.3: 生成限制组件实体ID
-	laneAllocator   *LaneAllocator              // Story 17.4: 行分配器系统
-	zombiePhysics   *config.ZombiePhysicsConfig // Story 17.9: 僵尸物理配置（出生点、进家边界）
+	entityManager        *ecs.EntityManager
+	resourceManager      *game.ResourceManager
+	levelConfig          *config.LevelConfig         // 关卡配置（用于验证行数限制）
+	gameState            *game.GameState             // 用于更新僵尸生成计数
+	spawnRules           *config.SpawnRulesConfig    // Story 17.3: 僵尸生成规则配置
+	constraintID         ecs.EntityID                // Story 17.3: 生成限制组件实体ID
+	laneAllocator        *LaneAllocator              // Story 17.4: 行分配器系统
+	zombiePhysics        *config.ZombiePhysicsConfig // Story 17.9: 僵尸物理配置（出生点、进家边界）
+	dispersionAllocator  *WaveDispersionAllocator    // 僵尸出场分散分配器
 }
 
 // NewWaveSpawnSystem 创建波次生成系统
@@ -87,6 +157,13 @@ func NewWaveSpawnSystem(em *ecs.EntityManager, rm *game.ResourceManager, lc *con
 		rowMax = lc.RowMax
 	}
 	sys.laneAllocator.InitializeLanes(rowMax, 1.0)
+
+	// 初始化分散分配器
+	var dispersionConfig *config.SpawnDispersionConfig
+	if zp != nil {
+		dispersionConfig = &zp.SpawnDispersion
+	}
+	sys.dispersionAllocator = NewWaveDispersionAllocator(dispersionConfig)
 
 	return sys
 }
@@ -211,6 +288,9 @@ func (s *WaveSpawnSystem) PreSpawnAllWaves() int {
 
 	// 遍历所有波次
 	for waveIndex, waveConfig := range s.levelConfig.Waves {
+		// 每波开始时重置分散分配器（用于计算同行僵尸的时间错开和空间错开）
+		s.dispersionAllocator.Reset()
+
 		// Story 17.3: 更新限制组件的当前波次编号
 		if s.spawnRules != nil && s.constraintID != 0 {
 			if constraint, ok := ecs.GetComponent[*components.SpawnConstraintComponent](s.entityManager, s.constraintID); ok {
@@ -433,6 +513,9 @@ func (s *WaveSpawnSystem) SpawnWaveRealtime(waveIndex int) int {
 	waveConfig := s.levelConfig.Waves[waveIndex]
 	totalSpawned := 0
 
+	// 每波开始时重置分散分配器（用于计算同行僵尸的时间错开和空间错开）
+	s.dispersionAllocator.Reset()
+
 	// Story 17.3: 更新限制组件的当前波次编号
 	if s.spawnRules != nil && s.constraintID != 0 {
 		if constraint, ok := ecs.GetComponent[*components.SpawnConstraintComponent](s.entityManager, s.constraintID); ok {
@@ -553,14 +636,18 @@ func (s *WaveSpawnSystem) spawnAndActivateZombie(zombieType string, lane int, wa
 		row = 4
 	}
 
+	// 使用分散分配器计算X偏移（实时模式不使用延迟，但仍需空间错开）
+	_, xOffset := s.dispersionAllocator.AllocateZombie(row)
+
 	// Story 17.9: 判断是否为旗帜波
 	isFlagWave := false
 	if s.levelConfig != nil && waveIndex >= 0 && waveIndex < len(s.levelConfig.Waves) {
 		isFlagWave = s.levelConfig.Waves[waveIndex].IsFlag
 	}
 
-	// Story 17.9: 计算生成位置
-	spawnX := s.getZombieSpawnXForWave(zombieType, isFlagWave, false)
+	// Story 17.9: 计算生成位置 + 分散偏移
+	baseSpawnX := s.getZombieSpawnXForWave(zombieType, isFlagWave, false)
+	spawnX := baseSpawnX + xOffset // 应用跨行空间错开
 	spawnY := s.getZombieSpawnY(row)
 
 	// 根据类型创建僵尸
@@ -690,6 +777,19 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 		isFlagWave = s.levelConfig.Waves[waveIndex].IsFlag
 	}
 
+	// 转换 lane (1-5) 为 row (0-4) 用于分散分配
+	targetRow := lane - 1
+	if targetRow < 0 {
+		targetRow = 0
+	}
+	if targetRow > 4 {
+		targetRow = 4
+	}
+
+	// 使用分散分配器计算激活延迟和X偏移
+	// 确保同行僵尸有时间间隔，不同行有空间错开
+	activationDelay, xOffset := s.dispersionAllocator.AllocateZombie(targetRow)
+
 	// 开场预览期间，僵尸随机分布在5行上
 	// 激活后，僵尸会移动到随机选择的有效行
 
@@ -697,8 +797,9 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 	previewRow := rand.Intn(5)
 
 	// Story 17.9: 计算预览位置（僵尸初始站位）
-	// X坐标：根据波次类型和僵尸类型使用精确坐标
-	spawnX := s.getZombieSpawnXForWave(zombieType, isFlagWave, false)
+	// X坐标：根据波次类型和僵尸类型使用精确坐标 + 分散偏移
+	baseSpawnX := s.getZombieSpawnXForWave(zombieType, isFlagWave, false)
+	spawnX := baseSpawnX + xOffset // 应用跨行空间错开
 	spawnY := s.getZombieSpawnY(previewRow) // 使用随机行的Y坐标
 
 	// 根据类型创建僵尸
@@ -746,10 +847,7 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 	}
 
 	// 添加波次状态组件（标记为待命状态）
-	// 为每个僵尸分配随机激活延迟，实现散落入场效果
-	activationDelay := config.ZombieActivationDelayMin +
-		rand.Float64()*(config.ZombieActivationDelayMax-config.ZombieActivationDelayMin)
-
+	// 使用分散分配器计算的激活延迟，实现同行僵尸时间错开效果
 	ecs.AddComponent(s.entityManager, entityID, &components.ZombieWaveStateComponent{
 		WaveIndex:           waveIndex,
 		IsActivated:         false, // 初始状态：待命

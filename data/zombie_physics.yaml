@@ -12,14 +12,14 @@
 
 # 出生点X坐标配置 (相对于网格原点的X偏移)
 spawnX:
-  # 普通波: 僵尸出生在 780~819 范围内随机
+  # 普通波: 僵尸出生在 750~850 范围内随机（扩大范围以容纳分散）
   normal:
-    min: 780
-    max: 819
-  # 旗帜波: 僵尸出生在 820~859 范围内随机
+    min: 750
+    max: 850
+  # 旗帜波: 僵尸出生在 800~900 范围内随机（扩大范围）
   flagWave:
-    min: 820
-    max: 859
+    min: 800
+    max: 900
   # 旗帜僵尸: 固定位置 800
   flagZombie: 800
   # 冰车 (Zomboni): 800~809 范围
@@ -30,6 +30,30 @@ spawnX:
   gargantuar:
     min: 845
     max: 854
+
+# 僵尸出场分散配置
+# 用于避免同一波次僵尸扎堆，实现视觉上的杂乱效果
+spawnDispersion:
+  # 启用分散机制
+  enabled: true
+
+  # ===== 同行时间分散（核心：避免同行僵尸重叠）=====
+  # 同行僵尸激活间隔基础值（秒）
+  # 同一行的第N个僵尸延迟 = 基础延迟 + (N-1) * sameRowDelayStep
+  sameRowDelayStep: 0.8
+
+  # 同行延迟随机抖动（秒）
+  # 在累加延迟上再加 [0, jitter] 的随机值
+  sameRowDelayJitter: 0.3
+
+  # ===== 跨行空间错开（辅助：避免列对齐感）=====
+  # 跨行错开基础偏移（像素）
+  # 每行的基础 X 偏移 = (行号 % 3) * rowOffsetBase（交错模式）
+  rowOffsetBase: 30
+
+  # 跨行错开随机抖动范围（像素）
+  # 在基础偏移上再加 [-jitter, +jitter] 的随机值
+  rowOffsetJitter: 20
 
 # 进家判定X坐标 (相对于网格原点, 负值表示在网格左侧)
 # 当僵尸X坐标 <= GridWorldStartX + defeatBoundary 时判定为进家
