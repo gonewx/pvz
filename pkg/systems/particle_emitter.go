@@ -667,17 +667,25 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 
 	// Load particle image from ResourceManager (Story 7.4 修复)
 	// config.Image 包含资源 ID（如 "IMAGE_ZOMBIEARM"）
+	// 支持图片覆盖：如果 emitter.ImageOverride 非空，使用它代替 config.Image
 	var particleImage *ebiten.Image
 	imageFrames := 1 // 默认单帧
 	imageRows := 1   // 默认单行
 	frameNum := 0    // 默认第 0 帧
 
-	if config.Image != "" && ps.ResourceManager != nil {
-		img, err := ps.ResourceManager.LoadImageByID(config.Image)
+	// 确定要使用的图片资源 ID
+	imageID := config.Image
+	if emitter.ImageOverride != "" {
+		imageID = emitter.ImageOverride
+		log.Printf("[ParticleSystem] 使用图片覆盖: %s -> %s", config.Image, imageID)
+	}
+
+	if imageID != "" && ps.ResourceManager != nil {
+		img, err := ps.ResourceManager.LoadImageByID(imageID)
 		if err != nil {
 			// 图片加载失败，记录错误但不阻塞粒子生成
 			// 粒子会创建但不渲染（因为 Image == nil）
-			log.Printf("[ParticleSystem] 警告：无法加载粒子图片 '%s': %v", config.Image, err)
+			log.Printf("[ParticleSystem] 警告：无法加载粒子图片 '%s': %v", imageID, err)
 		} else {
 			particleImage = img
 
@@ -698,7 +706,7 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 			// BUG修复：从资源配置读取精灵图的 rows 信息
 			// 例如：IMAGE_DIRTSMALL 配置为 cols=8, rows=2
 			// 这样才能正确渲染 40x40 的土粒，而不是拉伸为 40x80
-			if cols, rows, ok := ps.ResourceManager.GetImageMetadata(config.Image); ok {
+			if cols, rows, ok := ps.ResourceManager.GetImageMetadata(imageID); ok {
 				if rows > 0 {
 					imageRows = rows
 				}

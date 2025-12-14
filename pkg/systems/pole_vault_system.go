@@ -127,6 +127,7 @@ func (s *PoleVaultSystem) startJump(zombieID ecs.EntityID, poleVault *components
 	// 设置跳跃状态
 	poleVault.IsJumping = true
 	poleVault.TargetPlantEntityID = uint64(plantID)
+	poleVault.JumpElapsedTime = 0 // 重置跳跃计时
 
 	// 播放跳跃动画组合（使用 ComboName 以应用 loop: false 设置）
 	ecs.AddComponent(s.entityManager, zombieID, &components.AnimationCommandComponent{
@@ -140,6 +141,9 @@ func (s *PoleVaultSystem) startJump(zombieID ecs.EntityID, poleVault *components
 // 跳跃期间位置保持不变，动画内部的 body1 位移制造跳跃视觉效果
 // 动画结束后需要补偿位移，保持视觉连续
 func (s *PoleVaultSystem) updateJumping(zombieID ecs.EntityID, poleVault *components.PoleVaultComponent, deltaTime float64) {
+	// 更新跳跃已过时间
+	poleVault.JumpElapsedTime += deltaTime
+
 	// 获取 Reanim 组件，检测动画是否播放完成
 	reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, zombieID)
 	if !ok {

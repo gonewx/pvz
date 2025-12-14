@@ -62,13 +62,28 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 		}
 
 		// 触发僵尸头部掉落粒子效果
-		_, err := entities.CreateParticleEffect(
-			s.entityManager,
-			s.resourceManager,
-			"ZombieHead", // 粒子效果名称（不带.xml后缀）
-			position.X, position.Y,
-			angleOffset, // 传递角度偏移
-		)
+		// 根据僵尸类型选择正确的头部图片
+		var err error
+		if behavior.UnitID == types.UnitIDZombiePolevaulter {
+			// 撑杆僵尸使用专用头部图片
+			_, err = entities.CreateParticleEffectWithImage(
+				s.entityManager,
+				s.resourceManager,
+				"ZombieHead", // 复用 ZombieHead 粒子配置
+				position.X, position.Y,
+				"IMAGE_ZOMBIEPOLEVAULTERHEAD", // 使用撑杆僵尸专用头部图片
+				angleOffset,
+			)
+		} else {
+			// 其他僵尸使用默认头部图片
+			_, err = entities.CreateParticleEffect(
+				s.entityManager,
+				s.resourceManager,
+				"ZombieHead", // 粒子效果名称（不带.xml后缀）
+				position.X, position.Y,
+				angleOffset, // 传递角度偏移
+			)
+		}
 		if err != nil {
 			log.Printf("[BehaviorSystem] 警告：创建僵尸头部掉落粒子效果失败: %v", err)
 			// 不阻塞游戏逻辑，游戏继续运行
@@ -320,11 +335,19 @@ func (s *BehaviorSystem) updateZombieDamageState(entityID ecs.EntityID, health *
 
 		// 隐藏手臂轨道（手臂掉落效果）
 		// 直接修改 HiddenTracks 字段而不调用废弃的 HideTrack API
+		// 根据僵尸类型选择正确的轨道名称
 		if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
 			if reanim.HiddenTracks == nil {
 				reanim.HiddenTracks = make(map[string]bool)
 			}
-			armTracks := []string{"Zombie_outerarm_hand", "Zombie_outerarm_upper", "Zombie_outerarm_lower"}
+			var armTracks []string
+			if hasBehavior && behavior.UnitID == types.UnitIDZombiePolevaulter {
+				// 撑杆僵尸使用专用轨道名
+				armTracks = []string{"Zombie_outerarm_hand", "Zombie_polevaulter_outerarm_upper", "Zombie_polevaulter_outerarm_lower"}
+			} else {
+				// 普通僵尸使用默认轨道名
+				armTracks = []string{"Zombie_outerarm_hand", "Zombie_outerarm_upper", "Zombie_outerarm_lower"}
+			}
 			for _, trackName := range armTracks {
 				reanim.HiddenTracks[trackName] = true
 			}
@@ -372,13 +395,28 @@ func (s *BehaviorSystem) updateZombieDamageState(entityID ecs.EntityID, health *
 		}
 
 		// 触发僵尸手臂掉落粒子效果
-		_, err := entities.CreateParticleEffect(
-			s.entityManager,
-			s.resourceManager,
-			"ZombieArm", // 粒子效果名称（不带.xml后缀）
-			position.X, position.Y,
-			angleOffset, // 角度偏移
-		)
+		// 根据僵尸类型选择正确的手臂图片
+		var err error
+		if hasBehavior && behavior.UnitID == types.UnitIDZombiePolevaulter {
+			// 撑杆僵尸只显示手的掉落（因为胳膊部分与普通僵尸不同）
+			_, err = entities.CreateParticleEffectWithImage(
+				s.entityManager,
+				s.resourceManager,
+				"ZombieArm", // 复用 ZombieArm 粒子配置
+				position.X, position.Y,
+				"IMAGE_REANIM_ZOMBIE_OUTERARM_HAND", // 只显示手
+				angleOffset,
+			)
+		} else {
+			// 其他僵尸使用完整的手臂+手图片
+			_, err = entities.CreateParticleEffect(
+				s.entityManager,
+				s.resourceManager,
+				"ZombieArm", // 粒子效果名称（不带.xml后缀）
+				position.X, position.Y,
+				angleOffset, // 角度偏移
+			)
+		}
 		if err != nil {
 			log.Printf("[BehaviorSystem] 警告：创建僵尸手臂掉落粒子效果失败: %v", err)
 		} else {

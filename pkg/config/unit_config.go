@@ -112,6 +112,20 @@ const (
 	// - 补偿量 = jump结束时body1.X - walk开始时body1.X = -109.2 - 40.1 = -149.3
 	// 负值表示向左移动
 	PolevaulterZombieJumpDistance = -149.3
+
+	// PolevaulterZombieAirborneStartTime 撑杆僵尸腾空阶段开始时间（秒）
+	// 从跳跃开始计算，在此时间之前的起跳阶段可被子弹击中
+	// 基于动画分析：帧 75 开始腾空（body1.X 变负）
+	// 约为跳跃开始后 2.0 秒（25帧/12FPS ≈ 2.08秒）
+	// 考虑到动画可能有速度调整，设为 1.0 秒以确保起跳时能被击中
+	PolevaulterZombieAirborneStartTime = 1.0
+
+	// PolevaulterZombieAirborneEndTime 撑杆僵尸腾空阶段结束时间（秒）
+	// 从跳跃开始计算，在此时间之后的落地阶段可被子弹击中
+	// 基于动画分析：帧 92 结束腾空（body1.X 回正）
+	// 约为跳跃开始后 3.5 秒（42帧/12FPS ≈ 3.5秒）
+	// 考虑到动画可能有速度调整，设为 2.5 秒以确保落地时能被击中
+	PolevaulterZombieAirborneEndTime = 2.5
 )
 
 // Projectile Configuration (子弹配置)

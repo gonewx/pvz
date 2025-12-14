@@ -94,3 +94,16 @@ animation_combos:
           - anim_death
       loop: false
       binding_strategy: auto
+      hidden_tracks:
+          - Zombie_polevaulter_pole
+          - Zombie_polevaulter_pole2
+
+    - name: death2
+      display_name: 死亡2
+      animations:
+          - anim_death
+      loop: false
+      binding_strategy: auto
+      hidden_tracks:
+          - Zombie_polevaulter_pole
+          - Zombie_polevaulter_pole2

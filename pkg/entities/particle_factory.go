@@ -423,3 +423,166 @@ func CreateParticleEffectWithColor(em *ecs.EntityManager, rm *game.ResourceManag
 
 	return firstEmitterID, nil
 }
+
+// CreateParticleEffectWithImage creates a particle emitter with custom image override.
+// This allows reusing a particle configuration but with a different image.
+//
+// Parameters:
+//   - em: EntityManager instance for creating entities
+//   - rm: ResourceManager instance for loading particle configurations
+//   - effectName: Name of the particle effect (e.g., "ZombieHead")
+//   - worldX, worldY: World coordinates where the emitter should be positioned
+//   - imageOverride: Resource ID to use instead of the config's Image (e.g., "IMAGE_ZOMBIEPOLEVAULTERHEAD")
+//   - angleOffset: Optional angle offset for launch direction (e.g., 180.0 to flip)
+//
+// Returns:
+//   - ecs.EntityID: The ID of the first emitter entity
+//   - error: Error if loading configuration fails
+//
+// Example:
+//
+//	// Pole Vaulter zombie head drop: reuse ZombieHead config with different image
+//	emitterID, err := CreateParticleEffectWithImage(em, rm, "ZombieHead", x, y, "IMAGE_ZOMBIEPOLEVAULTERHEAD", 180.0)
+func CreateParticleEffectWithImage(em *ecs.EntityManager, rm *game.ResourceManager, effectName string, worldX, worldY float64, imageOverride string, angleOffset float64) (ecs.EntityID, error) {
+	log.Printf("[ParticleFactory] CreateParticleEffectWithImage 被调用: effectName='%s', 位置=(%.1f, %.1f), imageOverride='%s', angleOffset=%.1f°",
+		effectName, worldX, worldY, imageOverride, angleOffset)
+
+	// Load particle configuration from ResourceManager
+	particleConfig, err := rm.LoadParticleConfig(effectName)
+	if err != nil {
+		log.Printf("[ParticleFactory] 加载粒子配置失败: %v", err)
+		return 0, fmt.Errorf("failed to load particle config '%s': %w", effectName, err)
+	}
+
+	// Validate that configuration has at least one emitter
+	if len(particleConfig.Emitters) == 0 {
+		log.Printf("[ParticleFactory] 粒子配置没有发射器")
+		return 0, fmt.Errorf("particle config '%s' has no emitters", effectName)
+	}
+
+	log.Printf("[ParticleFactory] 粒子配置加载成功（图片覆盖）: %d 个发射器", len(particleConfig.Emitters))
+
+	// 粒子效果作为整体管理
+	sharedPosition := &components.PositionComponent{
+		X: worldX,
+		Y: worldY,
+	}
+
+	var firstEmitterID ecs.EntityID
+
+	for i, emitterConfig := range particleConfig.Emitters {
+		emitterID := em.CreateEntity()
+		if i == 0 {
+			firstEmitterID = emitterID
+		}
+
+		em.AddComponent(emitterID, sharedPosition)
+
+		// Parse emitter parameters
+		spawnRateMin, spawnRateMax, spawnRateKeyframes, spawnRateInterp := particle.ParseValue(emitterConfig.SpawnRate)
+		spawnRate := particle.RandomInRange(spawnRateMin, spawnRateMax)
+
+		spawnMinActiveVal, _, spawnMinActiveKeyframes, spawnMinActiveInterp := particle.ParseValue(emitterConfig.SpawnMinActive)
+		spawnMaxActiveVal, _, spawnMaxActiveKeyframes, spawnMaxActiveInterp := particle.ParseValue(emitterConfig.SpawnMaxActive)
+		spawnMaxLaunchedVal, _, spawnMaxLaunchedKeyframes, spawnMaxLaunchedInterp := particle.ParseValue(emitterConfig.SpawnMaxLaunched)
+
+		emitterBoxXMin, emitterBoxXMax, emitterBoxXMinKf, emitterBoxXWidthKf, emitterBoxXInterp := particle.ParseRangeValue(emitterConfig.EmitterBoxX)
+		emitterBoxYMin, emitterBoxYMax, emitterBoxYMinKf, emitterBoxYWidthKf, emitterBoxYInterp := particle.ParseRangeValue(emitterConfig.EmitterBoxY)
+
+		emitterRadiusMin, emitterRadiusMax, _, _ := particle.ParseValue(emitterConfig.EmitterRadius)
+
+		emitterOffsetXMin, emitterOffsetXMax, _, _ := particle.ParseValue(emitterConfig.EmitterOffsetX)
+		emitterOffsetYMin, emitterOffsetYMax, _, _ := particle.ParseValue(emitterConfig.EmitterOffsetY)
+
+		systemDurationMin, systemDurationMax, _, _ := particle.ParseValue(emitterConfig.SystemDuration)
+		systemDuration := particle.RandomInRange(systemDurationMin, systemDurationMax) / 100.0
+
+		systemLoops := emitterConfig.SystemLoops == "1"
+		particleLoops := emitterConfig.ParticleLoops == "1"
+
+		_, _, systemAlphaKeyframes, systemAlphaInterp := particle.ParseValue(emitterConfig.SystemAlpha)
+
+		var systemPosXKeyframes, systemPosYKeyframes []particle.Keyframe
+		var systemPosXInterp, systemPosYInterp string
+
+		for _, field := range emitterConfig.SystemFields {
+			if field.FieldType == "SystemPosition" {
+				_, _, systemPosXKeyframes, systemPosXInterp = particle.ParseValue(field.X)
+				_, _, systemPosYKeyframes, systemPosYInterp = particle.ParseValue(field.Y)
+				break
+			}
+		}
+
+		// Create EmitterComponent with image override enabled
+		emitterComp := &components.EmitterComponent{
+			Config:          &emitterConfig,
+			Active:          true,
+			Age:             0,
+			SystemDuration:  systemDuration,
+			SystemLoops:     systemLoops,
+			ParticleLoops:   particleLoops,
+			NextSpawnTime:   0,
+			ActiveParticles: make([]ecs.EntityID, 0),
+			TotalLaunched:   0,
+			SpawnRate:       spawnRate,
+
+			SpawnRateKeyframes: spawnRateKeyframes,
+			SpawnRateInterp:    spawnRateInterp,
+
+			SpawnMinActive:            int(spawnMinActiveVal),
+			SpawnMinActiveKeyframes:   spawnMinActiveKeyframes,
+			SpawnMinActiveInterp:      spawnMinActiveInterp,
+			SpawnMaxActive:            int(spawnMaxActiveVal),
+			SpawnMaxActiveKeyframes:   spawnMaxActiveKeyframes,
+			SpawnMaxActiveInterp:      spawnMaxActiveInterp,
+			SpawnMaxLaunched:          int(spawnMaxLaunchedVal),
+			SpawnMaxLaunchedKeyframes: spawnMaxLaunchedKeyframes,
+			SpawnMaxLaunchedInterp:    spawnMaxLaunchedInterp,
+
+			EmitterBoxX:    emitterBoxXMax - emitterBoxXMin,
+			EmitterBoxY:    emitterBoxYMax - emitterBoxYMin,
+			EmitterBoxXMin: emitterBoxXMin,
+			EmitterBoxYMin: emitterBoxYMin,
+
+			EmitterRadius:    emitterRadiusMin,
+			EmitterRadiusMin: emitterRadiusMin,
+			EmitterRadiusMax: emitterRadiusMax,
+
+			EmitterBoxXKeyframes:    emitterBoxXWidthKf,
+			EmitterBoxXInterp:       emitterBoxXInterp,
+			EmitterBoxYKeyframes:    emitterBoxYWidthKf,
+			EmitterBoxYInterp:       emitterBoxYInterp,
+			EmitterBoxXMinKeyframes: emitterBoxXMinKf,
+			EmitterBoxYMinKeyframes: emitterBoxYMinKf,
+
+			EmitterOffsetX:    emitterOffsetXMin,
+			EmitterOffsetY:    emitterOffsetYMin,
+			EmitterOffsetXMin: emitterOffsetXMin,
+			EmitterOffsetXMax: emitterOffsetXMax,
+			EmitterOffsetYMin: emitterOffsetYMin,
+			EmitterOffsetYMax: emitterOffsetYMax,
+
+			SystemAlphaKeyframes: systemAlphaKeyframes,
+			SystemAlphaInterp:    systemAlphaInterp,
+
+			SystemPositionXKeyframes: systemPosXKeyframes,
+			SystemPositionXInterp:    systemPosXInterp,
+			SystemPositionYKeyframes: systemPosYKeyframes,
+			SystemPositionYInterp:    systemPosYInterp,
+
+			InitialX: worldX,
+			InitialY: worldY,
+
+			AngleOffset: angleOffset,
+
+			// 图片覆盖设置
+			ImageOverride: imageOverride,
+		}
+		em.AddComponent(emitterID, emitterComp)
+
+		log.Printf("[ParticleFactory] 发射器实体创建成功（图片覆盖）: ID=%d, Name='%s', ImageOverride='%s'",
+			emitterID, emitterConfig.Name, imageOverride)
+	}
+
+	return firstEmitterID, nil
+}

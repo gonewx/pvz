@@ -127,4 +127,8 @@ type EmitterComponent struct {
 	ColorOverrideR       float64 // 红色通道覆盖值（0-1）
 	ColorOverrideG       float64 // 绿色通道覆盖值（0-1）
 	ColorOverrideB       float64 // 蓝色通道覆盖值（0-1）
+
+	// 图片覆盖（用于复用粒子配置但使用不同图片）
+	// 例如：撑杆僵尸掉头效果复用 ZombieHead 配置，但使用 IMAGE_ZOMBIEPOLEVAULTERHEAD 图片
+	ImageOverride string // 如果非空，使用此资源 ID 代替配置中的 Image
 }

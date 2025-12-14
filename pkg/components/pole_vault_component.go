@@ -27,4 +27,10 @@ type PoleVaultComponent struct {
 	// NeedPositionCompensation 是否需要应用位移补偿
 	// 跳跃完成后设为 true，延迟一帧应用，避免动画切换时的视觉跳变
 	NeedPositionCompensation bool
+
+	// JumpElapsedTime 跳跃已过时间（秒）
+	// 用于判断当前是否在腾空阶段
+	// 起跳阶段（0-0.5秒）和落地阶段（2.5秒后）可被子弹击中
+	// 腾空阶段（0.5-2.5秒）免疫子弹
+	JumpElapsedTime float64
 }
