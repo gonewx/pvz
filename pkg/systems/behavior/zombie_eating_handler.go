@@ -8,6 +8,7 @@ import (
 	"github.com/gonewx/pvz/pkg/ecs"
 	"github.com/gonewx/pvz/pkg/entities"
 	"github.com/gonewx/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/systems"
 )
 
 // startEatingPlant 开始啃食植物
@@ -36,7 +37,6 @@ func (s *BehaviorSystem) startEatingPlant(zombieID, plantID ecs.EntityID) {
 	if !ok {
 		return
 	}
-	originalZombieType := behavior.Type // 记住原始类型
 
 	// 4. 切换 BehaviorComponent.Type 为 BehaviorZombieEating
 	behavior.Type = components.BehaviorZombieEating
@@ -46,40 +46,6 @@ func (s *BehaviorSystem) startEatingPlant(zombieID, plantID ecs.EntityID) {
 
 	// 切换僵尸动画为啃食状态
 	s.changeZombieAnimation(zombieID, components.ZombieAnimEating)
-
-	// 待迁移到 ReanimComponent
-	// 5. 根据原始僵尸类型加载对应的啃食动画
-	// var eatFrames []*ebiten.Image
-
-	_ = originalZombieType // 临时避免未使用警告
-	/*
-		switch originalZombieType {
-		case components.BehaviorZombieConehead:
-			// 路障僵尸啃食动画
-			eatFrames, _ = utils.LoadConeheadZombieEatAnimation(s.resourceManager)
-			log.Printf("[BehaviorSystem] 路障僵尸 %d 开始啃食，使用路障僵尸啃食动画", zombieID)
-		case components.BehaviorZombieBuckethead:
-			// 铁桶僵尸啃食动画
-			eatFrames, _ = utils.LoadBucketheadZombieEatAnimation(s.resourceManager)
-			log.Printf("[BehaviorSystem] 铁桶僵尸 %d 开始啃食，使用铁桶僵尸啃食动画", zombieID)
-		default:
-			// 普通僵尸或其他类型
-			eatFrames = utils.LoadZombieEatAnimation(s.resourceManager)
-		}
-
-		// 待迁移到 ReanimComponent
-		// 6. 替换 AnimationComponent 为啃食动画
-		// animComp, ok := s.entityManager.GetComponent(zombieID, reflect.TypeOf(&components.AnimationComponent{}))
-		// if ok {
-		// 	anim := animComp.(*components.AnimationComponent)
-		// 	anim.Frames = eatFrames
-		// 	anim.FrameSpeed = config.ZombieEatFrameSpeed
-		// 	anim.CurrentFrame = 0
-		// 	anim.FrameCounter = 0
-		// 	anim.IsLooping = true
-		// 	anim.IsFinished = false
-		// }
-	*/
 }
 
 // stopEatingAndResume 停止啃食并恢复移动
@@ -252,9 +218,18 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 			// WallnutEatLarge: 在受损状态变化时触发（在 handleWallnutBehavior 中）
 			if plantComp, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, plantID); ok {
 				if plantComp.PlantType == components.PlantWallnut {
-					// 粒子位置：僵尸嘴巴位置（啃食接触点）
-					particleX := pos.X + config.ZombieEatParticleOffsetX
-					particleY := pos.Y + config.ZombieEatParticleOffsetY
+					// 粒子位置：使用僵尸下巴轨道位置（anim_head2）获取精确的嘴巴位置
+					// 参考 zombie_death_handler.go 中头部掉落粒子效果的处理方式
+					particleX, particleY := pos.X, pos.Y // 回退值
+					if s.reanimSystem != nil {
+						// 使用 AnchorCenter 获取下巴中心位置，作为啃食接触点
+						if trackX, trackY, found := s.reanimSystem.GetTrackWorldPosition(entityID, "anim_head2", systems.AnchorCenter); found {
+							particleX, particleY = trackX, trackY
+							log.Printf("[BehaviorSystem] 僵尸 %d 下巴轨道位置: (%.1f, %.1f)", entityID, particleX, particleY)
+						} else {
+							log.Printf("[BehaviorSystem] 警告：僵尸 %d 无法获取下巴轨道位置，使用回退值", entityID)
+						}
+					}
 					_, err := entities.CreateParticleEffect(
 						s.entityManager,
 						s.resourceManager,

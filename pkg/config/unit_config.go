@@ -272,16 +272,6 @@ const (
 	// ZombieEatAnimationFrames 僵尸啃食动画帧数
 	// 需要根据实际资源文件确定
 	ZombieEatAnimationFrames = 21
-
-	// ZombieEatParticleOffsetX 僵尸啃食粒子效果 X 偏移量
-	// 僵尸面朝左，嘴巴在身体前方（左侧）
-	// 负值表示向左偏移（朝向植物方向，即僵尸嘴巴位置）
-	ZombieEatParticleOffsetX = -30.0
-
-	// ZombieEatParticleOffsetY 僵尸啃食粒子效果 Y 偏移量
-	// 僵尸 pos.Y 指向脚底位置，嘴巴位置在脚底上方约 80 像素（头部位置）
-	// 负值表示向上偏移
-	ZombieEatParticleOffsetY = -80.0
 )
 
 // Potato Mine Configuration (土豆雷配置)

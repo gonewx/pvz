@@ -8,6 +8,7 @@ import (
 	"github.com/gonewx/pvz/pkg/config"
 	"github.com/gonewx/pvz/pkg/ecs"
 	"github.com/gonewx/pvz/pkg/entities"
+	"github.com/gonewx/pvz/pkg/systems"
 )
 
 func (s *BehaviorSystem) handleWallnutBehavior(entityID ecs.EntityID, deltaTime float64) {
@@ -152,19 +153,32 @@ func (s *BehaviorSystem) handleWallnutBehavior(entityID ecs.EntityID, deltaTime 
 		// 只有在状态变差时才触发 WallnutEatLarge 粒子效果
 		if newDamageState > plantComp.WallnutDamageState {
 			// 状态变差，触发大碎屑粒子效果
+			// 粒子位置：使用坚果身体轨道位置获取顶部位置（碎屑从顶部掉落）
+			// 参考 zombie_death_handler.go 中头部掉落粒子效果的处理方式
 			if plantPos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID); ok {
+				particleX, particleY := plantPos.X, plantPos.Y // 回退值
+				if s.reanimSystem != nil {
+					// 使用 AnchorTopLeft 获取坚果身体轨道的左上角位置（顶部）
+					// 坚果身体图片在 anim_face 轨道上
+					if trackX, trackY, found := s.reanimSystem.GetTrackWorldPosition(entityID, "anim_face", systems.AnchorTopLeft); found {
+						particleX, particleY = trackX, trackY
+						log.Printf("[BehaviorSystem] 坚果墙 %d 身体轨道顶部位置: (%.1f, %.1f)", entityID, particleX, particleY)
+					} else {
+						log.Printf("[BehaviorSystem] 警告：坚果墙 %d 无法获取身体轨道位置，使用回退值", entityID)
+					}
+				}
 				_, err := entities.CreateParticleEffect(
 					s.entityManager,
 					s.resourceManager,
 					"WallnutEatLarge",
-					plantPos.X,
-					plantPos.Y,
+					particleX,
+					particleY,
 				)
 				if err != nil {
 					log.Printf("[BehaviorSystem] 警告：创建坚果墙大碎屑粒子效果失败: %v", err)
 				} else {
-					log.Printf("[BehaviorSystem] 坚果墙 %d 受损状态变化 %d→%d，触发大碎屑粒子效果",
-						entityID, plantComp.WallnutDamageState, newDamageState)
+					log.Printf("[BehaviorSystem] 坚果墙 %d 受损状态变化 %d→%d，触发大碎屑粒子效果，位置: (%.1f, %.1f)",
+						entityID, plantComp.WallnutDamageState, newDamageState, particleX, particleY)
 				}
 			}
 			// 更新受损状态
