@@ -801,28 +801,23 @@ func (s *LawnmowerSystem) triggerSquashParticles(zombieID ecs.EntityID, squashAn
 		}
 	}
 
-	// 粒子方向修正
-	angleOffset := -90.0
-
-	// 触发手臂掉落粒子
+	// 触发手臂掉落粒子（不使用 angleOffset，粒子定义中已设置正确角度）
 	_, err := entities.CreateParticleEffect(
 		s.entityManager,
 		s.resourceManager,
 		"MoweredZombieArm",
 		spawnX, spawnY,
-		angleOffset,
 	)
 	if err != nil {
 		log.Printf("[LawnmowerSystem] 警告：创建手臂粒子失败: %v", err)
 	}
 
-	// 触发头部掉落粒子
+	// 触发头部掉落粒子（不使用 angleOffset，粒子定义中已设置正确角度）
 	_, err = entities.CreateParticleEffect(
 		s.entityManager,
 		s.resourceManager,
 		"MoweredZombieHead",
 		spawnX, spawnY,
-		angleOffset,
 	)
 	if err != nil {
 		log.Printf("[LawnmowerSystem] 警告：创建头部粒子失败: %v", err)
