@@ -152,11 +152,21 @@ func CalculateRootMotionDelta(
 			rawDeltaX, rawDeltaY = 0, 0
 		}
 
-		// 获取当前动画的速度倍率
+		// 获取当前动画的位移速度倍率
+		// 优先使用 MovementSpeedOverrides（独立控制位移速度）
+		// 如果未设置，回退到 AnimationSpeedOverrides（向后兼容）
 		speedMultiplier := 1.0
 		if len(reanimComp.CurrentAnimations) > 0 {
 			currentAnimName := reanimComp.CurrentAnimations[0]
-			if speed, ok := reanimComp.AnimationSpeedOverrides[currentAnimName]; ok && speed > 0 {
+			// 优先检查 MovementSpeedOverrides
+			if reanimComp.MovementSpeedOverrides != nil {
+				if speed, ok := reanimComp.MovementSpeedOverrides[currentAnimName]; ok && speed > 0 {
+					speedMultiplier = speed
+				} else if speed, ok := reanimComp.AnimationSpeedOverrides[currentAnimName]; ok && speed > 0 {
+					// 回退到 AnimationSpeedOverrides
+					speedMultiplier = speed
+				}
+			} else if speed, ok := reanimComp.AnimationSpeedOverrides[currentAnimName]; ok && speed > 0 {
 				speedMultiplier = speed
 			}
 		}

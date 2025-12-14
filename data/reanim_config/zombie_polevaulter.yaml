@@ -33,10 +33,12 @@ available_animations:
     - name: anim_run
       display_name: run
       speed: 3
+      movement_speed: 1.8
     - name: anim_jump
       display_name: jump
     - name: anim_walk
       display_name: walk
+      speed: 1
     - name: anim_death
       display_name: death
     - name: anim_eat

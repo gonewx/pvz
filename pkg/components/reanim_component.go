@@ -147,6 +147,14 @@ type ReanimComponent struct {
 	// 用于在保持高 FPS（平滑）的同时控制动画播放速度
 	AnimationSpeedOverrides map[string]float64
 
+	// MovementSpeedOverrides 存储每个动画的根运动位移速度倍率
+	// Key: 动画名称（如 "anim_run"）
+	// Value: 位移速度倍率，1.0=正常位移，0.5=50%位移
+	// 与 AnimationSpeedOverrides 独立，用于实现"动画跑得快但实际位移慢"的效果
+	// 典型用例：撑杆僵尸跑步动画速度3倍，但位移只有1倍
+	// 如果某个动画不在此 map 中，默认使用 AnimationSpeedOverrides 的值（向后兼容）
+	MovementSpeedOverrides map[string]float64
+
 	// PhysicalFrameLoopStates 存储每个动画是否使用物理帧循环
 	// Key: 动画名称（如 "anim_armed"）
 	// Value: true 表示使用物理帧数（包含隐藏帧）来确定循环边界

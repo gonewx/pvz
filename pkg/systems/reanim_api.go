@@ -350,6 +350,7 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 		comp.AnimationFrameIndices = nil
 		comp.AnimationFPSOverrides = nil
 		comp.AnimationSpeedOverrides = nil
+		comp.MovementSpeedOverrides = nil
 		comp.AnimationLoopStates = nil
 		log.Printf("[ReanimSystem] PlayCombo: 初始化实体 %d, ReanimName='%s', VisualTracks=%d, LogicalTracks=%d, FPS=%.1f",
 			entityID, comp.ReanimName, len(comp.VisualTracks), len(comp.LogicalTracks), comp.AnimationFPS)
@@ -419,6 +420,9 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 	if comp.AnimationSpeedOverrides == nil {
 		comp.AnimationSpeedOverrides = make(map[string]float64)
 	}
+	if comp.MovementSpeedOverrides == nil {
+		comp.MovementSpeedOverrides = make(map[string]float64)
+	}
 	for _, animInfo := range unitConfig.AvailableAnimations {
 		// 如果配置中指定了 FPS，应用到 AnimationFPSOverrides
 		if animInfo.FPS > 0 {
@@ -429,6 +433,12 @@ func (s *ReanimSystem) PlayCombo(entityID ecs.EntityID, unitID, comboName string
 		if animInfo.Speed > 0 {
 			comp.AnimationSpeedOverrides[animInfo.Name] = animInfo.Speed
 			log.Printf("[ReanimSystem] PlayCombo: 动画 %s 使用速度倍率 = %.2f", animInfo.Name, animInfo.Speed)
+		}
+		// 如果配置中指定了 MovementSpeed，应用到 MovementSpeedOverrides
+		// MovementSpeed 用于独立控制根运动位移速度，与动画播放速度解耦
+		if animInfo.MovementSpeed > 0 {
+			comp.MovementSpeedOverrides[animInfo.Name] = animInfo.MovementSpeed
+			log.Printf("[ReanimSystem] PlayCombo: 动画 %s 使用位移速度倍率 = %.2f", animInfo.Name, animInfo.MovementSpeed)
 		}
 	}
 

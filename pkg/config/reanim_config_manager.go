@@ -47,7 +47,8 @@ type AnimationInfo struct {
 	DisplayName       string  `yaml:"display_name"`
 	Loop              *bool   `yaml:"loop,omitempty"`                // 可选：是否循环播放，nil=默认true，显式false=不循环
 	FPS               float64 `yaml:"fps,omitempty"`                 // 可选：该动画的独立 FPS，若未指定则使用全局/Reanim 文件的 FPS
-	Speed             float64 `yaml:"speed,omitempty"`               // 可选：动画速度倍率（0.0-1.0），1.0=正常速度，0.5=50%速度，默认 1.0
+	Speed             float64 `yaml:"speed,omitempty"`               // 可选：动画播放速度倍率，1.0=正常速度，2.0=2倍速（视觉效果）
+	MovementSpeed     float64 `yaml:"movement_speed,omitempty"`      // 可选：根运动位移速度倍率，与动画播放速度独立。用于实现"动画跑得快但实际位移慢"的效果
 	PhysicalFrameLoop *bool   `yaml:"physical_frame_loop,omitempty"` // 可选：使用物理帧数（包括隐藏帧）循环，用于土豆地雷闪烁灯等需要"显示-隐藏"周期的动画
 }
 
