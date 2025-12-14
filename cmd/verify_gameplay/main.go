@@ -56,9 +56,11 @@ type VerifyGameplayGame struct {
 	plantPreviewSystem    *systems.PlantPreviewSystem
 	flagWaveWarningSystem *systems.FlagWaveWarningSystem
 	lawnGridSystem        *systems.LawnGridSystem
+	inputSystem           *systems.InputSystem
 
 	// 植物卡片渲染
 	plantCardRenderSystem *systems.PlantCardRenderSystem
+	plantCardSystem       *systems.PlantCardSystem // 卡片冷却更新
 	sunCounterFont        *text.GoTextFace
 
 	// 调试字体
@@ -76,12 +78,6 @@ type VerifyGameplayGame struct {
 
 	// 草坪网格实体
 	lawnGridEntityID ecs.EntityID
-
-	// 选中的植物类型
-	selectedPlantType components.PlantType
-
-	// 植物预览实体
-	previewEntityID ecs.EntityID
 }
 
 // NewVerifyGameplayGame 创建验证游戏实例
@@ -189,6 +185,9 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 
 	plantCardRenderSystem := systems.NewPlantCardRenderSystem(em, plantCardFont)
 
+	// 创建 PlantCardSystem（负责卡片冷却更新）
+	plantCardSystem := systems.NewPlantCardSystem(em, gs, rm)
+
 	// 加载背景图片
 	background, err := rm.LoadImageByID("IMAGE_BACKGROUND1")
 	if err != nil {
@@ -221,7 +220,7 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 	log.Println("  Shift+1-5 - 在对应行生成一个僵尸")
 	log.Println("  R         - 触发奖励动画")
 	log.Println("  H         - 触发「一大波僵尸正在接近」提示")
-	log.Println("  P         - 开启/关闭自动生成僵尸")
+	log.Println("  G         - 开启/关闭自动生成僵尸")
 	log.Println("  C         - 清除所有僵尸")
 	log.Println("  ESC       - 退出程序")
 	log.Println("  右键      - 取消植物选择")
@@ -241,12 +240,14 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 		rewardSystem:       systemManager.GetRewardSystem(),
 		plantPreviewSystem: systemManager.GetPlantPreviewSystem(),
 		lawnGridSystem:     systemManager.GetLawnGridSystem(),
+		inputSystem:        systemManager.GetInputSystem(),
 
 		// 手动创建的系统（不在 SystemManager 中）
 		flagWaveWarningSystem: flagWaveWarningSystem,
 
 		// 其他字段
 		plantCardRenderSystem: plantCardRenderSystem,
+		plantCardSystem:       plantCardSystem,
 		sunCounterFont:        sunCounterFont,
 		debugFont:             debugFont,
 		background:            background,
@@ -419,7 +420,13 @@ var zombieSpawnEnabled = false // 默认关闭自动生成
 func (vg *VerifyGameplayGame) Update() error {
 	dt := 1.0 / 60.0
 
-	// 快捷键处理
+	// ESC 退出（优先于 InputSystem 的暂停处理）
+	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
+		log.Println("[VerifyGameplay] Exiting...")
+		return fmt.Errorf("quit")
+	}
+
+	// verify_gameplay 特有的调试快捷键
 	// F1-F5 触发对应行的除草车
 	if inpututil.IsKeyJustPressed(ebiten.KeyF1) {
 		vg.triggerLawnmower(1)
@@ -454,9 +461,6 @@ func (vg *VerifyGameplayGame) Update() error {
 		if inpututil.IsKeyJustPressed(ebiten.Key5) {
 			vg.spawnZombie(4)
 		}
-	} else {
-		// 数字键 1-5 选择对应植物卡片（不按 Shift 时）
-		vg.handlePlantCardHotkeys()
 	}
 
 	// R 触发奖励动画
@@ -476,8 +480,8 @@ func (vg *VerifyGameplayGame) Update() error {
 		}
 	}
 
-	// P 暂停/继续僵尸生成
-	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
+	// G 暂停/继续僵尸生成（改用 G 键避免与 InputSystem 的 P 键冲突）
+	if inpututil.IsKeyJustPressed(ebiten.KeyG) {
 		zombieSpawnEnabled = !zombieSpawnEnabled
 		if zombieSpawnEnabled {
 			log.Println("[VerifyGameplay] Zombie spawn ENABLED")
@@ -491,22 +495,11 @@ func (vg *VerifyGameplayGame) Update() error {
 		vg.clearAllZombies()
 	}
 
-	// ESC 退出
-	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
-		log.Println("[VerifyGameplay] Exiting...")
-		return fmt.Errorf("quit")
+	// 调用正式的 InputSystem 处理植物选择和种植逻辑
+	// 这会复用正式的逻辑，包括种植粒子效果
+	if vg.inputSystem != nil {
+		vg.inputSystem.Update(dt, vg.gameState.CameraX)
 	}
-
-	// 处理植物卡片点击
-	vg.handlePlantCardClick()
-
-	// 处理右键取消选择
-	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight) && vg.selectedPlantType != components.PlantUnknown {
-		vg.cancelPlantSelection()
-	}
-
-	// 处理草坪格子点击（种植植物）
-	vg.handleLawnClick()
 
 	// 僵尸自动生成（每行每5秒生成一个）
 	if zombieSpawnEnabled {
@@ -525,280 +518,13 @@ func (vg *VerifyGameplayGame) Update() error {
 
 	// 更新手动管理的系统
 	vg.flagWaveWarningSystem.Update(dt)
+	vg.plantCardSystem.Update(dt) // 更新卡片冷却
 
 	// 更新鼠标光标
 	cursorShape := vg.rewardSystem.GetCursorShape()
 	ebiten.SetCursorShape(cursorShape)
 
 	return nil
-}
-
-// handlePlantCardClick 处理植物卡片点击
-func (vg *VerifyGameplayGame) handlePlantCardClick() {
-	if !inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
-		return
-	}
-
-	mx, my := ebiten.CursorPosition()
-
-	for _, cardID := range vg.plantCards {
-		pos, ok := ecs.GetComponent[*components.PositionComponent](vg.entityManager, cardID)
-		if !ok {
-			continue
-		}
-		card, ok := ecs.GetComponent[*components.PlantCardComponent](vg.entityManager, cardID)
-		if !ok {
-			continue
-		}
-		click, ok := ecs.GetComponent[*components.ClickableComponent](vg.entityManager, cardID)
-		if !ok {
-			continue
-		}
-
-		// 检查点击是否在卡片范围内
-		if float64(mx) >= pos.X && float64(mx) <= pos.X+click.Width &&
-			float64(my) >= pos.Y && float64(my) <= pos.Y+click.Height {
-			// 如果点击同一个卡片，取消选择
-			if vg.selectedPlantType == card.PlantType {
-				vg.cancelPlantSelection()
-				return
-			}
-
-			// 选择新植物前，先销毁旧的预览实体
-			if vg.previewEntityID != 0 {
-				vg.entityManager.DestroyEntity(vg.previewEntityID)
-				vg.previewEntityID = 0
-			}
-
-			vg.selectedPlantType = card.PlantType
-			log.Printf("[VerifyGameplay] Selected plant: %d", card.PlantType)
-
-			// 创建预览实体
-			vg.createPlantPreview(card.PlantType)
-			return
-		}
-	}
-}
-
-// createPlantPreview 创建植物预览实体
-func (vg *VerifyGameplayGame) createPlantPreview(plantType components.PlantType) {
-	// 渲染植物图标（直接传入 plantType）
-	plantIcon, err := entities.RenderPlantIcon(
-		vg.entityManager,
-		vg.resourceManager,
-		vg.reanimSystem,
-		plantType,
-	)
-	if err != nil {
-		log.Printf("[VerifyGameplay] Failed to render plant preview: %v", err)
-		return
-	}
-
-	// 创建预览实体
-	vg.previewEntityID = vg.entityManager.CreateEntity()
-
-	// 添加位置组件（初始位置，会被 PlantPreviewSystem 更新）
-	ecs.AddComponent(vg.entityManager, vg.previewEntityID, &components.PositionComponent{
-		X: 0,
-		Y: 0,
-	})
-
-	// 添加精灵组件
-	ecs.AddComponent(vg.entityManager, vg.previewEntityID, &components.SpriteComponent{
-		Image: plantIcon,
-	})
-
-	// 添加预览组件
-	ecs.AddComponent(vg.entityManager, vg.previewEntityID, &components.PlantPreviewComponent{
-		PlantType: plantType,
-		Alpha:     0.5,
-	})
-
-	log.Printf("[VerifyGameplay] Created plant preview entity: %d", vg.previewEntityID)
-}
-
-// cancelPlantSelection 取消植物选择
-func (vg *VerifyGameplayGame) cancelPlantSelection() {
-	if vg.previewEntityID != 0 {
-		vg.entityManager.DestroyEntity(vg.previewEntityID)
-		vg.previewEntityID = 0
-	}
-	vg.selectedPlantType = components.PlantUnknown
-	log.Printf("[VerifyGameplay] Cancelled plant selection")
-}
-
-// handleLawnClick 处理草坪点击（种植植物）
-func (vg *VerifyGameplayGame) handleLawnClick() {
-	if vg.selectedPlantType == components.PlantUnknown {
-		return
-	}
-
-	if !inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
-		return
-	}
-
-	mx, my := ebiten.CursorPosition()
-
-	// 将屏幕坐标转换为世界坐标
-	worldX := float64(mx) + vg.gameState.CameraX
-	worldY := float64(my)
-
-	// 计算格子坐标
-	col := int((worldX - config.GridWorldStartX) / config.CellWidth)
-	row := int((worldY - config.GridWorldStartY) / config.CellHeight)
-
-	// 检查是否在有效范围内
-	if col < 0 || col >= config.GridColumns || row < 0 || row >= config.GridRows {
-		return
-	}
-
-	// 检查格子是否被占用（使用 LawnGridSystem API）
-	if vg.lawnGridSystem.IsOccupied(vg.lawnGridEntityID, col, row) {
-		log.Printf("[VerifyGameplay] Cell (%d, %d) is occupied", row, col)
-		return
-	}
-
-	// 检查阳光是否足够
-	sunCost := vg.getSunCost(vg.selectedPlantType)
-	if vg.gameState.GetSun() < sunCost {
-		log.Printf("[VerifyGameplay] Not enough sun: need %d, have %d", sunCost, vg.gameState.GetSun())
-		return
-	}
-
-	// 根据植物类型调用对应的工厂函数
-	var plantID ecs.EntityID
-	var err error
-
-	switch vg.selectedPlantType {
-	case components.PlantSunflower, components.PlantPeashooter:
-		plantID, err = entities.NewPlantEntity(
-			vg.entityManager,
-			vg.resourceManager,
-			vg.gameState,
-			vg.reanimSystem,
-			vg.selectedPlantType,
-			col, row,
-		)
-	case components.PlantWallnut:
-		plantID, err = entities.NewWallnutEntity(
-			vg.entityManager,
-			vg.resourceManager,
-			vg.gameState,
-			vg.reanimSystem,
-			col, row,
-		)
-	case components.PlantCherryBomb:
-		plantID, err = entities.NewCherryBombEntity(
-			vg.entityManager,
-			vg.resourceManager,
-			vg.gameState,
-			col, row,
-		)
-	case components.PlantPotatoMine:
-		plantID, err = entities.NewPotatoMineEntity(
-			vg.entityManager,
-			vg.resourceManager,
-			vg.gameState,
-			col, row,
-		)
-	default:
-		log.Printf("[VerifyGameplay] Unknown plant type: %d", vg.selectedPlantType)
-		return
-	}
-
-	if err != nil {
-		log.Printf("Warning: Failed to plant: %v", err)
-		return
-	}
-
-	// 更新网格（使用 LawnGridSystem API）
-	vg.lawnGridSystem.OccupyCell(vg.lawnGridEntityID, col, row, plantID)
-
-	// 扣除阳光
-	vg.gameState.SpendSun(sunCost)
-
-	log.Printf("[VerifyGameplay] Planted type=%d at (%d, %d), entity=%d", vg.selectedPlantType, row, col, plantID)
-
-	// 销毁预览实体
-	if vg.previewEntityID != 0 {
-		vg.entityManager.DestroyEntity(vg.previewEntityID)
-		vg.previewEntityID = 0
-	}
-
-	// 重置选中状态
-	vg.selectedPlantType = components.PlantUnknown
-}
-
-// getSunCost 获取植物阳光消耗
-func (vg *VerifyGameplayGame) getSunCost(plantType components.PlantType) int {
-	switch plantType {
-	case components.PlantSunflower:
-		return config.SunflowerSunCost
-	case components.PlantPeashooter:
-		return config.PeashooterSunCost
-	case components.PlantWallnut:
-		return config.WallnutCost
-	case components.PlantCherryBomb:
-		return config.CherryBombSunCost
-	case components.PlantPotatoMine:
-		return config.PotatoMineSunCost
-	default:
-		return 0
-	}
-}
-
-// handlePlantCardHotkeys 处理植物卡片快捷键（数字键 1-5）
-func (vg *VerifyGameplayGame) handlePlantCardHotkeys() {
-	// 定义快捷键映射
-	hotkeys := []ebiten.Key{
-		ebiten.Key1, ebiten.Key2, ebiten.Key3,
-		ebiten.Key4, ebiten.Key5,
-	}
-
-	// 检测按下的数字键
-	pressedIndex := -1
-	for i, key := range hotkeys {
-		if inpututil.IsKeyJustPressed(key) {
-			pressedIndex = i
-			break
-		}
-	}
-
-	if pressedIndex < 0 {
-		return // 没有按下快捷键
-	}
-
-	// 检查索引是否在卡片范围内
-	if pressedIndex >= len(vg.plantCards) {
-		log.Printf("[VerifyGameplay] 快捷键 %d 无效：只有 %d 张卡片", pressedIndex+1, len(vg.plantCards))
-		return
-	}
-
-	// 获取对应卡片
-	cardID := vg.plantCards[pressedIndex]
-	card, ok := ecs.GetComponent[*components.PlantCardComponent](vg.entityManager, cardID)
-	if !ok {
-		return
-	}
-
-	log.Printf("[VerifyGameplay] 快捷键选择卡片: 按键=%d, 植物类型=%v", pressedIndex+1, card.PlantType)
-
-	// 如果点击同一个卡片，取消选择
-	if vg.selectedPlantType == card.PlantType {
-		vg.cancelPlantSelection()
-		return
-	}
-
-	// 选择新植物前，先销毁旧的预览实体
-	if vg.previewEntityID != 0 {
-		vg.entityManager.DestroyEntity(vg.previewEntityID)
-		vg.previewEntityID = 0
-	}
-
-	vg.selectedPlantType = card.PlantType
-
-	// 创建预览实体
-	vg.createPlantPreview(card.PlantType)
 }
 
 // Draw 绘制游戏画面
@@ -959,11 +685,12 @@ func (vg *VerifyGameplayGame) drawDebugInfo(screen *ebiten.Image) {
 
 	// 快捷键提示
 	hints := []string{
-		"1-5=选择植物 | F1-F5=除草车 | Shift+1-5=生成僵尸 | R=奖励 | H=一大波 | P=自动生成 | C=清除 | ESC=退出",
+		"1-5=选择植物 | F1-F5=除草车 | Shift+1-5=生成僵尸 | R=奖励 | H=一大波 | G=自动生成 | C=清除 | ESC=退出",
 	}
 
-	if vg.selectedPlantType != components.PlantUnknown {
-		hints = append(hints, fmt.Sprintf("已选择植物: %d (点击草坪种植)", vg.selectedPlantType))
+	isPlanting, plantType := vg.gameState.GetPlantingMode()
+	if isPlanting {
+		hints = append(hints, fmt.Sprintf("已选择植物: %d (点击草坪种植)", plantType))
 	}
 
 	spawnStatus := "已启用"

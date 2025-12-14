@@ -137,7 +137,7 @@ func VerifyGameplayOptions() SystemOptions {
 		EnableDaveDialogue:      false,
 		EnableCamera:            false, // Not needed for verify
 		EnableZombieGroan:       false, // Not needed for verify
-		EnableInput:             false, // verify_gameplay handles its own input
+		EnableInput:             true,  // Use standard InputSystem for planting logic
 		EnableButton:            false, // Not needed for verify
 		EnableSlider:            false, // Not needed for verify
 		EnableCheckbox:          false, // Not needed for verify
