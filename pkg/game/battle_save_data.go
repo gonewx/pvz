@@ -7,7 +7,9 @@ import (
 // BattleSaveVersion 战斗存档版本号
 // 用于版本兼容性检查，当数据结构发生不兼容变更时递增
 // v2: 添加保龄球模式支持（BowlingNuts, ConveyorBelt, LevelPhase, DaveDialogue, GuidedTutorial）
-const BattleSaveVersion = 2
+// v3: 添加撑杆僵尸和旗帜僵尸支持（HasPole, IsJumping）
+// v4: 添加土豆地雷阶段支持（PotatoMinePhase, ArmingTimer）
+const BattleSaveVersion = 4
 
 // BattleSaveData 战斗存档数据结构
 //
@@ -76,6 +78,10 @@ type PlantData struct {
 	TimerTargetTime  float64 // 计时器目标时间（秒），用于恢复向日葵等变周期植物
 	BlinkTimer       float64 // 眨眼计时器（秒）
 	AttackAnimState  int     // 攻击动画状态 (0=空闲, 1=攻击中)
+
+	// 土豆地雷专用字段
+	PotatoMinePhase int     // 土豆地雷阶段 (0=Arming, 1=Rising, 2=Armed, 3=Exploding)
+	ArmingTimer     float64 // 武装计时器剩余时间（秒）
 }
 
 // ZombieData 僵尸序列化数据
@@ -83,7 +89,7 @@ type PlantData struct {
 // 包含僵尸实体的核心状态，用于恢复僵尸实体。
 // 字段与 BehaviorComponent、HealthComponent、ArmorComponent 等组件对应。
 type ZombieData struct {
-	ZombieType   string  // 僵尸类型ID，如 "basic", "conehead", "buckethead"
+	ZombieType   string  // 僵尸类型ID，如 "basic", "conehead", "buckethead", "polevaulter", "flag"
 	X            float64 // X坐标（世界坐标）
 	Y            float64 // Y坐标（世界坐标）
 	VelocityX    float64 // X轴速度（像素/秒）
@@ -94,6 +100,10 @@ type ZombieData struct {
 	Lane         int     // 所在行号（1-5）
 	BehaviorType string  // 行为类型，如 "basic", "eating", "dying"
 	IsEating     bool    // 是否正在啃食
+
+	// 撑杆僵尸特有字段
+	HasPole   bool // 是否持有撑杆（撑杆僵尸专用）
+	IsJumping bool // 是否正在跳跃中（撑杆僵尸专用）
 }
 
 // ProjectileData 子弹序列化数据

@@ -227,27 +227,25 @@ func (s *BattleSerializer) collectPlantData(em *ecs.EntityManager) []PlantData {
 }
 
 // collectZombieData 从 EntityManager 收集所有僵尸实体数据
+//
+// Story 18.4: 重构为使用 ZombieTagComponent 识别僵尸，使用 UnitID 作为类型标识
+// 新增僵尸类型无需修改此函数，只需在工厂函数中添加 ZombieTagComponent 即可
 func (s *BattleSerializer) collectZombieData(em *ecs.EntityManager) []ZombieData {
 	var zombies []ZombieData
 
-	// 查询所有拥有 BehaviorComponent 和 PositionComponent 的实体
-	entities := ecs.GetEntitiesWith2[
-		*components.BehaviorComponent,
-		*components.PositionComponent,
-	](em)
+	// Story 18.4: 使用 ZombieTagComponent 查询所有僵尸实体
+	// 替代硬编码的 isZombieBehavior() 函数，新增僵尸类型自动被识别
+	zombieEntities := ecs.GetEntitiesWith1[*components.ZombieTagComponent](em)
 
-	for _, entity := range entities {
-		behaviorComp, ok := ecs.GetComponent[*components.BehaviorComponent](em, entity)
+	for _, entity := range zombieEntities {
+		// 获取位置组件
+		posComp, ok := ecs.GetComponent[*components.PositionComponent](em, entity)
 		if !ok {
 			continue
 		}
 
-		// 判断是否是僵尸（检查行为类型）
-		if !isZombieBehavior(behaviorComp.Type) {
-			continue
-		}
-
-		posComp, ok := ecs.GetComponent[*components.PositionComponent](em, entity)
+		// 获取行为组件（用于获取 UnitID 和动画状态）
+		behaviorComp, ok := ecs.GetComponent[*components.BehaviorComponent](em, entity)
 		if !ok {
 			continue
 		}
@@ -275,16 +273,25 @@ func (s *BattleSerializer) collectZombieData(em *ecs.EntityManager) []ZombieData
 		// 获取行号
 		var lane int
 		if collComp, ok := ecs.GetComponent[*components.CollisionComponent](em, entity); ok {
-			// 从碰撞组件或位置推算行号
-			_ = collComp
+			lane = collComp.LaneIndex + 1 // LaneIndex 是 0-based，转换为 1-based
 		}
-		// 尝试从 ZombieTargetLaneComponent 获取行号
-		if laneComp, ok := ecs.GetComponent[*components.ZombieTargetLaneComponent](em, entity); ok {
-			lane = laneComp.TargetRow + 1 // TargetRow 是 0-based，转换为 1-based
+		// 如果碰撞组件没有行号，尝试从 ZombieTargetLaneComponent 获取
+		if lane == 0 {
+			if laneComp, ok := ecs.GetComponent[*components.ZombieTargetLaneComponent](em, entity); ok {
+				lane = laneComp.TargetRow + 1
+			}
 		}
 
-		zombies = append(zombies, ZombieData{
-			ZombieType:   behaviorTypeToZombieType(behaviorComp.Type),
+		// Story 18.4: 直接使用 UnitID 作为 ZombieType
+		// 替代硬编码的 behaviorTypeToZombieType() 函数
+		zombieType := behaviorComp.UnitID
+		if zombieType == "" {
+			// 回退：如果 UnitID 未设置，使用默认值
+			zombieType = "zombie"
+		}
+
+		zombieData := ZombieData{
+			ZombieType:   zombieType,
 			X:            posComp.X,
 			Y:            posComp.Y,
 			VelocityX:    velocityX,
@@ -295,7 +302,15 @@ func (s *BattleSerializer) collectZombieData(em *ecs.EntityManager) []ZombieData
 			Lane:         lane,
 			BehaviorType: behaviorTypeToString(behaviorComp.Type),
 			IsEating:     behaviorComp.Type == components.BehaviorZombieEating,
-		})
+		}
+
+		// Story 18.4: 收集 PoleVaultComponent 状态（撑杆僵尸特有）
+		if poleVault, ok := ecs.GetComponent[*components.PoleVaultComponent](em, entity); ok {
+			zombieData.HasPole = poleVault.HasPole
+			zombieData.IsJumping = poleVault.IsJumping
+		}
+
+		zombies = append(zombies, zombieData)
 	}
 
 	return zombies
@@ -447,36 +462,6 @@ func (s *BattleSerializer) collectLawnmowerData(em *ecs.EntityManager) []Lawnmow
 	return lawnmowers
 }
 
-// isZombieBehavior 判断行为类型是否是僵尸行为
-func isZombieBehavior(behaviorType components.BehaviorType) bool {
-	switch behaviorType {
-	case components.BehaviorZombieBasic,
-		components.BehaviorZombieEating,
-		components.BehaviorZombieDying,
-		components.BehaviorZombieSquashing,
-		components.BehaviorZombieDyingExplosion,
-		components.BehaviorZombieConehead,
-		components.BehaviorZombieBuckethead,
-		components.BehaviorZombiePreview:
-		return true
-	default:
-		return false
-	}
-}
-
-// behaviorTypeToZombieType 将行为类型转换为僵尸类型字符串
-func behaviorTypeToZombieType(behaviorType components.BehaviorType) string {
-	switch behaviorType {
-	case components.BehaviorZombieBasic, components.BehaviorZombieEating, components.BehaviorZombieDying:
-		return "basic"
-	case components.BehaviorZombieConehead:
-		return "conehead"
-	case components.BehaviorZombieBuckethead:
-		return "buckethead"
-	default:
-		return "basic"
-	}
-}
 
 // behaviorTypeToString 将行为类型转换为字符串
 func behaviorTypeToString(behaviorType components.BehaviorType) string {
@@ -497,6 +482,10 @@ func behaviorTypeToString(behaviorType components.BehaviorType) string {
 		return "buckethead"
 	case components.BehaviorZombiePreview:
 		return "preview"
+	case components.BehaviorZombieFlag:
+		return "flag"
+	case components.BehaviorZombiePolevaulter:
+		return "polevaulter"
 	default:
 		return "unknown"
 	}

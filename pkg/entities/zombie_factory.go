@@ -709,3 +709,55 @@ func ActivatePolevaulterZombie(em *ecs.EntityManager, entityID ecs.EntityID) {
 		})
 	}
 }
+
+// =============================================================================
+// Story 18.4: 僵尸工厂注册表
+// =============================================================================
+
+// ZombieFactory 僵尸工厂函数类型
+//
+// 所有僵尸工厂函数都遵循相同的签名：
+//   - em: 实体管理器
+//   - rm: 资源加载器（用于加载 Reanim 资源）
+//   - row: 生成行索引 (0-4)
+//   - spawnX: 生成的世界坐标X位置
+//
+// 返回创建的实体ID和可能的错误
+type ZombieFactory func(em *ecs.EntityManager, rm ResourceLoader, row int, spawnX float64) (ecs.EntityID, error)
+
+// zombieFactories 僵尸工厂注册表
+//
+// Story 18.4: 使用 UnitID 作为键，映射到对应的工厂函数
+// 新增僵尸类型只需在此表中添加一行，恢复逻辑无需修改
+var zombieFactories = map[string]ZombieFactory{
+	types.UnitIDZombie:           NewZombieEntity,
+	types.UnitIDZombieConehead:   NewConeheadZombieEntity,
+	types.UnitIDZombieBuckethead: NewBucketheadZombieEntity,
+	types.UnitIDZombieFlag:       NewFlagZombieEntity,
+	types.UnitIDZombiePolevaulter: NewPolevaulterZombieEntity,
+}
+
+// GetZombieFactory 获取僵尸工厂函数
+//
+// Story 18.4: 通过 UnitID 查找对应的工厂函数
+// 如果找不到对应的工厂函数，返回 nil 和 false
+//
+// 参数:
+//   - unitID: 僵尸类型标识（如 "zombie", "zombie_polevaulter"）
+//
+// 返回:
+//   - ZombieFactory: 工厂函数，如果未找到返回 nil
+//   - bool: 是否找到对应的工厂函数
+func GetZombieFactory(unitID string) (ZombieFactory, bool) {
+	factory, ok := zombieFactories[unitID]
+	return factory, ok
+}
+
+// GetDefaultZombieFactory 获取默认僵尸工厂函数
+//
+// Story 18.4: 当找不到对应的工厂函数时，返回普通僵尸工厂
+// 作为回退策略，确保旧版存档不会导致崩溃
+func GetDefaultZombieFactory() ZombieFactory {
+	return NewZombieEntity
+}
+

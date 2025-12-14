@@ -10,6 +10,7 @@ import (
 	"github.com/gonewx/pvz/pkg/components"
 	"github.com/gonewx/pvz/pkg/config"
 	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/types"
 	"github.com/quasilyte/gdata/v2"
 )
 
@@ -207,6 +208,7 @@ func TestBattleSerializer_SaveAndLoadBattle_WithPlants(t *testing.T) {
 }
 
 // TestBattleSerializer_SaveAndLoadBattle_WithZombies 测试带僵尸的战斗状态
+// Story 18.4: 使用 ZombieTagComponent 识别僵尸，使用 UnitID 作为 ZombieType
 func TestBattleSerializer_SaveAndLoadBattle_WithZombies(t *testing.T) {
 	gdataManager := createTestGdataManagerForBattle(t, "with_zombies")
 	if gdataManager == nil {
@@ -220,21 +222,23 @@ func TestBattleSerializer_SaveAndLoadBattle_WithZombies(t *testing.T) {
 		CurrentLevel: &config.LevelConfig{ID: "1-4"},
 	}
 
-	// 创建僵尸实体
+	// 创建僵尸实体（必须添加 ZombieTagComponent）
 	zombie1 := em.CreateEntity()
-	ecs.AddComponent(em, zombie1, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	ecs.AddComponent(em, zombie1, &components.ZombieTagComponent{})
+	ecs.AddComponent(em, zombie1, &components.BehaviorComponent{Type: components.BehaviorZombieBasic, UnitID: types.UnitIDZombie})
 	ecs.AddComponent(em, zombie1, &components.PositionComponent{X: 500, Y: 150})
 	ecs.AddComponent(em, zombie1, &components.VelocityComponent{VX: -23.0})
 	ecs.AddComponent(em, zombie1, &components.HealthComponent{CurrentHealth: 180, MaxHealth: 200})
-	ecs.AddComponent(em, zombie1, &components.ZombieTargetLaneComponent{TargetRow: 1})
+	ecs.AddComponent(em, zombie1, &components.CollisionComponent{LaneIndex: 1})
 
 	zombie2 := em.CreateEntity()
-	ecs.AddComponent(em, zombie2, &components.BehaviorComponent{Type: components.BehaviorZombieConehead})
+	ecs.AddComponent(em, zombie2, &components.ZombieTagComponent{})
+	ecs.AddComponent(em, zombie2, &components.BehaviorComponent{Type: components.BehaviorZombieConehead, UnitID: types.UnitIDZombieConehead})
 	ecs.AddComponent(em, zombie2, &components.PositionComponent{X: 600, Y: 250})
 	ecs.AddComponent(em, zombie2, &components.VelocityComponent{VX: -23.0})
 	ecs.AddComponent(em, zombie2, &components.HealthComponent{CurrentHealth: 200, MaxHealth: 200})
 	ecs.AddComponent(em, zombie2, &components.ArmorComponent{CurrentArmor: 300, MaxArmor: 370})
-	ecs.AddComponent(em, zombie2, &components.ZombieTargetLaneComponent{TargetRow: 2})
+	ecs.AddComponent(em, zombie2, &components.CollisionComponent{LaneIndex: 2})
 
 	// 保存
 	serializer := NewBattleSerializer(gdataManager)
@@ -254,15 +258,15 @@ func TestBattleSerializer_SaveAndLoadBattle_WithZombies(t *testing.T) {
 		t.Fatalf("Expected 2 zombies, got %d", len(data.Zombies))
 	}
 
-	// 找到路障僵尸
+	// 找到路障僵尸（使用 UnitID 作为 ZombieType）
 	var foundConehead bool
 	for _, z := range data.Zombies {
-		if z.ZombieType == "conehead" {
+		if z.ZombieType == types.UnitIDZombieConehead {
 			foundConehead = true
 			if z.ArmorHealth != 300 {
 				t.Errorf("Conehead armor health mismatch: expected 300, got %d", z.ArmorHealth)
 			}
-			if z.Lane != 3 { // TargetRow 2 + 1 = Lane 3
+			if z.Lane != 3 { // LaneIndex 2 + 1 = Lane 3
 				t.Errorf("Conehead lane mismatch: expected 3, got %d", z.Lane)
 			}
 		}
@@ -419,55 +423,6 @@ func TestBattleSerializer_CollectLevelState(t *testing.T) {
 	}
 }
 
-// TestIsZombieBehavior 测试僵尸行为判断
-func TestIsZombieBehavior(t *testing.T) {
-	tests := []struct {
-		behavior components.BehaviorType
-		expected bool
-	}{
-		{components.BehaviorZombieBasic, true},
-		{components.BehaviorZombieEating, true},
-		{components.BehaviorZombieDying, true},
-		{components.BehaviorZombieSquashing, true},
-		{components.BehaviorZombieDyingExplosion, true},
-		{components.BehaviorZombieConehead, true},
-		{components.BehaviorZombieBuckethead, true},
-		{components.BehaviorZombiePreview, true},
-		{components.BehaviorPeashooter, false},
-		{components.BehaviorSunflower, false},
-		{components.BehaviorPeaProjectile, false},
-		{components.BehaviorWallnut, false},
-	}
-
-	for _, tt := range tests {
-		result := isZombieBehavior(tt.behavior)
-		if result != tt.expected {
-			t.Errorf("isZombieBehavior(%v) = %v, expected %v", tt.behavior, result, tt.expected)
-		}
-	}
-}
-
-// TestBehaviorTypeToZombieType 测试行为类型到僵尸类型转换
-func TestBehaviorTypeToZombieType(t *testing.T) {
-	tests := []struct {
-		behavior components.BehaviorType
-		expected string
-	}{
-		{components.BehaviorZombieBasic, "basic"},
-		{components.BehaviorZombieEating, "basic"},
-		{components.BehaviorZombieDying, "basic"},
-		{components.BehaviorZombieConehead, "conehead"},
-		{components.BehaviorZombieBuckethead, "buckethead"},
-	}
-
-	for _, tt := range tests {
-		result := behaviorTypeToZombieType(tt.behavior)
-		if result != tt.expected {
-			t.Errorf("behaviorTypeToZombieType(%v) = %q, expected %q", tt.behavior, result, tt.expected)
-		}
-	}
-}
-
 // TestBehaviorTypeToString 测试行为类型到字符串转换
 func TestBehaviorTypeToString(t *testing.T) {
 	tests := []struct {
@@ -482,6 +437,8 @@ func TestBehaviorTypeToString(t *testing.T) {
 		{components.BehaviorZombieConehead, "conehead"},
 		{components.BehaviorZombieBuckethead, "buckethead"},
 		{components.BehaviorZombiePreview, "preview"},
+		{components.BehaviorZombieFlag, "flag"},
+		{components.BehaviorZombiePolevaulter, "polevaulter"},
 		{components.BehaviorPeashooter, "unknown"}, // 非僵尸类型应返回 unknown
 		{components.BehaviorSunflower, "unknown"},
 		{components.BehaviorType(999), "unknown"}, // 未定义的类型
@@ -650,21 +607,23 @@ func TestBattleSerializer_SaveAndLoadBattle_CompleteScenario(t *testing.T) {
 	ecs.AddComponent(em, plant3, &components.PositionComponent{X: 300, Y: 150})
 	ecs.AddComponent(em, plant3, &components.HealthComponent{CurrentHealth: 2500, MaxHealth: 4000})
 
-	// 创建多种僵尸
+	// 创建多种僵尸（必须添加 ZombieTagComponent）
 	zombie1 := em.CreateEntity()
-	ecs.AddComponent(em, zombie1, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	ecs.AddComponent(em, zombie1, &components.ZombieTagComponent{})
+	ecs.AddComponent(em, zombie1, &components.BehaviorComponent{Type: components.BehaviorZombieBasic, UnitID: types.UnitIDZombie})
 	ecs.AddComponent(em, zombie1, &components.PositionComponent{X: 600, Y: 100})
 	ecs.AddComponent(em, zombie1, &components.VelocityComponent{VX: -23})
 	ecs.AddComponent(em, zombie1, &components.HealthComponent{CurrentHealth: 200, MaxHealth: 200})
-	ecs.AddComponent(em, zombie1, &components.ZombieTargetLaneComponent{TargetRow: 1})
+	ecs.AddComponent(em, zombie1, &components.CollisionComponent{LaneIndex: 1})
 
 	zombie2 := em.CreateEntity()
-	ecs.AddComponent(em, zombie2, &components.BehaviorComponent{Type: components.BehaviorZombieBuckethead})
+	ecs.AddComponent(em, zombie2, &components.ZombieTagComponent{})
+	ecs.AddComponent(em, zombie2, &components.BehaviorComponent{Type: components.BehaviorZombieBuckethead, UnitID: types.UnitIDZombieBuckethead})
 	ecs.AddComponent(em, zombie2, &components.PositionComponent{X: 550, Y: 200})
 	ecs.AddComponent(em, zombie2, &components.VelocityComponent{VX: -23})
 	ecs.AddComponent(em, zombie2, &components.HealthComponent{CurrentHealth: 200, MaxHealth: 200})
 	ecs.AddComponent(em, zombie2, &components.ArmorComponent{CurrentArmor: 900, MaxArmor: 1100})
-	ecs.AddComponent(em, zombie2, &components.ZombieTargetLaneComponent{TargetRow: 2})
+	ecs.AddComponent(em, zombie2, &components.CollisionComponent{LaneIndex: 2})
 
 	// 创建除草车
 	for lane := 1; lane <= 5; lane++ {
@@ -726,10 +685,10 @@ func TestBattleSerializer_SaveAndLoadBattle_CompleteScenario(t *testing.T) {
 		t.Error("Wallnut not found in saved data")
 	}
 
-	// 验证铁桶僵尸数据
+	// 验证铁桶僵尸数据（使用 UnitID 作为 ZombieType）
 	var foundBuckethead bool
 	for _, z := range data.Zombies {
-		if z.ZombieType == "buckethead" {
+		if z.ZombieType == types.UnitIDZombieBuckethead {
 			foundBuckethead = true
 			if z.ArmorHealth != 900 {
 				t.Errorf("Buckethead armor health mismatch: expected 900, got %d", z.ArmorHealth)
@@ -888,5 +847,249 @@ func TestBattleSerializer_SaveAndLoadBattle_WithTutorial(t *testing.T) {
 
 	if data.Tutorial.SunflowerCount != 1 {
 		t.Errorf("Expected SunflowerCount 1, got %d", data.Tutorial.SunflowerCount)
+	}
+}
+
+// =============================================================================
+// Story 18.4: 撑杆僵尸和旗帜僵尸序列化测试
+// =============================================================================
+
+// TestBattleSerializer_PolevaulterZombie_WithPole 测试撑杆僵尸（持杆状态）序列化
+func TestBattleSerializer_PolevaulterZombie_WithPole(t *testing.T) {
+	gdataManager := createTestGdataManagerForBattle(t, "polevaulter_with_pole")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	em := ecs.NewEntityManager()
+	gs := &GameState{
+		Sun:          200,
+		SpawnedWaves: []bool{true},
+		CurrentLevel: &config.LevelConfig{ID: "1-6"},
+	}
+
+	// 创建撑杆僵尸（持杆状态）
+	zombie := em.CreateEntity()
+	ecs.AddComponent(em, zombie, &components.ZombieTagComponent{})
+	ecs.AddComponent(em, zombie, &components.BehaviorComponent{
+		Type:   components.BehaviorZombiePolevaulter,
+		UnitID: types.UnitIDZombiePolevaulter,
+	})
+	ecs.AddComponent(em, zombie, &components.PositionComponent{X: 600, Y: 150})
+	ecs.AddComponent(em, zombie, &components.VelocityComponent{VX: -54.0}) // 持杆时高速
+	ecs.AddComponent(em, zombie, &components.HealthComponent{CurrentHealth: 500, MaxHealth: 500})
+	ecs.AddComponent(em, zombie, &components.CollisionComponent{LaneIndex: 1})
+	ecs.AddComponent(em, zombie, &components.PoleVaultComponent{
+		HasPole:   true,
+		IsJumping: false,
+	})
+
+	// 保存
+	serializer := NewBattleSerializer(gdataManager)
+	err := serializer.SaveBattle(em, gs, "testuser")
+	if err != nil {
+		t.Fatalf("SaveBattle failed: %v", err)
+	}
+
+	// 加载
+	data, err := serializer.LoadBattle("testuser")
+	if err != nil {
+		t.Fatalf("LoadBattle failed: %v", err)
+	}
+
+	// 验证
+	if len(data.Zombies) != 1 {
+		t.Fatalf("Expected 1 zombie, got %d", len(data.Zombies))
+	}
+
+	z := data.Zombies[0]
+	if z.ZombieType != types.UnitIDZombiePolevaulter {
+		t.Errorf("ZombieType mismatch: expected %s, got %s", types.UnitIDZombiePolevaulter, z.ZombieType)
+	}
+	if !z.HasPole {
+		t.Error("HasPole should be true")
+	}
+	if z.IsJumping {
+		t.Error("IsJumping should be false")
+	}
+	if z.Health != 500 {
+		t.Errorf("Health mismatch: expected 500, got %d", z.Health)
+	}
+}
+
+// TestBattleSerializer_PolevaulterZombie_Jumping 测试撑杆僵尸（跳跃中）序列化
+func TestBattleSerializer_PolevaulterZombie_Jumping(t *testing.T) {
+	gdataManager := createTestGdataManagerForBattle(t, "polevaulter_jumping")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	em := ecs.NewEntityManager()
+	gs := &GameState{
+		Sun:          200,
+		SpawnedWaves: []bool{true},
+		CurrentLevel: &config.LevelConfig{ID: "1-6"},
+	}
+
+	// 创建撑杆僵尸（跳跃中状态）
+	zombie := em.CreateEntity()
+	ecs.AddComponent(em, zombie, &components.ZombieTagComponent{})
+	ecs.AddComponent(em, zombie, &components.BehaviorComponent{
+		Type:   components.BehaviorZombiePolevaulter,
+		UnitID: types.UnitIDZombiePolevaulter,
+	})
+	ecs.AddComponent(em, zombie, &components.PositionComponent{X: 500, Y: 150})
+	ecs.AddComponent(em, zombie, &components.VelocityComponent{VX: 0}) // 跳跃时不移动
+	ecs.AddComponent(em, zombie, &components.HealthComponent{CurrentHealth: 480, MaxHealth: 500})
+	ecs.AddComponent(em, zombie, &components.CollisionComponent{LaneIndex: 1})
+	ecs.AddComponent(em, zombie, &components.PoleVaultComponent{
+		HasPole:         true,
+		IsJumping:       true,
+		JumpElapsedTime: 1.5,
+	})
+
+	// 保存
+	serializer := NewBattleSerializer(gdataManager)
+	err := serializer.SaveBattle(em, gs, "testuser")
+	if err != nil {
+		t.Fatalf("SaveBattle failed: %v", err)
+	}
+
+	// 加载
+	data, err := serializer.LoadBattle("testuser")
+	if err != nil {
+		t.Fatalf("LoadBattle failed: %v", err)
+	}
+
+	// 验证
+	if len(data.Zombies) != 1 {
+		t.Fatalf("Expected 1 zombie, got %d", len(data.Zombies))
+	}
+
+	z := data.Zombies[0]
+	if z.ZombieType != types.UnitIDZombiePolevaulter {
+		t.Errorf("ZombieType mismatch: expected %s, got %s", types.UnitIDZombiePolevaulter, z.ZombieType)
+	}
+	if !z.HasPole {
+		t.Error("HasPole should be true (still holding during jump)")
+	}
+	if !z.IsJumping {
+		t.Error("IsJumping should be true")
+	}
+}
+
+// TestBattleSerializer_PolevaulterZombie_AfterJump 测试撑杆僵尸（跳跃后）序列化
+func TestBattleSerializer_PolevaulterZombie_AfterJump(t *testing.T) {
+	gdataManager := createTestGdataManagerForBattle(t, "polevaulter_after_jump")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	em := ecs.NewEntityManager()
+	gs := &GameState{
+		Sun:          200,
+		SpawnedWaves: []bool{true},
+		CurrentLevel: &config.LevelConfig{ID: "1-6"},
+	}
+
+	// 创建撑杆僵尸（跳跃后状态，已丢弃撑杆）
+	zombie := em.CreateEntity()
+	ecs.AddComponent(em, zombie, &components.ZombieTagComponent{})
+	ecs.AddComponent(em, zombie, &components.BehaviorComponent{
+		Type:   components.BehaviorZombiePolevaulter,
+		UnitID: types.UnitIDZombiePolevaulter,
+	})
+	ecs.AddComponent(em, zombie, &components.PositionComponent{X: 400, Y: 150})
+	ecs.AddComponent(em, zombie, &components.VelocityComponent{VX: -30.0}) // 跳跃后普通速度
+	ecs.AddComponent(em, zombie, &components.HealthComponent{CurrentHealth: 450, MaxHealth: 500})
+	ecs.AddComponent(em, zombie, &components.CollisionComponent{LaneIndex: 1})
+	ecs.AddComponent(em, zombie, &components.PoleVaultComponent{
+		HasPole:   false, // 已丢弃撑杆
+		IsJumping: false,
+	})
+
+	// 保存
+	serializer := NewBattleSerializer(gdataManager)
+	err := serializer.SaveBattle(em, gs, "testuser")
+	if err != nil {
+		t.Fatalf("SaveBattle failed: %v", err)
+	}
+
+	// 加载
+	data, err := serializer.LoadBattle("testuser")
+	if err != nil {
+		t.Fatalf("LoadBattle failed: %v", err)
+	}
+
+	// 验证
+	if len(data.Zombies) != 1 {
+		t.Fatalf("Expected 1 zombie, got %d", len(data.Zombies))
+	}
+
+	z := data.Zombies[0]
+	if z.ZombieType != types.UnitIDZombiePolevaulter {
+		t.Errorf("ZombieType mismatch: expected %s, got %s", types.UnitIDZombiePolevaulter, z.ZombieType)
+	}
+	if z.HasPole {
+		t.Error("HasPole should be false (pole discarded after jump)")
+	}
+	if z.IsJumping {
+		t.Error("IsJumping should be false")
+	}
+}
+
+// TestBattleSerializer_FlagZombie 测试旗帜僵尸序列化
+func TestBattleSerializer_FlagZombie(t *testing.T) {
+	gdataManager := createTestGdataManagerForBattle(t, "flag_zombie")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	em := ecs.NewEntityManager()
+	gs := &GameState{
+		Sun:          200,
+		SpawnedWaves: []bool{true, true},
+		CurrentLevel: &config.LevelConfig{ID: "1-4"},
+	}
+
+	// 创建旗帜僵尸
+	zombie := em.CreateEntity()
+	ecs.AddComponent(em, zombie, &components.ZombieTagComponent{})
+	ecs.AddComponent(em, zombie, &components.BehaviorComponent{
+		Type:   components.BehaviorZombieFlag,
+		UnitID: types.UnitIDZombieFlag,
+	})
+	ecs.AddComponent(em, zombie, &components.PositionComponent{X: 700, Y: 200})
+	ecs.AddComponent(em, zombie, &components.VelocityComponent{VX: -23.0})
+	ecs.AddComponent(em, zombie, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
+	ecs.AddComponent(em, zombie, &components.CollisionComponent{LaneIndex: 2})
+
+	// 保存
+	serializer := NewBattleSerializer(gdataManager)
+	err := serializer.SaveBattle(em, gs, "testuser")
+	if err != nil {
+		t.Fatalf("SaveBattle failed: %v", err)
+	}
+
+	// 加载
+	data, err := serializer.LoadBattle("testuser")
+	if err != nil {
+		t.Fatalf("LoadBattle failed: %v", err)
+	}
+
+	// 验证
+	if len(data.Zombies) != 1 {
+		t.Fatalf("Expected 1 zombie, got %d", len(data.Zombies))
+	}
+
+	z := data.Zombies[0]
+	if z.ZombieType != types.UnitIDZombieFlag {
+		t.Errorf("ZombieType mismatch: expected %s, got %s", types.UnitIDZombieFlag, z.ZombieType)
+	}
+	if z.Health != 270 {
+		t.Errorf("Health mismatch: expected 270, got %d", z.Health)
+	}
+	if z.Lane != 3 { // LaneIndex 2 + 1
+		t.Errorf("Lane mismatch: expected 3, got %d", z.Lane)
 	}
 }

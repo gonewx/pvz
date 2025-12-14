@@ -10,6 +10,7 @@ import (
 	"github.com/gonewx/pvz/pkg/game"
 	"github.com/gonewx/pvz/pkg/modules"
 	"github.com/gonewx/pvz/pkg/systems"
+	"github.com/gonewx/pvz/pkg/types"
 	"github.com/gonewx/pvz/pkg/utils"
 )
 
@@ -918,6 +919,8 @@ func (s *GameScene) restorePlants(plants []game.PlantData) {
 // 简化处理：
 //   - 行为状态简化为 walking（让系统重新判断）
 //   - 动画从 walk 状态开始
+//
+// Story 18.4: 使用工厂注册表，支持撑杆僵尸和旗帜僵尸
 func (s *GameScene) restoreZombies(zombies []game.ZombieData) {
 	for _, zombieData := range zombies {
 		// 跳过正在死亡的僵尸
@@ -942,21 +945,18 @@ func (s *GameScene) restoreZombies(zombies []game.ZombieData) {
 			}
 		}
 
-		// 根据僵尸类型创建实体
+		// Story 18.4: 使用工厂注册表创建僵尸实体
+		// 替代硬编码的 switch 语句，新增僵尸类型无需修改此处
 		var entityID ecs.EntityID
 		var err error
 
-		switch zombieData.ZombieType {
-		case "basic":
-			entityID, err = entities.NewZombieEntity(s.entityManager, s.resourceManager, lane-1, zombieData.X)
-		case "conehead":
-			entityID, err = entities.NewConeheadZombieEntity(s.entityManager, s.resourceManager, lane-1, zombieData.X)
-		case "buckethead":
-			entityID, err = entities.NewBucketheadZombieEntity(s.entityManager, s.resourceManager, lane-1, zombieData.X)
-		default:
-			// 默认创建普通僵尸
-			entityID, err = entities.NewZombieEntity(s.entityManager, s.resourceManager, lane-1, zombieData.X)
+		factory, found := entities.GetZombieFactory(zombieData.ZombieType)
+		if !found {
+			// 回退：未知类型使用默认工厂
+			log.Printf("[GameScene] Unknown zombie type %s, using default factory", zombieData.ZombieType)
+			factory = entities.GetDefaultZombieFactory()
 		}
+		entityID, err = factory(s.entityManager, s.resourceManager, lane-1, zombieData.X)
 
 		if err != nil {
 			log.Printf("[GameScene] ERROR: Failed to restore zombie %s at (%.1f, %.1f): %v",
@@ -984,13 +984,25 @@ func (s *GameScene) restoreZombies(zombies []game.ZombieData) {
 			}
 		}
 
+		// Story 18.4: 恢复撑杆僵尸特有状态
+		if zombieData.ZombieType == types.UnitIDZombiePolevaulter {
+			if poleVault, ok := ecs.GetComponent[*components.PoleVaultComponent](s.entityManager, entityID); ok {
+				poleVault.HasPole = zombieData.HasPole
+				poleVault.IsJumping = zombieData.IsJumping
+			}
+		}
+
 		// 恢复速度并激活僵尸
 		if velComp, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID); ok {
 			if zombieData.VelocityX != 0 {
 				velComp.VX = zombieData.VelocityX
 			} else {
-				// 如果没有保存速度，使用默认速度激活（僵尸标准移动速度）
-				velComp.VX = -23.0
+				// 如果没有保存速度，根据僵尸类型使用默认速度
+				if zombieData.ZombieType == types.UnitIDZombiePolevaulter && zombieData.HasPole {
+					velComp.VX = config.PolevaulterZombieRunSpeed
+				} else {
+					velComp.VX = config.ZombieWalkSpeed
+				}
 			}
 		}
 
@@ -1003,19 +1015,19 @@ func (s *GameScene) restoreZombies(zombies []game.ZombieData) {
 			}
 		}
 
-		// 触发走路动画（僵尸工厂默认创建的是 idle 动画）
-		// 根据僵尸类型选择正确的 unit ID
-		unitID := "zombie"
+		// Story 18.4: 使用 ZombieType 作为 UnitID（直接使用存档中的类型）
+		unitID := zombieData.ZombieType
 		comboName := "walk"
+
+		// 撑杆僵尸持杆时使用 run 动画
+		if zombieData.ZombieType == types.UnitIDZombiePolevaulter && zombieData.HasPole {
+			comboName = "run"
+		}
+
 		if zombieData.IsEating {
-			comboName = "eat" // Bug Fix: 配置中的啃食动画 combo 名称是 "eat"，不是 "eating"
+			comboName = "eat"
 		}
-		switch zombieData.ZombieType {
-		case "conehead":
-			unitID = "zombie_conehead"
-		case "buckethead":
-			unitID = "zombie_buckethead"
-		}
+
 		ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
 			UnitID:    unitID,
 			ComboName: comboName,
@@ -1027,8 +1039,8 @@ func (s *GameScene) restoreZombies(zombies []game.ZombieData) {
 			TargetRow: lane - 1,
 		})
 
-		log.Printf("[GameScene] Restored zombie %s at (%.1f, %.1f), lane=%d, health=%d/%d",
-			zombieData.ZombieType, zombieData.X, zombieData.Y, lane, zombieData.Health, zombieData.MaxHealth)
+		log.Printf("[GameScene] Restored zombie %s at (%.1f, %.1f), lane=%d, health=%d/%d, hasPole=%v",
+			zombieData.ZombieType, zombieData.X, zombieData.Y, lane, zombieData.Health, zombieData.MaxHealth, zombieData.HasPole)
 	}
 }
 

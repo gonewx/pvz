@@ -364,10 +364,11 @@ func validateLevelConfig(config *LevelConfig) error {
 			return fmt.Errorf("wave %d: type must be one of: Fixed, ExtraPoints, Final, got %q", i, wave.Type)
 		}
 
-		// 验证 ExtraPoints（仅在 Type="ExtraPoints" 或 "Fixed" 时允许非零值）
+		// 验证 ExtraPoints（在 Type="ExtraPoints", "Fixed" 或 "Final" 时允许非零值）
 		// Story 8.9: Fixed 类型支持混合模式 - 固定僵尸 + 额外点数动态分配
-		if wave.ExtraPoints != 0 && wave.Type != "ExtraPoints" && wave.Type != "Fixed" {
-			return fmt.Errorf("wave %d: extraPoints can only be set when type is 'ExtraPoints' or 'Fixed', got type %q with extraPoints %d", i, wave.Type, wave.ExtraPoints)
+		// Story 18.4: Final 类型也支持 extraPoints
+		if wave.ExtraPoints != 0 && wave.Type != "ExtraPoints" && wave.Type != "Fixed" && wave.Type != "Final" {
+			return fmt.Errorf("wave %d: extraPoints can only be set when type is 'ExtraPoints', 'Fixed', or 'Final', got type %q with extraPoints %d", i, wave.Type, wave.ExtraPoints)
 		}
 
 		// 验证 ExtraPoints（必须 >= 0）

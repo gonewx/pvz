@@ -409,3 +409,130 @@ func TestBucketheadZombieTotalHealth(t *testing.T) {
 		t.Errorf("配置中铁桶僵尸总生命值应为1370，实际为 %d", expectedTotal)
 	}
 }
+
+// =============================================================================
+// Story 18.4: 僵尸工厂注册表测试
+// =============================================================================
+
+// TestGetZombieFactory_KnownTypes 测试已知僵尸类型的工厂查找
+func TestGetZombieFactory_KnownTypes(t *testing.T) {
+	tests := []struct {
+		unitID      string
+		description string
+	}{
+		{"zombie", "普通僵尸"},
+		{"zombie_conehead", "路障僵尸"},
+		{"zombie_buckethead", "铁桶僵尸"},
+		{"zombie_flag", "旗帜僵尸"},
+		{"zombie_polevaulter", "撑杆僵尸"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			factory, found := GetZombieFactory(tt.unitID)
+			if !found {
+				t.Errorf("GetZombieFactory(%q) should find factory for %s", tt.unitID, tt.description)
+			}
+			if factory == nil {
+				t.Errorf("GetZombieFactory(%q) returned nil factory", tt.unitID)
+			}
+		})
+	}
+}
+
+// TestGetZombieFactory_UnknownType 测试未知僵尸类型的工厂查找
+func TestGetZombieFactory_UnknownType(t *testing.T) {
+	unknownTypes := []string{
+		"zombie_unknown",
+		"zombie_dancing",
+		"zombie_gargantuar",
+		"invalid",
+		"",
+	}
+
+	for _, unitID := range unknownTypes {
+		t.Run(unitID, func(t *testing.T) {
+			factory, found := GetZombieFactory(unitID)
+			if found {
+				t.Errorf("GetZombieFactory(%q) should not find factory for unknown type", unitID)
+			}
+			if factory != nil {
+				t.Errorf("GetZombieFactory(%q) should return nil for unknown type", unitID)
+			}
+		})
+	}
+}
+
+// TestGetDefaultZombieFactory 测试默认工厂函数
+func TestGetDefaultZombieFactory(t *testing.T) {
+	factory := GetDefaultZombieFactory()
+	if factory == nil {
+		t.Fatal("GetDefaultZombieFactory() should not return nil")
+	}
+
+	// 验证默认工厂能创建普通僵尸
+	rm := newMockResourceManager()
+	em := ecs.NewEntityManager()
+
+	entityID, err := factory(em, rm, 0, 1450.0)
+	if err != nil {
+		t.Fatalf("Default factory failed to create zombie: %v", err)
+	}
+	if entityID == 0 {
+		t.Error("Default factory returned invalid entity ID")
+	}
+
+	// 验证是普通僵尸
+	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](em, entityID)
+	if !ok {
+		t.Fatal("Zombie should have BehaviorComponent")
+	}
+	if behavior.Type != components.BehaviorZombieBasic {
+		t.Errorf("Default factory should create basic zombie, got %v", behavior.Type)
+	}
+}
+
+// TestZombieFactoryRegistration_CreateEntity 测试工厂注册表创建实体
+func TestZombieFactoryRegistration_CreateEntity(t *testing.T) {
+	rm := newMockResourceManager()
+	em := ecs.NewEntityManager()
+
+	tests := []struct {
+		unitID       string
+		expectedType components.BehaviorType
+	}{
+		{"zombie", components.BehaviorZombieBasic},
+		{"zombie_conehead", components.BehaviorZombieConehead},
+		{"zombie_buckethead", components.BehaviorZombieBuckethead},
+		{"zombie_flag", components.BehaviorZombieFlag},
+		{"zombie_polevaulter", components.BehaviorZombiePolevaulter},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.unitID, func(t *testing.T) {
+			factory, found := GetZombieFactory(tt.unitID)
+			if !found {
+				t.Fatalf("Factory not found for %s", tt.unitID)
+			}
+
+			entityID, err := factory(em, rm, 2, 1450.0)
+			if err != nil {
+				t.Fatalf("Factory failed to create %s: %v", tt.unitID, err)
+			}
+
+			behavior, ok := ecs.GetComponent[*components.BehaviorComponent](em, entityID)
+			if !ok {
+				t.Fatalf("%s should have BehaviorComponent", tt.unitID)
+			}
+			if behavior.Type != tt.expectedType {
+				t.Errorf("%s: expected behavior type %v, got %v", tt.unitID, tt.expectedType, behavior.Type)
+			}
+
+			// 验证 ZombieTagComponent（Story 18.4 关键）
+			_, hasTag := ecs.GetComponent[*components.ZombieTagComponent](em, entityID)
+			if !hasTag {
+				t.Errorf("%s should have ZombieTagComponent", tt.unitID)
+			}
+		})
+	}
+}
