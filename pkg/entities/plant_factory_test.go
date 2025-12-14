@@ -644,3 +644,204 @@ func TestCherryBombConfiguration(t *testing.T) {
 		}
 	})
 }
+
+// =============================================================================
+// Story 18.5: 植物工厂注册表测试
+// =============================================================================
+
+// TestGetPlantFactory_KnownTypes 测试已知植物类型的工厂查找
+func TestGetPlantFactory_KnownTypes(t *testing.T) {
+	testCases := []struct {
+		plantType string
+		wantFound bool
+	}{
+		{"sunflower", true},
+		{"peashooter", true},
+		{"wallnut", true},
+		{"cherrybomb", true},
+		{"potatomine", true},
+		{"snowpea", true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.plantType, func(t *testing.T) {
+			factory, found := GetPlantFactory(tc.plantType)
+			if found != tc.wantFound {
+				t.Errorf("GetPlantFactory(%q) found = %v, want %v", tc.plantType, found, tc.wantFound)
+			}
+			if tc.wantFound && factory == nil {
+				t.Errorf("GetPlantFactory(%q) returned nil factory", tc.plantType)
+			}
+		})
+	}
+}
+
+// TestGetPlantFactory_UnknownType 测试未知植物类型返回 nil
+func TestGetPlantFactory_UnknownType(t *testing.T) {
+	unknownTypes := []string{
+		"unknown",
+		"chomper",
+		"repeater",
+		"",
+		"SUNFLOWER", // 区分大小写
+	}
+
+	for _, plantType := range unknownTypes {
+		t.Run(plantType, func(t *testing.T) {
+			factory, found := GetPlantFactory(plantType)
+			if found {
+				t.Errorf("GetPlantFactory(%q) should not find unknown type", plantType)
+			}
+			if factory != nil {
+				t.Errorf("GetPlantFactory(%q) should return nil for unknown type", plantType)
+			}
+		})
+	}
+}
+
+// TestGetDefaultPlantFactory 测试默认工厂返回非 nil
+func TestGetDefaultPlantFactory(t *testing.T) {
+	factory := GetDefaultPlantFactory()
+	if factory == nil {
+		t.Error("GetDefaultPlantFactory() returned nil")
+	}
+}
+
+// TestPlantTagComponent_AddedByFactories 测试工厂函数是否添加 PlantTagComponent
+func TestPlantTagComponent_AddedByFactories(t *testing.T) {
+	rm := newMockResourceManager()
+	em := ecs.NewEntityManager()
+	gs := game.GetGameState()
+	gs.CameraX = 215
+	mockRS := &mockReanimSystem{em: em}
+
+	// 测试向日葵工厂
+	t.Run("Sunflower", func(t *testing.T) {
+		entityID, err := NewPlantEntity(em, rm, gs, mockRS, components.PlantSunflower, 0, 0)
+		if err != nil {
+			t.Fatalf("Failed to create sunflower: %v", err)
+		}
+		_, ok := ecs.GetComponent[*components.PlantTagComponent](em, entityID)
+		if !ok {
+			t.Error("Sunflower should have PlantTagComponent")
+		}
+	})
+
+	// 测试坚果墙工厂
+	t.Run("Wallnut", func(t *testing.T) {
+		entityID, err := NewWallnutEntity(em, rm, gs, mockRS, 1, 0)
+		if err != nil {
+			t.Fatalf("Failed to create wallnut: %v", err)
+		}
+		_, ok := ecs.GetComponent[*components.PlantTagComponent](em, entityID)
+		if !ok {
+			t.Error("Wallnut should have PlantTagComponent")
+		}
+	})
+
+	// 测试樱桃炸弹工厂
+	t.Run("CherryBomb", func(t *testing.T) {
+		entityID, err := NewCherryBombEntity(em, rm, gs, 2, 0)
+		if err != nil {
+			t.Fatalf("Failed to create cherrybomb: %v", err)
+		}
+		_, ok := ecs.GetComponent[*components.PlantTagComponent](em, entityID)
+		if !ok {
+			t.Error("CherryBomb should have PlantTagComponent")
+		}
+	})
+
+	// 测试土豆地雷工厂
+	t.Run("PotatoMine", func(t *testing.T) {
+		entityID, err := NewPotatoMineEntity(em, rm, gs, 3, 0)
+		if err != nil {
+			t.Fatalf("Failed to create potatomine: %v", err)
+		}
+		_, ok := ecs.GetComponent[*components.PlantTagComponent](em, entityID)
+		if !ok {
+			t.Error("PotatoMine should have PlantTagComponent")
+		}
+	})
+
+	// 测试寒冰射手工厂
+	t.Run("SnowPea", func(t *testing.T) {
+		entityID, err := NewSnowPeaEntity(em, rm, gs, mockRS, 4, 0)
+		if err != nil {
+			t.Fatalf("Failed to create snowpea: %v", err)
+		}
+		_, ok := ecs.GetComponent[*components.PlantTagComponent](em, entityID)
+		if !ok {
+			t.Error("SnowPea should have PlantTagComponent")
+		}
+	})
+}
+
+// TestPlantTagComponent_QueryMultipleEntities 测试通过 PlantTagComponent 查询多个植物实体
+func TestPlantTagComponent_QueryMultipleEntities(t *testing.T) {
+	em := ecs.NewEntityManager()
+
+	// 创建多个植物实体
+	plantTypes := []components.PlantType{
+		components.PlantSunflower,
+		components.PlantPeashooter,
+		components.PlantWallnut,
+	}
+
+	var createdEntities []ecs.EntityID
+	for i, pt := range plantTypes {
+		entityID := em.CreateEntity()
+		em.AddComponent(entityID, &components.PlantTagComponent{})
+		em.AddComponent(entityID, &components.PlantComponent{
+			PlantType: pt,
+			GridRow:   0,
+			GridCol:   i,
+		})
+		createdEntities = append(createdEntities, entityID)
+	}
+
+	// 创建一个非植物实体（不添加 PlantTagComponent）
+	nonPlantEntity := em.CreateEntity()
+	em.AddComponent(nonPlantEntity, &components.PositionComponent{X: 100, Y: 100})
+
+	// 验证查询结果
+	plantEntities := ecs.GetEntitiesWith1[*components.PlantTagComponent](em)
+	if len(plantEntities) != len(plantTypes) {
+		t.Errorf("Expected %d plant entities, got %d", len(plantTypes), len(plantEntities))
+	}
+
+	// 验证非植物实体不在结果中
+	for _, e := range plantEntities {
+		if e == nonPlantEntity {
+			t.Error("Non-plant entity should not be in plant query results")
+		}
+	}
+}
+
+// TestPlantFactoryDeps_Structure 测试 PlantFactoryDeps 结构体
+func TestPlantFactoryDeps_Structure(t *testing.T) {
+	// 测试可以创建空依赖结构
+	deps := PlantFactoryDeps{}
+
+	if deps.EntityManager != nil {
+		t.Error("Expected nil EntityManager")
+	}
+	if deps.ResourceLoader != nil {
+		t.Error("Expected nil ResourceLoader")
+	}
+	if deps.GameState != nil {
+		t.Error("Expected nil GameState")
+	}
+	if deps.ReanimSystem != nil {
+		t.Error("Expected nil ReanimSystem")
+	}
+
+	// 测试可以正确设置依赖
+	em := ecs.NewEntityManager()
+	deps2 := PlantFactoryDeps{
+		EntityManager: em,
+	}
+	if deps2.EntityManager != em {
+		t.Error("EntityManager not set correctly")
+	}
+}
+

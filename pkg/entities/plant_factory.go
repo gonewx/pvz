@@ -55,6 +55,9 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 	// 创建实体
 	entityID := em.CreateEntity()
 
+	// Story 18.5: 添加植物标签组件（用于序列化时统一识别植物实体）
+	em.AddComponent(entityID, &components.PlantTagComponent{})
+
 	// 添加位置组件（使用世界坐标）
 	em.AddComponent(entityID, &components.PositionComponent{
 		X: worldCenterX,
@@ -224,6 +227,9 @@ func NewWallnutEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameSta
 	// 创建实体
 	entityID := em.CreateEntity()
 
+	// Story 18.5: 添加植物标签组件（用于序列化时统一识别植物实体）
+	em.AddComponent(entityID, &components.PlantTagComponent{})
+
 	// 添加位置组件（使用世界坐标）
 	em.AddComponent(entityID, &components.PositionComponent{
 		X: worldCenterX,
@@ -321,6 +327,9 @@ func NewCherryBombEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.Game
 	// 创建实体
 	entityID := em.CreateEntity()
 
+	// Story 18.5: 添加植物标签组件（用于序列化时统一识别植物实体）
+	em.AddComponent(entityID, &components.PlantTagComponent{})
+
 	// 添加位置组件（使用世界坐标）
 	em.AddComponent(entityID, &components.PositionComponent{
 		X: worldCenterX,
@@ -413,6 +422,9 @@ func NewPotatoMineEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.Game
 	// 创建实体
 	entityID := em.CreateEntity()
 
+	// Story 18.5: 添加植物标签组件（用于序列化时统一识别植物实体）
+	em.AddComponent(entityID, &components.PlantTagComponent{})
+
 	// 添加位置组件（使用世界坐标）
 	em.AddComponent(entityID, &components.PositionComponent{
 		X: worldCenterX,
@@ -498,6 +510,9 @@ func NewSnowPeaEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameSta
 	// 创建实体
 	entityID := em.CreateEntity()
 
+	// Story 18.5: 添加植物标签组件（用于序列化时统一识别植物实体）
+	em.AddComponent(entityID, &components.PlantTagComponent{})
+
 	// 添加位置组件（使用世界坐标）
 	em.AddComponent(entityID, &components.PositionComponent{
 		X: worldCenterX,
@@ -574,4 +589,96 @@ func NewSnowPeaEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameSta
 	})
 
 	return entityID, nil
+}
+
+// =============================================================================
+// Story 18.5: 植物工厂注册表
+// =============================================================================
+
+// PlantFactoryDeps 植物工厂依赖
+//
+// 封装植物工厂函数所需的所有依赖，避免工厂签名不统一的问题
+// 不需要的依赖可以传 nil（如樱桃炸弹不需要 ReanimSystem）
+type PlantFactoryDeps struct {
+	EntityManager  *ecs.EntityManager
+	ResourceLoader ResourceLoader
+	GameState      *game.GameState
+	ReanimSystem   ReanimSystemInterface // 可选，部分植物不需要
+}
+
+// PlantFactory 统一的植物工厂函数签名
+//
+// 所有植物工厂适配器函数都遵循相同的签名：
+//   - deps: 工厂依赖（包含 EntityManager、ResourceLoader 等）
+//   - col: 网格列索引 (0-8)
+//   - row: 网格行索引 (0-4)
+//
+// 返回创建的实体ID和可能的错误
+type PlantFactory func(deps PlantFactoryDeps, col, row int) (ecs.EntityID, error)
+
+// plantFactories 植物工厂注册表
+//
+// Story 18.5: 使用植物类型字符串作为键，映射到对应的工厂适配器函数
+// 新增植物类型只需在此表中添加一行，恢复逻辑无需修改
+var plantFactories = map[string]PlantFactory{
+	"sunflower":  newSunflowerFactory,
+	"peashooter": newPeashooterFactory,
+	"wallnut":    newWallnutFactory,
+	"cherrybomb": newCherryBombFactory,
+	"potatomine": newPotatoMineFactory,
+	"snowpea":    newSnowPeaFactory,
+}
+
+// 适配器函数：将统一签名适配到各具体工厂函数
+
+func newSunflowerFactory(deps PlantFactoryDeps, col, row int) (ecs.EntityID, error) {
+	return NewPlantEntity(deps.EntityManager, deps.ResourceLoader, deps.GameState,
+		deps.ReanimSystem, components.PlantSunflower, col, row)
+}
+
+func newPeashooterFactory(deps PlantFactoryDeps, col, row int) (ecs.EntityID, error) {
+	return NewPlantEntity(deps.EntityManager, deps.ResourceLoader, deps.GameState,
+		deps.ReanimSystem, components.PlantPeashooter, col, row)
+}
+
+func newWallnutFactory(deps PlantFactoryDeps, col, row int) (ecs.EntityID, error) {
+	return NewWallnutEntity(deps.EntityManager, deps.ResourceLoader, deps.GameState,
+		deps.ReanimSystem, col, row)
+}
+
+func newCherryBombFactory(deps PlantFactoryDeps, col, row int) (ecs.EntityID, error) {
+	return NewCherryBombEntity(deps.EntityManager, deps.ResourceLoader, deps.GameState, col, row)
+}
+
+func newPotatoMineFactory(deps PlantFactoryDeps, col, row int) (ecs.EntityID, error) {
+	return NewPotatoMineEntity(deps.EntityManager, deps.ResourceLoader, deps.GameState, col, row)
+}
+
+func newSnowPeaFactory(deps PlantFactoryDeps, col, row int) (ecs.EntityID, error) {
+	return NewSnowPeaEntity(deps.EntityManager, deps.ResourceLoader, deps.GameState,
+		deps.ReanimSystem, col, row)
+}
+
+// GetPlantFactory 获取植物工厂函数
+//
+// Story 18.5: 通过植物类型字符串查找对应的工厂函数
+// 如果找不到对应的工厂函数，返回 nil 和 false
+//
+// 参数:
+//   - plantType: 植物类型字符串（如 "peashooter", "sunflower"）
+//
+// 返回:
+//   - PlantFactory: 工厂函数，如果未找到返回 nil
+//   - bool: 是否找到对应的工厂函数
+func GetPlantFactory(plantType string) (PlantFactory, bool) {
+	factory, ok := plantFactories[plantType]
+	return factory, ok
+}
+
+// GetDefaultPlantFactory 获取默认植物工厂函数
+//
+// Story 18.5: 当找不到对应的工厂函数时，返回豌豆射手工厂
+// 作为回退策略，确保旧版存档不会导致崩溃
+func GetDefaultPlantFactory() PlantFactory {
+	return newPeashooterFactory
 }

@@ -1,0 +1,128 @@
+# Quality Gate Decision
+# Story 18.5: 重构植物实体序列化以支持扩展性
+
+schema: 1
+story: "18.5"
+story_title: "植物序列化扩展性重构"
+gate: PASS
+status_reason: "所有 AC 验证通过，之前的 CONCERNS 已全部解决：土豆地雷序列化测试已添加，stringToPlantType() 已清理"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-12-14T14:35:00+08:00"
+
+waiver: { active: false }
+
+top_issues: []
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
+  recommendations:
+    must_fix: []
+    monitor: []
+
+quality_score: 100
+expires: "2025-12-28T00:00:00+08:00"
+
+evidence:
+  tests_reviewed: 23
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "无安全风险，仅涉及内部数据序列化"
+  performance:
+    status: PASS
+    notes: "工厂注册表查找 O(1)，无性能影响"
+  reliability:
+    status: PASS
+    notes: "未知植物类型有回退机制，保证向后兼容"
+  maintainability:
+    status: PASS
+    notes: "新增植物类型只需注册一行，符合 Open/Closed 原则"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "监控 TestZombieDeathParticleEffect 失败"
+      refs: ["pkg/systems/behavior/zombie_death_particle_test.go"]
+
+history:
+  - at: "2025-12-14T10:00:00+08:00"
+    gate: CONCERNS
+    note: "初审 - 缺少土豆地雷序列化测试，stringToPlantType() 未清理"
+  - at: "2025-12-14T14:35:00+08:00"
+    gate: PASS
+    note: "复审 - 所有 CONCERNS 已解决"
+
+# === 详细审查记录 ===
+
+acceptance_criteria:
+  - id: AC1
+    description: "使用 PlantTagComponent 识别植物实体"
+    status: PASS
+    evidence:
+      - "pkg/components/plant_tag.go - PlantTagComponent 已创建"
+      - "pkg/entities/plant_factory.go - 所有工厂函数添加 PlantTagComponent"
+      - "pkg/game/battle_serializer.go:182 - 使用 PlantTagComponent 查询"
+      - "测试: TestPlantTagComponent_AddedByFactories PASS"
+      - "测试: TestPlantTagComponent_QueryMultipleEntities PASS"
+
+  - id: AC2
+    description: "使用 PlantType 作为类型标识"
+    status: PASS
+    evidence:
+      - "pkg/game/battle_serializer.go:216 - 使用 PlantType.String()"
+
+  - id: AC3
+    description: "工厂函数注册表"
+    status: PASS
+    evidence:
+      - "pkg/entities/plant_factory.go:598-684 - PlantFactoryDeps 和 PlantFactory"
+      - "pkg/entities/plant_factory.go:623-630 - plantFactoryRegistry"
+      - "测试: TestGetPlantFactory_KnownTypes PASS"
+      - "测试: TestGetPlantFactory_UnknownType PASS"
+      - "测试: TestGetDefaultPlantFactory PASS"
+
+  - id: AC4
+    description: "土豆地雷状态保存和恢复"
+    status: PASS
+    evidence:
+      - "pkg/game/battle_serializer.go:226-227 - 收集土豆地雷状态"
+      - "pkg/scenes/game_scene_init.go:851-891 - 恢复土豆地雷状态"
+      - "测试: TestBattleSerializer_PotatoMine_Arming PASS"
+      - "测试: TestBattleSerializer_PotatoMine_Armed PASS"
+
+  - id: AC5
+    description: "移除硬编码 switch-case"
+    status: PASS
+    evidence:
+      - "pkg/scenes/game_scene_init.go:794-815 - 使用工厂注册表"
+
+  - id: AC6
+    description: "单元测试"
+    status: PASS
+    evidence:
+      - "pkg/entities/plant_factory_test.go - 工厂测试完整"
+      - "pkg/game/battle_serializer_test.go - 序列化测试完整"
+      - "Testing 部分列出的 9 个必须测试场景全部覆盖"
+
+test_results:
+  - suite: "pkg/entities/..."
+    status: PASS
+    count: "67 tests"
+
+  - suite: "pkg/game/... (BattleSerializer)"
+    status: PASS
+    count: "23 tests"
+    note: "包含新增的土豆地雷序列化测试"
+
+code_quality:
+  positives:
+    - "遵循 ECS 泛型 API 模式"
+    - "工厂注册表设计符合 Open/Closed 原则"
+    - "PlantTagComponent 是标记组件，符合 ECS 纯数据组件原则"
+    - "代码有良好的日志和注释"
+    - "stringToPlantType() 已完全清理"

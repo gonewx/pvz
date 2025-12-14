@@ -171,16 +171,17 @@ func (s *BattleSerializer) collectLevelState(gs *GameState, saveData *BattleSave
 }
 
 // collectPlantData 从 EntityManager 收集所有植物实体数据
+//
+// Story 18.5: 使用 PlantTagComponent 查询所有植物实体
+// 新增植物类型无需修改此函数，只需在工厂函数中添加 PlantTagComponent 即可
 func (s *BattleSerializer) collectPlantData(em *ecs.EntityManager) []PlantData {
 	var plants []PlantData
 
-	// 查询所有拥有 PlantComponent 和 PositionComponent 的实体
-	entities := ecs.GetEntitiesWith2[
-		*components.PlantComponent,
-		*components.PositionComponent,
-	](em)
+	// Story 18.5: 使用 PlantTagComponent 查询所有植物实体
+	// 替代硬编码的 GetEntitiesWith2[PlantComponent, PositionComponent]
+	plantEntities := ecs.GetEntitiesWith1[*components.PlantTagComponent](em)
 
-	for _, entity := range entities {
+	for _, entity := range plantEntities {
 		plantComp, ok := ecs.GetComponent[*components.PlantComponent](em, entity)
 		if !ok {
 			continue
@@ -210,7 +211,8 @@ func (s *BattleSerializer) collectPlantData(em *ecs.EntityManager) []PlantData {
 				timerComp.CurrentTime, timerComp.TargetTime, attackCooldown)
 		}
 
-		plants = append(plants, PlantData{
+		// Story 18.5: 使用 PlantType.String() 作为类型标识
+		plantData := PlantData{
 			PlantType:       plantComp.PlantType.String(),
 			GridRow:         plantComp.GridRow,
 			GridCol:         plantComp.GridCol,
@@ -220,7 +222,12 @@ func (s *BattleSerializer) collectPlantData(em *ecs.EntityManager) []PlantData {
 			TimerTargetTime: timerTargetTime,
 			BlinkTimer:      plantComp.BlinkTimer,
 			AttackAnimState: int(plantComp.AttackAnimState),
-		})
+			// Story 18.5: 收集土豆地雷状态
+			PotatoMinePhase: int(plantComp.PotatoMinePhase),
+			ArmingTimer:     plantComp.ArmingTimer,
+		}
+
+		plants = append(plants, plantData)
 	}
 
 	return plants

@@ -779,78 +779,40 @@ func (s *GameScene) restoreBattleState() {
 // restorePlants 恢复植物实体
 //
 // Story 18.3: 从存档数据重建植物实体
+// Story 18.5: 使用工厂注册表，支持土豆地雷状态恢复
 //
 // 恢复内容：
 //   - 植物类型和位置（网格行列）
 //   - 生命值（当前/最大）
 //   - 攻击冷却时间
 //   - 草坪网格占用状态
+//   - 土豆地雷阶段和武装计时器
 //
 // 简化处理：
-//   - 动画从 idle 状态开始
+//   - 动画从 idle 状态开始（土豆地雷除外，根据阶段设置正确动画）
 //   - 眨眼计时器重置
 func (s *GameScene) restorePlants(plants []game.PlantData) {
-	for _, plantData := range plants {
-		// 将植物类型字符串转换为 PlantType
-		plantType := stringToPlantType(plantData.PlantType)
-		if plantType == components.PlantUnknown {
-			log.Printf("[GameScene] Warning: Unknown plant type '%s', skipping", plantData.PlantType)
-			continue
-		}
+	// Story 18.5: 创建工厂依赖
+	deps := entities.PlantFactoryDeps{
+		EntityManager:  s.entityManager,
+		ResourceLoader: s.resourceManager,
+		GameState:      s.gameState,
+		ReanimSystem:   s.reanimSystem,
+	}
 
-		// 根据植物类型创建实体
+	for _, plantData := range plants {
+		// Story 18.5: 使用工厂注册表创建植物实体
+		// 替代硬编码的 switch 语句，新增植物类型无需修改此处
 		var entityID ecs.EntityID
 		var err error
 
-		switch plantType {
-		case components.PlantSunflower, components.PlantPeashooter:
-			entityID, err = entities.NewPlantEntity(
-				s.entityManager,
-				s.resourceManager,
-				s.gameState,
-				s.reanimSystem,
-				plantType,
-				plantData.GridCol,
-				plantData.GridRow,
-			)
-		case components.PlantWallnut:
-			entityID, err = entities.NewWallnutEntity(
-				s.entityManager,
-				s.resourceManager,
-				s.gameState,
-				s.reanimSystem,
-				plantData.GridCol,
-				plantData.GridRow,
-			)
-		case components.PlantCherryBomb:
-			entityID, err = entities.NewCherryBombEntity(
-				s.entityManager,
-				s.resourceManager,
-				s.gameState,
-				plantData.GridCol,
-				plantData.GridRow,
-			)
-		case components.PlantPotatoMine:
-			entityID, err = entities.NewPotatoMineEntity(
-				s.entityManager,
-				s.resourceManager,
-				s.gameState,
-				plantData.GridCol,
-				plantData.GridRow,
-			)
-		case components.PlantSnowPea:
-			entityID, err = entities.NewSnowPeaEntity(
-				s.entityManager,
-				s.resourceManager,
-				s.gameState,
-				s.reanimSystem,
-				plantData.GridCol,
-				plantData.GridRow,
-			)
-		default:
-			log.Printf("[GameScene] Warning: Unsupported plant type '%s', skipping", plantData.PlantType)
-			continue
+		factory, found := entities.GetPlantFactory(plantData.PlantType)
+		if !found {
+			// 回退：未知类型使用默认工厂
+			log.Printf("[GameScene] Unknown plant type '%s', using default factory", plantData.PlantType)
+			factory = entities.GetDefaultPlantFactory()
 		}
+		entityID, err = factory(deps, plantData.GridCol, plantData.GridRow)
 
 		if err != nil {
 			log.Printf("[GameScene] ERROR: Failed to restore plant %s at (%d,%d): %v",
@@ -883,6 +845,49 @@ func (s *GameScene) restorePlants(plants []game.PlantData) {
 			timerComp.IsReady = plantData.AttackCooldown <= 0
 			log.Printf("[GameScene] Restored timer for %s: CurrentTime=%.2f, TargetTime=%.2f, IsReady=%v",
 				plantData.PlantType, timerComp.CurrentTime, timerComp.TargetTime, timerComp.IsReady)
+		}
+
+		// Story 18.5: 恢复土豆地雷状态
+		if plantData.PlantType == "potatomine" {
+			if plantComp, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, entityID); ok {
+				plantComp.PotatoMinePhase = components.PotatoMinePhase(plantData.PotatoMinePhase)
+				plantComp.ArmingTimer = plantData.ArmingTimer
+
+				// 根据阶段触发正确的动画
+				switch plantComp.PotatoMinePhase {
+				case components.PotatoMineArming:
+					// 武装阶段：播放 anim_idle（埋在地下）
+					ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
+						UnitID:        "potatomine",
+						AnimationName: "anim_idle",
+						Processed:     false,
+					})
+				case components.PotatoMineRising:
+					// 升起阶段：播放 anim_rise
+					ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
+						UnitID:        "potatomine",
+						AnimationName: "anim_rise",
+						Processed:     false,
+					})
+				case components.PotatoMineArmed:
+					// 待机阶段：播放 armed combo（anim_armed + anim_light）
+					ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
+						UnitID:    "potatomine",
+						ComboName: "armed",
+						Processed: false,
+					})
+				case components.PotatoMineExploding:
+					// 爆炸阶段：播放 anim_mashed（通常存档时不会保存这个状态）
+					ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
+						UnitID:        "potatomine",
+						AnimationName: "anim_mashed",
+						Processed:     false,
+					})
+				}
+
+				log.Printf("[GameScene] Restored potato mine at (%d,%d): Phase=%d, ArmingTimer=%.2f",
+					plantData.GridRow, plantData.GridCol, plantData.PotatoMinePhase, plantData.ArmingTimer)
+			}
 		}
 
 		// 更新草坪网格占用状态
@@ -1211,26 +1216,6 @@ func (s *GameScene) restoreLawnmowers(lawnmowers []game.LawnmowerData) {
 
 		log.Printf("[GameScene] Restored lawnmower on lane %d at X=%.1f, triggered=%v, active=%v",
 			lmData.Lane, lmData.X, lmData.Triggered, lmData.Active)
-	}
-}
-
-// stringToPlantType 将植物类型字符串转换为 PlantType
-func stringToPlantType(s string) components.PlantType {
-	switch s {
-	case "Sunflower", "sunflower":
-		return components.PlantSunflower
-	case "Peashooter", "peashooter":
-		return components.PlantPeashooter
-	case "Wallnut", "wallnut":
-		return components.PlantWallnut
-	case "CherryBomb", "cherrybomb":
-		return components.PlantCherryBomb
-	case "PotatoMine", "potatomine":
-		return components.PlantPotatoMine
-	case "SnowPea", "snowpea":
-		return components.PlantSnowPea
-	default:
-		return components.PlantUnknown
 	}
 }
 

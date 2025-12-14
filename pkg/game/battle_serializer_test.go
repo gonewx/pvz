@@ -154,6 +154,7 @@ func TestBattleSerializer_SaveAndLoadBattle_WithPlants(t *testing.T) {
 
 	// 创建植物实体
 	plant1 := em.CreateEntity()
+	ecs.AddComponent(em, plant1, &components.PlantTagComponent{}) // Story 18.5: 添加植物标签
 	ecs.AddComponent(em, plant1, &components.PlantComponent{
 		PlantType: components.PlantPeashooter,
 		GridRow:   1,
@@ -163,6 +164,7 @@ func TestBattleSerializer_SaveAndLoadBattle_WithPlants(t *testing.T) {
 	ecs.AddComponent(em, plant1, &components.HealthComponent{CurrentHealth: 280, MaxHealth: 300})
 
 	plant2 := em.CreateEntity()
+	ecs.AddComponent(em, plant2, &components.PlantTagComponent{}) // Story 18.5: 添加植物标签
 	ecs.AddComponent(em, plant2, &components.PlantComponent{
 		PlantType: components.PlantSunflower,
 		GridRow:   0,
@@ -592,17 +594,20 @@ func TestBattleSerializer_SaveAndLoadBattle_CompleteScenario(t *testing.T) {
 
 	// 创建多种植物
 	plant1 := em.CreateEntity()
+	ecs.AddComponent(em, plant1, &components.PlantTagComponent{}) // Story 18.5: 添加植物标签
 	ecs.AddComponent(em, plant1, &components.PlantComponent{PlantType: components.PlantPeashooter, GridRow: 0, GridCol: 2})
 	ecs.AddComponent(em, plant1, &components.PositionComponent{X: 200, Y: 50})
 	ecs.AddComponent(em, plant1, &components.HealthComponent{CurrentHealth: 300, MaxHealth: 300})
 
 	plant2 := em.CreateEntity()
+	ecs.AddComponent(em, plant2, &components.PlantTagComponent{}) // Story 18.5: 添加植物标签
 	ecs.AddComponent(em, plant2, &components.PlantComponent{PlantType: components.PlantSunflower, GridRow: 1, GridCol: 0})
 	ecs.AddComponent(em, plant2, &components.PositionComponent{X: 100, Y: 100})
 	ecs.AddComponent(em, plant2, &components.HealthComponent{CurrentHealth: 200, MaxHealth: 200})
 	ecs.AddComponent(em, plant2, &components.TimerComponent{Name: "sun_production", TargetTime: 20, CurrentTime: 15})
 
 	plant3 := em.CreateEntity()
+	ecs.AddComponent(em, plant3, &components.PlantTagComponent{}) // Story 18.5: 添加植物标签
 	ecs.AddComponent(em, plant3, &components.PlantComponent{PlantType: components.PlantWallnut, GridRow: 2, GridCol: 4})
 	ecs.AddComponent(em, plant3, &components.PositionComponent{X: 300, Y: 150})
 	ecs.AddComponent(em, plant3, &components.HealthComponent{CurrentHealth: 2500, MaxHealth: 4000})
@@ -1091,5 +1096,135 @@ func TestBattleSerializer_FlagZombie(t *testing.T) {
 	}
 	if z.Lane != 3 { // LaneIndex 2 + 1
 		t.Errorf("Lane mismatch: expected 3, got %d", z.Lane)
+	}
+}
+
+// =============================================================================
+// Story 18.5: 土豆地雷序列化测试
+// =============================================================================
+
+// TestBattleSerializer_PotatoMine_Arming 测试土豆地雷武装阶段的序列化
+func TestBattleSerializer_PotatoMine_Arming(t *testing.T) {
+	gdataManager := createTestGdataManagerForBattle(t, "potatomine_arming")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	em := ecs.NewEntityManager()
+	gs := &GameState{
+		Sun:          200,
+		SpawnedWaves: []bool{true},
+		CurrentLevel: &config.LevelConfig{ID: "1-3"},
+	}
+
+	// 创建武装阶段的土豆地雷
+	potatoMine := em.CreateEntity()
+	ecs.AddComponent(em, potatoMine, &components.PlantTagComponent{})
+	ecs.AddComponent(em, potatoMine, &components.PlantComponent{
+		PlantType:       components.PlantPotatoMine,
+		GridRow:         2,
+		GridCol:         3,
+		PotatoMinePhase: components.PotatoMineArming, // 武装阶段
+		ArmingTimer:     10.5,                        // 剩余武装时间
+	})
+	ecs.AddComponent(em, potatoMine, &components.PositionComponent{X: 350, Y: 250})
+	ecs.AddComponent(em, potatoMine, &components.HealthComponent{CurrentHealth: 300, MaxHealth: 300})
+
+	// 保存
+	serializer := NewBattleSerializer(gdataManager)
+	err := serializer.SaveBattle(em, gs, "testuser")
+	if err != nil {
+		t.Fatalf("SaveBattle failed: %v", err)
+	}
+
+	// 加载
+	data, err := serializer.LoadBattle("testuser")
+	if err != nil {
+		t.Fatalf("LoadBattle failed: %v", err)
+	}
+
+	// 验证土豆地雷数据
+	if len(data.Plants) != 1 {
+		t.Fatalf("Expected 1 plant, got %d", len(data.Plants))
+	}
+
+	p := data.Plants[0]
+	if p.PlantType != components.PlantPotatoMine.String() {
+		t.Errorf("PlantType mismatch: expected %s, got %s", components.PlantPotatoMine.String(), p.PlantType)
+	}
+	if p.GridRow != 2 || p.GridCol != 3 {
+		t.Errorf("Grid position mismatch: expected (2, 3), got (%d, %d)", p.GridRow, p.GridCol)
+	}
+	if p.PotatoMinePhase != int(components.PotatoMineArming) {
+		t.Errorf("PotatoMinePhase mismatch: expected %d (Arming), got %d", int(components.PotatoMineArming), p.PotatoMinePhase)
+	}
+	if p.ArmingTimer != 10.5 {
+		t.Errorf("ArmingTimer mismatch: expected 10.5, got %f", p.ArmingTimer)
+	}
+	if p.Health != 300 {
+		t.Errorf("Health mismatch: expected 300, got %d", p.Health)
+	}
+}
+
+// TestBattleSerializer_PotatoMine_Armed 测试土豆地雷待机阶段的序列化
+func TestBattleSerializer_PotatoMine_Armed(t *testing.T) {
+	gdataManager := createTestGdataManagerForBattle(t, "potatomine_armed")
+	if gdataManager == nil {
+		t.Skip("Cannot create gdata manager for testing")
+	}
+
+	em := ecs.NewEntityManager()
+	gs := &GameState{
+		Sun:          150,
+		SpawnedWaves: []bool{true, true},
+		CurrentLevel: &config.LevelConfig{ID: "1-4"},
+	}
+
+	// 创建待机阶段的土豆地雷（武装完成，等待僵尸触发）
+	potatoMine := em.CreateEntity()
+	ecs.AddComponent(em, potatoMine, &components.PlantTagComponent{})
+	ecs.AddComponent(em, potatoMine, &components.PlantComponent{
+		PlantType:       components.PlantPotatoMine,
+		GridRow:         1,
+		GridCol:         5,
+		PotatoMinePhase: components.PotatoMineArmed, // 待机阶段
+		ArmingTimer:     0,                          // 武装完成，计时器归零
+	})
+	ecs.AddComponent(em, potatoMine, &components.PositionComponent{X: 450, Y: 150})
+	ecs.AddComponent(em, potatoMine, &components.HealthComponent{CurrentHealth: 300, MaxHealth: 300})
+
+	// 保存
+	serializer := NewBattleSerializer(gdataManager)
+	err := serializer.SaveBattle(em, gs, "testuser")
+	if err != nil {
+		t.Fatalf("SaveBattle failed: %v", err)
+	}
+
+	// 加载
+	data, err := serializer.LoadBattle("testuser")
+	if err != nil {
+		t.Fatalf("LoadBattle failed: %v", err)
+	}
+
+	// 验证土豆地雷数据
+	if len(data.Plants) != 1 {
+		t.Fatalf("Expected 1 plant, got %d", len(data.Plants))
+	}
+
+	p := data.Plants[0]
+	if p.PlantType != components.PlantPotatoMine.String() {
+		t.Errorf("PlantType mismatch: expected %s, got %s", components.PlantPotatoMine.String(), p.PlantType)
+	}
+	if p.GridRow != 1 || p.GridCol != 5 {
+		t.Errorf("Grid position mismatch: expected (1, 5), got (%d, %d)", p.GridRow, p.GridCol)
+	}
+	if p.PotatoMinePhase != int(components.PotatoMineArmed) {
+		t.Errorf("PotatoMinePhase mismatch: expected %d (Armed), got %d", int(components.PotatoMineArmed), p.PotatoMinePhase)
+	}
+	if p.ArmingTimer != 0 {
+		t.Errorf("ArmingTimer mismatch: expected 0, got %f", p.ArmingTimer)
+	}
+	if p.Health != 300 {
+		t.Errorf("Health mismatch: expected 300, got %d", p.Health)
 	}
 }
