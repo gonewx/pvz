@@ -123,6 +123,9 @@ func NewZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spawnX f
 		OffsetY: 0,
 	})
 
+	// 添加僵尸标签组件（用于统一识别僵尸实体）
+	em.AddComponent(entityID, &components.ZombieTagComponent{})
+
 	return entityID, nil
 }
 
@@ -246,6 +249,9 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, 
 		OffsetY: 0,
 	})
 
+	// 添加僵尸标签组件（用于统一识别僵尸实体）
+	em.AddComponent(entityID, &components.ZombieTagComponent{})
+
 	return entityID, nil
 }
 
@@ -368,6 +374,9 @@ func NewBucketheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int
 		Alpha:   config.DefaultShadowAlpha,
 		OffsetY: 0,
 	})
+
+	// 添加僵尸标签组件（用于统一识别僵尸实体）
+	em.AddComponent(entityID, &components.ZombieTagComponent{})
 
 	return entityID, nil
 }
@@ -497,6 +506,9 @@ func NewFlagZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spaw
 		Alpha:   config.DefaultShadowAlpha,
 		OffsetY: 0,
 	})
+
+	// 添加僵尸标签组件（用于统一识别僵尸实体）
+	ecs.AddComponent(em, entityID, &components.ZombieTagComponent{})
 
 	return entityID, nil
 }
@@ -654,6 +666,9 @@ func NewPolevaulterZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row in
 		Height: shadowSize.Height,
 		Alpha:  config.DefaultShadowAlpha,
 	})
+
+	// 添加僵尸标签组件（用于统一识别僵尸实体）
+	ecs.AddComponent(em, entityID, &components.ZombieTagComponent{})
 
 	return entityID, nil
 }

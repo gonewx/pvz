@@ -67,19 +67,19 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 
 	// 对每个僵尸检查是否在爆炸范围内
 	for _, zombieID := range allZombies {
-		// 获取僵尸的行为组件，确认是僵尸类型
+		// 使用 ZombieTagComponent 判断是否为僵尸实体
+		if _, isZombie := ecs.GetComponent[*components.ZombieTagComponent](s.entityManager, zombieID); !isZombie {
+			continue
+		}
+
+		// 获取僵尸的行为组件，检查是否已死亡
 		behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
 		if !ok {
 			continue
 		}
 
-		// 只处理僵尸类型的实体
-		if behavior.Type != components.BehaviorZombieBasic &&
-			behavior.Type != components.BehaviorZombieEating &&
-			behavior.Type != components.BehaviorZombieConehead &&
-			behavior.Type != components.BehaviorZombieBuckethead &&
-			behavior.Type != components.BehaviorZombieFlag &&
-			behavior.Type != components.BehaviorZombieDying {
+		// 跳过已死亡的僵尸
+		if behavior.Type == components.BehaviorZombieDying || behavior.Type == components.BehaviorZombieDyingExplosion {
 			continue
 		}
 
@@ -313,15 +313,18 @@ func (s *BehaviorSystem) handlePotatoMineArmedPhase(entityID ecs.EntityID, plant
 
 	// 检测僵尸
 	for _, zombieID := range zombieEntities {
+		// 使用 ZombieTagComponent 判断是否为僵尸实体
+		if _, isZombie := ecs.GetComponent[*components.ZombieTagComponent](s.entityManager, zombieID); !isZombie {
+			continue
+		}
+
+		// 获取僵尸的行为组件，检查是否已死亡
 		behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
 		if !ok {
 			continue
 		}
 
-		// 只检测活着的僵尸
-		if !s.isZombieBehaviorType(behavior.Type) {
-			continue
-		}
+		// 跳过已死亡的僵尸
 		if behavior.Type == components.BehaviorZombieDying || behavior.Type == components.BehaviorZombieDyingExplosion {
 			continue
 		}
@@ -472,15 +475,18 @@ func (s *BehaviorSystem) triggerPotatoMineExplosion(entityID ecs.EntityID, explo
 
 	// 对每个僵尸检查是否在爆炸范围内
 	for _, zombieID := range allZombies {
+		// 使用 ZombieTagComponent 判断是否为僵尸实体
+		if _, isZombie := ecs.GetComponent[*components.ZombieTagComponent](s.entityManager, zombieID); !isZombie {
+			continue
+		}
+
+		// 获取僵尸的行为组件，检查是否已死亡
 		behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
 		if !ok {
 			continue
 		}
 
-		// 只处理活着的僵尸
-		if !s.isZombieBehaviorType(behavior.Type) {
-			continue
-		}
+		// 跳过已死亡的僵尸
 		if behavior.Type == components.BehaviorZombieDying || behavior.Type == components.BehaviorZombieDyingExplosion {
 			continue
 		}

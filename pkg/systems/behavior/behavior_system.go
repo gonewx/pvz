@@ -263,16 +263,11 @@ func (s *BehaviorSystem) queryMovingZombies() []ecs.EntityID {
 		*components.VelocityComponent,
 	](s.entityManager)
 
-	// 过滤出真正的僵尸（排除子弹和其他实体）
+	// 过滤出真正的僵尸（使用 ZombieTagComponent 统一判断）
 	var zombies []ecs.EntityID
 	for _, entityID := range candidates {
-		behaviorComp, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
-		if !ok {
-			continue
-		}
-
-		// 只保留僵尸类型的实体
-		if s.isZombieBehaviorType(behaviorComp.Type) {
+		// 使用 ZombieTagComponent 判断是否为僵尸实体
+		if _, isZombie := ecs.GetComponent[*components.ZombieTagComponent](s.entityManager, entityID); isZombie {
 			zombies = append(zombies, entityID)
 		}
 	}
@@ -406,29 +401,6 @@ func (s *BehaviorSystem) queryProjectiles() []ecs.EntityID {
 	}
 
 	return projectiles
-}
-
-// isZombieBehaviorType 判断行为类型是否为僵尸类型
-//
-// 参数:
-//   - behaviorType: 行为类型
-//
-// 返回:
-//   - true: 是僵尸类型
-//   - false: 不是僵尸类型
-func (s *BehaviorSystem) isZombieBehaviorType(behaviorType components.BehaviorType) bool {
-	switch behaviorType {
-	case components.BehaviorZombieBasic,
-		components.BehaviorZombieConehead,
-		components.BehaviorZombieBuckethead,
-		components.BehaviorZombieFlag,
-		components.BehaviorZombiePolevaulter,
-		components.BehaviorZombieEating,
-		components.BehaviorZombieDying:
-		return true
-	default:
-		return false
-	}
 }
 
 // ============================================================================

@@ -642,6 +642,8 @@ func TestCherryBombExplosionCharredAnimation(t *testing.T) {
 		VX: -50.0,
 		VY: 0,
 	})
+	// 添加 ZombieTagComponent（僵尸标签组件）
+	ecs.AddComponent(em, zombieID, &components.ZombieTagComponent{})
 	// 添加 ReanimComponent
 	ecs.AddComponent(em, zombieID, &components.ReanimComponent{
 		ReanimName: "zombie",
