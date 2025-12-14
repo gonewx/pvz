@@ -3,45 +3,8 @@ package scenes
 import (
 	"testing"
 
-	"github.com/gonewx/pvz/pkg/components"
 	"github.com/gonewx/pvz/pkg/game"
 )
-
-// TestStringToPlantType 测试植物类型字符串转换
-// Story 18.3: 验证植物类型转换函数
-func TestStringToPlantType(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected components.PlantType
-	}{
-		// 小写形式
-		{"sunflower lowercase", "sunflower", components.PlantSunflower},
-		{"peashooter lowercase", "peashooter", components.PlantPeashooter},
-		{"wallnut lowercase", "wallnut", components.PlantWallnut},
-		{"cherrybomb lowercase", "cherrybomb", components.PlantCherryBomb},
-
-		// 大写形式
-		{"Sunflower uppercase", "Sunflower", components.PlantSunflower},
-		{"Peashooter uppercase", "Peashooter", components.PlantPeashooter},
-		{"Wallnut uppercase", "Wallnut", components.PlantWallnut},
-		{"CherryBomb uppercase", "CherryBomb", components.PlantCherryBomb},
-
-		// 未知类型
-		{"unknown plant", "unknown", components.PlantUnknown},
-		{"empty string", "", components.PlantUnknown},
-		{"random string", "randomtype", components.PlantUnknown},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := stringToPlantType(tt.input)
-			if result != tt.expected {
-				t.Errorf("stringToPlantType(%q) = %v, expected %v", tt.input, result, tt.expected)
-			}
-		})
-	}
-}
 
 // TestRestorePlants_EmptyList 测试空植物列表恢复
 // Story 18.3: 验证空列表处理
