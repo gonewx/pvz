@@ -32,6 +32,9 @@ type InputSystem struct {
 	isDragPlanting      bool                 // 是否处于拖拽种植模式
 	dragPlantType       components.PlantType // 拖拽中的植物类型
 	dragStartCardEntity ecs.EntityID         // 拖拽开始时的卡片实体ID
+
+	// 调试/验证模式选项
+	ignoreCooldown bool // 忽略植物卡片冷却（用于 verify_gameplay 等验证工具）
 }
 
 // NewInputSystem 创建一个新的输入系统
@@ -52,6 +55,12 @@ func NewInputSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.Ga
 	// 音效统一由 AudioManager 管理（Story 10.9）
 
 	return system
+}
+
+// SetIgnoreCooldown 设置是否忽略植物卡片冷却
+// 用于验证工具（如 verify_gameplay）可以随意种植植物
+func (s *InputSystem) SetIgnoreCooldown(ignore bool) {
+	s.ignoreCooldown = ignore
 }
 
 // Update 处理用户输入
@@ -369,8 +378,8 @@ func (s *InputSystem) handlePlantCardClick(mouseX, mouseY int, cameraX float64) 
 			currentSun := s.gameState.GetSun()
 			plantCost := card.SunCost
 
-			// 1. 冷却中 - 不做任何反应
-			if card.CurrentCooldown > 0 {
+			// 1. 冷却中 - 不做任何反应（除非启用忽略冷却模式）
+			if card.CurrentCooldown > 0 && !s.ignoreCooldown {
 				log.Printf("[InputSystem] 卡片冷却中，跳过 (剩余 %.1f 秒)", card.CurrentCooldown)
 				return true // 已处理点击，但卡片冷却中
 			}
@@ -653,6 +662,11 @@ func (s *InputSystem) getPlantCost(plantType components.PlantType) int {
 
 // triggerPlantCardCooldown 触发指定植物类型的卡片进入冷却状态
 func (s *InputSystem) triggerPlantCardCooldown(plantType components.PlantType) {
+	// 忽略冷却模式下不触发冷却
+	if s.ignoreCooldown {
+		return
+	}
+
 	// 查询所有植物卡片实体
 	entities := ecs.GetEntitiesWith1[*components.PlantCardComponent](s.entityManager)
 
@@ -827,7 +841,8 @@ func (s *InputSystem) hideTooltip() {
 // isCardClickable 检测卡片是否可点击
 // Story 10.8: 判断卡片是否处于可点击状态（决定鼠标光标样式）
 func (s *InputSystem) isCardClickable(card *components.PlantCardComponent) bool {
-	return card.IsAvailable && card.CurrentCooldown <= 0 && s.gameState.Sun >= card.SunCost
+	cooldownOk := card.CurrentCooldown <= 0 || s.ignoreCooldown
+	return card.IsAvailable && cooldownOk && s.gameState.Sun >= card.SunCost
 }
 
 // getPlantName 获取植物名称
@@ -926,8 +941,8 @@ func (s *InputSystem) handlePlantCardHotkeys(cameraX float64) {
 	log.Printf("[InputSystem] 快捷键选择卡片: 按键=%d, 植物类型=%v", pressedIndex+1, targetCard.card.PlantType)
 
 	// 检查卡片状态（与鼠标点击逻辑保持一致）
-	// 1. 冷却中 - 不做任何反应
-	if targetCard.card.CurrentCooldown > 0 {
+	// 1. 冷却中 - 不做任何反应（除非启用忽略冷却模式）
+	if targetCard.card.CurrentCooldown > 0 && !s.ignoreCooldown {
 		log.Printf("[InputSystem] 卡片冷却中，跳过 (剩余 %.1f 秒)", targetCard.card.CurrentCooldown)
 		return
 	}
@@ -1104,8 +1119,8 @@ func (s *InputSystem) handleDragStart(dragInfo utils.DragInfo, cameraX float64) 
 	currentSun := s.gameState.GetSun()
 	plantCost := plantCard.SunCost
 
-	// 1. 冷却中 - 不做任何反应
-	if plantCard.CurrentCooldown > 0 {
+	// 1. 冷却中 - 不做任何反应（除非启用忽略冷却模式）
+	if plantCard.CurrentCooldown > 0 && !s.ignoreCooldown {
 		log.Printf("[InputSystem] 拖拽开始: 卡片冷却中，忽略")
 		return false
 	}

@@ -255,6 +255,12 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 		lawnGridEntityID:      lawnGridEntityID,
 	}
 
+	// 验证工具启用忽略冷却模式，可以随意种植
+	if vg.inputSystem != nil {
+		vg.inputSystem.SetIgnoreCooldown(true)
+		log.Println("[VerifyGameplay] 已启用忽略冷却模式，可以随意种植植物")
+	}
+
 	// 初始化场景
 	vg.setupScene()
 
