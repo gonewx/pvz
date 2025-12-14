@@ -3,6 +3,7 @@ package entities
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/gonewx/pvz/pkg/components"
 	"github.com/gonewx/pvz/pkg/config"
@@ -665,13 +666,14 @@ func newSnowPeaFactory(deps PlantFactoryDeps, col, row int) (ecs.EntityID, error
 // 如果找不到对应的工厂函数，返回 nil 和 false
 //
 // 参数:
-//   - plantType: 植物类型字符串（如 "peashooter", "sunflower"）
+//   - plantType: 植物类型字符串（如 "peashooter", "sunflower", "Sunflower"）
 //
 // 返回:
 //   - PlantFactory: 工厂函数，如果未找到返回 nil
 //   - bool: 是否找到对应的工厂函数
 func GetPlantFactory(plantType string) (PlantFactory, bool) {
-	factory, ok := plantFactories[plantType]
+	// 使用小写进行匹配，兼容存档中保存的大写类型名称
+	factory, ok := plantFactories[strings.ToLower(plantType)]
 	return factory, ok
 }
 

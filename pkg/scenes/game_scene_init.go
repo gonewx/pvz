@@ -744,6 +744,11 @@ func (s *GameScene) restoreBattleState() {
 	// 跳过铺草皮动画
 	s.soddingAnimStarted = true
 
+	// 跳过植物选择栏滑入动画（存档恢复时直接显示最终位置）
+	s.seedBankSlideInStarted = true
+	s.seedBankSlideInProgress = 1.0
+	s.seedBankSlideInCompleted = true
+
 	// Story 18.3: 恢复进度条数据
 	s.restoreProgressBar(saveData)
 
@@ -1480,6 +1485,19 @@ func (s *GameScene) restoreLevelPhase(phaseData *game.LevelPhaseData) {
 	phaseComp.ConveyorBeltY = phaseData.ConveyorBeltY
 	phaseComp.ConveyorBeltVisible = phaseData.ConveyorBeltVisible
 	phaseComp.ShowRedLine = phaseData.ShowRedLine
+
+	// 存档恢复时跳过所有转场动画，直接设置到最终状态
+	// 如果传送带应该可见，直接设置到目标位置
+	if phaseComp.ConveyorBeltVisible {
+		phaseComp.ConveyorBeltY = config.ConveyorBeltTargetY
+		phaseComp.TransitionProgress = 1.0
+		// 如果正在传送带滑入步骤，跳过到下一步
+		if phaseComp.TransitionStep == components.TransitionStepConveyorSlide {
+			phaseComp.TransitionStep = components.TransitionStepShowRedLine
+			phaseComp.ShowRedLine = true
+		}
+		log.Printf("[GameScene] 存档恢复：跳过传送带滑入动画，直接显示在最终位置 Y=%.1f", phaseComp.ConveyorBeltY)
+	}
 
 	log.Printf("[GameScene] 关卡阶段已恢复: Phase=%d, State=%s, ConveyorVisible=%v, ShowRedLine=%v",
 		phaseComp.CurrentPhase, phaseComp.PhaseState,
