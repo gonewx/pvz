@@ -51,8 +51,11 @@ func createTestBehaviorSystem(em *ecs.EntityManager, rm *game.ResourceManager, g
 	gridID := em.CreateEntity()
 	ecs.AddComponent(em, gridID, &components.LawnGridComponent{})
 
+	// 创建测试用的 ReanimSystem（用于获取轨道世界坐标）
+	rs := systems.NewReanimSystem(em)
+
 	// 返回完整的 BehaviorSystem
-	return NewBehaviorSystem(em, rm, gs, lgs, gridID)
+	return NewBehaviorSystem(em, rm, gs, lgs, gridID, rs)
 }
 
 // TestZombieDeathParticleEffect 测试僵尸死亡时是否正确触发粒子效果

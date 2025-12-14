@@ -8,6 +8,7 @@ import (
 	"github.com/gonewx/pvz/pkg/ecs"
 	"github.com/gonewx/pvz/pkg/entities"
 	"github.com/gonewx/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/systems"
 	"github.com/gonewx/pvz/pkg/types"
 )
 
@@ -28,32 +29,22 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 	behavior.Type = components.BehaviorZombieDying
 	log.Printf("[BehaviorSystem] 僵尸 %d 行为切换为 BehaviorZombieDying", entityID)
 
-	// 获取僵尸位置，用于触发粒子效果
-	position, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
-	if !ok {
+	// 获取僵尸位置（用于回退方案）
+	position, hasPosition := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+	if !hasPosition {
 		log.Printf("[BehaviorSystem] 警告：僵尸 %d 缺少 PositionComponent，无法触发粒子效果", entityID)
 	} else {
-		// 无论是普通死亡还是瞬间死亡，都播放头部掉落效果
-		// 检测僵尸行进方向，计算粒子角度偏移
-		// 粒子效果应该在僵尸行进的反方向飞出
-		//
-		// 角度系统：标准屏幕坐标系（0°=右，90°=下，180°=左，270°=上）
-		// ZombieHead 配置：LaunchAngle [150-185°] ≈ 向左下
-		// 该配置是为**向右走的僵尸**设计的（头向左后方飞）
-		//
-		// 我们游戏中僵尸通常向左走，需要翻转方向
-		angleOffset := 180.0 // 默认翻转（适合僵尸向左走）
-		velocity, hasVelocity := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID)
-		if hasVelocity {
-			if velocity.VX > 0 {
-				// 僵尸向右走 → 配置已经正确 → 不翻转
-				angleOffset = 0.0
+		// 【重要】先获取头部轨道位置，再隐藏轨道
+		// GetTrackWorldPosition 从 CachedRenderData 中查找轨道，被隐藏的轨道不在缓存中
+		// 使用 AnchorBottomCenter 获取脖子位置（头部底部中心）
+		headX, headY := position.X, position.Y // 回退值
+		if s.reanimSystem != nil {
+			if trackX, trackY, found := s.reanimSystem.GetTrackWorldPosition(entityID, "anim_head1", systems.AnchorBottomCenter); found {
+				headX, headY = trackX, trackY
+				log.Printf("[BehaviorSystem] 僵尸 %d 头部轨道位置: (%.1f, %.1f)", entityID, headX, headY)
 			} else {
-				// 僵尸向左走 → 配置方向相反 → 翻转 180°
-				// [150-185°] + 180° = [330-365°] = [-30 to 5°] → 向右后方
-				angleOffset = 180.0
+				log.Printf("[BehaviorSystem] 警告：僵尸 %d 无法获取头部轨道位置，使用回退值", entityID)
 			}
-			log.Printf("[BehaviorSystem] 僵尸 %d 方向: VX=%.1f → 粒子角度偏移=%.0f°", entityID, velocity.VX, angleOffset)
 		}
 
 		// 播放头部掉落音效
@@ -62,7 +53,7 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 		}
 
 		// 触发僵尸头部掉落粒子效果
-		// 根据僵尸类型选择正确的头部图片
+		// 从头部轨道位置（脖子）发射粒子
 		var err error
 		if behavior.UnitID == types.UnitIDZombiePolevaulter {
 			// 撑杆僵尸使用专用头部图片
@@ -70,9 +61,9 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 				s.entityManager,
 				s.resourceManager,
 				"ZombieHead", // 复用 ZombieHead 粒子配置
-				position.X, position.Y,
+				headX, headY,
 				"IMAGE_ZOMBIEPOLEVAULTERHEAD", // 使用撑杆僵尸专用头部图片
-				angleOffset,
+				0.0,                           // 使用定义文件中的角度
 			)
 		} else {
 			// 其他僵尸使用默认头部图片
@@ -80,15 +71,14 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 				s.entityManager,
 				s.resourceManager,
 				"ZombieHead", // 粒子效果名称（不带.xml后缀）
-				position.X, position.Y,
-				angleOffset, // 传递角度偏移
+				headX, headY,
 			)
 		}
 		if err != nil {
 			log.Printf("[BehaviorSystem] 警告：创建僵尸头部掉落粒子效果失败: %v", err)
 			// 不阻塞游戏逻辑，游戏继续运行
 		} else {
-			log.Printf("[BehaviorSystem] 僵尸 %d 触发头部掉落粒子效果，位置: (%.1f, %.1f)", entityID, position.X, position.Y)
+			log.Printf("[BehaviorSystem] 僵尸 %d 触发头部掉落粒子效果，位置: (%.1f, %.1f)", entityID, headX, headY)
 		}
 
 		// 旗帜僵尸特殊处理：触发旗帜掉落粒子效果
@@ -97,8 +87,7 @@ func (s *BehaviorSystem) triggerZombieDeath(entityID ecs.EntityID) {
 				s.entityManager,
 				s.resourceManager,
 				"ZombieFlag", // 旗帜掉落粒子效果
-				position.X, position.Y,
-				angleOffset, // 与头部掉落方向一致
+				position.X, position.Y, // 旗帜使用脚底位置
 			)
 			if err != nil {
 				log.Printf("[BehaviorSystem] 警告：创建旗帜掉落粒子效果失败: %v", err)
@@ -333,6 +322,29 @@ func (s *BehaviorSystem) updateZombieDamageState(entityID ecs.EntityID, health *
 		// 获取行为组件，检查僵尸类型
 		behavior, hasBehavior := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
 
+		// 【重要】先获取轨道位置，再隐藏轨道
+		// GetTrackWorldPosition 从 CachedRenderData 中查找轨道，被隐藏的轨道不在缓存中
+		// 获取僵尸位置（用于回退方案）
+		position, hasPosition := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+		if !hasPosition {
+			log.Printf("[BehaviorSystem] 警告：僵尸 %d 缺少 PositionComponent，无法触发手臂掉落粒子", entityID)
+			return
+		}
+
+		// 使用轨道位置方案获取手臂的世界坐标
+		// 修复：僵尸使用脚底锚点（CenterOffsetY = maxY），position.Y 是脚底位置
+		// 手臂实际在脚底上方 60-100 像素，需要通过轨道位置获取精确坐标
+		// 使用 AnchorBottomCenter 获取手部底部中心位置，更适合粒子效果生成
+		armX, armY := position.X, position.Y // 回退值
+		if s.reanimSystem != nil {
+			if trackX, trackY, found := s.reanimSystem.GetTrackWorldPosition(entityID, "Zombie_outerarm_hand", systems.AnchorBottomCenter); found {
+				armX, armY = trackX, trackY
+				log.Printf("[BehaviorSystem] 僵尸 %d 手臂轨道位置: (%.1f, %.1f)", entityID, armX, armY)
+			} else {
+				log.Printf("[BehaviorSystem] 警告：僵尸 %d 无法获取手臂轨道位置，使用回退值", entityID)
+			}
+		}
+
 		// 隐藏手臂轨道（手臂掉落效果）
 		// 直接修改 HiddenTracks 字段而不调用废弃的 HideTrack API
 		// 根据僵尸类型选择正确的轨道名称
@@ -376,24 +388,6 @@ func (s *BehaviorSystem) updateZombieDamageState(entityID ecs.EntityID, health *
 			}
 		}
 
-		// 获取僵尸位置，用于触发粒子效果
-		position, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
-		if !ok {
-			log.Printf("[BehaviorSystem] 警告：僵尸 %d 缺少 PositionComponent，无法触发手臂掉落粒子", entityID)
-			return
-		}
-
-		// 检测僵尸行进方向，计算粒子角度偏移
-		angleOffset := 180.0 // 默认翻转（适合僵尸向左走）
-		velocity, hasVelocity := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID)
-		if hasVelocity {
-			if velocity.VX > 0 {
-				angleOffset = 0.0 // 僵尸向右走
-			} else {
-				angleOffset = 180.0 // 僵尸向左走
-			}
-		}
-
 		// 触发僵尸手臂掉落粒子效果
 		// 根据僵尸类型选择正确的手臂图片
 		var err error
@@ -403,9 +397,9 @@ func (s *BehaviorSystem) updateZombieDamageState(entityID ecs.EntityID, health *
 				s.entityManager,
 				s.resourceManager,
 				"ZombieArm", // 复用 ZombieArm 粒子配置
-				position.X, position.Y,
+				armX, armY,
 				"IMAGE_REANIM_ZOMBIE_OUTERARM_HAND", // 只显示手
-				angleOffset,
+				0.0,                                 // 使用定义文件中的角度
 			)
 		} else {
 			// 其他僵尸使用完整的手臂+手图片
@@ -413,14 +407,13 @@ func (s *BehaviorSystem) updateZombieDamageState(entityID ecs.EntityID, health *
 				s.entityManager,
 				s.resourceManager,
 				"ZombieArm", // 粒子效果名称（不带.xml后缀）
-				position.X, position.Y,
-				angleOffset, // 角度偏移
+				armX, armY,
 			)
 		}
 		if err != nil {
 			log.Printf("[BehaviorSystem] 警告：创建僵尸手臂掉落粒子效果失败: %v", err)
 		} else {
-			log.Printf("[BehaviorSystem] 僵尸 %d 触发手臂掉落粒子效果，位置: (%.1f, %.1f)", entityID, position.X, position.Y)
+			log.Printf("[BehaviorSystem] 僵尸 %d 触发手臂掉落粒子效果，位置: (%.1f, %.1f)", entityID, armX, armY)
 		}
 	}
 }

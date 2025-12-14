@@ -557,16 +557,12 @@ func (s *LawnmowerSystem) triggerZombieDeathFallback(zombieID ecs.EntityID) {
 		return
 	}
 
-	// 除草车碾压的僵尸通常向左走，需要翻转粒子方向
-	angleOffset := 180.0 // 默认翻转（适合僵尸向左走）
-
-	// 触发僵尸手臂掉落粒子效果
+	// 触发僵尸手臂掉落粒子效果（不使用 angleOffset，粒子定义中已设置正确角度）
 	_, err := entities.CreateParticleEffect(
 		s.entityManager,
 		s.resourceManager,
 		"MoweredZombieArm",
 		position.X, position.Y,
-		angleOffset,
 	)
 	if err != nil {
 		log.Printf("[LawnmowerSystem] 警告：创建僵尸手臂掉落粒子效果失败: %v", err)
@@ -574,13 +570,12 @@ func (s *LawnmowerSystem) triggerZombieDeathFallback(zombieID ecs.EntityID) {
 		log.Printf("[LawnmowerSystem] 僵尸 %d 触发手臂掉落粒子效果", zombieID)
 	}
 
-	// 触发僵尸头部掉落粒子效果
+	// 触发僵尸头部掉落粒子效果（不使用 angleOffset，粒子定义中已设置正确角度）
 	_, err = entities.CreateParticleEffect(
 		s.entityManager,
 		s.resourceManager,
 		"MoweredZombieHead",
 		position.X, position.Y,
-		angleOffset,
 	)
 	if err != nil {
 		log.Printf("[LawnmowerSystem] 警告：创建僵尸头部掉落粒子效果失败: %v", err)

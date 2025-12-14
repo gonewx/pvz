@@ -6,6 +6,7 @@ import (
 	"github.com/gonewx/pvz/pkg/components"
 	"github.com/gonewx/pvz/pkg/ecs"
 	"github.com/gonewx/pvz/pkg/entities"
+	"github.com/gonewx/pvz/pkg/systems"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -44,7 +45,24 @@ func (s *BehaviorSystem) handleConeheadZombieBehavior(entityID ecs.EntityID, del
 				// 2. 更新 UnitID 为普通僵尸，防止后续动画切换使用错误配置
 				behavior.UnitID = "zombie"
 
-				// 3. 隐藏路障轨道（使用 HiddenTracks 黑名单）
+				// 3. 【重要】先获取路障轨道位置，再隐藏轨道
+				// GetTrackWorldPosition 从 CachedRenderData 中查找轨道，被隐藏的轨道不在缓存中
+				// 使用 AnchorBottomCenter 获取路障底部中心位置
+				position, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+				coneX, coneY := 0.0, 0.0
+				if hasPos {
+					coneX, coneY = position.X, position.Y // 回退值
+				}
+				if s.reanimSystem != nil {
+					if trackX, trackY, found := s.reanimSystem.GetTrackWorldPosition(entityID, "anim_cone", systems.AnchorBottomCenter); found {
+						coneX, coneY = trackX, trackY
+						log.Printf("[BehaviorSystem] 路障僵尸 %d 路障轨道位置: (%.1f, %.1f)", entityID, coneX, coneY)
+					} else {
+						log.Printf("[BehaviorSystem] 警告：路障僵尸 %d 无法获取路障轨道位置，使用回退值", entityID)
+					}
+				}
+
+				// 4. 隐藏路障轨道（使用 HiddenTracks 黑名单）
 				reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 				if ok {
 					if reanim.HiddenTracks == nil {
@@ -54,28 +72,18 @@ func (s *BehaviorSystem) handleConeheadZombieBehavior(entityID ecs.EntityID, del
 					log.Printf("[BehaviorSystem] 路障僵尸 %d 隐藏 anim_cone 轨道", entityID)
 				}
 
-				// 4. 触发路障掉落粒子效果
-				position, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
-				velocity, hasVel := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID)
+				// 5. 触发路障掉落粒子效果（从路障轨道位置发射，不使用 angleOffset）
 				if hasPos {
-					// 粒子发射角度调整
-					angleOffset := 180.0
-					if hasVel && velocity.VX > 0 {
-						angleOffset = 0.0
-					}
-
-					// 创建掉落粒子
 					_, err := entities.CreateParticleEffect(
 						s.entityManager,
 						s.resourceManager,
 						"ZombieTrafficCone", // 掉落粒子配置文件名
-						position.X, position.Y,
-						angleOffset,
+						coneX, coneY,
 					)
 					if err != nil {
 						log.Printf("[BehaviorSystem] 警告：创建路障掉落粒子失败: %v", err)
 					} else {
-						log.Printf("[BehaviorSystem] 路障僵尸 %d 触发路障掉落效果", entityID)
+						log.Printf("[BehaviorSystem] 路障僵尸 %d 触发路障掉落效果，位置: (%.1f, %.1f)", entityID, coneX, coneY)
 					}
 				}
 			}
@@ -128,7 +136,24 @@ func (s *BehaviorSystem) handleBucketheadZombieBehavior(entityID ecs.EntityID, d
 				// 2. 更新 UnitID 为普通僵尸，防止后续动画切换使用错误配置
 				behavior.UnitID = "zombie"
 
-				// 3. 隐藏铁桶轨道（使用 HiddenTracks 黑名单）
+				// 3. 【重要】先获取铁桶轨道位置，再隐藏轨道
+				// GetTrackWorldPosition 从 CachedRenderData 中查找轨道，被隐藏的轨道不在缓存中
+				// 使用 AnchorBottomCenter 获取铁桶底部中心位置
+				position, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+				bucketX, bucketY := 0.0, 0.0
+				if hasPos {
+					bucketX, bucketY = position.X, position.Y // 回退值
+				}
+				if s.reanimSystem != nil {
+					if trackX, trackY, found := s.reanimSystem.GetTrackWorldPosition(entityID, "anim_bucket", systems.AnchorBottomCenter); found {
+						bucketX, bucketY = trackX, trackY
+						log.Printf("[BehaviorSystem] 铁桶僵尸 %d 铁桶轨道位置: (%.1f, %.1f)", entityID, bucketX, bucketY)
+					} else {
+						log.Printf("[BehaviorSystem] 警告：铁桶僵尸 %d 无法获取铁桶轨道位置，使用回退值", entityID)
+					}
+				}
+
+				// 4. 隐藏铁桶轨道（使用 HiddenTracks 黑名单）
 				reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
 				if ok {
 					if reanim.HiddenTracks == nil {
@@ -138,28 +163,18 @@ func (s *BehaviorSystem) handleBucketheadZombieBehavior(entityID ecs.EntityID, d
 					log.Printf("[BehaviorSystem] 铁桶僵尸 %d 隐藏 anim_bucket 轨道", entityID)
 				}
 
-				// 4. 触发铁桶掉落粒子效果
-				position, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
-				velocity, hasVel := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID)
+				// 5. 触发铁桶掉落粒子效果（从铁桶轨道位置发射，不使用 angleOffset）
 				if hasPos {
-					// 粒子发射角度调整
-					angleOffset := 180.0
-					if hasVel && velocity.VX > 0 {
-						angleOffset = 0.0
-					}
-
-					// 创建掉落粒子
 					_, err := entities.CreateParticleEffect(
 						s.entityManager,
 						s.resourceManager,
 						"ZombiePail", // 掉落粒子配置文件名
-						position.X, position.Y,
-						angleOffset,
+						bucketX, bucketY,
 					)
 					if err != nil {
 						log.Printf("[BehaviorSystem] 警告：创建铁桶掉落粒子失败: %v", err)
 					} else {
-						log.Printf("[BehaviorSystem] 铁桶僵尸 %d 触发铁桶掉落效果", entityID)
+						log.Printf("[BehaviorSystem] 铁桶僵尸 %d 触发铁桶掉落效果，位置: (%.1f, %.1f)", entityID, bucketX, bucketY)
 					}
 				}
 			}
@@ -276,8 +291,26 @@ func (s *BehaviorSystem) handleArmorDestroyedWhileEating(entityID ecs.EntityID, 
 			// 轨道已隐藏，不需要重复处理
 			return
 		}
+	}
 
-		// 隐藏护甲轨道
+	// 【重要】先获取护甲轨道位置，再隐藏轨道
+	// GetTrackWorldPosition 从 CachedRenderData 中查找轨道，被隐藏的轨道不在缓存中
+	position, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+	armorX, armorY := 0.0, 0.0
+	if hasPos {
+		armorX, armorY = position.X, position.Y // 回退值
+	}
+	if s.reanimSystem != nil {
+		if trackX, trackY, found := s.reanimSystem.GetTrackWorldPosition(entityID, armorTrackName, systems.AnchorBottomCenter); found {
+			armorX, armorY = trackX, trackY
+			log.Printf("[BehaviorSystem] 啃食中的僵尸 %d 护甲轨道位置: (%.1f, %.1f)", entityID, armorX, armorY)
+		} else {
+			log.Printf("[BehaviorSystem] 警告：啃食中的僵尸 %d 无法获取护甲轨道位置，使用回退值", entityID)
+		}
+	}
+
+	// 隐藏护甲轨道
+	if hasReanim {
 		if reanim.HiddenTracks == nil {
 			reanim.HiddenTracks = make(map[string]bool)
 		}
@@ -290,23 +323,18 @@ func (s *BehaviorSystem) handleArmorDestroyedWhileEating(entityID ecs.EntityID, 
 	behavior.UnitID = "zombie"
 	log.Printf("[BehaviorSystem] 啃食中的僵尸 %d UnitID 更新: %s -> zombie", entityID, oldUnitID)
 
-	// 触发护甲掉落粒子效果
-	position, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+	// 触发护甲掉落粒子效果（从轨道位置发射，不使用 angleOffset）
 	if hasPos {
-		// 啃食状态没有 VelocityComponent，默认角度偏移 180°（僵尸向左走）
-		angleOffset := 180.0
-
 		_, err := entities.CreateParticleEffect(
 			s.entityManager,
 			s.resourceManager,
 			particleEffectName,
-			position.X, position.Y,
-			angleOffset,
+			armorX, armorY,
 		)
 		if err != nil {
 			log.Printf("[BehaviorSystem] 警告：创建护甲掉落粒子失败: %v", err)
 		} else {
-			log.Printf("[BehaviorSystem] 啃食中的僵尸 %d 触发护甲掉落效果 (%s)", entityID, particleEffectName)
+			log.Printf("[BehaviorSystem] 啃食中的僵尸 %d 触发护甲掉落效果，位置: (%.1f, %.1f)", entityID, armorX, armorY)
 		}
 	}
 }

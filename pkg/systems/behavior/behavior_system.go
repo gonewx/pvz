@@ -18,6 +18,7 @@ type BehaviorSystem struct {
 	logFrameCounter  int                     // 日志输出计数器（避免全局变量）
 	lawnGridSystem   *systems.LawnGridSystem // 用于植物死亡时释放网格占用
 	lawnGridEntityID ecs.EntityID            // 草坪网格实体ID
+	reanimSystem     *systems.ReanimSystem   // 用于获取轨道世界坐标（僵尸粒子效果定位）
 }
 
 // 日志输出间隔常量
@@ -30,14 +31,16 @@ const LogOutputFrameInterval = 100 // 日志输出间隔（每N帧输出一次�
 //   - gs: GameState 实例 (用于僵尸死亡计数)
 //   - lgs: LawnGridSystem 实例 (用于植物死亡时释放网格占用)
 //   - lawnGridID: 草坪网格实体ID
-func NewBehaviorSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.GameState, lgs *systems.LawnGridSystem, lawnGridID ecs.EntityID) *BehaviorSystem {
-	log.Printf("[BehaviorSystem] NewBehaviorSystem: lawnGridSystem=%v, lawnGridEntityID=%d", lgs != nil, lawnGridID)
+//   - rs: ReanimSystem 实例 (用于获取轨道世界坐标)
+func NewBehaviorSystem(em *ecs.EntityManager, rm *game.ResourceManager, gs *game.GameState, lgs *systems.LawnGridSystem, lawnGridID ecs.EntityID, rs *systems.ReanimSystem) *BehaviorSystem {
+	log.Printf("[BehaviorSystem] NewBehaviorSystem: lawnGridSystem=%v, lawnGridEntityID=%d, reanimSystem=%v", lgs != nil, lawnGridID, rs != nil)
 	return &BehaviorSystem{
 		entityManager:    em,
 		resourceManager:  rm,
 		gameState:        gs,
 		lawnGridSystem:   lgs,
 		lawnGridEntityID: lawnGridID,
+		reanimSystem:     rs,
 	}
 }
 

@@ -286,6 +286,7 @@ func (sm *SystemManager) createCoreSystems() {
 	sm.behaviorSystem = behavior.NewBehaviorSystem(
 		em, rm, sm.deps.GameState,
 		sm.lawnGridSystem, sm.deps.LawnGridEntityID,
+		sm.reanimSystem,
 	)
 	log.Printf("[SystemManager] Created BehaviorSystem")
 

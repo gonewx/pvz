@@ -104,6 +104,10 @@ var ParticleAnchorOffsets = map[string]ParticleAnchorOffset{
 		Comment: "爆炸中心对齐格子中心，从植物脚底位置上移",
 	},
 
+	// 注：ZombieHead 和 ZombieArm 不在此配置，因为它们使用轨道位置方案
+	// 通过 GetTrackWorldPosition 获取动画轨道的实际位置，更精确
+	// 参见 zombie_death_handler.go 中的实现
+
 	// 注：其他未列出的粒子效果使用默认值（OffsetX=0, OffsetY=0）
 	// 即锚点 = 视觉中心，调用者提供的坐标直接作为粒子锚点
 }

@@ -114,7 +114,7 @@ func NewVerifyZombiesWonGame() (*VerifyZombiesWonGame, error) {
 	// 创建行为系统（用于处理僵尸移动）
 	// 注意：验证程序不需要 LawnmowerSystem 和 LawnGridSystem，传入 nil 即可
 	// 因为在 Freeze 状态下，BehaviorSystem 只处理触发僵尸的移动，不会访问这些依赖
-	behaviorSystem := behavior.NewBehaviorSystem(em, rm, gs, nil, 0)
+	behaviorSystem := behavior.NewBehaviorSystem(em, rm, gs, nil, 0, reanimSystem)
 
 	// 加载中文调试字体
 	debugFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 16)

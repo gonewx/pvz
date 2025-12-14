@@ -128,7 +128,7 @@ func NewOpeningVerifyGame() (*OpeningVerifyGame, error) {
 
 	// Create systems
 	reanimSystem := systems.NewReanimSystem(em)
-	behaviorSystem := behavior.NewBehaviorSystem(em, rm, gs, lawnGridSystem, lawnGridEntity)
+	behaviorSystem := behavior.NewBehaviorSystem(em, rm, gs, lawnGridSystem, lawnGridEntity, reanimSystem)
 	renderSystem := systems.NewRenderSystem(em)
 	cameraSystem := systems.NewCameraSystem(em, gs)
 

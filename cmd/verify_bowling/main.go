@@ -121,7 +121,7 @@ func NewVerifyBowlingGame() (*VerifyBowlingGame, error) {
 	lawnGridSystem := systems.NewLawnGridSystem(em, enabledLanes)
 
 	// 创建行为系统
-	behaviorSystem := behavior.NewBehaviorSystem(em, rm, gs, lawnGridSystem, 0)
+	behaviorSystem := behavior.NewBehaviorSystem(em, rm, gs, lawnGridSystem, 0, reanimSystem)
 
 	// 创建物理系统
 	physicsSystem := systems.NewPhysicsSystem(em, rm)

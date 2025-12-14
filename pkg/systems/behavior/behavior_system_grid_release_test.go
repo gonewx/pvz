@@ -23,8 +23,11 @@ func TestPlantDeathReleasesGrid(t *testing.T) {
 	gridID := em.CreateEntity()
 	ecs.AddComponent(em, gridID, &components.LawnGridComponent{})
 
+	// 创建测试用的 ReanimSystem
+	rs := systems.NewReanimSystem(em)
+
 	// 创建 BehaviorSystem（传入 LawnGridSystem）
-	bs := NewBehaviorSystem(em, rm, gs, lgs, gridID)
+	bs := NewBehaviorSystem(em, rm, gs, lgs, gridID, rs)
 
 	// 创建植物实体在网格 (2, 3)
 	plantID := em.CreateEntity()
@@ -94,7 +97,10 @@ func TestMultiplePlantsDeathReleasesGrid(t *testing.T) {
 	gridID := em.CreateEntity()
 	ecs.AddComponent(em, gridID, &components.LawnGridComponent{})
 
-	bs := NewBehaviorSystem(em, rm, gs, lgs, gridID)
+	// 创建测试用的 ReanimSystem
+	rs := systems.NewReanimSystem(em)
+
+	bs := NewBehaviorSystem(em, rm, gs, lgs, gridID, rs)
 
 	// 创建 3 个植物在不同网格位置
 	plantPositions := [][2]int{{0, 0}, {1, 1}, {2, 2}}
@@ -179,8 +185,11 @@ func TestCherryBombExplosionReleasesGrid(t *testing.T) {
 	gridID := em.CreateEntity()
 	ecs.AddComponent(em, gridID, &components.LawnGridComponent{})
 
+	// 创建测试用的 ReanimSystem
+	rs := systems.NewReanimSystem(em)
+
 	// 创建 BehaviorSystem
-	bs := NewBehaviorSystem(em, rm, gs, lgs, gridID)
+	bs := NewBehaviorSystem(em, rm, gs, lgs, gridID, rs)
 
 	// 创建樱桃炸弹实体在网格 (4, 2)
 	cherryBombID := em.CreateEntity()

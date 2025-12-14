@@ -3,8 +3,70 @@ package entities
 import (
 	"github.com/gonewx/pvz/internal/reanim"
 	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/ecs"
 	"github.com/hajimehoshi/ebiten/v2"
 )
+
+// GetTrackWorldPosition 获取指定轨道在世界坐标系中的位置
+//
+// 用于从 Reanim 动画的特定轨道（如头部、手臂）获取世界坐标，
+// 以便在正确的位置生成粒子效果（如僵尸死亡时头部/手臂掉落）。
+//
+// 参数：
+//   - em: 实体管理器
+//   - entityID: 实体 ID
+//   - trackName: 轨道名称（如 "anim_head1", "Zombie_outerarm_hand"）
+//
+// 返回：
+//   - x, y: 轨道在世界坐标系中的位置
+//   - found: 是否找到该轨道
+//
+// 计算方法：
+//  1. 从 CachedRenderData 中查找指定轨道的渲染数据
+//  2. 获取轨道的局部坐标（Frame.X, Frame.Y）和父子偏移（OffsetX, OffsetY）
+//  3. 加上实体位置（PositionComponent）得到世界坐标
+//  4. 减去 CenterOffset（因为渲染时会减去 CenterOffset）
+func GetTrackWorldPosition(em *ecs.EntityManager, entityID ecs.EntityID, trackName string) (x, y float64, found bool) {
+	// 获取 ReanimComponent
+	comp, ok := ecs.GetComponent[*components.ReanimComponent](em, entityID)
+	if !ok {
+		return 0, 0, false
+	}
+
+	// 获取 PositionComponent
+	pos, ok := ecs.GetComponent[*components.PositionComponent](em, entityID)
+	if !ok {
+		return 0, 0, false
+	}
+
+	// 在 CachedRenderData 中查找指定轨道
+	for _, data := range comp.CachedRenderData {
+		if data.TrackName == trackName {
+			// 获取轨道的局部坐标
+			localX := getFloat(data.Frame.X)
+			localY := getFloat(data.Frame.Y)
+
+			// 计算世界坐标：
+			// worldPos = entityPos + (localPos + parentOffset) - centerOffset
+			// 注意：渲染时使用 screenX = pos.X - comp.CenterOffsetX + localX + offsetX
+			worldX := pos.X + localX + data.OffsetX - comp.CenterOffsetX
+			worldY := pos.Y + localY + data.OffsetY - comp.CenterOffsetY
+
+			return worldX, worldY, true
+		}
+	}
+
+	// 未找到轨道（可能是隐藏的轨道或不存在）
+	return 0, 0, false
+}
+
+// getFloat 安全获取 float64 指针的值，nil 返回 0
+func getFloat(ptr *float64) float64 {
+	if ptr == nil {
+		return 0
+	}
+	return *ptr
+}
 
 // createSimpleReanimComponent 为单图片实体创建简单的 ReanimComponent
 // 这个辅助函数将单张图片包装成一个简单的单帧 Reanim 动画

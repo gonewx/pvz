@@ -440,6 +440,7 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 		scene.gameState,
 		scene.lawnGridSystem,
 		scene.lawnGridEntityID,
+		scene.reanimSystem,
 	)
 	log.Printf("[GameScene] Initialized behavior system for plant behaviors")
 
