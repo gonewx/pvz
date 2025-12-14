@@ -723,10 +723,11 @@ func (s *GameScene) restoreBattleState() {
 	s.restoreProjectiles(saveData.Projectiles)
 	s.restoreSuns(saveData.Suns)
 	s.restoreLawnmowers(saveData.Lawnmowers)
+	s.restorePlantCards(saveData.PlantCards)
 
-	log.Printf("[GameScene] 实体恢复完成: Plants=%d, Zombies=%d, Projectiles=%d, Suns=%d, Lawnmowers=%d",
+	log.Printf("[GameScene] 实体恢复完成: Plants=%d, Zombies=%d, Projectiles=%d, Suns=%d, Lawnmowers=%d, PlantCards=%d",
 		len(saveData.Plants), len(saveData.Zombies), len(saveData.Projectiles),
-		len(saveData.Suns), len(saveData.Lawnmowers))
+		len(saveData.Suns), len(saveData.Lawnmowers), len(saveData.PlantCards))
 
 	// 显示调整后的击杀计数（可能因跳过死亡僵尸而增加）
 	log.Printf("[GameScene] 实体恢复后状态: ZombiesKilled=%d/%d, TotalZombiesSpawned=%d, OnField=%d",
@@ -806,6 +807,14 @@ func (s *GameScene) restorePlants(plants []game.PlantData) {
 	}
 
 	for _, plantData := range plants {
+		// 跳过正在爆炸的土豆地雷
+		// 爆炸已触发、伤害已造成、网格已释放，不需要恢复这个即将消失的实体
+		if plantData.PlantType == types.PlantPotatoMine.String() &&
+			plantData.PotatoMinePhase == int(components.PotatoMineExploding) {
+			log.Printf("[GameScene] Skipping exploding potato mine at (%d,%d), phase=%d",
+				plantData.GridRow, plantData.GridCol, plantData.PotatoMinePhase)
+			continue
+		}
 		// Story 18.5: 使用工厂注册表创建植物实体
 		// 替代硬编码的 switch 语句，新增植物类型无需修改此处
 		var entityID ecs.EntityID
@@ -1692,4 +1701,37 @@ func (s *GameScene) restoreGuidedTutorial(guidedData *game.GuidedTutorialData) {
 
 	log.Printf("[GameScene] 强引导教学已恢复: IsActive=%v, ArrowTarget=%s, TransitionReady=%v",
 		guidedComp.IsActive, guidedComp.ArrowTarget, guidedComp.TransitionReady)
+}
+
+// restorePlantCards 恢复植物卡片冷却状态
+//
+// 从存档数据恢复每张卡片的冷却时间
+func (s *GameScene) restorePlantCards(plantCards []game.PlantCardData) {
+	if len(plantCards) == 0 {
+		return
+	}
+
+	log.Printf("[GameScene] 恢复 %d 张植物卡片冷却状态...", len(plantCards))
+
+	// 创建植物类型到冷却时间的映射
+	cooldownMap := make(map[string]float64)
+	for _, cardData := range plantCards {
+		cooldownMap[cardData.PlantType] = cardData.CurrentCooldown
+	}
+
+	// 查找所有植物卡片实体并恢复冷却时间
+	cardEntities := ecs.GetEntitiesWith1[*components.PlantCardComponent](s.entityManager)
+	for _, entity := range cardEntities {
+		cardComp, ok := ecs.GetComponent[*components.PlantCardComponent](s.entityManager, entity)
+		if !ok {
+			continue
+		}
+
+		plantTypeStr := cardComp.PlantType.String()
+		if cooldown, exists := cooldownMap[plantTypeStr]; exists {
+			cardComp.CurrentCooldown = cooldown
+			cardComp.IsAvailable = false // 冷却中不可用
+			log.Printf("[GameScene] 恢复卡片 %s 冷却: %.2f 秒", plantTypeStr, cooldown)
+		}
+	}
 }

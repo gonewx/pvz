@@ -76,6 +76,7 @@ func (s *BattleSerializer) SaveBattle(em *ecs.EntityManager, gs *GameState, user
 	saveData.Projectiles = s.collectProjectileData(em)
 	saveData.Suns = s.collectSunData(em)
 	saveData.Lawnmowers = s.collectLawnmowerData(em)
+	saveData.PlantCards = s.collectPlantCardData(em)
 
 	// 收集教学状态（如果是教学关卡）
 	saveData.Tutorial = s.collectTutorialData(em)
@@ -187,6 +188,14 @@ func (s *BattleSerializer) collectPlantData(em *ecs.EntityManager) []PlantData {
 			continue
 		}
 
+		// 跳过正在爆炸的土豆地雷（不保存即将消失的实体）
+		if plantComp.PlantType == components.PlantPotatoMine &&
+			plantComp.PotatoMinePhase == components.PotatoMineExploding {
+			log.Printf("[BattleSerializer] Skipping exploding potato mine at (%d,%d), phase=%d",
+				plantComp.GridRow, plantComp.GridCol, plantComp.PotatoMinePhase)
+			continue
+		}
+
 		// 获取生命值组件
 		var health, maxHealth int
 		if healthComp, ok := ecs.GetComponent[*components.HealthComponent](em, entity); ok {
@@ -225,6 +234,12 @@ func (s *BattleSerializer) collectPlantData(em *ecs.EntityManager) []PlantData {
 			// Story 18.5: 收集土豆地雷状态
 			PotatoMinePhase: int(plantComp.PotatoMinePhase),
 			ArmingTimer:     plantComp.ArmingTimer,
+		}
+
+		// 土豆地雷阶段日志
+		if plantComp.PlantType == components.PlantPotatoMine {
+			log.Printf("[BattleSerializer] Saving potato mine at (%d,%d): Phase=%d, ArmingTimer=%.2f",
+				plantComp.GridRow, plantComp.GridCol, plantComp.PotatoMinePhase, plantComp.ArmingTimer)
 		}
 
 		plants = append(plants, plantData)
@@ -467,6 +482,35 @@ func (s *BattleSerializer) collectLawnmowerData(em *ecs.EntityManager) []Lawnmow
 	}
 
 	return lawnmowers
+}
+
+// collectPlantCardData 从 EntityManager 收集所有植物卡片冷却数据
+//
+// 只收集正在冷却中的卡片（CurrentCooldown > 0）
+func (s *BattleSerializer) collectPlantCardData(em *ecs.EntityManager) []PlantCardData {
+	var plantCards []PlantCardData
+
+	// 查询所有拥有 PlantCardComponent 的实体
+	entities := ecs.GetEntitiesWith1[*components.PlantCardComponent](em)
+
+	for _, entity := range entities {
+		cardComp, ok := ecs.GetComponent[*components.PlantCardComponent](em, entity)
+		if !ok {
+			continue
+		}
+
+		// 只保存正在冷却中的卡片
+		if cardComp.CurrentCooldown > 0 {
+			plantCards = append(plantCards, PlantCardData{
+				PlantType:       cardComp.PlantType.String(),
+				CurrentCooldown: cardComp.CurrentCooldown,
+			})
+			log.Printf("[BattleSerializer] Saving plant card %s cooldown: %.2f",
+				cardComp.PlantType.String(), cardComp.CurrentCooldown)
+		}
+	}
+
+	return plantCards
 }
 
 

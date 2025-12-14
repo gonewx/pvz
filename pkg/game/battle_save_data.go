@@ -9,7 +9,8 @@ import (
 // v2: 添加保龄球模式支持（BowlingNuts, ConveyorBelt, LevelPhase, DaveDialogue, GuidedTutorial）
 // v3: 添加撑杆僵尸和旗帜僵尸支持（HasPole, IsJumping）
 // v4: 添加土豆地雷阶段支持（PotatoMinePhase, ArmingTimer）
-const BattleSaveVersion = 4
+// v5: 添加植物卡片冷却状态支持（PlantCards）
+const BattleSaveVersion = 5
 
 // BattleSaveData 战斗存档数据结构
 //
@@ -44,6 +45,7 @@ type BattleSaveData struct {
 	Projectiles []ProjectileData // 子弹数据
 	Suns        []SunData        // 阳光数据
 	Lawnmowers  []LawnmowerData  // 除草车数据
+	PlantCards  []PlantCardData  // 植物卡片冷却状态
 
 	// 保龄球模式数据（Level 1-5）
 	BowlingNuts    []BowlingNutData    // 保龄球坚果数据
@@ -142,6 +144,14 @@ type LawnmowerData struct {
 	Active    bool    // 是否激活（正在移动）
 }
 
+// PlantCardData 植物卡片冷却序列化数据
+//
+// 包含植物卡片的冷却状态，用于恢复卡片冷却进度。
+type PlantCardData struct {
+	PlantType       string  // 植物类型ID，如 "Peashooter", "Sunflower"
+	CurrentCooldown float64 // 当前剩余冷却时间（秒）
+}
+
 // BattleSaveInfo 战斗存档信息预览
 //
 // 用于在不加载完整存档的情况下显示存档信息。
@@ -166,6 +176,7 @@ func NewBattleSaveData() *BattleSaveData {
 		Projectiles:  []ProjectileData{},
 		Suns:         []SunData{},
 		Lawnmowers:   []LawnmowerData{},
+		PlantCards:   []PlantCardData{},
 		BowlingNuts:  []BowlingNutData{},
 	}
 }
