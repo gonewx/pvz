@@ -63,6 +63,12 @@ animation_combos:
           - anim_walk
       binding_strategy: auto
 
+    - name: walk2
+      display_name: 行走2（无杆）
+      animations:
+          - anim_walk
+      binding_strategy: auto
+
     - name: run
       display_name: 跑步（持杆）
       animations:
