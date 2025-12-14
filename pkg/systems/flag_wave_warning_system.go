@@ -361,13 +361,23 @@ func (s *FlagWaveWarningSystem) createTextWarningEntity() {
 	}
 }
 
+// FinalWave.png 的原始尺寸（动画坐标基于此尺寸设计）
+const (
+	FinalWaveImageWidth  = 341
+	FinalWaveImageHeight = 80
+)
+
 // renderWarningTextImage 获取预渲染的红色警告文字图片
 //
 // Story 17.7 补充任务：使用 HouseofTerror28 字体图集中预渲染的
 // 「一大波僵尸正在接近!」中文文字，并应用红色着色
 //
+// 重要：由于红色文字图片 (288x39) 尺寸与 FinalWave.png (341x80) 不同，
+// 需要创建一个与 FinalWave.png 相同尺寸的画布，将红色文字居中绘制，
+// 以确保动画坐标正确对齐。
+//
 // 返回：
-//   - *ebiten.Image: 渲染的文字图片，失败时返回 nil
+//   - *ebiten.Image: 渲染的文字图片（341x80），失败时返回 nil
 func (s *FlagWaveWarningSystem) renderWarningTextImage() *ebiten.Image {
 	// 懒加载位图字体（只尝试一次）
 	if !s.bitmapFontLoaded {
@@ -386,9 +396,30 @@ func (s *FlagWaveWarningSystem) renderWarningTextImage() *ebiten.Image {
 		return nil
 	}
 
+	// 获取红色文字的实际尺寸
+	textWidth := textImage.Bounds().Dx()
+	textHeight := textImage.Bounds().Dy()
+
 	log.Printf("[FlagWaveWarningSystem] Got pre-rendered warning text image: %dx%d",
-		textImage.Bounds().Dx(), textImage.Bounds().Dy())
-	return textImage
+		textWidth, textHeight)
+
+	// 创建与 FinalWave.png 相同尺寸的画布，将红色文字居中绘制
+	// 这样动画坐标就能正确对齐
+	canvas := ebiten.NewImage(FinalWaveImageWidth, FinalWaveImageHeight)
+
+	// 计算居中偏移
+	offsetX := float64(FinalWaveImageWidth-textWidth) / 2
+	offsetY := float64(FinalWaveImageHeight-textHeight) / 2
+
+	// 将红色文字居中绘制到画布上
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Translate(offsetX, offsetY)
+	canvas.DrawImage(textImage, op)
+
+	log.Printf("[FlagWaveWarningSystem] Created centered canvas: %dx%d, text offset: (%.1f, %.1f)",
+		FinalWaveImageWidth, FinalWaveImageHeight, offsetX, offsetY)
+
+	return canvas
 }
 
 // loadBitmapFont 加载 HouseofTerror28 位图字体
