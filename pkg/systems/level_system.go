@@ -624,14 +624,12 @@ func (s *LevelSystem) triggerFinalWaveWarning() {
 		audioManager.PlaySound("SOUND_AWOOGA")
 	}
 
-	centerX := float64(config.ScreenWidth) / 2
-	centerY := float64(config.ScreenHeight) / 2
-
+	// FinalWave.reanim 使用绝对屏幕坐标，传入 (0, 0) 让动画按原始坐标渲染
 	warningEntity, err := entities.NewFinalWaveWarningEntity(
 		s.entityManager,
 		s.resourceManager,
-		centerX,
-		centerY,
+		0, // 屏幕原点 X
+		0, // 屏幕原点 Y
 	)
 
 	if err != nil {

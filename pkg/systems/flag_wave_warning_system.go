@@ -155,14 +155,13 @@ func (s *FlagWaveWarningSystem) createFinalWaveWarningEntity() {
 		return
 	}
 
-	centerX := float64(config.ScreenWidth) / 2
-	centerY := float64(config.ScreenHeight) / 2
-
+	// FinalWave.reanim 使用绝对屏幕坐标，动画本身设计为从左侧飞入到接近屏幕中心
+	// 传入 (0, 0) 让动画按原始坐标渲染
 	entityID, err := entities.NewFinalWaveWarningEntity(
 		s.entityManager,
 		s.resourceManager,
-		centerX,
-		centerY,
+		0, // 屏幕原点 X
+		0, // 屏幕原点 Y
 	)
 
 	if err != nil {
@@ -253,14 +252,9 @@ func (s *FlagWaveWarningSystem) createWarningEntity() {
 		"IMAGE_REANIM_FINALWAVE": textImage,
 	}
 
-	// 计算实体位置
-	// FinalWave.reanim 动画最终帧的相对位置是 (220.1, 260.1)
-	// 为了让动画最终帧居中显示在屏幕中心，需要补偿这个偏移
-	// 同时考虑图片尺寸（图片锚点在左上角，需要偏移半个图片尺寸）
-	imgWidth := float64(textImage.Bounds().Dx())
-	imgHeight := float64(textImage.Bounds().Dy())
-	centerX := float64(config.ScreenWidth)/2 - imgWidth/2
-	centerY := float64(config.ScreenHeight)/2 - imgHeight/2
+	// FinalWave.reanim 使用绝对屏幕坐标，动画设计为从左侧飞入到接近屏幕中心
+	// finalwave.yaml 配置了 center_offset: [0, 0]，传入 (0, 0) 让动画按原始坐标渲染
+	// 注意：动态生成的红色文字图片尺寸应与 FinalWave.png (341x80) 相近以保持居中效果
 
 	// 创建实体
 	entityID := s.entityManager.CreateEntity()
@@ -293,10 +287,10 @@ func (s *FlagWaveWarningSystem) createWarningEntity() {
 		HiddenTracks:      nil,
 	}
 
-	// 添加位置组件
+	// 添加位置组件（使用绝对屏幕坐标）
 	posComp := &components.PositionComponent{
-		X: centerX,
-		Y: centerY,
+		X: 0,
+		Y: 0,
 	}
 
 	// 添加 UI 组件（标记为 UI 元素，不受摄像机影响）
@@ -322,8 +316,8 @@ func (s *FlagWaveWarningSystem) createWarningEntity() {
 		log.Printf("[FlagWaveWarningSystem] Playing SOUND_HUGE_WAVE for huge wave warning")
 	}
 
-	log.Printf("[FlagWaveWarningSystem] Created huge wave warning entity (ID: %d) at (%.0f, %.0f) with custom text image",
-		entityID, centerX, centerY)
+	log.Printf("[FlagWaveWarningSystem] Created huge wave warning entity (ID: %d) at (0, 0) with custom text image",
+		entityID)
 }
 
 // createTextWarningEntity 创建纯文本警告实体（回退方案）

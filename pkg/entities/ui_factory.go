@@ -77,20 +77,22 @@ func NewLevelProgressBarEntity(
 // 参数：
 //   - em: 实体管理器
 //   - rm: 资源管理器（用于加载 FinalWave.reanim）
-//   - centerX: 屏幕中央 X 坐标（通常是 ScreenWidth/2）
-//   - centerY: 屏幕中央 Y 坐标（通常是 ScreenHeight/2）
+//   - posX: 位置 X 坐标（通常传 0，因为动画使用绝对屏幕坐标）
+//   - posY: 位置 Y 坐标（通常传 0，因为动画使用绝对屏幕坐标）
 //
 // 返回：
 //   - ecs.EntityID: 提示动画实体ID
 //   - error: 如果资源加载失败返回错误
 //
 // 注意：
+//   - FinalWave.reanim 使用绝对屏幕坐标，动画设计为从左侧飞入到接近屏幕中心
+//   - finalwave.yaml 配置了 center_offset: [0, 0]，所以传入 (0, 0) 即可
 //   - 调用者需要在创建后添加 AnimationCommandComponent 来播放动画
 //   - 推荐使用 combo 配置: UnitID="finalwave", ComboName="warning" (loop: false)
 func NewFinalWaveWarningEntity(
 	em *ecs.EntityManager,
 	rm *game.ResourceManager,
-	centerX, centerY float64,
+	posX, posY float64,
 ) (ecs.EntityID, error) {
 	// 加载 FinalWave.reanim 动画
 	reanimComp, err := createReanimComponent(rm, "FinalWave")
@@ -101,10 +103,10 @@ func NewFinalWaveWarningEntity(
 	// 创建实体
 	entityID := em.CreateEntity()
 
-	// 设置位置（屏幕中央）
+	// 设置位置（FinalWave.reanim 使用绝对屏幕坐标，通常传入 (0, 0)）
 	posComp := &components.PositionComponent{
-		X: centerX,
-		Y: centerY,
+		X: posX,
+		Y: posY,
 	}
 
 	// 创建提示组件
@@ -126,7 +128,7 @@ func NewFinalWaveWarningEntity(
 	ecs.AddComponent(em, entityID, warningComp)
 	ecs.AddComponent(em, entityID, uiComp)
 
-	log.Printf("[UI Factory] Created final wave warning entity (ID: %d) at (%.2f, %.2f)", entityID, centerX, centerY)
+	log.Printf("[UI Factory] Created final wave warning entity (ID: %d) at (%.2f, %.2f)", entityID, posX, posY)
 
 	return entityID, nil
 }

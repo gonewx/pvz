@@ -57,3 +57,5 @@ mobile/assets/
 mobile/data/
 
 .cache
+# Nimbalyst local data (not checked into version control)
+nimbalyst-local/

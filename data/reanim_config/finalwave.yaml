@@ -3,6 +3,9 @@ name: FinalWave
 reanim_file: data/reanim/FinalWave.reanim
 default_animation: FinalWave
 scale: 1
+# FinalWave.reanim 的坐标是绝对屏幕坐标，不需要居中偏移
+# 动画设计：从左侧飞入到接近屏幕中心位置 (约 390, 300)
+center_offset: [0, 0]
 images:
     IMAGE_REANIM_FINALWAVE: assets/reanim/FinalWave.png
 available_animations:
