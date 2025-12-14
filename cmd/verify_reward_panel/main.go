@@ -26,8 +26,9 @@ const (
 
 var (
 	// 命令行参数
-	plantID = flag.String("plant", "sunflower", "植物ID (sunflower, peashooter, cherrybomb, wallnut, potatomine)")
-	verbose = flag.Bool("verbose", false, "显示详细调试信息")
+	plantID    = flag.String("plant", "sunflower", "植物ID (使用 --list 查看所有可用植物)")
+	listPlants = flag.Bool("list", false, "列出所有可用植物")
+	verbose    = flag.Bool("verbose", false, "显示详细调试信息")
 )
 
 // VerifyPanelGame 奖励植物介绍面板验证游戏
@@ -115,36 +116,18 @@ func NewVerifyPanelGame() (*VerifyPanelGame, error) {
 	log.Println("[VerifyPanelGame] 奖励植物介绍面板验证程序已启动")
 	log.Printf("[VerifyPanelGame] 测试植物: %s", *plantID)
 
+	// 加载 LawnStrings 用于获取植物名称和描述
+	lawnStrings, err := game.NewLawnStrings("assets/properties/LawnStrings.txt")
+	if err != nil {
+		return nil, fmt.Errorf("failed to load LawnStrings: %w", err)
+	}
+
 	// 直接创建并显示面板实体
 	panelEntity := em.CreateEntity()
 
-	// 获取植物信息
-	plantName := "向日葵"
-	plantDesc := "提供你额外的阳光"
-	sunCost := 50
-
-	switch *plantID {
-	case "sunflower":
-		plantName = "向日葵"
-		plantDesc = "提供你额外的阳光"
-		sunCost = 50
-	case "peashooter":
-		plantName = "豌豆射手"
-		plantDesc = "发射豌豆攻击僵尸"
-		sunCost = 100
-	case "cherrybomb":
-		plantName = "樱桃炸弹"
-		plantDesc = "炸毁一定范围内的所有僵尸"
-		sunCost = 150
-	case "wallnut":
-		plantName = "坚果墙"
-		plantDesc = "阻挡僵尸前进"
-		sunCost = 50
-	case "potatomine":
-		plantName = "土豆雷"
-		plantDesc = "埋在地里等待僵尸踩上去后爆炸"
-		sunCost = 25
-	}
+	// 使用统一的植物信息获取方法
+	plantName, plantDesc := game.GetPlantInfoWithStrings(*plantID, lawnStrings)
+	sunCost := game.GetPlantSunCost(*plantID)
 
 	// 添加面板组件（PlantID 字段很重要，用于自动加载图标）
 	ecs.AddComponent(em, panelEntity, &components.RewardPanelComponent{
@@ -339,18 +322,20 @@ func main() {
 		log.SetOutput(os.Stdout)
 	}
 
-	// 验证植物ID
-	validPlants := map[string]bool{
-		"sunflower":  true,
-		"peashooter": true,
-		"cherrybomb": true,
-		"wallnut":    true,
-		"potatomine": true,
+	// 列出所有可用植物
+	if *listPlants {
+		allPlants := config.GetAllPlants()
+		fmt.Println("可用植物ID:")
+		for _, plant := range allPlants {
+			fmt.Printf("  %s\n", plant.ID)
+		}
+		os.Exit(0)
 	}
 
-	if !validPlants[*plantID] {
+	// 验证植物ID - 使用植物注册表
+	if config.GetPlantByID(*plantID) == nil {
 		fmt.Fprintf(os.Stderr, "错误: 无效的植物ID '%s'\n", *plantID)
-		fmt.Fprintln(os.Stderr, "有效的植物ID: sunflower, peashooter, cherrybomb, wallnut, potatomine")
+		fmt.Fprintln(os.Stderr, "使用 --list 查看所有可用植物")
 		os.Exit(1)
 	}
 

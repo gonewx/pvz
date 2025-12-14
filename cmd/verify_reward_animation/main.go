@@ -26,8 +26,9 @@ const (
 
 var (
 	// 命令行参数
-	plantID    = flag.String("plant", "", "植物ID (sunflower, peashooter, cherrybomb, wallnut, potatomine)")
+	plantID    = flag.String("plant", "", "植物ID (使用 --list 查看所有可用植物)")
 	toolID     = flag.String("tool", "", "工具ID (shovel)")
+	listPlants = flag.Bool("list", false, "列出所有可用植物")
 	verbose    = flag.Bool("verbose", false, "显示详细调试信息")
 	rewardType string // 奖励类型: "plant" 或 "tool"
 	rewardID   string // 奖励ID
@@ -327,15 +328,17 @@ func main() {
 		log.SetOutput(os.Stdout)
 	}
 
-	// 验证参数：必须指定 --plant 或 --tool 其中之一
-	validPlants := map[string]bool{
-		"sunflower":  true,
-		"peashooter": true,
-		"cherrybomb": true,
-		"wallnut":    true,
-		"potatomine": true,
+	// 列出所有可用植物
+	if *listPlants {
+		allPlants := config.GetAllPlants()
+		fmt.Println("可用植物ID:")
+		for _, plant := range allPlants {
+			fmt.Printf("  %s\n", plant.ID)
+		}
+		os.Exit(0)
 	}
 
+	// 验证参数：必须指定 --plant 或 --tool 其中之一
 	validTools := map[string]bool{
 		"shovel": true,
 	}
@@ -346,9 +349,10 @@ func main() {
 	}
 
 	if *plantID != "" {
-		if !validPlants[*plantID] {
+		// 使用植物注册表验证植物ID
+		if config.GetPlantByID(*plantID) == nil {
 			fmt.Fprintf(os.Stderr, "错误: 无效的植物ID '%s'\n", *plantID)
-			fmt.Fprintln(os.Stderr, "有效的植物ID: sunflower, peashooter, cherrybomb, wallnut, potatomine")
+			fmt.Fprintln(os.Stderr, "使用 --list 查看所有可用植物")
 			os.Exit(1)
 		}
 		rewardType = "plant"

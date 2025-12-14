@@ -861,15 +861,8 @@ func (ras *RewardAnimationSystem) createRewardPanel(rewardType string, plantID s
 		rewardName = ras.gameState.LawnStrings.GetString(plantInfo.NameKey)
 		rewardDesc = ras.gameState.LawnStrings.GetString(plantInfo.DescriptionKey)
 
-		// 阳光值（硬编码，待配置化）
-		sunCostMap := map[string]int{
-			"sunflower":  50,
-			"peashooter": 100,
-			"cherrybomb": 150,
-			"wallnut":    50,
-			"potatomine": 25,
-		}
-		sunCost = sunCostMap[plantID]
+		// 从植物注册表获取阳光值
+		sunCost = game.GetPlantSunCost(plantID)
 	}
 
 	// 添加 RewardPanelComponent

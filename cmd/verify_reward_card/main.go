@@ -26,8 +26,9 @@ const (
 
 var (
 	// 命令行参数
-	plantID = flag.String("plant", "sunflower", "植物ID (sunflower, peashooter, cherrybomb, wallnut, potatomine)")
-	verbose = flag.Bool("verbose", false, "显示详细调试信息")
+	plantID    = flag.String("plant", "sunflower", "植物ID (使用 --list 查看所有可用植物)")
+	listPlants = flag.Bool("list", false, "列出所有可用植物")
+	verbose    = flag.Bool("verbose", false, "显示详细调试信息")
 )
 
 // VerifyGame 奖励卡片包动画验证游戏
@@ -363,18 +364,20 @@ func main() {
 		log.SetOutput(os.Stdout)
 	}
 
-	// 验证植物ID
-	validPlants := map[string]bool{
-		"sunflower":  true,
-		"peashooter": true,
-		"cherrybomb": true,
-		"wallnut":    true,
-		"potatomine": true,
+	// 列出所有可用植物
+	if *listPlants {
+		allPlants := config.GetAllPlants()
+		fmt.Println("可用植物ID:")
+		for _, plant := range allPlants {
+			fmt.Printf("  %s\n", plant.ID)
+		}
+		os.Exit(0)
 	}
 
-	if !validPlants[*plantID] {
+	// 验证植物ID - 使用植物注册表
+	if config.GetPlantByID(*plantID) == nil {
 		fmt.Fprintf(os.Stderr, "错误: 无效的植物ID '%s'\n", *plantID)
-		fmt.Fprintln(os.Stderr, "有效的植物ID: sunflower, peashooter, cherrybomb, wallnut, potatomine")
+		fmt.Fprintln(os.Stderr, "使用 --list 查看所有可用植物")
 		os.Exit(1)
 	}
 
