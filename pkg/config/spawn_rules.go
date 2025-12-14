@@ -9,8 +9,6 @@ import (
 
 // SpawnRulesConfig 僵尸生成规则配置
 type SpawnRulesConfig struct {
-	ZombieTiers           map[string]int           `yaml:"zombieTiers"`           // 僵尸类型 -> 阶数
-	TierWaveRestrictions  map[int]int              `yaml:"tierWaveRestrictions"`  // 阶数 -> 最早波次
 	RedEyeRules           RedEyeRulesConfig        `yaml:"redEyeRules"`           // 红眼规则
 	SceneTypeRestrictions SceneRestrictions        `yaml:"sceneTypeRestrictions"` // 场景限制
 	HealthAcceleration    HealthAccelerationConfig `yaml:"healthAcceleration"`    // Story 17.8: 血量加速配置
@@ -85,34 +83,6 @@ func applyHealthAccelerationDefaults(config *SpawnRulesConfig) {
 
 // validateSpawnRules 验证配置的有效性
 func validateSpawnRules(config *SpawnRulesConfig) error {
-	// 验证僵尸阶数映射表
-	if len(config.ZombieTiers) == 0 {
-		return fmt.Errorf("zombieTiers cannot be empty")
-	}
-
-	for zombieType, tier := range config.ZombieTiers {
-		if zombieType == "" {
-			return fmt.Errorf("zombie type cannot be empty")
-		}
-		if tier < 1 || tier > 4 {
-			return fmt.Errorf("zombie tier must be between 1 and 4, got %d for %s", tier, zombieType)
-		}
-	}
-
-	// 验证阶数波次限制
-	if len(config.TierWaveRestrictions) == 0 {
-		return fmt.Errorf("tierWaveRestrictions cannot be empty")
-	}
-
-	for tier, minWave := range config.TierWaveRestrictions {
-		if tier < 1 || tier > 4 {
-			return fmt.Errorf("tier in tierWaveRestrictions must be between 1 and 4, got %d", tier)
-		}
-		if minWave < 1 {
-			return fmt.Errorf("minimum wave for tier %d must be >= 1, got %d", tier, minWave)
-		}
-	}
-
 	// 验证红眼规则
 	if config.RedEyeRules.StartRound < 0 {
 		return fmt.Errorf("redEyeRules.startRound must be >= 0, got %d", config.RedEyeRules.StartRound)

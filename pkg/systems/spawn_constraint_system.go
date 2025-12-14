@@ -37,52 +37,6 @@ func CheckZombieTypeAllowed(zombieType string, allowedTypes []string) bool {
 	return false
 }
 
-// CheckTierRestriction 检查僵尸阶数是否符合波次限制
-// 独立纯函数，无副作用
-// 参数：
-//   - zombieType: 僵尸类型（如 "basic", "gargantuar"）
-//   - currentWave: 当前波次编号（从 1 开始）
-//   - roundNumber: 当前轮数（影响四阶僵尸最早波次）
-//   - spawnRules: 生成规则配置
-func CheckTierRestriction(
-	zombieType string,
-	currentWave int,
-	roundNumber int,
-	spawnRules *config.SpawnRulesConfig,
-) (bool, error) {
-	// 获取僵尸阶数
-	tier, ok := spawnRules.ZombieTiers[zombieType]
-	if !ok {
-		return false, fmt.Errorf("unknown zombie type: %s", zombieType)
-	}
-
-	// 获取该阶数的最早波次限制
-	minWave, ok := spawnRules.TierWaveRestrictions[tier]
-	if !ok {
-		return false, fmt.Errorf("no wave restriction defined for tier %d", tier)
-	}
-
-	// 四阶僵尸：根据轮数调整最早波次
-	// 公式: MinWave = max(15 - RoundNumber, 1)
-	if tier == 4 {
-		adjustedMinWave := 15 - roundNumber
-		if adjustedMinWave < 1 {
-			adjustedMinWave = 1
-		}
-		minWave = adjustedMinWave
-	}
-
-	// 检查当前波次是否满足限制
-	if currentWave < minWave {
-		return false, fmt.Errorf(
-			"zombie %s (tier %d) cannot spawn before wave %d (current: %d, round: %d)",
-			zombieType, tier, minWave, currentWave, roundNumber,
-		)
-	}
-
-	return true, nil
-}
-
 // CheckRedEyeLimit 检查红眼数量是否超限
 // 独立纯函数，无副作用
 // 参数：
@@ -235,19 +189,13 @@ func ValidateZombieSpawn(
 		return false, fmt.Sprintf("zombie type %s not allowed in this level", zombieType)
 	}
 
-	// 2. 检查阶数限制
-	ok, err := CheckTierRestriction(zombieType, constraint.CurrentWaveNum, roundNumber, spawnRules)
+	// 2. 检查红眼数量上限
+	ok, err := CheckRedEyeLimit(zombieType, constraint.RedEyeCount, roundNumber, spawnRules)
 	if !ok {
 		return false, err.Error()
 	}
 
-	// 3. 检查红眼数量上限
-	ok, err = CheckRedEyeLimit(zombieType, constraint.RedEyeCount, roundNumber, spawnRules)
-	if !ok {
-		return false, err.Error()
-	}
-
-	// 4. 检查场景类型限制
+	// 3. 检查场景类型限制
 	ok, err = CheckSceneTypeRestriction(zombieType, constraint.SceneType, lane, spawnRules)
 	if !ok {
 		return false, err.Error()

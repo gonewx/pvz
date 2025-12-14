@@ -791,36 +791,6 @@ func TestLaneAllocation_LegalLaneOnly(t *testing.T) {
 // Task 7: 僵尸生成约束集成测试
 // ========================================
 
-// TestSpawnConstraint_TierRestriction 阶数限制验证
-func TestSpawnConstraint_TierRestriction(t *testing.T) {
-	env, err := SetupTestEnvironment("1-4")
-	if err != nil {
-		t.Fatalf("Failed to setup test environment: %v", err)
-	}
-	defer TeardownTestEnvironment(env)
-
-	if env.SpawnRules == nil {
-		t.Skip("SpawnRules not loaded, skipping tier restriction test")
-	}
-
-	// 验证阶数限制配置
-	if len(env.SpawnRules.TierWaveRestrictions) == 0 {
-		t.Error("TierWaveRestrictions should not be empty")
-	}
-
-	// 验证一阶僵尸可以在第1波出现
-	tier1MinWave := env.SpawnRules.TierWaveRestrictions[1]
-	if tier1MinWave != 1 {
-		t.Errorf("Tier 1 min wave should be 1, got %d", tier1MinWave)
-	}
-
-	// 验证二阶僵尸最早在第3波出现
-	tier2MinWave := env.SpawnRules.TierWaveRestrictions[2]
-	if tier2MinWave != 3 {
-		t.Errorf("Tier 2 min wave should be 3, got %d", tier2MinWave)
-	}
-}
-
 // TestSpawnConstraint_SceneTypeRestriction 场景类型限制验证
 func TestSpawnConstraint_SceneTypeRestriction(t *testing.T) {
 	env, err := SetupTestEnvironment("1-4")

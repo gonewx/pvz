@@ -17,17 +17,6 @@ func TestLoadSpawnRules(t *testing.T) {
 		{
 			name: "valid config",
 			yamlContent: `
-zombieTiers:
-  basic: 1
-  buckethead: 2
-  gargantuar: 4
-
-tierWaveRestrictions:
-  1: 1
-  2: 3
-  3: 8
-  4: 15
-
 redEyeRules:
   startRound: 5
   capacityPerRound: 1
@@ -46,15 +35,6 @@ sceneTypeRestrictions:
 `,
 			wantErr: false,
 			validate: func(t *testing.T, cfg *SpawnRulesConfig) {
-				if cfg.ZombieTiers["basic"] != 1 {
-					t.Errorf("expected basic tier = 1, got %d", cfg.ZombieTiers["basic"])
-				}
-				if cfg.ZombieTiers["buckethead"] != 2 {
-					t.Errorf("expected buckethead tier = 2, got %d", cfg.ZombieTiers["buckethead"])
-				}
-				if cfg.TierWaveRestrictions[4] != 15 {
-					t.Errorf("expected tier 4 min wave = 15, got %d", cfg.TierWaveRestrictions[4])
-				}
 				if cfg.RedEyeRules.StartRound != 5 {
 					t.Errorf("expected red eye start round = 5, got %d", cfg.RedEyeRules.StartRound)
 				}
@@ -64,67 +44,8 @@ sceneTypeRestrictions:
 			},
 		},
 		{
-			name: "empty zombie tiers",
-			yamlContent: `
-zombieTiers: {}
-tierWaveRestrictions:
-  1: 1
-redEyeRules:
-  startRound: 5
-  capacityPerRound: 1
-`,
-			wantErr:     true,
-			errContains: "zombieTiers cannot be empty",
-		},
-		{
-			name: "invalid tier number",
-			yamlContent: `
-zombieTiers:
-  basic: 5
-tierWaveRestrictions:
-  1: 1
-redEyeRules:
-  startRound: 5
-  capacityPerRound: 1
-`,
-			wantErr:     true,
-			errContains: "zombie tier must be between 1 and 4",
-		},
-		{
-			name: "invalid tier wave restriction",
-			yamlContent: `
-zombieTiers:
-  basic: 1
-tierWaveRestrictions:
-  5: 1
-redEyeRules:
-  startRound: 5
-  capacityPerRound: 1
-`,
-			wantErr:     true,
-			errContains: "tier in tierWaveRestrictions must be between 1 and 4",
-		},
-		{
-			name: "negative min wave",
-			yamlContent: `
-zombieTiers:
-  basic: 1
-tierWaveRestrictions:
-  1: -1
-redEyeRules:
-  startRound: 5
-  capacityPerRound: 1
-`,
-			wantErr:     true,
-			errContains: "minimum wave for tier 1 must be >= 1",
-		},
-		{
 			name: "negative red eye start round",
 			yamlContent: `
-zombieTiers:
-  basic: 1
-tierWaveRestrictions:
-  1: 1
 redEyeRules:
   startRound: -1
   capacityPerRound: 1
@@ -135,10 +56,6 @@ redEyeRules:
 		{
 			name: "negative red eye capacity per round",
 			yamlContent: `
-zombieTiers:
-  basic: 1
-tierWaveRestrictions:
-  1: 1
 redEyeRules:
   startRound: 5
   capacityPerRound: -1
@@ -214,35 +131,12 @@ func TestValidateSpawnRules(t *testing.T) {
 		{
 			name: "valid config",
 			config: &SpawnRulesConfig{
-				ZombieTiers: map[string]int{
-					"basic":      1,
-					"gargantuar": 4,
-				},
-				TierWaveRestrictions: map[int]int{
-					1: 1,
-					4: 15,
-				},
 				RedEyeRules: RedEyeRulesConfig{
 					StartRound:       5,
 					CapacityPerRound: 1,
 				},
 			},
 			wantErr: false,
-		},
-		{
-			name: "empty zombie type",
-			config: &SpawnRulesConfig{
-				ZombieTiers: map[string]int{
-					"": 1,
-				},
-				TierWaveRestrictions: map[int]int{1: 1},
-				RedEyeRules: RedEyeRulesConfig{
-					StartRound:       5,
-					CapacityPerRound: 1,
-				},
-			},
-			wantErr:     true,
-			errContains: "zombie type cannot be empty",
 		},
 	}
 

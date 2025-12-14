@@ -50,127 +50,6 @@ func TestCheckZombieTypeAllowed(t *testing.T) {
 	}
 }
 
-func TestCheckTierRestriction(t *testing.T) {
-	spawnRules := &config.SpawnRulesConfig{
-		ZombieTiers: map[string]int{
-			"basic":             1,
-			"conehead":          1,
-			"buckethead":        2,
-			"polevaulter":       3,
-			"gargantuar":        4,
-			"gargantuar_redeye": 4,
-		},
-		TierWaveRestrictions: map[int]int{
-			1: 1,
-			2: 3,
-			3: 8,
-			4: 15,
-		},
-	}
-
-	tests := []struct {
-		name          string
-		zombieType    string
-		currentWave   int
-		roundNumber   int
-		expectedValid bool
-		expectError   bool
-	}{
-		{
-			name:          "tier 1 zombie at wave 1",
-			zombieType:    "basic",
-			currentWave:   1,
-			roundNumber:   0,
-			expectedValid: true,
-			expectError:   false,
-		},
-		{
-			name:          "tier 2 zombie at wave 3",
-			zombieType:    "buckethead",
-			currentWave:   3,
-			roundNumber:   0,
-			expectedValid: true,
-			expectError:   false,
-		},
-		{
-			name:          "tier 2 zombie at wave 2 (too early)",
-			zombieType:    "buckethead",
-			currentWave:   2,
-			roundNumber:   0,
-			expectedValid: false,
-			expectError:   true,
-		},
-		{
-			name:          "tier 3 zombie at wave 8",
-			zombieType:    "polevaulter",
-			currentWave:   8,
-			roundNumber:   0,
-			expectedValid: true,
-			expectError:   false,
-		},
-		{
-			name:          "tier 4 zombie at wave 15 (round 0)",
-			zombieType:    "gargantuar",
-			currentWave:   15,
-			roundNumber:   0,
-			expectedValid: true,
-			expectError:   false,
-		},
-		{
-			name:          "tier 4 zombie at wave 10 (round 5, adjusted min wave = 10)",
-			zombieType:    "gargantuar",
-			currentWave:   10,
-			roundNumber:   5,
-			expectedValid: true,
-			expectError:   false,
-		},
-		{
-			name:          "tier 4 zombie at wave 9 (round 5, adjusted min wave = 10, too early)",
-			zombieType:    "gargantuar",
-			currentWave:   9,
-			roundNumber:   5,
-			expectedValid: false,
-			expectError:   true,
-		},
-		{
-			name:          "tier 4 zombie at wave 1 (round 15, adjusted min wave = 1)",
-			zombieType:    "gargantuar",
-			currentWave:   1,
-			roundNumber:   15,
-			expectedValid: true,
-			expectError:   false,
-		},
-		{
-			name:          "unknown zombie type",
-			zombieType:    "unknown",
-			currentWave:   1,
-			roundNumber:   0,
-			expectedValid: false,
-			expectError:   true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			valid, err := CheckTierRestriction(tt.zombieType, tt.currentWave, tt.roundNumber, spawnRules)
-
-			if tt.expectError {
-				if err == nil {
-					t.Errorf("CheckTierRestriction() expected error, got nil")
-				}
-			} else {
-				if err != nil {
-					t.Errorf("CheckTierRestriction() unexpected error: %v", err)
-				}
-			}
-
-			if valid != tt.expectedValid {
-				t.Errorf("CheckTierRestriction() = %v, want %v (error: %v)", valid, tt.expectedValid, err)
-			}
-		})
-	}
-}
-
 func TestCalculateRedEyeCapacity(t *testing.T) {
 	spawnRules := &config.SpawnRulesConfig{
 		RedEyeRules: config.RedEyeRulesConfig{
@@ -403,18 +282,6 @@ func TestCheckSceneTypeRestriction(t *testing.T) {
 
 func TestValidateZombieSpawn(t *testing.T) {
 	spawnRules := &config.SpawnRulesConfig{
-		ZombieTiers: map[string]int{
-			"basic":             1,
-			"buckethead":        2,
-			"gargantuar_redeye": 4,
-			"snorkel":           3,
-		},
-		TierWaveRestrictions: map[int]int{
-			1: 1,
-			2: 3,
-			3: 8,
-			4: 15,
-		},
 		RedEyeRules: config.RedEyeRulesConfig{
 			StartRound:       5,
 			CapacityPerRound: 1,
@@ -456,19 +323,6 @@ func TestValidateZombieSpawn(t *testing.T) {
 				RedEyeCount:        0,
 				CurrentWaveNum:     1,
 				AllowedZombieTypes: []string{"basic", "conehead"},
-				SceneType:          "day",
-			},
-			roundNumber:   0,
-			expectedValid: false,
-		},
-		{
-			name:       "tier 2 zombie too early (wave 2)",
-			zombieType: "buckethead",
-			lane:       1,
-			constraint: &components.SpawnConstraintComponent{
-				RedEyeCount:        0,
-				CurrentWaveNum:     2,
-				AllowedZombieTypes: []string{"basic", "buckethead"},
 				SceneType:          "day",
 			},
 			roundNumber:   0,
