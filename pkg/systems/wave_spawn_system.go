@@ -12,6 +12,16 @@ import (
 	"github.com/gonewx/pvz/pkg/types"
 )
 
+// zombiePointCost 定义每种僵尸的点数成本
+// Story 8.9: 用于 ExtraPoints 波次类型的动态僵尸分配
+var zombiePointCost = map[string]int{
+	"basic":       1, // 普通僵尸
+	"zombie":      1, // 普通僵尸（别名）
+	"conehead":    2, // 路障僵尸
+	"buckethead":  3, // 铁桶僵尸
+	"polevaulter": 2, // 撑杆僵尸
+}
+
 // WaveSpawnSystem 波次生成系统
 //
 // 职责：
@@ -21,6 +31,7 @@ import (
 //   - Story 8.1: 验证僵尸生成行是否在 EnabledLanes 中
 //   - Story 17.3: 验证僵尸生成是否符合限制规则
 //   - Story 17.9: 使用精确的僵尸出生坐标
+//   - Story 8.9: 支持 ExtraPoints 波次类型的动态僵尸分配
 //
 // 架构说明：
 //   - 作为 LevelSystem 的依赖，由 LevelSystem 调用
@@ -116,6 +127,11 @@ func (s *WaveSpawnSystem) extractAllowedZombieTypes() []string {
 	}
 
 	typeSet := make(map[string]bool)
+
+	// Story 8.9: 优先从 ZombiePool 中提取（ExtraPoints 波次使用）
+	for _, zombieType := range s.levelConfig.ZombiePool {
+		typeSet[zombieType] = true
+	}
 
 	// 从所有波次配置中提取僵尸类型
 	for _, wave := range s.levelConfig.Waves {
@@ -236,6 +252,30 @@ func (s *WaveSpawnSystem) PreSpawnAllWaves() int {
 					if entityID != 0 {
 						totalSpawned++
 					}
+				}
+			}
+		}
+
+		// Story 8.9: 处理 ExtraPoints 类型波次的动态僵尸分配
+		// 当波次有 extraPoints 点数时，从僵尸池中动态选择僵尸
+		if waveConfig.ExtraPoints > 0 {
+			extraZombies := s.allocateZombiesFromPoints(waveConfig.ExtraPoints, waveIndex)
+			for i, zombieType := range extraZombies {
+				selectedLane := s.laneAllocator.SelectLane(
+					zombieType,
+					s.levelConfig.SceneType,
+					s.spawnRules,
+					s.levelConfig.EnabledLanes,
+					waveConfig.LaneRestriction,
+				)
+				s.laneAllocator.UpdateLaneCounters(selectedLane)
+
+				// 使用 1000+ 作为额外点数僵尸的索引，避免与固定僵尸冲突
+				entityID := s.spawnZombieForWave(zombieType, selectedLane, waveIndex, 1000+i)
+				if entityID != 0 {
+					totalSpawned++
+					log.Printf("[WaveSpawnSystem] ExtraPoints zombie spawned: type=%s, wave=%d, index=%d",
+						zombieType, waveIndex+1, i)
 				}
 			}
 		}
@@ -436,6 +476,30 @@ func (s *WaveSpawnSystem) SpawnWaveRealtime(waveIndex int) int {
 		}
 	}
 
+	// Story 8.9: 处理 ExtraPoints 类型波次的动态僵尸分配
+	// 当波次有 extraPoints 点数时，从僵尸池中动态选择僵尸
+	if waveConfig.ExtraPoints > 0 {
+		extraZombies := s.allocateZombiesFromPoints(waveConfig.ExtraPoints, waveIndex)
+		for i, zombieType := range extraZombies {
+			selectedLane := s.laneAllocator.SelectLane(
+				zombieType,
+				s.levelConfig.SceneType,
+				s.spawnRules,
+				s.levelConfig.EnabledLanes,
+				waveConfig.LaneRestriction,
+			)
+			s.laneAllocator.UpdateLaneCounters(selectedLane)
+
+			// 使用 1000+ 作为额外点数僵尸的索引，避免与固定僵尸冲突
+			entityID := s.spawnAndActivateZombie(zombieType, selectedLane, waveIndex, 1000+i)
+			if entityID != 0 {
+				totalSpawned++
+				log.Printf("[WaveSpawnSystem] ExtraPoints zombie spawned (realtime): type=%s, wave=%d, index=%d",
+					zombieType, waveIndex+1, i)
+			}
+		}
+	}
+
 	// 增加已激活僵尸计数
 	s.gameState.IncrementZombiesSpawned(totalSpawned)
 
@@ -504,7 +568,7 @@ func (s *WaveSpawnSystem) spawnAndActivateZombie(zombieType string, lane int, wa
 	var err error
 
 	switch zombieType {
-	case "basic":
+	case "basic", "zombie":
 		entityID, err = entities.NewZombieEntity(
 			s.entityManager,
 			s.resourceManager,
@@ -643,7 +707,7 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 
 	// 工厂函数不再接受 reanimSystem 参数
 	switch zombieType {
-	case "basic":
+	case "basic", "zombie":
 		entityID, err = entities.NewZombieEntity(
 			s.entityManager,
 			s.resourceManager,
@@ -792,7 +856,7 @@ func (s *WaveSpawnSystem) spawnZombieWithOffset(zombieType string, lane int, ind
 
 	// 工厂函数不再接受 reanimSystem 参数
 	switch zombieType {
-	case "basic":
+	case "basic", "zombie":
 		entityID, err = entities.NewZombieEntity(
 			s.entityManager,
 			s.resourceManager,
@@ -1099,4 +1163,168 @@ func (s *WaveSpawnSystem) getLaneTransitionMode() components.LaneTransitionMode 
 		log.Printf("[WaveSpawnSystem] Lane transition mode: instant (default)")
 		return components.TransitionModeInstant
 	}
+}
+
+// allocateZombiesFromPoints 根据点数从僵尸池中动态分配僵尸
+//
+// Story 8.9: 用于 ExtraPoints 波次类型的动态僵尸分配
+// 根据给定的点数从关卡配置的 zombiePool 中随机选择僵尸，直到点数用尽
+//
+// 参数：
+//
+//	points - 可用点数
+//
+// 返回：
+//
+//	选择的僵尸类型列表
+//
+// 僵尸点数成本：
+//   - basic/zombie: 1 点
+//   - conehead: 2 点
+//   - buckethead: 3 点
+//   - polevaulter: 2 点
+func (s *WaveSpawnSystem) allocateZombiesFromPoints(points int, waveIndex int) []string {
+	if points <= 0 {
+		return nil
+	}
+
+	// 获取关卡配置的僵尸池
+	zombiePool := s.getZombiePool()
+	if len(zombiePool) == 0 {
+		log.Printf("[WaveSpawnSystem] WARNING: No zombie pool configured, defaulting to basic zombie")
+		// 默认使用普通僵尸
+		zombiePool = []string{"basic"}
+	}
+
+	// 当前波次编号（1-based）
+	currentWave := waveIndex + 1
+
+	var result []string
+	remainingPoints := points
+
+	// 循环分配僵尸直到点数用尽
+	for remainingPoints > 0 {
+		// 过滤出当前点数可以负担且当前波次允许的僵尸类型
+		affordableTypes := s.filterAffordableAndAllowedZombies(zombiePool, remainingPoints, currentWave)
+		if len(affordableTypes) == 0 {
+			// 没有可负担/可用的僵尸类型，退出循环
+			log.Printf("[WaveSpawnSystem] No affordable/allowed zombie types for %d remaining points at wave %d", remainingPoints, currentWave)
+			break
+		}
+
+		// 从可负担的类型中随机选择一个
+		selectedType := affordableTypes[rand.Intn(len(affordableTypes))]
+		cost := s.getZombieCost(selectedType)
+
+		result = append(result, selectedType)
+		remainingPoints -= cost
+
+		log.Printf("[WaveSpawnSystem] ExtraPoints allocated: type=%s, cost=%d, remaining=%d",
+			selectedType, cost, remainingPoints)
+	}
+
+	log.Printf("[WaveSpawnSystem] ExtraPoints allocation complete: %d points -> %d zombies", points, len(result))
+	return result
+}
+
+// getZombiePool 获取关卡配置的僵尸池
+//
+// 返回：
+//
+//	僵尸类型列表
+func (s *WaveSpawnSystem) getZombiePool() []string {
+	if s.levelConfig == nil {
+		return nil
+	}
+
+	// 优先使用关卡配置的 zombiePool
+	if len(s.levelConfig.ZombiePool) > 0 {
+		return s.levelConfig.ZombiePool
+	}
+
+	// 向后兼容：从波次配置中提取僵尸类型
+	return s.extractAllowedZombieTypes()
+}
+
+// filterAffordableZombies 过滤出当前点数可以负担的僵尸类型
+//
+// 参数：
+//
+//	zombiePool - 僵尸池
+//	availablePoints - 可用点数
+//
+// 返回：
+//
+//	可负担的僵尸类型列表
+func (s *WaveSpawnSystem) filterAffordableZombies(zombiePool []string, availablePoints int) []string {
+	var affordable []string
+	for _, zombieType := range zombiePool {
+		cost := s.getZombieCost(zombieType)
+		if cost <= availablePoints {
+			affordable = append(affordable, zombieType)
+		}
+	}
+	return affordable
+}
+
+// filterAffordableAndAllowedZombies 过滤出当前点数可以负担且当前波次允许的僵尸类型
+//
+// Story 8.9: 用于 ExtraPoints 波次类型的动态僵尸分配
+// 根据僵尸阶数限制，过滤掉当前波次不能出现的僵尸
+//
+// 参数：
+//
+//	zombiePool - 僵尸池
+//	availablePoints - 可用点数
+//	currentWave - 当前波次编号（1-based）
+//
+// 返回：
+//
+//	可负担且当前波次允许的僵尸类型列表
+func (s *WaveSpawnSystem) filterAffordableAndAllowedZombies(zombiePool []string, availablePoints int, currentWave int) []string {
+	var result []string
+	for _, zombieType := range zombiePool {
+		// 检查点数是否足够
+		cost := s.getZombieCost(zombieType)
+		if cost > availablePoints {
+			continue
+		}
+
+		// 检查阶数限制（如果有生成规则配置）
+		if s.spawnRules != nil {
+			// 计算当前轮数
+			roundNumber := -1
+			if s.gameState != nil && s.gameState.TotalCompletedFlags > 0 {
+				roundNumber = s.gameState.TotalCompletedFlags/2 - 1
+			}
+
+			// 调用阶数检查
+			ok, _ := CheckTierRestriction(zombieType, currentWave, roundNumber, s.spawnRules)
+			if !ok {
+				log.Printf("[WaveSpawnSystem] filterAffordableAndAllowedZombies: %s not allowed at wave %d (tier restriction)",
+					zombieType, currentWave)
+				continue
+			}
+		}
+
+		result = append(result, zombieType)
+	}
+	return result
+}
+
+// getZombieCost 获取僵尸类型的点数成本
+//
+// 参数：
+//
+//	zombieType - 僵尸类型
+//
+// 返回：
+//
+//	点数成本（未知类型默认为 1）
+func (s *WaveSpawnSystem) getZombieCost(zombieType string) int {
+	if cost, ok := zombiePointCost[zombieType]; ok {
+		return cost
+	}
+	// 未知类型默认为 1 点
+	return 1
 }

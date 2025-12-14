@@ -89,6 +89,11 @@ type LevelConfig struct {
 	// 设置为 0 表示立即开始（传送带关卡等特殊关卡）
 	// 设置为 -1 表示使用默认值（不覆盖）
 	FirstWaveDelay *float64 `yaml:"firstWaveDelay"`
+
+	// Story 8.9: 僵尸池配置
+	// 定义关卡中可出现的僵尸类型，用于 ExtraPoints 波次类型的动态僵尸分配
+	// 如 ["zombie", "conehead", "polevaulter"]
+	ZombiePool []string `yaml:"zombiePool"`
 }
 
 // PresetPlant 预设植物配置（Story 19.4）

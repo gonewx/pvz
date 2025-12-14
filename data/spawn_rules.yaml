@@ -5,6 +5,7 @@
 zombieTiers:
   # 一阶僵尸（第1波起）
   basic: 1              # 普通僵尸
+  zombie: 1             # 普通僵尸（别名）
   conehead: 1           # 路障僵尸
   flag: 1               # 旗帜僵尸
 
