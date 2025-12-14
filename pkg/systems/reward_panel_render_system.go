@@ -370,58 +370,21 @@ func (rprs *RewardPanelRenderSystem) updatePlantCardEntity(panelEntity ecs.Entit
 }
 
 // getPlantType 将 plantID 映射到 PlantType 枚举。
+// 使用统一的植物注册表，新增植物时只需在 config/plant_registry.go 中添加记录
 func (rprs *RewardPanelRenderSystem) getPlantType(plantID string) components.PlantType {
-	switch plantID {
-	case "sunflower":
-		return components.PlantSunflower
-	case "peashooter":
-		return components.PlantPeashooter
-	case "cherrybomb":
-		return components.PlantCherryBomb
-	case "wallnut":
-		return components.PlantWallnut
-	case "potatomine":
-		return components.PlantPotatoMine
-	default:
-		return components.PlantUnknown
-	}
+	return config.PlantIDToType(plantID)
 }
 
 // getReanimName 根据 PlantType 获取 Reanim 名称
-// 注意：必须与 ResourceManager.LoadReanimResources() 中的名称完全一致
+// 使用统一的植物注册表，新增植物时只需在 config/plant_registry.go 中添加记录
 func (rprs *RewardPanelRenderSystem) getReanimName(plantType components.PlantType) string {
-	switch plantType {
-	case components.PlantSunflower:
-		return "SunFlower" // 修复：与资源加载时的名称一致
-	case components.PlantPeashooter:
-		return "PeaShooterSingle" // 修正为普通豌豆射手资源
-	case components.PlantCherryBomb:
-		return "CherryBomb"
-	case components.PlantWallnut:
-		return "Wallnut" // 修复：与资源加载时的名称一致（小写n）
-	case components.PlantPotatoMine:
-		return "PotatoMine"
-	default:
-		return ""
-	}
+	return config.GetPlantReanimName(plantType)
 }
 
 // getConfigID 返回配置文件中的ID（Story 13.8）
+// 使用统一的植物注册表，新增植物时只需在 config/plant_registry.go 中添加记录
 func (rprs *RewardPanelRenderSystem) getConfigID(plantType components.PlantType) string {
-	switch plantType {
-	case components.PlantSunflower:
-		return "sunflower"
-	case components.PlantPeashooter:
-		return "peashooter"
-	case components.PlantCherryBomb:
-		return "cherrybomb"
-	case components.PlantWallnut:
-		return "wallnut"
-	case components.PlantPotatoMine:
-		return "potatomine"
-	default:
-		return ""
-	}
+	return config.PlantTypeToID(plantType)
 }
 
 // drawToolIcon 绘制工具图标（铲子）

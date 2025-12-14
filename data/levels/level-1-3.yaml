@@ -38,6 +38,9 @@ preSoddedLanes: [2, 3, 4]                     # 预先渲染中间3行草皮
 sodRollAnimation: false                       # 禁用铺草皮动画
 sodRollParticles: false                       # 禁用土粒飞溅特效
 
+# === 僵尸池 ===
+zombiePool: ["basic", "conehead"]
+
 # === 波次配置 (Story 17.2 新格式) ===
 # Story 17.6: 波次计时由 WaveTimingSystem 自动管理
 waves:
@@ -68,12 +71,10 @@ waves:
         spawnInterval: 2.0
 
   - waveNum: 4
-    type: "Fixed"
-    zombies:
-      - type: "basic"
-        lanes: [2, 3, 4]
-        count: 2
-        spawnInterval: 2.0
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 2
+    zombies: []
 
   - waveNum: 5
     type: "Fixed"
@@ -84,19 +85,14 @@ waves:
         spawnInterval: 2.0
 
   - waveNum: 6
-    type: "Fixed"
-    zombies:
-      - type: "basic"
-        lanes: [2, 3, 4]
-        count: 1
-        spawnInterval: 2.0
-      - type: "conehead"
-        lanes: [2, 3, 4]
-        count: 1
-        spawnInterval: 2.0
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 2
+    zombies: []
 
   - waveNum: 7
-    type: "Fixed"
+    type: "ExtraPoints"
+    extraPoints: 2
     zombies:
       - type: "basic"
         lanes: [2, 3, 4]

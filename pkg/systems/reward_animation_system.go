@@ -1078,39 +1078,15 @@ func (ras *RewardAnimationSystem) createCardPackReanim() *reanim.ReanimXML {
 }
 
 // plantIDToType 将 plantID 字符串转换为 PlantType 枚举
+// 使用统一的植物注册表，新增植物时只需在 config/plant_registry.go 中添加记录
 func (ras *RewardAnimationSystem) plantIDToType(plantID string) components.PlantType {
-	switch plantID {
-	case "sunflower":
-		return components.PlantSunflower
-	case "peashooter":
-		return components.PlantPeashooter
-	case "cherrybomb":
-		return components.PlantCherryBomb
-	case "wallnut":
-		return components.PlantWallnut
-	case "potatomine":
-		return components.PlantPotatoMine
-	default:
-		return components.PlantUnknown
-	}
+	return config.PlantIDToType(plantID)
 }
 
 // getReanimName 根据 plantID 获取 Reanim 资源名称
+// 使用统一的植物注册表，新增植物时只需在 config/plant_registry.go 中添加记录
 func (ras *RewardAnimationSystem) getReanimName(plantID string) string {
-	switch plantID {
-	case "sunflower":
-		return "SunFlower"
-	case "peashooter":
-		return "PeaShooterSingle" // 修正为普通豌豆射手资源
-	case "cherrybomb":
-		return "CherryBomb"
-	case "wallnut":
-		return "Wallnut"
-	case "potatomine":
-		return "PotatoMine"
-	default:
-		return ""
-	}
+	return config.GetPlantReanimNameByID(plantID)
 }
 
 // compositePlantCard 将植物图标合成到卡片包图片上。

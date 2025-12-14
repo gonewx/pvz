@@ -358,14 +358,15 @@ func (gs *GameState) CheckVictory() bool {
 
 	// 胜利条件：
 	// 1. 所有波次已生成（allWavesSpawned = true）
-	// 2. 已消灭的僵尸数量 >= 关卡配置中的总僵尸数
-	// 注意：必须消灭配置中的所有僵尸，而不是已激活的僵尸
-	result := allWavesSpawned && gs.ZombiesKilled >= gs.TotalZombiesInLevel && gs.TotalZombiesInLevel > 0
+	// 2. 场上没有存活的僵尸（TotalZombiesSpawned - ZombiesKilled == 0）
+	// 注意：必须消灭所有已激活的僵尸，而不是配置中的僵尸数量
+	zombiesOnField := gs.TotalZombiesSpawned - gs.ZombiesKilled
+	result := allWavesSpawned && gs.TotalZombiesSpawned > 0 && zombiesOnField == 0
 
 	// 调试日志：当接近胜利条件时输出
-	if allWavesSpawned || gs.ZombiesKilled >= gs.TotalZombiesInLevel-1 {
-		log.Printf("[GameState] CheckVictory: allWavesSpawned=%v, ZombiesKilled=%d, TotalZombiesInLevel=%d, result=%v",
-			allWavesSpawned, gs.ZombiesKilled, gs.TotalZombiesInLevel, result)
+	if allWavesSpawned || zombiesOnField <= 2 {
+		log.Printf("[GameState] CheckVictory: allWavesSpawned=%v, ZombiesKilled=%d, TotalZombiesSpawned=%d, ZombiesOnField=%d, result=%v",
+			allWavesSpawned, gs.ZombiesKilled, gs.TotalZombiesSpawned, zombiesOnField, result)
 	}
 
 	return result

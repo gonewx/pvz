@@ -25,8 +25,7 @@ showSoddingAnim: false          # 无铺草皮动画
 rewardPlant: "snowpea"          # 完成后奖励寒冰射手
 
 # === 僵尸池 ===
-# 普通僵尸 (1 point)、路障僵尸 (2 points)、撑杆僵尸 (2 points)
-zombiePool: ["zombie", "conehead", "polevaulter"]
+zombiePool: ["basic", "conehead", "polevaulter"]
 
 # === 波次配置 (1 面旗帜，10 波) ===
 # 使用 Fixed + ExtraPoints 混合系统

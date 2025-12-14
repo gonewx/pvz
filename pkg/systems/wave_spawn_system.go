@@ -650,43 +650,15 @@ func (s *WaveSpawnSystem) spawnAndActivateZombie(zombieType string, lane int, wa
 	spawnX := baseSpawnX + xOffset // 应用跨行空间错开
 	spawnY := s.getZombieSpawnY(row)
 
-	// 根据类型创建僵尸
-	var entityID ecs.EntityID
-	var err error
-
-	switch zombieType {
-	case "basic", "zombie":
-		entityID, err = entities.NewZombieEntity(
-			s.entityManager,
-			s.resourceManager,
-			row,
-			spawnX,
-		)
-	case "conehead":
-		entityID, err = entities.NewConeheadZombieEntity(
-			s.entityManager,
-			s.resourceManager,
-			row,
-			spawnX,
-		)
-	case "buckethead":
-		entityID, err = entities.NewBucketheadZombieEntity(
-			s.entityManager,
-			s.resourceManager,
-			row,
-			spawnX,
-		)
-	case "polevaulter":
-		entityID, err = entities.NewPolevaulterZombieEntity(
-			s.entityManager,
-			s.resourceManager,
-			row,
-			spawnX,
-		)
-	default:
-		log.Printf("[WaveSpawnSystem] ERROR: Unknown zombie type '%s'", zombieType)
-		return 0
-	}
+	// 使用统一的工厂注册表创建僵尸
+	// 新增僵尸时只需在 entities/zombie_factory_registry.go 中添加记录
+	entityID, err := entities.CreateZombieByID(
+		zombieType,
+		s.entityManager,
+		s.resourceManager,
+		row,
+		spawnX,
+	)
 
 	if err != nil {
 		log.Printf("[WaveSpawnSystem] ERROR: Failed to spawn zombie: %v", err)
@@ -802,44 +774,15 @@ func (s *WaveSpawnSystem) spawnZombieForWave(zombieType string, lane int, waveIn
 	spawnX := baseSpawnX + xOffset // 应用跨行空间错开
 	spawnY := s.getZombieSpawnY(previewRow) // 使用随机行的Y坐标
 
-	// 根据类型创建僵尸
-	var entityID ecs.EntityID
-	var err error
-
-	// 工厂函数不再接受 reanimSystem 参数
-	switch zombieType {
-	case "basic", "zombie":
-		entityID, err = entities.NewZombieEntity(
-			s.entityManager,
-			s.resourceManager,
-			previewRow,
-			spawnX,
-		)
-	case "conehead":
-		entityID, err = entities.NewConeheadZombieEntity(
-			s.entityManager,
-			s.resourceManager,
-			previewRow,
-			spawnX,
-		)
-	case "buckethead":
-		entityID, err = entities.NewBucketheadZombieEntity(
-			s.entityManager,
-			s.resourceManager,
-			previewRow,
-			spawnX,
-		)
-	case "polevaulter":
-		entityID, err = entities.NewPolevaulterZombieEntity(
-			s.entityManager,
-			s.resourceManager,
-			previewRow,
-			spawnX,
-		)
-	default:
-		log.Printf("[WaveSpawnSystem] ERROR: Unknown zombie type '%s'", zombieType)
-		return 0
-	}
+	// 使用统一的工厂注册表创建僵尸
+	// 新增僵尸时只需在 entities/zombie_factory_registry.go 中添加记录
+	entityID, err := entities.CreateZombieByID(
+		zombieType,
+		s.entityManager,
+		s.resourceManager,
+		previewRow,
+		spawnX,
+	)
 
 	if err != nil {
 		log.Printf("[WaveSpawnSystem] ERROR: Failed to spawn zombie: %v", err)
@@ -948,44 +891,15 @@ func (s *WaveSpawnSystem) spawnZombieWithOffset(zombieType string, lane int, ind
 	targetLane := s.findNearestEnabledLane(lane)
 	targetRow := targetLane - 1
 
-	// 根据僵尸类型调用对应的工厂函数
-	var entityID ecs.EntityID
-	var err error
-
-	// 工厂函数不再接受 reanimSystem 参数
-	switch zombieType {
-	case "basic", "zombie":
-		entityID, err = entities.NewZombieEntity(
-			s.entityManager,
-			s.resourceManager,
-			row,
-			spawnX,
-		)
-	case "conehead":
-		entityID, err = entities.NewConeheadZombieEntity(
-			s.entityManager,
-			s.resourceManager,
-			row,
-			spawnX,
-		)
-	case "buckethead":
-		entityID, err = entities.NewBucketheadZombieEntity(
-			s.entityManager,
-			s.resourceManager,
-			row,
-			spawnX,
-		)
-	case "polevaulter":
-		entityID, err = entities.NewPolevaulterZombieEntity(
-			s.entityManager,
-			s.resourceManager,
-			row,
-			spawnX,
-		)
-	default:
-		log.Printf("[WaveSpawnSystem] ERROR: Unknown zombie type '%s'", zombieType)
-		return 0
-	}
+	// 使用统一的工厂注册表创建僵尸
+	// 新增僵尸时只需在 entities/zombie_factory_registry.go 中添加记录
+	entityID, err := entities.CreateZombieByID(
+		zombieType,
+		s.entityManager,
+		s.resourceManager,
+		row,
+		spawnX,
+	)
 
 	// 检查是否创建成功
 	if err != nil {
@@ -1365,20 +1279,19 @@ func (s *WaveSpawnSystem) filterAffordableZombies(zombiePool []string, available
 	return affordable
 }
 
-// filterAffordableAndAllowedZombies 过滤出当前点数可以负担且当前波次允许的僵尸类型
+// filterAffordableAndAllowedZombies 过滤出当前点数可以负担的僵尸类型
 //
 // Story 8.9: 用于 ExtraPoints 波次类型的动态僵尸分配
-// 根据僵尸阶数限制，过滤掉当前波次不能出现的僵尸
 //
 // 参数：
 //
 //	zombiePool - 僵尸池
 //	availablePoints - 可用点数
-//	currentWave - 当前波次编号（1-based）
+//	currentWave - 当前波次编号（1-based，保留用于后续扩展）
 //
 // 返回：
 //
-//	可负担且当前波次允许的僵尸类型列表
+//	可负担的僵尸类型列表
 func (s *WaveSpawnSystem) filterAffordableAndAllowedZombies(zombiePool []string, availablePoints int, currentWave int) []string {
 	var result []string
 	for _, zombieType := range zombiePool {
@@ -1386,23 +1299,6 @@ func (s *WaveSpawnSystem) filterAffordableAndAllowedZombies(zombiePool []string,
 		cost := s.getZombieCost(zombieType)
 		if cost > availablePoints {
 			continue
-		}
-
-		// 检查阶数限制（如果有生成规则配置）
-		if s.spawnRules != nil {
-			// 计算当前轮数
-			roundNumber := -1
-			if s.gameState != nil && s.gameState.TotalCompletedFlags > 0 {
-				roundNumber = s.gameState.TotalCompletedFlags/2 - 1
-			}
-
-			// 调用阶数检查
-			ok, _ := CheckTierRestriction(zombieType, currentWave, roundNumber, s.spawnRules)
-			if !ok {
-				log.Printf("[WaveSpawnSystem] filterAffordableAndAllowedZombies: %s not allowed at wave %d (tier restriction)",
-					zombieType, currentWave)
-				continue
-			}
 		}
 
 		result = append(result, zombieType)

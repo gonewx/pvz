@@ -38,6 +38,9 @@ sodRollAnimation: true                        # 启用铺草皮动画
 sodRollParticles: true                        # 启用土粒飞溅特效
 soddingAnimLanes: [1, 5]                      # 在第1,5行播放动画（第2,3,4行跳过）
 
+# === 僵尸池 ===
+zombiePool: ["basic", "conehead"]
+
 # === 波次配置 (Story 17.2 新格式) ===
 # Story 17.6: 波次计时由 WaveTimingSystem 自动管理
 waves:
@@ -66,31 +69,26 @@ waves:
         spawnInterval: 1.5
 
   - waveNum: 4
-    type: "Fixed"
-    zombies:
-      - type: "conehead"
-        lanes: [1, 2, 3, 4, 5]
-        count: 1
-        spawnInterval: 2.0
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 2
+    zombies: []
 
   - waveNum: 5
-    type: "Fixed"
-    zombies:
-      - type: "conehead"
-        lanes: [1, 2, 3, 4, 5]
-        count: 1
-        spawnInterval: 2.0
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 2
+    zombies: []
 
   - waveNum: 6
-    type: "Fixed"
-    zombies:
-      - type: "conehead"
-        lanes: [1, 2, 3, 4, 5]
-        count: 1
-        spawnInterval: 2.0
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 2
+    zombies: []
 
   - waveNum: 7
     type: "Fixed"
+    extraPoints: 2
     zombies:
       - type: "basic"
         lanes: [1, 2, 3, 4, 5]
@@ -100,6 +98,7 @@ waves:
   - waveNum: 8
     type: "Fixed"
     flagIndex: 1
+    extraPoints: 2
     zombies:
       - type: "basic"
         lanes: [1, 2, 3, 4, 5]
@@ -109,6 +108,7 @@ waves:
   - waveNum: 9
     type: "Fixed"
     flagIndex: 1
+    extraPoints: 2
     zombies:
       - type: "basic"
         lanes: [1, 2, 3, 4, 5]
@@ -117,20 +117,12 @@ waves:
       - type: "conehead"
         lanes: [1, 2, 3, 4, 5]
         count: 1
-        spawnInterval: 2.0
 
   - waveNum: 10
-    type: "Fixed"
-    zombies:
-      - type: "basic"
-        lanes: [1, 2, 3, 4, 5]
-        count: 3
-        spawnInterval: 2.0
-
-  - waveNum: 11
     type: "Final"
     isFlag: true
     flagIndex: 1
+    extraPoints: 2
     zombies:
       - type: "basic"
         lanes: [1, 2, 3, 4, 5]
@@ -138,5 +130,5 @@ waves:
         spawnInterval: 1.0
       - type: "conehead"
         lanes: [1, 2, 3, 4, 5]
-        count: 2
+        count: 1
         spawnInterval: 1.2

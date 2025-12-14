@@ -232,31 +232,13 @@ func GetPlantInfoWithStrings(plantID string, lawnStrings *LawnStrings) (name, de
 	return name, desc
 }
 
-// GetPlantSunCost 获取植物的阳光消耗值（从 config 包获取）
+// GetPlantSunCost 获取植物的阳光消耗值（从植物注册表获取）
+// 使用统一的植物注册表，新增植物时只需在 config/plant_registry.go 中添加记录
 // 参数:
 //   - plantID: 植物ID
 //
 // 返回:
 //   - int: 阳光消耗值，如果植物ID未知则返回0
 func GetPlantSunCost(plantID string) int {
-	switch plantID {
-	case "sunflower":
-		return config.SunflowerSunCost
-	case "peashooter":
-		return config.PeashooterSunCost
-	case "wallnut":
-		return config.WallnutCost
-	case "cherrybomb":
-		return config.CherryBombSunCost
-	case "potatomine":
-		return config.PotatoMineSunCost
-	case "snowpea":
-		return config.SnowPeaSunCost
-	case "chomper":
-		return 150 // TODO: 添加到 config 包
-	case "repeater":
-		return 200 // TODO: 添加到 config 包
-	default:
-		return 0
-	}
+	return config.GetPlantSunCost(plantID)
 }
