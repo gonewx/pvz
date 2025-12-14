@@ -764,6 +764,18 @@ func (s *GameScene) restoreBattleState() {
 		waveTimingSystem := s.levelSystem.GetWaveTimingSystem()
 		if waveTimingSystem != nil {
 			waveTimingSystem.RestoreState(saveData.CurrentWaveIndex, saveData.LevelTime)
+
+			// Bug Fix: 存档恢复后，如果场上没有僵尸但还有波次未生成，立即触发下一波
+			// 问题：恢复时 WaveElapsedCs 被重置为 0，导致加速刷新条件无法满足
+			// 玩家需要等待完整的倒计时（最终波是55秒）才能触发下一波
+			// 解决：检查场上是否有僵尸，如果没有则立即触发下一波
+			zombiesOnField := s.gameState.TotalZombiesSpawned - s.gameState.ZombiesKilled
+			hasMoreWaves := saveData.CurrentWaveIndex < len(s.gameState.SpawnedWaves)
+			if zombiesOnField == 0 && hasMoreWaves {
+				log.Printf("[GameScene] Bug Fix: 场上无僵尸但还有波次未生成，立即触发下一波 (wave %d)",
+					saveData.CurrentWaveIndex+1)
+				waveTimingSystem.TriggerNextWaveImmediately()
+			}
 		}
 	}
 
