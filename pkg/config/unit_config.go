@@ -82,12 +82,18 @@ const (
 	// 与普通僵尸相同
 	PolevaulterZombieWalkSpeed = -30.0
 
-	// PolevaulterZombieJumpDistance 撑杆僵尸跳跃距离（像素）
-	// 约 1.5 格（1.5 * 80 = 120 像素）
-	PolevaulterZombieJumpDistance = 120.0
-
 	// PolevaulterZombieJumpDuration 撑杆僵尸跳跃动画持续时间（秒）
-	PolevaulterZombieJumpDuration = 0.8
+	// 增加到 1.5 秒让跳跃看起来更自然
+	PolevaulterZombieJumpDuration = 1.5
+
+	// PolevaulterZombieJumpDistance 撑杆僵尸跳跃时实体需要移动的距离（像素）
+	// 从 Zombie_polevaulter.reanim 的 body1 轨道分析得出：
+	// - jump 动画期间 (帧50-92)，body1.X 从 42.0 变化到 -109.2
+	// - walk 动画开始时 (帧93)，body1.X 重置为 40.1
+	// - 为保持视觉连续，实体 Position.X 需要补偿这个差值
+	// - 补偿量 = jump结束时body1.X - walk开始时body1.X = -109.2 - 40.1 = -149.3
+	// 负值表示向左移动
+	PolevaulterZombieJumpDistance = -149.3
 )
 
 // Projectile Configuration (子弹配置)
@@ -284,13 +290,17 @@ const (
 	// 僵尸距离小于此值时使用最快速度
 	PotatoMineWarningDistanceMin = 50.0
 
-	// PotatoMineBlinkIntervalMax 警告灯最慢闪烁间隔（秒）
-	// 僵尸很远或没有僵尸时，每隔此时间切换一次灯的亮灭状态
-	PotatoMineBlinkIntervalMax = 0.5
+	// PotatoMineBlinkOnDuration 红灯亮的固定时间（秒）
+	// 无论闪烁频率如何，红灯每次都亮这么长时间
+	PotatoMineBlinkOnDuration = 0.1
 
-	// PotatoMineBlinkIntervalMin 警告灯最快闪烁间隔（秒）
-	// 僵尸很近时，每隔此时间切换一次灯的亮灭状态
-	PotatoMineBlinkIntervalMin = 0.1
+	// PotatoMineBlinkOffMax 红灯灭的最长时间（秒）
+	// 僵尸很远时，红灯灭这么长时间后再亮
+	PotatoMineBlinkOffMax = 0.8
+
+	// PotatoMineBlinkOffMin 红灯灭的最短时间（秒）
+	// 僵尸很近时，红灯灭这么短时间后就亮
+	PotatoMineBlinkOffMin = 0.15
 )
 
 // Snow Pea Configuration (寒冰射手配置)

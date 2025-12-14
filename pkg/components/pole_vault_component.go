@@ -4,9 +4,11 @@ package components
 // Story 8.9: 定义撑杆僵尸的跳跃状态和行为
 //
 // 撑杆僵尸的特殊机制：
-// - 持杆时高速移动（8.5 像素/秒，普通僵尸的 1.8 倍）
+// - 持杆时高速移动（约 54 像素/秒，普通僵尸的 1.8 倍）
 // - 遇到第一个植物时触发跳跃，跳过该植物
-// - 跳跃后丢弃撑杆，速度降为普通速度（4.7 像素/秒）
+// - 跳跃动画期间，body1 轨道位移制造视觉效果，实体位置不变
+// - 跳跃完成时，实体位置补偿 body1 重置，保持视觉连续
+// - 跳跃后丢弃撑杆，速度降为普通速度（30 像素/秒）
 // - 跳跃后不再具备跳跃能力，遇到植物时正常攻击
 type PoleVaultComponent struct {
 	// HasPole 是否持有撑杆
@@ -18,19 +20,11 @@ type PoleVaultComponent struct {
 	// 跳跃动画播放期间为 true
 	IsJumping bool
 
-	// JumpProgress 跳跃进度 (0.0 - 1.0)
-	// 用于计算跳跃过程中的位置插值
-	JumpProgress float64
-
-	// JumpStartX 跳跃起始 X 坐标
-	// 用于计算跳跃轨迹
-	JumpStartX float64
-
-	// JumpTargetX 跳跃目标 X 坐标
-	// 跳跃完成后的最终位置
-	JumpTargetX float64
-
 	// TargetPlantEntityID 要跳过的植物实体ID
 	// 用于在跳跃过程中避免与该植物发生碰撞
 	TargetPlantEntityID uint64
+
+	// NeedPositionCompensation 是否需要应用位移补偿
+	// 跳跃完成后设为 true，延迟一帧应用，避免动画切换时的视觉跳变
+	NeedPositionCompensation bool
 }

@@ -61,13 +61,27 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 	zombieCol := int((position.X + collisionOffsetX - config.GridWorldStartX) / config.CellWidth)
 	zombieRow := int((position.Y - config.GridWorldStartY - config.ZombieVerticalOffset - config.CellHeight/2.0) / config.CellHeight)
 
+	// Story 8.9: 撑杆僵尸跳跃和持杆状态处理
+	// 撑杆僵尸持杆时遇到植物应该跳跃而不是啃食
+	shouldCheckPlantCollision := true
+	if poleVault, ok := ecs.GetComponent[*components.PoleVaultComponent](s.entityManager, entityID); ok {
+		if poleVault.IsJumping || poleVault.HasPole {
+			// 跳跃中或持杆状态，跳过植物碰撞检测
+			// 但继续执行根运动来控制位移（让动画的 _ground 数据生效）
+			shouldCheckPlantCollision = false
+			log.Printf("[BehaviorSystem] 撑杆僵尸 %d 跳跃/持杆状态，跳过植物碰撞检测", entityID)
+		}
+	}
+
 	// 检测是否与植物在同一格子
-	plantID, hasCollision := s.detectPlantCollision(zombieRow, zombieCol)
-	if hasCollision {
-		log.Printf("[BehaviorSystem] ✅ 僵尸 %d 检测到植物 %d，位置(%d,%d)，开始啃食！", entityID, plantID, zombieRow, zombieCol)
-		// 进入啃食状态
-		s.startEatingPlant(entityID, plantID)
-		return // 跳过移动逻辑
+	if shouldCheckPlantCollision {
+		plantID, hasCollision := s.detectPlantCollision(zombieRow, zombieCol)
+		if hasCollision {
+			log.Printf("[BehaviorSystem] ✅ 僵尸 %d 检测到植物 %d，位置(%d,%d)，开始啃食！", entityID, plantID, zombieRow, zombieCol)
+			// 进入啃食状态
+			s.startEatingPlant(entityID, plantID)
+			return // 跳过移动逻辑
+		}
 	}
 
 	// 获取速度组件

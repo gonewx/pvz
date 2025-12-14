@@ -34,6 +34,13 @@ func (s *PoleVaultSystem) Update(deltaTime float64) {
 			continue
 		}
 
+		// 检查是否需要应用延迟的位移补偿
+		// 这必须在动画切换后的下一帧执行，确保 body1 已重置
+		if poleVault.NeedPositionCompensation {
+			s.applyPositionCompensation(entityID, poleVault)
+			continue
+		}
+
 		// 处理跳跃中的僵尸
 		if poleVault.IsJumping {
 			s.updateJumping(entityID, poleVault, deltaTime)
@@ -48,6 +55,7 @@ func (s *PoleVaultSystem) Update(deltaTime float64) {
 		// 检查僵尸是否正在移动（避免对静止的僵尸进行检测）
 		vel, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, entityID)
 		if !ok || vel.VX >= 0 {
+			log.Printf("[PoleVaultSystem] 僵尸 %d 无速度或未移动，跳过检测", entityID)
 			continue
 		}
 
@@ -65,6 +73,7 @@ func (s *PoleVaultSystem) checkPlantCollision(zombieID ecs.EntityID, poleVault *
 
 	zombieCol, ok := ecs.GetComponent[*components.CollisionComponent](s.entityManager, zombieID)
 	if !ok {
+		log.Printf("[PoleVaultSystem] 僵尸 %d 无 CollisionComponent", zombieID)
 		return
 	}
 
@@ -73,6 +82,9 @@ func (s *PoleVaultSystem) checkPlantCollision(zombieID ecs.EntityID, poleVault *
 
 	// 获取所有植物实体
 	plants := ecs.GetEntitiesWith2[*components.PlantComponent, *components.PositionComponent](s.entityManager)
+
+	// 僵尸左边缘
+	zombieLeftEdge := zombiePos.X - zombieCol.Width/2
 
 	for _, plantID := range plants {
 		plantPos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, plantID)
@@ -90,14 +102,15 @@ func (s *PoleVaultSystem) checkPlantCollision(zombieID ecs.EntityID, poleVault *
 			continue
 		}
 
-		// 检测碰撞：僵尸左边缘是否接触到植物
-		// 僵尸左边缘 = zombiePos.X - zombieCol.Width/2
-		// 植物右边缘 = plantPos.X + CellWidth/2
-		zombieLeftEdge := zombiePos.X - zombieCol.Width/2
+		// 植物右边缘
 		plantRightEdge := plantPos.X + config.CellWidth/2
 
 		// 检测距离阈值（当僵尸接近植物时触发跳跃）
 		jumpTriggerDistance := 20.0
+
+		log.Printf("[PoleVaultSystem] 检测: 僵尸%d(X=%.1f,左边缘=%.1f,行=%d) 植物%d(X=%.1f,右边缘=%.1f,行=%d)",
+			zombieID, zombiePos.X, zombieLeftEdge, zombieRow,
+			plantID, plantPos.X, plantRightEdge, plant.GridRow)
 
 		if zombieLeftEdge <= plantRightEdge+jumpTriggerDistance && zombieLeftEdge > plantRightEdge-config.CellWidth {
 			// 触发跳跃
@@ -109,85 +122,79 @@ func (s *PoleVaultSystem) checkPlantCollision(zombieID ecs.EntityID, poleVault *
 
 // startJump 开始跳跃
 func (s *PoleVaultSystem) startJump(zombieID ecs.EntityID, poleVault *components.PoleVaultComponent, currentX, plantX float64, plantID ecs.EntityID) {
-	log.Printf("[PoleVaultSystem] 撑杆僵尸 %d 检测到植物 %d，开始跳跃", zombieID, plantID)
+	log.Printf("[PoleVaultSystem] 撑杆僵尸 %d 检测到植物 %d，开始跳跃 (当前 X=%.1f)", zombieID, plantID, currentX)
 
 	// 设置跳跃状态
 	poleVault.IsJumping = true
-	poleVault.JumpProgress = 0.0
-	poleVault.JumpStartX = currentX
-	// 跳跃目标位置：植物位置左侧 + 跳跃距离
-	poleVault.JumpTargetX = plantX - config.PolevaulterZombieJumpDistance
 	poleVault.TargetPlantEntityID = uint64(plantID)
 
-	// 停止移动
-	if vel, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, zombieID); ok {
-		vel.VX = 0
-		vel.VY = 0
-	}
-
-	// 播放跳跃动画
+	// 播放跳跃动画组合（使用 ComboName 以应用 loop: false 设置）
 	ecs.AddComponent(s.entityManager, zombieID, &components.AnimationCommandComponent{
-		UnitID:        types.UnitIDZombiePolevaulter,
-		AnimationName: "anim_jump",
-		Processed:     false,
+		UnitID:    types.UnitIDZombiePolevaulter,
+		ComboName: "jump",
+		Processed: false,
 	})
 }
 
 // updateJumping 更新跳跃中的僵尸
+// 跳跃期间位置保持不变，动画内部的 body1 位移制造跳跃视觉效果
+// 动画结束后需要补偿位移，保持视觉连续
 func (s *PoleVaultSystem) updateJumping(zombieID ecs.EntityID, poleVault *components.PoleVaultComponent, deltaTime float64) {
-	// 更新跳跃进度
-	poleVault.JumpProgress += deltaTime / config.PolevaulterZombieJumpDuration
-	if poleVault.JumpProgress > 1.0 {
-		poleVault.JumpProgress = 1.0
-	}
-
-	// 计算当前位置（线性插值）
-	pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
+	// 获取 Reanim 组件，检测动画是否播放完成
+	reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, zombieID)
 	if !ok {
+		// 没有动画组件，直接结束跳跃
+		s.finishJump(zombieID, poleVault)
 		return
 	}
 
-	// X 位置插值
-	pos.X = poleVault.JumpStartX + (poleVault.JumpTargetX-poleVault.JumpStartX)*poleVault.JumpProgress
-
-	// Y 位置使用抛物线（跳跃弧度）
-	// 最高点在进度 0.5 时
-	jumpHeight := 80.0 // 跳跃最大高度（像素）
-	t := poleVault.JumpProgress
-
-	// 抛物线公式：-4h * (t - 0.5)^2 + h，在 t=0.5 时达到最高点 h
-	verticalOffset := -4.0 * jumpHeight * (t - 0.5) * (t - 0.5) + jumpHeight
-
-	// 应用跳跃弧度：向上是负Y方向
-	// 使用行的基准Y坐标 + 垂直偏移
-	row := utils.GetEntityRow(pos.Y+verticalOffset, config.GridWorldStartY, config.CellHeight)
-	baseY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2.0 + config.ZombieVerticalOffset
-	pos.Y = baseY - verticalOffset
-
-	// 跳跃完成
-	if poleVault.JumpProgress >= 1.0 {
+	// 检测动画是否播放完成
+	if reanim.IsFinished {
 		s.finishJump(zombieID, poleVault)
+		return
 	}
+
+	// 跳跃期间位置保持不变，等待动画完成
 }
 
 // finishJump 完成跳跃
 func (s *PoleVaultSystem) finishJump(zombieID ecs.EntityID, poleVault *components.PoleVaultComponent) {
-	log.Printf("[PoleVaultSystem] 撑杆僵尸 %d 跳跃完成，丢弃撑杆", zombieID)
+	log.Printf("[PoleVaultSystem] 撑杆僵尸 %d 跳跃动画完成，准备应用位移补偿", zombieID)
 
 	// 更新撑杆状态
 	poleVault.HasPole = false
 	poleVault.IsJumping = false
-	poleVault.JumpProgress = 0.0
+
+	// 标记需要位移补偿，延迟到下一帧应用
+	// 这样可以确保动画切换（body1 重置）在位移补偿之前完成
+	poleVault.NeedPositionCompensation = true
 
 	// 恢复移动（使用普通速度）
 	if vel, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, zombieID); ok {
 		vel.VX = config.PolevaulterZombieWalkSpeed
 	}
 
-	// 播放行走动画
+	// 播放行走动画（AnimationCommandComponent 会被 ReanimSystem 在本帧或下一帧处理）
 	ecs.AddComponent(s.entityManager, zombieID, &components.AnimationCommandComponent{
 		UnitID:    types.UnitIDZombiePolevaulter,
 		ComboName: "walk",
 		Processed: false,
 	})
+}
+
+// applyPositionCompensation 应用延迟的位移补偿
+func (s *PoleVaultSystem) applyPositionCompensation(zombieID ecs.EntityID, poleVault *components.PoleVaultComponent) {
+	// 应用跳跃位移补偿
+	// jump 动画期间，body1 轨道的 X 从 42.0 变化到 -109.2（视觉上向左移动）
+	// 切换到 walk 动画时，body1.X 重置为 40.1（视觉上向右跳回）
+	// 为保持视觉连续，需要将实体的世界坐标向左移动，补偿 body1 的重置
+	if pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID); ok {
+		oldX := pos.X
+		pos.X += config.PolevaulterZombieJumpDistance
+		log.Printf("[PoleVaultSystem] 撑杆僵尸 %d 应用位移补偿: %.1f → %.1f (补偿量=%.1f)",
+			zombieID, oldX, pos.X, config.PolevaulterZombieJumpDistance)
+	}
+
+	// 清除补偿标记
+	poleVault.NeedPositionCompensation = false
 }

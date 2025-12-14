@@ -134,6 +134,13 @@ func (s *RenderSystem) drawZombieShadowsWithClipping(screen *ebiten.Image, zombi
 			continue
 		}
 
+		// 撑杆僵尸跳跃期间隐藏阴影（包括等待位移补偿的那一帧）
+		if poleVault, hasPoleVault := ecs.GetComponent[*components.PoleVaultComponent](s.entityManager, id); hasPoleVault {
+			if poleVault.IsJumping || poleVault.NeedPositionCompensation {
+				continue
+			}
+		}
+
 		// 获取位置组件
 		pos, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, id)
 		if !hasPos {

@@ -11,6 +11,21 @@ const (
 	AttackAnimAttacking
 )
 
+// PotatoMinePhase 土豆地雷阶段状态
+// 用于管理土豆地雷的生命周期状态转换
+type PotatoMinePhase int
+
+const (
+	// PotatoMineArming 武装阶段：埋在地下，播放 anim_idle，等待武装完成
+	PotatoMineArming PotatoMinePhase = iota
+	// PotatoMineRising 升起阶段：播放 anim_rise 动画
+	PotatoMineRising
+	// PotatoMineArmed 待机阶段：武装完成，播放 anim_armed + anim_light，等待僵尸触发
+	PotatoMineArmed
+	// PotatoMineExploding 爆炸阶段：播放 anim_mashed，造成伤害后销毁
+	PotatoMineExploding
+)
+
 // PlantComponent 标识实体为植物
 // 包含植物类型和所在格子位置信息
 //
@@ -67,17 +82,20 @@ type PlantComponent struct {
 	WallnutBlinkDuration float64
 
 	// Story 8.9: 土豆地雷相关字段
+	// PotatoMinePhase 土豆地雷当前阶段
+	// 使用明确的阶段状态来管理土豆地雷的生命周期
+	PotatoMinePhase PotatoMinePhase
+
 	// ArmingTimer 武装计时器（秒）
 	// 土豆地雷种植后需要一定时间武装，武装完成后才能触发爆炸
 	ArmingTimer float64
 
-	// IsArmed 是否已武装
-	// true: 武装完成，可以被僵尸触发爆炸
-	// false: 正在武装中，无法触发爆炸
+	// IsArmed 是否已武装（已废弃，使用 PotatoMinePhase 代替）
+	// 保留用于向后兼容
 	IsArmed bool
 
-	// IsExploding 是否正在爆炸
-	// 用于防止重复触发爆炸逻辑
+	// IsExploding 是否正在爆炸（已废弃，使用 PotatoMinePhase 代替）
+	// 保留用于向后兼容
 	IsExploding bool
 
 	// WarningLightSpeed 警告灯闪烁动画速度倍率
@@ -98,6 +116,10 @@ type PlantComponent struct {
 	// WarningLightInterval 当前闪烁间隔（秒）
 	// 根据最近僵尸距离动态计算，距离越近间隔越短（闪得越快）
 	WarningLightInterval float64
+
+	// WarningLightInitialized 警告灯是否已初始化
+	// 用于在 PlayCombo 完成后执行一次性初始化
+	WarningLightInitialized bool
 }
 
 // Story 10.3: 射手类植物列表（用于判断是否需要攻击动画）

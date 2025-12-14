@@ -53,6 +53,17 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 		if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 10 {
 			log.Printf("[ReanimSystem] 🎨 处理轨道: %s", trackName)
 		}
+		// Debug: PotatoMine anim_glow 轨道的 HiddenTracks 检查
+		if strings.EqualFold(comp.ReanimName, "potatomine") && trackName == "anim_glow" {
+			isHidden := comp.HiddenTracks != nil && comp.HiddenTracks[trackName]
+			log.Printf("[ReanimSystem] 🥔 PotatoMine anim_glow: HiddenTracks=%v, isHidden=%v",
+				comp.HiddenTracks, isHidden)
+		}
+		// Debug: PotatoMine anim_face 轨道（呼吸动画）
+		if strings.EqualFold(comp.ReanimName, "potatomine") && trackName == "anim_face" {
+			log.Printf("[ReanimSystem] 🥔 PotatoMine anim_face: CurrentAnimations=%v, AnimationFrameIndices=%v",
+				comp.CurrentAnimations, comp.AnimationFrameIndices)
+		}
 		// 检查隐藏轨道（黑名单）
 		if comp.HiddenTracks != nil && comp.HiddenTracks[trackName] {
 			skippedHidden++
@@ -97,12 +108,12 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 
 			// 检查轨道是否有帧覆盖（TrackFrameOverrides）
 			// 有帧覆盖的轨道直接使用指定的物理帧，跳过帧映射
-			// TODO: 此功能尚未完全实现，暂时保留代码结构
+			useFrameOverride := false
+			overridePhysicalFrame := 0
 			if comp.TrackFrameOverrides != nil {
-				if _, exists := comp.TrackFrameOverrides[trackName]; exists {
-					// useFrameOverride = true
-					// overridePhysicalFrame = frame
-					// 未来实现：直接使用 overridePhysicalFrame 跳过帧映射
+				if frame, exists := comp.TrackFrameOverrides[trackName]; exists {
+					useFrameOverride = true
+					overridePhysicalFrame = frame
 				}
 			}
 
@@ -120,7 +131,10 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 			// 特殊处理：对于单动画文件（使用合成动画名 "_root"），逻辑帧=物理帧
 			var physicalFrame int
 			isSyntheticAnim := animName == "_root" || strings.HasPrefix(animName, "_")
-			if isSyntheticAnim {
+			if useFrameOverride {
+				// 使用帧覆盖指定的物理帧
+				physicalFrame = overridePhysicalFrame
+			} else if isSyntheticAnim {
 				// 单动画文件：直接使用逻辑帧作为物理帧
 				physicalFrame = int(logicalFrame)
 				// Story 8.8: 修复 ZombiesWon 动画越界问题
@@ -138,13 +152,13 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 				log.Printf("[ReanimSystem] 🟫 SodRoll Frame %d: trackName=%s, animName=%s, logicalFrame=%.2f, physicalFrame=%d, isSynthetic=%v",
 					comp.CurrentFrame, trackName, animName, logicalFrame, physicalFrame, isSyntheticAnim)
 			}
-			// Debug: PotatoMine 卡片预览渲染
-			if strings.EqualFold(comp.ReanimName, "potatomine") && comp.IsPaused && trackName == "anim_face" {
+			// Debug: PotatoMine anim_face 渲染 (呼吸动画)
+			if strings.EqualFold(comp.ReanimName, "potatomine") && trackName == "anim_face" {
 				// 打印物理帧的实际数据
 				if physicalFrame >= 0 && physicalFrame < len(mergedFrames) {
 					frame := mergedFrames[physicalFrame]
-					log.Printf("[ReanimSystem] 🥔 PotatoMine prepareRenderCache: logicalFrame=%.2f -> physicalFrame=%d, x=%.1f, y=%.1f, sx=%.3f, sy=%.3f",
-						logicalFrame, physicalFrame, getFloat(frame.X), getFloat(frame.Y), getFloat(frame.ScaleX), getFloat(frame.ScaleY))
+					log.Printf("[ReanimSystem] 🥔 PotatoMine anim_face 渲染: animName=%s, logicalFrame=%.2f -> physicalFrame=%d, y=%.1f, sy=%.3f",
+						animName, logicalFrame, physicalFrame, getFloat(frame.Y), getFloat(frame.ScaleY))
 				}
 			}
 
@@ -173,7 +187,8 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 			// 对于单动画文件（使用合成动画名如 "_root"），跳过这个检查
 			// 因为 MergedTracks 只包含轨道名称，不包含合成的动画名称
 			// isSyntheticAnim 已在上面定义
-			if !isSyntheticAnim {
+			// 当轨道有 TrackFrameOverrides 时，也跳过此检查，因为已经强制使用指定帧
+			if !isSyntheticAnim && !useFrameOverride {
 				// 只对命名动画（named animations）进行动画定义轨道检查
 				animDefTrack, ok := comp.MergedTracks[animName]
 				if !ok || physicalFrame >= len(animDefTrack) {
@@ -305,6 +320,11 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 			selectedOffsetY = offsetY
 			hasValidSelection = true
 			trackRenderSource[trackName] = animName
+
+			// Debug: PotatoMine anim_face 被哪个动画选中
+			if strings.EqualFold(comp.ReanimName, "potatomine") && trackName == "anim_face" {
+				log.Printf("[ReanimSystem] 🥔 PotatoMine anim_face 被选中: animName=%s, y=%.1f", animName, getFloat(frame.Y))
+			}
 
 			// Debug: SelectorScreen 记录选中的动画
 			if comp.ReanimName == "SelectorScreen" && comp.CurrentFrame < 10 {

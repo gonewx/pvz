@@ -91,6 +91,19 @@ var ParticleAnchorOffsets = map[string]ParticleAnchorOffset{
 		Comment: "土粒从植物根部（格子底部）飞溅",
 	},
 
+	// PotatoMine: 土豆地雷爆炸效果
+	// 调用者提供植物位置（格子中心 + PlantOffsetY）
+	// 爆炸效果应该在格子中心附近显示，而不是植物脚底
+	// 计算：
+	//   - 植物位置 Y = GridCenterY + PlantOffsetY = 格子中心 + 35
+	//   - 期望爆炸中心 = 格子中心
+	//   - OffsetY = -PlantOffsetY = -35.0（向上移动）
+	"PotatoMine": {
+		OffsetX: 0,
+		OffsetY: -PlantOffsetY,
+		Comment: "爆炸中心对齐格子中心，从植物脚底位置上移",
+	},
+
 	// 注：其他未列出的粒子效果使用默认值（OffsetX=0, OffsetY=0）
 	// 即锚点 = 视觉中心，调用者提供的坐标直接作为粒子锚点
 }

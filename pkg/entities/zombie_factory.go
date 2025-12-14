@@ -607,9 +607,8 @@ func NewPolevaulterZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row in
 
 	// 添加撑杆组件（初始持有撑杆）
 	ecs.AddComponent(em, entityID, &components.PoleVaultComponent{
-		HasPole:     true,
-		IsJumping:   false,
-		JumpProgress: 0.0,
+		HasPole:   true,
+		IsJumping: false,
 	})
 
 	// 添加生命值组件（500 点）

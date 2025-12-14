@@ -492,8 +492,11 @@ func (s *BehaviorSystem) triggerPotatoMineExplosion(entityID ecs.EntityID, explo
 		}
 
 		// 计算僵尸到爆炸中心的距离
+		// 注意：explosionY 是植物的 PositionComponent.Y，已包含 PlantOffsetY
+		// zombiePos.Y 也包含 ZombieVerticalOffset（= PlantOffsetY）
+		// 因此两者可以直接比较，不需要减去偏移量
 		dx := zombiePos.X - explosionX
-		dy := (zombiePos.Y - config.ZombieVerticalOffset) - explosionY
+		dy := zombiePos.Y - explosionY
 		distanceSq := dx*dx + dy*dy
 
 		// 如果在爆炸范围内
@@ -548,12 +551,13 @@ func (s *BehaviorSystem) triggerPotatoMineExplosion(entityID ecs.EntityID, explo
 	}
 
 	// 创建爆炸粒子效果
-	// 注：不再需要角度偏移，粒子系统已使用正确的 PvZ 坐标系
+	// 使用锚点偏移将粒子效果从植物位置调整到格子中心
+	offsetX, offsetY := config.GetParticleAnchorOffset("PotatoMine")
 	_, err := entities.CreateParticleEffect(
 		s.entityManager,
 		s.resourceManager,
 		"PotatoMine", // 使用土豆地雷专用粒子效果
-		explosionX, explosionY,
+		explosionX+offsetX, explosionY+offsetY,
 	)
 	if err != nil {
 		log.Printf("[BehaviorSystem] 警告：创建土豆地雷爆炸粒子效果失败: %v", err)
