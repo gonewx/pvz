@@ -185,16 +185,10 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 		return
 	}
 
-	// 获取碰撞组件，用于计算碰撞盒中心
-	collision, hasCollisionComp := ecs.GetComponent[*components.CollisionComponent](s.entityManager, entityID)
-	collisionOffsetX := 0.0
-	if hasCollisionComp {
-		collisionOffsetX = collision.OffsetX
-	}
-
-	// 计算僵尸碰撞盒中心所在格子
-	// 使用碰撞盒中心而非实体位置，确保旗帜僵尸等有偏移的僵尸正确检测
-	zombieCol := int((pos.X + collisionOffsetX - config.GridWorldStartX) / config.CellWidth)
+	// 计算僵尸实际位置所在格子
+	// 注意：不使用 CollisionComponent.OffsetX，该偏移量仅用于子弹碰撞检测
+	// 啃食检测应基于僵尸脚底位置，与 zombie_behavior_handler.go 保持一致
+	zombieCol := int((pos.X - config.GridWorldStartX) / config.CellWidth)
 	zombieRow := int((pos.Y - config.GridWorldStartY - config.ZombieVerticalOffset - config.CellHeight/2.0) / config.CellHeight)
 
 	// 检测植物

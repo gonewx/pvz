@@ -48,17 +48,11 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 		return
 	}
 
-	// 获取碰撞组件，用于计算碰撞盒中心
-	collision, hasCollision := ecs.GetComponent[*components.CollisionComponent](s.entityManager, entityID)
-	collisionOffsetX := 0.0
-	if hasCollision {
-		collisionOffsetX = collision.OffsetX
-	}
-
 	// 检测植物碰撞（在移动之前）
-	// 计算僵尸碰撞盒中心所在格子
-	// 使用碰撞盒中心而非实体位置，确保旗帜僵尸等有偏移的僵尸正确检测
-	zombieCol := int((position.X + collisionOffsetX - config.GridWorldStartX) / config.CellWidth)
+	// 计算僵尸实际位置所在格子
+	// 注意：不使用 CollisionComponent.OffsetX，该偏移量仅用于子弹碰撞检测
+	// 啃食检测应基于僵尸脚底位置，确保视觉上僵尸与植物保持合理距离
+	zombieCol := int((position.X - config.GridWorldStartX) / config.CellWidth)
 	zombieRow := int((position.Y - config.GridWorldStartY - config.ZombieVerticalOffset - config.CellHeight/2.0) / config.CellHeight)
 
 	// Story 8.9: 撑杆僵尸跳跃和持杆状态处理
