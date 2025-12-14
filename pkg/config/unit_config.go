@@ -24,10 +24,28 @@ const (
 	// ZombieCollisionHeight 普通僵尸碰撞盒高度（像素）
 	ZombieCollisionHeight = 115.0
 
+	// ZombieCollisionOffsetX 普通僵尸碰撞盒X偏移量（像素）
+	// 正值向右偏移（朝向植物方向），负值向左偏移
+	// 僵尸身体中心相对于锚点（脚底中心）的水平偏移
+	ZombieCollisionOffsetX = 20.0
+
+	// ZombieCollisionOffsetY 普通僵尸碰撞盒Y偏移量（像素）
+	// 负值向上偏移，使碰撞盒覆盖身体而不是地面
+	// 僵尸位置指向脚底，碰撞盒需要向上偏移到躯干位置
+	// 计算：碰撞盒底部 = pos.Y + OffsetY + Height/2
+	// 希望碰撞盒底部略高于脚底（约 10 像素）
+	// OffsetY = -Height/2 + 10 = -57.5 + 10 = -47.5，取 -50
+	ZombieCollisionOffsetY = -50.0
+
 	// ZombieFlagCollisionOffsetX 旗帜僵尸碰撞盒X偏移量（像素）
 	// 正值向右偏移，使碰撞盒只检测身体部分而非旗子手
 	// 旗子手向前伸出约40像素，偏移量设可使碰撞盒居中于身体
-	ZombieFlagCollisionOffsetX = 30.0
+	ZombieFlagCollisionOffsetX = 20.0
+
+	// PolevaulterCollisionOffsetX 撑杆僵尸碰撞盒X偏移量（像素）
+	// 撑杆僵尸持杆时身体前倾，需要向前（左）调整碰撞盒
+	// 负值向左偏移（朝向房子方向）
+	PolevaulterCollisionOffsetX = 15.0
 
 	// ZombieDeletionBoundary 僵尸删除边界（世界坐标X）
 	// 僵尸移出此边界后将被删除

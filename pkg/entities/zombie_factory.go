@@ -105,9 +105,12 @@ func NewZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spawnX f
 
 	// 添加碰撞组件（用于检测子弹碰撞）
 	// Story 8.9 修复：设置 LaneIndex 用于同行碰撞检测
+	// 添加 OffsetX/OffsetY 使碰撞盒对齐僵尸身体
 	em.AddComponent(entityID, &components.CollisionComponent{
 		Width:     config.ZombieCollisionWidth,
 		Height:    config.ZombieCollisionHeight,
+		OffsetX:   config.ZombieCollisionOffsetX,
+		OffsetY:   config.ZombieCollisionOffsetY,
 		LaneIndex: row,
 	})
 
@@ -225,9 +228,12 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, 
 
 	// 添加碰撞组件（用于检测子弹碰撞）
 	// Story 8.9 修复：设置 LaneIndex 用于同行碰撞检测
+	// 添加 OffsetX/OffsetY 使碰撞盒对齐僵尸身体
 	em.AddComponent(entityID, &components.CollisionComponent{
 		Width:     config.ZombieCollisionWidth,
 		Height:    config.ZombieCollisionHeight,
+		OffsetX:   config.ZombieCollisionOffsetX,
+		OffsetY:   config.ZombieCollisionOffsetY,
 		LaneIndex: row,
 	})
 
@@ -345,9 +351,12 @@ func NewBucketheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int
 
 	// 添加碰撞组件（用于检测子弹碰撞）
 	// Story 8.9 修复：设置 LaneIndex 用于同行碰撞检测
+	// 添加 OffsetX/OffsetY 使碰撞盒对齐僵尸身体
 	em.AddComponent(entityID, &components.CollisionComponent{
 		Width:     config.ZombieCollisionWidth,
 		Height:    config.ZombieCollisionHeight,
+		OffsetX:   config.ZombieCollisionOffsetX,
+		OffsetY:   config.ZombieCollisionOffsetY,
 		LaneIndex: row,
 	})
 
@@ -476,6 +485,7 @@ func NewFlagZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spaw
 		Width:     config.ZombieCollisionWidth,
 		Height:    config.ZombieCollisionHeight,
 		OffsetX:   config.ZombieFlagCollisionOffsetX,
+		OffsetY:   config.ZombieCollisionOffsetY,
 		LaneIndex: row,
 	})
 
@@ -627,9 +637,12 @@ func NewPolevaulterZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row in
 
 	// 添加碰撞组件（用于检测子弹碰撞）
 	// Story 8.9 修复：设置 LaneIndex 用于同行碰撞检测
+	// 撑杆僵尸使用特定的 X 偏移量
 	ecs.AddComponent(em, entityID, &components.CollisionComponent{
 		Width:     config.ZombieCollisionWidth,
 		Height:    config.ZombieCollisionHeight,
+		OffsetX:   config.PolevaulterCollisionOffsetX,
+		OffsetY:   config.ZombieCollisionOffsetY,
 		LaneIndex: row,
 	})
 
