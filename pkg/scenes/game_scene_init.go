@@ -862,7 +862,7 @@ func (s *GameScene) restorePlants(plants []game.PlantData) {
 		}
 
 		// Story 18.5: 恢复土豆地雷状态
-		if plantData.PlantType == "potatomine" {
+		if plantData.PlantType == types.PlantPotatoMine.String() {
 			if plantComp, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, entityID); ok {
 				plantComp.PotatoMinePhase = components.PotatoMinePhase(plantData.PotatoMinePhase)
 				plantComp.ArmingTimer = plantData.ArmingTimer
@@ -884,10 +884,11 @@ func (s *GameScene) restorePlants(plants []game.PlantData) {
 						Processed:     false,
 					})
 				case components.PotatoMineArmed:
-					// 待机阶段：播放 armed combo（anim_armed + anim_light）
+					// 待机阶段：播放 idle combo（只包含 anim_armed）
+					// 注意：combo 名称是 "idle"，不是 "armed"
 					ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
 						UnitID:    "potatomine",
-						ComboName: "armed",
+						ComboName: "idle",
 						Processed: false,
 					})
 				case components.PotatoMineExploding:
