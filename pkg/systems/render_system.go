@@ -152,10 +152,12 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 		s.drawEntity(screen, id, cameraX)
 	}
 
-	// 第二遍：渲染僵尸、子弹、特效（中间层）
+	// 第二遍：渲染僵尸、特效（中间层）
 	// 特效包括：SodRoll（草皮卷）、爆炸效果等
 	// 需要按Y坐标排序以解决重叠闪烁问题（上方行先渲染，下方行后渲染会遮挡上方）
-	zombiesAndProjectiles := make([]ecs.EntityID, 0)
+	// 子弹单独收集，在僵尸之后渲染（确保子弹显示在僵尸上方）
+	zombiesAndEffects := make([]ecs.EntityID, 0)
+	projectiles := make([]ecs.EntityID, 0)
 	for _, id := range entities {
 		// 跳过植物卡片实体
 		if _, hasPlantCard := ecs.GetComponent[*components.PlantCardComponent](s.entityManager, id); hasPlantCard {
@@ -193,14 +195,18 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 			continue
 		}
 
-		// 渲染其他所有实体（僵尸、子弹、SodRoll 等特效）
-		// DEBUG: 追踪哪些实体被添加到渲染列表
-		if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id); ok {
-			if reanim.ReanimName == "simple_pea" {
-				log.Printf("[RenderSystem] 🎯 子弹 %d 被添加到 zombiesAndProjectiles 渲染列表", id)
+		// 分离子弹实体：子弹需要渲染在僵尸上方
+		if behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, id); ok {
+			if behavior.Type == components.BehaviorPeaProjectile ||
+				behavior.Type == components.BehaviorSnowPeaProjectile ||
+				behavior.Type == components.BehaviorPeaBulletHit {
+				projectiles = append(projectiles, id)
+				continue
 			}
 		}
-		zombiesAndProjectiles = append(zombiesAndProjectiles, id)
+
+		// 其他实体（僵尸、SodRoll 等特效）
+		zombiesAndEffects = append(zombiesAndEffects, id)
 	}
 
 	// 按Y坐标排序（从小到大，即从上到下）
@@ -209,9 +215,9 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 	//   1. 上方行的僵尸先绘制，下方行的僵尸后绘制会正确遮挡
 	//   2. 同一行中，右侧的僵尸先绘制，左侧的僵尸后绘制会遮挡右侧（符合透视效果）
 	//   3. 使用网格列而非连续坐标，避免同列僵尸因微小位置差异导致的渲染闪烁
-	sort.Slice(zombiesAndProjectiles, func(i, j int) bool {
-		posI, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombiesAndProjectiles[i])
-		posJ, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombiesAndProjectiles[j])
+	sort.Slice(zombiesAndEffects, func(i, j int) bool {
+		posI, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombiesAndEffects[i])
+		posJ, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombiesAndEffects[j])
 
 		// Story 10.6: 修正 Y 坐标排序逻辑
 		// 如果实体正在被压扁，应该使用其 OriginalPosY 参与排序
@@ -219,16 +225,16 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 		yI := posI.Y
 		yJ := posJ.Y
 
-		_, isSquashedI := ecs.GetComponent[*components.SquashAnimationComponent](s.entityManager, zombiesAndProjectiles[i])
+		_, isSquashedI := ecs.GetComponent[*components.SquashAnimationComponent](s.entityManager, zombiesAndEffects[i])
 		if isSquashedI {
-			if squashI, ok := ecs.GetComponent[*components.SquashAnimationComponent](s.entityManager, zombiesAndProjectiles[i]); ok {
+			if squashI, ok := ecs.GetComponent[*components.SquashAnimationComponent](s.entityManager, zombiesAndEffects[i]); ok {
 				yI = squashI.OriginalPosY
 			}
 		}
 
-		_, isSquashedJ := ecs.GetComponent[*components.SquashAnimationComponent](s.entityManager, zombiesAndProjectiles[j])
+		_, isSquashedJ := ecs.GetComponent[*components.SquashAnimationComponent](s.entityManager, zombiesAndEffects[j])
 		if isSquashedJ {
-			if squashJ, ok := ecs.GetComponent[*components.SquashAnimationComponent](s.entityManager, zombiesAndProjectiles[j]); ok {
+			if squashJ, ok := ecs.GetComponent[*components.SquashAnimationComponent](s.entityManager, zombiesAndEffects[j]); ok {
 				yJ = squashJ.OriginalPosY
 			}
 		}
@@ -261,9 +267,9 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 	// Story 10.7: 第二遍A：渲染僵尸阴影（中间层-阴影层）
 	// 当僵尸进入房子时（Phase 2+），阴影也需要被门框剪裁
 	if currentPhase >= 2 {
-		s.drawZombieShadowsWithClipping(screen, zombiesAndProjectiles, cameraX, config.GameOverDoorMaskX)
+		s.drawZombieShadowsWithClipping(screen, zombiesAndEffects, cameraX, config.GameOverDoorMaskX)
 	} else {
-		s.drawZombieShadows(screen, zombiesAndProjectiles, cameraX)
+		s.drawZombieShadows(screen, zombiesAndEffects, cameraX)
 	}
 
 	// Story 8.8 - Task 6: Phase 2+ 时渲染房门图片
@@ -273,10 +279,10 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 		s.drawGameOverDoorUnderlay(screen, cameraX) // 阴影层（在僵尸下方）
 	}
 
-	// 按排序后的顺序渲染僵尸和子弹
+	// 按排序后的顺序渲染僵尸和特效
 	// Story 8.8 - Task 6: 如果在 Phase 2+，门板层会渲染在僵尸上方进行遮挡
 	// 当僵尸完全走进门内（超过门板左边缘）时，才需要剪裁
-	for _, id := range zombiesAndProjectiles {
+	for _, id := range zombiesAndEffects {
 		if currentPhase >= 2 {
 			// 计算门板左边界的世界坐标
 			// 僵尸超过此边界的部分将被完全隐藏（因为已经进入房子内部）
@@ -293,6 +299,12 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 	// 注意：必须在僵尸之后、UI元素（ZombiesWon动画）之前渲染
 	if currentPhase >= 2 && s.resourceManager != nil {
 		s.drawGameOverDoorOverlay(screen, cameraX) // 门板层（在僵尸上方）
+	}
+
+	// 第三遍：渲染子弹（在僵尸上层）
+	// 子弹需要显示在僵尸上方，确保视觉上的正确层级
+	for _, id := range projectiles {
+		s.drawEntity(screen, id, cameraX)
 	}
 }
 
