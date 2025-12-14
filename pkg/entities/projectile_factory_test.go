@@ -16,35 +16,39 @@ func TestNewPeaProjectile(t *testing.T) {
 	em := ecs.NewEntityManager()
 
 	tests := []struct {
-		name    string
-		startX  float64
-		startY  float64
-		wantErr bool
+		name      string
+		startX    float64
+		startY    float64
+		laneIndex int
+		wantErr   bool
 	}{
 		{
-			name:    "创建豌豆子弹在标准位置",
-			startX:  300.0,
-			startY:  250.0,
-			wantErr: false,
+			name:      "创建豌豆子弹在标准位置",
+			startX:    300.0,
+			startY:    250.0,
+			laneIndex: 1,
+			wantErr:   false,
 		},
 		{
-			name:    "创建豌豆子弹在屏幕左侧",
-			startX:  100.0,
-			startY:  150.0,
-			wantErr: false,
+			name:      "创建豌豆子弹在屏幕左侧",
+			startX:    100.0,
+			startY:    150.0,
+			laneIndex: 0,
+			wantErr:   false,
 		},
 		{
-			name:    "创建豌豆子弹在屏幕右侧",
-			startX:  800.0,
-			startY:  400.0,
-			wantErr: false,
+			name:      "创建豌豆子弹在屏幕右侧",
+			startX:    800.0,
+			startY:    400.0,
+			laneIndex: 3,
+			wantErr:   false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// 创建豌豆子弹实体
-			projectileID, err := NewPeaProjectile(em, rm, tt.startX, tt.startY)
+			projectileID, err := NewPeaProjectile(em, rm, tt.startX, tt.startY, tt.laneIndex)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("NewPeaProjectile() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -119,6 +123,10 @@ func TestNewPeaProjectile(t *testing.T) {
 				if collision.Height != config.PeaBulletHeight {
 					t.Errorf("Expected Height %.1f, got %.1f", config.PeaBulletHeight, collision.Height)
 				}
+				// Story 8.9 修复：验证 LaneIndex
+				if collision.LaneIndex != tt.laneIndex {
+					t.Errorf("Expected LaneIndex %d, got %d", tt.laneIndex, collision.LaneIndex)
+				}
 			}
 		})
 	}
@@ -151,7 +159,7 @@ func TestNewPeaProjectile_NilParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			projectileID, err := NewPeaProjectile(tt.em, tt.rm, 100.0, 100.0)
+			projectileID, err := NewPeaProjectile(tt.em, tt.rm, 100.0, 100.0, 0)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewPeaProjectile() error = %v, wantErr %v", err, tt.wantErr)
 			}

@@ -104,9 +104,11 @@ func NewZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spawnX f
 	})
 
 	// 添加碰撞组件（用于检测子弹碰撞）
+	// Story 8.9 修复：设置 LaneIndex 用于同行碰撞检测
 	em.AddComponent(entityID, &components.CollisionComponent{
-		Width:  config.ZombieCollisionWidth,
-		Height: config.ZombieCollisionHeight,
+		Width:     config.ZombieCollisionWidth,
+		Height:    config.ZombieCollisionHeight,
+		LaneIndex: row,
 	})
 
 	// Story 10.7: 为僵尸添加阴影组件
@@ -222,9 +224,11 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, 
 	})
 
 	// 添加碰撞组件（用于检测子弹碰撞）
+	// Story 8.9 修复：设置 LaneIndex 用于同行碰撞检测
 	em.AddComponent(entityID, &components.CollisionComponent{
-		Width:  config.ZombieCollisionWidth,
-		Height: config.ZombieCollisionHeight,
+		Width:     config.ZombieCollisionWidth,
+		Height:    config.ZombieCollisionHeight,
+		LaneIndex: row,
 	})
 
 	// Story 10.7: 为路障僵尸添加阴影组件
@@ -340,9 +344,11 @@ func NewBucketheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int
 	})
 
 	// 添加碰撞组件（用于检测子弹碰撞）
+	// Story 8.9 修复：设置 LaneIndex 用于同行碰撞检测
 	em.AddComponent(entityID, &components.CollisionComponent{
-		Width:  config.ZombieCollisionWidth,
-		Height: config.ZombieCollisionHeight,
+		Width:     config.ZombieCollisionWidth,
+		Height:    config.ZombieCollisionHeight,
+		LaneIndex: row,
 	})
 
 	// Story 10.7: 为铁桶僵尸添加阴影组件
@@ -465,10 +471,12 @@ func NewFlagZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spaw
 
 	// 添加碰撞组件（用于检测子弹碰撞）
 	// 旗帜僵尸使用偏移量，使碰撞盒只检测身体部分而非旗子手
+	// Story 8.9 修复：设置 LaneIndex 用于同行碰撞检测
 	ecs.AddComponent(em, entityID, &components.CollisionComponent{
-		Width:   config.ZombieCollisionWidth,
-		Height:  config.ZombieCollisionHeight,
-		OffsetX: config.ZombieFlagCollisionOffsetX,
+		Width:     config.ZombieCollisionWidth,
+		Height:    config.ZombieCollisionHeight,
+		OffsetX:   config.ZombieFlagCollisionOffsetX,
+		LaneIndex: row,
 	})
 
 	// 为旗帜僵尸添加阴影组件
@@ -618,9 +626,11 @@ func NewPolevaulterZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row in
 	})
 
 	// 添加碰撞组件（用于检测子弹碰撞）
+	// Story 8.9 修复：设置 LaneIndex 用于同行碰撞检测
 	ecs.AddComponent(em, entityID, &components.CollisionComponent{
-		Width:  config.ZombieCollisionWidth,
-		Height: config.ZombieCollisionHeight,
+		Width:     config.ZombieCollisionWidth,
+		Height:    config.ZombieCollisionHeight,
+		LaneIndex: row,
 	})
 
 	// 添加阴影组件

@@ -27,11 +27,12 @@ func getAnimVisiblesMapKeys(m map[string][]int) []string {
 //   - rm: 资源管理器（用于加载子弹图像）
 //   - startX: 子弹起始世界坐标X位置
 //   - startY: 子弹起始世界坐标Y位置
+//   - laneIndex: 子弹所在行号（0-based，用于同行碰撞检测）
 //
 // 返回:
 //   - ecs.EntityID: 创建的子弹实体ID，如果失败返回 0
 //   - error: 如果创建失败返回错误信息
-func NewPeaProjectile(em *ecs.EntityManager, rm ResourceLoader, startX, startY float64) (ecs.EntityID, error) {
+func NewPeaProjectile(em *ecs.EntityManager, rm ResourceLoader, startX, startY float64, laneIndex int) (ecs.EntityID, error) {
 	if em == nil {
 		return 0, fmt.Errorf("entity manager cannot be nil")
 	}
@@ -76,9 +77,11 @@ func NewPeaProjectile(em *ecs.EntityManager, rm ResourceLoader, startX, startY f
 	})
 
 	// 添加碰撞组件（为 Story 4.3 准备）
+	// Story 8.9 修复：设置 LaneIndex 用于同行碰撞检测
 	em.AddComponent(entityID, &components.CollisionComponent{
-		Width:  config.PeaBulletWidth,
-		Height: config.PeaBulletHeight,
+		Width:     config.PeaBulletWidth,
+		Height:    config.PeaBulletHeight,
+		LaneIndex: laneIndex,
 	})
 
 	return entityID, nil
@@ -93,11 +96,12 @@ func NewPeaProjectile(em *ecs.EntityManager, rm ResourceLoader, startX, startY f
 //   - rm: 资源管理器（用于加载子弹图像）
 //   - startX: 子弹起始世界坐标X位置
 //   - startY: 子弹起始世界坐标Y位置
+//   - laneIndex: 子弹所在行号（0-based，用于同行碰撞检测）
 //
 // 返回:
 //   - ecs.EntityID: 创建的子弹实体ID，如果失败返回 0
 //   - error: 如果创建失败返回错误信息
-func NewSnowPeaProjectile(em *ecs.EntityManager, rm ResourceLoader, startX, startY float64) (ecs.EntityID, error) {
+func NewSnowPeaProjectile(em *ecs.EntityManager, rm ResourceLoader, startX, startY float64, laneIndex int) (ecs.EntityID, error) {
 	if em == nil {
 		return 0, fmt.Errorf("entity manager cannot be nil")
 	}
@@ -138,9 +142,11 @@ func NewSnowPeaProjectile(em *ecs.EntityManager, rm ResourceLoader, startX, star
 	})
 
 	// 添加碰撞组件（与普通豌豆相同尺寸）
+	// Story 8.9 修复：设置 LaneIndex 用于同行碰撞检测
 	em.AddComponent(entityID, &components.CollisionComponent{
-		Width:  config.PeaBulletWidth,
-		Height: config.PeaBulletHeight,
+		Width:     config.PeaBulletWidth,
+		Height:    config.PeaBulletHeight,
+		LaneIndex: laneIndex,
 	})
 
 	return entityID, nil

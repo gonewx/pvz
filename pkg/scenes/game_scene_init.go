@@ -10,6 +10,7 @@ import (
 	"github.com/gonewx/pvz/pkg/game"
 	"github.com/gonewx/pvz/pkg/modules"
 	"github.com/gonewx/pvz/pkg/systems"
+	"github.com/gonewx/pvz/pkg/utils"
 )
 
 // initPlantCardSystems initializes the plant selection module.
@@ -1051,7 +1052,9 @@ func (s *GameScene) restoreProjectiles(projectiles []game.ProjectileData) {
 		}
 
 		// 使用工厂函数创建子弹实体
-		entityID, err := entities.NewPeaProjectile(s.entityManager, s.resourceManager, projData.X, projData.Y)
+		// Story 8.9 修复：从 Y 坐标计算行号用于同行碰撞检测
+		laneIndex := utils.GetEntityRow(projData.Y, config.GridWorldStartY, config.CellHeight)
+		entityID, err := entities.NewPeaProjectile(s.entityManager, s.resourceManager, projData.X, projData.Y, laneIndex)
 		if err != nil {
 			log.Printf("[GameScene] ERROR: Failed to restore projectile at (%.1f, %.1f): %v", projData.X, projData.Y, err)
 			continue

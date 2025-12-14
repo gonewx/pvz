@@ -852,3 +852,132 @@ func TestPhysicsSystem_GameFreezeDeletesBullets(t *testing.T) {
 		t.Error("游戏冻结期间僵尸不应被删除")
 	}
 }
+
+// TestPhysicsSystem_CrossLaneNoCollision 测试跨行不碰撞
+// Story 8.9 修复：验证不同行的子弹和僵尸不会发生碰撞
+func TestPhysicsSystem_CrossLaneNoCollision(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(getTestAudioContext())
+	ps := NewPhysicsSystem(em, rm)
+
+	// 创建豌豆子弹实体（行号 = 0）
+	bulletID := em.CreateEntity()
+	em.AddComponent(bulletID, &components.BehaviorComponent{
+		Type: components.BehaviorPeaProjectile,
+	})
+	em.AddComponent(bulletID, &components.PositionComponent{
+		X: 400,
+		Y: 250,
+	})
+	em.AddComponent(bulletID, &components.CollisionComponent{
+		Width:     config.PeaBulletWidth,
+		Height:    config.PeaBulletHeight,
+		LaneIndex: 0, // 行 0
+	})
+
+	// 创建僵尸实体（行号 = 1，与子弹位置 Y 坐标重叠但行号不同）
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.BehaviorComponent{
+		Type: components.BehaviorZombieBasic,
+	})
+	em.AddComponent(zombieID, &components.PositionComponent{
+		X: 400, // X 坐标相同，AABB 会重叠
+		Y: 250, // Y 坐标相同，AABB 会重叠
+	})
+	em.AddComponent(zombieID, &components.CollisionComponent{
+		Width:     config.ZombieCollisionWidth,
+		Height:    config.ZombieCollisionHeight,
+		LaneIndex: 1, // 行 1（不同于子弹的行 0）
+	})
+	em.AddComponent(zombieID, &components.HealthComponent{
+		CurrentHealth: 270,
+		MaxHealth:     270,
+	})
+
+	// 执行物理更新
+	ps.Update(0.016)
+
+	// 移除标记删除的实体
+	em.RemoveMarkedEntities()
+
+	// 验证：子弹不应被删除（因为跨行不碰撞）
+	_, bulletExists := em.GetComponent(bulletID, reflect.TypeOf(&components.PositionComponent{}))
+	if !bulletExists {
+		t.Error("跨行的子弹不应该与不同行的僵尸发生碰撞")
+	}
+
+	// 验证：僵尸生命值不应减少
+	healthComp, ok := em.GetComponent(zombieID, reflect.TypeOf(&components.HealthComponent{}))
+	if !ok {
+		t.Fatal("Expected zombie to have HealthComponent")
+	}
+	health := healthComp.(*components.HealthComponent)
+	if health.CurrentHealth != 270 {
+		t.Errorf("跨行僵尸不应受到伤害，期望 270，实际 %d", health.CurrentHealth)
+	}
+}
+
+// TestPhysicsSystem_SameLaneCollision 测试同行碰撞正常工作
+// Story 8.9 修复：验证同行的子弹和僵尸正常碰撞
+func TestPhysicsSystem_SameLaneCollision(t *testing.T) {
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(getTestAudioContext())
+	ps := NewPhysicsSystem(em, rm)
+
+	// 创建豌豆子弹实体（行号 = 2）
+	bulletID := em.CreateEntity()
+	em.AddComponent(bulletID, &components.BehaviorComponent{
+		Type: components.BehaviorPeaProjectile,
+	})
+	em.AddComponent(bulletID, &components.PositionComponent{
+		X: 400,
+		Y: 250,
+	})
+	em.AddComponent(bulletID, &components.CollisionComponent{
+		Width:     config.PeaBulletWidth,
+		Height:    config.PeaBulletHeight,
+		LaneIndex: 2, // 行 2
+	})
+
+	// 创建僵尸实体（同样行号 = 2）
+	zombieID := em.CreateEntity()
+	em.AddComponent(zombieID, &components.BehaviorComponent{
+		Type: components.BehaviorZombieBasic,
+	})
+	em.AddComponent(zombieID, &components.PositionComponent{
+		X: 400, // X 坐标相同
+		Y: 250, // Y 坐标相同
+	})
+	em.AddComponent(zombieID, &components.CollisionComponent{
+		Width:     config.ZombieCollisionWidth,
+		Height:    config.ZombieCollisionHeight,
+		LaneIndex: 2, // 同行（行 2）
+	})
+	em.AddComponent(zombieID, &components.HealthComponent{
+		CurrentHealth: 270,
+		MaxHealth:     270,
+	})
+
+	// 执行物理更新
+	ps.Update(0.016)
+
+	// 移除标记删除的实体
+	em.RemoveMarkedEntities()
+
+	// 验证：子弹应被删除（同行碰撞正常工作）
+	_, bulletExists := em.GetComponent(bulletID, reflect.TypeOf(&components.PositionComponent{}))
+	if bulletExists {
+		t.Error("同行的子弹应该与僵尸发生碰撞并被删除")
+	}
+
+	// 验证：僵尸生命值应减少
+	healthComp, ok := em.GetComponent(zombieID, reflect.TypeOf(&components.HealthComponent{}))
+	if !ok {
+		t.Fatal("Expected zombie to have HealthComponent")
+	}
+	health := healthComp.(*components.HealthComponent)
+	expectedHealth := 270 - config.PeaBulletDamage
+	if health.CurrentHealth != expectedHealth {
+		t.Errorf("同行僵尸应受到伤害，期望 %d，实际 %d", expectedHealth, health.CurrentHealth)
+	}
+}

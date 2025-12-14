@@ -164,6 +164,12 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 				continue
 			}
 
+			// Story 8.9 修复：检查行号匹配，只有同一行的子弹才能命中僵尸
+			// 这可以防止撑杆僵尸跳跃时因碰撞盒跨行而被错误命中
+			if bulletCol.LaneIndex != zombieCol.LaneIndex {
+				continue
+			}
+
 			// 执行AABB碰撞检测
 			if ps.checkAABBCollision(bulletPos, bulletCol, zombiePos, zombieCol) {
 				// 碰撞发生！记录这个僵尸，但只选择 X 最小的

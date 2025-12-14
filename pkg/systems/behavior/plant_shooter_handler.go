@@ -191,12 +191,13 @@ func (s *BehaviorSystem) updatePlantAttackAnimation(entityID ecs.EntityID, delta
 			s.playShootSound()
 
 			// Story 8.9: 根据植物类型创建不同的子弹
+			// Story 8.9 修复：传递行号用于同行碰撞检测
 			var bulletID ecs.EntityID
 			var err error
 			switch plant.PlantType {
 			case components.PlantSnowPea:
 				// 寒冰射手发射冰豌豆
-				bulletID, err = entities.NewSnowPeaProjectile(s.entityManager, s.resourceManager, bulletStartX, bulletStartY)
+				bulletID, err = entities.NewSnowPeaProjectile(s.entityManager, s.resourceManager, bulletStartX, bulletStartY, plant.GridRow)
 				if err != nil {
 					log.Printf("[BehaviorSystem] 创建冰豌豆子弹失败: %v", err)
 				} else {
@@ -204,7 +205,7 @@ func (s *BehaviorSystem) updatePlantAttackAnimation(entityID ecs.EntityID, delta
 				}
 			default:
 				// 豌豆射手发射普通豌豆
-				bulletID, err = entities.NewPeaProjectile(s.entityManager, s.resourceManager, bulletStartX, bulletStartY)
+				bulletID, err = entities.NewPeaProjectile(s.entityManager, s.resourceManager, bulletStartX, bulletStartY, plant.GridRow)
 				if err != nil {
 					log.Printf("[BehaviorSystem] 创建豌豆子弹失败: %v", err)
 				} else {
