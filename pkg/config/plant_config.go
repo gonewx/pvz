@@ -94,6 +94,20 @@ func GetPlantHiddenTracks(plantType types.PlantType) []string {
 	return nil
 }
 
+// InitialCooldownPlants 需要初始冷却的植物类型列表
+// 这些植物在游戏开始时默认处于冷却状态，开场自动开始解冻
+// 设计目的：防止玩家在游戏开始时立即使用强力一次性植物
+var InitialCooldownPlants = map[types.PlantType]bool{
+	types.PlantCherryBomb: true, // 樱桃炸弹
+	types.PlantPotatoMine: true, // 土豆地雷
+	types.PlantWallnut:    true, // 坚果墙
+}
+
+// NeedsInitialCooldown 判断植物是否需要初始冷却
+func NeedsInitialCooldown(plantType types.PlantType) bool {
+	return InitialCooldownPlants[plantType]
+}
+
 // 植物攻击动画关键帧配置
 // 本文件定义了射手类植物的子弹发射关键帧号
 

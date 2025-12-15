@@ -189,6 +189,15 @@ func (m *PlantSelectionModule) createPlantCards(levelConfig *config.LevelConfig,
 			continue // 继续创建其他卡片
 		}
 
+		// 检查是否需要初始冷却（樱桃炸弹、土豆地雷、坚果墙）
+		if config.NeedsInitialCooldown(plantType) {
+			if cardComp, ok := ecs.GetComponent[*components.PlantCardComponent](m.entityManager, cardEntity); ok {
+				cardComp.CurrentCooldown = cardComp.CooldownTime
+				cardComp.IsAvailable = false
+				log.Printf("[PlantSelectionModule] %s 设置初始冷却: %.1f 秒", plantName, cardComp.CooldownTime)
+			}
+		}
+
 		// 记录卡片实体ID（用于清理）
 		m.cardEntities = append(m.cardEntities, cardEntity)
 	}
