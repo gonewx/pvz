@@ -758,41 +758,63 @@ func (s *GameScene) restoreBattleState() {
 		s.restoreTutorialState(saveData.Tutorial)
 	}
 
-	// Story 18.3: 恢复波次计时系统状态
-	// 这是关键：让 WaveTimingSystem 知道当前进度，以便正确触发后续波次
+	// Story 18.3 + v6: 恢复波次计时系统状态
+	// v6 改进：使用存档中的 WaveSystemState 直接恢复状态，而不是从关卡类型推断
 	//
-	// Bug Fix: Level 1-5 在 Phase 1（铲子教学/Dave 对话）时不应该触发波次
-	// 必须先检查 saveData.LevelPhase，如果是 Phase 1 或转场中，暂停波次计时而不是触发
-	isPhase1OrTransitioning := false
-	if saveData.LevelPhase != nil {
-		if saveData.LevelPhase.CurrentPhase < 2 ||
-			saveData.LevelPhase.PhaseState == components.PhaseStateTransitioning {
-			isPhase1OrTransitioning = true
-			log.Printf("[GameScene] 检测到 Phase %d (状态: %s)，跳过波次立即触发",
-				saveData.LevelPhase.CurrentPhase, saveData.LevelPhase.PhaseState)
-		}
-	}
-
+	// 核心设计原则：
+	//   - 存档应该是游戏状态的完整快照，而不是需要外部推断的部分数据
+	//   - 波次系统的控制状态应该被显式保存，而不是从关卡类型推断
 	if s.levelSystem != nil {
 		waveTimingSystem := s.levelSystem.GetWaveTimingSystem()
 		if waveTimingSystem != nil {
+			// 恢复基础状态
 			waveTimingSystem.RestoreState(saveData.CurrentWaveIndex, saveData.LevelTime)
 
-			// Bug Fix: 如果是 Phase 1 或转场中，暂停波次计时系统
-			if isPhase1OrTransitioning {
-				waveTimingSystem.Pause()
-				log.Printf("[GameScene] Phase 1/转场中，暂停波次计时系统")
+			// v6: 使用存档中的 WaveSystemState
+			if saveData.WaveSystemState != nil {
+				// v6 存档：直接使用存档中的状态
+				log.Printf("[GameScene] v6: 使用存档中的波次系统状态: IsPaused=%v, ControlledBy=%s, CountdownCs=%d",
+					saveData.WaveSystemState.IsPaused, saveData.WaveSystemState.ControlledBy, saveData.WaveSystemState.CountdownCs)
+
+				// Bug Fix: 如果波次由教学系统控制（ControlledBy == "tutorial"），不恢复 CountdownCs
+				// 因为教学关卡存档时波次系统是暂停的，CountdownCs = 0
+				// 恢复这个 0 值会覆盖 RestoreState() 计算的正确倒计时
+				// 教学关卡的第一波是由 TriggerNextWaveImmediately() 触发的，不是由倒计时触发
+				if saveData.WaveSystemState.ControlledBy != "tutorial" {
+					// 恢复精确的计时状态
+					waveTimingSystem.RestoreTimerState(
+						saveData.WaveSystemState.CountdownCs,
+						saveData.WaveSystemState.WaveElapsedCs,
+						saveData.WaveSystemState.IsFlagWaveApproaching,
+						saveData.WaveSystemState.IsFinalWave,
+					)
+				} else {
+					log.Printf("[GameScene] v6: 跳过 CountdownCs 恢复（教学控制），保留 RestoreState() 设置的倒计时")
+				}
+
+				// 设置暂停状态
+				if saveData.WaveSystemState.IsPaused {
+					waveTimingSystem.Pause()
+					log.Printf("[GameScene] v6: 波次系统根据存档设置为暂停 (ControlledBy=%s)",
+						saveData.WaveSystemState.ControlledBy)
+				}
 			} else {
-				// Bug Fix: 存档恢复后，如果场上没有僵尸但还有波次未生成，立即触发下一波
-				// 问题：恢复时 WaveElapsedCs 被重置为 0，导致加速刷新条件无法满足
-				// 玩家需要等待完整的倒计时（最终波是55秒）才能触发下一波
-				// 解决：检查场上是否有僵尸，如果没有则立即触发下一波
-				zombiesOnField := s.gameState.TotalZombiesSpawned - s.gameState.ZombiesKilled
-				hasMoreWaves := saveData.CurrentWaveIndex < len(s.gameState.SpawnedWaves)
-				if zombiesOnField == 0 && hasMoreWaves {
-					log.Printf("[GameScene] Bug Fix: 场上无僵尸但还有波次未生成，立即触发下一波 (wave %d)",
-						saveData.CurrentWaveIndex+1)
-					waveTimingSystem.TriggerNextWaveImmediately()
+				// v5 兼容：使用推断逻辑
+				log.Printf("[GameScene] v5 兼容模式: 使用推断逻辑确定波次系统状态")
+				shouldPause := s.inferWaveSystemPauseState(saveData)
+
+				if shouldPause {
+					waveTimingSystem.Pause()
+					log.Printf("[GameScene] v5 兼容: 推断结果为暂停波次系统")
+				} else {
+					// Bug Fix: 存档恢复后，如果场上没有僵尸但还有波次未生成，立即触发下一波
+					zombiesOnField := s.gameState.TotalZombiesSpawned - s.gameState.ZombiesKilled
+					hasMoreWaves := saveData.CurrentWaveIndex < len(s.gameState.SpawnedWaves)
+					if zombiesOnField == 0 && hasMoreWaves {
+						log.Printf("[GameScene] v5 兼容: 场上无僵尸但还有波次未生成，立即触发下一波 (wave %d)",
+							saveData.CurrentWaveIndex+1)
+						waveTimingSystem.TriggerNextWaveImmediately()
+					}
 				}
 			}
 		}
@@ -811,6 +833,57 @@ func (s *GameScene) restoreBattleState() {
 	// - 用户选择"继续"时，在继续按钮回调中删除存档
 	// - 用户选择"重玩关卡"时，在重玩按钮回调中删除存档
 	log.Printf("[GameScene] 战斗状态恢复完成! (存档将在用户确认后删除)")
+}
+
+// inferWaveSystemPauseState 推断波次系统是否应该暂停（v5 兼容）
+//
+// v6 新增：为 v5 存档提供向后兼容
+//
+// 当 WaveSystemState 为 nil（v5 存档）时，使用此方法推断波次系统状态。
+// 推断逻辑基于关卡类型和存档中的其他数据：
+//   - 教学关卡（openingType == "tutorial"）且教学仍激活 → 暂停
+//   - 特殊关卡（openingType == "special"）且 Phase < 2 或转场中 → 暂停
+//   - 其他情况 → 不暂停
+//
+// 参数：
+//   - saveData: 存档数据
+//
+// 返回：
+//   - bool: true 表示应该暂停波次系统
+func (s *GameScene) inferWaveSystemPauseState(saveData *game.BattleSaveData) bool {
+	if s.gameState.CurrentLevel == nil {
+		return false
+	}
+
+	openingType := s.gameState.CurrentLevel.OpeningType
+
+	// 教学关卡：检查教学是否仍在进行中
+	if openingType == "tutorial" {
+		if saveData.Tutorial != nil && saveData.Tutorial.IsActive {
+			log.Printf("[GameScene] v5 推断: 教学关卡且教学仍激活，应暂停波次系统")
+			return true
+		}
+	}
+
+	// 特殊关卡（如 Level 1-5）：检查 Phase 状态
+	if openingType == "special" {
+		if saveData.LevelPhase != nil {
+			if saveData.LevelPhase.CurrentPhase < 2 ||
+				saveData.LevelPhase.PhaseState == components.PhaseStateTransitioning {
+				log.Printf("[GameScene] v5 推断: 特殊关卡 Phase %d (状态: %s)，应暂停波次系统",
+					saveData.LevelPhase.CurrentPhase, saveData.LevelPhase.PhaseState)
+				return true
+			}
+		}
+		// 特殊关卡但没有 LevelPhase 数据，可能是 Phase 1 开始时保存的
+		// 为安全起见，暂停波次系统
+		if saveData.LevelPhase == nil {
+			log.Printf("[GameScene] v5 推断: 特殊关卡但无 LevelPhase 数据，为安全起见暂停波次系统")
+			return true
+		}
+	}
+
+	return false
 }
 
 // restorePlants 恢复植物实体
@@ -1369,6 +1442,20 @@ func (s *GameScene) restoreTutorialState(tutorialData *game.TutorialSaveData) {
 		}
 	}
 
+	// Bug Fix: 恢复 TutorialSystem 的内部 plantCount 变量
+	// 存档恢复时，TutorialSystem.plantCount 仍然是 0，
+	// 导致教学步骤的触发条件无法满足
+	if s.tutorialSystem != nil && tutorialData.PlantCount > 0 {
+		s.tutorialSystem.SetPlantCount(tutorialData.PlantCount)
+	}
+
+	// Bug Fix: 重置文本显示计时器
+	// 存档恢复时，lastTextDisplayTime = 0，导致 isMinDisplayTimeElapsed() 返回 false，
+	// 某些触发器（如 sunSpawned）需要这个条件才能触发
+	if s.tutorialSystem != nil && tutorialData.IsActive {
+		s.tutorialSystem.ResetTextDisplayTimer()
+	}
+
 	log.Printf("[GameScene] 教学状态已恢复: StepIndex=%d, IsActive=%v, CompletedSteps=%d, PlantCount=%d",
 		tutorial.CurrentStepIndex, tutorial.IsActive,
 		len(tutorial.CompletedSteps), tutorialData.PlantCount)
@@ -1544,22 +1631,11 @@ func (s *GameScene) restoreLevelPhase(phaseData *game.LevelPhaseData) {
 		phaseComp.CurrentPhase, phaseComp.PhaseState,
 		phaseComp.ConveyorBeltVisible, phaseComp.ShowRedLine)
 
-	// Bug Fix: 如果恢复的是 Phase 1（铲子教学阶段）或正在转场中，
-	// 需要暂停波次计时系统，防止僵尸在 Dave 对话期间出现
-	// 波次计时系统在 restoreBattleState 中被恢复并取消暂停，这里需要根据阶段重新设置
-	if phaseComp.CurrentPhase < 2 || phaseComp.PhaseState == components.PhaseStateTransitioning {
-		if s.levelSystem != nil {
-			waveTimingSystem := s.levelSystem.GetWaveTimingSystem()
-			if waveTimingSystem != nil {
-				waveTimingSystem.Pause()
-				log.Printf("[GameScene] 恢复 Phase %d 状态，暂停波次计时系统（僵尸应在 Phase 2 才出现）",
-					phaseComp.CurrentPhase)
-			}
-		}
-		return
-	}
+	// 注意：波次系统状态（IsPaused）由 restoreBattleState 中的 WaveSystemState 控制
+	// 这里不再根据 Phase 强制暂停/恢复波次系统，避免覆盖 v6 存档的正确状态
+	// v5 存档的波次系统状态在 restoreBattleState 的 inferWaveSystemPauseState 中处理
 
-	// Bug Fix: 如果恢复的是 Phase 2（保龄球阶段）且状态为 active，
+	// 如果恢复的是 Phase 2（保龄球阶段）且状态为 active，
 	// 需要激活相关系统（这些操作在正常转场完成时由回调执行）
 	if phaseComp.CurrentPhase == 2 && phaseComp.PhaseState == components.PhaseStateActive {
 		log.Printf("[GameScene] 恢复 Phase 2 激活状态，启动相关系统...")
@@ -1573,12 +1649,6 @@ func (s *GameScene) restoreLevelPhase(phaseData *game.LevelPhaseData) {
 		// 启用红线限制
 		if s.plantPreviewRenderSystem != nil {
 			s.plantPreviewRenderSystem.SetRedLineEnabled(true)
-		}
-
-		// 恢复波次计时系统
-		if s.levelSystem != nil {
-			s.levelSystem.ResumeWaveTiming()
-			log.Printf("[GameScene] 波次计时系统已恢复")
 		}
 	}
 }

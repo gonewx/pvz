@@ -10,7 +10,8 @@ import (
 // v3: 添加撑杆僵尸和旗帜僵尸支持（HasPole, IsJumping）
 // v4: 添加土豆地雷阶段支持（PotatoMinePhase, ArmingTimer）
 // v5: 添加植物卡片冷却状态支持（PlantCards）
-const BattleSaveVersion = 5
+// v6: 添加波次系统状态支持（WaveSystemState）- 解决存档恢复后波次控制异常问题
+const BattleSaveVersion = 6
 
 // BattleSaveData 战斗存档数据结构
 //
@@ -53,6 +54,9 @@ type BattleSaveData struct {
 	LevelPhase     *LevelPhaseData     // 关卡阶段数据（可选）
 	DaveDialogue   *DaveDialogueData   // Dave 对话数据（可选）
 	GuidedTutorial *GuidedTutorialData // 强引导教学数据（可选）
+
+	// v6: 波次系统状态（解决存档恢复后波次控制异常问题）
+	WaveSystemState *WaveSystemStateData // 波次系统状态（可选，v5 存档为 nil）
 }
 
 // TutorialSaveData 教学进度序列化数据
@@ -276,4 +280,47 @@ type GuidedTutorialData struct {
 	LastPlantCount  int      // 上一帧的植物数量
 	TransitionReady bool     // 转场条件是否满足
 	TutorialTextKey string   // 教学文本键
+}
+
+// =============================================================================
+// v6: 波次系统状态数据结构
+// =============================================================================
+
+// WaveSystemStateData 波次系统状态序列化数据
+//
+// v6 新增：解决存档恢复后波次控制异常问题
+//
+// 核心设计原则：
+//   - 存档应该是游戏状态的完整快照，而不是需要外部推断的部分数据
+//   - 波次系统的控制状态应该被显式保存，而不是从关卡类型推断
+//
+// 使用场景：
+//   - 教学关卡：波次由 TutorialSystem 控制，IsPaused=true，ControlledBy="tutorial"
+//   - 特殊关卡（如 Level 1-5）：Phase 1 时 IsPaused=true，Phase 2 后 IsPaused=false
+//   - 普通关卡：IsPaused=false，ControlledBy="timer"
+type WaveSystemStateData struct {
+	// IsPaused 波次计时系统是否应该暂停
+	// 恢复时直接使用此值，而不是从关卡类型推断
+	IsPaused bool
+
+	// ControlledBy 波次由谁控制
+	// 可选值：
+	//   - "timer": 由 WaveTimingSystem 自动计时触发
+	//   - "tutorial": 由 TutorialSystem 在玩家完成条件后触发
+	//   - "phase": 由 LevelPhaseSystem 在阶段转场后触发
+	ControlledBy string
+
+	// CountdownCs 当前倒计时（厘秒）
+	// 用于精确恢复计时进度
+	CountdownCs int
+
+	// WaveElapsedCs 当前波次已过时间（厘秒）
+	// 用于加速刷新判定
+	WaveElapsedCs int
+
+	// IsFlagWaveApproaching 是否正在接近旗帜波
+	IsFlagWaveApproaching bool
+
+	// IsFinalWave 是否是最终波
+	IsFinalWave bool
 }

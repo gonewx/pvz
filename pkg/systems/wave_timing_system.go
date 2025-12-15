@@ -1168,3 +1168,41 @@ func (s *WaveTimingSystem) RestoreState(currentWaveIndex int, levelTime float64)
 	log.Printf("[WaveTimingSystem] Restore: Next wave=%d, countdown=%d cs, accumulated=%.0f cs",
 		currentWaveIndex+1, timer.CountdownCs, timer.AccumulatedCs)
 }
+
+// RestoreTimerState 从存档恢复精确的计时器状态
+//
+// v6 新增：精确恢复计时器的内部状态，而不是重新计算
+//
+// 当使用 v6 存档时，可以精确恢复以下状态：
+//   - CountdownCs: 当前倒计时（厘秒）
+//   - WaveElapsedCs: 当前波次已过时间（厘秒）
+//   - IsFlagWaveApproaching: 是否正在接近旗帜波
+//   - IsFinalWave: 是否是最终波
+//
+// 这比 RestoreState 中的 SetNextWaveCountdown() 更精确，
+// 因为 SetNextWaveCountdown() 会重新计算倒计时，而不是恢复保存时的精确值。
+//
+// 参数：
+//   - countdownCs: 当前倒计时（厘秒）
+//   - waveElapsedCs: 当前波次已过时间（厘秒）
+//   - isFlagWaveApproaching: 是否正在接近旗帜波
+//   - isFinalWave: 是否是最终波
+func (s *WaveTimingSystem) RestoreTimerState(countdownCs, waveElapsedCs int, isFlagWaveApproaching, isFinalWave bool) {
+	timer := s.getTimerComponent()
+	if timer == nil {
+		log.Printf("[WaveTimingSystem] ERROR: Timer component not found during RestoreTimerState")
+		return
+	}
+
+	// 精确恢复计时器状态
+	timer.CountdownCs = countdownCs
+	timer.WaveElapsedCs = waveElapsedCs
+	timer.IsFlagWaveApproaching = isFlagWaveApproaching
+	timer.IsFinalWave = isFinalWave
+
+	// 同步 LastRefreshTimeCs（用于进度条计算）
+	timer.LastRefreshTimeCs = countdownCs
+
+	log.Printf("[WaveTimingSystem] RestoreTimerState: CountdownCs=%d, WaveElapsedCs=%d, IsFlagWaveApproaching=%v, IsFinalWave=%v",
+		countdownCs, waveElapsedCs, isFlagWaveApproaching, isFinalWave)
+}

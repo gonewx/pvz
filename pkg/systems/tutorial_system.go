@@ -107,6 +107,25 @@ func (s *TutorialSystem) SetLevelSystem(ls *LevelSystem) {
 	log.Printf("[TutorialSystem] LevelSystem reference set")
 }
 
+// SetPlantCount 设置植物计数（用于存档恢复）
+//
+// 存档恢复时，需要将 plantCount 设置为存档中保存的值，
+// 否则教学步骤的触发条件会因为 plantCount=0 而无法满足。
+func (s *TutorialSystem) SetPlantCount(count int) {
+	s.plantCount = count
+	log.Printf("[TutorialSystem] Plant count restored: %d", count)
+}
+
+// ResetTextDisplayTimer 重置文本显示计时器（用于存档恢复）
+//
+// 存档恢复时，需要重置 lastTextDisplayTime，否则 isMinDisplayTimeElapsed()
+// 会返回 false，导致某些触发器（如 sunSpawned）无法满足条件。
+// 设置为最小显示时间，让恢复后的触发器检查能够通过。
+func (s *TutorialSystem) ResetTextDisplayTimer() {
+	s.lastTextDisplayTime = config.TutorialTextMinDisplayTime
+	log.Printf("[TutorialSystem] Text display timer reset for save restore")
+}
+
 // Update 更新教学系统状态
 // 参数：
 //   - dt: 时间增量（秒）

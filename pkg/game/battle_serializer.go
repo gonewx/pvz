@@ -88,6 +88,9 @@ func (s *BattleSerializer) SaveBattle(em *ecs.EntityManager, gs *GameState, user
 	saveData.DaveDialogue = s.collectDaveDialogueData(em)
 	saveData.GuidedTutorial = s.collectGuidedTutorialData(em)
 
+	// v6: 收集波次系统状态（解决存档恢复后波次控制异常问题）
+	saveData.WaveSystemState = s.collectWaveSystemState(em, gs)
+
 	// 使用 gob 编码到内存 buffer
 	var buffer bytes.Buffer
 	encoder := gob.NewEncoder(&buffer)
@@ -111,7 +114,7 @@ func (s *BattleSerializer) SaveBattle(em *ecs.EntityManager, gs *GameState, user
 // LoadBattle 从 gdata 加载战斗状态
 //
 // Story 20.3: 从 gdata 加载 gob 二进制数据并反序列化战斗数据。
-// 会进行版本兼容性检查，如果版本不匹配返回错误。
+// v6: 支持 v5 和 v6 版本的向后兼容（v5 存档的 WaveSystemState 为 nil）
 //
 // 参数：
 //   - username: 用户名，用于构建存储 key
@@ -139,10 +142,17 @@ func (s *BattleSerializer) LoadBattle(username string) (*BattleSaveData, error) 
 		return nil, fmt.Errorf("failed to decode save data: %w", err)
 	}
 
-	// 版本兼容性检查
-	if saveData.Version != BattleSaveVersion {
-		return nil, fmt.Errorf("incompatible save version: %d (expected %d)",
+	// v6: 版本兼容性检查 - 支持 v5 和 v6
+	// v5 存档可以加载，但 WaveSystemState 为 nil，恢复时需要使用推断逻辑
+	if saveData.Version < 5 || saveData.Version > BattleSaveVersion {
+		return nil, fmt.Errorf("incompatible save version: %d (supported: 5-%d)",
 			saveData.Version, BattleSaveVersion)
+	}
+
+	// 记录版本信息
+	if saveData.Version < BattleSaveVersion {
+		log.Printf("[BattleSerializer] Loading legacy save (v%d), will use inference for WaveSystemState",
+			saveData.Version)
 	}
 
 	log.Printf("[BattleSerializer] Loaded battle for user %s: Level=%s, Sun=%d, Wave=%d/%d, Plants=%d, Zombies=%d",
@@ -801,4 +811,85 @@ func (s *BattleSerializer) collectGuidedTutorialData(em *ecs.EntityManager) *Gui
 		TransitionReady: guidedComp.TransitionReady,
 		TutorialTextKey: guidedComp.TutorialTextKey,
 	}
+}
+
+// =============================================================================
+// v6: 波次系统状态收集方法
+// =============================================================================
+
+// collectWaveSystemState 从 EntityManager 收集波次系统状态
+//
+// v6 新增：解决存档恢复后波次控制异常问题
+//
+// 核心设计原则：
+//   - 存档应该是游戏状态的完整快照，而不是需要外部推断的部分数据
+//   - 波次系统的控制状态应该被显式保存，而不是从关卡类型推断
+//
+// 收集内容：
+//   - IsPaused: 波次计时系统是否暂停
+//   - ControlledBy: 波次由谁控制（timer/tutorial/phase）
+//   - CountdownCs: 当前倒计时（厘秒）
+//   - WaveElapsedCs: 当前波次已过时间（厘秒）
+//   - IsFlagWaveApproaching: 是否正在接近旗帜波
+//   - IsFinalWave: 是否是最终波
+func (s *BattleSerializer) collectWaveSystemState(em *ecs.EntityManager, gs *GameState) *WaveSystemStateData {
+	// 查询 WaveTimerComponent
+	entities := ecs.GetEntitiesWith1[*components.WaveTimerComponent](em)
+
+	if len(entities) == 0 {
+		log.Printf("[BattleSerializer] No WaveTimerComponent found, skipping wave system state")
+		return nil
+	}
+
+	// 取第一个（通常只有一个）
+	entity := entities[0]
+	timerComp, ok := ecs.GetComponent[*components.WaveTimerComponent](em, entity)
+	if !ok {
+		return nil
+	}
+
+	// 确定波次由谁控制
+	controlledBy := "timer" // 默认由计时器控制
+
+	// 检查是否是教学关卡
+	if gs.CurrentLevel != nil && gs.CurrentLevel.OpeningType == "tutorial" {
+		// 检查教学是否仍在进行中
+		tutorialEntities := ecs.GetEntitiesWith1[*components.TutorialComponent](em)
+		for _, tutorialEntity := range tutorialEntities {
+			if tutorialComp, ok := ecs.GetComponent[*components.TutorialComponent](em, tutorialEntity); ok {
+				if tutorialComp.IsActive {
+					controlledBy = "tutorial"
+					break
+				}
+			}
+		}
+	}
+
+	// 检查是否是特殊关卡（如 Level 1-5）
+	if gs.CurrentLevel != nil && gs.CurrentLevel.OpeningType == "special" {
+		// 检查关卡阶段
+		phaseEntities := ecs.GetEntitiesWith1[*components.LevelPhaseComponent](em)
+		for _, phaseEntity := range phaseEntities {
+			if phaseComp, ok := ecs.GetComponent[*components.LevelPhaseComponent](em, phaseEntity); ok {
+				if phaseComp.CurrentPhase < 2 || phaseComp.PhaseState == "transitioning" {
+					controlledBy = "phase"
+					break
+				}
+			}
+		}
+	}
+
+	waveState := &WaveSystemStateData{
+		IsPaused:              timerComp.IsPaused,
+		ControlledBy:          controlledBy,
+		CountdownCs:           timerComp.CountdownCs,
+		WaveElapsedCs:         timerComp.WaveElapsedCs,
+		IsFlagWaveApproaching: timerComp.IsFlagWaveApproaching,
+		IsFinalWave:           timerComp.IsFinalWave,
+	}
+
+	log.Printf("[BattleSerializer] Collected wave system state: IsPaused=%v, ControlledBy=%s, CountdownCs=%d, WaveElapsedCs=%d",
+		waveState.IsPaused, waveState.ControlledBy, waveState.CountdownCs, waveState.WaveElapsedCs)
+
+	return waveState
 }
