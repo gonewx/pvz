@@ -140,9 +140,9 @@ func (s *BehaviorSystem) detectPlantCollision(zombieRow, zombieCol int) (ecs.Ent
 			continue
 		}
 
-		// 跳过一次性爆炸植物（樱桃炸弹）
+		// 跳过一次性爆炸植物（樱桃炸弹、土豆地雷）
 		// 僵尸不应该吃这类植物，而是让它们自然爆炸
-		if plant.PlantType == components.PlantCherryBomb {
+		if plant.PlantType == components.PlantCherryBomb || plant.PlantType == components.PlantPotatoMine {
 			continue
 		}
 

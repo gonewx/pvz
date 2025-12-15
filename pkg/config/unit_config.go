@@ -285,7 +285,7 @@ const (
 
 	// Story 8.9: 土豆地雷武装和爆炸配置
 	// PotatoMineArmingTime 土豆雷武装时间（秒）
-	PotatoMineArmingTime = 1.0
+	PotatoMineArmingTime = 15.0
 
 	// PotatoMineExplosionDamage 土豆雷爆炸伤害
 	// 1800 点伤害，足以秒杀大多数普通僵尸
@@ -313,17 +313,27 @@ const (
 	// 僵尸距离小于此值时使用最快速度
 	PotatoMineWarningDistanceMin = 50.0
 
-	// PotatoMineBlinkOnDuration 红灯亮的固定时间（秒）
-	// 无论闪烁频率如何，红灯每次都亮这么长时间
-	PotatoMineBlinkOnDuration = 0.1
+	// PotatoMineBlinkPeriodMax 闪烁周期最大值（秒）
+	// 僵尸很远时使用，红灯亮和灭各占一半
+	PotatoMineBlinkPeriodMax = 0.8
 
-	// PotatoMineBlinkOffMax 红灯灭的最长时间（秒）
-	// 僵尸很远时，红灯灭这么长时间后再亮
-	PotatoMineBlinkOffMax = 0.8
+	// PotatoMineBlinkPeriodMin 闪烁周期最小值（秒）
+	// 僵尸很近时使用，红灯亮和灭各占一半
+	PotatoMineBlinkPeriodMin = 0.16
 
-	// PotatoMineBlinkOffMin 红灯灭的最短时间（秒）
-	// 僵尸很近时，红灯灭这么短时间后就亮
-	PotatoMineBlinkOffMin = 0.15
+	// PotatoMineLight1Size 灰灯图片尺寸（像素）
+	PotatoMineLight1Size = 28.0
+
+	// PotatoMineLight2Size 红灯图片尺寸（像素）
+	PotatoMineLight2Size = 46.0
+
+	// PotatoMineLightOffsetX 红灯替换灰灯时的 X 偏移（未缩放）
+	// 计算：(灰灯中心 - 红灯中心) = (14 - 23) = -9
+	PotatoMineLightOffsetX = -9.0
+
+	// PotatoMineLightOffsetY 红灯替换灰灯时的 Y 偏移（未缩放）
+	// 计算：(灰灯中心 - 红灯中心) = (14 - 23) = -9
+	PotatoMineLightOffsetY = -9.0
 )
 
 // Snow Pea Configuration (寒冰射手配置)

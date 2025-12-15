@@ -343,10 +343,19 @@ func (s *ReanimSystem) prepareRenderCache(comp *components.ReanimComponent) {
 			}
 
 			// 应用 ImageOverrides 偏移（用于调整替换图片的位置，如 Dave 手持的坚果）
+			// 偏移值需要乘以帧的缩放因子，因为图片被缩放后中心点的相对位置也会变化
 			if comp.ImageOverrideOffsets != nil && selectedFrame.ImagePath != "" {
 				if offset, ok := comp.ImageOverrideOffsets[selectedFrame.ImagePath]; ok {
-					selectedOffsetX += offset[0]
-					selectedOffsetY += offset[1]
+					scaleX := getFloat(selectedFrame.ScaleX)
+					scaleY := getFloat(selectedFrame.ScaleY)
+					if scaleX == 0 {
+						scaleX = 1.0
+					}
+					if scaleY == 0 {
+						scaleY = 1.0
+					}
+					selectedOffsetX += offset[0] * scaleX
+					selectedOffsetY += offset[1] * scaleY
 				}
 			}
 

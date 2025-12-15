@@ -4,6 +4,8 @@ import (
 	"log"
 	"math"
 
+	"github.com/hajimehoshi/ebiten/v2"
+
 	"github.com/gonewx/pvz/pkg/components"
 	"github.com/gonewx/pvz/pkg/config"
 	"github.com/gonewx/pvz/pkg/ecs"
@@ -256,10 +258,10 @@ func (s *BehaviorSystem) handlePotatoMineBehavior(entityID ecs.EntityID, deltaTi
 				Processed: false,
 			})
 
-			// 初始化闪烁状态
+			// 初始化闪烁状态（从灰灯开始，使用最大周期的一半）
 			plant.WarningLightOn = false
-			plant.WarningLightTimer = config.PotatoMineBlinkOffMax
-			plant.WarningLightInterval = config.PotatoMineBlinkOffMax
+			plant.WarningLightTimer = config.PotatoMineBlinkPeriodMax / 2.0
+			plant.WarningLightInterval = config.PotatoMineBlinkPeriodMax
 			plant.WarningLightInitialized = false // 等待 PlayCombo 完成后再初始化
 		}
 
@@ -356,6 +358,11 @@ func (s *BehaviorSystem) handlePotatoMineArmedPhase(entityID ecs.EntityID, plant
 
 		// 检测触发爆炸
 		zombieCol := int((zombieCenterX - config.GridWorldStartX) / config.CellWidth)
+		// 调试：输出僵尸和土豆地雷的列位置
+		if distance < 100 {
+			log.Printf("[PotatoMine] 土豆地雷 %d (col=%d): 僵尸 %d zombieCenterX=%.1f, zombieCol=%d, distance=%.1f",
+				entityID, plant.GridCol, zombieID, zombieCenterX, zombieCol, distance)
+		}
 		if zombieCol == plant.GridCol {
 			log.Printf("[BehaviorSystem] 土豆地雷 %d: 检测到僵尸 %d 触发！", entityID, zombieID)
 			s.triggerPotatoMineExplosion(entityID, plantPos.X, plantPos.Y)
@@ -374,26 +381,29 @@ func (s *BehaviorSystem) handlePotatoMineArmedPhase(entityID ecs.EntityID, plant
 }
 
 // updatePotatoMineWarningLight 更新土豆地雷警告灯闪烁
-// 使用 HiddenTracks 控制 anim_glow 轨道（红灯）的显隐
-// 灰灯（anim_light）始终显示，红灯（anim_glow）叠加显示实现闪烁效果
-// 红灯亮的时间固定，灭的时间根据僵尸距离变化
+// 使用 ImageOverrides 替换灰灯图片为红灯图片实现闪烁效果
+// 红灯继承灰灯轨道的所有动画变换（位置、缩放、抖动）
+// 红灯亮和灭的时间相同（50%占空比），频率根据僵尸距离变化
 func (s *BehaviorSystem) updatePotatoMineWarningLight(entityID ecs.EntityID, plant *components.PlantComponent, reanim *components.ReanimComponent, hasReanim bool, nearestDistance float64, deltaTime float64) {
 	// DEBUG: 确认函数被调用
 	log.Printf("[PotatoMine] updateWarningLight: entityID=%d, timer=%.3f, deltaTime=%.3f, lightOn=%v",
 		entityID, plant.WarningLightTimer, deltaTime, plant.WarningLightOn)
 
-	// 计算红灯灭的时间（线性插值）
-	var offDuration float64
+	// 计算闪烁周期（线性插值）
+	var blinkPeriod float64
 	if nearestDistance <= config.PotatoMineWarningDistanceMin {
-		offDuration = config.PotatoMineBlinkOffMin
+		blinkPeriod = config.PotatoMineBlinkPeriodMin
 	} else if nearestDistance >= config.PotatoMineWarningDistanceMax {
-		offDuration = config.PotatoMineBlinkOffMax
+		blinkPeriod = config.PotatoMineBlinkPeriodMax
 	} else {
 		t := (config.PotatoMineWarningDistanceMax - nearestDistance) /
 			(config.PotatoMineWarningDistanceMax - config.PotatoMineWarningDistanceMin)
-		offDuration = config.PotatoMineBlinkOffMax -
-			t*(config.PotatoMineBlinkOffMax-config.PotatoMineBlinkOffMin)
+		blinkPeriod = config.PotatoMineBlinkPeriodMax -
+			t*(config.PotatoMineBlinkPeriodMax-config.PotatoMineBlinkPeriodMin)
 	}
+
+	// 半周期（亮灭各占一半）
+	halfPeriod := blinkPeriod / 2.0
 
 	plant.WarningLightTimer -= deltaTime
 
@@ -401,36 +411,42 @@ func (s *BehaviorSystem) updatePotatoMineWarningLight(entityID ecs.EntityID, pla
 		// 切换灯的亮灭状态
 		plant.WarningLightOn = !plant.WarningLightOn
 
-		// 根据新状态设置下一次切换的时间
+		// 下次切换时间 = 半周期（亮灭时间相同）
+		plant.WarningLightTimer = halfPeriod
+		plant.WarningLightInterval = blinkPeriod // 用于调试日志
+
 		if plant.WarningLightOn {
-			// 刚切换到亮：下次切换时间 = 固定的亮时间
-			plant.WarningLightTimer = config.PotatoMineBlinkOnDuration
-			log.Printf("[PotatoMine] 🔴 红灯亮！下次切换时间=%.3f秒", plant.WarningLightTimer)
+			log.Printf("[PotatoMine] 🔴 红灯亮！周期=%.3f秒, 半周期=%.3f秒", blinkPeriod, halfPeriod)
 		} else {
-			// 刚切换到灭：下次切换时间 = 根据距离计算的灭时间
-			plant.WarningLightTimer = offDuration
-			log.Printf("[PotatoMine] ⚪ 红灯灭！下次切换时间=%.3f秒（offDuration）", plant.WarningLightTimer)
+			log.Printf("[PotatoMine] ⚪ 红灯灭！周期=%.3f秒, 半周期=%.3f秒", blinkPeriod, halfPeriod)
 		}
-		plant.WarningLightInterval = offDuration // 用于调试日志
 
 		if hasReanim {
-			// 使用 HiddenTracks 只控制红灯（anim_glow）的显隐
-			// 灰灯（anim_light）始终显示，红灯叠加在灰灯之上实现闪烁
-			if reanim.HiddenTracks == nil {
-				reanim.HiddenTracks = make(map[string]bool)
+			// 使用 ImageOverrides 替换灰灯图片为红灯图片
+			if reanim.ImageOverrides == nil {
+				reanim.ImageOverrides = make(map[string]*ebiten.Image)
+			}
+			if reanim.ImageOverrideOffsets == nil {
+				reanim.ImageOverrideOffsets = make(map[string][2]float64)
 			}
 
-			// 灰灯始终显示（确保不被隐藏）
-			delete(reanim.HiddenTracks, "anim_light")
-
 			if plant.WarningLightOn {
-				// 红灯亮：显示 anim_glow（叠加在灰灯上）
-				delete(reanim.HiddenTracks, "anim_glow")
-				log.Printf("[PotatoMine] HiddenTracks: 显示红灯（叠加在灰灯上）")
+				// 红灯亮：将灰灯图片替换为红灯图片
+				// 红灯图片继承灰灯轨道的所有动画变换（位置、缩放）
+				if light2Img, ok := reanim.PartImages["IMAGE_REANIM_POTATOMINE_LIGHT2"]; ok {
+					reanim.ImageOverrides["IMAGE_REANIM_POTATOMINE_LIGHT1"] = light2Img
+					// 设置偏移以实现中心对齐（偏移值会在渲染时乘以帧缩放）
+					reanim.ImageOverrideOffsets["IMAGE_REANIM_POTATOMINE_LIGHT1"] = [2]float64{
+						config.PotatoMineLightOffsetX,
+						config.PotatoMineLightOffsetY,
+					}
+					log.Printf("[PotatoMine] ImageOverrides: 灰灯 → 红灯")
+				}
 			} else {
-				// 红灯灭：隐藏 anim_glow，灰灯继续显示
-				reanim.HiddenTracks["anim_glow"] = true
-				log.Printf("[PotatoMine] HiddenTracks: 隐藏红灯，灰灯继续显示")
+				// 红灯灭：清除图片覆盖和偏移，恢复显示灰灯
+				delete(reanim.ImageOverrides, "IMAGE_REANIM_POTATOMINE_LIGHT1")
+				delete(reanim.ImageOverrideOffsets, "IMAGE_REANIM_POTATOMINE_LIGHT1")
+				log.Printf("[PotatoMine] ImageOverrides: 恢复灰灯")
 			}
 
 			// 强制缓存失效
@@ -589,45 +605,33 @@ func (s *BehaviorSystem) triggerPotatoMineExplosion(entityID ecs.EntityID, explo
 }
 
 // initPotatoMineWarningLight 初始化土豆地雷的红灯闪烁
-// 使用 HiddenTracks 控制 anim_glow（红灯）和 anim_light（灰灯）的互斥显示
-// 注意：anim_glow 和 anim_light 已在 idle combo 配置中，此函数只需设置额外参数
+// 使用 ImageOverrides 替换灰灯图片为红灯图片实现闪烁效果
+// 红灯继承灰灯轨道的所有动画变换（位置、缩放、抖动）
 func (s *BehaviorSystem) initPotatoMineWarningLight(reanim *components.ReanimComponent) {
-	if reanim.TrackFrameOverrides == nil {
-		reanim.TrackFrameOverrides = make(map[string]int)
-	}
-
-	// 1. 设置 TrackFrameOverrides 强制 anim_glow 使用 frame 20
-	// anim_glow 轨道只有 frame 20 有图像数据，其他帧都是 f=-1 或空
-	reanim.TrackFrameOverrides["anim_glow"] = 20
-
-	// 2. 设置 TrackFrameOverrides 强制 anim_light 使用 frame 0
-	// anim_light 轨道在 frame 0 有图像数据（IMAGE_REANIM_POTATOMINE_LIGHT1）
-	// 注意：anim_light 在 frame 20-22 是空帧，frame 9-10 也是空帧
-	// 如果让 anim_light 跟随 anim_armed 的帧索引（20-30），会在帧 20-22 时没有图像
-	// 所以固定使用 frame 0，确保灰灯始终显示
-	reanim.TrackFrameOverrides["anim_light"] = 0
-
-	// 3. 设置 anim_glow 和 anim_light 的动画速度为 0，阻止帧索引被自动更新
-	if reanim.AnimationSpeedOverrides == nil {
-		reanim.AnimationSpeedOverrides = make(map[string]float64)
-	}
-	reanim.AnimationSpeedOverrides["anim_glow"] = 0
-	reanim.AnimationSpeedOverrides["anim_light"] = 0
-
-	// 4. 重置帧索引为 0（防止 PlayCombo 后已有更新）
-	if reanim.AnimationFrameIndices == nil {
-		reanim.AnimationFrameIndices = make(map[string]float64)
-	}
-	reanim.AnimationFrameIndices["anim_glow"] = 0
-	reanim.AnimationFrameIndices["anim_light"] = 0
-
-	// 5. 确保 HiddenTracks 已初始化（combo 配置会设置 anim_glow 为隐藏）
+	// 1. 始终隐藏 anim_glow 轨道（不再需要这个轨道）
 	if reanim.HiddenTracks == nil {
 		reanim.HiddenTracks = make(map[string]bool)
 	}
+	reanim.HiddenTracks["anim_glow"] = true
 
-	// 6. 强制缓存失效
+	// 2. 让 anim_light 跟随主动画的帧变化（不再固定帧索引）
+	// 删除之前的帧覆盖设置
+	if reanim.TrackFrameOverrides != nil {
+		delete(reanim.TrackFrameOverrides, "anim_light")
+		delete(reanim.TrackFrameOverrides, "anim_glow")
+	}
+
+	// 3. 让 anim_light 正常播放（不再冻结速度）
+	if reanim.AnimationSpeedOverrides != nil {
+		delete(reanim.AnimationSpeedOverrides, "anim_light")
+		delete(reanim.AnimationSpeedOverrides, "anim_glow")
+	}
+
+	// 4. ImageOverrideOffsets 不在这里设置，而是在红灯亮时动态设置
+	// 这样灰灯不会被错误偏移
+
+	// 5. 强制缓存失效
 	reanim.LastRenderFrame = -1
 
-	log.Printf("[BehaviorSystem] initPotatoMineWarningLight: 初始化完成，TrackFrameOverrides[anim_glow]=20, TrackFrameOverrides[anim_light]=0")
+	log.Printf("[BehaviorSystem] initPotatoMineWarningLight: 初始化完成，使用 ImageOverrides 方式实现闪烁")
 }

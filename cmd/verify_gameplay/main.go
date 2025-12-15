@@ -288,6 +288,7 @@ func (vg *VerifyGameplayGame) createPlantCards() {
 		components.PlantWallnut,
 		components.PlantCherryBomb,
 		components.PlantPotatoMine,
+		components.PlantSnowPea,
 	}
 
 	startX := float64(config.SeedBankX + config.PlantCardStartOffsetX)
