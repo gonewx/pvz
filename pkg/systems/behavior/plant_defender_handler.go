@@ -37,14 +37,14 @@ func (s *BehaviorSystem) handleWallnutBehavior(entityID ecs.EntityID, deltaTime 
 	// 检测坚果墙是否正在被啃食（检查同格子是否有啃食状态的僵尸）
 	isBeingEaten := s.isPlantBeingEaten(plantComp.GridRow, plantComp.GridCol)
 
+	// 初始化暂停状态 map（如果为空）
+	if reanim.AnimationPausedStates == nil {
+		reanim.AnimationPausedStates = make(map[string]bool)
+	}
+
 	// 处理被啃食状态变化
 	if isBeingEaten != plantComp.WallnutBeingEaten {
 		plantComp.WallnutBeingEaten = isBeingEaten
-
-		// 初始化暂停状态 map（如果为空）
-		if reanim.AnimationPausedStates == nil {
-			reanim.AnimationPausedStates = make(map[string]bool)
-		}
 
 		if isBeingEaten {
 			// 刚开始被啃食：暂停身体动画使其保持静止
@@ -67,6 +67,12 @@ func (s *BehaviorSystem) handleWallnutBehavior(entityID ecs.EntityID, deltaTime 
 			})
 			log.Printf("[BehaviorSystem] 坚果墙 %d 停止被啃食，恢复 idle 动画", entityID)
 		}
+	}
+
+	// 被啃食时：每帧确保动画保持暂停（防止动画切换导致状态丢失）
+	if plantComp.WallnutBeingEaten {
+		reanim.AnimationPausedStates["anim_idle"] = true
+		reanim.AnimationPausedStates["anim_face"] = true
 	}
 
 	// 被啃食时的眨眼逻辑（偶尔眨一次眼）
@@ -208,15 +214,10 @@ func (s *BehaviorSystem) isPlantBeingEaten(row, col int) bool {
 			continue
 		}
 
-		// 获取碰撞组件，用于计算碰撞盒中心
-		collision, hasCollisionComp := ecs.GetComponent[*components.CollisionComponent](s.entityManager, zombieID)
-		collisionOffsetX := 0.0
-		if hasCollisionComp {
-			collisionOffsetX = collision.OffsetX
-		}
-
-		// 计算僵尸碰撞盒中心所在格子
-		zombieCol := int((pos.X + collisionOffsetX - config.GridWorldStartX) / config.CellWidth)
+		// 计算僵尸脚底位置所在格子
+		// 注意：不使用 CollisionComponent.OffsetX，与 zombie_eating_handler.go 保持一致
+		// 啃食检测应基于僵尸脚底位置，而非碰撞盒中心
+		zombieCol := int((pos.X - config.GridWorldStartX) / config.CellWidth)
 		zombieRow := int((pos.Y - config.GridWorldStartY - config.ZombieVerticalOffset - config.CellHeight/2.0) / config.CellHeight)
 
 		if zombieRow == row && zombieCol == col {

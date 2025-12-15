@@ -25,6 +25,32 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 		return
 	}
 
+	// 检测豌豆射手是否正在被啃食（检查同格子是否有啃食状态的僵尸）
+	isBeingEaten := s.isPlantBeingEaten(plant.GridRow, plant.GridCol)
+
+	// 处理被啃食状态变化
+	if isBeingEaten != plant.BeingEaten {
+		plant.BeingEaten = isBeingEaten
+
+		// 获取 ReanimComponent 用于暂停/恢复动画
+		if reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID); ok {
+			// 初始化暂停状态 map（如果为空）
+			if reanim.AnimationPausedStates == nil {
+				reanim.AnimationPausedStates = make(map[string]bool)
+			}
+
+			if isBeingEaten {
+				// 刚开始被啃食：暂停身体摇晃动画使其保持静止
+				reanim.AnimationPausedStates["anim_idle"] = true
+				log.Printf("[BehaviorSystem] 豌豆射手 %d 开始被啃食，暂停摇晃动画", entityID)
+			} else {
+				// 停止被啃食，恢复身体摇晃动画
+				reanim.AnimationPausedStates["anim_idle"] = false
+				log.Printf("[BehaviorSystem] 豌豆射手 %d 停止被啃食，恢复摇晃动画", entityID)
+			}
+		}
+	}
+
 	// 更新计时器
 	timer.CurrentTime += deltaTime
 

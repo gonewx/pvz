@@ -120,6 +120,11 @@ type PlantComponent struct {
 	// WarningLightInitialized 警告灯是否已初始化
 	// 用于在 PlayCombo 完成后执行一次性初始化
 	WarningLightInitialized bool
+
+	// BeingEaten 植物是否正在被僵尸啃食
+	// 用于控制动画状态（被啃食时停止摇晃动画，保持静止）
+	// 此字段为通用字段，适用于豌豆射手、向日葵等需要在被啃食时停止摇晃的植物
+	BeingEaten bool
 }
 
 // Story 10.3: 射手类植物列表（用于判断是否需要攻击动画）
