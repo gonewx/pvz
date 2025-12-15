@@ -27,8 +27,10 @@ import (
 //   - error: 如果创建失败返回错误信息
 func NewBowlingNutEntity(em *ecs.EntityManager, rm ResourceLoader, row, col int, isExplosive bool) (ecs.EntityID, error) {
 	// 计算世界坐标（基于 row, col）
+	// Bug Fix: 加入 PlantOffsetY 偏移，与植物工厂保持一致
+	// 这样 Wallnut 的 Reanim CenterOffset 才能正确对齐渲染位置
 	worldX := config.GridWorldStartX + float64(col)*config.CellWidth + config.CellWidth/2
-	worldY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2
+	worldY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2 + config.PlantOffsetY
 
 	// 加载 Wallnut Reanim 资源
 	reanimXML := rm.GetReanimXML("Wallnut")

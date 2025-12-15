@@ -760,21 +760,40 @@ func (s *GameScene) restoreBattleState() {
 
 	// Story 18.3: 恢复波次计时系统状态
 	// 这是关键：让 WaveTimingSystem 知道当前进度，以便正确触发后续波次
+	//
+	// Bug Fix: Level 1-5 在 Phase 1（铲子教学/Dave 对话）时不应该触发波次
+	// 必须先检查 saveData.LevelPhase，如果是 Phase 1 或转场中，暂停波次计时而不是触发
+	isPhase1OrTransitioning := false
+	if saveData.LevelPhase != nil {
+		if saveData.LevelPhase.CurrentPhase < 2 ||
+			saveData.LevelPhase.PhaseState == components.PhaseStateTransitioning {
+			isPhase1OrTransitioning = true
+			log.Printf("[GameScene] 检测到 Phase %d (状态: %s)，跳过波次立即触发",
+				saveData.LevelPhase.CurrentPhase, saveData.LevelPhase.PhaseState)
+		}
+	}
+
 	if s.levelSystem != nil {
 		waveTimingSystem := s.levelSystem.GetWaveTimingSystem()
 		if waveTimingSystem != nil {
 			waveTimingSystem.RestoreState(saveData.CurrentWaveIndex, saveData.LevelTime)
 
-			// Bug Fix: 存档恢复后，如果场上没有僵尸但还有波次未生成，立即触发下一波
-			// 问题：恢复时 WaveElapsedCs 被重置为 0，导致加速刷新条件无法满足
-			// 玩家需要等待完整的倒计时（最终波是55秒）才能触发下一波
-			// 解决：检查场上是否有僵尸，如果没有则立即触发下一波
-			zombiesOnField := s.gameState.TotalZombiesSpawned - s.gameState.ZombiesKilled
-			hasMoreWaves := saveData.CurrentWaveIndex < len(s.gameState.SpawnedWaves)
-			if zombiesOnField == 0 && hasMoreWaves {
-				log.Printf("[GameScene] Bug Fix: 场上无僵尸但还有波次未生成，立即触发下一波 (wave %d)",
-					saveData.CurrentWaveIndex+1)
-				waveTimingSystem.TriggerNextWaveImmediately()
+			// Bug Fix: 如果是 Phase 1 或转场中，暂停波次计时系统
+			if isPhase1OrTransitioning {
+				waveTimingSystem.Pause()
+				log.Printf("[GameScene] Phase 1/转场中，暂停波次计时系统")
+			} else {
+				// Bug Fix: 存档恢复后，如果场上没有僵尸但还有波次未生成，立即触发下一波
+				// 问题：恢复时 WaveElapsedCs 被重置为 0，导致加速刷新条件无法满足
+				// 玩家需要等待完整的倒计时（最终波是55秒）才能触发下一波
+				// 解决：检查场上是否有僵尸，如果没有则立即触发下一波
+				zombiesOnField := s.gameState.TotalZombiesSpawned - s.gameState.ZombiesKilled
+				hasMoreWaves := saveData.CurrentWaveIndex < len(s.gameState.SpawnedWaves)
+				if zombiesOnField == 0 && hasMoreWaves {
+					log.Printf("[GameScene] Bug Fix: 场上无僵尸但还有波次未生成，立即触发下一波 (wave %d)",
+						saveData.CurrentWaveIndex+1)
+					waveTimingSystem.TriggerNextWaveImmediately()
+				}
 			}
 		}
 	}
@@ -1524,6 +1543,21 @@ func (s *GameScene) restoreLevelPhase(phaseData *game.LevelPhaseData) {
 	log.Printf("[GameScene] 关卡阶段已恢复: Phase=%d, State=%s, ConveyorVisible=%v, ShowRedLine=%v",
 		phaseComp.CurrentPhase, phaseComp.PhaseState,
 		phaseComp.ConveyorBeltVisible, phaseComp.ShowRedLine)
+
+	// Bug Fix: 如果恢复的是 Phase 1（铲子教学阶段）或正在转场中，
+	// 需要暂停波次计时系统，防止僵尸在 Dave 对话期间出现
+	// 波次计时系统在 restoreBattleState 中被恢复并取消暂停，这里需要根据阶段重新设置
+	if phaseComp.CurrentPhase < 2 || phaseComp.PhaseState == components.PhaseStateTransitioning {
+		if s.levelSystem != nil {
+			waveTimingSystem := s.levelSystem.GetWaveTimingSystem()
+			if waveTimingSystem != nil {
+				waveTimingSystem.Pause()
+				log.Printf("[GameScene] 恢复 Phase %d 状态，暂停波次计时系统（僵尸应在 Phase 2 才出现）",
+					phaseComp.CurrentPhase)
+			}
+		}
+		return
+	}
 
 	// Bug Fix: 如果恢复的是 Phase 2（保龄球阶段）且状态为 active，
 	// 需要激活相关系统（这些操作在正常转场完成时由回调执行）
