@@ -1306,6 +1306,26 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 	isReadySetPlantPlaying := s.readySetPlantSystem != nil && s.readySetPlantSystem.IsPlaying()
 	hideMenuButton := hideUI || isLawnmowerEntering || isReadySetPlantPlaying
 
+	// Level 1-5 特殊处理：菜单按钮在传送带滑入完成后才显示
+	// 不影响其他关卡的菜单显示逻辑
+	isShovelTutorialLevel := s.gameState.CurrentLevel != nil && len(s.gameState.CurrentLevel.PresetPlants) > 0
+	if isShovelTutorialLevel && !hideMenuButton {
+		// 检查传送带滑入是否完成
+		if s.levelPhaseSystem == nil || !s.levelPhaseSystem.IsConveyorBeltSlideComplete() {
+			hideMenuButton = true
+		}
+	}
+
+	// Story 19.x: 铲子槽的显示逻辑与菜单按钮分离
+	// 对于有预设植物的关卡（Level 1-5），铲子槽在 Phase 1 已经显示
+	// 传送带滑入后创建除草车时，铲子槽不应因除草车入场动画而消失
+	// 只有菜单按钮需要等待除草车入场完成
+	hideShovel := hideUI || isReadySetPlantPlaying
+	// 非铲子教学关卡的普通流程：铲子槽与菜单按钮同时显示
+	if !isShovelTutorialLevel {
+		hideShovel = hideMenuButton
+	}
+
 	// Layer 2: Draw UI base elements (seed bank, shovel, plant cards)
 	// 按照原版PVZ设计，UI元素在游戏世界实体下方渲染
 	if !hideUI {
@@ -1314,10 +1334,13 @@ func (s *GameScene) Draw(screen *ebiten.Image) {
 		// Story 19.5: 绘制传送带（在铲子和植物卡片之间）
 		s.drawConveyorBelt(screen)
 
-		// 使用 ECS 按钮系统渲染菜单按钮和铲子
-		// 菜单按钮和铲子需要等待所有开场动画完成后才显示（包括除草车入场和 ReadySetPlant）
-		if !hideMenuButton {
+		// 铲子槽：对于铲子教学关卡，在除草车入场期间保持显示
+		if !hideShovel {
 			s.drawShovel(screen)
+		}
+
+		// 菜单按钮：需要等待所有开场动画完成后才显示（包括除草车入场和 ReadySetPlant）
+		if !hideMenuButton {
 			if s.buttonRenderSystem != nil {
 				s.buttonRenderSystem.Draw(screen)
 			}

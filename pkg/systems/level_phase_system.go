@@ -368,6 +368,30 @@ func (s *LevelPhaseSystem) IsConveyorBeltVisible() bool {
 	return phaseComp.ConveyorBeltVisible
 }
 
+// IsConveyorBeltSlideComplete 检查传送带滑入动画是否完成
+// 传送带滑入完成的条件：
+// 1. 传送带可见
+// 2. 转场步骤已经超过 ConveyorSlide（即 >= ShowRedLine 或 TransitionStepNone 且 Phase == 2）
+func (s *LevelPhaseSystem) IsConveyorBeltSlideComplete() bool {
+	phaseComp, ok := ecs.GetComponent[*components.LevelPhaseComponent](s.entityManager, s.phaseEntity)
+	if !ok {
+		return false
+	}
+	// 传送带必须可见
+	if !phaseComp.ConveyorBeltVisible {
+		return false
+	}
+	// 转场步骤已经超过 ConveyorSlide（滑入动画结束后会变成 ShowRedLine）
+	// 或者转场已完成（TransitionStepNone 且处于 Phase 2）
+	if phaseComp.TransitionStep >= components.TransitionStepShowRedLine {
+		return true
+	}
+	if phaseComp.TransitionStep == components.TransitionStepNone && phaseComp.CurrentPhase >= 2 {
+		return true
+	}
+	return false
+}
+
 // ShouldShowRedLine 检查是否应该显示红线
 func (s *LevelPhaseSystem) ShouldShowRedLine() bool {
 	phaseComp, ok := ecs.GetComponent[*components.LevelPhaseComponent](s.entityManager, s.phaseEntity)
