@@ -793,10 +793,16 @@ func (s *GameScene) restoreBattleState() {
 				}
 
 				// 设置暂停状态
-				if saveData.WaveSystemState.IsPaused {
+				// Bug Fix: 对于 ControlledBy=timer 的标准关卡，不应该恢复暂停状态
+				// 因为存档保存时的暂停可能是游戏暂停菜单导致的临时状态
+				// 恢复后游戏不再处于暂停菜单状态，波次系统应该继续运行
+				// 只有 tutorial 和 phase 控制的波次系统才需要保持暂停状态
+				if saveData.WaveSystemState.IsPaused && saveData.WaveSystemState.ControlledBy != "timer" {
 					waveTimingSystem.Pause()
 					log.Printf("[GameScene] v6: 波次系统根据存档设置为暂停 (ControlledBy=%s)",
 						saveData.WaveSystemState.ControlledBy)
+				} else if saveData.WaveSystemState.IsPaused && saveData.WaveSystemState.ControlledBy == "timer" {
+					log.Printf("[GameScene] v6: 跳过波次系统暂停恢复（ControlledBy=timer，暂停可能是游戏菜单导致的临时状态）")
 				}
 			} else {
 				// v5 兼容：使用推断逻辑
