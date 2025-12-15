@@ -159,16 +159,15 @@ func (s *BehaviorSystem) handleWallnutBehavior(entityID ecs.EntityID, deltaTime 
 		// 只有在状态变差时才触发 WallnutEatLarge 粒子效果
 		if newDamageState > plantComp.WallnutDamageState {
 			// 状态变差，触发大碎屑粒子效果
-			// 粒子位置：使用坚果身体轨道位置获取顶部位置（碎屑从顶部掉落）
-			// 参考 zombie_death_handler.go 中头部掉落粒子效果的处理方式
+			// 粒子位置：使用坚果身体轨道的中心位置（碎屑从坚果身体中心掉落）
 			if plantPos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID); ok {
 				particleX, particleY := plantPos.X, plantPos.Y // 回退值
 				if s.reanimSystem != nil {
-					// 使用 AnchorTopLeft 获取坚果身体轨道的左上角位置（顶部）
+					// 使用 AnchorCenter 获取坚果身体轨道的中心位置
 					// 坚果身体图片在 anim_face 轨道上
-					if trackX, trackY, found := s.reanimSystem.GetTrackWorldPosition(entityID, "anim_face", systems.AnchorTopLeft); found {
+					if trackX, trackY, found := s.reanimSystem.GetTrackWorldPosition(entityID, "anim_face", systems.AnchorCenter); found {
 						particleX, particleY = trackX, trackY
-						log.Printf("[BehaviorSystem] 坚果墙 %d 身体轨道顶部位置: (%.1f, %.1f)", entityID, particleX, particleY)
+						log.Printf("[BehaviorSystem] 坚果墙 %d 身体轨道中心位置: (%.1f, %.1f)", entityID, particleX, particleY)
 					} else {
 						log.Printf("[BehaviorSystem] 警告：坚果墙 %d 无法获取身体轨道位置，使用回退值", entityID)
 					}
