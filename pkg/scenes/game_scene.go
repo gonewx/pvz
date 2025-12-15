@@ -659,7 +659,7 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	log.Printf("[GameScene] Initialized zombie groan system")
 
 	// Story 8.9: 初始化撑杆僵尸跳跃系统
-	scene.poleVaultSystem = systems.NewPoleVaultSystem(scene.entityManager)
+	scene.poleVaultSystem = systems.NewPoleVaultSystem(scene.entityManager, scene.gameState)
 	log.Printf("[GameScene] Initialized pole vault system")
 
 	// Story 8.9: 初始化减速效果系统

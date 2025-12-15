@@ -294,8 +294,8 @@ func (sm *SystemManager) createCoreSystems() {
 	sm.physicsSystem = systems.NewPhysicsSystem(em, rm)
 	log.Printf("[SystemManager] Created PhysicsSystem")
 
-	// 6. PoleVaultSystem (no dependencies)
-	sm.poleVaultSystem = systems.NewPoleVaultSystem(em)
+	// 6. PoleVaultSystem (requires GameState for sound effects)
+	sm.poleVaultSystem = systems.NewPoleVaultSystem(em, sm.deps.GameState)
 	log.Printf("[SystemManager] Created PoleVaultSystem")
 
 	// 7. SlowEffectSystem (no dependencies)

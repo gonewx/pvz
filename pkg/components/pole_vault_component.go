@@ -33,4 +33,8 @@ type PoleVaultComponent struct {
 	// 起跳阶段（0-0.5秒）和落地阶段（2.5秒后）可被子弹击中
 	// 腾空阶段（0.5-2.5秒）免疫子弹
 	JumpElapsedTime float64
+
+	// JumpSoundPlayed 跳跃音效是否已播放
+	// 用于确保音效只在起跳时播放一次
+	JumpSoundPlayed bool
 }

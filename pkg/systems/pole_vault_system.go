@@ -6,6 +6,7 @@ import (
 	"github.com/gonewx/pvz/pkg/components"
 	"github.com/gonewx/pvz/pkg/config"
 	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/game"
 	"github.com/gonewx/pvz/pkg/types"
 	"github.com/gonewx/pvz/pkg/utils"
 )
@@ -14,12 +15,14 @@ import (
 // Story 8.9: 处理撑杆僵尸的植物检测和跳跃逻辑
 type PoleVaultSystem struct {
 	entityManager *ecs.EntityManager
+	gameState     *game.GameState // 用于播放音效
 }
 
 // NewPoleVaultSystem 创建新的撑杆僵尸跳跃系统
-func NewPoleVaultSystem(em *ecs.EntityManager) *PoleVaultSystem {
+func NewPoleVaultSystem(em *ecs.EntityManager, gs *game.GameState) *PoleVaultSystem {
 	return &PoleVaultSystem{
 		entityManager: em,
+		gameState:     gs,
 	}
 }
 
@@ -127,7 +130,8 @@ func (s *PoleVaultSystem) startJump(zombieID ecs.EntityID, poleVault *components
 	// 设置跳跃状态
 	poleVault.IsJumping = true
 	poleVault.TargetPlantEntityID = uint64(plantID)
-	poleVault.JumpElapsedTime = 0 // 重置跳跃计时
+	poleVault.JumpElapsedTime = 0     // 重置跳跃计时
+	poleVault.JumpSoundPlayed = false // 重置音效播放标记
 
 	// 播放跳跃动画组合（使用 ComboName 以应用 loop: false 设置）
 	ecs.AddComponent(s.entityManager, zombieID, &components.AnimationCommandComponent{
@@ -143,6 +147,17 @@ func (s *PoleVaultSystem) startJump(zombieID ecs.EntityID, poleVault *components
 func (s *PoleVaultSystem) updateJumping(zombieID ecs.EntityID, poleVault *components.PoleVaultComponent, deltaTime float64) {
 	// 更新跳跃已过时间
 	poleVault.JumpElapsedTime += deltaTime
+
+	// 在起跳时刻播放音效（约 1.0 秒，僵尸身体真正离地腾空的时刻）
+	if !poleVault.JumpSoundPlayed && poleVault.JumpElapsedTime >= 1.0 {
+		if s.gameState != nil {
+			if audioManager := s.gameState.GetAudioManager(); audioManager != nil {
+				audioManager.PlaySound("SOUND_POLEVAULT")
+				log.Printf("[PoleVaultSystem] 撑杆僵尸 %d 播放跳跃音效 (起跳时刻)", zombieID)
+			}
+		}
+		poleVault.JumpSoundPlayed = true
+	}
 
 	// 获取 Reanim 组件，检测动画是否播放完成
 	reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, zombieID)
