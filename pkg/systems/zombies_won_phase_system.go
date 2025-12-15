@@ -27,8 +27,8 @@ const (
 
 	// Phase 2: 第1个目标位置偏移量（房门口，相对于 config.GameOverDoorMaskX/Y）
 	// 实际目标位置 = GameOverDoorMaskX + OffsetX, GameOverDoorMaskY + OffsetY
-	Phase2ZombieTarget1OffsetX = 50.0  // 让僵尸站在门口偏右
-	Phase2ZombieTarget1OffsetY = 150.0 // 门口 Y 位置（手工调整）
+	Phase2ZombieTarget1OffsetX = 100.0 // 让僵尸站在门口偏右
+	Phase2ZombieTarget1OffsetY = 200.0 // 门口 Y 位置（手工调整）
 
 	// Phase 2: 第2个目标位置 X 偏移量（即将进入房子，相对于第1个目标位置的 X）
 	// 僵尸到达第1个目标后继续向左走，到达此位置时触发 Phase 3
