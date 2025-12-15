@@ -127,28 +127,18 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 			MaxHealth:     config.PeashooterDefaultHealth,
 		})
 
-		// Story 10.3: 添加植物组件（用于攻击动画状态管理）
+		// 添加植物组件（用于攻击动画状态管理）
 		em.AddComponent(entityID, &components.PlantComponent{
-			PlantType:         components.PlantPeashooter,
-			GridRow:           row, // ✅ 添加缺失的 GridRow
-			GridCol:           col, // ✅ 添加缺失的 GridCol
-			AttackAnimState:   components.AttackAnimIdle,
-			PendingProjectile: false,
-			LastFiredFrame:    -1, // 初始化为 -1，表示还未发射过
-			LastMouthX:        0,
+			PlantType:       components.PlantPeashooter,
+			GridRow:         row,
+			GridCol:         col,
+			AttackAnimState: components.AttackAnimIdle,
+			LastFiredFrame:  -1, // 初始化为 -1，表示还未发射过
 		})
 
 		// 添加行为组件
 		em.AddComponent(entityID, &components.BehaviorComponent{
 			Type: components.BehaviorPeashooter,
-		})
-
-		// 添加攻击冷却计时器
-		em.AddComponent(entityID, &components.TimerComponent{
-			Name:        "attack_cooldown",
-			TargetTime:  1.5, // 攻击间隔 1.5 秒（匹配原版）
-			CurrentTime: 0,
-			IsReady:     false,
 		})
 
 		// Story 13.6: 使用集中配置文件创建豌豆射手动画
@@ -528,27 +518,17 @@ func NewSnowPeaEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameSta
 
 	// 添加植物组件（用于攻击动画状态管理）
 	em.AddComponent(entityID, &components.PlantComponent{
-		PlantType:         components.PlantSnowPea,
-		GridRow:           row,
-		GridCol:           col,
-		AttackAnimState:   components.AttackAnimIdle,
-		PendingProjectile: false,
-		LastFiredFrame:    -1, // 初始化为 -1，表示还未发射过
-		LastMouthX:        0,
-		BlinkTimer:        3.0, // 初始化眨眼计时器
+		PlantType:       components.PlantSnowPea,
+		GridRow:         row,
+		GridCol:         col,
+		AttackAnimState: components.AttackAnimIdle,
+		LastFiredFrame:  -1, // 初始化为 -1，表示还未发射过
+		BlinkTimer:      3.0, // 初始化眨眼计时器
 	})
 
 	// 添加行为组件（寒冰射手行为）
 	em.AddComponent(entityID, &components.BehaviorComponent{
 		Type: components.BehaviorSnowPea,
-	})
-
-	// 添加攻击冷却计时器（与豌豆射手相同）
-	em.AddComponent(entityID, &components.TimerComponent{
-		Name:        "attack_cooldown",
-		TargetTime:  1.5, // 攻击间隔 1.5 秒（匹配原版）
-		CurrentTime: 0,
-		IsReady:     false,
 	})
 
 	// 从 ResourceManager 获取寒冰射手的 Reanim 数据和部件图片

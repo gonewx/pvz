@@ -13,37 +13,26 @@ import (
 )
 
 // ============================================================================
-// Story 10.3: Plant Attack Animation System Tests
+// Plant Attack Animation System Tests (Simplified)
 // ============================================================================
 //
-// This file contains comprehensive tests for the plant attack animation system,
-// covering all acceptance criteria (AC 1-8) from Story 10.3.
-//
-// Test Coverage:
-// - AC 1: Peashooter switches to attack animation on shoot
-// - AC 2: Attack animation auto-returns to idle
-// - AC 3: No re-trigger during attack animation
-// - AC 4: All shooter plants support attack animation
-// - AC 7: Doesn't affect bullet firing logic
-// - AC 8: Non-shooter plants unaffected
-//
-// Note: AC 5 (resource verification) is covered by resource loading tests
-//       AC 6 (animation smoothness) requires manual gameplay testing
+// 重构后的攻击系统测试
+// - 攻击动画完全控制攻击节奏，不需要冷却计时器
+// - 有僵尸时播放攻击动画（循环）
+// - 动画到达关键帧时发射子弹
+// - 没有僵尸时切回 idle
 
 // ============================================================================
 // Unit Tests
 // ============================================================================
 
-// TestTriggerPlantAttackAnimation tests the triggerPlantAttackAnimation method
-// AC 1: Verifies peashooter switches to attack animation when shooting
-// Note: Attack animation is now looping (IsLooping=true) until no zombies are present
+// TestTriggerPlantAttackAnimation tests that peashooter switches to attack animation when zombie is detected
 func TestTriggerPlantAttackAnimation(t *testing.T) {
 	// Given: A peashooter plant entity with idle animation state
 	em := ecs.NewEntityManager()
 	rm := game.NewResourceManager(getTestAudioContext())
 	rs := systems.NewReanimSystem(em)
 
-	// Story 13.6: 设置配置管理器以支持配置驱动的动画播放
 	configManager, err := config.NewReanimConfigManager("data/reanim_config.yaml")
 	if err != nil {
 		t.Skipf("跳过测试：无法加载配置文件: %v", err)
@@ -65,21 +54,10 @@ func TestTriggerPlantAttackAnimation(t *testing.T) {
 		t.Errorf("Initial state should be AttackAnimIdle, got %v", plant.AttackAnimState)
 	}
 
-	// When: triggerPlantAttackAnimation is called (simulating a shoot event)
-	// Note: We can't call the private method directly, but we can verify the
-	// state change happens through handlePeashooterBehavior by setting up
-	// the right conditions
-
 	// Create a zombie to trigger attack
 	zombieID := createTestZombie(em, 500.0, 300.0)
 
-	// Set timer to ready state
-	timer, ok := ecs.GetComponent[*components.TimerComponent](em, peashooterID)
-	if ok {
-		timer.CurrentTime = timer.TargetTime + 0.1 // Ready to shoot
-	}
-
-	// Call handlePeashooterBehavior which should trigger attack animation
+	// When: handlePeashooterBehavior is called with zombie in range
 	bs.handlePeashooterBehavior(peashooterID, 0.016, []ecs.EntityID{zombieID})
 
 	// Then: Plant state should change to Attacking
@@ -88,28 +66,23 @@ func TestTriggerPlantAttackAnimation(t *testing.T) {
 		t.Errorf("Expected AttackAnimState to be Attacking, got %v", plant.AttackAnimState)
 	}
 
-	// Then: Reanim component should be playing (attack animation is now looping)
+	// Then: Reanim component should be playing (attack animation is looping)
 	reanim, ok := ecs.GetComponent[*components.ReanimComponent](em, peashooterID)
 	if !ok {
 		t.Fatal("Failed to get ReanimComponent")
 	}
-	// Note: Attack animation is now looping until no zombies are detected
 	if !reanim.IsLooping {
-		t.Error("Attack animation should be looping (new behavior)")
+		t.Error("Attack animation should be looping")
 	}
 }
 
-// TestUpdatePlantAttackAnimation tests return to idle via handlePeashooterBehavior
-// AC 2: Verifies attack animation returns to idle when no zombies are present
-// Note: New behavior - attack animation is looping, and returns to idle via handlePeashooterBehavior
-// when no zombies are detected, not via updatePlantAttackAnimation
-func TestUpdatePlantAttackAnimation(t *testing.T) {
+// TestUpdatePlantAttackAnimation_ReturnToIdle tests that plant returns to idle when no zombies
+func TestUpdatePlantAttackAnimation_ReturnToIdle(t *testing.T) {
 	// Given: A peashooter in Attacking state
 	em := ecs.NewEntityManager()
 	rm := game.NewResourceManager(getTestAudioContext())
 	rs := systems.NewReanimSystem(em)
 
-	// Story 13.6: 设置配置管理器以支持配置驱动的动画播放
 	configManager, err := config.NewReanimConfigManager("data/reanim_config.yaml")
 	if err != nil {
 		t.Skipf("跳过测试：无法加载配置文件: %v", err)
@@ -121,82 +94,28 @@ func TestUpdatePlantAttackAnimation(t *testing.T) {
 
 	peashooterID := createTestPeashooter(em, rs)
 
-	// Set plant to Attacking state with looping animation (new behavior)
+	// Set plant to Attacking state
 	plant, _ := ecs.GetComponent[*components.PlantComponent](em, peashooterID)
 	plant.AttackAnimState = components.AttackAnimAttacking
 
-	// Attack animation is now looping
+	// Attack animation is looping
 	reanim, _ := ecs.GetComponent[*components.ReanimComponent](em, peashooterID)
 	reanim.IsLooping = true
 	reanim.IsFinished = false
 
 	// When: handlePeashooterBehavior is called with NO zombies
-	// This should trigger return to idle state
-	bs.handlePeashooterBehavior(peashooterID, 0.016, []ecs.EntityID{}) // Empty zombie list
+	bs.handlePeashooterBehavior(peashooterID, 0.016, []ecs.EntityID{})
 
-	// Then: Plant state should return to Idle (because no zombies)
+	// Then: Plant state should return to Idle
 	plant, _ = ecs.GetComponent[*components.PlantComponent](em, peashooterID)
 	if plant.AttackAnimState != components.AttackAnimIdle {
 		t.Errorf("Expected AttackAnimState to return to Idle when no zombies, got %v", plant.AttackAnimState)
 	}
 }
 
-// TestUpdatePlantAttackAnimation_OtherPlants tests idle state transition for non-peashooter plants
-// Note: This test verifies that non-shooter plants (like sunflower) don't have attack animation
-// states in the first place - they stay in Idle
-func TestUpdatePlantAttackAnimation_OtherPlants(t *testing.T) {
-	// Given: A sunflower plant (non-shooter)
-	em := ecs.NewEntityManager()
-	rm := game.NewResourceManager(getTestAudioContext())
-	rs := systems.NewReanimSystem(em)
-
-	// Story 13.6: 设置配置管理器以支持配置驱动的动画播放
-	configManager, err := config.NewReanimConfigManager("data/reanim_config.yaml")
-	if err != nil {
-		t.Skipf("跳过测试：无法加载配置文件: %v", err)
-	}
-	rs.SetConfigManager(configManager)
-
-	gs := game.GetGameState()
-	bs := createTestBehaviorSystem(em, rm, gs)
-
-	// Create a sunflower plant entity (non-shooter - should stay in Idle)
-	plantID := em.CreateEntity()
-	ecs.AddComponent(em, plantID, &components.PlantComponent{
-		PlantType:       components.PlantSunflower,
-		AttackAnimState: components.AttackAnimIdle, // Sunflower starts and stays in Idle
-	})
-	ecs.AddComponent(em, plantID, &components.PositionComponent{X: 300, Y: 300})
-
-	// Add mock ReanimComponent
-	reanimXML := createMockReanimData()
-	ecs.AddComponent(em, plantID, &components.ReanimComponent{
-		ReanimXML:  reanimXML,
-		PartImages: make(map[string]*ebiten.Image),
-		IsFinished: false,
-		IsLooping:  true,
-	})
-
-	// When: updatePlantAttackAnimation is called
-	bs.updatePlantAttackAnimation(plantID, 0.016)
-
-	// Then: Plant state should remain Idle (sunflower doesn't attack)
-	plant, _ := ecs.GetComponent[*components.PlantComponent](em, plantID)
-	if plant.AttackAnimState != components.AttackAnimIdle {
-		t.Errorf("Expected sunflower to stay in Idle, got %v", plant.AttackAnimState)
-	}
-}
-
-// ============================================================================
-// Boundary Tests
-// ============================================================================
-
-// TestAttackAnimationNoRetrigger tests that attack continues properly during animation
-// AC 3: Verifies attack continues with proper frame-based firing during animation
-// Note: New behavior - attack animation is looping, timer can trigger PendingProjectile
-// but bullets are only fired on specific keyframes
-func TestAttackAnimationNoRetrigger(t *testing.T) {
-	// Given: A peashooter in Attacking state with timer ready
+// TestUpdatePlantAttackAnimation_FireOnKeyframe tests that bullet fires on keyframe
+func TestUpdatePlantAttackAnimation_FireOnKeyframe(t *testing.T) {
+	// Given: A peashooter in Attacking state
 	em := ecs.NewEntityManager()
 	rm := game.NewResourceManager(getTestAudioContext())
 	rs := systems.NewReanimSystem(em)
@@ -205,99 +124,69 @@ func TestAttackAnimationNoRetrigger(t *testing.T) {
 
 	peashooterID := createTestPeashooter(em, rs)
 
-	// Set to Attacking state (simulating ongoing animation)
+	// Set plant to Attacking state
 	plant, _ := ecs.GetComponent[*components.PlantComponent](em, peashooterID)
 	plant.AttackAnimState = components.AttackAnimAttacking
+	plant.LastFiredFrame = -1 // Allow firing
 
-	// Create zombie in range
-	zombieID := createTestZombie(em, 500.0, 300.0)
-
-	// When: handlePeashooterBehavior is called during animation
-	bs.handlePeashooterBehavior(peashooterID, 0.016, []ecs.EntityID{zombieID})
-
-	// Then: Plant should still be in Attacking state (because zombies are present)
-	plant, _ = ecs.GetComponent[*components.PlantComponent](em, peashooterID)
-	if plant.AttackAnimState != components.AttackAnimAttacking {
-		t.Error("Plant should remain in Attacking state while zombies are present")
-	}
-}
-
-// ============================================================================
-// Integration Tests
-// ============================================================================
-
-// TestPeashooterAttackAnimationCycle tests the attack → bullet → return to idle cycle
-// Note: New behavior - attack animation is looping, bullets fire on keyframes,
-// and return to idle happens when no zombies are detected
-func TestPeashooterAttackAnimationCycle(t *testing.T) {
-	// Given: A fully configured peashooter and zombie in range
-	em := ecs.NewEntityManager()
-	rm := game.NewResourceManager(getTestAudioContext())
-	rs := systems.NewReanimSystem(em)
-	gs := game.GetGameState()
-	bs := createTestBehaviorSystem(em, rm, gs)
-
-	peashooterID := createTestPeashooter(em, rs)
-	zombieID := createTestZombie(em, 500.0, 300.0)
-
-	// Verify initial state
-	plant, _ := ecs.GetComponent[*components.PlantComponent](em, peashooterID)
-	if plant.AttackAnimState != components.AttackAnimIdle {
-		t.Fatalf("Initial state should be Idle, got %v", plant.AttackAnimState)
-	}
-
-	// Phase 1: Trigger attack (timer ready + zombie in range)
-	timer, _ := ecs.GetComponent[*components.TimerComponent](em, peashooterID)
-	timer.CurrentTime = timer.TargetTime + 0.1
+	// Set animation to keyframe
+	reanim, _ := ecs.GetComponent[*components.ReanimComponent](em, peashooterID)
+	reanim.CurrentFrame = config.PeashooterShootingFireFrame
 
 	initialBulletCount := countBullets(em)
-	bs.handlePeashooterBehavior(peashooterID, 0.016, []ecs.EntityID{zombieID})
 
-	// Verify: Plant state should change to Attacking
-	plant, _ = ecs.GetComponent[*components.PlantComponent](em, peashooterID)
-	if plant.AttackAnimState != components.AttackAnimAttacking {
-		t.Errorf("Phase 1: Expected state Attacking, got %v", plant.AttackAnimState)
-	}
+	// When: updatePlantAttackAnimation is called
+	bs.updatePlantAttackAnimation(peashooterID, 0.016)
 
-	// Phase 2: Simulate animation advancing to keyframe 10 to trigger bullet creation
-	reanim, _ := ecs.GetComponent[*components.ReanimComponent](em, peashooterID)
-	for i := 0; i <= 10; i++ {
-		reanim.CurrentFrame = i
-		// Reset LastFiredFrame to allow firing (simulating animation loop)
-		if i == 0 {
-			plant.LastFiredFrame = -1
-		}
-		bs.updatePlantAttackAnimation(peashooterID, 0.016)
-	}
-
-	// Verify: Bullet should be created at keyframe 10
+	// Then: Bullet should be created
 	currentBulletCount := countBullets(em)
 	if currentBulletCount != initialBulletCount+1 {
-		t.Errorf("Phase 2: Expected 1 bullet created at keyframe 10. Before: %d, After: %d",
+		t.Errorf("Expected 1 bullet created at keyframe. Before: %d, After: %d",
 			initialBulletCount, currentBulletCount)
 	}
 
-	// Phase 3: Return to idle when zombies are removed
-	// Remove the zombie by destroying it
-	em.DestroyEntity(zombieID)
-	em.RemoveMarkedEntities()
-
-	// Call handlePeashooterBehavior with empty zombie list
-	bs.handlePeashooterBehavior(peashooterID, 0.016, []ecs.EntityID{})
-
-	// Verify: Plant should return to Idle when no zombies
+	// And: LastFiredFrame should be updated to prevent re-fire
 	plant, _ = ecs.GetComponent[*components.PlantComponent](em, peashooterID)
-	if plant.AttackAnimState != components.AttackAnimIdle {
-		t.Errorf("Phase 3: Expected state to return to Idle when no zombies, got %v", plant.AttackAnimState)
+	if plant.LastFiredFrame != config.PeashooterShootingFireFrame {
+		t.Errorf("LastFiredFrame should be %d, got %d",
+			config.PeashooterShootingFireFrame, plant.LastFiredFrame)
 	}
 }
 
-// ============================================================================
-// Regression Tests
-// ============================================================================
+// TestUpdatePlantAttackAnimation_NoDoubleFireOnSameFrame tests no double fire on same frame
+func TestUpdatePlantAttackAnimation_NoDoubleFireOnSameFrame(t *testing.T) {
+	// Given: A peashooter that just fired
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(getTestAudioContext())
+	rs := systems.NewReanimSystem(em)
+	gs := game.GetGameState()
+	bs := createTestBehaviorSystem(em, rm, gs)
+
+	peashooterID := createTestPeashooter(em, rs)
+
+	// Set plant to Attacking state with LastFiredFrame set to keyframe
+	plant, _ := ecs.GetComponent[*components.PlantComponent](em, peashooterID)
+	plant.AttackAnimState = components.AttackAnimAttacking
+	plant.LastFiredFrame = config.PeashooterShootingFireFrame // Already fired on this frame
+
+	// Set animation to same keyframe
+	reanim, _ := ecs.GetComponent[*components.ReanimComponent](em, peashooterID)
+	reanim.CurrentFrame = config.PeashooterShootingFireFrame
+
+	initialBulletCount := countBullets(em)
+
+	// When: updatePlantAttackAnimation is called again
+	bs.updatePlantAttackAnimation(peashooterID, 0.016)
+
+	// Then: No additional bullet should be created
+	currentBulletCount := countBullets(em)
+	if currentBulletCount != initialBulletCount {
+		t.Errorf("Should not fire again on same frame. Before: %d, After: %d",
+			initialBulletCount, currentBulletCount)
+	}
+}
 
 // TestNonShooterPlantsUnaffected tests that non-shooter plants are not affected
-// AC 8: Verifies sunflower and other non-shooter plants behave normally
 func TestNonShooterPlantsUnaffected(t *testing.T) {
 	// Given: Various plant types
 	testCases := []struct {
@@ -306,6 +195,7 @@ func TestNonShooterPlantsUnaffected(t *testing.T) {
 		expectShooter bool
 	}{
 		{components.PlantPeashooter, "Peashooter", true},
+		{components.PlantSnowPea, "SnowPea", true},
 		{components.PlantSunflower, "Sunflower", false},
 		{components.PlantWallnut, "Wallnut", false},
 		{components.PlantCherryBomb, "CherryBomb", false},
@@ -352,18 +242,16 @@ func TestNonShooterPlantsUnaffected(t *testing.T) {
 	})
 
 	// When: sunflower behavior is updated
-	initialState := components.AttackAnimIdle
 	bs.handleSunflowerBehavior(sunflowerID, 0.016)
 
 	// Then: AttackAnimState should remain unchanged (sunflower doesn't attack)
 	plant, _ := ecs.GetComponent[*components.PlantComponent](em, sunflowerID)
-	if plant.AttackAnimState != initialState {
-		t.Errorf("Sunflower AttackAnimState should not change. Expected %v, got %v",
-			initialState, plant.AttackAnimState)
+	if plant.AttackAnimState != components.AttackAnimIdle {
+		t.Errorf("Sunflower AttackAnimState should not change. Expected Idle, got %v",
+			plant.AttackAnimState)
 	}
 
 	// Verify: updatePlantAttackAnimation is safe to call on non-shooters
-	// Note: For non-shooters, it simply returns early since AttackAnimState is Idle
 	bs.updatePlantAttackAnimation(sunflowerID, 0.016)
 
 	// Then: State should still be Idle
@@ -373,29 +261,61 @@ func TestNonShooterPlantsUnaffected(t *testing.T) {
 	}
 }
 
-// TestIsShooterPlant_FuturePlants tests extensibility for future plant types
-// AC 4: Verifies the IsShooterPlant mechanism supports future additions
-func TestIsShooterPlant_FuturePlants(t *testing.T) {
-	// This test documents the expected behavior for future plant types
-	// When new shooter plants are added (snowpea, repeater, etc.),
-	// they should be added to the shooterPlants map in plant.go
+// TestPeashooterAttackAnimationCycle tests the complete attack cycle
+func TestPeashooterAttackAnimationCycle(t *testing.T) {
+	// Given: A fully configured peashooter and zombie in range
+	em := ecs.NewEntityManager()
+	rm := game.NewResourceManager(getTestAudioContext())
+	rs := systems.NewReanimSystem(em)
+	gs := game.GetGameState()
+	bs := createTestBehaviorSystem(em, rm, gs)
 
-	// Current implementation check
-	if !components.IsShooterPlant(components.PlantPeashooter) {
-		t.Error("Peashooter should be identified as shooter plant")
+	peashooterID := createTestPeashooter(em, rs)
+	zombieID := createTestZombie(em, 500.0, 300.0)
+
+	// Verify initial state
+	plant, _ := ecs.GetComponent[*components.PlantComponent](em, peashooterID)
+	if plant.AttackAnimState != components.AttackAnimIdle {
+		t.Fatalf("Initial state should be Idle, got %v", plant.AttackAnimState)
 	}
 
-	// Future plants (commented out until implemented):
-	// - PlantSnowPea: true
-	// - PlantRepeater: true
-	// - PlantThreepeater: true
-	// - PlantCabbagePult: true
-	// - PlantKernelPult: true
+	// Phase 1: Trigger attack (zombie in range)
+	bs.handlePeashooterBehavior(peashooterID, 0.016, []ecs.EntityID{zombieID})
 
-	// When adding new shooter plants:
-	// 1. Add to shooterPlants map in pkg/components/plant.go
-	// 2. Ensure attack animation logic works (no code changes needed in behavior_system.go)
-	// 3. Add specific animation name if different from "anim_shooting"
+	// Verify: Plant state should change to Attacking
+	plant, _ = ecs.GetComponent[*components.PlantComponent](em, peashooterID)
+	if plant.AttackAnimState != components.AttackAnimAttacking {
+		t.Errorf("Phase 1: Expected state Attacking, got %v", plant.AttackAnimState)
+	}
+
+	// Phase 2: Simulate animation advancing to keyframe to trigger bullet
+	reanim, _ := ecs.GetComponent[*components.ReanimComponent](em, peashooterID)
+	initialBulletCount := countBullets(em)
+
+	// Advance to keyframe
+	reanim.CurrentFrame = config.PeashooterShootingFireFrame
+	plant.LastFiredFrame = -1 // Reset to allow firing
+	bs.updatePlantAttackAnimation(peashooterID, 0.016)
+
+	// Verify: Bullet should be created at keyframe
+	currentBulletCount := countBullets(em)
+	if currentBulletCount != initialBulletCount+1 {
+		t.Errorf("Phase 2: Expected 1 bullet created at keyframe. Before: %d, After: %d",
+			initialBulletCount, currentBulletCount)
+	}
+
+	// Phase 3: Return to idle when zombies are removed
+	em.DestroyEntity(zombieID)
+	em.RemoveMarkedEntities()
+
+	// Call handlePeashooterBehavior with empty zombie list
+	bs.handlePeashooterBehavior(peashooterID, 0.016, []ecs.EntityID{})
+
+	// Verify: Plant should return to Idle when no zombies
+	plant, _ = ecs.GetComponent[*components.PlantComponent](em, peashooterID)
+	if plant.AttackAnimState != components.AttackAnimIdle {
+		t.Errorf("Phase 3: Expected state to return to Idle when no zombies, got %v", plant.AttackAnimState)
+	}
 }
 
 // ============================================================================
@@ -403,6 +323,7 @@ func TestIsShooterPlant_FuturePlants(t *testing.T) {
 // ============================================================================
 
 // createTestPeashooter creates a test peashooter entity with all required components
+// Note: No TimerComponent needed for attack (animation controls attack rhythm)
 func createTestPeashooter(em *ecs.EntityManager, rs *systems.ReanimSystem) ecs.EntityID {
 	entityID := em.CreateEntity()
 
@@ -412,6 +333,7 @@ func createTestPeashooter(em *ecs.EntityManager, rs *systems.ReanimSystem) ecs.E
 		GridRow:         2,
 		GridCol:         3,
 		AttackAnimState: components.AttackAnimIdle,
+		LastFiredFrame:  -1,
 	})
 
 	// Add BehaviorComponent
@@ -423,13 +345,6 @@ func createTestPeashooter(em *ecs.EntityManager, rs *systems.ReanimSystem) ecs.E
 	ecs.AddComponent(em, entityID, &components.PositionComponent{
 		X: 400.0,
 		Y: 300.0,
-	})
-
-	// Add TimerComponent
-	ecs.AddComponent(em, entityID, &components.TimerComponent{
-		Name:        "attack_cooldown",
-		TargetTime:  1.4,
-		CurrentTime: 0,
 	})
 
 	// Add mock ReanimComponent
@@ -508,7 +423,6 @@ func createMockReanimData() *reanim.ReanimXML {
 					{FrameNum: intPtr(-1)},
 				},
 			},
-			// Story 6.9: Add anim_head_idle for multi-animation overlay support
 			{
 				Name: "anim_head_idle",
 				Frames: []reanim.Frame{
