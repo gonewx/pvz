@@ -98,9 +98,9 @@ func TestNewBowlingNutEntity_Normal(t *testing.T) {
 		t.Fatal("PositionComponent not found")
 	}
 
-	// 验证位置计算
+	// 验证位置计算（需要包含 PlantOffsetY 偏移）
 	expectedX := config.GridWorldStartX + float64(1)*config.CellWidth + config.CellWidth/2
-	expectedY := config.GridWorldStartY + float64(2)*config.CellHeight + config.CellHeight/2
+	expectedY := config.GridWorldStartY + float64(2)*config.CellHeight + config.CellHeight/2 + config.PlantOffsetY
 	if posComp.X < expectedX-0.1 || posComp.X > expectedX+0.1 {
 		t.Errorf("Position X = %f, want %f", posComp.X, expectedX)
 	}
@@ -198,9 +198,9 @@ func TestNewBowlingNutEntity_PositionCalculation(t *testing.T) {
 		expectedX float64
 		expectedY float64
 	}{
-		{0, 0, config.GridWorldStartX + config.CellWidth/2, config.GridWorldStartY + config.CellHeight/2},
-		{1, 1, config.GridWorldStartX + config.CellWidth + config.CellWidth/2, config.GridWorldStartY + config.CellHeight + config.CellHeight/2},
-		{4, 8, config.GridWorldStartX + 8*config.CellWidth + config.CellWidth/2, config.GridWorldStartY + 4*config.CellHeight + config.CellHeight/2},
+		{0, 0, config.GridWorldStartX + config.CellWidth/2, config.GridWorldStartY + config.CellHeight/2 + config.PlantOffsetY},
+		{1, 1, config.GridWorldStartX + config.CellWidth + config.CellWidth/2, config.GridWorldStartY + config.CellHeight + config.CellHeight/2 + config.PlantOffsetY},
+		{4, 8, config.GridWorldStartX + 8*config.CellWidth + config.CellWidth/2, config.GridWorldStartY + 4*config.CellHeight + config.CellHeight/2 + config.PlantOffsetY},
 	}
 
 	for _, tc := range testCases {
