@@ -363,8 +363,8 @@ const (
 	CherryBombSunCost = 150
 
 	// CherryBombFuseTime 樱桃炸弹引信时间（秒）
-	// 种植后到爆炸的延迟时间
-	CherryBombFuseTime = 1.5
+	// 种植后到爆炸的延迟时间（匹配原版：1秒后爆炸）
+	CherryBombFuseTime = 1.0
 
 	// CherryBombDamage 樱桃炸弹爆炸伤害
 	// 1800点伤害足以秒杀所有僵尸（包括铁桶僵尸1370总生命值）

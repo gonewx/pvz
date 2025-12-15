@@ -52,8 +52,9 @@ func TestVerifyGameplayOptions(t *testing.T) {
 	if opts.EnableZombieGroan {
 		t.Error("EnableZombieGroan should be false for verify_gameplay")
 	}
-	if opts.EnableInput {
-		t.Error("EnableInput should be false for verify_gameplay")
+	// EnableInput is true for verify_gameplay to support planting logic
+	if !opts.EnableInput {
+		t.Error("EnableInput should be true for verify_gameplay (needed for planting logic)")
 	}
 	if opts.EnableButton {
 		t.Error("EnableButton should be false for verify_gameplay")

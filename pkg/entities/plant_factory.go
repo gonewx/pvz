@@ -146,7 +146,7 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 		// 添加攻击冷却计时器
 		em.AddComponent(entityID, &components.TimerComponent{
 			Name:        "attack_cooldown",
-			TargetTime:  1.4, // 攻击间隔 1.4 秒
+			TargetTime:  1.5, // 攻击间隔 1.5 秒（匹配原版）
 			CurrentTime: 0,
 			IsReady:     false,
 		})
@@ -546,7 +546,7 @@ func NewSnowPeaEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameSta
 	// 添加攻击冷却计时器（与豌豆射手相同）
 	em.AddComponent(entityID, &components.TimerComponent{
 		Name:        "attack_cooldown",
-		TargetTime:  1.4, // 攻击间隔 1.4 秒
+		TargetTime:  1.5, // 攻击间隔 1.5 秒（匹配原版）
 		CurrentTime: 0,
 		IsReady:     false,
 	})

@@ -595,9 +595,9 @@ func TestCherryBombConfiguration(t *testing.T) {
 			expected: 150,
 		},
 		{
-			name:     "引信时间应为1.5秒",
+			name:     "引信时间应为1秒",
 			constant: config.CherryBombFuseTime,
-			expected: 1.5,
+			expected: 1.0,
 		},
 		{
 			name:     "爆炸伤害应为1800",
@@ -683,7 +683,8 @@ func TestGetPlantFactory_UnknownType(t *testing.T) {
 		"chomper",
 		"repeater",
 		"",
-		"SUNFLOWER", // 区分大小写
+		// 注意：大写的 "SUNFLOWER" 现在可以匹配，因为 GetPlantFactory 使用 strings.ToLower
+		// 这是为了兼容存档中可能保存的不同大小写的类型名称
 	}
 
 	for _, plantType := range unknownTypes {
