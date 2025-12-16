@@ -69,7 +69,6 @@ shared:
         - Zombie_outerarm_screendoor      # 铁门僵尸的外臂
         - Zombie_duckytube  # 游泳圈僵尸的道具
         - Zombie_mustache   # 胡子装饰
-        - Zombie_tie        # 领带装饰
 
 animation_combos:
     - name: idle
