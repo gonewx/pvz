@@ -187,6 +187,9 @@ func (s *BehaviorSystem) handleZombieDyingBehavior(entityID ecs.EntityID) {
 // 当僵尸被爆炸类攻击（樱桃炸弹、土豆雷、辣椒等）杀死时调用此方法
 // 切换为烧焦死亡行为，播放 Zombie_charred.reanim 动画
 //
+// 特殊处理：
+//   - 撑杆僵尸在跳跃中被炸死时直接消失，不显示烧焦效果
+//
 // 参数:
 //   - entityID: 僵尸实体ID
 //
@@ -201,6 +204,20 @@ func (s *BehaviorSystem) handleZombieDyingBehavior(entityID ecs.EntityID) {
 //   - 不触发粒子效果（爆炸效果已在爆炸时播放）
 //   - 参考实现: triggerZombieDeath() (普通死亡)
 func (s *BehaviorSystem) triggerZombieExplosionDeath(entityID ecs.EntityID) {
+	// 撑杆僵尸在跳跃中被炸死时直接消失，不显示烧焦效果
+	if poleVault, ok := ecs.GetComponent[*components.PoleVaultComponent](s.entityManager, entityID); ok {
+		if poleVault.IsJumping {
+			log.Printf("[BehaviorSystem] 撑杆僵尸 %d 跳跃中被炸死，直接消失", entityID)
+			position, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
+			posX, posY := 0.0, 0.0
+			if position != nil {
+				posX, posY = position.X, position.Y
+			}
+			s.triggerZombieInstantDeath(entityID, posX, posY)
+			return
+		}
+	}
+
 	// 1. 切换行为类型为 BehaviorZombieDyingExplosion
 	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
 	if !ok {

@@ -427,6 +427,7 @@ func (sm *SystemManager) createUISystems() {
 	// Plant preview systems
 	if sm.opts.EnablePlantPreview {
 		sm.plantPreviewSystem = systems.NewPlantPreviewSystem(em, gs, sm.lawnGridSystem)
+		sm.plantPreviewSystem.SetLawnGridEntityID(sm.deps.LawnGridEntityID)
 		sm.plantPreviewRenderSystem = systems.NewPlantPreviewRenderSystem(em, sm.plantPreviewSystem)
 		log.Printf("[SystemManager] Created PlantPreview systems")
 	}

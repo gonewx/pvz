@@ -15,9 +15,10 @@ import (
 //
 // 注意：所有位置都使用世界坐标系统
 type PlantPreviewSystem struct {
-	entityManager  *ecs.EntityManager
-	gameState      *game.GameState
-	lawnGridSystem *LawnGridSystem // Story 8.1: 用于检查行是否启用
+	entityManager    *ecs.EntityManager
+	gameState        *game.GameState
+	lawnGridSystem   *LawnGridSystem // Story 8.1: 用于检查行是否启用
+	lawnGridEntityID ecs.EntityID    // 用于检查格子占用状态
 
 	// 鼠标光标位置（世界坐标）- 用于渲染不透明光标图像
 	mouseWorldX float64
@@ -121,6 +122,13 @@ func (s *PlantPreviewSystem) Update(deltaTime float64) {
 		}
 	}
 
+	// 检查格子是否已被植物占用，如果已占用则不显示网格预览
+	if s.isInGrid && s.lawnGridSystem != nil && s.lawnGridEntityID != 0 {
+		if s.lawnGridSystem.IsOccupied(s.lawnGridEntityID, col, row) {
+			s.isInGrid = false
+		}
+	}
+
 	if s.isInGrid {
 		// 在网格内，计算格子中心的屏幕坐标
 		gridScreenX, gridScreenY := utils.GridToScreenCoords(
@@ -146,4 +154,9 @@ func (s *PlantPreviewSystem) Update(deltaTime float64) {
 //   - isInGrid: 鼠标是否在网格内（决定是否渲染半透明预览）
 func (s *PlantPreviewSystem) GetPreviewPositions() (mouseX, mouseY, gridX, gridY float64, isInGrid bool) {
 	return s.mouseWorldX, s.mouseWorldY, s.gridAlignedWorldX, s.gridAlignedWorldY, s.isInGrid
+}
+
+// SetLawnGridEntityID 设置草坪网格实体ID，用于检查格子占用状态
+func (s *PlantPreviewSystem) SetLawnGridEntityID(entityID ecs.EntityID) {
+	s.lawnGridEntityID = entityID
 }
