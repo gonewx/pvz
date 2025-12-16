@@ -10,6 +10,7 @@ import (
 	"github.com/gonewx/pvz/pkg/config"
 	"github.com/gonewx/pvz/pkg/ecs"
 	"github.com/gonewx/pvz/pkg/entities"
+	"github.com/gonewx/pvz/pkg/game"
 	"github.com/gonewx/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -655,6 +656,11 @@ func (s *GameScene) handleConveyorBeltClick(mouseX, mouseY int) bool {
 	if cardIndex >= 0 {
 		// 选中卡片
 		s.conveyorBeltSystem.SelectCard(cardIndex)
+
+		// 播放选中植物卡片音效 (seedlift.ogg)
+		if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+			audioManager.PlaySound("SOUND_SEEDLIFT")
+		}
 		return true
 	}
 
@@ -1044,6 +1050,11 @@ func (s *GameScene) handleConveyorDragStart(dragInfo utils.DragInfo) bool {
 
 	// 选中卡片
 	s.conveyorBeltSystem.SelectCard(cardIndex)
+
+	// 播放选中植物卡片音效 (seedlift.ogg)
+	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+		audioManager.PlaySound("SOUND_SEEDLIFT")
+	}
 
 	// 创建植物预览实体
 	s.createConveyorCardPreview()
