@@ -303,6 +303,6 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 func (s *BehaviorSystem) playEatingSound() {
 	// 使用 AudioManager 统一管理音效（Story 10.9）
 	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
-		audioManager.PlaySound("SOUND_CHOMP")
+		audioManager.PlaySound("SOUND_CHOMPSOFT")
 	}
 }
