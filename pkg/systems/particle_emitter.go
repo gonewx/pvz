@@ -912,6 +912,9 @@ func (ps *ParticleSystem) spawnParticle(emitterID ecs.EntityID, emitter *compone
 		PositionFieldXInterp:    positionFieldXInterp,
 		PositionFieldYInterp:    positionFieldYInterp,
 		HasPositionField:        hasPositionField,
+
+		// DontFollow: 继承发射器的 ParticlesDontFollow 设置
+		DontFollow: emitter.ParticlesDontFollow,
 	}
 
 	// Create PositionComponent

@@ -195,7 +195,8 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 
 		// 根据行为类型分发
 		switch behaviorComp.Type {
-		case components.BehaviorPeaProjectile:
+		case components.BehaviorPeaProjectile, components.BehaviorSnowPeaProjectile:
+			// 普通豌豆和冰豌豆使用相同的移动逻辑
 			s.handlePeaProjectileBehavior(entityID, deltaTime)
 		default:
 			// 忽略非子弹类型（如僵尸）
@@ -365,7 +366,7 @@ func (s *BehaviorSystem) queryExplosionDyingZombies() []ecs.EntityID {
 
 // queryProjectiles 查询所有豌豆子弹实体
 //
-// 返回所有 BehaviorType 为 BehaviorPeaProjectile 的实体
+// 返回所有 BehaviorType 为 BehaviorPeaProjectile 或 BehaviorSnowPeaProjectile 的实体
 func (s *BehaviorSystem) queryProjectiles() []ecs.EntityID {
 	// 查询所有拥有 BehaviorComponent, PositionComponent, VelocityComponent 的实体
 	// 注意：子弹和移动中的僵尸组件组合相同，需要通过 BehaviorType 区分
@@ -380,7 +381,7 @@ func (s *BehaviorSystem) queryProjectiles() []ecs.EntityID {
 		log.Printf("[BehaviorSystem] queryProjectiles: 找到 %d 个候选实体（有 Behavior+Position+Velocity）", len(candidates))
 	}
 
-	// 过滤出子弹
+	// 过滤出子弹（包括普通豌豆和冰豌豆）
 	var projectiles []ecs.EntityID
 	for _, entityID := range candidates {
 		behaviorComp, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entityID)
@@ -390,10 +391,12 @@ func (s *BehaviorSystem) queryProjectiles() []ecs.EntityID {
 		}
 
 		// DEBUG: 记录每个候选实体的行为类型
+		isProjectile := behaviorComp.Type == components.BehaviorPeaProjectile ||
+			behaviorComp.Type == components.BehaviorSnowPeaProjectile
 		log.Printf("[BehaviorSystem] queryProjectiles: 实体 %d 的行为类型 = %v（是子弹: %v）",
-			entityID, behaviorComp.Type, behaviorComp.Type == components.BehaviorPeaProjectile)
+			entityID, behaviorComp.Type, isProjectile)
 
-		if behaviorComp.Type == components.BehaviorPeaProjectile {
+		if isProjectile {
 			projectiles = append(projectiles, entityID)
 		}
 	}
