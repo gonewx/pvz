@@ -180,6 +180,8 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 		shadowEntityType = "cherrybomb"
 	case components.PlantSnowPea:
 		shadowEntityType = "snowpea"
+	case components.PlantChomper:
+		shadowEntityType = "chomper"
 	default:
 		shadowEntityType = "" // 使用默认尺寸
 	}
@@ -461,6 +463,12 @@ func NewPotatoMineEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.Game
 		Type: components.BehaviorPotatoMine,
 	})
 
+	// 添加生命值组件（用于被僵尸啃食时造成伤害）
+	em.AddComponent(entityID, &components.HealthComponent{
+		CurrentHealth: config.PotatoMineDefaultHealth,
+		MaxHealth:     config.PotatoMineDefaultHealth,
+	})
+
 	// 添加碰撞组件（用于后续爆炸范围检测）
 	em.AddComponent(entityID, &components.CollisionComponent{
 		Width:  config.CellWidth,
@@ -572,6 +580,105 @@ func NewSnowPeaEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameSta
 	return entityID, nil
 }
 
+// NewChomperEntity 创建大嘴花实体
+// Story 8.11: 大嘴花是一种秒杀类植物，吞噬后需要消化时间
+//
+// 参数:
+//   - em: 实体管理器
+//   - rm: 资源管理器（用于加载大嘴花图像和 Reanim 资源）
+//   - gs: 游戏状态
+//   - col: 网格列索引 (0-8)
+//   - row: 网格行索引 (0-4)
+//
+// 返回:
+//   - ecs.EntityID: 创建的大嘴花实体ID，如果失败返回 0
+//   - error: 如果创建失败返回错误信息
+func NewChomperEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState, col, row int) (ecs.EntityID, error) {
+	// 计算植物原点坐标（使用世界坐标系统）
+	worldCenterX := config.GridWorldStartX + float64(col)*config.CellWidth + config.CellWidth/2
+	worldCenterY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2 + config.PlantOffsetY
+
+	// 创建实体
+	entityID := em.CreateEntity()
+
+	// Story 18.5: 添加植物标签组件（用于序列化时统一识别植物实体）
+	em.AddComponent(entityID, &components.PlantTagComponent{})
+
+	// 添加位置组件（使用世界坐标）
+	em.AddComponent(entityID, &components.PositionComponent{
+		X: worldCenterX,
+		Y: worldCenterY,
+	})
+
+	// 添加生命值组件
+	em.AddComponent(entityID, &components.HealthComponent{
+		CurrentHealth: config.ChomperHealth,
+		MaxHealth:     config.ChomperHealth,
+	})
+
+	// 添加植物组件
+	em.AddComponent(entityID, &components.PlantComponent{
+		PlantType:       components.PlantChomper,
+		GridRow:         row,
+		GridCol:         col,
+		AttackAnimState: components.AttackAnimIdle,
+	})
+
+	// 添加大嘴花特有组件
+	em.AddComponent(entityID, &components.ChomperComponent{
+		State:          components.ChomperStateIdle,
+		TargetZombie:   0,
+		DigestTimer:    0,
+		AttackCooldown: 0,
+		DamageDealt:    false,
+	})
+
+	// 添加行为组件（大嘴花行为）
+	em.AddComponent(entityID, &components.BehaviorComponent{
+		Type: components.BehaviorChomper,
+	})
+
+	// 从 ResourceManager 获取大嘴花的 Reanim 数据和部件图片
+	reanimXML := rm.GetReanimXML("Chomper")
+	partImages := rm.GetReanimPartImages("Chomper")
+
+	if reanimXML == nil || partImages == nil {
+		return 0, fmt.Errorf("failed to load Chomper Reanim resources")
+	}
+
+	// 添加 ReanimComponent
+	em.AddComponent(entityID, &components.ReanimComponent{
+		ReanimName: "Chomper",
+		ReanimXML:  reanimXML,
+		PartImages: partImages,
+	})
+
+	// 使用 AnimationCommand 触发默认动画（anim_idle）
+	ecs.AddComponent(em, entityID, &components.AnimationCommandComponent{
+		UnitID:        "chomper",
+		AnimationName: "anim_idle",
+		Processed:     false,
+	})
+	log.Printf("[PlantFactory] 大嘴花 %d: 成功添加 ReanimComponent 并初始化动画", entityID)
+
+	// 添加碰撞组件
+	em.AddComponent(entityID, &components.CollisionComponent{
+		Width:  config.CellWidth * 0.8,
+		Height: config.CellHeight * 0.8,
+	})
+
+	// 添加阴影组件
+	shadowSize := config.GetShadowSize("chomper")
+	em.AddComponent(entityID, &components.ShadowComponent{
+		Width:   shadowSize.Width,
+		Height:  shadowSize.Height,
+		Alpha:   config.DefaultShadowAlpha,
+		OffsetY: 0,
+	})
+
+	return entityID, nil
+}
+
 // =============================================================================
 // Story 18.5: 植物工厂注册表
 // =============================================================================
@@ -608,6 +715,7 @@ var plantFactories = map[string]PlantFactory{
 	"cherrybomb": newCherryBombFactory,
 	"potatomine": newPotatoMineFactory,
 	"snowpea":    newSnowPeaFactory,
+	"chomper":    newChomperFactory,
 }
 
 // 适配器函数：将统一签名适配到各具体工厂函数
@@ -638,6 +746,10 @@ func newPotatoMineFactory(deps PlantFactoryDeps, col, row int) (ecs.EntityID, er
 func newSnowPeaFactory(deps PlantFactoryDeps, col, row int) (ecs.EntityID, error) {
 	return NewSnowPeaEntity(deps.EntityManager, deps.ResourceLoader, deps.GameState,
 		deps.ReanimSystem, col, row)
+}
+
+func newChomperFactory(deps PlantFactoryDeps, col, row int) (ecs.EntityID, error) {
+	return NewChomperEntity(deps.EntityManager, deps.ResourceLoader, deps.GameState, col, row)
 }
 
 // GetPlantFactory 获取植物工厂函数

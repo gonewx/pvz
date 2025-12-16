@@ -661,6 +661,7 @@ func TestGetPlantFactory_KnownTypes(t *testing.T) {
 		{"cherrybomb", true},
 		{"potatomine", true},
 		{"snowpea", true},
+		{"chomper", true}, // Story 8.11
 	}
 
 	for _, tc := range testCases {
@@ -680,7 +681,6 @@ func TestGetPlantFactory_KnownTypes(t *testing.T) {
 func TestGetPlantFactory_UnknownType(t *testing.T) {
 	unknownTypes := []string{
 		"unknown",
-		"chomper",
 		"repeater",
 		"",
 		// 注意：大写的 "SUNFLOWER" 现在可以匹配，因为 GetPlantFactory 使用 strings.ToLower
@@ -775,6 +775,18 @@ func TestPlantTagComponent_AddedByFactories(t *testing.T) {
 			t.Error("SnowPea should have PlantTagComponent")
 		}
 	})
+
+	// 测试大嘴花工厂 (Story 8.11)
+	t.Run("Chomper", func(t *testing.T) {
+		entityID, err := NewChomperEntity(em, rm, gs, 5, 0)
+		if err != nil {
+			t.Fatalf("Failed to create chomper: %v", err)
+		}
+		_, ok := ecs.GetComponent[*components.PlantTagComponent](em, entityID)
+		if !ok {
+			t.Error("Chomper should have PlantTagComponent")
+		}
+	})
 }
 
 // TestPlantTagComponent_QueryMultipleEntities 测试通过 PlantTagComponent 查询多个植物实体
@@ -844,5 +856,235 @@ func TestPlantFactoryDeps_Structure(t *testing.T) {
 	if deps2.EntityManager != em {
 		t.Error("EntityManager not set correctly")
 	}
+}
+
+// =============================================================================
+// Story 8.11: 大嘴花工厂测试
+// =============================================================================
+
+// TestNewChomperEntity 测试大嘴花实体创建
+func TestNewChomperEntity(t *testing.T) {
+	// 初始化资源管理器和实体管理器
+	rm := newMockResourceManager()
+	em := ecs.NewEntityManager()
+	gs := game.GetGameState()
+	gs.CameraX = 215
+
+	tests := []struct {
+		name string
+		col  int
+		row  int
+	}{
+		{
+			name: "创建大嘴花 (0,0)",
+			col:  0,
+			row:  0,
+		},
+		{
+			name: "创建大嘴花 (4,2)",
+			col:  4,
+			row:  2,
+		},
+		{
+			name: "创建大嘴花 (8,4)",
+			col:  8,
+			row:  4,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// 创建大嘴花实体
+			chomperID, err := NewChomperEntity(em, rm, gs, tt.col, tt.row)
+			if err != nil {
+				t.Fatalf("Failed to create chomper entity: %v", err)
+			}
+
+			if chomperID == 0 {
+				t.Fatal("Expected valid entity ID, got 0")
+			}
+
+			// 验证 PositionComponent
+			posComp, ok := em.GetComponent(chomperID, reflect.TypeOf(&components.PositionComponent{}))
+			if !ok {
+				t.Error("Chomper entity should have PositionComponent")
+			} else {
+				pos := posComp.(*components.PositionComponent)
+				expectedX := config.GridWorldStartX + float64(tt.col)*config.CellWidth + config.CellWidth/2
+				expectedY := config.GridWorldStartY + float64(tt.row)*config.CellHeight + config.CellHeight/2 + config.PlantOffsetY
+				if pos.X != expectedX || pos.Y != expectedY {
+					t.Errorf("Position mismatch: got (%.1f, %.1f), want (%.1f, %.1f)",
+						pos.X, pos.Y, expectedX, expectedY)
+				}
+			}
+
+			// 验证 ReanimComponent
+			reanimComp, ok := em.GetComponent(chomperID, reflect.TypeOf(&components.ReanimComponent{}))
+			if !ok {
+				t.Error("Chomper entity should have ReanimComponent")
+			} else {
+				reanim := reanimComp.(*components.ReanimComponent)
+				if reanim.ReanimXML == nil {
+					t.Error("ReanimComponent.ReanimXML should not be nil")
+				}
+				if reanim.PartImages == nil {
+					t.Error("ReanimComponent.PartImages should not be nil")
+				}
+				if reanim.ReanimName != "Chomper" {
+					t.Errorf("ReanimName should be 'Chomper', got '%s'", reanim.ReanimName)
+				}
+			}
+
+			// 验证 AnimationCommandComponent
+			animCmd, ok := ecs.GetComponent[*components.AnimationCommandComponent](em, chomperID)
+			if !ok {
+				t.Error("Chomper entity should have AnimationCommandComponent")
+			} else {
+				if animCmd.AnimationName != "anim_idle" {
+					t.Errorf("AnimationCommandComponent.AnimationName should be 'anim_idle', got '%s'", animCmd.AnimationName)
+				}
+				if animCmd.Processed {
+					t.Error("AnimationCommand should not be processed yet (Processed=false)")
+				}
+			}
+
+			// 验证 PlantComponent
+			plantComp, ok := em.GetComponent(chomperID, reflect.TypeOf(&components.PlantComponent{}))
+			if !ok {
+				t.Fatal("Chomper entity should have PlantComponent")
+			} else {
+				plant := plantComp.(*components.PlantComponent)
+				if plant.PlantType != components.PlantChomper {
+					t.Errorf("PlantType mismatch: got %v, want %v",
+						plant.PlantType, components.PlantChomper)
+				}
+				if plant.GridCol != tt.col {
+					t.Errorf("GridCol mismatch: got %d, want %d", plant.GridCol, tt.col)
+				}
+				if plant.GridRow != tt.row {
+					t.Errorf("GridRow mismatch: got %d, want %d", plant.GridRow, tt.row)
+				}
+			}
+
+			// 验证 ChomperComponent
+			chomperComp, ok := ecs.GetComponent[*components.ChomperComponent](em, chomperID)
+			if !ok {
+				t.Fatal("Chomper entity should have ChomperComponent")
+			} else {
+				if chomperComp.State != components.ChomperStateIdle {
+					t.Errorf("ChomperComponent.State should be Idle, got %v", chomperComp.State)
+				}
+				if chomperComp.TargetZombie != 0 {
+					t.Error("ChomperComponent.TargetZombie should be 0 initially")
+				}
+				if chomperComp.DigestTimer != 0 {
+					t.Error("ChomperComponent.DigestTimer should be 0 initially")
+				}
+			}
+
+			// 验证 HealthComponent
+			healthComp, ok := em.GetComponent(chomperID, reflect.TypeOf(&components.HealthComponent{}))
+			if !ok {
+				t.Fatal("Chomper entity should have HealthComponent")
+			} else {
+				health := healthComp.(*components.HealthComponent)
+				if health.CurrentHealth != config.ChomperHealth {
+					t.Errorf("CurrentHealth mismatch: got %d, want %d",
+						health.CurrentHealth, config.ChomperHealth)
+				}
+				if health.MaxHealth != config.ChomperHealth {
+					t.Errorf("MaxHealth mismatch: got %d, want %d",
+						health.MaxHealth, config.ChomperHealth)
+				}
+			}
+
+			// 验证 BehaviorComponent
+			behaviorComp, ok := em.GetComponent(chomperID, reflect.TypeOf(&components.BehaviorComponent{}))
+			if !ok {
+				t.Fatal("Chomper entity should have BehaviorComponent")
+			} else {
+				behavior := behaviorComp.(*components.BehaviorComponent)
+				if behavior.Type != components.BehaviorChomper {
+					t.Errorf("BehaviorType mismatch: got %v, want %v",
+						behavior.Type, components.BehaviorChomper)
+				}
+			}
+
+			// 验证 CollisionComponent
+			collisionComp, ok := em.GetComponent(chomperID, reflect.TypeOf(&components.CollisionComponent{}))
+			if !ok {
+				t.Fatal("Chomper entity should have CollisionComponent")
+			} else {
+				collision := collisionComp.(*components.CollisionComponent)
+				if collision.Width <= 0 || collision.Height <= 0 {
+					t.Errorf("Collision box has invalid size: Width=%f, Height=%f",
+						collision.Width, collision.Height)
+				}
+			}
+		})
+	}
+}
+
+// TestChomperConfiguration 测试大嘴花配置常量
+func TestChomperConfiguration(t *testing.T) {
+	tests := []struct {
+		name     string
+		constant interface{}
+		expected interface{}
+	}{
+		{
+			name:     "阳光消耗应为150",
+			constant: config.ChomperSunCost,
+			expected: 150,
+		},
+		{
+			name:     "冷却时间应为7.5秒",
+			constant: config.ChomperRechargeTime,
+			expected: 7.5,
+		},
+		{
+			name:     "撕咬伤害应为40",
+			constant: config.ChomperBiteDamage,
+			expected: 40,
+		},
+		{
+			name:     "吞噬伤害应为1800",
+			constant: config.ChomperSwallowDamage,
+			expected: 1800,
+		},
+		{
+			name:     "消化时间应为42秒",
+			constant: config.ChomperDigestTime,
+			expected: 42.0,
+		},
+		{
+			name:     "攻击范围应为2格",
+			constant: config.ChomperAttackRange,
+			expected: 2,
+		},
+		{
+			name:     "生命值应为300",
+			constant: config.ChomperHealth,
+			expected: 300,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.constant != tt.expected {
+				t.Errorf("Configuration mismatch: got %v, want %v", tt.constant, tt.expected)
+			}
+		})
+	}
+
+	// 验证吞噬伤害足以秒杀普通僵尸
+	t.Run("吞噬伤害应足以秒杀铁桶僵尸", func(t *testing.T) {
+		// 铁桶僵尸：270生命值 + 1100护甲 = 1370总生命值
+		bucketheadTotalHealth := config.ZombieDefaultHealth + config.BucketheadZombieArmorHealth
+		if config.ChomperSwallowDamage < bucketheadTotalHealth {
+			t.Errorf("Chomper swallow damage (%d) should be >= buckethead total health (%d)",
+				config.ChomperSwallowDamage, bucketheadTotalHealth)
+		}
+	})
 }
 

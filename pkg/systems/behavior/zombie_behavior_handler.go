@@ -140,10 +140,18 @@ func (s *BehaviorSystem) detectPlantCollision(zombieRow, zombieCol int) (ecs.Ent
 			continue
 		}
 
-		// 跳过一次性爆炸植物（樱桃炸弹、土豆地雷）
-		// 僵尸不应该吃这类植物，而是让它们自然爆炸
-		if plant.PlantType == components.PlantCherryBomb || plant.PlantType == components.PlantPotatoMine {
+		// 跳过樱桃炸弹（一次性爆炸植物，僵尸不应该吃）
+		if plant.PlantType == components.PlantCherryBomb {
 			continue
+		}
+
+		// 土豆地雷特殊处理：
+		// - 地下状态 (Arming/Rising/Armed): 僵尸可以啃食
+		// - 爆炸中 (Exploding): 不需要啃食（正在爆炸）
+		if plant.PlantType == components.PlantPotatoMine {
+			if plant.PotatoMinePhase == components.PotatoMineExploding {
+				continue
+			}
 		}
 
 		// 检查是否在同一格子

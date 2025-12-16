@@ -288,6 +288,10 @@ const (
 	// PotatoMineRechargeTime 土豆雷的冷却时间（秒）
 	PotatoMineRechargeTime = 30.0
 
+	// PotatoMineDefaultHealth 土豆地雷默认生命值
+	// 与其他普通植物相同
+	PotatoMineDefaultHealth = 300
+
 	// Story 8.9: 土豆地雷武装和爆炸配置
 	// PotatoMineArmingTime 土豆雷武装时间（秒）
 	PotatoMineArmingTime = 15.0
