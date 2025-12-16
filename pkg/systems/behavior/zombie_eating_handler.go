@@ -207,6 +207,9 @@ func (s *BehaviorSystem) handleZombieEatingBehavior(entityID ecs.EntityID, delta
 		if ok {
 			plantHealth.CurrentHealth -= config.ZombieEatingDamage
 
+			// 所有植物被啃食时添加闪烁效果
+			s.addPlantFlashEffect(plantID)
+
 			// 坚果墙被啃食时触发小碎屑粒子效果和发光效果
 			// WallnutEatSmall: 每次啃食伤害时触发
 			// WallnutEatLarge: 在受损状态变化时触发（在 handleWallnutBehavior 中）
@@ -304,5 +307,27 @@ func (s *BehaviorSystem) playEatingSound() {
 	// 使用 AudioManager 统一管理音效（Story 10.9）
 	if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
 		audioManager.PlaySound("SOUND_CHOMPSOFT")
+	}
+}
+
+// addPlantFlashEffect 为植物添加被啃食闪烁效果
+// 参数：
+//   - plantID: 植物实体ID
+func (s *BehaviorSystem) addPlantFlashEffect(plantID ecs.EntityID) {
+	// 检查是否已有闪烁组件
+	flashComp, hasFlash := ecs.GetComponent[*components.FlashEffectComponent](s.entityManager, plantID)
+
+	if hasFlash {
+		// 已有闪烁组件，重置时间（连续被啃食时延长闪烁）
+		flashComp.Elapsed = 0
+		flashComp.IsActive = true
+	} else {
+		// 没有闪烁组件，创建新的
+		ecs.AddComponent(s.entityManager, plantID, &components.FlashEffectComponent{
+			Duration:  0.1,  // 闪烁持续0.1秒
+			Elapsed:   0,    // 从0开始计时
+			Intensity: 0.8,  // 闪烁强度80%（白色叠加）
+			IsActive:  true, // 激活状态
+		})
 	}
 }
