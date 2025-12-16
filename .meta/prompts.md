@@ -377,3 +377,7 @@ assets/images/FlagMeterParts.png
 - 明确的锚点选择建议（中心/左上角/混合方案）
 - 每种场景下的坐标计算公式
 - 需要修改的代码位置清单
+
+## 构建
+
+- level 1-6 开发完成了,请触发github ci/cd流程构建最新版本
