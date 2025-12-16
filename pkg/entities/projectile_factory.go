@@ -84,6 +84,15 @@ func NewPeaProjectile(em *ecs.EntityManager, rm ResourceLoader, startX, startY f
 		LaneIndex: laneIndex,
 	})
 
+	// 添加阴影组件
+	shadowSize := config.GetShadowSize("pea_projectile")
+	em.AddComponent(entityID, &components.ShadowComponent{
+		Width:   shadowSize.Width,
+		Height:  shadowSize.Height,
+		Alpha:   config.DefaultShadowAlpha,
+		OffsetY: config.ProjectileShadowOffsetY,
+	})
+
 	return entityID, nil
 }
 
@@ -147,6 +156,15 @@ func NewSnowPeaProjectile(em *ecs.EntityManager, rm ResourceLoader, startX, star
 		Width:     config.PeaBulletWidth,
 		Height:    config.PeaBulletHeight,
 		LaneIndex: laneIndex,
+	})
+
+	// 添加阴影组件
+	shadowSize := config.GetShadowSize("snowpea_projectile")
+	em.AddComponent(entityID, &components.ShadowComponent{
+		Width:   shadowSize.Width,
+		Height:  shadowSize.Height,
+		Alpha:   config.DefaultShadowAlpha,
+		OffsetY: config.ProjectileShadowOffsetY,
 	})
 
 	return entityID, nil

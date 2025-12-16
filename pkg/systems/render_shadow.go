@@ -212,3 +212,91 @@ func (s *RenderSystem) drawZombieShadowsWithClipping(screen *ebiten.Image, zombi
 func (s *RenderSystem) drawZombieShadows(screen *ebiten.Image, zombieEntities []ecs.EntityID, cameraX float64) {
 	s.drawZombieShadowsWithClipping(screen, zombieEntities, cameraX, 0)
 }
+
+// drawProjectileShadows 渲染子弹阴影
+// 为飞行中的子弹（豌豆、冰豌豆）渲染阴影以增加深度感
+//
+// 参数:
+//   - screen: 绘制目标屏幕
+//   - entities: 所有实体的ID列表
+//   - cameraX: 摄像机X坐标
+func (s *RenderSystem) drawProjectileShadows(screen *ebiten.Image, entities []ecs.EntityID, cameraX float64) {
+	if s.resourceManager == nil {
+		return
+	}
+
+	// 加载阴影贴图
+	shadowImg := s.resourceManager.GetShadowImage()
+	if shadowImg == nil {
+		return
+	}
+
+	// 获取阴影贴图的原始尺寸
+	shadowImgBounds := shadowImg.Bounds()
+	shadowImgWidth := float64(shadowImgBounds.Dx())
+	shadowImgHeight := float64(shadowImgBounds.Dy())
+
+	// 遍历所有子弹实体，渲染阴影
+	for _, id := range entities {
+		// 只渲染有 BehaviorComponent 且是子弹类型的实体
+		behaviorComp, hasBehavior := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, id)
+		if !hasBehavior {
+			continue
+		}
+
+		// 检查是否是子弹类型
+		isProjectile := behaviorComp.Type == components.BehaviorPeaProjectile ||
+			behaviorComp.Type == components.BehaviorSnowPeaProjectile
+
+		if !isProjectile {
+			continue
+		}
+
+		// 获取位置组件
+		pos, hasPos := ecs.GetComponent[*components.PositionComponent](s.entityManager, id)
+		if !hasPos {
+			continue
+		}
+
+		// 获取阴影组件
+		shadowComp, hasShadow := ecs.GetComponent[*components.ShadowComponent](s.entityManager, id)
+		if !hasShadow {
+			continue
+		}
+
+		// 获取 ReanimComponent 来计算子弹图片宽度
+		// 简单实体的 CenterOffsetX = 0，图片从 pos.X 开始向右绘制
+		// 需要找到图片中心来对齐阴影
+		bulletCenterX := pos.X // 默认使用 pos.X
+		if reanim, hasReanim := ecs.GetComponent[*components.ReanimComponent](s.entityManager, id); hasReanim {
+			// 获取图片实际宽度
+			for _, img := range reanim.PartImages {
+				if img != nil {
+					imgWidth := float64(img.Bounds().Dx())
+					// 子弹图片左边缘在 pos.X - CenterOffsetX，中心在 pos.X - CenterOffsetX + imgWidth/2
+					bulletCenterX = pos.X - reanim.CenterOffsetX + imgWidth/2
+					break
+				}
+			}
+		}
+
+		// 计算阴影位置：阴影中心对齐子弹中心
+		shadowOffsetY := shadowComp.OffsetY
+		footY := pos.Y + shadowOffsetY
+		screenX := bulletCenterX - shadowComp.Width/2 - cameraX
+		screenY := footY - shadowComp.Height/2
+
+		// 计算缩放比例（子弹阴影比默认阴影小）
+		scaleX := shadowComp.Width / shadowImgWidth
+		scaleY := shadowComp.Height / shadowImgHeight
+
+		// 应用变换和透明度
+		op := &ebiten.DrawImageOptions{}
+		op.GeoM.Scale(scaleX, scaleY)
+		op.GeoM.Translate(screenX, screenY)
+		op.ColorScale.ScaleAlpha(shadowComp.Alpha)
+
+		// 绘制阴影
+		screen.DrawImage(shadowImg, op)
+	}
+}

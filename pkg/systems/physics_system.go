@@ -120,14 +120,27 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 			bullets = append(bullets, entityID)
 		} else if behavior.Type == components.BehaviorZombieBasic ||
 			behavior.Type == components.BehaviorZombieEating ||
-			behavior.Type == components.BehaviorZombieDying || // 死亡动画期间仍然检测碰撞
 			behavior.Type == components.BehaviorZombieConehead ||
 			behavior.Type == components.BehaviorZombieBuckethead ||
 			behavior.Type == components.BehaviorZombieFlag ||
 			behavior.Type == components.BehaviorZombiePolevaulter {
-			// 包括移动中的僵尸、啃食中的僵尸、死亡中的僵尸（普通、路障、铁桶、旗帜、撑杆）
-			// 死亡中的僵尸仍然需要碰撞检测，以便子弹不会穿透尸体
+			// 包括移动中的僵尸、啃食中的僵尸（普通、路障、铁桶、旗帜、撑杆）
 			zombies = append(zombies, entityID)
+		} else if behavior.Type == components.BehaviorZombieDying {
+			// 死亡动画早期（身体还直立）仍可被子弹命中
+			// 检查动画播放进度，只有进度小于阈值时才参与碰撞
+			reanim, hasReanim := ecs.GetComponent[*components.ReanimComponent](ps.em, entityID)
+			if hasReanim && len(reanim.CurrentAnimations) > 0 {
+				// 计算动画播放进度
+				animName := reanim.CurrentAnimations[0]
+				if visibles, ok := reanim.AnimVisiblesMap[animName]; ok && len(visibles) > 0 {
+					totalFrames := len(visibles)
+					progress := float64(reanim.CurrentFrame) / float64(totalFrames)
+					if progress < config.DyingCollisionThreshold {
+						zombies = append(zombies, entityID)
+					}
+				}
+			}
 		}
 	}
 

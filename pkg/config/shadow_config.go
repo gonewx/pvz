@@ -79,6 +79,10 @@ var ShadowSizes = map[string]ShadowSize{
 	"zombie_gargantuar": {Width: 100, Height: 50},
 	"zombie_imp":        {Width: 50, Height: 25},
 	"boss_zombot":       {Width: 150, Height: 75},
+
+	// 子弹 - 较小的阴影
+	"pea_projectile":     {Width: PeaBulletWidth, Height: 8},
+	"snowpea_projectile": {Width: PeaBulletWidth, Height: 8},
 }
 
 // DefaultShadowSize 默认阴影尺寸（未配置时使用）
@@ -124,3 +128,15 @@ const ZombieShadowOffsetX float64 = 10.0
 // 调整此值可以微调僵尸阴影的垂直位置
 // 建议值范围：-25.0 ~ 0.0
 const ZombieShadowOffsetY float64 = PlantShadowOffsetY
+
+// ProjectileShadowOffsetY 子弹阴影 Y 偏移量（像素）
+// 子弹在植物上方飞行，阴影应该在子弹正下方的地面位置
+// 偏移量 = -PeaBulletOffsetY（将阴影从子弹位置移到地面）
+var ProjectileShadowOffsetY float64 = -PeaBulletOffsetY
+
+// ========== 碰撞检测配置 ==========
+
+// DyingCollisionThreshold 死亡动画碰撞检测阈值
+// 动画进度小于此值时仍参与碰撞检测（身体还直立）
+// 值为 0.3，即死亡动画播放前 30% 时仍可被子弹命中
+const DyingCollisionThreshold float64 = 0.02

@@ -301,7 +301,10 @@ func (s *RenderSystem) DrawGameWorld(screen *ebiten.Image, cameraX float64) {
 		s.drawGameOverDoorOverlay(screen, cameraX) // 门板层（在僵尸上方）
 	}
 
-	// 第三遍：渲染子弹（在僵尸上层）
+	// 第三遍A：渲染子弹阴影
+	s.drawProjectileShadows(screen, projectiles, cameraX)
+
+	// 第三遍B：渲染子弹（在僵尸上层）
 	// 子弹需要显示在僵尸上方，确保视觉上的正确层级
 	for _, id := range projectiles {
 		s.drawEntity(screen, id, cameraX)
