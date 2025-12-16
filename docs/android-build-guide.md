@@ -71,7 +71,7 @@ make sign-apk APK=build/pvz-unsigned.apk
 make clean
 
 # 安装到设备
-adb install -r build/pvz-unsigned.apk
+adb install -r build/pvz.apk
 
 # 卸载应用
 adb uninstall com.decker.pvz
