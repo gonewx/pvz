@@ -58,12 +58,18 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 	// Story 8.9: 撑杆僵尸跳跃和持杆状态处理
 	// 撑杆僵尸持杆时遇到植物应该跳跃而不是啃食
 	shouldCheckPlantCollision := true
+	isJumping := false
 	if poleVault, ok := ecs.GetComponent[*components.PoleVaultComponent](s.entityManager, entityID); ok {
-		if poleVault.IsJumping || poleVault.HasPole {
-			// 跳跃中或持杆状态，跳过植物碰撞检测
-			// 但继续执行根运动来控制位移（让动画的 _ground 数据生效）
+		if poleVault.IsJumping {
+			// 跳跃中：跳过植物碰撞检测和位置更新
+			// 跳跃期间位置保持不变，视觉效果由动画偏移实现
 			shouldCheckPlantCollision = false
-			log.Printf("[BehaviorSystem] 撑杆僵尸 %d 跳跃/持杆状态，跳过植物碰撞检测", entityID)
+			isJumping = true
+			log.Printf("[BehaviorSystem] 撑杆僵尸 %d 跳跃中，跳过植物碰撞检测和位置更新", entityID)
+		} else if poleVault.HasPole {
+			// 持杆状态：跳过植物碰撞检测，但继续移动
+			shouldCheckPlantCollision = false
+			log.Printf("[BehaviorSystem] 撑杆僵尸 %d 持杆状态，跳过植物碰撞检测", entityID)
 		}
 	}
 
@@ -76,6 +82,13 @@ func (s *BehaviorSystem) handleZombieBasicBehavior(entityID ecs.EntityID, deltaT
 			s.startEatingPlant(entityID, plantID)
 			return // 跳过移动逻辑
 		}
+	}
+
+	// 撑杆僵尸跳跃期间不更新位置
+	// 跳跃期间位置保持不变，视觉效果由动画偏移（body1）实现
+	// 跳跃结束后由 PoleVaultSystem 应用位移补偿
+	if isJumping {
+		return
 	}
 
 	// 获取速度组件

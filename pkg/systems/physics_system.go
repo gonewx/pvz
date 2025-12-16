@@ -183,18 +183,13 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 				continue
 			}
 
-			// 撑杆僵尸腾空阶段免疫子弹
+			// 撑杆僵尸跳跃期间免疫子弹
+			// 整个跳跃过程中（从起跳到落地）都不检测子弹碰撞
 			// 跳跃时实体位置不变，视觉效果由动画偏移实现
-			// 只有在真正腾空阶段（body1.X 为负数时）才免疫
-			// 起跳和落地阶段仍然可以被击中
+			// 只有落地后（IsJumping == false）才恢复碰撞检测
 			if poleVault, ok := ecs.GetComponent[*components.PoleVaultComponent](ps.em, zombieID); ok {
 				if poleVault.IsJumping {
-					// 检查是否在腾空阶段（基于时间）
-					isAirborne := poleVault.JumpElapsedTime >= config.PolevaulterZombieAirborneStartTime &&
-						poleVault.JumpElapsedTime < config.PolevaulterZombieAirborneEndTime
-					if isAirborne {
-						continue
-					}
+					continue
 				}
 			}
 
