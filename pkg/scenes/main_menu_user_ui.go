@@ -15,12 +15,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
-// showNewUserDialogForFirstLaunch 显示首次启动的新建用户对话框
-//
-// Story 12.4: 首次启动用户创建流程
-//
-// 当游戏首次启动（无任何用户）时，自动弹出新建用户对话框
-// 用户必须创建用户才能继续游戏（不可跳过）
+// showNewUserDialogForFirstLaunch 显示首次启动的新建用户对话框（不可跳过）
 func (m *MainMenuScene) showNewUserDialogForFirstLaunch() {
 	log.Printf("[MainMenuScene] Showing new user dialog for first launch")
 
@@ -55,7 +50,6 @@ func (m *MainMenuScene) showNewUserDialogForFirstLaunch() {
 	m.currentDialog = dialogID // 设置 currentDialog 以触发背景交互阻止
 	log.Printf("[MainMenuScene] New user dialog created (entity ID: %d)", dialogID)
 
-	// Story 21.4: 移动端显示虚拟键盘
 	if utils.IsMobile() && m.virtualKeyboardSystem != nil {
 		m.virtualKeyboardSystem.ShowKeyboard(inputBoxID)
 	}
@@ -97,14 +91,10 @@ func (m *MainMenuScene) onNewUserCreated(username string) {
 		m.hasStartedGame = saveManager.GetHasStartedGame()
 	}
 
-	// ✅ 修复：先记录是否首次启动，然后立即设置为 false
-	// 这样 updateButtonVisibility() 就不会保留首次启动的隐藏轨道
 	wasFirstLaunch := m.isFirstLaunch
 	m.isFirstLaunch = false
 
-	// Story 12.4 AC8: 创建成功后，首先取消隐藏木牌和草叶子轨道
 	if wasFirstLaunch && m.selectorScreenEntity != 0 {
-		// 首次启动时，取消隐藏木牌和草叶子轨道
 		reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
 		if ok && reanimComp.HiddenTracks != nil {
 			// 取消隐藏木牌轨道
@@ -121,17 +111,13 @@ func (m *MainMenuScene) onNewUserCreated(username string) {
 			delete(reanimComp.HiddenTracks, "leaf_SelectorScreen_Leaves")
 			log.Printf("[MainMenuScene] First launch: unhidden woodsign and leaf tracks")
 
-			// ✅ 设置动画循环状态
 			if reanimComp.AnimationLoopStates == nil {
 				reanimComp.AnimationLoopStates = make(map[string]bool)
 			}
-			reanimComp.AnimationLoopStates["anim_sign"] = false // 木牌动画非循环
-			reanimComp.AnimationLoopStates["anim_grass"] = true // 草动画循环
+			reanimComp.AnimationLoopStates["anim_sign"] = false
+			reanimComp.AnimationLoopStates["anim_grass"] = true
 		}
 
-		// ✅ 修复：直接调用 AddAnimation() 添加到现有动画列表
-		// 此时应该已经有：anim_open（背景）、anim_idle（按钮）、云朵动画
-		// 现在添加：anim_sign（木牌）、anim_grass（草）
 		if err := m.reanimSystem.AddAnimation(m.selectorScreenEntity, "anim_sign"); err != nil {
 			log.Printf("[MainMenuScene] Warning: Failed to add anim_sign: %v", err)
 		}
@@ -141,11 +127,8 @@ func (m *MainMenuScene) onNewUserCreated(username string) {
 		log.Printf("[MainMenuScene] First launch: added anim_sign + anim_grass to existing animations")
 	}
 
-	// ✅ 修复：在取消隐藏轨道后再更新按钮可见性
-	// 这样 updateButtonVisibility() 就不会重新隐藏 woodsign2
 	m.updateButtonVisibility()
 
-	// Story 12.4: 初始化木牌（显示用户名）
 	m.initUserSign()
 
 	log.Printf("[MainMenuScene] First launch setup completed")
@@ -164,14 +147,12 @@ func (m *MainMenuScene) closeCurrentDialog() {
 	// 清除 currentDialog 以允许背景交互
 	m.currentDialog = 0
 
-	// Story 21.4: 隐藏虚拟键盘
 	if m.virtualKeyboardSystem != nil {
 		m.virtualKeyboardSystem.HideKeyboard()
 	}
 }
 
 // initUserSign 初始化木牌UI实体（显示用户名）
-// Story 12.4 Task 2.2
 func (m *MainMenuScene) initUserSign() {
 	// 获取当前用户名
 	currentUser := m.saveManager.GetCurrentUser()
@@ -187,8 +168,7 @@ func (m *MainMenuScene) initUserSign() {
 		signPressImage = nil
 	}
 
-	// Story 12.4 新方案：将用户名预先绘制到木牌图片上
-	// 这样用户名会自然跟随木牌动画，不需要单独处理动画同步
+	// 将用户名预先绘制到木牌图片上（用户名自然跟随动画）
 	if m.selectorScreenEntity != 0 {
 		reanimComp, ok := ecs.GetComponent[*components.ReanimComponent](m.entityManager, m.selectorScreenEntity)
 		if ok {
@@ -270,7 +250,6 @@ func drawCenteredTextOnImage(img *ebiten.Image, textStr string, centerX, centerY
 }
 
 // updateUserSignHover 更新木牌悬停状态和点击检测
-// Story 12.4 Task 2.3
 func (m *MainMenuScene) updateUserSignHover(mouseX, mouseY int, isMouseReleased bool) {
 	// 如果没有木牌实体，跳过
 	if m.userSignEntity == 0 {
@@ -289,7 +268,7 @@ func (m *MainMenuScene) updateUserSignHover(mouseX, mouseY int, isMouseReleased 
 		return
 	}
 
-	// Story 12.4 AC2: woodsign2 是 "如果这不是你的存档，请点我" 的木板
+	// woodsign2 是 "如果这不是你的存档，请点我" 的木板
 	signTrackName := "woodsign2"
 
 	// 检查轨道是否被隐藏
@@ -305,8 +284,7 @@ func (m *MainMenuScene) updateUserSignHover(mouseX, mouseY int, isMouseReleased 
 		return
 	}
 
-	// ✅ 修复：使用与渲染系统相同的逻辑来获取当前帧
-	// 遍历所有动画，找到最后一个有效的 woodsign2 数据
+	// 使用与渲染系统相同的逻辑来获取当前帧
 	var selectedFrame *reanim.Frame
 	for _, animName := range reanimComp.CurrentAnimations {
 		// 获取该动画的当前逻辑帧（支持独立帧索引）
@@ -391,12 +369,11 @@ func (m *MainMenuScene) updateUserSignHover(mouseX, mouseY int, isMouseReleased 
 	signWidth := float64(bounds.Dx())
 	signHeight := float64(bounds.Dy())
 
-	// Story 12.4 AC2: woodsign2 木板的点击检测区域
-	// "如果这不是你的存档，请点我" 整个木板都可点击
-	clickableTop := signY + signHeight*0.1    // 木板顶部预留 10% 边距
-	clickableBottom := signY + signHeight*0.9 // 木板底部预留 10% 边距
-	clickableLeft := signX + signWidth*0.05   // 木板左侧预留 5% 边距
-	clickableRight := signX + signWidth*0.95  // 木板右侧预留 5% 边距
+	// woodsign2 木板的点击检测区域
+	clickableTop := signY + signHeight*0.1
+	clickableBottom := signY + signHeight*0.9
+	clickableLeft := signX + signWidth*0.05
+	clickableRight := signX + signWidth*0.95
 
 	// 检查鼠标是否在可点击区域内
 	mouseInSign := float64(mouseX) >= clickableLeft &&
@@ -408,14 +385,14 @@ func (m *MainMenuScene) updateUserSignHover(mouseX, mouseY int, isMouseReleased 
 	if userSignComp.IsHovered != mouseInSign {
 		userSignComp.IsHovered = mouseInSign
 
-		// Story 10.9: 悬停时播放音效
+		// 悬停时播放音效
 		if mouseInSign {
 			if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
 				audioManager.PlaySound("SOUND_BLEEP")
 			}
 		}
 
-		// Story 12.4 AC2: 悬停时切换 woodsign2 为 SignPressImage
+		// 悬停时切换 woodsign2 为 SignPressImage
 		if mouseInSign && userSignComp.SignPressImage != nil {
 			// 直接使用按下状态图片（不需要绘制用户名，woodsign2 是纯木板）
 			reanimComp.PartImages["IMAGE_REANIM_SELECTORSCREEN_WOODSIGN2"] = userSignComp.SignPressImage
@@ -432,7 +409,6 @@ func (m *MainMenuScene) updateUserSignHover(mouseX, mouseY int, isMouseReleased 
 
 	// 如果点击木牌，打开用户管理对话框
 	if mouseInSign && isMouseReleased {
-		// Story 10.9: 点击时播放音效
 		if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
 			audioManager.PlaySound("SOUND_TAP")
 		}
@@ -442,7 +418,6 @@ func (m *MainMenuScene) updateUserSignHover(mouseX, mouseY int, isMouseReleased 
 }
 
 // showUserManagementDialog 显示用户管理对话框
-// Story 12.4 AC3, AC4
 func (m *MainMenuScene) showUserManagementDialog() {
 	// 如果已有对话框打开，先关闭
 	if m.currentUserDialogID != 0 {
@@ -482,7 +457,6 @@ func (m *MainMenuScene) showUserManagementDialog() {
 }
 
 // onUserManagementAction 用户管理对话框的操作回调
-// Story 12.4 AC4, AC9
 func (m *MainMenuScene) onUserManagementAction(result entities.UserManagementDialogResult) {
 	// 从 UserListComponent 读取选中的用户
 	var selectedUser string
@@ -555,7 +529,6 @@ func (m *MainMenuScene) onUserManagementAction(result entities.UserManagementDia
 }
 
 // reloadMainMenuData 重新加载主菜单数据（用户切换后）
-// Story 12.4 Task 8.2
 func (m *MainMenuScene) reloadMainMenuData() {
 	// 重新加载存档数据
 	if err := m.saveManager.Load(); err != nil {
@@ -579,7 +552,6 @@ func (m *MainMenuScene) reloadMainMenuData() {
 }
 
 // showNewUserDialog 显示新建用户对话框
-// Story 12.4 AC5
 func (m *MainMenuScene) showNewUserDialog(force bool) {
 	// 关闭现有对话框
 	if m.currentUserDialogID != 0 {
@@ -615,14 +587,12 @@ func (m *MainMenuScene) showNewUserDialog(force bool) {
 	m.currentDialog = dialogID
 	log.Printf("[MainMenuScene] New user dialog opened (force=%v)", force)
 
-	// Story 21.4: 移动端显示虚拟键盘
 	if utils.IsMobile() && m.virtualKeyboardSystem != nil {
 		m.virtualKeyboardSystem.ShowKeyboard(inputBoxID)
 	}
 }
 
 // showRenameUserDialog 显示重命名用户对话框
-// Story 12.4 AC6
 func (m *MainMenuScene) showRenameUserDialog(oldUsername string) {
 	// 用于存储对话框 ID 的变量
 	var renameDialogID ecs.EntityID
@@ -676,21 +646,17 @@ func (m *MainMenuScene) showRenameUserDialog(oldUsername string) {
 	renameDialogID = dialogID
 	renameInputBoxID = inputBoxID
 
-	// ✅ 重命名对话框不覆盖 currentUserDialogID
-	// 只更新 currentDialog 和 currentInputBoxID
 	m.currentInputBoxID = inputBoxID
 	m.currentDialog = dialogID
 	log.Printf("[MainMenuScene] Rename user dialog opened for: %s (dialogID=%d, keeping userDialogID=%d)",
 		oldUsername, dialogID, m.currentUserDialogID)
 
-	// Story 21.4: 移动端显示虚拟键盘
 	if utils.IsMobile() && m.virtualKeyboardSystem != nil {
 		m.virtualKeyboardSystem.ShowKeyboard(inputBoxID)
 	}
 }
 
 // showDeleteUserDialog 显示删除用户确认对话框
-// Story 12.4 AC7
 func (m *MainMenuScene) showDeleteUserDialog(username string) {
 	// 用于存储对话框 ID 的变量
 	var deleteDialogID ecs.EntityID
@@ -776,16 +742,12 @@ func (m *MainMenuScene) showDeleteUserDialog(username string) {
 	// 保存到闭包变量中
 	deleteDialogID = dialogID
 
-	// ✅ 删除确认对话框不覆盖 currentUserDialogID
-	// 只更新 currentDialog
 	m.currentDialog = dialogID
 	log.Printf("[MainMenuScene] Delete user dialog opened for: %s (dialogID=%d, keeping userDialogID=%d)",
 		username, dialogID, m.currentUserDialogID)
 }
 
 // showNewUserDialogAfterDeleteAll 删除所有用户后显示新建用户对话框
-// Story 12.4: 删除最后一个用户后的特殊流程
-// 新建用户成功后，关闭两个对话框（新建用户对话框 + 用户管理对话框）
 func (m *MainMenuScene) showNewUserDialogAfterDeleteAll() {
 	// 保存用户管理对话框 ID，用于后续关闭
 	userManagementDialogID := m.currentUserDialogID
@@ -828,14 +790,12 @@ func (m *MainMenuScene) showNewUserDialogAfterDeleteAll() {
 	m.currentDialog = dialogID
 	log.Printf("[MainMenuScene] New user dialog opened after deleting all users (entity ID: %d)", dialogID)
 
-	// Story 21.4: 移动端显示虚拟键盘
 	if utils.IsMobile() && m.virtualKeyboardSystem != nil {
 		m.virtualKeyboardSystem.ShowKeyboard(inputBoxID)
 	}
 }
 
 // onNewUserCreatedAfterDeleteAll 处理删除所有用户后新建用户的回调
-// 需要关闭新建用户对话框和用户管理对话框
 func (m *MainMenuScene) onNewUserCreatedAfterDeleteAll(username string, newUserDialogID, newUserInputBoxID, userManagementDialogID ecs.EntityID) {
 	log.Printf("[MainMenuScene] Creating new user after delete all: %s", username)
 
@@ -928,7 +888,6 @@ func (m *MainMenuScene) onNewUserCreatedAfterDeleteAll(username string, newUserD
 }
 
 // refreshUserManagementDialog 刷新用户管理对话框的列表数据
-// Story 12.4: 重命名/删除后不重新创建对话框，只刷新数据
 func (m *MainMenuScene) refreshUserManagementDialog() {
 	if m.currentUserDialogID == 0 {
 		log.Printf("[MainMenuScene] Warning: No user management dialog to refresh")
@@ -966,9 +925,7 @@ func (m *MainMenuScene) refreshUserManagementDialog() {
 	// 更新当前用户
 	userList.CurrentUser = m.saveManager.GetCurrentUser()
 
-	// ✅ 智能更新选中索引
-	// 场景 1: 重命名（用户数量不变） - 保持原索引
-	// 场景 2: 删除（用户数量减少） - 调整索引
+	// 智能更新选中索引
 	if len(users) == oldUserCount {
 		// 重命名场景：保持原来的选中索引
 		userList.SelectedIndex = oldSelectedIndex
@@ -993,11 +950,7 @@ func (m *MainMenuScene) refreshUserManagementDialog() {
 		len(userList.Users), userList.CurrentUser, userList.SelectedIndex)
 }
 
-// renderUserSignText 渲染木牌上的用户名文本
-// Story 12.4 Task 2.4
-// 新方案：用户名已预先绘制到木牌图片上，这里不需要单独渲染
-// 保留此函数用于未来可能的悬停效果（如更换图片）
+// renderUserSignText 渲染木牌上的用户名文本（预留扩展）
 func (m *MainMenuScene) renderUserSignText(screen *ebiten.Image) {
 	// 用户名已预先绘制到木牌图片上（通过 initUserSign），随 Reanim 动画自然移动
-	// 此函数暂时为空，保留用于未来扩展
 }

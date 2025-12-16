@@ -15,7 +15,7 @@
 | **状态** | 🚀 进行中 (In Progress) |
 | **预估工作量** | 1-2 Sprint (13 点) |
 | **依赖项** | 无（独立重构） |
-| **影响范围** | 5 个核心系统文件，300+ 行注释优化 |
+| **影响范围** | pkg/systems (5 个文件) + pkg/scenes (3 个文件) |
 | **技术负债清理** | 是 |
 
 ---
@@ -216,6 +216,37 @@ pkg/systems/
 
 ---
 
+### Story 15.5: 拆分 pkg/scenes 巨婴文件 (待定)
+
+**目标**: 将 `pkg/scenes` 目录下的巨婴文件拆分为职责清晰的多个文件。
+
+**当前状态**:
+| 文件 | 行数 | 严重度 |
+|------|------|--------|
+| `game_scene.go` | 2,118 | 🔴 严重 |
+| `game_scene_init.go` | 1,417 | 🟠 较重 |
+| `game_scene_conveyor.go` | 1,058 | 🟡 中等 |
+
+**拆分方案**:
+```
+pkg/scenes/
+├── game_scene.go              (核心逻辑，~500 行)
+├── game_scene_shovel.go       (铲子系统，~400 行)
+├── game_scene_seedbank.go     (SeedBank 动画，~100 行)
+├── game_scene_tutorial.go     (教程系统，~100 行)
+├── game_scene_init.go         (初始化，~300 行)
+├── game_scene_save.go         (存档保存，~150 行)
+├── game_scene_restore.go      (状态恢复，~900 行)
+├── game_scene_conveyor_render.go  (传送带渲染，~500 行)
+└── game_scene_conveyor_input.go   (传送带输入，~500 行)
+```
+
+**估算**: 5 点（约 2-3 天）
+
+**前置依赖**: 无
+
+---
+
 ## Success Criteria (成功标准)
 
 **Epic 级别成功标准**:
@@ -266,7 +297,7 @@ pkg/systems/
 - ❌ 功能性修改（只做代码质量改进，不改变行为）
 - ❌ 性能优化（除非拆分带来自然的性能提升）
 - ❌ 新功能开发
-- ❌ 其他目录的代码质量改进（仅限 `pkg/systems`）
+- ❌ 其他目录的代码质量改进（仅限 `pkg/systems` 和 `pkg/scenes`）
 
 ---
 
@@ -324,3 +355,4 @@ pkg/systems/
 | 日期 | 变更内容 | 作者 |
 |------|---------|------|
 | 2025-11-13 | 创建 Epic 15 PRD | Bob (Scrum Master) |
+| 2025-12-17 | 添加 Story 15.5: pkg/scenes 巨婴文件拆分 | James (Dev) |
