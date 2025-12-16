@@ -149,6 +149,11 @@ const (
 	// PeaBulletHeight 豌豆子弹碰撞盒高度（像素）
 	PeaBulletHeight = 28.0
 
+	// PeaBulletTrailOffsetY 子弹拖尾粒子的 Y 偏移（像素）
+	// 粒子应该在子弹视觉中心发射，而不是图像左上角
+	// 值为子弹高度的一半
+	PeaBulletTrailOffsetY = PeaBulletHeight / 2.0
+
 	// PeaBulletDeletionBoundary 子弹删除边界（屏幕坐标X）
 	// 子弹移出此边界后将被删除
 	PeaBulletDeletionBoundary = 1500.0
@@ -354,6 +359,37 @@ const (
 	// SnowPeaSlowMultiplier 冰豌豆减速效果倍率
 	// 0.5 表示减速 50%（速度变为原来的一半）
 	SnowPeaSlowMultiplier = 0.5
+)
+
+// Chomper Configuration (大嘴花配置)
+// Story 8.11: Level 1-7 解锁植物
+const (
+	// ChomperSunCost 大嘴花的阳光消耗
+	ChomperSunCost = 150
+
+	// ChomperRechargeTime 大嘴花的冷却时间（秒）
+	// 快速冷却类型
+	ChomperRechargeTime = 7.5
+
+	// ChomperBiteDamage 大嘴花撕咬伤害
+	// 对无法吞噬的目标（巨人僵尸等）每次撕咬造成的伤害
+	ChomperBiteDamage = 40
+
+	// ChomperSwallowDamage 大嘴花吞噬伤害
+	// 秒杀级伤害，一口吃掉普通僵尸
+	ChomperSwallowDamage = 1800
+
+	// ChomperDigestTime 大嘴花消化时间（秒）
+	// 吞噬后进入消化期，期间无法攻击
+	ChomperDigestTime = 42.0
+
+	// ChomperAttackRange 大嘴花攻击范围（格子数）
+	// 检测前方 2 格内的僵尸
+	ChomperAttackRange = 2
+
+	// ChomperHealth 大嘴花生命值
+	// 标准植物生命值
+	ChomperHealth = 300
 )
 
 // Cherry Bomb Configuration (樱桃炸弹配置)

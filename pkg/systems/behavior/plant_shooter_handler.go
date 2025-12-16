@@ -23,6 +23,12 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 		return
 	}
 
+	// 根据植物类型确定动画 UnitID
+	unitID := "peashootersingle"
+	if plant.PlantType == components.PlantSnowPea {
+		unitID = "snowpea"
+	}
+
 	// 检测豌豆射手是否正在被啃食（检查同格子是否有啃食状态的僵尸）
 	isBeingEaten := s.isPlantBeingEaten(plant.GridRow, plant.GridCol)
 
@@ -93,7 +99,7 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 			// 没有僵尸了，切换回空闲状态
 			log.Printf("[BehaviorSystem] 豌豆射手 %d 没有目标，切换回空闲状态", entityID)
 			ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
-				UnitID:           "peashootersingle",
+				UnitID:           unitID,
 				ComboName:        "idle",
 				Processed:        false,
 				PreserveProgress: true,
@@ -108,7 +114,7 @@ func (s *BehaviorSystem) handlePeashooterBehavior(entityID ecs.EntityID, deltaTi
 			// 有僵尸，切换到攻击动画
 			log.Printf("[BehaviorSystem] 🎯 豌豆射手 %d 发现目标，切换到攻击动画", entityID)
 			ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
-				UnitID:           "peashootersingle",
+				UnitID:           unitID,
 				ComboName:        "attack_with_sway",
 				Processed:        false,
 				PreserveProgress: true,
@@ -175,6 +181,10 @@ func (s *BehaviorSystem) updatePlantAttackAnimation(entityID ecs.EntityID, delta
 				log.Printf("[BehaviorSystem] 创建冰豌豆子弹失败: %v", err)
 			} else {
 				log.Printf("[BehaviorSystem] 寒冰射手 %d 发射冰豌豆 %d", entityID, bulletID)
+				// 为冰豌豆子弹添加雪花尾迹粒子效果（Y 偏移使粒子在子弹中心发射）
+				if trailErr := entities.AttachTrailEffect(s.entityManager, s.resourceManager, bulletID, "SnowPeaTrail", config.PeaBulletTrailOffsetY); trailErr != nil {
+					log.Printf("[BehaviorSystem] 添加冰豌豆尾迹效果失败: %v", trailErr)
+				}
 			}
 		default:
 			// 豌豆射手发射普通豌豆

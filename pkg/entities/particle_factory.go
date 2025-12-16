@@ -147,6 +147,10 @@ func CreateParticleEffect(em *ecs.EntityManager, rm *game.ResourceManager, effec
 		// When ParticleLoops is true, particles reset Age when reaching Lifetime instead of being destroyed
 		particleLoops := emitterConfig.ParticleLoops == "1"
 
+		// Parse ParticlesDontFollow: "1" means particles don't follow emitter movement
+		// Used for trail effects (like SnowPeaTrail) where particles stay in place
+		particlesDontFollow := emitterConfig.ParticlesDontFollow == "1"
+
 		// Story 7.5: Parse SystemAlpha (ZombieHead 系统级透明度)
 		_, _, systemAlphaKeyframes, systemAlphaInterp := particle.ParseValue(emitterConfig.SystemAlpha)
 
@@ -227,6 +231,8 @@ func CreateParticleEffect(em *ecs.EntityManager, rm *game.ResourceManager, effec
 			InitialY: worldY,
 			// Angle offset
 			AngleOffset: offset,
+			// ParticlesDontFollow: 粒子不跟随发射器移动（用于拖尾效果）
+			ParticlesDontFollow: particlesDontFollow,
 		}
 		em.AddComponent(emitterID, emitterComp)
 
@@ -334,6 +340,9 @@ func CreateParticleEffectWithColor(em *ecs.EntityManager, rm *game.ResourceManag
 		// Parse ParticleLoops: "1" means loop (true), "0" or empty means no loop (false)
 		particleLoops := emitterConfig.ParticleLoops == "1"
 
+		// Parse ParticlesDontFollow: "1" means particles don't follow emitter movement
+		particlesDontFollow := emitterConfig.ParticlesDontFollow == "1"
+
 		_, _, systemAlphaKeyframes, systemAlphaInterp := particle.ParseValue(emitterConfig.SystemAlpha)
 
 		var systemPosXKeyframes, systemPosYKeyframes []particle.Keyframe
@@ -414,6 +423,9 @@ func CreateParticleEffectWithColor(em *ecs.EntityManager, rm *game.ResourceManag
 			ColorOverrideR:       colorR,
 			ColorOverrideG:       colorG,
 			ColorOverrideB:       colorB,
+
+			// ParticlesDontFollow: 粒子不跟随发射器移动
+			ParticlesDontFollow: particlesDontFollow,
 		}
 		em.AddComponent(emitterID, emitterComp)
 
@@ -499,6 +511,7 @@ func CreateParticleEffectWithImage(em *ecs.EntityManager, rm *game.ResourceManag
 
 		systemLoops := emitterConfig.SystemLoops == "1"
 		particleLoops := emitterConfig.ParticleLoops == "1"
+		particlesDontFollow := emitterConfig.ParticlesDontFollow == "1"
 
 		_, _, systemAlphaKeyframes, systemAlphaInterp := particle.ParseValue(emitterConfig.SystemAlpha)
 
@@ -577,6 +590,9 @@ func CreateParticleEffectWithImage(em *ecs.EntityManager, rm *game.ResourceManag
 
 			// 图片覆盖设置
 			ImageOverride: imageOverride,
+
+			// ParticlesDontFollow: 粒子不跟随发射器移动
+			ParticlesDontFollow: particlesDontFollow,
 		}
 		em.AddComponent(emitterID, emitterComp)
 
@@ -585,4 +601,120 @@ func CreateParticleEffectWithImage(em *ecs.EntityManager, rm *game.ResourceManag
 	}
 
 	return firstEmitterID, nil
+}
+
+// AttachTrailEffect attaches a particle trail emitter to an existing entity.
+// The trail effect will follow the entity's position as it moves.
+// This is useful for projectiles like snow pea bullets that need a trailing effect.
+//
+// Parameters:
+//   - em: Entity manager
+//   - rm: Resource manager for loading particle configurations
+//   - entityID: The entity to attach the trail effect to (must have PositionComponent)
+//   - effectName: Name of the particle effect (e.g., "SnowPeaTrail")
+//   - offsetY: Y offset for particle spawn position (e.g., bullet height / 2 for center alignment)
+//
+// Returns:
+//   - error: nil if successful, otherwise an error
+func AttachTrailEffect(em *ecs.EntityManager, rm *game.ResourceManager, entityID ecs.EntityID, effectName string, offsetY float64) error {
+	// Verify entity has PositionComponent
+	pos, ok := ecs.GetComponent[*components.PositionComponent](em, entityID)
+	if !ok {
+		return fmt.Errorf("entity %d does not have PositionComponent", entityID)
+	}
+
+	// Load particle configuration
+	particleConfig, err := rm.LoadParticleConfig(effectName)
+	if err != nil {
+		return fmt.Errorf("failed to load particle config '%s': %w", effectName, err)
+	}
+
+	if len(particleConfig.Emitters) == 0 {
+		return fmt.Errorf("particle config '%s' has no emitters", effectName)
+	}
+
+	log.Printf("[ParticleFactory] AttachTrailEffect: 为实体 %d 附加 %s 粒子效果", entityID, effectName)
+
+	// 只添加主发射器（有 SpawnRate 的那个）
+	// 跳过 FadeOut 等辅助发射器，因为 ECS 不支持同类型多组件
+	for _, emitterConfig := range particleConfig.Emitters {
+		// Parse spawn rate
+		spawnRateMin, spawnRateMax, spawnRateKeyframes, spawnRateInterp := particle.ParseValue(emitterConfig.SpawnRate)
+		spawnRate := particle.RandomInRange(spawnRateMin, spawnRateMax)
+
+		// 跳过 SpawnRate=0 的辅助发射器（如 FadeOut）
+		if spawnRate == 0 && len(spawnRateKeyframes) == 0 {
+			log.Printf("[ParticleFactory] 跳过辅助发射器: Name='%s' (SpawnRate=0)", emitterConfig.Name)
+			continue
+		}
+
+		// Parse spawn constraints
+		spawnMinActiveVal, _, spawnMinActiveKeyframes, spawnMinActiveInterp := particle.ParseValue(emitterConfig.SpawnMinActive)
+		spawnMaxActiveVal, _, spawnMaxActiveKeyframes, spawnMaxActiveInterp := particle.ParseValue(emitterConfig.SpawnMaxActive)
+		spawnMaxLaunchedVal, _, spawnMaxLaunchedKeyframes, spawnMaxLaunchedInterp := particle.ParseValue(emitterConfig.SpawnMaxLaunched)
+
+		// Parse system duration (修复：除以100转换为秒)
+		systemDurationMin, systemDurationMax, _, _ := particle.ParseValue(emitterConfig.SystemDuration)
+		systemDuration := particle.RandomInRange(systemDurationMin, systemDurationMax) / 100.0 // centiseconds to seconds
+		systemLoops := emitterConfig.SystemLoops == "1"
+		particleLoops := emitterConfig.ParticleLoops == "1"
+		particlesDontFollow := emitterConfig.ParticlesDontFollow == "1"
+
+		// Parse emitter properties
+		emitterRadiusMin, emitterRadiusMax, _, _ := particle.ParseValue(emitterConfig.EmitterRadius)
+		emitterOffsetXMin, emitterOffsetXMax, _, _ := particle.ParseValue(emitterConfig.EmitterOffsetX)
+		emitterOffsetYMin, emitterOffsetYMax, _, _ := particle.ParseValue(emitterConfig.EmitterOffsetY)
+
+		// Create EmitterComponent with all necessary fields
+		emitterComp := &components.EmitterComponent{
+			Config:          &emitterConfig,
+			Active:          true,
+			Age:             0,
+			SystemDuration:  systemDuration,
+			SystemLoops:     systemLoops,
+			ParticleLoops:   particleLoops,
+			NextSpawnTime:   0,
+			ActiveParticles: make([]ecs.EntityID, 0),
+			TotalLaunched:   0,
+
+			// Spawn rate
+			SpawnRate:          spawnRate,
+			SpawnRateKeyframes: spawnRateKeyframes,
+			SpawnRateInterp:    spawnRateInterp,
+
+			// Spawn constraints
+			SpawnMinActive:            int(spawnMinActiveVal),
+			SpawnMinActiveKeyframes:   spawnMinActiveKeyframes,
+			SpawnMinActiveInterp:      spawnMinActiveInterp,
+			SpawnMaxActive:            int(spawnMaxActiveVal),
+			SpawnMaxActiveKeyframes:   spawnMaxActiveKeyframes,
+			SpawnMaxActiveInterp:      spawnMaxActiveInterp,
+			SpawnMaxLaunched:          int(spawnMaxLaunchedVal),
+			SpawnMaxLaunchedKeyframes: spawnMaxLaunchedKeyframes,
+			SpawnMaxLaunchedInterp:    spawnMaxLaunchedInterp,
+
+			// Emitter properties
+			EmitterRadiusMin:  emitterRadiusMin,
+			EmitterRadiusMax:  emitterRadiusMax,
+			EmitterOffsetXMin: emitterOffsetXMin,
+			EmitterOffsetXMax: emitterOffsetXMax,
+			EmitterOffsetYMin: emitterOffsetYMin + offsetY, // 应用 Y 偏移（子弹中心对齐）
+			EmitterOffsetYMax: emitterOffsetYMax + offsetY, // 应用 Y 偏移（子弹中心对齐）
+
+			// Initial position (用于计算相对偏移)
+			InitialX: pos.X,
+			InitialY: pos.Y,
+
+			// ParticlesDontFollow: 粒子不跟随发射器移动（拖尾效果关键）
+			ParticlesDontFollow: particlesDontFollow,
+		}
+
+		// Add the emitter component directly to the entity
+		em.AddComponent(entityID, emitterComp)
+
+		log.Printf("[ParticleFactory] 尾迹粒子发射器附加成功: EntityID=%d, EffectName='%s', SpawnRate=%.2f, DontFollow=%v",
+			entityID, effectName, spawnRate, particlesDontFollow)
+	}
+
+	return nil
 }
