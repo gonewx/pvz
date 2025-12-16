@@ -66,6 +66,13 @@ var PlantConfigs = map[types.PlantType]*PlantResourceConfig{
 			"idle_shoot_blink", // 隐藏射击眨眼轨道
 		},
 	},
+	types.PlantChomper: {
+		ResourceName:     "Chomper",
+		ConfigID:         "chomper",
+		PreviewFrame:     0,           // 自动选择
+		PreviewAnimation: "anim_idle", // 待机动画
+		HiddenTracks:     nil,         // 无需隐藏轨道
+	},
 }
 
 // GetPlantConfig 获取植物配置

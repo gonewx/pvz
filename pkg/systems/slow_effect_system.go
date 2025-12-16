@@ -22,8 +22,9 @@ func NewSlowEffectSystem(em *ecs.EntityManager) *SlowEffectSystem {
 
 // Update 更新所有拥有减速效果的实体
 func (s *SlowEffectSystem) Update(deltaTime float64) {
-	// 查询所有拥有 SlowedComponent 和 VelocityComponent 的实体
-	entities := ecs.GetEntitiesWith2[*components.SlowedComponent, *components.VelocityComponent](s.entityManager)
+	// 查询所有拥有 SlowedComponent 的实体
+	// 注意：不再要求 VelocityComponent，因为啃食中的僵尸没有 VelocityComponent
+	entities := ecs.GetEntitiesWith1[*components.SlowedComponent](s.entityManager)
 
 	for _, id := range entities {
 		slowed, ok := ecs.GetComponent[*components.SlowedComponent](s.entityManager, id)
@@ -31,35 +32,39 @@ func (s *SlowEffectSystem) Update(deltaTime float64) {
 			continue
 		}
 
-		velocity, ok := ecs.GetComponent[*components.VelocityComponent](s.entityManager, id)
-		if !ok {
-			continue
-		}
-
-		// 如果减速效果还未应用，保存原始速度并应用减速
+		// 如果减速效果还未应用速度减慢
 		if !slowed.Applied {
-			slowed.OriginalVX = velocity.VX
-			slowed.OriginalVY = velocity.VY
-			velocity.VX *= slowed.SpeedMultiplier
-			velocity.VY *= slowed.SpeedMultiplier
+			// 对有 VelocityComponent 的实体应用移动速度减慢
+			if velocity, hasVel := ecs.GetComponent[*components.VelocityComponent](s.entityManager, id); hasVel {
+				slowed.OriginalVX = velocity.VX
+				slowed.OriginalVY = velocity.VY
+				velocity.VX *= slowed.SpeedMultiplier
+				velocity.VY *= slowed.SpeedMultiplier
+				log.Printf("[SlowEffectSystem] 实体 %d: 应用减速效果，速度从 (%.2f, %.2f) 降至 (%.2f, %.2f)，持续 %.1f 秒",
+					id, slowed.OriginalVX, slowed.OriginalVY, velocity.VX, velocity.VY, slowed.Duration)
+			}
 			slowed.Applied = true
-			log.Printf("[SlowEffectSystem] 实体 %d: 应用减速效果，速度从 (%.2f, %.2f) 降至 (%.2f, %.2f)，持续 %.1f 秒",
-				id, slowed.OriginalVX, slowed.OriginalVY, velocity.VX, velocity.VY, slowed.Duration)
 
 			// Story 8.9: 应用动画减速视觉效果
 			s.applyAnimationSlowdown(id, slowed.SpeedMultiplier)
 		}
+
+		// Story 8.9 补充：确保新切换的动画也被减速
+		// 例如：僵尸被减速后开始啃食，啃食动画也需要被减速
+		s.ensureAnimationSlowdown(id, slowed.SpeedMultiplier)
 
 		// 更新减速持续时间
 		slowed.Duration -= deltaTime
 
 		// 检查减速效果是否结束
 		if slowed.Duration <= 0 {
-			// 恢复原始速度
-			velocity.VX = slowed.OriginalVX
-			velocity.VY = slowed.OriginalVY
-			log.Printf("[SlowEffectSystem] 实体 %d: 减速效果结束，速度恢复至 (%.2f, %.2f)",
-				id, velocity.VX, velocity.VY)
+			// 恢复原始速度（如果有 VelocityComponent）
+			if velocity, hasVel := ecs.GetComponent[*components.VelocityComponent](s.entityManager, id); hasVel {
+				velocity.VX = slowed.OriginalVX
+				velocity.VY = slowed.OriginalVY
+				log.Printf("[SlowEffectSystem] 实体 %d: 减速效果结束，速度恢复至 (%.2f, %.2f)",
+					id, velocity.VX, velocity.VY)
+			}
 
 			// Story 8.9: 恢复动画速度
 			s.restoreAnimationSpeed(id)
@@ -92,6 +97,29 @@ func (s *SlowEffectSystem) applyAnimationSlowdown(entityID ecs.EntityID, speedMu
 	// 启用视觉效果标记
 	if slowed, ok := ecs.GetComponent[*components.SlowedComponent](s.entityManager, entityID); ok {
 		slowed.VisualEffect = true
+	}
+}
+
+// ensureAnimationSlowdown 确保新切换的动画也被减速
+// Story 8.9 补充：当僵尸切换动画（如从行走切换到啃食）时，新动画也需要被减速
+func (s *SlowEffectSystem) ensureAnimationSlowdown(entityID ecs.EntityID, speedMultiplier float64) {
+	reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !ok {
+		return
+	}
+
+	// 如果还没有 AnimationSpeedOverrides，初始化它
+	if reanim.AnimationSpeedOverrides == nil {
+		reanim.AnimationSpeedOverrides = make(map[string]float64)
+	}
+
+	// 检查当前播放的动画是否都已被减速
+	for _, animName := range reanim.CurrentAnimations {
+		if _, exists := reanim.AnimationSpeedOverrides[animName]; !exists {
+			// 新动画还没有被减速，应用减速
+			reanim.AnimationSpeedOverrides[animName] = speedMultiplier
+			log.Printf("[SlowEffectSystem] 实体 %d: 新动画 '%s' 速度设为 %.2f（动画切换后）", entityID, animName, speedMultiplier)
+		}
 	}
 }
 

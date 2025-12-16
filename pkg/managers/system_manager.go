@@ -144,7 +144,7 @@ func VerifyGameplayOptions() SystemOptions {
 		EnableDialog:            false, // Not needed for verify
 		EnableProgressBar:       false, // Not needed for verify
 		EnablePlantPreview:      true,  // Useful for testing
-		EnableShovelInteraction: false, // Not needed for verify
+		EnableShovelInteraction: true,  // Enable shovel tool
 	}
 }
 

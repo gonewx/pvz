@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"image"
 	"image/color"
 	"log"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/gonewx/pvz/pkg/game"
 	"github.com/gonewx/pvz/pkg/managers"
 	"github.com/gonewx/pvz/pkg/systems"
+	"github.com/gonewx/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -75,6 +77,13 @@ type VerifyGameplayGame struct {
 	// 背景图片
 	background *ebiten.Image
 	seedBank   *ebiten.Image
+
+	// 铲子
+	shovelSlot             *ebiten.Image
+	shovel                 *ebiten.Image
+	shovelSelected         bool
+	shovelSlotBounds       image.Rectangle
+	shovelInteractionSystem *systems.ShovelInteractionSystem
 
 	// 草坪网格实体
 	lawnGridEntityID ecs.EntityID
@@ -199,6 +208,25 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 		log.Printf("Warning: Failed to load seed bank: %v", err)
 	}
 
+	// 加载铲子资源
+	shovelSlot, err := rm.LoadImageByID("IMAGE_SHOVELBANK")
+	if err != nil {
+		log.Printf("Warning: Failed to load shovel slot: %v", err)
+	}
+	shovel, err := rm.LoadImageByID("IMAGE_SHOVEL")
+	if err != nil {
+		log.Printf("Warning: Failed to load shovel: %v", err)
+	}
+
+	// 计算铲子槽位边界
+	var shovelSlotBounds image.Rectangle
+	if seedBank != nil {
+		seedBankWidth := float64(seedBank.Bounds().Dx())
+		shovelX := int(float64(config.SeedBankX) + seedBankWidth + float64(config.ShovelGapFromSeedBank))
+		shovelY := config.SeedBankY
+		shovelSlotBounds = image.Rect(shovelX, shovelY, shovelX+config.ShovelWidth, shovelY+config.ShovelHeight)
+	}
+
 	// 创建 FlagWaveWarningSystem（手动触发模式）
 	flagWaveWarningSystem := systems.NewFlagWaveWarningSystem(em, nil, rm)
 
@@ -216,6 +244,7 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 	log.Println()
 	log.Println("【快捷键】")
 	log.Println("  1-5       - 选择对应植物卡片")
+	log.Println("  S/P       - 选择/取消铲子")
 	log.Println("  F1-F5     - 触发对应行的除草车")
 	log.Println("  Shift+1-5 - 在对应行生成一个僵尸")
 	log.Println("  R         - 触发奖励动画")
@@ -223,7 +252,7 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 	log.Println("  G         - 开启/关闭自动生成僵尸")
 	log.Println("  C         - 清除所有僵尸")
 	log.Println("  ESC       - 退出程序")
-	log.Println("  右键      - 取消植物选择")
+	log.Println("  右键      - 取消植物选择/铲子")
 	log.Println("════════════════════════════════════════════════════════")
 
 	vg := &VerifyGameplayGame{
@@ -253,12 +282,24 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 		background:            background,
 		seedBank:              seedBank,
 		lawnGridEntityID:      lawnGridEntityID,
+
+		// 铲子
+		shovelSlot:              shovelSlot,
+		shovel:                  shovel,
+		shovelSlotBounds:        shovelSlotBounds,
+		shovelInteractionSystem: systemManager.GetShovelInteractionSystem(),
 	}
 
 	// 验证工具启用忽略冷却模式，可以随意种植
 	if vg.inputSystem != nil {
 		vg.inputSystem.SetIgnoreCooldown(true)
 		log.Println("[VerifyGameplay] 已启用忽略冷却模式，可以随意种植植物")
+	}
+
+	// 设置铲子状态提供者
+	if vg.shovelInteractionSystem != nil {
+		systems.SetShovelStateProvider(vg)
+		log.Println("[VerifyGameplay] 已设置铲子状态提供者")
 	}
 
 	// 初始化场景
@@ -281,7 +322,9 @@ func (vg *VerifyGameplayGame) setupScene() {
 }
 
 // createPlantCards 创建所有植物卡片
+// 优雅处理选择栏已满的情况：计算最大槽位数，超出时截断并打印警告
 func (vg *VerifyGameplayGame) createPlantCards() {
+	// 完整的植物列表（按解锁顺序）
 	allPlants := []components.PlantType{
 		components.PlantSunflower,
 		components.PlantPeashooter,
@@ -289,12 +332,30 @@ func (vg *VerifyGameplayGame) createPlantCards() {
 		components.PlantCherryBomb,
 		components.PlantPotatoMine,
 		components.PlantSnowPea,
+		components.PlantChomper,
+	}
+
+	// 计算种子栏最大槽位数
+	// 可用宽度 = 种子栏宽度 - 第一张卡片起始偏移
+	availableWidth := config.SeedBankWidth - config.PlantCardStartOffsetX
+	maxSlots := availableWidth / config.PlantCardSpacing
+	if maxSlots < 1 {
+		maxSlots = 1
+	}
+
+	// 检查是否超出最大槽位数
+	plantsToCreate := allPlants
+	if len(allPlants) > maxSlots {
+		log.Printf("[VerifyGameplay] ⚠️ 植物数量 (%d) 超出选择栏最大槽位 (%d)，只显示前 %d 种植物",
+			len(allPlants), maxSlots, maxSlots)
+		log.Printf("[VerifyGameplay] 💡 提示：可修改 allPlants 列表顺序来调整显示哪些植物")
+		plantsToCreate = allPlants[:maxSlots]
 	}
 
 	startX := float64(config.SeedBankX + config.PlantCardStartOffsetX)
 	startY := float64(config.SeedBankY + config.PlantCardOffsetY)
 
-	for i, plantType := range allPlants {
+	for i, plantType := range plantsToCreate {
 		x := startX + float64(i)*float64(config.PlantCardSpacing)
 		cardID, err := entities.NewPlantCardEntity(
 			vg.entityManager,
@@ -502,6 +563,31 @@ func (vg *VerifyGameplayGame) Update() error {
 		vg.clearAllZombies()
 	}
 
+	// S 选择/取消铲子
+	if inpututil.IsKeyJustPressed(ebiten.KeyS) {
+		vg.toggleShovel()
+	}
+
+	// P 选择/取消铲子（备用快捷键）
+	if inpututil.IsKeyJustPressed(ebiten.KeyP) {
+		vg.toggleShovel()
+	}
+
+	// 右键取消铲子或植物选择
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight) {
+		if vg.shovelSelected {
+			vg.SetShovelSelected(false)
+			if vg.shovelInteractionSystem != nil {
+				vg.shovelInteractionSystem.ClearHighlight()
+			}
+			ebiten.SetCursorMode(ebiten.CursorModeVisible)
+			log.Println("[VerifyGameplay] 右键取消铲子")
+		}
+	}
+
+	// 检测铲子槽位点击
+	vg.handleShovelClick()
+
 	// 调用正式的 InputSystem 处理植物选择和种植逻辑
 	// 这会复用正式的逻辑，包括种植粒子效果
 	if vg.inputSystem != nil {
@@ -522,6 +608,11 @@ func (vg *VerifyGameplayGame) Update() error {
 	// Story 22.1: 使用 SystemManager 统一更新所有系统
 	// 这确保了所有系统都会被更新，不会遗漏任何系统
 	vg.systemManager.Update(dt)
+
+	// 更新铲子交互系统
+	if vg.shovelInteractionSystem != nil {
+		vg.shovelInteractionSystem.Update(dt, vg.gameState.CameraX)
+	}
 
 	// 更新手动管理的系统
 	vg.flagWaveWarningSystem.Update(dt)
@@ -565,6 +656,11 @@ func (vg *VerifyGameplayGame) Draw(screen *ebiten.Image) {
 	// 使用 SystemManager 提供的 PlantPreviewRenderSystem
 	if plantPreviewRenderSystem := vg.systemManager.GetPlantPreviewRenderSystem(); plantPreviewRenderSystem != nil {
 		plantPreviewRenderSystem.Draw(screen, vg.gameState.CameraX)
+	}
+
+	// 绘制铲子光标和植物高亮效果
+	if vg.shovelInteractionSystem != nil {
+		vg.shovelInteractionSystem.Draw(screen, vg.gameState.CameraX)
 	}
 
 	// 绘制奖励动画
@@ -679,6 +775,44 @@ func (vg *VerifyGameplayGame) drawUI(screen *ebiten.Image) {
 		op.ColorScale.ScaleWithColor(color.Black)
 		text.Draw(screen, sunText, vg.sunCounterFont, op)
 	}
+
+	// 绘制铲子槽位和图标
+	vg.drawShovel(screen)
+}
+
+// drawShovel 绘制铲子槽位和图标
+func (vg *VerifyGameplayGame) drawShovel(screen *ebiten.Image) {
+	// 计算铲子位置（与选择栏右侧对齐）
+	var shovelX float64
+	if vg.seedBank != nil {
+		seedBankWidth := float64(vg.seedBank.Bounds().Dx())
+		shovelX = float64(config.SeedBankX) + seedBankWidth + float64(config.ShovelGapFromSeedBank)
+	} else {
+		shovelX = float64(config.ShovelX)
+	}
+	shovelY := float64(config.SeedBankY)
+
+	// 绘制铲子槽位背景
+	if vg.shovelSlot != nil {
+		op := &ebiten.DrawImageOptions{}
+		op.GeoM.Translate(shovelX, shovelY)
+		screen.DrawImage(vg.shovelSlot, op)
+	}
+
+	// 绘制铲子图标（选中时不显示，因为会跟随鼠标）
+	if vg.shovel != nil && !vg.shovelSelected {
+		op := &ebiten.DrawImageOptions{}
+		shovelBounds := vg.shovel.Bounds()
+		shovelImgW := float64(shovelBounds.Dx())
+		shovelImgH := float64(shovelBounds.Dy())
+		// 计算居中偏移
+		slotW := float64(config.ShovelWidth)
+		slotH := float64(config.ShovelHeight)
+		offsetX := (slotW - shovelImgW) / 2.0
+		offsetY := (slotH - shovelImgH) / 2.0
+		op.GeoM.Translate(shovelX+offsetX, shovelY+offsetY)
+		screen.DrawImage(vg.shovel, op)
+	}
 }
 
 // drawDebugInfo 绘制调试信息
@@ -692,12 +826,16 @@ func (vg *VerifyGameplayGame) drawDebugInfo(screen *ebiten.Image) {
 
 	// 快捷键提示
 	hints := []string{
-		"1-5=选择植物 | F1-F5=除草车 | Shift+1-5=生成僵尸 | R=奖励 | H=一大波 | G=自动生成 | C=清除 | ESC=退出",
+		"1-5=选择植物 | S/P=铲子 | F1-F5=除草车 | Shift+1-5=生成僵尸 | R=奖励 | H=一大波 | G=自动生成 | C=清除",
 	}
 
 	isPlanting, plantType := vg.gameState.GetPlantingMode()
 	if isPlanting {
 		hints = append(hints, fmt.Sprintf("已选择植物: %d (点击草坪种植)", plantType))
+	}
+
+	if vg.shovelSelected {
+		hints = append(hints, "铲子已选中 (点击植物移除)")
 	}
 
 	spawnStatus := "已启用"
@@ -718,6 +856,61 @@ func (vg *VerifyGameplayGame) drawDebugInfo(screen *ebiten.Image) {
 // Layout 设置屏幕布局
 func (vg *VerifyGameplayGame) Layout(outsideWidth, outsideHeight int) (int, int) {
 	return screenWidth, screenHeight
+}
+
+// ========================================
+// ShovelStateProvider 接口实现
+// ========================================
+
+// IsShovelSelected 返回铲子是否被选中
+func (vg *VerifyGameplayGame) IsShovelSelected() bool {
+	return vg.shovelSelected
+}
+
+// SetShovelSelected 设置铲子选中状态
+func (vg *VerifyGameplayGame) SetShovelSelected(selected bool) {
+	vg.shovelSelected = selected
+	// 取消植物选择模式（铲子和植物选择互斥）
+	if selected {
+		vg.gameState.ExitPlantingMode()
+	}
+}
+
+// GetShovelSlotBounds 获取铲子槽位边界（屏幕坐标）
+func (vg *VerifyGameplayGame) GetShovelSlotBounds() image.Rectangle {
+	return vg.shovelSlotBounds
+}
+
+// toggleShovel 切换铲子选中状态
+func (vg *VerifyGameplayGame) toggleShovel() {
+	vg.SetShovelSelected(!vg.shovelSelected)
+	if vg.shovelSelected {
+		log.Println("[VerifyGameplay] 铲子已选中")
+	} else {
+		log.Println("[VerifyGameplay] 铲子已取消")
+		// 清除高亮效果
+		if vg.shovelInteractionSystem != nil {
+			vg.shovelInteractionSystem.ClearHighlight()
+		}
+	}
+}
+
+// handleShovelClick 处理铲子槽位点击
+func (vg *VerifyGameplayGame) handleShovelClick() {
+	// 检测左键点击
+	justPressed, _, _ := utils.IsPointerJustPressed()
+	if !justPressed {
+		return
+	}
+
+	// 获取鼠标位置
+	mouseX, mouseY := utils.GetPointerPosition()
+	point := image.Pt(mouseX, mouseY)
+
+	// 检测是否点击了铲子槽位
+	if point.In(vg.shovelSlotBounds) {
+		vg.toggleShovel()
+	}
 }
 
 func main() {

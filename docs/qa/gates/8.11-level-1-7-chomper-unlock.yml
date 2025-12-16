@@ -1,0 +1,70 @@
+# Quality Gate: Story 8.11 - Level 1-7 Chomper Unlock
+schema: 1
+story: "8.11"
+story_title: "关卡 1-7 实现 - 大嘴花解锁"
+gate: CONCERNS
+status_reason: "关卡配置存在 flagIndex 值异常和 Wave 20 僵尸配置与参考文档不一致的问题，需要确认或修正"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-12-16T00:00:00Z"
+
+waiver: { active: false }
+
+top_issues:
+  - id: "CONFIG-001"
+    severity: medium
+    finding: "flagIndex 值异常 - Wave 10 为 5（应为 1），Wave 20 为 8（应为 2）"
+    suggested_action: "修正 flagIndex 值：Wave 10 改为 1，Wave 20 改为 2"
+    suggested_owner: dev
+  - id: "CONFIG-002"
+    severity: medium
+    finding: "Wave 20 僵尸配置与参考文档不一致 - 缺少 flag 僵尸，basic 数量为 8（参考文档为 7）"
+    suggested_action: "确认是否需要添加 flag 僵尸并调整 basic 数量"
+    suggested_owner: dev
+  - id: "TEST-001"
+    severity: low
+    finding: "缺少 level-1-7 的专门测试用例"
+    suggested_action: "在 level_config_chapter1_test.go 中添加 TestLevel1_7_Specification 测试"
+    suggested_owner: dev
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 2, low: 1 }
+  recommendations:
+    must_fix:
+      - "确认并修正 flagIndex 配置"
+      - "确认 Wave 20 僵尸配置"
+    monitor:
+      - "考虑添加测试覆盖"
+
+quality_score: 70
+expires: "2025-12-30T00:00:00Z"
+
+evidence:
+  tests_reviewed: 0
+  risks_identified: 3
+  trace:
+    ac_covered: [1, 2, 3, 4]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "配置文件不涉及安全敏感操作"
+  performance:
+    status: PASS
+    notes: "YAML 配置一次性加载，无性能问题"
+  reliability:
+    status: PASS
+    notes: "配置验证机制已存在"
+  maintainability:
+    status: CONCERNS
+    notes: "缺少专门测试，可维护性受影响"
+
+recommendations:
+  immediate:
+    - action: "确认并修正 flagIndex 值（Wave 10: 5→1, Wave 20: 8→2）"
+      refs: ["data/levels/level-1-7.yaml:121", "data/levels/level-1-7.yaml:216"]
+    - action: "确认 Wave 20 僵尸配置是否需要 flag 僵尸"
+      refs: ["data/levels/level-1-7.yaml:212-230", ".meta/levels/chapter1.md:280"]
+  future:
+    - action: "添加 level-1-7 测试用例"
+      refs: ["pkg/config/level_config_chapter1_test.go"]

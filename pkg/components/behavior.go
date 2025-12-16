@@ -69,6 +69,9 @@ const (
 	// BehaviorZombiePolevaulter 撑杆僵尸行为：持杆时高速移动，遇到植物跳跃越过
 	// Story 8.9: 跳跃后丢弃撑杆，速度降为普通速度
 	BehaviorZombiePolevaulter
+	// BehaviorChomper 大嘴花行为：检测前方僵尸，执行吞噬或撕咬攻击
+	// Story 8.11: 吞噬后进入 42 秒消化期，期间无法攻击
+	BehaviorChomper
 )
 
 // ZombieAnimState 定义僵尸的动画状态

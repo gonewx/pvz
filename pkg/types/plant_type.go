@@ -20,6 +20,8 @@ const (
 	PlantPotatoMine
 	// PlantSnowPea 寒冰射手 (Story 8.9)
 	PlantSnowPea
+	// PlantChomper 大嘴花 (Story 8.11)
+	PlantChomper
 )
 
 // String 返回植物类型的字符串表示
@@ -37,6 +39,8 @@ func (p PlantType) String() string {
 		return "PotatoMine"
 	case PlantSnowPea:
 		return "SnowPea"
+	case PlantChomper:
+		return "Chomper"
 	default:
 		return "Unknown"
 	}

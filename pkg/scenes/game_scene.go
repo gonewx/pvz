@@ -236,6 +236,12 @@ type GameScene struct {
 
 	// Story 8.9: 减速效果系统
 	slowEffectSystem *systems.SlowEffectSystem
+
+	// Story 8.11: 大嘴花系统
+	chomperSystem *systems.ChomperSystem
+
+	// 背景音乐播放状态
+	bgmStarted bool // 是否已开始播放背景音乐
 }
 
 // NewGameScene creates and returns a new GameScene instance.
@@ -427,6 +433,7 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	// PlantPreviewRenderSystem 需要引用 PlantPreviewSystem 来获取两个渲染位置
 	// Story 8.1: PlantPreviewSystem 需要 LawnGridSystem 来检查行是否启用
 	scene.plantPreviewSystem = systems.NewPlantPreviewSystem(scene.entityManager, scene.gameState, scene.lawnGridSystem)
+	scene.plantPreviewSystem.SetLawnGridEntityID(scene.lawnGridEntityID) // 设置网格实体ID用于检查格子占用
 	// 修复: 使用静态图像预览,不需要 ReanimSystem
 	scene.plantPreviewRenderSystem = systems.NewPlantPreviewRenderSystem(scene.entityManager, scene.plantPreviewSystem)
 
@@ -665,6 +672,10 @@ func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID strin
 	// Story 8.9: 初始化减速效果系统
 	scene.slowEffectSystem = systems.NewSlowEffectSystem(scene.entityManager)
 	log.Printf("[GameScene] Initialized slow effect system")
+
+	// Story 8.11: 初始化大嘴花系统
+	scene.chomperSystem = systems.NewChomperSystem(scene.entityManager, scene.gameState)
+	log.Printf("[GameScene] Initialized chomper system")
 
 	// Story 19.5: 根据关卡配置初始化传送带参数
 	if scene.gameState.CurrentLevel != nil && scene.gameState.CurrentLevel.ConveyorBelt != nil {
@@ -1140,6 +1151,23 @@ func (s *GameScene) Update(deltaTime float64) {
 		return // 停止其他游戏系统（僵尸移动、植物攻击等）
 	}
 
+	// 背景音乐播放：在所有开场动画完成后开始播放
+	// 检测条件：开场动画完成 + 铺草皮动画完成 + ReadySetPlant动画完成（如果有的话）
+	if !s.bgmStarted {
+		isOpeningComplete := s.openingSystem == nil || s.openingSystem.IsCompleted()
+		isSoddingComplete := s.soddingSystem == nil || !s.soddingSystem.IsPlaying()
+		isReadySetPlantComplete := s.readySetPlantSystem == nil || !s.readySetPlantSystem.IsPlaying()
+
+		// 所有开场动画完成后开始播放背景音乐
+		if isOpeningComplete && isSoddingComplete && isReadySetPlantComplete && s.seedBankSlideInCompleted {
+			if audioManager := s.gameState.GetAudioManager(); audioManager != nil {
+				audioManager.PlayMusic("SOUND_MAINMUSIC")
+				log.Printf("[GameScene] 开始播放背景音乐")
+			}
+			s.bgmStarted = true
+		}
+	}
+
 	// Update all ECS systems in order (order matters for correct game logic)
 	s.levelSystem.Update(deltaTime)                       // 0. Update level system (Story 5.5: wave spawning, victory/defeat)
 	s.waveSpawnSystem.UpdatePendingActivations(deltaTime) // 0.05. Update pending zombie activations (散落入场效果)
@@ -1199,6 +1227,11 @@ func (s *GameScene) Update(deltaTime float64) {
 	// Story 8.9: 减速效果系统（处理冰豌豆减速效果持续时间）
 	if s.slowEffectSystem != nil {
 		s.slowEffectSystem.Update(deltaTime) // 7.5. Update slow effects
+	}
+
+	// Story 8.11: 大嘴花系统（处理吞噬/撕咬/消化逻辑）
+	if s.chomperSystem != nil {
+		s.chomperSystem.Update(deltaTime) // 7.6. Update chomper states
 	}
 
 	// Story 6.3: Reanim 动画系统（替代旧的 AnimationSystem）
@@ -1715,6 +1748,15 @@ func (s *GameScene) updateShovelSlotClick() {
 	// 检测左键点击或触摸
 	justPressed, mouseX, mouseY := utils.IsJustTouchedOrClicked()
 	if justPressed {
+		// Bug Fix: 触摸输入由拖拽逻辑处理，这里只处理鼠标点击
+		// 避免触摸开始时 toggleShovelMode() 和 handleShovelDragStart() 都被调用导致重复音效
+		touchIDs := inpututil.AppendJustPressedTouchIDs(nil)
+		if len(touchIDs) > 0 {
+			// 触摸输入会在下一帧由 handleShovelDrag() 处理（DragManager 状态更新后）
+			// 这里跳过，避免重复播放音效
+			return
+		}
+
 		bounds := s.GetShovelSlotBounds()
 
 		// 检查是否点击了铲子槽位

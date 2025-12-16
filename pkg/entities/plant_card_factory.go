@@ -60,6 +60,9 @@ func NewPlantCardEntity(em *ecs.EntityManager, rm *game.ResourceManager, rs Rean
 	case components.PlantSnowPea:
 		sunCost = config.SnowPeaSunCost
 		cooldownTime = config.SnowPeaRechargeTime
+	case components.PlantChomper:
+		sunCost = config.ChomperSunCost
+		cooldownTime = config.ChomperRechargeTime
 	default:
 		em.DestroyEntity(entity)
 		em.RemoveMarkedEntities()

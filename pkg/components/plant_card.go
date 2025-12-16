@@ -17,6 +17,7 @@ const (
 	PlantCherryBomb = types.PlantCherryBomb
 	PlantPotatoMine = types.PlantPotatoMine // Story 19.10
 	PlantSnowPea    = types.PlantSnowPea    // Story 8.9
+	PlantChomper    = types.PlantChomper    // Story 8.11
 )
 
 // PlantCardComponent 表示植物选择卡片的数据

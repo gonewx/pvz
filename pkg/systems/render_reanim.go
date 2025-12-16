@@ -126,6 +126,12 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		isExplosiveNut = true
 	}
 
+	// Story 8.9: 检查冰冻减速效果（需要冰蓝色叠加层）
+	var slowedEffect *components.SlowedComponent
+	if slowComp, hasSlowed := ecs.GetComponent[*components.SlowedComponent](s.entityManager, id); hasSlowed && slowComp.VisualEffect {
+		slowedEffect = slowComp
+	}
+
 	// 使用坐标转换工具库计算屏幕坐标
 	baseScreenX, baseScreenY, err := utils.GetRenderScreenOrigin(s.entityManager, id, pos, cameraX)
 	if err != nil {
@@ -369,6 +375,18 @@ func (s *RenderSystem) renderReanimEntity(screen *ebiten.Image, id ecs.EntityID,
 		if isExplosiveNut {
 			colorG *= 0.3
 			colorB *= 0.3
+		}
+
+		// Story 8.9: 冰冻减速效果 - 整体色调偏蓝紫色
+		// 参考原版 PvZ，被冰冻的僵尸呈现蓝紫色调
+		if slowedEffect != nil {
+			colorR *= 0.6 // 减少红色
+			colorG *= 0.7 // 减少绿色
+			colorB *= 1.3 // 增加蓝色
+			// 限制蓝色不超过最大值
+			if colorB > 1.5 {
+				colorB = 1.5
+			}
 		}
 
 		// 应用透明度（Alpha）值

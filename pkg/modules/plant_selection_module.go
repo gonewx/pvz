@@ -124,8 +124,8 @@ func (m *PlantSelectionModule) createPlantCards(levelConfig *config.LevelConfig,
 		"cherrybomb": components.PlantCherryBomb,
 		"potatomine": components.PlantPotatoMine,
 		"snowpea":    components.PlantSnowPea,
+		"chomper":    components.PlantChomper, // Story 8.11
 		// TODO: 未来添加更多植物类型
-		// "chomper":       components.PlantChomper,
 		// "repeater":      components.PlantRepeater,
 		// "puffshroom":    components.PlantPuffShroom,
 		// "sunshroom":     components.PlantSunShroom,
