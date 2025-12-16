@@ -116,4 +116,9 @@ type ParticleComponent struct {
 	PositionFieldXInterp    string              // X 轴插值模式
 	PositionFieldYInterp    string              // Y 轴插值模式
 	HasPositionField        bool                // 是否有 Position Field（用于快速检查）
+
+	// DontFollow: 粒子不跟随发射器移动
+	// 当为 true 时，粒子位置是绝对世界坐标，不会随发射器移动
+	// 用于拖尾效果（如 SnowPeaTrail），粒子留在原地形成轨迹
+	DontFollow bool
 }

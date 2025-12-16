@@ -202,15 +202,10 @@ func ParseValue(s string) (min, max float64, keyframes []Keyframe, interpolation
 				endMax, err4 := strconv.ParseFloat(range2Parts[1], 64)
 
 				if err1 == nil && err2 == nil && err3 == nil && err4 == nil {
-					// Story 10.4 修复：双范围格式应该计算宽度（绝对值）
-					// 例如：[-130 0] → width = abs(0 - (-130)) = 130
-					//      [-100 0] → width = abs(0 - (-100)) = 100
-					// 这样 EmitterBox 从 130 插值到 100（宽度缩小）
-					//
-					// 注意：EmitterBox 应该使用 ParseRangeValue() 而不是 ParseValue()
-					// ParseRangeValue() 会保留完整的范围信息（min + width）
-					startValue := math.Abs(startMax - startMin)
-					endValue := math.Abs(endMax - endMin)
+					// 双范围格式：每个粒子在起始范围随机一个值，插值到结束范围的随机值
+					// 例如：[.4 .6] [.8 1.2] → 从[0.4-0.6]随机插值到[0.8-1.2]随机
+					startValue := RandomInRange(startMin, startMax)
+					endValue := RandomInRange(endMin, endMax)
 
 					// 创建从 0 到 1 的 keyframes
 					keyframes = []Keyframe{
@@ -221,6 +216,14 @@ func ParseValue(s string) (min, max float64, keyframes []Keyframe, interpolation
 				}
 			}
 		}
+	}
+
+	// 复杂混合格式支持：初始值 + [范围],时间点 + ... + 最终值
+	// 例如：".3 [.8 1.2],9.999999 [.8 1.2],70 0"
+	// 例如："1 [.4 .8],79.99999 0"
+	// 这种格式用于粒子属性的多阶段动画
+	if !strings.HasPrefix(s, "[") && strings.Contains(s, "[") && strings.Contains(s, ",") {
+		return parseComplexMixedFormat(s)
 	}
 
 	// Story: 支持 "initialValue [minEnd maxEnd]" 格式（Position Field 特殊格式）
@@ -559,4 +562,99 @@ func RandomInRange(min, max float64) float64 {
 		return min
 	}
 	return min + rand.Float64()*(max-min)
+}
+
+// parseComplexMixedFormat 解析复杂混合格式
+// 支持格式：初始值 + [范围],时间点 组合 + 最终值
+//
+// 例子：
+//   - ".3 [.8 1.2],9.999999 [.8 1.2],70 0"
+//     含义：初始0.3 → 在10%快速变到[0.8-1.2]随机 → 保持到70% → 变到0
+//   - "1 [.4 .8],79.99999 0"
+//     含义：初始1 → 在80%变到[0.4-0.8]随机 → 变到0
+//
+// 返回值：生成的关键帧数组和插值模式
+func parseComplexMixedFormat(s string) (min, max float64, keyframes []Keyframe, interpolation string) {
+	// 将字符串按空格分割成 token
+	tokens := strings.Fields(s)
+	if len(tokens) < 2 {
+		return 0, 0, nil, ""
+	}
+
+	var kf []Keyframe
+	var i int
+
+	// 解析初始值（第一个 token 应该是一个数字）
+	initialValue, err := strconv.ParseFloat(tokens[0], 64)
+	if err != nil {
+		return 0, 0, nil, ""
+	}
+	kf = append(kf, Keyframe{Time: 0, Value: initialValue})
+	i = 1
+
+	// 遍历剩余的 token
+	for i < len(tokens) {
+		token := tokens[i]
+
+		// 检查是否是 "[范围],时间点" 格式
+		if strings.HasPrefix(token, "[") {
+			// 找到对应的 "]" 并提取时间点
+			// 格式可能是 "[.8 1.2],9.999999" (同一token) 或 "[.8" "1.2],9.999999" (分开的token)
+
+			// 收集完整的范围和时间点
+			fullToken := token
+			for !strings.Contains(fullToken, "],") && i+1 < len(tokens) {
+				i++
+				fullToken += " " + tokens[i]
+			}
+
+			// 检查是否是 "[范围],时间点" 格式
+			if strings.Contains(fullToken, "],") {
+				// 分割范围和时间点
+				splitIdx := strings.Index(fullToken, "],")
+				rangePart := fullToken[:splitIdx+1] // 包含 "]"
+				timePart := fullToken[splitIdx+2:]  // 跳过 "],"
+
+				// 解析范围
+				rangeStr := strings.TrimPrefix(rangePart, "[")
+				rangeStr = strings.TrimSuffix(rangeStr, "]")
+				rangeParts := strings.Fields(rangeStr)
+
+				if len(rangeParts) == 2 {
+					rangeMin, err1 := strconv.ParseFloat(rangeParts[0], 64)
+					rangeMax, err2 := strconv.ParseFloat(rangeParts[1], 64)
+					timePercent, err3 := strconv.ParseFloat(timePart, 64)
+
+					if err1 == nil && err2 == nil && err3 == nil {
+						// 从范围中随机选择一个值
+						value := RandomInRange(rangeMin, rangeMax)
+						time := timePercent / 100.0
+
+						kf = append(kf, Keyframe{Time: time, Value: value})
+					}
+				}
+			}
+		} else {
+			// 可能是最终值（单独的数字）
+			value, err := strconv.ParseFloat(token, 64)
+			if err == nil {
+				// 添加最终关键帧（时间 100%）
+				kf = append(kf, Keyframe{Time: 1.0, Value: value})
+			}
+		}
+		i++
+	}
+
+	// 确保至少有2个关键帧
+	if len(kf) < 2 {
+		return 0, 0, nil, ""
+	}
+
+	// 确保最后一个关键帧在 t=1.0
+	if kf[len(kf)-1].Time < 1.0 {
+		// 保持最后一个值到 t=1.0
+		kf = append(kf, Keyframe{Time: 1.0, Value: kf[len(kf)-1].Value})
+	}
+
+	return 0, 0, kf, "Linear"
 }

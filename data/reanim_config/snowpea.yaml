@@ -41,3 +41,29 @@ available_animations:
     - name: anim_blink
       display_name: blink
       speed: 1.5
+animation_combos:
+    - name: idle
+      display_name: 待机
+      loop: true
+      animations:
+        - anim_full_idle
+      binding_strategy: auto
+      hidden_tracks:
+        - anim_blink
+        - idle_shoot_blink
+    - name: attack_with_sway
+      display_name: 攻击+摇晃
+      loop: true
+      animations:
+        - anim_shooting
+        - anim_idle
+      binding_strategy: auto
+      parent_tracks:
+        anim_face: anim_stem
+        SnowPea_mouth: anim_stem
+        SnowPea_crystals1: anim_stem
+        SnowPea_crystals2: anim_stem
+        SnowPea_crystals3: anim_stem
+      hidden_tracks:
+        - anim_blink
+        - idle_shoot_blink

@@ -131,4 +131,9 @@ type EmitterComponent struct {
 	// 图片覆盖（用于复用粒子配置但使用不同图片）
 	// 例如：撑杆僵尸掉头效果复用 ZombieHead 配置，但使用 IMAGE_ZOMBIEPOLEVAULTERHEAD 图片
 	ImageOverride string // 如果非空，使用此资源 ID 代替配置中的 Image
+
+	// ParticlesDontFollow: 粒子不跟随发射器移动
+	// 当为 true 时，粒子生成后使用世界坐标，不会跟随发射器位置更新
+	// 用于拖尾效果（如 SnowPeaTrail），粒子留在原地形成轨迹
+	ParticlesDontFollow bool
 }
