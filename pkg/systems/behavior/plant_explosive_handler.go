@@ -342,13 +342,13 @@ func (s *BehaviorSystem) handlePotatoMineArmedPhase(entityID ecs.EntityID, plant
 			continue
 		}
 
-		// 获取僵尸碰撞盒偏移
+		// 计算僵尸到土豆地雷的距离（用于警告灯闪烁频率）
+		// 使用碰撞盒中心来计算距离
 		collision, hasCollision := ecs.GetComponent[*components.CollisionComponent](s.entityManager, zombieID)
 		collisionOffsetX := 0.0
 		if hasCollision {
 			collisionOffsetX = collision.OffsetX
 		}
-
 		zombieCenterX := zombiePos.X + collisionOffsetX
 		distance := zombieCenterX - plantPos.X
 
@@ -357,11 +357,13 @@ func (s *BehaviorSystem) handlePotatoMineArmedPhase(entityID ecs.EntityID, plant
 		}
 
 		// 检测触发爆炸
-		zombieCol := int((zombieCenterX - config.GridWorldStartX) / config.CellWidth)
+		// 使用僵尸脚底位置（position.X）计算所在列，与僵尸啃食检测逻辑保持一致
+		// 这样确保土豆地雷在僵尸"踩到"它时爆炸，而不是等僵尸的碰撞盒中心到达
+		zombieCol := int((zombiePos.X - config.GridWorldStartX) / config.CellWidth)
 		// 调试：输出僵尸和土豆地雷的列位置
 		if distance < 100 {
-			log.Printf("[PotatoMine] 土豆地雷 %d (col=%d): 僵尸 %d zombieCenterX=%.1f, zombieCol=%d, distance=%.1f",
-				entityID, plant.GridCol, zombieID, zombieCenterX, zombieCol, distance)
+			log.Printf("[PotatoMine] 土豆地雷 %d (col=%d): 僵尸 %d zombiePos.X=%.1f, zombieCol=%d, distance=%.1f",
+				entityID, plant.GridCol, zombieID, zombiePos.X, zombieCol, distance)
 		}
 		if zombieCol == plant.GridCol {
 			log.Printf("[BehaviorSystem] 土豆地雷 %d: 检测到僵尸 %d 触发！", entityID, zombieID)
