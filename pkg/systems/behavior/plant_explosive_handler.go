@@ -45,11 +45,15 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 		return
 	}
 
-	// 获取樱桃炸弹的网格位置用于调试
+	// 获取樱桃炸弹的网格位置（用于 3x3 范围限制）
 	plantComp, _ := ecs.GetComponent[*components.PlantComponent](s.entityManager, entityID)
-	if plantComp != nil {
-		log.Printf("[BehaviorSystem] 樱桃炸弹 %d 网格位置: col=%d, row=%d", entityID, plantComp.GridCol, plantComp.GridRow)
+	if plantComp == nil {
+		log.Printf("[BehaviorSystem] 警告：樱桃炸弹 %d 缺少 PlantComponent，无法确定网格位置", entityID)
+		return
 	}
+	plantRow := plantComp.GridRow
+	plantCol := plantComp.GridCol
+	log.Printf("[BehaviorSystem] 樱桃炸弹 %d 网格位置: col=%d, row=%d", entityID, plantCol, plantRow)
 
 	// 计算爆炸圆心：植物位置 + 偏移量
 	// 修正：PositionComponent 已经是网格中心，偏移量已在配置中归零
@@ -91,6 +95,17 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 			continue
 		}
 
+		// 3x3 网格范围限制：只影响行差 <= 1 的僵尸
+		zombieRow := int((zombiePos.Y - config.GridWorldStartY - config.ZombieVerticalOffset) / config.CellHeight)
+		rowDiff := zombieRow - plantRow
+		if rowDiff < 0 {
+			rowDiff = -rowDiff
+		}
+		if rowDiff > 1 {
+			// 超出 3x3 网格范围，跳过此僵尸
+			continue
+		}
+
 		// 计算爆炸圆心到僵尸碰撞盒的最近距离
 		// 僵尸碰撞盒：以 zombiePos 为中心，宽 ZombieCollisionWidth，高 ZombieCollisionHeight
 		// 僵尸的 PositionComponent.Y 已包含 ZombieVerticalOffset，需要还原到格子中心进行计算
@@ -111,8 +126,6 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 		dy := closestY - explosionCenterY
 		distanceSq := dx*dx + dy*dy
 
-		// 计算僵尸所在行（用于调试）
-		zombieRow := int((zombiePos.Y - config.GridWorldStartY - config.ZombieVerticalOffset) / config.CellHeight)
 		log.Printf("[BehaviorSystem] 检测僵尸 %d: pos=(%.1f, %.1f), 碰撞盒中心Y=%.1f, row=%d, 到碰撞盒距离=%.1f, 半径=%.1f",
 			zombieID, zombiePos.X, zombiePos.Y, zombieCenterY, zombieRow, math.Sqrt(distanceSq), explosionRadius)
 
