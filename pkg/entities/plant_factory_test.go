@@ -681,10 +681,10 @@ func TestGetPlantFactory_KnownTypes(t *testing.T) {
 func TestGetPlantFactory_UnknownType(t *testing.T) {
 	unknownTypes := []string{
 		"unknown",
-		"repeater",
 		"",
 		// 注意：大写的 "SUNFLOWER" 现在可以匹配，因为 GetPlantFactory 使用 strings.ToLower
 		// 这是为了兼容存档中可能保存的不同大小写的类型名称
+		// 注意：repeater 已经实现，不再是未知类型
 	}
 
 	for _, plantType := range unknownTypes {

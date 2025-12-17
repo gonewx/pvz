@@ -280,6 +280,7 @@ func TestBowlingNutSystem_CollisionDetection(t *testing.T) {
 	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+	em.AddComponent(zombieID, &components.ZombieTagComponent{})
 
 	// 更新系统
 	system.Update(0.016)
@@ -318,6 +319,7 @@ func TestBowlingNutSystem_ArmorDamage(t *testing.T) {
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(zombieID, &components.ArmorComponent{CurrentArmor: 370, MaxArmor: 370})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+	em.AddComponent(zombieID, &components.ZombieTagComponent{})
 
 	// 更新系统（第一次碰撞）
 	system.Update(0.016)
@@ -359,6 +361,7 @@ func TestBowlingNutSystem_BucketheadZombieArmorDamage(t *testing.T) {
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(zombieID, &components.ArmorComponent{CurrentArmor: 1100, MaxArmor: 1100})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+	em.AddComponent(zombieID, &components.ZombieTagComponent{})
 
 	// 更新系统（第一次碰撞）
 	system.Update(0.016)
@@ -466,6 +469,7 @@ func TestBowlingNutSystem_BounceCountIncrement(t *testing.T) {
 	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+	em.AddComponent(zombieID, &components.ZombieTagComponent{})
 
 	// 更新系统
 	system.Update(0.016)
@@ -500,6 +504,7 @@ func TestBowlingNutSystem_CollisionCooldown(t *testing.T) {
 	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+	em.AddComponent(zombieID, &components.ZombieTagComponent{})
 
 	// 更新系统（冷却期间不应检测碰撞）
 	system.Update(0.016)
@@ -575,6 +580,7 @@ func TestBowlingNutSystem_ExplosiveNut_DestroyedOnCollision(t *testing.T) {
 	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+	em.AddComponent(zombieID, &components.ZombieTagComponent{})
 
 	// 更新系统
 	system.Update(0.016)
@@ -611,6 +617,7 @@ func TestBowlingNutSystem_FlashEffectAdded(t *testing.T) {
 	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+	em.AddComponent(zombieID, &components.ZombieTagComponent{})
 
 	// 更新系统
 	system.Update(0.016)
@@ -724,6 +731,7 @@ func TestBowlingNutSystem_ExplosiveNut_AreaDamage(t *testing.T) {
 	em.AddComponent(targetID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
 	em.AddComponent(targetID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(targetID, &components.CollisionComponent{Width: 40, Height: 115})
+	em.AddComponent(targetID, &components.ZombieTagComponent{})
 
 	// 创建相邻行僵尸（行 1，范围内）
 	row1Y := config.GridWorldStartY + float64(1)*config.CellHeight + config.CellHeight/2 // 228.0
@@ -732,6 +740,7 @@ func TestBowlingNutSystem_ExplosiveNut_AreaDamage(t *testing.T) {
 	em.AddComponent(adjacentID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
 	em.AddComponent(adjacentID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(adjacentID, &components.CollisionComponent{Width: 40, Height: 115})
+	em.AddComponent(adjacentID, &components.ZombieTagComponent{})
 
 	// 创建远距离僵尸（同行但远离，范围外）
 	farID := em.CreateEntity()
@@ -739,6 +748,7 @@ func TestBowlingNutSystem_ExplosiveNut_AreaDamage(t *testing.T) {
 	em.AddComponent(farID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
 	em.AddComponent(farID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(farID, &components.CollisionComponent{Width: 40, Height: 115})
+	em.AddComponent(farID, &components.ZombieTagComponent{})
 
 	// 更新系统
 	system.Update(0.016)
@@ -786,6 +796,7 @@ func TestBowlingNutSystem_ExplosiveNut_NoBounce(t *testing.T) {
 	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+	em.AddComponent(zombieID, &components.ZombieTagComponent{})
 
 	// 更新系统
 	system.Update(0.016)
@@ -825,6 +836,7 @@ func TestBowlingNutSystem_ExplosiveNut_Damage1800(t *testing.T) {
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(zombieID, &components.ArmorComponent{CurrentArmor: 1100, MaxArmor: 1100})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+	em.AddComponent(zombieID, &components.ZombieTagComponent{})
 
 	// 更新系统
 	system.Update(0.016)
@@ -871,6 +883,7 @@ func TestBowlingNutSystem_ExplosiveNut_BounceCountNotIncreased(t *testing.T) {
 	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+	em.AddComponent(zombieID, &components.ZombieTagComponent{})
 
 	// 更新系统
 	system.Update(0.016)
@@ -913,6 +926,7 @@ func TestBowlingNutSystem_ExplosiveNut_ArmorPriority(t *testing.T) {
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(zombieID, &components.ArmorComponent{CurrentArmor: 370, MaxArmor: 370})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+	em.AddComponent(zombieID, &components.ZombieTagComponent{})
 
 	// 更新系统
 	system.Update(0.016)
@@ -955,6 +969,7 @@ func TestBowlingNutSystem_ExplosiveNut_FlashEffect(t *testing.T) {
 	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+	em.AddComponent(zombieID, &components.ZombieTagComponent{})
 
 	// 更新系统
 	system.Update(0.016)
@@ -996,6 +1011,7 @@ func TestBowlingNutSystem_ExplosiveNut_MultipleZombiesInRange(t *testing.T) {
 	em.AddComponent(zombieIDs[0], &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
 	em.AddComponent(zombieIDs[0], &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(zombieIDs[0], &components.CollisionComponent{Width: 40, Height: 115})
+	em.AddComponent(zombieIDs[0], &components.ZombieTagComponent{})
 
 	// 僵尸2：上方（Y 偏移 -60，考虑 ZombieVerticalOffset 后有效距离约 85 像素）
 	zombieIDs[1] = em.CreateEntity()
@@ -1003,6 +1019,7 @@ func TestBowlingNutSystem_ExplosiveNut_MultipleZombiesInRange(t *testing.T) {
 	em.AddComponent(zombieIDs[1], &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
 	em.AddComponent(zombieIDs[1], &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(zombieIDs[1], &components.CollisionComponent{Width: 40, Height: 115})
+	em.AddComponent(zombieIDs[1], &components.ZombieTagComponent{})
 
 	// 僵尸3：下方（Y 偏移 +60，考虑 ZombieVerticalOffset 后有效距离约 85 像素）
 	zombieIDs[2] = em.CreateEntity()
@@ -1010,6 +1027,7 @@ func TestBowlingNutSystem_ExplosiveNut_MultipleZombiesInRange(t *testing.T) {
 	em.AddComponent(zombieIDs[2], &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
 	em.AddComponent(zombieIDs[2], &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(zombieIDs[2], &components.CollisionComponent{Width: 40, Height: 115})
+	em.AddComponent(zombieIDs[2], &components.ZombieTagComponent{})
 
 	// 更新系统
 	system.Update(0.016)
@@ -1158,6 +1176,7 @@ func TestBowlingNutSystem_ContinueBounce_StopsOnCollision(t *testing.T) {
 	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
+	em.AddComponent(zombieID, &components.ZombieTagComponent{})
 
 	// 创建第3行更近的僵尸（影响弹射方向计算）
 	row3Y := config.GridWorldStartY + float64(3)*config.CellHeight + config.CellHeight/2

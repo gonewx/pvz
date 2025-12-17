@@ -308,8 +308,15 @@ func (s *BowlingNutSystem) triggerExplosion(entityID ecs.EntityID, posComp *comp
 	explosionRadius := config.ExplosiveNutExplosionRadius * config.CellWidth
 	explosionRadiusSq := explosionRadius * explosionRadius
 
-	log.Printf("[BowlingNutSystem] 爆炸坚果爆炸: entityID=%d, 位置=(%.1f, %.1f), 半径=%.1f像素",
-		entityID, posComp.X, posComp.Y, explosionRadius)
+	// 获取坚果所在行（用于 3x3 范围限制）
+	nutComp, _ := ecs.GetComponent[*components.BowlingNutComponent](s.entityManager, entityID)
+	nutRow := 0
+	if nutComp != nil {
+		nutRow = nutComp.Row
+	}
+
+	log.Printf("[BowlingNutSystem] 爆炸坚果爆炸: entityID=%d, 位置=(%.1f, %.1f), 半径=%.1f像素, 行=%d",
+		entityID, posComp.X, posComp.Y, explosionRadius, nutRow)
 
 	// 查询所有僵尸实体
 	zombieEntities := ecs.GetEntitiesWith2[
@@ -319,14 +326,36 @@ func (s *BowlingNutSystem) triggerExplosion(entityID ecs.EntityID, posComp *comp
 
 	damageCount := 0
 	for _, zombieID := range zombieEntities {
-		behavior, _ := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
-
-		// 检查是否是僵尸类型
-		if !s.isZombieType(behavior.Type) {
+		// 使用 ZombieTagComponent 判断是否为僵尸实体（与樱桃炸弹保持一致）
+		if _, isZombie := ecs.GetComponent[*components.ZombieTagComponent](s.entityManager, zombieID); !isZombie {
 			continue
 		}
 
-		zombiePos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
+		behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
+		if !ok {
+			continue
+		}
+
+		// 跳过已死亡的僵尸（与樱桃炸弹保持一致）
+		if behavior.Type == components.BehaviorZombieDying || behavior.Type == components.BehaviorZombieDyingExplosion {
+			continue
+		}
+
+		zombiePos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
+		if !ok {
+			continue
+		}
+
+		// 3x3 网格范围限制：只影响行差 <= 1 的僵尸（与樱桃炸弹保持一致）
+		zombieRow := int((zombiePos.Y - config.GridWorldStartY - config.ZombieVerticalOffset) / config.CellHeight)
+		rowDiff := zombieRow - nutRow
+		if rowDiff < 0 {
+			rowDiff = -rowDiff
+		}
+		if rowDiff > 1 {
+			// 超出 3x3 网格范围，跳过此僵尸
+			continue
+		}
 
 		// 计算爆炸圆心到僵尸碰撞盒的最近距离
 		// 僵尸碰撞盒：以 zombiePos 为中心，宽 ZombieCollisionWidth，高 ZombieCollisionHeight
@@ -351,8 +380,8 @@ func (s *BowlingNutSystem) triggerExplosion(entityID ecs.EntityID, posComp *comp
 		if distSq <= explosionRadiusSq {
 			s.applyExplosionDamageToZombie(zombieID)
 			damageCount++
-			log.Printf("[BowlingNutSystem] 僵尸在爆炸范围内: zombieID=%d, 到碰撞盒距离=%.1f像素",
-				zombieID, math.Sqrt(distSq))
+			log.Printf("[BowlingNutSystem] 僵尸在爆炸范围内: zombieID=%d, row=%d, 到碰撞盒距离=%.1f像素",
+				zombieID, zombieRow, math.Sqrt(distSq))
 		}
 	}
 

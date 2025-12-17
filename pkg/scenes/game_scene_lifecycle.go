@@ -471,6 +471,10 @@ func (s *GameScene) updateGameplaySystems(deltaTime, cameraX float64, skipInputT
 	if s.particleSystem != nil {
 		s.particleSystem.Update(deltaTime) // 8.1. Update particle emitters and particles
 	}
+	// 闪烁效果系统（僵尸受击闪烁）
+	if s.flashEffectSystem != nil {
+		s.flashEffectSystem.Update(deltaTime) // 8.2. Update flash effect duration
+	}
 	// Story 8.3: ReadySetPlant 动画系统（铺草皮完成后播放）
 	if s.readySetPlantSystem != nil {
 		s.readySetPlantSystem.Update(deltaTime) // 8.5. Update ReadySetPlant animation duration
@@ -478,6 +482,26 @@ func (s *GameScene) updateGameplaySystems(deltaTime, cameraX float64, skipInputT
 	// Story 11.6: 更新 Dave 对话系统
 	if s.daveDialogueSystem != nil {
 		s.daveDialogueSystem.Update(deltaTime) // 9.10. Update Dave dialogue
+	}
+	// Story 8.2: 更新教学系统（Level 1-1, 1-2 的教学引导）
+	if s.tutorialSystem != nil {
+		s.tutorialSystem.Update(deltaTime) // 9.10.1. Update tutorial (text, arrows, card highlight)
+	}
+	// Story 19.3: 更新强引导教学系统（监控植物数量变化、空闲提示箭头）
+	if s.guidedTutorialSystem != nil {
+		s.guidedTutorialSystem.Update(deltaTime) // 9.11. Update guided tutorial (plant count monitoring)
+	}
+	// Story 19.4: 更新阶段转场系统（铲子教学 → 保龄球阶段转场）
+	if s.levelPhaseSystem != nil {
+		s.levelPhaseSystem.Update(deltaTime) // 9.12. Update level phase transitions
+	}
+	// Story 19.5: 更新传送带系统（生成坚果卡片、移动卡片）
+	if s.conveyorBeltSystem != nil {
+		s.conveyorBeltSystem.Update(deltaTime) // 9.13. Update conveyor belt card generation and movement
+	}
+	// Story 19.6: 更新保龄球坚果系统（坚果滚动、碰撞检测）
+	if s.bowlingNutSystem != nil {
+		s.bowlingNutSystem.Update(deltaTime) // 9.14. Update bowling nut rolling and collision
 	}
 	// 僵尸呻吟音效系统 - 环境音效
 	if s.zombieGroanSystem != nil {

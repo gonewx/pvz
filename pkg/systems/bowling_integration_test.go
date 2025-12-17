@@ -480,6 +480,7 @@ func TestBowlingIntegration_CollisionAndBounce(t *testing.T) {
 		em.AddComponent(zombieEntities[0], &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
 		em.AddComponent(zombieEntities[0], &components.HealthComponent{MaxHealth: 270, CurrentHealth: 270})
 		em.AddComponent(zombieEntities[0], &components.CollisionComponent{Width: 50, Height: 80})
+		em.AddComponent(zombieEntities[0], &components.ZombieTagComponent{})
 
 		// 范围内僵尸 2（相邻行，考虑 ZombieVerticalOffset 修正后仍在 120 像素范围内）
 		zombieEntities[1] = em.CreateEntity()
@@ -487,6 +488,7 @@ func TestBowlingIntegration_CollisionAndBounce(t *testing.T) {
 		em.AddComponent(zombieEntities[1], &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
 		em.AddComponent(zombieEntities[1], &components.HealthComponent{MaxHealth: 270, CurrentHealth: 270})
 		em.AddComponent(zombieEntities[1], &components.CollisionComponent{Width: 50, Height: 80})
+		em.AddComponent(zombieEntities[1], &components.ZombieTagComponent{})
 
 		// 范围外僵尸
 		zombieEntities[2] = em.CreateEntity()
@@ -494,6 +496,7 @@ func TestBowlingIntegration_CollisionAndBounce(t *testing.T) {
 		em.AddComponent(zombieEntities[2], &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
 		em.AddComponent(zombieEntities[2], &components.HealthComponent{MaxHealth: 270, CurrentHealth: 270})
 		em.AddComponent(zombieEntities[2], &components.CollisionComponent{Width: 50, Height: 80})
+		em.AddComponent(zombieEntities[2], &components.ZombieTagComponent{})
 
 		// 更新系统
 		nutSystem.Update(0.016)

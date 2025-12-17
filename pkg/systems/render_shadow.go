@@ -128,7 +128,8 @@ func (s *RenderSystem) drawZombieShadowsWithClipping(screen *ebiten.Image, zombi
 			behaviorComp.Type == components.BehaviorZombieConehead ||
 			behaviorComp.Type == components.BehaviorZombieBuckethead ||
 			behaviorComp.Type == components.BehaviorZombieFlag ||
-			behaviorComp.Type == components.BehaviorZombiePolevaulter
+			behaviorComp.Type == components.BehaviorZombiePolevaulter ||
+			behaviorComp.Type == components.BehaviorZombiePreview
 
 		if !isZombie {
 			continue
