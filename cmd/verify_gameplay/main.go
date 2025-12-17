@@ -267,8 +267,8 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 	)
 	log.Println("[VerifyGameplay] 初始化选卡输入系统")
 
-	// 设置选卡输入系统引用（用于渲染系统获取飞行卡片状态）
-	systems.SetSeedChooserInputSystem(seedChooserInputSystem)
+	// 依赖注入：将输入系统注入渲染系统
+	seedChooserRenderSystem.SetInputSystem(seedChooserInputSystem)
 
 	log.Println("╔════════════════════════════════════════════════════════╗")
 	log.Println("║              统一游戏验证程序                          ║")
@@ -369,15 +369,11 @@ func (vg *VerifyGameplayGame) setupScene() {
 // createPlantCards 创建所有植物卡片
 // 优雅处理选择栏已满的情况：计算最大槽位数，超出时截断并打印警告
 func (vg *VerifyGameplayGame) createPlantCards() {
-	// 完整的植物列表（按解锁顺序）
-	allPlants := []components.PlantType{
-		components.PlantSunflower,
-		components.PlantPeashooter,
-		components.PlantWallnut,
-		components.PlantCherryBomb,
-		components.PlantPotatoMine,
-		components.PlantSnowPea,
-		components.PlantChomper,
+	// 从植物注册表获取所有植物（统一管理，新增植物只需修改 plant_registry.go）
+	registeredPlants := config.GetAllPlants()
+	allPlants := make([]components.PlantType, len(registeredPlants))
+	for i, plant := range registeredPlants {
+		allPlants[i] = components.PlantType(plant.Type)
 	}
 
 	// 计算种子栏最大槽位数
@@ -391,9 +387,8 @@ func (vg *VerifyGameplayGame) createPlantCards() {
 	// 检查是否超出最大槽位数
 	plantsToCreate := allPlants
 	if len(allPlants) > maxSlots {
-		log.Printf("[VerifyGameplay] ⚠️ 植物数量 (%d) 超出选择栏最大槽位 (%d)，只显示前 %d 种植物",
+		log.Printf("[VerifyGameplay] 植物数量 (%d) 超出选择栏最大槽位 (%d)，只显示前 %d 种植物",
 			len(allPlants), maxSlots, maxSlots)
-		log.Printf("[VerifyGameplay] 💡 提示：可修改 allPlants 列表顺序来调整显示哪些植物")
 		plantsToCreate = allPlants[:maxSlots]
 	}
 

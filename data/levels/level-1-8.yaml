@@ -5,7 +5,7 @@ name: "前院白天 1-8"
 description: "引入双发射手的连发攻击和铁桶僵尸的高护甲"
 
 # === Story 17.2: 顶层字段 ===
-flags: 2                        # 2 面旗帜
+flags: 1                        # 1 面旗帜
 sceneType: "day"                # 场景类型: 白天前院
 rowMax: 5                       # 最大行数: 前院 5 行
 
@@ -28,8 +28,8 @@ rewardPlant: "repeater"         # 完成后奖励双发射手
 # === 僵尸池 ===
 zombiePool: ["basic", "conehead", "buckethead", "polevaulter"]
 
-# === 波次配置 (2 面旗帜，20 波) ===
-# 使用 Fixed + ExtraPoints 混合系统
+# === 波次配置 (1 面旗帜，10 波) ===
+# 参考 .meta/levels/chapter1.md 第 290-301 行
 waves:
   # Wave 1
   - waveNum: 1
@@ -39,7 +39,6 @@ waves:
       - type: "basic"
         lanes: [1, 2, 3, 4, 5]
         count: 1
-        spawnInterval: 2.5
 
   # Wave 2
   - waveNum: 2
@@ -49,7 +48,6 @@ waves:
       - type: "basic"
         lanes: [1, 2, 3, 4, 5]
         count: 1
-        spawnInterval: 2.5
 
   # Wave 3
   - waveNum: 3
@@ -58,214 +56,73 @@ waves:
     zombies:
       - type: "basic"
         lanes: [1, 2, 3, 4, 5]
-        count: 2
-        spawnInterval: 2.5
+        count: 1
 
-  # Wave 4: ExtraPoints - 3 点动态分配
+  # Wave 4: ExtraPoints - 动态分配
   - waveNum: 4
     type: "ExtraPoints"
     isFlag: false
-    extraPoints: 3
+    extraPoints: 2
     zombies: []
 
-  # Wave 5: ExtraPoints - 3 点动态分配
+  # Wave 5: ExtraPoints - 2 点动态分配
   - waveNum: 5
     type: "ExtraPoints"
     isFlag: false
-    extraPoints: 3
+    extraPoints: 2
     zombies: []
 
   # Wave 6: 首次出现铁桶僵尸
   - waveNum: 6
     type: "Fixed"
     isFlag: false
-    extraPoints: 3
     zombies:
-      - type: "basic"
-        lanes: [1, 2, 3, 4, 5]
-        count: 1
-        spawnInterval: 2.5
       - type: "buckethead"
         lanes: [1, 2, 3, 4, 5]
         count: 1
-        spawnInterval: 2.5
 
   # Wave 7
   - waveNum: 7
     type: "Fixed"
     isFlag: false
-    extraPoints: 3
+    extraPoints: 2
     zombies:
       - type: "basic"
         lanes: [1, 2, 3, 4, 5]
-        count: 2
-        spawnInterval: 2.5
+        count: 1
 
   # Wave 8
   - waveNum: 8
     type: "Fixed"
     isFlag: false
-    extraPoints: 3
+    extraPoints: 2
     zombies:
       - type: "basic"
         lanes: [1, 2, 3, 4, 5]
-        count: 2
-        spawnInterval: 2.5
-      - type: "conehead"
+        count: 1
+
+  # Wave 9
+  - waveNum: 9
+    type: "Fixed"
+    isFlag: false
+    extraPoints: 2
+    zombies:
+      - type: "basic"
         lanes: [1, 2, 3, 4, 5]
         count: 1
-        spawnInterval: 2.5
 
-  # Wave 9: ExtraPoints - 4 点动态分配
-  - waveNum: 9
-    type: "ExtraPoints"
-    isFlag: false
-    extraPoints: 4
-    zombies: []
-
-  # Wave 10: 旗帜波 1 - basic x5 + flag + buckethead
+  # Wave 10: Final Wave - basic x 4, flag zombie, Conehead, Buckethead Zombie
   - waveNum: 10
-    type: "Fixed"
+    type: "Final"
     isFlag: true
     flagIndex: 1
-    extraPoints: 5
     zombies:
       - type: "basic"
         lanes: [1, 2, 3, 4, 5]
         count: 5
-        spawnInterval: 1.0
-      - type: "flag"
-        lanes: [1, 2, 3, 4, 5]
-        count: 1
-        spawnInterval: 1.0
-      - type: "buckethead"
-        lanes: [1, 2, 3, 4, 5]
-        count: 1
-        spawnInterval: 1.5
-
-  # Wave 11: ExtraPoints - 5 点动态分配
-  - waveNum: 11
-    type: "ExtraPoints"
-    isFlag: false
-    extraPoints: 5
-    zombies: []
-
-  # Wave 12: ExtraPoints - 5 点动态分配
-  - waveNum: 12
-    type: "ExtraPoints"
-    isFlag: false
-    extraPoints: 5
-    zombies: []
-
-  # Wave 13
-  - waveNum: 13
-    type: "Fixed"
-    isFlag: false
-    extraPoints: 5
-    zombies:
-      - type: "basic"
-        lanes: [1, 2, 3, 4, 5]
-        count: 2
-        spawnInterval: 2.5
       - type: "conehead"
         lanes: [1, 2, 3, 4, 5]
         count: 1
-        spawnInterval: 2.5
-
-  # Wave 14
-  - waveNum: 14
-    type: "Fixed"
-    isFlag: false
-    extraPoints: 5
-    zombies:
-      - type: "basic"
-        lanes: [1, 2, 3, 4, 5]
-        count: 2
-        spawnInterval: 2.5
       - type: "buckethead"
         lanes: [1, 2, 3, 4, 5]
         count: 1
-        spawnInterval: 2.5
-
-  # Wave 15
-  - waveNum: 15
-    type: "Fixed"
-    isFlag: false
-    extraPoints: 5
-    zombies:
-      - type: "basic"
-        lanes: [1, 2, 3, 4, 5]
-        count: 2
-        spawnInterval: 2.5
-      - type: "polevaulter"
-        lanes: [1, 2, 3, 4, 5]
-        count: 1
-        spawnInterval: 2.5
-
-  # Wave 16: ExtraPoints - 6 点动态分配
-  - waveNum: 16
-    type: "ExtraPoints"
-    isFlag: false
-    extraPoints: 6
-    zombies: []
-
-  # Wave 17: ExtraPoints - 6 点动态分配
-  - waveNum: 17
-    type: "ExtraPoints"
-    isFlag: false
-    extraPoints: 6
-    zombies: []
-
-  # Wave 18
-  - waveNum: 18
-    type: "Fixed"
-    isFlag: false
-    extraPoints: 6
-    zombies:
-      - type: "basic"
-        lanes: [1, 2, 3, 4, 5]
-        count: 2
-        spawnInterval: 2.5
-      - type: "buckethead"
-        lanes: [1, 2, 3, 4, 5]
-        count: 1
-        spawnInterval: 2.5
-
-  # Wave 19
-  - waveNum: 19
-    type: "Fixed"
-    isFlag: false
-    extraPoints: 6
-    zombies:
-      - type: "basic"
-        lanes: [1, 2, 3, 4, 5]
-        count: 3
-        spawnInterval: 2.5
-      - type: "conehead"
-        lanes: [1, 2, 3, 4, 5]
-        count: 1
-        spawnInterval: 2.5
-
-  # Wave 20: Final Wave (旗帜波 2) - 大量僵尸
-  - waveNum: 20
-    type: "Final"
-    isFlag: true
-    flagIndex: 2
-    extraPoints: 6
-    zombies:
-      - type: "basic"
-        lanes: [1, 2, 3, 4, 5]
-        count: 8
-        spawnInterval: 1.0
-      - type: "conehead"
-        lanes: [1, 2, 3, 4, 5]
-        count: 2
-        spawnInterval: 1.0
-      - type: "buckethead"
-        lanes: [1, 2, 3, 4, 5]
-        count: 2
-        spawnInterval: 1.5
-      - type: "polevaulter"
-        lanes: [1, 2, 3, 4, 5]
-        count: 1
-        spawnInterval: 1.5

@@ -174,6 +174,7 @@ type SystemManager struct {
 	// Special movement systems
 	poleVaultSystem  *systems.PoleVaultSystem
 	slowEffectSystem *systems.SlowEffectSystem
+	chomperSystem    *systems.ChomperSystem
 
 	// Effects
 	particleSystem    *systems.ParticleSystem
@@ -301,6 +302,10 @@ func (sm *SystemManager) createCoreSystems() {
 	// 7. SlowEffectSystem (no dependencies)
 	sm.slowEffectSystem = systems.NewSlowEffectSystem(em)
 	log.Printf("[SystemManager] Created SlowEffectSystem")
+
+	// 7.1. ChomperSystem (requires GameState for sound effects)
+	sm.chomperSystem = systems.NewChomperSystem(em, sm.deps.GameState)
+	log.Printf("[SystemManager] Created ChomperSystem")
 
 	// 8. ParticleSystem (needs ResourceManager)
 	sm.particleSystem = systems.NewParticleSystem(em, rm)
@@ -568,6 +573,11 @@ func (sm *SystemManager) Update(deltaTime float64) {
 		sm.slowEffectSystem.Update(deltaTime)
 	}
 
+	// ChomperSystem handles chomper attack logic
+	if sm.chomperSystem != nil {
+		sm.chomperSystem.Update(deltaTime)
+	}
+
 	// Lawnmower activation and movement
 	if sm.lawnmowerSystem != nil {
 		sm.lawnmowerSystem.Update(deltaTime)
@@ -710,6 +720,11 @@ func (sm *SystemManager) GetPoleVaultSystem() *systems.PoleVaultSystem {
 // GetSlowEffectSystem returns the slow effect system.
 func (sm *SystemManager) GetSlowEffectSystem() *systems.SlowEffectSystem {
 	return sm.slowEffectSystem
+}
+
+// GetChomperSystem returns the chomper system.
+func (sm *SystemManager) GetChomperSystem() *systems.ChomperSystem {
+	return sm.chomperSystem
 }
 
 // GetParticleSystem returns the particle system.

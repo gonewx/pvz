@@ -403,7 +403,8 @@ func (s *GameScene) initLevelSpecificSystems(rm *game.ResourceManager) {
 		)
 		log.Printf("[GameScene] Initialized seed chooser input system")
 
-		systems.SetSeedChooserInputSystem(s.seedChooserInputSystem)
+		// 依赖注入：将输入系统注入渲染系统
+		s.seedChooserRenderSystem.SetInputSystem(s.seedChooserInputSystem)
 	}
 
 	// 配置传送带系统

@@ -74,7 +74,7 @@ var PlantConfigs = map[types.PlantType]*PlantResourceConfig{
 		HiddenTracks:     nil,         // 无需隐藏轨道
 	},
 	types.PlantRepeater: {
-		ResourceName:     "Peashooter",
+		ResourceName:     "PeaShooter",
 		ConfigID:         "repeater",
 		PreviewFrame:     0,
 		PreviewAnimation: "anim_full_idle",

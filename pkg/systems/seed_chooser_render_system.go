@@ -22,6 +22,7 @@ type SeedChooserRenderSystem struct {
 	resourceManager *game.ResourceManager
 	reanimSystem    *ReanimSystem
 	levelConfig     *config.LevelConfig
+	inputSystem     *SeedChooserInputSystem // 输入系统引用（依赖注入）
 
 	// 图片资源
 	panelBackground *ebiten.Image // 选卡面板背景
@@ -132,35 +133,16 @@ func (s *SeedChooserRenderSystem) loadResources() {
 // 复用 PlantCardComponent 结构，确保与游戏中卡片渲染完全一致
 func (s *SeedChooserRenderSystem) preCreatePlantCards() {
 	// 获取可用植物列表
+	// 优先使用关卡配置的植物列表（当前关卡解锁的植物）
 	if s.levelConfig != nil && len(s.levelConfig.AvailablePlants) > 0 {
 		s.availablePlants = s.levelConfig.AvailablePlants
 	} else {
-		// 默认植物列表
-		s.availablePlants = []string{"peashooter", "sunflower", "cherrybomb", "wallnut", "potatomine", "snowpea", "chomper"}
-	}
-
-	// 植物ID到类型的映射
-	plantTypeMap := map[string]components.PlantType{
-		"sunflower":  components.PlantSunflower,
-		"peashooter": components.PlantPeashooter,
-		"wallnut":    components.PlantWallnut,
-		"cherrybomb": components.PlantCherryBomb,
-		"potatomine": components.PlantPotatoMine,
-		"snowpea":    components.PlantSnowPea,
-		"chomper":    components.PlantChomper,
-		"repeater":   components.PlantRepeater,
-	}
-
-	// 植物阳光消耗映射
-	sunCostMap := map[string]int{
-		"sunflower":  config.SunflowerSunCost,
-		"peashooter": config.PeashooterSunCost,
-		"wallnut":    config.WallnutCost,
-		"cherrybomb": config.CherryBombSunCost,
-		"potatomine": config.PotatoMineSunCost,
-		"snowpea":    config.SnowPeaSunCost,
-		"chomper":    config.ChomperSunCost,
-		"repeater":   config.RepeaterSunCost,
+		// 无关卡配置时，从植物注册表获取所有植物（用于验证程序等场景）
+		registeredPlants := config.GetAllPlants()
+		s.availablePlants = make([]string, len(registeredPlants))
+		for i, plant := range registeredPlants {
+			s.availablePlants[i] = plant.ID
+		}
 	}
 
 	// 加载卡片背景图（所有卡片共用）
@@ -169,10 +151,11 @@ func (s *SeedChooserRenderSystem) preCreatePlantCards() {
 		log.Printf("[SeedChooserRenderSystem] 警告: 加载卡片背景失败: %v", err)
 	}
 
-	// 为每个植物创建 PlantCardComponent
+	// 为每个植物创建 PlantCardComponent（使用植物注册表查询）
 	for _, plantID := range s.availablePlants {
-		plantType, ok := plantTypeMap[plantID]
-		if !ok {
+		// 从植物注册表获取植物类型
+		plantType := config.PlantIDToType(plantID)
+		if plantType == components.PlantUnknown {
 			log.Printf("[SeedChooserRenderSystem] 未知植物类型: %s", plantID)
 			continue
 		}
@@ -185,9 +168,10 @@ func (s *SeedChooserRenderSystem) preCreatePlantCards() {
 		}
 
 		// 创建 PlantCardComponent（用于复用 RenderPlantCard）
+		// 从植物注册表获取阳光消耗
 		s.plantCards[plantID] = &components.PlantCardComponent{
 			PlantType:        plantType,
-			SunCost:          sunCostMap[plantID],
+			SunCost:          config.GetPlantSunCost(plantID),
 			BackgroundImage:  backgroundImg,
 			PlantIconTexture: icon,
 			CardScale:        config.PlantCardScale,
@@ -306,10 +290,10 @@ func (s *SeedChooserRenderSystem) drawInventory(screen *ebiten.Image) {
 
 // isPlantPending 检查植物是否在待处理列表中（正在飞向卡槽）
 func (s *SeedChooserRenderSystem) isPlantPending(plantID string) bool {
-	if seedChooserInputSystem == nil {
+	if s.inputSystem == nil {
 		return false
 	}
-	return seedChooserInputSystem.IsPlantSelectedOrPending(plantID) && !s.gameState.IsSeedChooserPlantSelected(plantID)
+	return s.inputSystem.IsPlantSelectedOrPending(plantID) && !s.gameState.IsSeedChooserPlantSelected(plantID)
 }
 
 // drawInventorySilhouette 渲染仓库位置的空卡轮廓剪影
@@ -438,7 +422,7 @@ func (s *SeedChooserRenderSystem) drawButton(screen *ebiten.Image) {
 	screen.DrawImage(buttonImg, op)
 
 	// 如果悬停，绘制发光效果（在按钮之后绘制，覆盖在按钮上方）
-	isHoveringButton := seedChooserInputSystem != nil && seedChooserInputSystem.IsHoveringButton()
+	isHoveringButton := s.inputSystem != nil && s.inputSystem.IsHoveringButton()
 	if isHoveringButton && s.buttonGlow != nil {
 		glowOp := &ebiten.DrawImageOptions{}
 		glowBounds := s.buttonGlow.Bounds()
@@ -522,22 +506,19 @@ func (s *SeedChooserRenderSystem) GetAvailablePlants() []string {
 	return s.availablePlants
 }
 
-// inputSystem 引用（用于获取飞行卡片状态）
-var seedChooserInputSystem *SeedChooserInputSystem
-
-// SetSeedChooserInputSystem 设置输入系统引用
-func SetSeedChooserInputSystem(is *SeedChooserInputSystem) {
-	seedChooserInputSystem = is
+// SetInputSystem 设置输入系统引用（依赖注入）
+func (s *SeedChooserRenderSystem) SetInputSystem(is *SeedChooserInputSystem) {
+	s.inputSystem = is
 }
 
 // DrawFlyingCards 渲染飞行中的卡片
 // Story 8.12 重构: 完全复用 entities.RenderPlantCard() 统一渲染逻辑
 func (s *SeedChooserRenderSystem) DrawFlyingCards(screen *ebiten.Image) {
-	if seedChooserInputSystem == nil {
+	if s.inputSystem == nil {
 		return
 	}
 
-	flyingCards := seedChooserInputSystem.GetFlyingCards()
+	flyingCards := s.inputSystem.GetFlyingCards()
 	for _, card := range flyingCards {
 		if !card.IsFlying {
 			continue
@@ -629,15 +610,15 @@ func (s *SeedChooserRenderSystem) loadZombieNames() {
 // DrawTooltip 渲染悬停提示框
 // 在选卡界面渲染之后调用
 func (s *SeedChooserRenderSystem) DrawTooltip(screen *ebiten.Image) {
-	if seedChooserInputSystem == nil {
+	if s.inputSystem == nil {
 		return
 	}
 
 	// 获取悬停的植物ID
-	hoveredPlantID := seedChooserInputSystem.GetHoveredPlantID()
+	hoveredPlantID := s.inputSystem.GetHoveredPlantID()
 
 	// 获取悬停的僵尸类型
-	hoveredZombieType := seedChooserInputSystem.GetHoveredZombieType()
+	hoveredZombieType := s.inputSystem.GetHoveredZombieType()
 
 	// 如果都没有悬停，返回
 	if hoveredPlantID == "" && hoveredZombieType == "" {
@@ -645,7 +626,7 @@ func (s *SeedChooserRenderSystem) DrawTooltip(screen *ebiten.Image) {
 	}
 
 	// 获取鼠标位置
-	mouseX, mouseY := seedChooserInputSystem.GetHoveredMousePosition()
+	mouseX, mouseY := s.inputSystem.GetHoveredMousePosition()
 
 	// 确定要显示的内容
 	var displayName, displayTooltip string

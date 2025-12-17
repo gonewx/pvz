@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/config"
 	"github.com/gonewx/pvz/pkg/ecs"
 	"github.com/gonewx/pvz/pkg/entities"
 	"github.com/gonewx/pvz/pkg/game"
@@ -375,20 +376,9 @@ func (s *InputSystem) isCardClickable(card *components.PlantCardComponent) bool 
 }
 
 // getPlantName 获取植物名称
-// Story 10.8: 根据植物类型返回中文名称
+// Story 10.8: 使用统一注册表获取植物显示名称
 func (s *InputSystem) getPlantName(plantType components.PlantType) string {
-	switch plantType {
-	case components.PlantPeashooter:
-		return "豌豆射手"
-	case components.PlantSunflower:
-		return "向日葵"
-	case components.PlantCherryBomb:
-		return "樱桃炸弹"
-	case components.PlantWallnut:
-		return "坚果墙"
-	default:
-		return "未知植物"
-	}
+	return config.GetPlantDisplayNameByType(plantType)
 }
 
 // handlePlantCardHotkeys 处理植物卡片快捷键（数字键 1-9）

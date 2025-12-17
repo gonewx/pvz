@@ -98,16 +98,18 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 
 		// Story 6.3: 使用 ReanimComponent 替代 AnimationComponent
 		// 从 ResourceManager 获取向日葵的 Reanim 数据和部件图片
-		reanimXML := rm.GetReanimXML("SunFlower")
-		partImages := rm.GetReanimPartImages("SunFlower")
+		// 使用植物注册表查询 ReanimName，避免硬编码
+		reanimName := config.GetPlantReanimName(components.PlantSunflower)
+		reanimXML := rm.GetReanimXML(reanimName)
+		partImages := rm.GetReanimPartImages(reanimName)
 
 		if reanimXML == nil || partImages == nil {
-			return 0, fmt.Errorf("failed to load SunFlower Reanim resources")
+			return 0, fmt.Errorf("failed to load %s Reanim resources", reanimName)
 		}
 
 		// 添加 ReanimComponent
 		em.AddComponent(entityID, &components.ReanimComponent{
-			ReanimName: "SunFlower",
+			ReanimName: reanimName,
 			ReanimXML:  reanimXML,
 			PartImages: partImages,
 		})
@@ -143,16 +145,18 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 
 		// Story 13.6: 使用集中配置文件创建豌豆射手动画
 		// 从 ResourceManager 获取豌豆射手的 Reanim 数据和部件图片
-		reanimXML := rm.GetReanimXML("PeaShooterSingle")
-		partImages := rm.GetReanimPartImages("PeaShooterSingle")
+		// 使用植物注册表查询 ReanimName，避免硬编码
+		reanimName := config.GetPlantReanimName(components.PlantPeashooter)
+		reanimXML := rm.GetReanimXML(reanimName)
+		partImages := rm.GetReanimPartImages(reanimName)
 
 		if reanimXML == nil || partImages == nil {
-			return 0, fmt.Errorf("failed to load PeaShooterSingle Reanim resources")
+			return 0, fmt.Errorf("failed to load %s Reanim resources", reanimName)
 		}
 
 		// 添加基础的 ReanimComponent
 		em.AddComponent(entityID, &components.ReanimComponent{
-			ReanimName: "PeaShooterSingle",
+			ReanimName: reanimName,
 			ReanimXML:  reanimXML,
 			PartImages: partImages,
 		})
@@ -167,24 +171,8 @@ func NewPlantEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState
 	}
 
 	// Story 10.7: 为植物添加阴影组件
-	// 根据植物类型从配置获取阴影尺寸
-	var shadowEntityType string
-	switch plantType {
-	case components.PlantSunflower:
-		shadowEntityType = "sunflower"
-	case components.PlantPeashooter:
-		shadowEntityType = "peashooter"
-	case components.PlantWallnut:
-		shadowEntityType = "wallnut"
-	case components.PlantCherryBomb:
-		shadowEntityType = "cherrybomb"
-	case components.PlantSnowPea:
-		shadowEntityType = "snowpea"
-	case components.PlantChomper:
-		shadowEntityType = "chomper"
-	default:
-		shadowEntityType = "" // 使用默认尺寸
-	}
+	// 根据植物类型从统一注册表获取ID作为阴影配置键
+	shadowEntityType := config.PlantTypeToID(plantType)
 
 	shadowSize := config.GetShadowSize(shadowEntityType)
 	em.AddComponent(entityID, &components.ShadowComponent{
@@ -231,12 +219,13 @@ func NewWallnutEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameSta
 
 	// Story 6.3: 使用 ReanimComponent 替代 AnimationComponent
 	// 从 ResourceManager 获取坚果墙的 Reanim 数据和部件图片
-	// 注意：ResourceManager 加载时使用 "Wallnut"（与文件名匹配）
-	reanimXML := rm.GetReanimXML("Wallnut")
-	partImages := rm.GetReanimPartImages("Wallnut")
+	// 使用植物注册表查询 ReanimName，避免硬编码
+	reanimName := config.GetPlantReanimName(components.PlantWallnut)
+	reanimXML := rm.GetReanimXML(reanimName)
+	partImages := rm.GetReanimPartImages(reanimName)
 
 	if reanimXML == nil || partImages == nil {
-		return 0, fmt.Errorf("failed to load Wallnut Reanim resources")
+		return 0, fmt.Errorf("failed to load %s Reanim resources", reanimName)
 	}
 
 	// Clone partImages to avoid shared state issues when modifying images (e.g. cracking)
@@ -266,7 +255,7 @@ func NewWallnutEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameSta
 
 	// 添加 ReanimComponent
 	em.AddComponent(entityID, &components.ReanimComponent{
-		ReanimName: "Wallnut",
+		ReanimName: reanimName,
 		ReanimXML:  reanimXML,
 		PartImages: clonedPartImages,
 	})
@@ -330,16 +319,18 @@ func NewCherryBombEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.Game
 	})
 
 	// 从 ResourceManager 获取樱桃炸弹的 Reanim 数据和部件图片
-	reanimXML := rm.GetReanimXML("CherryBomb")
-	partImages := rm.GetReanimPartImages("CherryBomb")
+	// 使用植物注册表查询 ReanimName，避免硬编码
+	reanimName := config.GetPlantReanimName(components.PlantCherryBomb)
+	reanimXML := rm.GetReanimXML(reanimName)
+	partImages := rm.GetReanimPartImages(reanimName)
 
 	if reanimXML == nil || partImages == nil {
-		return 0, fmt.Errorf("failed to load CherryBomb Reanim resources")
+		return 0, fmt.Errorf("failed to load %s Reanim resources", reanimName)
 	}
 
 	// 添加 ReanimComponent
 	em.AddComponent(entityID, &components.ReanimComponent{
-		ReanimName: "CherryBomb",
+		ReanimName: reanimName,
 		ReanimXML:  reanimXML,
 		PartImages: partImages,
 	})
@@ -425,16 +416,18 @@ func NewPotatoMineEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.Game
 	})
 
 	// 从 ResourceManager 获取土豆雷的 Reanim 数据和部件图片
-	reanimXML := rm.GetReanimXML("PotatoMine")
-	partImages := rm.GetReanimPartImages("PotatoMine")
+	// 使用植物注册表查询 ReanimName，避免硬编码
+	reanimName := config.GetPlantReanimName(components.PlantPotatoMine)
+	reanimXML := rm.GetReanimXML(reanimName)
+	partImages := rm.GetReanimPartImages(reanimName)
 
 	if reanimXML == nil || partImages == nil {
-		return 0, fmt.Errorf("failed to load PotatoMine Reanim resources")
+		return 0, fmt.Errorf("failed to load %s Reanim resources", reanimName)
 	}
 
 	// 添加 ReanimComponent
 	em.AddComponent(entityID, &components.ReanimComponent{
-		ReanimName: "PotatoMine",
+		ReanimName: reanimName,
 		ReanimXML:  reanimXML,
 		PartImages: partImages,
 	})
@@ -733,16 +726,16 @@ func NewRepeaterEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameSt
 
 	// 从 ResourceManager 获取双发射手的 Reanim 数据和部件图片
 	// 注意：双发射手使用 "Peashooter"（双头豌豆射手）资源
-	reanimXML := rm.GetReanimXML("Peashooter")
-	partImages := rm.GetReanimPartImages("Peashooter")
+	reanimXML := rm.GetReanimXML("PeaShooter")
+	partImages := rm.GetReanimPartImages("PeaShooter")
 
 	if reanimXML == nil || partImages == nil {
-		return 0, fmt.Errorf("failed to load Peashooter (Repeater) Reanim resources")
+		return 0, fmt.Errorf("failed to load PeaShooter (Repeater) Reanim resources")
 	}
 
 	// 添加基础的 ReanimComponent
 	em.AddComponent(entityID, &components.ReanimComponent{
-		ReanimName: "Peashooter",
+		ReanimName: "PeaShooter",
 		ReanimXML:  reanimXML,
 		PartImages: partImages,
 	})

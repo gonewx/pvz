@@ -1,0 +1,61 @@
+schema: 1
+story: '8.12'
+story_title: '关卡 1-8 实现 - 选卡系统与大嘴花行为'
+gate: PASS
+status_reason: '所有问题已修复：关卡配置已修正，chomper 默认动画已修复，高频调试日志已移除，全局变量已重构为依赖注入，单元测试已添加'
+reviewer: 'Quinn (Test Architect)'
+updated: '2025-12-17T00:00:00Z'
+
+top_issues:
+  - severity: resolved
+    category: requirements
+    description: '[已修复] 关卡配置已修正为 1 面旗帜、10 波僵尸，符合 AC17'
+    refs: ['data/levels/level-1-8.yaml', 'docs/stories/8.12.story.md']
+    suggested_owner: dev
+  - severity: resolved
+    category: code_quality
+    description: '[已修复] chomper.yaml 的 default_animation 已修正为 anim_idle'
+    refs: ['data/reanim_config/chomper.yaml']
+    suggested_owner: dev
+  - severity: resolved
+    category: performance
+    description: '[已修复] ChomperSystem 高频调试日志已移除'
+    refs: ['pkg/systems/chomper_system.go']
+    suggested_owner: dev
+  - severity: resolved
+    category: architecture
+    description: '[已修复] seedChooserInputSystem 全局变量已重构为依赖注入模式'
+    refs: ['pkg/systems/seed_chooser_render_system.go']
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 95
+
+expires: '2025-12-31T00:00:00Z'
+
+evidence:
+  tests_reviewed: 7
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: '无安全相关功能'
+  performance:
+    status: PASS
+    notes: 'ChomperSystem 高频调试日志已移除，性能问题已解决'
+  reliability:
+    status: PASS
+    notes: '代码逻辑完整，错误处理合理'
+  maintainability:
+    status: PASS
+    notes: '全局变量已重构为依赖注入，单元测试已添加（7个测试用例）'
+
+recommendations:
+  immediate: []
+  future: []

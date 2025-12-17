@@ -1058,9 +1058,9 @@ func TestChomperConfiguration(t *testing.T) {
 			expected: 42.0,
 		},
 		{
-			name:     "攻击范围应为2格",
+			name:     "攻击范围应为1.5格",
 			constant: config.ChomperAttackRange,
-			expected: 2,
+			expected: 1.5,
 		},
 		{
 			name:     "生命值应为300",

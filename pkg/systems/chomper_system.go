@@ -38,8 +38,16 @@ func (s *ChomperSystem) Update(deltaTime float64) {
 		return
 	}
 
+	// 分别查询 ChomperComponent 和 PositionComponent，用于调试
+	chomperOnly := ecs.GetEntitiesWith1[*components.ChomperComponent](s.entityManager)
+	posOnly := ecs.GetEntitiesWith1[*components.PositionComponent](s.entityManager)
+
 	// 获取所有拥有 ChomperComponent 的植物
 	chompers := ecs.GetEntitiesWith2[*components.ChomperComponent, *components.PositionComponent](s.entityManager)
+
+	// 静默忽略未使用的调试变量
+	_ = chomperOnly
+	_ = posOnly
 
 	for _, entityID := range chompers {
 		chomper, ok := ecs.GetComponent[*components.ChomperComponent](s.entityManager, entityID)
@@ -51,6 +59,8 @@ func (s *ChomperSystem) Update(deltaTime float64) {
 		switch chomper.State {
 		case components.ChomperStateIdle:
 			s.handleIdleState(entityID, chomper, deltaTime)
+		case components.ChomperStateAttacking:
+			s.handleAttackingState(entityID, chomper, deltaTime)
 		case components.ChomperStateSwallowing:
 			s.handleSwallowingState(entityID, chomper, deltaTime)
 		case components.ChomperStateBiting:
@@ -66,11 +76,13 @@ func (s *ChomperSystem) handleIdleState(entityID ecs.EntityID, chomper *componen
 	// 获取大嘴花位置
 	pos, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, entityID)
 	if !ok {
+		log.Printf("[ChomperSystem] 大嘴花 %d 没有 PositionComponent", entityID)
 		return
 	}
 
 	plant, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, entityID)
 	if !ok {
+		log.Printf("[ChomperSystem] 大嘴花 %d 没有 PlantComponent", entityID)
 		return
 	}
 
@@ -87,20 +99,43 @@ func (s *ChomperSystem) handleIdleState(entityID ecs.EntityID, chomper *componen
 	chomper.DamageDealt = false
 
 	if canSwallow {
-		// 可吞噬：切换到吞噬状态
-		chomper.State = components.ChomperStateSwallowing
-		s.playAnimation(entityID, "anim_swallow")
-		log.Printf("[ChomperSystem] 大嘴花 %d 开始吞噬僵尸 %d", entityID, targetZombie)
+		// 可吞噬：先进入攻击状态播放咬住动画
+		chomper.State = components.ChomperStateAttacking
+		chomper.AttackCooldown = 0
+		s.playAnimation(entityID, "anim_bite")
 	} else {
 		// 不可吞噬：切换到撕咬状态
 		chomper.State = components.ChomperStateBiting
 		chomper.AttackCooldown = 0
 		s.playAnimation(entityID, "anim_bite")
-		log.Printf("[ChomperSystem] 大嘴花 %d 开始撕咬僵尸 %d（无法吞噬）", entityID, targetZombie)
 	}
 }
 
-// handleSwallowingState 处理吞噬状态
+// handleAttackingState 处理攻击状态：播放咬住动画
+func (s *ChomperSystem) handleAttackingState(entityID ecs.EntityID, chomper *components.ChomperComponent, deltaTime float64) {
+	// 检查动画组件
+	reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
+	if !ok {
+		return
+	}
+
+	// 在咬住关键帧时删除僵尸
+	if !chomper.DamageDealt && reanim.CurrentFrame >= config.ChomperBiteFrame && chomper.TargetZombie != 0 {
+		s.dealSwallowDamage(chomper.TargetZombie)
+		chomper.DamageDealt = true
+		chomper.TargetZombie = 0
+	}
+
+	// anim_bite 动画完成后进入消化状态（咀嚼 42 秒）
+	if reanim.IsFinished {
+		chomper.State = components.ChomperStateChewing
+		chomper.DigestTimer = 0
+		chomper.DamageDealt = false
+		s.playAnimation(entityID, "anim_chew")
+	}
+}
+
+// handleSwallowingState 处理吞咽状态
 func (s *ChomperSystem) handleSwallowingState(entityID ecs.EntityID, chomper *components.ChomperComponent, deltaTime float64) {
 	// 检查动画是否完成
 	reanim, ok := ecs.GetComponent[*components.ReanimComponent](s.entityManager, entityID)
@@ -108,25 +143,10 @@ func (s *ChomperSystem) handleSwallowingState(entityID ecs.EntityID, chomper *co
 		return
 	}
 
-	// 更新攻击计时器
-	chomper.AttackCooldown += deltaTime
-
-	// 在动画播放到一定程度时造成伤害（约 0.4 秒后）
-	const damageDelay = 0.4
-	if !chomper.DamageDealt && chomper.AttackCooldown >= damageDelay {
-		s.dealSwallowDamage(chomper.TargetZombie)
-		chomper.DamageDealt = true
-		log.Printf("[ChomperSystem] 大嘴花对僵尸 %d 造成吞噬伤害 %d", chomper.TargetZombie, config.ChomperSwallowDamage)
-	}
-
-	// 动画完成后进入消化状态
+	// 吞咽动画完成后回到待机状态
 	if reanim.IsFinished {
-		chomper.State = components.ChomperStateChewing
-		chomper.DigestTimer = 0
-		chomper.TargetZombie = 0
-		chomper.AttackCooldown = 0
-		s.playAnimation(entityID, "anim_chew")
-		log.Printf("[ChomperSystem] 大嘴花 %d 进入消化状态，持续 %.1f 秒", entityID, config.ChomperDigestTime)
+		chomper.State = components.ChomperStateIdle
+		s.playAnimation(entityID, "anim_idle")
 	}
 }
 
@@ -146,7 +166,6 @@ func (s *ChomperSystem) handleBitingState(entityID ecs.EntityID, chomper *compon
 	if !chomper.DamageDealt && chomper.AttackCooldown >= damageDelay {
 		s.dealBiteDamage(chomper.TargetZombie)
 		chomper.DamageDealt = true
-		log.Printf("[ChomperSystem] 大嘴花对僵尸 %d 造成撕咬伤害 %d", chomper.TargetZombie, config.ChomperBiteDamage)
 	}
 
 	// 动画完成后检查目标是否还存在
@@ -163,26 +182,24 @@ func (s *ChomperSystem) handleBitingState(entityID ecs.EntityID, chomper *compon
 			chomper.TargetZombie = 0
 			chomper.AttackCooldown = 0
 			s.playAnimation(entityID, "anim_idle")
-			log.Printf("[ChomperSystem] 大嘴花 %d 目标消失，回到待机状态", entityID)
 		}
 	}
 }
 
-// handleChewingState 处理消化状态
+// handleChewingState 处理消化状态（咀嚼 42 秒）
 func (s *ChomperSystem) handleChewingState(entityID ecs.EntityID, chomper *components.ChomperComponent, deltaTime float64) {
 	// 更新消化计时器
 	chomper.DigestTimer += deltaTime
 
-	// 检查消化是否完成
+	// 消化完成（42秒），播放吞咽动画
 	if chomper.DigestTimer >= config.ChomperDigestTime {
-		chomper.State = components.ChomperStateIdle
+		chomper.State = components.ChomperStateSwallowing
 		chomper.DigestTimer = 0
-		s.playAnimation(entityID, "anim_idle")
-		log.Printf("[ChomperSystem] 大嘴花 %d 消化完成，回到待机状态", entityID)
+		s.playAnimation(entityID, "anim_swallow")
 	}
 }
 
-// findNearestZombieInRange 查找前方 2 格内最近的僵尸
+// findNearestZombieInRange 查找前方 1 格内最近的僵尸
 func (s *ChomperSystem) findNearestZombieInRange(pos *components.PositionComponent, plantRow int) ecs.EntityID {
 	// 获取所有僵尸
 	zombies := ecs.GetEntitiesWith2[*components.ZombieTagComponent, *components.PositionComponent](s.entityManager)
@@ -246,38 +263,17 @@ func (s *ChomperSystem) canSwallowZombie(zombieID ecs.EntityID) bool {
 	}
 }
 
-// dealSwallowDamage 对目标造成吞噬伤害
+// dealSwallowDamage 对目标造成吞噬伤害（僵尸直接消失）
 func (s *ChomperSystem) dealSwallowDamage(zombieID ecs.EntityID) {
-	health, ok := ecs.GetComponent[*components.HealthComponent](s.entityManager, zombieID)
-	if !ok {
-		return
-	}
-
-	// 先对护甲造成伤害（如果有）
-	armor, hasArmor := ecs.GetComponent[*components.ArmorComponent](s.entityManager, zombieID)
-	damage := config.ChomperSwallowDamage
-
-	if hasArmor && armor.CurrentArmor > 0 {
-		if armor.CurrentArmor >= damage {
-			armor.CurrentArmor -= damage
-			damage = 0
-		} else {
-			damage -= armor.CurrentArmor
-			armor.CurrentArmor = 0
-		}
-	}
-
-	// 剩余伤害对生命值造成伤害
-	if damage > 0 {
-		health.CurrentHealth -= damage
-	}
-
 	// 播放吞噬音效
 	if s.gameState != nil {
 		if audioManager := s.gameState.GetAudioManager(); audioManager != nil {
 			audioManager.PlaySound("SOUND_CHOMP")
 		}
 	}
+
+	// 直接删除僵尸实体（不播放死亡动画）
+	s.entityManager.DestroyEntity(zombieID)
 }
 
 // dealBiteDamage 对目标造成撕咬伤害

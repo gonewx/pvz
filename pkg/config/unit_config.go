@@ -374,8 +374,12 @@ const (
 	ChomperDigestTime = 42.0
 
 	// ChomperAttackRange 大嘴花攻击范围（格子数）
-	// 检测前方 2 格内的僵尸
-	ChomperAttackRange = 2
+	// 1.5格可以覆盖到正在啃食前方植物的僵尸
+	ChomperAttackRange = 1.5
+
+	// ChomperBiteFrame 大嘴花咬住僵尸的关键帧
+	// anim_bite 动画播放到此帧时，僵尸消失
+	ChomperBiteFrame = 15
 
 	// ChomperHealth 大嘴花生命值
 	// 标准植物生命值

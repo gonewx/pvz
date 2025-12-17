@@ -1,7 +1,7 @@
 id: chomper
 name: Chomper
 reanim_file: data/reanim/Chomper.reanim
-default_animation: anim_swallow
+default_animation: anim_idle
 scale: 1
 images:
     IMAGE_REANIM_CHOMPER_BOTTOMLIP: assets/reanim/Chomper_bottomlip.png
@@ -29,9 +29,12 @@ images:
 available_animations:
     - name: anim_swallow
       display_name: swallow
+      loop: false
     - name: anim_chew
       display_name: chew
+      loop: true
     - name: anim_bite
       display_name: bite
+      loop: false
     - name: anim_idle
       display_name: idle

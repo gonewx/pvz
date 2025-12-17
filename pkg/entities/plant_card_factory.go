@@ -37,36 +37,15 @@ func NewPlantCardEntity(em *ecs.EntityManager, rm *game.ResourceManager, rs Rean
 		return 0, fmt.Errorf("no config found for plant type: %v", plantType)
 	}
 
-	// 根据植物类型设置阳光消耗和冷却时间
-	var sunCost int
-	var cooldownTime float64
+	// 从统一注册表获取阳光消耗和冷却时间
+	sunCost := config.GetPlantSunCostByType(plantType)
+	cooldownTime := config.GetPlantRechargeTimeByType(plantType)
 
-	switch plantType {
-	case components.PlantSunflower:
-		sunCost = config.SunflowerSunCost
-		cooldownTime = config.SunflowerRechargeTime
-	case components.PlantPeashooter:
-		sunCost = config.PeashooterSunCost
-		cooldownTime = config.PeashooterRechargeTime
-	case components.PlantWallnut:
-		sunCost = config.WallnutCost
-		cooldownTime = config.WallnutRechargeTime
-	case components.PlantCherryBomb:
-		sunCost = config.CherryBombSunCost
-		cooldownTime = config.CherryBombCooldown
-	case components.PlantPotatoMine:
-		sunCost = config.PotatoMineSunCost
-		cooldownTime = config.PotatoMineRechargeTime
-	case components.PlantSnowPea:
-		sunCost = config.SnowPeaSunCost
-		cooldownTime = config.SnowPeaRechargeTime
-	case components.PlantChomper:
-		sunCost = config.ChomperSunCost
-		cooldownTime = config.ChomperRechargeTime
-	default:
+	// 检查植物是否已注册
+	if sunCost == 0 && cooldownTime == 0 {
 		em.DestroyEntity(entity)
 		em.RemoveMarkedEntities()
-		return 0, fmt.Errorf("unknown plant type: %v", plantType)
+		return 0, fmt.Errorf("plant type not registered: %v", plantType)
 	}
 
 	// 加载卡片背景框
