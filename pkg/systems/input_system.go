@@ -1,6 +1,7 @@
 package systems
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/gonewx/pvz/pkg/components"
@@ -550,44 +551,35 @@ func (s *InputSystem) handleLawnClick(mouseX, mouseY int) bool {
 }
 
 // createPlantEntity 创建植物实体的辅助方法
-// 根据植物类型选择合适的工厂函数
+// 使用工厂注册表机制，新增植物无需修改此方法
 func (s *InputSystem) createPlantEntity(plantType components.PlantType, col, row int) (ecs.EntityID, error) {
-	// 传递 reanimSystem 给工厂函数以初始化动画
-	// 坚果墙和樱桃炸弹使用专用的工厂函数
-	if plantType == components.PlantWallnut {
-		return entities.NewWallnutEntity(s.entityManager, s.resourceManager, s.gameState, s.reanimSystem, col, row)
+	// 将 PlantType 转换为配置 ID
+	plantID := config.PlantTypeToID(plantType)
+	if plantID == "" {
+		return 0, fmt.Errorf("unknown plant type: %v", plantType)
 	}
-	if plantType == components.PlantCherryBomb {
-		return entities.NewCherryBombEntity(s.entityManager, s.resourceManager, s.gameState, col, row)
+
+	// 从工厂注册表获取工厂函数
+	factory, ok := entities.GetPlantFactory(plantID)
+	if !ok {
+		return 0, fmt.Errorf("no factory registered for plant: %s", plantID)
 	}
-	if plantType == components.PlantPotatoMine {
-		return entities.NewPotatoMineEntity(s.entityManager, s.resourceManager, s.gameState, col, row)
+
+	// 构造工厂依赖
+	deps := entities.PlantFactoryDeps{
+		EntityManager:  s.entityManager,
+		ResourceLoader: s.resourceManager,
+		GameState:      s.gameState,
+		ReanimSystem:   s.reanimSystem,
 	}
-	if plantType == components.PlantSnowPea {
-		return entities.NewSnowPeaEntity(s.entityManager, s.resourceManager, s.gameState, s.reanimSystem, col, row)
-	}
-	// 其他植物使用通用工厂函数
-	return entities.NewPlantEntity(s.entityManager, s.resourceManager, s.gameState, s.reanimSystem, plantType, col, row)
+
+	// 调用工厂函数创建实体
+	return factory(deps, col, row)
 }
 
 // getPlantCost 获取植物的阳光消耗
 func (s *InputSystem) getPlantCost(plantType components.PlantType) int {
-	switch plantType {
-	case components.PlantSunflower:
-		return config.SunflowerSunCost // 50
-	case components.PlantPeashooter:
-		return config.PeashooterSunCost // 100
-	case components.PlantWallnut:
-		return config.WallnutCost // 50
-	case components.PlantCherryBomb:
-		return config.CherryBombSunCost // 150
-	case components.PlantPotatoMine:
-		return config.PotatoMineSunCost // 25
-	case components.PlantSnowPea:
-		return config.SnowPeaSunCost // 175
-	default:
-		return 0
-	}
+	return config.GetPlantSunCostByType(plantType)
 }
 
 // triggerPlantCardCooldown 触发指定植物类型的卡片进入冷却状态
