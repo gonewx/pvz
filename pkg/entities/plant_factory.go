@@ -533,16 +533,18 @@ func NewSnowPeaEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameSta
 	})
 
 	// 从 ResourceManager 获取寒冰射手的 Reanim 数据和部件图片
-	reanimXML := rm.GetReanimXML("SnowPea")
-	partImages := rm.GetReanimPartImages("SnowPea")
+	// 使用植物注册表查询 ReanimName，避免硬编码
+	reanimName := config.GetPlantReanimName(components.PlantSnowPea)
+	reanimXML := rm.GetReanimXML(reanimName)
+	partImages := rm.GetReanimPartImages(reanimName)
 
 	if reanimXML == nil || partImages == nil {
-		return 0, fmt.Errorf("failed to load SnowPea Reanim resources")
+		return 0, fmt.Errorf("failed to load %s Reanim resources", reanimName)
 	}
 
 	// 添加基础的 ReanimComponent
 	em.AddComponent(entityID, &components.ReanimComponent{
-		ReanimName: "SnowPea",
+		ReanimName: reanimName,
 		ReanimXML:  reanimXML,
 		PartImages: partImages,
 	})
@@ -632,16 +634,18 @@ func NewChomperEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameSta
 	})
 
 	// 从 ResourceManager 获取大嘴花的 Reanim 数据和部件图片
-	reanimXML := rm.GetReanimXML("Chomper")
-	partImages := rm.GetReanimPartImages("Chomper")
+	// 使用植物注册表查询 ReanimName，避免硬编码
+	reanimName := config.GetPlantReanimName(components.PlantChomper)
+	reanimXML := rm.GetReanimXML(reanimName)
+	partImages := rm.GetReanimPartImages(reanimName)
 
 	if reanimXML == nil || partImages == nil {
-		return 0, fmt.Errorf("failed to load Chomper Reanim resources")
+		return 0, fmt.Errorf("failed to load %s Reanim resources", reanimName)
 	}
 
 	// 添加 ReanimComponent
 	em.AddComponent(entityID, &components.ReanimComponent{
-		ReanimName: "Chomper",
+		ReanimName: reanimName,
 		ReanimXML:  reanimXML,
 		PartImages: partImages,
 	})
@@ -725,17 +729,18 @@ func NewRepeaterEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameSt
 	})
 
 	// 从 ResourceManager 获取双发射手的 Reanim 数据和部件图片
-	// 注意：双发射手使用 "Peashooter"（双头豌豆射手）资源
-	reanimXML := rm.GetReanimXML("PeaShooter")
-	partImages := rm.GetReanimPartImages("PeaShooter")
+	// 使用植物注册表查询 ReanimName，避免硬编码
+	reanimName := config.GetPlantReanimName(components.PlantRepeater)
+	reanimXML := rm.GetReanimXML(reanimName)
+	partImages := rm.GetReanimPartImages(reanimName)
 
 	if reanimXML == nil || partImages == nil {
-		return 0, fmt.Errorf("failed to load PeaShooter (Repeater) Reanim resources")
+		return 0, fmt.Errorf("failed to load %s (Repeater) Reanim resources", reanimName)
 	}
 
 	// 添加基础的 ReanimComponent
 	em.AddComponent(entityID, &components.ReanimComponent{
-		ReanimName: "PeaShooter",
+		ReanimName: reanimName,
 		ReanimXML:  reanimXML,
 		PartImages: partImages,
 	})
