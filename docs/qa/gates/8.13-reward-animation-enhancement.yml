@@ -1,0 +1,76 @@
+# Quality Gate Decision - Story 8.13
+schema: 1
+story: "8.13"
+story_title: "奖励动画系统行为优化与主菜单按钮"
+gate: PASS
+status_reason: "所有 12 个验收标准已实现并通过验证，12 个单元测试全部通过，代码质量符合 ECS 架构规范"
+reviewer: "Quinn (Test Architect)"
+updated: "2025-12-18T06:40:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
+  recommendations:
+    must_fix: []
+    monitor: []
+
+quality_score: 100
+expires: "2026-01-01T00:00:00Z"
+
+evidence:
+  tests_reviewed: 12
+  tests_passed: 12
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "无安全问题，功能仅涉及 UI 交互和场景切换"
+  performance:
+    status: PASS
+    notes: "AABB 碰撞检测 O(1) 复杂度，不影响帧率"
+  reliability:
+    status: PASS
+    notes: "边界情况处理完善，测试覆盖全面"
+  maintainability:
+    status: PASS
+    notes: "代码遵循 ECS 原则，配置常量集中管理，可维护性良好"
+
+recommendations:
+  immediate: []
+  future: []
+
+# Test Coverage Summary
+test_summary:
+  - file: "pkg/systems/reward_animation_system_test.go"
+    tests:
+      - TestIsCardPackClicked_PlantCard (8 cases)
+      - TestIsCardPackClicked_ToolIcon (10 cases)
+      - TestIsCardPackClicked_NoEntity
+      - TestIsCardPackClicked_Scaled (3 cases)
+      - TestIsMainMenuButtonClicked (10 cases)
+      - TestIsMainMenuButtonClicked_ButtonDisabled
+      - TestIsMainMenuButtonClicked_NoPanel
+  - file: "pkg/systems/reward_panel_render_system_test.go"
+    tests:
+      - TestCalculateCardPosition (3 cases)
+      - TestMainMenuButtonPositionConstants
+      - TestMainMenuButtonPosition
+      - TestMainMenuButtonAABBCollision (11 cases)
+
+# Implementation Files
+files_reviewed:
+  - pkg/config/level_config.go
+  - pkg/config/layout_config.go
+  - pkg/components/reward_panel_component.go
+  - pkg/systems/reward_animation_helpers.go
+  - pkg/systems/reward_animation_phases.go
+  - pkg/systems/reward_panel_render_system.go
+  - data/levels/level-1-1.yaml
+  - data/levels/level-1-2.yaml

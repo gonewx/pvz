@@ -95,13 +95,17 @@ func (ras *RewardAnimationSystem) updateAppearingPhase(dt float64, rewardComp *c
 
 // updateWaitingPhase 处理等待阶段。
 // - 卡片包静止，显示光晕和箭头粒子效果
-// - 等待玩家点击后进入展开阶段
+// - 等待玩家点击卡包本身或按空格键后进入展开阶段（Story 8.13）
+// - 界面其他元素保持可操作状态
 func (ras *RewardAnimationSystem) updateWaitingPhase(dt float64, rewardComp *components.RewardAnimationComponent) {
-	// 检测玩家点击（支持触摸、鼠标或空格键）
-	justPressed, _, _ := utils.IsPointerJustPressed()
-	clicked := justPressed || inpututil.IsKeyJustPressed(ebiten.KeySpace)
+	// 检测玩家点击（只响应卡包点击或空格键 - Story 8.13）
+	justPressed, mouseX, mouseY := utils.IsPointerJustPressed()
+	spacePressed := inpututil.IsKeyJustPressed(ebiten.KeySpace)
 
-	if clicked {
+	// 只有点击卡包本身或按空格键才进入下一阶段
+	cardClicked := justPressed && ras.isCardPackClicked(float64(mouseX), float64(mouseY))
+
+	if cardClicked || spacePressed {
 		log.Printf("[RewardAnimationSystem] 玩家点击卡片包，切换到 expanding")
 
 		// 使用 AudioManager 统一管理音效（Story 10.9）
@@ -258,7 +262,7 @@ func (ras *RewardAnimationSystem) updateDisappearingPhase(dt float64, rewardComp
 
 // updateShowingPhaseInternal 处理显示奖励面板阶段（内部版本，不依赖rewardComp）。
 // - 面板淡入动画（透明度 0.0 → 1.0，持续 config.RewardPanelFadeInDuration）
-// - 淡入完成后清理粒子效果，然后等待玩家点击"下一关"按钮
+// - 淡入完成后清理粒子效果，然后等待玩家点击"下一关"或"主菜单"按钮
 func (ras *RewardAnimationSystem) updateShowingPhaseInternal(dt float64) {
 	ras.phaseElapsed += dt
 
@@ -304,6 +308,21 @@ func (ras *RewardAnimationSystem) updateShowingPhaseInternal(dt float64) {
 
 			ras.currentPhase = "closing"
 			ras.phaseElapsed = 0
+			return // 避免同时处理多个按钮
+		}
+
+		// 检查是否点击了"主菜单"按钮（Story 8.13）
+		if ras.isMainMenuButtonClicked(float64(mouseX), float64(mouseY)) {
+			log.Printf("[RewardAnimationSystem] 玩家点击\"主菜单\"按钮，准备返回主菜单")
+
+			// 播放点击按钮音效
+			if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
+				audioManager.PlaySound("SOUND_TAP2")
+			}
+
+			// 直接切换到主菜单（不需要进入 closing 阶段）
+			ras.cleanupAndSwitchToMainMenu()
+			return
 		}
 		// 注意：空格键不再触发关闭，只有点击按钮才能继续
 	}
@@ -338,6 +357,76 @@ func (ras *RewardAnimationSystem) isNextLevelButtonClicked(mouseX, mouseY float6
 	}
 
 	return false
+}
+
+// isMainMenuButtonClicked 检查鼠标点击是否在"主菜单"按钮范围内（Story 8.13）
+func (ras *RewardAnimationSystem) isMainMenuButtonClicked(mouseX, mouseY float64) bool {
+	// 首先检查面板是否存在且配置显示主菜单按钮
+	if ras.panelEntity == 0 {
+		return false // 面板不存在
+	}
+
+	panelComp, ok := ecs.GetComponent[*components.RewardPanelComponent](ras.entityManager, ras.panelEntity)
+	if !ok || !panelComp.ShowMainMenuButton {
+		return false // 面板组件不存在或主菜单按钮未启用
+	}
+
+	// 计算按钮位置（与 reward_panel_render_system.go 中的 drawMainMenuButton 逻辑一致）
+	bgWidth := config.RewardPanelBackgroundWidth
+	bgHeight := config.RewardPanelBackgroundHeight
+	offsetX := (ras.screenWidth - bgWidth) / 2
+	offsetY := (ras.screenHeight - bgHeight) / 2
+
+	// 按钮中心位置（右上角）
+	buttonX := offsetX + bgWidth*config.RewardPanelMainMenuButtonX
+	buttonY := offsetY + bgHeight*config.RewardPanelMainMenuButtonY
+
+	// 按钮尺寸（根据 IMAGE_SEEDCHOOSER_BUTTON2 的尺寸，约 65x28）
+	buttonWidth := 65.0
+	buttonHeight := 40.0 // 增大高度以提高可点击性
+
+	// AABB 碰撞检测
+	halfWidth := buttonWidth / 2
+	halfHeight := buttonHeight / 2
+
+	if mouseX >= buttonX-halfWidth && mouseX <= buttonX+halfWidth &&
+		mouseY >= buttonY-halfHeight && mouseY <= buttonY+halfHeight {
+		log.Printf("[RewardAnimationSystem] 主菜单按钮点击命中! 鼠标=(%.1f, %.1f), 按钮中心=(%.1f, %.1f)", mouseX, mouseY, buttonX, buttonY)
+		return true
+	}
+
+	return false
+}
+
+// cleanupAndSwitchToMainMenu 清理资源并切换到主菜单（Story 8.13）
+func (ras *RewardAnimationSystem) cleanupAndSwitchToMainMenu() {
+	log.Printf("[RewardAnimationSystem] 清理资源并切换到主菜单")
+
+	// 清理奖励实体
+	if ras.rewardEntity != 0 {
+		ras.entityManager.DestroyEntity(ras.rewardEntity)
+	}
+	if ras.panelEntity != 0 {
+		ras.entityManager.DestroyEntity(ras.panelEntity)
+	}
+	if ras.glowEntity != 0 {
+		ras.entityManager.DestroyEntity(ras.glowEntity)
+	}
+
+	ras.rewardEntity = 0
+	ras.panelEntity = 0
+	ras.glowEntity = 0
+	ras.isActive = false
+	ras.currentPhase = ""
+
+	// 切换到主菜单
+	if ras.sceneManager != nil {
+		ras.sceneManager.SwitchToMainMenu()
+	} else {
+		log.Printf("[RewardAnimationSystem] SceneManager 为 nil，跳过主菜单切换（可能在测试环境）")
+	}
+
+	log.Printf("[RewardAnimationSystem] 已返回主菜单")
 }
 
 // updateClosingPhaseInternal 处理关闭奖励面板阶段（0.5秒，内部版本）。
@@ -440,15 +529,24 @@ func (ras *RewardAnimationSystem) createRewardPanel(rewardType string, plantID s
 	}
 
 	// 添加 RewardPanelComponent
+	// Story 8.13: 从当前关卡配置获取 ShowMainMenuButton 设置
+	showMainMenuButton := true // 默认显示
+	if levelConfig := ras.gameState.CurrentLevel; levelConfig != nil {
+		if levelConfig.ShowMainMenuButton != nil {
+			showMainMenuButton = *levelConfig.ShowMainMenuButton
+		}
+	}
+
 	ecs.AddComponent(ras.entityManager, ras.panelEntity, &components.RewardPanelComponent{
-		RewardType:       rewardType, // 新增：奖励类型
-		PlantID:          plantID,    // 设置 PlantID，让渲染系统自动加载图标
-		ToolID:           toolID,     // 新增：工具ID
-		PlantName:        rewardName, // 名称（植物或工具）
-		PlantDescription: rewardDesc, // 描述（植物或工具）
-		SunCost:          sunCost,    // 设置阳光值（工具为0）
-		CardScale:        1.0,        // 卡片固定大小，不做动画
-		FadeAlpha:        0.0,        // 初始完全透明，用于淡入动画
+		RewardType:         rewardType, // 新增：奖励类型
+		PlantID:            plantID,    // 设置 PlantID，让渲染系统自动加载图标
+		ToolID:             toolID,     // 新增：工具ID
+		PlantName:          rewardName, // 名称（植物或工具）
+		PlantDescription:   rewardDesc, // 描述（植物或工具）
+		SunCost:            sunCost,    // 设置阳光值（工具为0）
+		CardScale:          1.0,        // 卡片固定大小，不做动画
+		FadeAlpha:          0.0,        // 初始完全透明，用于淡入动画
+		ShowMainMenuButton: showMainMenuButton, // Story 8.13: 是否显示主菜单按钮
 		// 卡片位置由 RewardPanelRenderSystem 自动计算（水平居中）
 		IsVisible:     true,
 		AnimationTime: 0.0, // 动画时间计数器，用于淡入效果

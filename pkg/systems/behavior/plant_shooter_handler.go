@@ -316,7 +316,7 @@ func (s *BehaviorSystem) handleRepeaterBehavior(entityID ecs.EntityID, deltaTime
 			log.Printf("[BehaviorSystem] 🎯 双发射手 %d 发现目标，切换到攻击动画", entityID)
 			ecs.AddComponent(s.entityManager, entityID, &components.AnimationCommandComponent{
 				UnitID:           unitID,
-				ComboName:        "attack_with_sway",
+				ComboName:        "attack",
 				Processed:        false,
 				PreserveProgress: true,
 			})

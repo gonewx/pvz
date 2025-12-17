@@ -16,6 +16,7 @@ availablePlants:              # 只有豌豆射手
 rewardPlant: "sunflower"      # Story 8.3: 完成本关奖励向日葵
 skipOpening: false            # 启用完整开场动画(铺草皮 + 僵尸预告)
 initialSun: 150               # 初始阳光150（原版1-1关卡配置，足够种植1个豌豆射手）
+showMainMenuButton: false     # Story 8.13: 教学关卡不显示主菜单按钮
 
 # Story 8.2 QA改进：背景和草皮配置
 backgroundImage: "IMAGE_BACKGROUND1UNSODDED"  # 使用未铺草皮的背景

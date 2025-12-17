@@ -26,6 +26,58 @@ func (ras *RewardAnimationSystem) IsCompleted() bool {
 	return !ras.isActive && ras.rewardEntity == 0
 }
 
+// isCardPackClicked 检查鼠标点击是否在卡包范围内（Story 8.13）
+// 用于 waiting 阶段的精确点击检测，只有点击卡包本身才触发展开动画
+// 参数：mouseX, mouseY - 鼠标点击位置（屏幕坐标）
+// 返回：true 如果点击在卡包范围内
+func (ras *RewardAnimationSystem) isCardPackClicked(mouseX, mouseY float64) bool {
+	if ras.rewardEntity == 0 {
+		return false
+	}
+
+	posComp, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.rewardEntity)
+	if !ok {
+		return false
+	}
+
+	// 获取奖励组件，确定奖励类型
+	rewardComp, ok := ecs.GetComponent[*components.RewardAnimationComponent](ras.entityManager, ras.rewardEntity)
+	if !ok {
+		return false
+	}
+
+	// 根据奖励类型计算边界框
+	if rewardComp.RewardType == "tool" {
+		// 工具图标：使用铲子图片尺寸 (116 x 125) * scale
+		// 图标以中心点为锚点绘制
+		width := 116.0 * rewardComp.Scale
+		height := 125.0 * rewardComp.Scale
+		// 计算边界框（以中心点为锚点）
+		left := posComp.X - width/2
+		top := posComp.Y - height/2
+		right := posComp.X + width/2
+		bottom := posComp.Y + height/2
+		return mouseX >= left && mouseX <= right &&
+			mouseY >= top && mouseY <= bottom
+	}
+
+	// 植物卡片：使用卡片尺寸
+	// 尝试从 PlantCardComponent 获取精确尺寸
+	if cardComp, ok := ecs.GetComponent[*components.PlantCardComponent](ras.entityManager, ras.rewardEntity); ok && cardComp.BackgroundImage != nil {
+		cardWidth := float64(cardComp.BackgroundImage.Bounds().Dx()) * cardComp.CardScale
+		cardHeight := float64(cardComp.BackgroundImage.Bounds().Dy()) * cardComp.CardScale
+		// 卡片以左上角为锚点绘制
+		return mouseX >= posComp.X && mouseX <= posComp.X+cardWidth &&
+			mouseY >= posComp.Y && mouseY <= posComp.Y+cardHeight
+	}
+
+	// 默认使用 RewardAnimationComponent 的缩放值
+	width := 100.0 * rewardComp.Scale
+	height := 140.0 * rewardComp.Scale
+	return mouseX >= posComp.X && mouseX <= posComp.X+width &&
+		mouseY >= posComp.Y && mouseY <= posComp.Y+height
+}
+
 // IsHoveringReward 检查鼠标是否悬停在奖励图标上（用于光标显示）
 // 在 waiting 阶段悬停在卡片/工具图标上时返回 true
 func (ras *RewardAnimationSystem) IsHoveringReward() bool {
@@ -102,8 +154,13 @@ func (ras *RewardAnimationSystem) GetCursorShape() ebiten.CursorShapeType {
 		return ebiten.CursorShapePointer
 	}
 
-	// showing 阶段：悬停在"下一关"按钮上时显示手形
+	// showing 阶段：悬停在"下一关"按钮或"主菜单"按钮上时显示手形
 	if ras.IsHoveringNextButton() {
+		return ebiten.CursorShapePointer
+	}
+
+	// Story 8.13: 悬停在"主菜单"按钮上时显示手形
+	if ras.panelRenderSystem != nil && ras.panelRenderSystem.IsHoveringMainMenuButton() {
 		return ebiten.CursorShapePointer
 	}
 

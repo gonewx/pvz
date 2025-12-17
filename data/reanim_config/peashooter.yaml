@@ -59,3 +59,13 @@ animation_combos:
       binding_strategy: auto
       parent_tracks:
         anim_face: anim_stem
+        idle_mouth: anim_stem    
+        idle_headleaf_farthest: anim_stem
+        idle_headleaf_3rdfarthest: anim_stem
+        idle_headleaf_2ndfarthest: anim_stem
+        idle_headleaf_tip_bottom: anim_stem
+        idle_headleaf_nearest: anim_stem
+        idle_headleaf_tip_top: anim_stem
+      hidden_tracks:
+        - anim_blink
+        - idle_shoot_blink

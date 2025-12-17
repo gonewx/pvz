@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/ecs"
 )
 
 // ========== Story 19.10: 土豆地雷奖励支持测试 ==========
@@ -99,4 +101,303 @@ func TestPlantType_PotatoMine_String(t *testing.T) {
 	}
 
 	t.Logf("✓ PlantPotatoMine.String() returns 'PotatoMine'")
+}
+
+// ========== Story 8.13: 卡包点击检测和主菜单按钮测试 ==========
+
+// TestIsCardPackClicked_PlantCard 测试植物卡片点击检测
+func TestIsCardPackClicked_PlantCard(t *testing.T) {
+	em := ecs.NewEntityManager()
+
+	// 创建奖励动画系统
+	ras := &RewardAnimationSystem{
+		entityManager: em,
+	}
+
+	// 创建奖励实体
+	rewardEntity := em.CreateEntity()
+	ras.rewardEntity = rewardEntity
+
+	// 添加位置组件（卡片左上角位置）
+	ecs.AddComponent(em, rewardEntity, &components.PositionComponent{
+		X: 100.0,
+		Y: 100.0,
+	})
+
+	// 添加奖励动画组件（植物类型，缩放为1.0）
+	ecs.AddComponent(em, rewardEntity, &components.RewardAnimationComponent{
+		RewardType: "plant",
+		Scale:      1.0,
+	})
+
+	// 卡片默认尺寸：100x140（左上角锚点）
+	// 边界框：(100, 100) - (200, 240)
+
+	tests := []struct {
+		name     string
+		mouseX   float64
+		mouseY   float64
+		expected bool
+	}{
+		{"点击卡片内部中心", 150.0, 170.0, true},
+		{"点击卡片左上角", 100.0, 100.0, true},
+		{"点击卡片右下角", 199.0, 239.0, true},
+		{"点击卡片左侧外部", 99.0, 170.0, false},
+		{"点击卡片右侧外部", 201.0, 170.0, false},
+		{"点击卡片上方外部", 150.0, 99.0, false},
+		{"点击卡片下方外部", 150.0, 241.0, false},
+		{"点击远处", 500.0, 500.0, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ras.isCardPackClicked(tt.mouseX, tt.mouseY)
+			if result != tt.expected {
+				t.Errorf("isCardPackClicked(%.1f, %.1f) = %v, want %v",
+					tt.mouseX, tt.mouseY, result, tt.expected)
+			}
+		})
+	}
+
+	t.Logf("✓ isCardPackClicked correctly detects plant card clicks")
+}
+
+// TestIsCardPackClicked_ToolIcon 测试工具图标点击检测
+func TestIsCardPackClicked_ToolIcon(t *testing.T) {
+	em := ecs.NewEntityManager()
+
+	// 创建奖励动画系统
+	ras := &RewardAnimationSystem{
+		entityManager: em,
+	}
+
+	// 创建奖励实体
+	rewardEntity := em.CreateEntity()
+	ras.rewardEntity = rewardEntity
+
+	// 添加位置组件（工具图标中心位置）
+	ecs.AddComponent(em, rewardEntity, &components.PositionComponent{
+		X: 400.0, // 中心点
+		Y: 300.0, // 中心点
+	})
+
+	// 添加奖励动画组件（工具类型，缩放为1.0）
+	ecs.AddComponent(em, rewardEntity, &components.RewardAnimationComponent{
+		RewardType: "tool",
+		Scale:      1.0,
+	})
+
+	// 工具图标尺寸：116x125（中心锚点）
+	// 边界框：(400-58, 300-62.5) - (400+58, 300+62.5)
+	// 即：(342, 237.5) - (458, 362.5)
+
+	tests := []struct {
+		name     string
+		mouseX   float64
+		mouseY   float64
+		expected bool
+	}{
+		{"点击图标中心", 400.0, 300.0, true},
+		{"点击图标左边缘", 343.0, 300.0, true},
+		{"点击图标右边缘", 457.0, 300.0, true},
+		{"点击图标上边缘", 400.0, 238.0, true},
+		{"点击图标下边缘", 400.0, 362.0, true},
+		{"点击图标左侧外部", 341.0, 300.0, false},
+		{"点击图标右侧外部", 459.0, 300.0, false},
+		{"点击图标上方外部", 400.0, 236.0, false},
+		{"点击图标下方外部", 400.0, 364.0, false},
+		{"点击远处", 100.0, 100.0, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ras.isCardPackClicked(tt.mouseX, tt.mouseY)
+			if result != tt.expected {
+				t.Errorf("isCardPackClicked(%.1f, %.1f) = %v, want %v",
+					tt.mouseX, tt.mouseY, result, tt.expected)
+			}
+		})
+	}
+
+	t.Logf("✓ isCardPackClicked correctly detects tool icon clicks")
+}
+
+// TestIsCardPackClicked_NoEntity 测试无实体时的点击检测
+func TestIsCardPackClicked_NoEntity(t *testing.T) {
+	em := ecs.NewEntityManager()
+
+	ras := &RewardAnimationSystem{
+		entityManager: em,
+		rewardEntity:  0, // 无实体
+	}
+
+	// 应该返回 false
+	result := ras.isCardPackClicked(100.0, 100.0)
+	if result {
+		t.Error("isCardPackClicked should return false when rewardEntity is 0")
+	}
+
+	t.Logf("✓ isCardPackClicked returns false when no reward entity exists")
+}
+
+// TestIsCardPackClicked_Scaled 测试缩放后的点击检测
+func TestIsCardPackClicked_Scaled(t *testing.T) {
+	em := ecs.NewEntityManager()
+
+	ras := &RewardAnimationSystem{
+		entityManager: em,
+	}
+
+	rewardEntity := em.CreateEntity()
+	ras.rewardEntity = rewardEntity
+
+	// 位置：卡片左上角
+	ecs.AddComponent(em, rewardEntity, &components.PositionComponent{
+		X: 100.0,
+		Y: 100.0,
+	})
+
+	// 使用 0.5 缩放
+	ecs.AddComponent(em, rewardEntity, &components.RewardAnimationComponent{
+		RewardType: "plant",
+		Scale:      0.5,
+	})
+
+	// 缩放后卡片尺寸：50x70
+	// 边界框：(100, 100) - (150, 170)
+
+	tests := []struct {
+		name     string
+		mouseX   float64
+		mouseY   float64
+		expected bool
+	}{
+		{"点击缩放后卡片内部", 125.0, 135.0, true},
+		{"点击缩放后卡片边缘", 149.0, 169.0, true},
+		{"点击原始尺寸范围但超出缩放后范围", 175.0, 200.0, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ras.isCardPackClicked(tt.mouseX, tt.mouseY)
+			if result != tt.expected {
+				t.Errorf("isCardPackClicked(%.1f, %.1f) = %v, want %v",
+					tt.mouseX, tt.mouseY, result, tt.expected)
+			}
+		})
+	}
+
+	t.Logf("✓ isCardPackClicked correctly handles scaled cards")
+}
+
+// TestIsMainMenuButtonClicked 测试主菜单按钮点击检测
+func TestIsMainMenuButtonClicked(t *testing.T) {
+	em := ecs.NewEntityManager()
+
+	// 创建奖励动画系统，设置屏幕尺寸
+	ras := &RewardAnimationSystem{
+		entityManager: em,
+		screenWidth:   800.0,
+		screenHeight:  600.0,
+	}
+
+	// 创建面板实体
+	panelEntity := em.CreateEntity()
+	ras.panelEntity = panelEntity
+
+	// 添加面板组件（ShowMainMenuButton = true）
+	ecs.AddComponent(em, panelEntity, &components.RewardPanelComponent{
+		IsVisible:          true,
+		ShowMainMenuButton: true,
+	})
+
+	// 根据 layout_config.go 计算按钮位置
+	bgWidth := config.RewardPanelBackgroundWidth
+	bgHeight := config.RewardPanelBackgroundHeight
+	offsetX := (800.0 - bgWidth) / 2
+	offsetY := (600.0 - bgHeight) / 2
+	buttonX := offsetX + bgWidth*config.RewardPanelMainMenuButtonX
+	buttonY := offsetY + bgHeight*config.RewardPanelMainMenuButtonY
+
+	// 按钮尺寸：65x40（半宽32.5，半高20）
+	halfWidth := 32.5
+	halfHeight := 20.0
+
+	tests := []struct {
+		name     string
+		mouseX   float64
+		mouseY   float64
+		expected bool
+	}{
+		{"点击按钮中心", buttonX, buttonY, true},
+		{"点击按钮左边缘", buttonX - halfWidth + 1, buttonY, true},
+		{"点击按钮右边缘", buttonX + halfWidth - 1, buttonY, true},
+		{"点击按钮上边缘", buttonX, buttonY - halfHeight + 1, true},
+		{"点击按钮下边缘", buttonX, buttonY + halfHeight - 1, true},
+		{"点击按钮左侧外部", buttonX - halfWidth - 2, buttonY, false},
+		{"点击按钮右侧外部", buttonX + halfWidth + 2, buttonY, false},
+		{"点击按钮上方外部", buttonX, buttonY - halfHeight - 2, false},
+		{"点击按钮下方外部", buttonX, buttonY + halfHeight + 2, false},
+		{"点击远处", 400.0, 300.0, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ras.isMainMenuButtonClicked(tt.mouseX, tt.mouseY)
+			if result != tt.expected {
+				t.Errorf("isMainMenuButtonClicked(%.1f, %.1f) = %v, want %v",
+					tt.mouseX, tt.mouseY, result, tt.expected)
+			}
+		})
+	}
+
+	t.Logf("✓ isMainMenuButtonClicked correctly detects main menu button clicks (center at %.1f, %.1f)", buttonX, buttonY)
+}
+
+// TestIsMainMenuButtonClicked_ButtonDisabled 测试主菜单按钮禁用时的点击检测
+func TestIsMainMenuButtonClicked_ButtonDisabled(t *testing.T) {
+	em := ecs.NewEntityManager()
+
+	ras := &RewardAnimationSystem{
+		entityManager: em,
+		screenWidth:   800.0,
+		screenHeight:  600.0,
+	}
+
+	panelEntity := em.CreateEntity()
+	ras.panelEntity = panelEntity
+
+	// ShowMainMenuButton = false（教学关卡配置）
+	ecs.AddComponent(em, panelEntity, &components.RewardPanelComponent{
+		IsVisible:          true,
+		ShowMainMenuButton: false, // 禁用
+	})
+
+	// 即使点击按钮位置也应返回 false
+	result := ras.isMainMenuButtonClicked(680.0, 48.0)
+	if result {
+		t.Error("isMainMenuButtonClicked should return false when ShowMainMenuButton is false")
+	}
+
+	t.Logf("✓ isMainMenuButtonClicked correctly respects ShowMainMenuButton config")
+}
+
+// TestIsMainMenuButtonClicked_NoPanel 测试无面板时的点击检测
+func TestIsMainMenuButtonClicked_NoPanel(t *testing.T) {
+	em := ecs.NewEntityManager()
+
+	ras := &RewardAnimationSystem{
+		entityManager: em,
+		screenWidth:   800.0,
+		screenHeight:  600.0,
+		panelEntity:   0, // 无面板
+	}
+
+	// 应该返回 false（面板不存在）
+	result := ras.isMainMenuButtonClicked(680.0, 48.0)
+	if result {
+		t.Error("isMainMenuButtonClicked should return false when panelEntity is 0")
+	}
+
+	t.Logf("✓ isMainMenuButtonClicked returns false when no panel exists")
 }

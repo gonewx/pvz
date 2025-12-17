@@ -106,6 +106,11 @@ func (rprs *RewardPanelRenderSystem) drawPanel(screen *ebiten.Image, panelEntity
 
 	// 5. 绘制"下一关"按钮
 	rprs.drawNextLevelButton(screen, panel.FadeAlpha)
+
+	// 6. 绘制"主菜单"按钮（Story 8.13，根据配置决定是否显示）
+	if panel.ShowMainMenuButton {
+		rprs.drawMainMenuButton(screen, panel.FadeAlpha)
+	}
 }
 
 // drawBackground 绘制奖励背景。
@@ -576,6 +581,39 @@ func (rprs *RewardPanelRenderSystem) isHoveringNextButton() bool {
 		float64(mouseY) >= buttonY-halfHeight && float64(mouseY) <= buttonY+halfHeight
 }
 
+// isHoveringMainMenuButton 检查鼠标是否悬停在主菜单按钮上（Story 8.13）
+func (rprs *RewardPanelRenderSystem) isHoveringMainMenuButton() bool {
+	// 获取鼠标位置
+	mouseX, mouseY := utils.GetPointerPosition()
+
+	// 计算按钮位置（与 drawMainMenuButton 逻辑一致）
+	bgWidth := config.RewardPanelBackgroundWidth
+	bgHeight := config.RewardPanelBackgroundHeight
+	offsetX := (rprs.screenWidth - bgWidth) / 2
+	offsetY := (rprs.screenHeight - bgHeight) / 2
+
+	// 按钮中心位置（右上角）
+	buttonX := offsetX + bgWidth*config.RewardPanelMainMenuButtonX
+	buttonY := offsetY + bgHeight*config.RewardPanelMainMenuButtonY
+
+	// 按钮尺寸（根据 IMAGE_SEEDCHOOSER_BUTTON2 的尺寸，约 65x28）
+	buttonWidth := 65.0
+	buttonHeight := 40.0 // 增大高度以提高可点击性
+
+	// AABB 碰撞检测
+	halfWidth := buttonWidth / 2
+	halfHeight := buttonHeight / 2
+
+	return float64(mouseX) >= buttonX-halfWidth && float64(mouseX) <= buttonX+halfWidth &&
+		float64(mouseY) >= buttonY-halfHeight && float64(mouseY) <= buttonY+halfHeight
+}
+
+// IsHoveringMainMenuButton 公开的主菜单按钮悬浮检测方法（Story 8.13）
+// 供 RewardAnimationSystem 使用，用于设置鼠标光标形状
+func (rprs *RewardPanelRenderSystem) IsHoveringMainMenuButton() bool {
+	return rprs.isHoveringMainMenuButton()
+}
+
 // drawNextLevelButton 绘制"下一关"按钮（在面板底部）。
 // 当鼠标悬停时，在普通按钮上叠加半透明的光晕效果
 func (rprs *RewardPanelRenderSystem) drawNextLevelButton(screen *ebiten.Image, alpha float64) {
@@ -685,26 +723,73 @@ func (rprs *RewardPanelRenderSystem) drawFallbackButton(screen *ebiten.Image, al
 	}
 }
 
-// findPhysicalFrameIndex 将逻辑帧号映射到物理帧索引（简化版）。
-func (rprs *RewardPanelRenderSystem) findPhysicalFrameIndex(reanim *components.ReanimComponent, logicalFrameNum int) int {
-	// 获取当前动画的 AnimVisibles
-	if len(reanim.CurrentAnimations) == 0 {
-		return -1
-	}
-	animVisibles := reanim.AnimVisiblesMap[reanim.CurrentAnimations[0]]
-	if len(animVisibles) == 0 {
-		return -1
+// drawMainMenuButton 绘制主菜单按钮（在面板右上角）（Story 8.13）
+// 当鼠标悬停时，在普通按钮上叠加发光效果
+func (rprs *RewardPanelRenderSystem) drawMainMenuButton(screen *ebiten.Image, alpha float64) {
+	if alpha < 0.5 {
+		return
 	}
 
-	logicalIndex := 0
-	for i := 0; i < len(animVisibles); i++ {
-		if animVisibles[i] == 0 {
-			if logicalIndex == logicalFrameNum {
-				return i
-			}
-			logicalIndex++
+	// 检查是否悬停
+	isHovered := rprs.isHoveringMainMenuButton()
+
+	// 获取普通按钮图片
+	buttonImage := rprs.resourceManager.GetImageByID("IMAGE_SEEDCHOOSER_BUTTON2")
+	if buttonImage == nil {
+		log.Printf("[RewardPanelRenderSystem] WARNING: IMAGE_SEEDCHOOSER_BUTTON2 not loaded! Skipping main menu button")
+		return
+	}
+
+	// 奖励背景是 800x600
+	bgWidth := config.RewardPanelBackgroundWidth
+	bgHeight := config.RewardPanelBackgroundHeight
+	offsetX := (rprs.screenWidth - bgWidth) / 2
+	offsetY := (rprs.screenHeight - bgHeight) / 2
+
+	// 计算按钮位置（右上角，使用配置的位置比例）
+	buttonX := offsetX + bgWidth*config.RewardPanelMainMenuButtonX
+	buttonY := offsetY + bgHeight*config.RewardPanelMainMenuButtonY
+
+	// 绘制普通按钮图片
+	buttonWidth := float64(buttonImage.Bounds().Dx())
+	buttonHeight := float64(buttonImage.Bounds().Dy())
+
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Translate(buttonX-buttonWidth/2, buttonY-buttonHeight/2)
+	op.ColorScale.ScaleAlpha(float32(alpha))
+	screen.DrawImage(buttonImage, op)
+
+	// 悬停时叠加发光效果
+	if isHovered {
+		glowImage := rprs.resourceManager.GetImageByID("IMAGE_SEEDCHOOSER_BUTTON2_GLOW")
+		if glowImage != nil {
+			glowWidth := float64(glowImage.Bounds().Dx())
+			glowHeight := float64(glowImage.Bounds().Dy())
+
+			glowOp := &ebiten.DrawImageOptions{}
+			glowOp.GeoM.Translate(buttonX-glowWidth/2, buttonY-glowHeight/2)
+			// 设置透明度（0.5 = 50% 透明度）
+			glowOp.ColorScale.ScaleAlpha(float32(alpha) * 0.5)
+			screen.DrawImage(glowImage, glowOp)
 		}
 	}
 
-	return -1
+	// 绘制按钮文字（"主菜单"，带阴影效果）
+	if rprs.buttonFont != nil {
+		buttonText := "主菜单"
+
+		// 按钮较小，使用较小的字体
+		smallFont, err := rprs.resourceManager.LoadFont("assets/fonts/SimHei.ttf", 12.0)
+		if err != nil {
+			smallFont = rprs.buttonFont // 回退到默认按钮字体
+		}
+
+		// 绘制主文字
+		textOp := &text.DrawOptions{}
+		textOp.GeoM.Translate(buttonX, buttonY)
+		textOp.PrimaryAlign = text.AlignCenter   // 水平居中
+		textOp.SecondaryAlign = text.AlignCenter // 垂直居中
+		textOp.ColorScale.ScaleWithColor(color.RGBA{0, 0, 0, 255})
+		text.Draw(screen, buttonText, smallFont, textOp)
+	}
 }

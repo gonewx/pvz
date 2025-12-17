@@ -100,6 +100,12 @@ type LevelConfig struct {
 	// 启用后：镜头右移预览僵尸 → 进入选卡界面 → 点击"一起摇滚吧!" → 镜头左移 → 开始游戏
 	// 禁用时（默认）：使用 AvailablePlants 固定植物列表
 	EnableSeedSelection bool `yaml:"enableSeedSelection"`
+
+	// Story 8.13: 奖励面板主菜单按钮配置
+	// 是否在奖励面板上显示主菜单按钮，默认为 true
+	// 教学关卡（1-1、1-2）设置为 false，避免玩家过早跳出教学流程
+	// 使用指针类型以区分"未设置"（nil → 默认 true）和"显式设置为 false"
+	ShowMainMenuButton *bool `yaml:"showMainMenuButton"`
 }
 
 // PresetPlant 预设植物配置（Story 19.4）
@@ -320,6 +326,12 @@ func applyDefaults(config *LevelConfig) {
 
 	// AvailablePlants、TutorialSteps、SpecialRules、SodRowImage 默认为空值（nil/空字符串），无需处理
 	// SkipOpening 默认为 false（bool 零值），无需处理
+
+	// Story 8.13: ShowMainMenuButton 默认为 true
+	if config.ShowMainMenuButton == nil {
+		defaultTrue := true
+		config.ShowMainMenuButton = &defaultTrue
+	}
 }
 
 // validateLevelConfig 验证关卡配置的完整性和合法性

@@ -39,4 +39,8 @@ type RewardPanelComponent struct {
 
 	// AnimationTime 动画时间计数器（秒）
 	AnimationTime float64
+
+	// ShowMainMenuButton 是否显示主菜单按钮
+	// 由关卡配置决定，教学关卡（1-1、1-2）不显示
+	ShowMainMenuButton bool
 }

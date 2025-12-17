@@ -19,6 +19,7 @@ initialSun: 50                # 初始阳光50（标准值）
 
 # Story 8.3: 奖励配置
 rewardPlant: "cherrybomb"     # 完成后解锁樱桃炸弹
+showMainMenuButton: false     # Story 8.13: 教学关卡不显示主菜单按钮
 
 # === 草皮配置（三行）===
 backgroundImage: "IMAGE_BACKGROUND1UNSODDED"  # 使用未铺草皮背景
