@@ -7,7 +7,6 @@ import (
 	"github.com/gonewx/pvz/pkg/components"
 	"github.com/gonewx/pvz/pkg/config"
 	"github.com/gonewx/pvz/pkg/ecs"
-	"github.com/gonewx/pvz/pkg/entities"
 	"github.com/gonewx/pvz/pkg/game"
 	"github.com/gonewx/pvz/pkg/modules"
 	"github.com/gonewx/pvz/pkg/systems"
@@ -258,592 +257,142 @@ type GameScene struct {
 //
 // If any UI resources fail to load, the scene will use fallback rendering methods.
 func NewGameScene(rm *game.ResourceManager, sm *game.SceneManager, levelID string) *GameScene {
+	// Phase 1: 创建场景基础结构
 	scene := &GameScene{
-		resourceManager: rm,
-		sceneManager:    sm,
-		gameState:       game.GetGameState(), // Get global game state singleton
-		// DEBUG: Skip intro animation for faster testing
-		// Initialize camera at the leftmost position for intro animation
-		// cameraX:            0,
-		// isIntroAnimPlaying: true,
-		cameraX:            config.GameCameraX, // 直接设置为游戏镜头位置，跳过开场动画
-		isIntroAnimPlaying: false,              // 禁用开场动画
+		resourceManager:    rm,
+		sceneManager:       sm,
+		gameState:          game.GetGameState(),
+		cameraX:            config.GameCameraX,
+		isIntroAnimPlaying: false,
 		introAnimTimer:     0,
 	}
 
-	// Reset game state flags for new session
-	scene.gameState.SetPaused(false)
-	scene.gameState.IsGameOver = false
-	scene.gameState.GameResult = ""
+	// Phase 2: 初始化基础状态
+	scene.initializeBaseState()
 
-	// Story 18.3: 检测战斗存档（进入游戏后立即检测）
-	saveManager := scene.gameState.GetSaveManager()
+	// Phase 3: 检测战斗存档
+	scene.detectBattleSave()
+
+	// Phase 4: 加载资源和关卡配置
+	if err := scene.loadGameResources(rm, levelID); err != nil {
+		log.Printf("[GameScene] FATAL: Failed to initialize game resources: %v", err)
+	}
+
+	// Phase 5: 初始化ECS系统（拆分到 game_scene_systems.go）
+	scene.initializeSystems(rm)
+
+	// Phase 6: 初始化关卡实体和回调
+	scene.initializeLevelContent(rm)
+
+	return scene
+}
+
+// initializeBaseState 初始化基础状态
+func (s *GameScene) initializeBaseState() {
+	s.gameState.SetPaused(false)
+	s.gameState.IsGameOver = false
+	s.gameState.GameResult = ""
+}
+
+// detectBattleSave 检测战斗存档
+func (s *GameScene) detectBattleSave() {
+	saveManager := s.gameState.GetSaveManager()
 	currentUser := saveManager.GetCurrentUser()
 	if currentUser != "" && saveManager.HasBattleSave(currentUser) {
-		scene.hasBattleSave = true
-		scene.battleSaveInfo, _ = saveManager.GetBattleSaveInfo(currentUser)
-		if scene.battleSaveInfo != nil {
+		s.hasBattleSave = true
+		s.battleSaveInfo, _ = saveManager.GetBattleSaveInfo(currentUser)
+		if s.battleSaveInfo != nil {
 			log.Printf("[GameScene] 检测到战斗存档: 关卡=%s, 波次=%d, 阳光=%d",
-				scene.battleSaveInfo.LevelID,
-				scene.battleSaveInfo.WaveIndex+1,
-				scene.battleSaveInfo.Sun)
+				s.battleSaveInfo.LevelID,
+				s.battleSaveInfo.WaveIndex+1,
+				s.battleSaveInfo.Sun)
 		}
 	}
+}
 
-	// Story 6.3: Load all Reanim resources (XML and part images)
-	// CRITICAL: Reanim resources are required for all entity animations.
-	// If loading fails in production, log fatal error.
-	// In test environments without assets, this will fail gracefully.
+// loadGameResources 加载游戏资源和关卡配置
+func (s *GameScene) loadGameResources(rm *game.ResourceManager, levelID string) error {
+	// 加载 Reanim 资源
 	if err := rm.LoadReanimResources(); err != nil {
 		log.Printf("[GameScene] FATAL: Failed to load Reanim resources: %v", err)
-		log.Printf("[GameScene] Game cannot function properly without animation resources")
-		// Note: In production with real assets, this indicates a critical setup error.
-		// The game will likely crash later when trying to access nil Reanim data.
-		// In test environments, tests may pass if they don't use Reanim features.
-	} else {
-		log.Printf("[GameScene] Successfully loaded all Reanim resources")
+		return fmt.Errorf("reanim resources: %w", err)
 	}
+	log.Printf("[GameScene] Successfully loaded all Reanim resources")
 
-	// Initialize ECS framework
-	scene.entityManager = ecs.NewEntityManager()
+	// 初始化 ECS 框架
+	s.entityManager = ecs.NewEntityManager()
 
-	// Story 5.5 & 8.1 & 8.6: Load level configuration FIRST (before creating systems that depend on it)
-	// Story 8.6: Convert levelID to file path (e.g., "1-2" → "data/levels/level-1-2.yaml")
-	// CRITICAL: This must happen before:
-	//   1. loadResources() (needs BackgroundImage)
-	//   2. LawnGridSystem (needs EnabledLanes)
-	//   3. initPlantCardSystems() (needs AvailablePlants)
-	//   4. WaveSpawnSystem (needs wave configuration)
+	// 加载关卡配置
 	levelFilePath := fmt.Sprintf("data/levels/level-%s.yaml", levelID)
 	levelConfig, err := config.LoadLevelConfig(levelFilePath)
 	if err != nil {
 		log.Printf("[GameScene] FATAL: Failed to load level config '%s': %v", levelFilePath, err)
-		log.Printf("[GameScene] Game cannot start without level configuration")
-	} else {
-		scene.gameState.LoadLevel(levelConfig)
-		log.Printf("[GameScene] Loaded level: %s (%d waves, %d plants available, enabled lanes: %v)",
-			levelConfig.Name, len(levelConfig.Waves), len(levelConfig.AvailablePlants), levelConfig.EnabledLanes)
-
-		// Bug Fix: 验证战斗存档的 LevelID 是否与当前加载的关卡匹配
-		// 如果不匹配，清除存档标记并删除不匹配的存档
-		// 这可以防止在错误的关卡场景中恢复存档数据
-		if scene.hasBattleSave && scene.battleSaveInfo != nil {
-			if scene.battleSaveInfo.LevelID != "" && scene.battleSaveInfo.LevelID != levelConfig.ID {
-				log.Printf("[GameScene] ⚠️ 战斗存档关卡不匹配! 存档关卡: %s, 当前关卡: %s",
-					scene.battleSaveInfo.LevelID, levelConfig.ID)
-				log.Printf("[GameScene] 清除存档标记，删除不匹配的存档...")
-				// 删除不匹配的存档
-				if err := saveManager.DeleteBattleSave(currentUser); err != nil {
-					log.Printf("[GameScene] Warning: Failed to delete mismatched battle save: %v", err)
-				}
-				// 清除存档标记，避免显示对话框
-				scene.hasBattleSave = false
-				scene.battleSaveInfo = nil
-			}
-		}
+		return fmt.Errorf("level config: %w", err)
 	}
 
-	// Load all UI resources
-	// CRITICAL: 必须在关卡配置加载之后调用，因为需要读取 BackgroundImage 配置
-	scene.loadResources()
+	s.gameState.LoadLevel(levelConfig)
+	log.Printf("[GameScene] Loaded level: %s (%d waves, %d plants available, enabled lanes: %v)",
+		levelConfig.Name, len(levelConfig.Waves), len(levelConfig.AvailablePlants), levelConfig.EnabledLanes)
 
-	// Initialize systems
-	scene.renderSystem = systems.NewRenderSystem(scene.entityManager)
-	scene.sunMovementSystem = systems.NewSunMovementSystem(scene.entityManager)
-	scene.lifetimeSystem = systems.NewLifetimeSystem(scene.entityManager)
-	// TODO(Story 6.3): 迁移到 ReanimSystem
-	// scene.animationSystem = systems.NewAnimationSystem(scene.entityManager)
+	// 验证战斗存档匹配性
+	s.validateBattleSave(levelConfig)
 
-	// Calculate sun collection target position from sun pool icon position
-	// This ensures the suns fly to the exact center of the sun pool icon (not the text)
-	sunCollectionTargetX := float64(config.SeedBankX + config.SunPoolOffsetX)
-	sunCollectionTargetY := float64(config.SeedBankY + config.SunPoolOffsetY)
+	// 加载 UI 资源
+	s.loadResources()
 
-	// Story 3.3 & 8.1: Initialize lawn grid system and entity with enabled lanes
-	// Now CurrentLevel is loaded, so we can read EnabledLanes correctly
-	var enabledLanes []int
-	if scene.gameState.CurrentLevel != nil {
-		enabledLanes = scene.gameState.CurrentLevel.EnabledLanes
-	}
-	if len(enabledLanes) == 0 {
-		enabledLanes = []int{1, 2, 3, 4, 5} // 默认所有行启用
-	}
-	scene.lawnGridSystem = systems.NewLawnGridSystem(scene.entityManager, enabledLanes)
-	scene.lawnGridEntityID = scene.entityManager.CreateEntity()
-	scene.entityManager.AddComponent(scene.lawnGridEntityID, &components.LawnGridComponent{})
-	log.Printf("[GameScene] Initialized lawn grid system (Entity ID: %d) with enabled lanes: %v", scene.lawnGridEntityID, enabledLanes)
+	return nil
+}
 
-	// Story 6.3: Initialize Reanim system (must be before InputSystem)
-	scene.reanimSystem = systems.NewReanimSystem(scene.entityManager)
-	log.Printf("[GameScene] Initialized Reanim system")
-
-	// Story 13.6: 设置配置管理器
-	if configManager := rm.GetReanimConfigManager(); configManager != nil {
-		scene.reanimSystem.SetConfigManager(configManager)
+// validateBattleSave 验证战斗存档的关卡匹配性
+func (s *GameScene) validateBattleSave(levelConfig *config.LevelConfig) {
+	if !s.hasBattleSave || s.battleSaveInfo == nil {
+		return
 	}
 
-	// Story 5.4.1: 设置资源加载器，用于运行时单位切换（如僵尸切换到烧焦僵尸）
-	scene.reanimSystem.SetResourceLoader(rm)
+	if s.battleSaveInfo.LevelID != "" && s.battleSaveInfo.LevelID != levelConfig.ID {
+		log.Printf("[GameScene] ⚠️ 战斗存档关卡不匹配! 存档关卡: %s, 当前关卡: %s",
+			s.battleSaveInfo.LevelID, levelConfig.ID)
+		log.Printf("[GameScene] 清除存档标记，删除不匹配的存档...")
 
-	// ✅ 修复：设置 ReanimSystem 引用，以便 RenderSystem 调用 GetRenderData()
-	scene.renderSystem.SetReanimSystem(scene.reanimSystem)
-
-	// Story 8.8 - Task 6: 设置 ResourceManager 引用，以便 RenderSystem 加载房门图片
-	scene.renderSystem.SetResourceManager(rm)
-
-	// Initialize input system with sun counter target position and lawn grid system (Story 2.4 + Story 3.3)
-	// Story 6.3: Pass reanimSystem to InputSystem for plant animation initialization
-	scene.inputSystem = systems.NewInputSystem(
-		scene.entityManager,
-		rm,
-		scene.gameState,
-		scene.reanimSystem,     // Story 6.3: Reanim 系统
-		sunCollectionTargetX,   // sunCounterX - 阳光计数器X坐标
-		sunCollectionTargetY,   // sunCounterY - 阳光计数器Y坐标
-		scene.lawnGridSystem,   // Story 3.3: 草坪网格系统
-		scene.lawnGridEntityID, // Story 3.3: 草坪网格实体ID
-	)
-
-	// Initialize sun collection system with the same target position
-	scene.sunCollectionSystem = systems.NewSunCollectionSystem(
-		scene.entityManager,
-		scene.gameState,      // 传入 GameState 以便在阳光到达时增加数值
-		sunCollectionTargetX, // targetX
-		sunCollectionTargetY, // targetY
-	)
-
-	// Initialize sun spawn system with lawn area parameters
-	// 使用配置常量确保阳光完整显示在屏幕内
-	scene.sunSpawnSystem = systems.NewSunSpawnSystem(
-		scene.entityManager,
-		rm,
-		config.SkyDropSunMinX,       // minX - 阳光中心最小 X 坐标
-		config.SkyDropSunMaxX,       // maxX - 阳光中心最大 X 坐标
-		config.SkyDropSunMinTargetY, // minTargetY - 阳光落地最小 Y 坐标
-		config.SkyDropSunMaxTargetY, // maxTargetY - 阳光落地最大 Y 坐标
-	)
-
-	// Story 8.2 QA改进：关卡加载后，加载草皮相关资源
-	scene.loadSoddingResources()
-
-	// Story 3.1: Initialize plant card systems
-	// NOW CurrentLevel is loaded, so availablePlants will be read correctly
-	scene.initPlantCardSystems(rm)
-
-	// Story 3.2: Initialize plant preview systems
-	// PlantPreviewRenderSystem 需要引用 PlantPreviewSystem 来获取两个渲染位置
-	// Story 8.1: PlantPreviewSystem 需要 LawnGridSystem 来检查行是否启用
-	scene.plantPreviewSystem = systems.NewPlantPreviewSystem(scene.entityManager, scene.gameState, scene.lawnGridSystem)
-	scene.plantPreviewSystem.SetLawnGridEntityID(scene.lawnGridEntityID) // 设置网格实体ID用于检查格子占用
-	// 修复: 使用静态图像预览,不需要 ReanimSystem
-	scene.plantPreviewRenderSystem = systems.NewPlantPreviewRenderSystem(scene.entityManager, scene.plantPreviewSystem)
-
-	// Story 3.4: Initialize behavior system (sunflower sun production, etc.)
-	// Story 14.3: Epic 14 - Removed ReanimSystem dependency, using AnimationCommand component
-	// Story 5.5: Pass GameState for zombie death counting
-	// Bug Fix: Pass LawnGridSystem for plant death grid release
-	scene.behaviorSystem = behavior.NewBehaviorSystem(
-		scene.entityManager,
-		rm,
-		scene.gameState,
-		scene.lawnGridSystem,
-		scene.lawnGridEntityID,
-		scene.reanimSystem,
-	)
-	log.Printf("[GameScene] Initialized behavior system for plant behaviors")
-
-	// Story 4.3: Initialize physics system (collision detection)
-	scene.physicsSystem = systems.NewPhysicsSystem(scene.entityManager, rm)
-	log.Printf("[GameScene] Initialized physics system for collision detection")
-
-	// Story 5.5: Initialize level management systems
-	// 1. Create WaveSpawnSystem (LevelSystem depends on it)
-	// Story 14.3: Epic 14 - Removed ReanimSystem dependency
-	// Story 17.3: Load spawn rules config (optional, nil means no constraint checking)
-	spawnRules, err := config.LoadSpawnRules("data/spawn_rules.yaml")
-	if err != nil {
-		log.Printf("[GameScene] Warning: Failed to load spawn rules: %v (constraint checking disabled)", err)
-		spawnRules = nil
-	}
-	// Story 17.9: Load zombie physics config (optional, nil means use default coordinates)
-	zombiePhysics, err := config.LoadZombiePhysicsConfig("data/zombie_physics.yaml")
-	if err != nil {
-		log.Printf("[GameScene] Warning: Failed to load zombie physics config: %v (using default coordinates)", err)
-		zombiePhysics = nil
-	}
-	scene.waveSpawnSystem = systems.NewWaveSpawnSystem(scene.entityManager, rm, scene.gameState.CurrentLevel, scene.gameState, spawnRules, zombiePhysics)
-	log.Printf("[GameScene] Initialized wave spawn system (spawn rules enabled: %v, physics config enabled: %v)", spawnRules != nil, zombiePhysics != nil)
-
-	// Pre-spawn all zombies for the level (they will be activated wave by wave)
-	// Story 8.3.1: 僵尸预生成时机取决于是否有开场动画
-	// - 有开场动画：延迟到开场动画完成后预生成（见 Update() 方法）
-	// - 无开场动画：立即预生成
-	// 注意：预览僵尸由 OpeningAnimationSystem 独立生成，与此处的关卡僵尸完全独立
-
-	// Story 8.3: Create CameraSystem (always create, used by opening animation)
-	scene.cameraSystem = systems.NewCameraSystem(scene.entityManager, scene.gameState)
-	log.Printf("[GameScene] Initialized camera system")
-
-	// Story 7.2: Initialize particle system (must be before RewardAnimationSystem)
-	// Story 7.4: Added ResourceManager parameter for loading particle images
-	scene.particleSystem = systems.NewParticleSystem(scene.entityManager, scene.resourceManager)
-	log.Printf("[GameScene] Initialized particle system for visual effects")
-
-	// Story 8.3 + 8.4重构: Create RewardAnimationSystem (完全封装，无需单独创建面板渲染系统)
-	// RewardAnimationSystem内部自动创建和管理RewardPanelRenderSystem
-	scene.rewardSystem = systems.NewRewardAnimationSystem(scene.entityManager, scene.gameState, rm, scene.sceneManager, scene.reanimSystem, scene.particleSystem, scene.renderSystem)
-	log.Printf("[GameScene] Initialized reward animation system (fully encapsulated)")
-
-	// Story 8.3: Create OpeningAnimationSystem (conditionally, may return nil)
-	scene.openingSystem = systems.NewOpeningAnimationSystem(scene.entityManager, scene.gameState, rm, levelConfig, scene.cameraSystem)
-	if scene.openingSystem != nil {
-		log.Printf("[GameScene] Initialized opening animation system")
-		// Story 8.3.1: 有开场动画时，僵尸预生成延迟到动画完成后
-		// zombiesPreSpawned 保持为 false，在 Update() 中检测动画完成后预生成
-	} else {
-		log.Printf("[GameScene] Skipping opening animation system (tutorial/skip/special level)")
-		// 实时生成模式：不再预生成僵尸，由 WaveTimingSystem 触发时实时生成
-	}
-
-	// Create ReadySetPlantSystem (在铺草皮完成、UI 显示后播放)
-	scene.readySetPlantSystem = systems.NewReadySetPlantSystem(scene.entityManager, rm)
-	log.Printf("[GameScene] Initialized ReadySetPlant animation system")
-
-	// Story 10.2: Create LawnmowerSystem (除草车系统 - 最后防线)
-	// Story 10.3: 传递 ReanimSystem 用于播放僵尸死亡动画
-	scene.lawnmowerSystem = systems.NewLawnmowerSystem(scene.entityManager, rm, scene.gameState)
-	log.Printf("[GameScene] Initialized lawnmower system")
-
-	// Story 10.2: 除草车实体将在铺草皮动画完成后创建（见铺草皮回调）
-	// 原版行为：草皮铺完后才显示除草车
-
-	// 2. Create LevelSystem (需要 RewardAnimationSystem 和 LawnmowerSystem)
-	// Story 14.3: Epic 14 - Removed ReanimSystem dependency
-	scene.levelSystem = systems.NewLevelSystem(scene.entityManager, scene.gameState, scene.waveSpawnSystem, rm, scene.rewardSystem, scene.lawnmowerSystem)
-	// Story 17.9: 设置僵尸物理配置（用于类型化进家判定）
-	if zombiePhysics != nil {
-		scene.levelSystem.SetZombiePhysicsConfig(zombiePhysics)
-	}
-	log.Printf("[GameScene] Initialized level system")
-
-	// Story 11.3: Create FinalWaveWarningSystem (最后一波提示系统)
-	scene.finalWaveWarningSystem = systems.NewFinalWaveWarningSystem(scene.entityManager)
-	log.Printf("[GameScene] Initialized final wave warning system")
-
-	// Story 8.8: Create ZombiesWonPhaseSystem (僵尸获胜流程系统)
-	scene.zombiesWonPhaseSystem = systems.NewZombiesWonPhaseSystem(
-		scene.entityManager,
-		scene.resourceManager,
-		scene.gameState,
-		WindowWidth,
-		WindowHeight,
-	)
-	log.Printf("[GameScene] Initialized zombies won phase system")
-	// Story 8.8: 设置"再次尝试"回调
-	scene.zombiesWonPhaseSystem.SetRetryCallback(func() {
-		scene.retryLevel()
-	})
-
-	// 3. Create ZombieLaneTransitionSystem (僵尸行转换系统)
-	scene.zombieLaneTransitionSystem = systems.NewZombieLaneTransitionSystem(scene.entityManager)
-	log.Printf("[GameScene] Initialized zombie lane transition system")
-
-	// 方案A+：Initialize flash effect system
-	scene.flashEffectSystem = systems.NewFlashEffectSystem(scene.entityManager)
-	log.Printf("[GameScene] Initialized flash effect system for hit feedback")
-
-	// Story 8.2: Initialize tutorial system (if this is a tutorial level)
-	if scene.gameState.CurrentLevel != nil && len(scene.gameState.CurrentLevel.TutorialSteps) > 0 {
-		scene.tutorialSystem = systems.NewTutorialSystem(scene.entityManager, scene.gameState, scene.resourceManager, scene.lawnGridSystem, scene.sunSpawnSystem, scene.gameState.CurrentLevel)
-		// Story 17.6+统一：设置 LevelSystem 引用，用于访问 WaveTimingSystem
-		scene.tutorialSystem.SetLevelSystem(scene.levelSystem)
-		log.Printf("[GameScene] Tutorial system activated for level %s", scene.gameState.CurrentLevel.ID)
-
-		// 仅强制性教学关卡禁用自动阳光生成
-		if scene.gameState.CurrentLevel.OpeningType == "tutorial" {
-			// 禁用自动阳光生成（第一次收集阳光后由 TutorialSystem 启用）
-			scene.sunSpawnSystem.Disable()
-			log.Printf("[GameScene] Tutorial level: suns will be spawned by tutorial system")
+		saveManager := s.gameState.GetSaveManager()
+		currentUser := saveManager.GetCurrentUser()
+		if err := saveManager.DeleteBattleSave(currentUser); err != nil {
+			log.Printf("[GameScene] Warning: Failed to delete mismatched battle save: %v", err)
 		}
 
-		// Load tutorial font (使用简体中文黑体字体 SimHei.ttf)
-		ttFont, err := scene.resourceManager.LoadFont("assets/fonts/SimHei.ttf", 28)
-		if err != nil {
-			log.Printf("FATAL: Failed to load tutorial font SimHei.ttf: %v", err)
-		} else {
-			scene.tutorialFont = ttFont
-			log.Printf("[GameScene] Loaded tutorial font: SimHei.ttf (28px)")
-		}
+		s.hasBattleSave = false
+		s.battleSaveInfo = nil
 	}
+}
 
-	// Story 19.10: 保龄球关卡（initialSun == 0）禁用阳光生成
-	if scene.gameState.CurrentLevel != nil && scene.gameState.CurrentLevel.InitialSun == 0 {
-		scene.sunSpawnSystem.Disable()
-		log.Printf("[GameScene] Bowling level (initialSun=0): sun spawn system DISABLED")
+// initializeSystems 初始化所有 ECS 系统（调用 game_scene_systems.go 中的函数）
+func (s *GameScene) initializeSystems(rm *game.ResourceManager) {
+	// 核心系统
+	s.initCoreSystems(rm)
 
-		// 加载保龄球关卡专用的大字体（42px）
-		bowlingFont, err := scene.resourceManager.LoadFont("assets/fonts/SimHei.ttf", config.BowlingTutorialTextFontSize)
-		if err != nil {
-			log.Printf("WARNING: Failed to load bowling tutorial font: %v", err)
-		} else {
-			scene.bowlingTutorialFont = bowlingFont
-			log.Printf("[GameScene] Loaded bowling tutorial font: SimHei.ttf (%.0fpx)", config.BowlingTutorialTextFontSize)
-		}
-	}
+	// 游戏逻辑系统
+	s.initGameplaySystems(rm)
 
-	// Story 8.2 QA改进：初始化铺草皮动画系统
-	scene.soddingSystem = systems.NewSoddingSystem(scene.entityManager, scene.resourceManager)
-	log.Printf("[GameScene] Initialized sodding animation system")
+	// UI 系统
+	s.initUISystems(rm)
 
-	// 按钮系统初始化（ECS 架构）
-	scene.buttonSystem = systems.NewButtonSystem(scene.entityManager)
-	scene.buttonRenderSystem = systems.NewButtonRenderSystem(scene.entityManager)
-	log.Printf("[GameScene] Initialized button systems")
+	// 加载草皮相关资源
+	s.loadSoddingResources()
 
-	// Story 20.5: 滑块和复选框系统初始化
-	scene.sliderSystem = systems.NewSliderSystem(scene.entityManager)
-	scene.checkboxSystem = systems.NewCheckboxSystem(scene.entityManager)
-	log.Printf("[GameScene] Initialized slider and checkbox systems")
+	// 初始化植物卡片系统
+	s.initPlantCardSystems(rm)
 
-	// 对话框系统初始化（ECS 架构）
-	// Story 8.8: Load dialog fonts for DialogRenderSystem
-	titleFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 24)
-	if err != nil {
-		log.Printf("Warning: Failed to load title font: %v", err)
-	}
+	// 关卡特定系统
+	s.initLevelSpecificSystems(rm)
 
-	messageFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 18)
-	if err != nil {
-		log.Printf("Warning: Failed to load message font: %v", err)
-	}
+	// 设置系统回调
+	s.setupSystemCallbacks()
+}
 
-	buttonFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 20)
-	if err != nil {
-		log.Printf("Warning: Failed to load button font: %v", err)
-	}
-
-	scene.dialogInputSystem = systems.NewDialogInputSystem(scene.entityManager)
-	scene.dialogRenderSystem = systems.NewDialogRenderSystem(scene.entityManager, WindowWidth, WindowHeight, titleFont, messageFont, buttonFont)
-	log.Printf("[GameScene] Initialized dialog systems (input + render)")
-
-	// 创建菜单按钮实体
-	scene.initMenuButton(rm)
-
-	// Story 10.1: 初始化暂停菜单系统
-	scene.initPauseMenuModule(rm)
-
-	// Story 11.2: 初始化关卡进度条系统
-	scene.initProgressBar(rm)
-
-	// Story 19.2: 初始化铲子交互系统
-	scene.shovelInteractionSystem = systems.NewShovelInteractionSystem(scene.entityManager, scene.gameState, rm)
-	systems.SetShovelStateProvider(scene)
-	log.Printf("[GameScene] Initialized shovel interaction system")
-
-	// Story 19.3: 初始化强引导教学系统
-	scene.guidedTutorialSystem = systems.NewGuidedTutorialSystem(scene.entityManager, scene.gameState, rm)
-	systems.SetGuidedTutorialShovelProvider(scene)
-	systems.SetGuidedTutorialStateProvider(scene)
-	log.Printf("[GameScene] Initialized guided tutorial system")
-
-	// Story 19.4: 初始化阶段转场���统
-	scene.levelPhaseSystem = systems.NewLevelPhaseSystem(scene.entityManager, scene.gameState, rm)
-	log.Printf("[GameScene] Initialized level phase system")
-
-	// Story 19.5: 初始化传送带系统
-	scene.conveyorBeltSystem = systems.NewConveyorBeltSystem(scene.entityManager, scene.gameState, rm)
-	log.Printf("[GameScene] Initialized conveyor belt system")
-
-	// Story 19.6: 初始化保龄球坚果滚动系统
-	scene.bowlingNutSystem = systems.NewBowlingNutSystem(scene.entityManager, rm)
-	log.Printf("[GameScene] Initialized bowling nut system")
-
-	// Story 19.1: 初始化疯狂戴夫对话系统
-	scene.daveDialogueSystem = systems.NewDaveDialogueSystem(scene.entityManager, scene.gameState, rm)
-	log.Printf("[GameScene] Initialized Dave dialogue system")
-
-	// 初始化僵尸呻吟音效系统（环境音效）
-	scene.zombieGroanSystem = systems.NewZombieGroanSystem(scene.entityManager, scene.gameState)
-	log.Printf("[GameScene] Initialized zombie groan system")
-
-	// Story 8.9: 初始化撑杆僵尸跳跃系统
-	scene.poleVaultSystem = systems.NewPoleVaultSystem(scene.entityManager, scene.gameState)
-	log.Printf("[GameScene] Initialized pole vault system")
-
-	// Story 8.9: 初始化减速效果系统
-	scene.slowEffectSystem = systems.NewSlowEffectSystem(scene.entityManager)
-	log.Printf("[GameScene] Initialized slow effect system")
-
-	// Story 8.11: 初始化大嘴花系统
-	scene.chomperSystem = systems.NewChomperSystem(scene.entityManager, scene.gameState)
-	log.Printf("[GameScene] Initialized chomper system")
-
-	// Story 8.12: 初始化选卡界面系统（仅在关卡配置启用时）
-	if levelConfig != nil && levelConfig.EnableSeedSelection {
-		// 加载选卡界面字体
-		seedChooserTitleFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 24)
-		if err != nil {
-			log.Printf("[GameScene] Warning: Failed to load seed chooser title font: %v", err)
-		}
-		seedChooserSunFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 14)
-		if err != nil {
-			log.Printf("[GameScene] Warning: Failed to load seed chooser sun font: %v", err)
-		}
-
-		// 创建选卡渲染系统
-		scene.seedChooserRenderSystem = systems.NewSeedChooserRenderSystem(
-			scene.entityManager,
-			scene.gameState,
-			rm,
-			scene.reanimSystem,
-			levelConfig,
-			seedChooserTitleFont,
-			seedChooserSunFont,
-		)
-		log.Printf("[GameScene] Initialized seed chooser render system")
-
-		// 创建选卡交互系统
-		scene.seedChooserInputSystem = systems.NewSeedChooserInputSystem(
-			scene.entityManager,
-			scene.gameState,
-			scene.seedChooserRenderSystem,
-			levelConfig,
-		)
-		log.Printf("[GameScene] Initialized seed chooser input system")
-
-		// 设置引用以便渲染系统能获取飞行卡片状态
-		systems.SetSeedChooserInputSystem(scene.seedChooserInputSystem)
-	}
-
-	// Story 19.5: 根据关卡配置初始化传送带参数
-	if scene.gameState.CurrentLevel != nil && scene.gameState.CurrentLevel.ConveyorBelt != nil {
-		conveyorConfig := scene.gameState.CurrentLevel.ConveyorBelt
-		if conveyorConfig.Enabled {
-			// 设置卡片生成间隔
-			if conveyorConfig.GenerationInterval > 0 {
-				scene.conveyorBeltSystem.SetGenerationInterval(conveyorConfig.GenerationInterval)
-			}
-			// 设置卡片池
-			if len(conveyorConfig.CardPool) > 0 {
-				cardPool := make([]systems.CardPoolEntry, len(conveyorConfig.CardPool))
-				for i, entry := range conveyorConfig.CardPool {
-					cardPool[i] = systems.CardPoolEntry{
-						Type:   entry.Type,
-						Weight: entry.Weight,
-					}
-				}
-				scene.conveyorBeltSystem.SetCardPool(cardPool)
-			}
-			// Story 19.12: 设置动态调节配置
-			if len(conveyorConfig.PhaseConfigs) > 0 || conveyorConfig.DynamicAdjustment != nil {
-				scene.conveyorBeltSystem.SetDynamicConfig(conveyorConfig.PhaseConfigs, conveyorConfig.DynamicAdjustment)
-			}
-			log.Printf("[GameScene] Conveyor belt configured from level config: interval=%.1fs, pool=%d entries, phases=%d",
-				conveyorConfig.GenerationInterval, len(conveyorConfig.CardPool), len(conveyorConfig.PhaseConfigs))
-
-			// 加载传送带卡片渲染资源（需要在 reanimSystem 初始化后）
-			scene.loadConveyorCardResources()
-		}
-	}
-
-	// Story 19.4: 设置转场回调
-	// 当 GuidedTutorialSystem 检测到所有预设植物被移除时，触发转场
-	scene.guidedTutorialSystem.SetTransitionCallback(func() {
-		log.Printf("[GameScene] GuidedTutorial transition callback triggered, starting phase transition")
-		scene.levelPhaseSystem.StartPhaseTransition(1, 2)
-	})
-
-	// 设置 LevelPhaseSystem 的回调
-	scene.levelPhaseSystem.SetOnDisableGuidedTutorial(func() {
-		log.Printf("[GameScene] Disabling guided tutorial mode")
-		scene.guidedTutorialSystem.SetActive(false)
-
-		// Story 19.x QA: 铲除任务完成后自动恢复鼠标和铲子卡槽状态
-		// 取消铲子选中状态
-		if scene.shovelSelected {
-			scene.SetShovelSelected(false)
-			log.Printf("[GameScene] Auto-deselected shovel after guided tutorial completed")
-		}
-		// 恢复系统光标
-		ebiten.SetCursorMode(ebiten.CursorModeVisible)
-		// 清除植物高亮效果
-		if scene.shovelInteractionSystem != nil {
-			scene.shovelInteractionSystem.ClearHighlight()
-		}
-	})
-
-	scene.levelPhaseSystem.SetOnActivateBowling(func() {
-		log.Printf("[GameScene] Activating bowling phase")
-		// Story 19.5: 激活传送带系统
-		if scene.conveyorBeltSystem != nil {
-			scene.conveyorBeltSystem.Activate()
-		}
-		// 启用红线限制（网格预览在红线右侧不显示）
-		if scene.plantPreviewRenderSystem != nil {
-			scene.plantPreviewRenderSystem.SetRedLineEnabled(true)
-		}
-		// Story 19.9: 恢复波次计时系统
-		// 特殊关卡在 LevelSystem 初始化时暂停了波次计时，现在需要初始化并恢复
-		if scene.levelSystem != nil {
-			scene.levelSystem.ResumeWaveTiming()
-			log.Printf("[GameScene] Wave timing resumed for bowling phase")
-		}
-		// Story 19.x QA: 保龄球阶段开始时创建除草车
-		// 除草车应该在铲子教学完成后才出现
-		scene.initLawnmowers()
-		log.Printf("[GameScene] Lawnmowers initialized for bowling phase")
-	})
-
-	// Story 19.4: 生成预设植物
-	// 必须在 GuidedTutorialSystem 初始化之后调用，这样系统才能正确追踪植物数量
-	// Bug Fix: 如果有战斗存档，跳过预设植物生成（会从存档恢复）
-	if !scene.hasBattleSave {
-		scene.spawnPresetPlants()
-	} else {
-		log.Printf("[GameScene] Skipping preset plants spawn (will restore from battle save)")
-	}
-
-	// Story 19.4: 检查是否需要激活强引导模式（Level 1-5）
-	// 并创建开场 Dave 对话
-	// Bug Fix: 如果有战斗存档，不在此处创建 Dave
-	// 因为用户可能选择"重玩关卡"导致场景重建，Dave 会重新创建
-	// 避免出现 Dave 入场一半就消失的问题
-	if scene.gameState.CurrentLevel != nil && len(scene.gameState.CurrentLevel.PresetPlants) > 0 && !scene.hasBattleSave {
-		log.Printf("[GameScene] Level has preset plants, creating opening Dave dialogue")
-
-		// 创建开场 Dave 对话（铲子教学阶段）
-		// 对话完成后才激活强引导模式
-		openingDialogueKeys := []string{
-			"CRAZY_DAVE_2400", // "你好，我的邻居！"
-			"CRAZY_DAVE_2401", // "我的名字叫疯狂的戴夫。"
-			"CRAZY_DAVE_2402", // "但你叫我疯狂的戴夫就行了。"
-			"CRAZY_DAVE_2403", // "听好，我有个惊喜要给你。"
-			"CRAZY_DAVE_2404", // "但是首先，我需要你清理一下草坪。"
-			"CRAZY_DAVE_2405", // "用你的铲子挖出那些植物！"
-			"CRAZY_DAVE_2406", // "开始挖吧！"
-		}
-
-		daveEntity, err := entities.NewCrazyDaveEntity(
-			scene.entityManager,
-			rm,
-			openingDialogueKeys,
-			func() {
-				// Dave 对话完成回调：激活强引导模式
-				log.Printf("[GameScene] Opening Dave dialogue completed, activating guided tutorial mode")
-				scene.guidedTutorialSystem.SetActive(true)
-			},
-		)
-
-		if err != nil {
-			log.Printf("[GameScene] ERROR: Failed to create opening Dave entity: %v", err)
-			// 跳过 Dave 对话，直接激活强引导模式
-			scene.guidedTutorialSystem.SetActive(true)
-		} else {
-			log.Printf("[GameScene] Opening Dave entity created: %d", daveEntity)
-		}
-	}
-
-	return scene
+// initializeLevelContent 初始化关卡内容（实体、回调等）
+func (s *GameScene) initializeLevelContent(rm *game.ResourceManager) {
+	// 初始化关卡实体（预设植物、Dave对话）
+	s.initLevelEntities(rm)
 }
 
 // NewGameSceneFromBattleSave 创建从战斗存档恢复的游戏场景
@@ -878,477 +427,43 @@ func NewGameSceneFromBattleSave(rm *game.ResourceManager, sm *game.SceneManager,
 //   - System execution order ensures correct game logic flow
 //   - Story 10.1: Pause menu (只更新 UI 系统，跳过游戏逻辑)
 func (s *GameScene) Update(deltaTime float64) {
-	// Story 18.3: 战斗存档对话框优先于所有其他逻辑
-	// 如果有战斗存档且对话框未显示，先显示对话框
-	if s.hasBattleSave && !s.battleSaveDialogShown {
-		s.showBattleSaveDialog()
-		s.battleSaveDialogShown = true
-		return // 等待对话框显示
+	// Phase 1: 战斗存档对话框处理（最高优先级）
+	if !s.updateBattleSaveDialog(deltaTime) {
+		return
 	}
 
-	// 如果对话框正在显示，只更新对话框系统（所有元素保持静止）
-	if s.battleSaveDialogID != 0 {
-		if s.dialogInputSystem != nil {
-			s.dialogInputSystem.Update(deltaTime)
-			s.entityManager.RemoveMarkedEntities()
-		}
-		// 检查对话框是否已关闭
-		if _, ok := ecs.GetComponent[*components.DialogComponent](s.entityManager, s.battleSaveDialogID); !ok {
-			s.battleSaveDialogID = 0 // 对话框已关闭
-		}
-		s.updateMouseCursor()
-		return // 对话框打开时阻止其他更新（类似暂停效果）
+	// Phase 2: 暂停菜单处理
+	if !s.updatePauseMenu(deltaTime) {
+		return
 	}
 
-	// DEBUG: Check for GameFreezeComponent on every frame to debug freeze issue
-	freezeEntities := ecs.GetEntitiesWith1[*components.GameFreezeComponent](s.entityManager)
-	if len(freezeEntities) > 0 && s.zombiesWonPhaseSystem == nil {
-		log.Printf("[GameScene] ⚠️ WARNING: GameFreezeComponent found but ZombiesWonPhaseSystem is nil! Count: %d", len(freezeEntities))
+	// Phase 3: 开场动画阶段处理
+	if !s.updateOpeningPhase(deltaTime) {
+		return
 	}
 
-	// Story 10.1: 更新暂停菜单模块
-	if s.pauseMenuModule != nil {
-		s.pauseMenuModule.Update(deltaTime)
+	// Phase 4: 开场动画完成后的一次性设置（返回是否跳过本帧输入）
+	skipInputThisFrame := s.updatePostOpeningSetup()
+
+	// Phase 5: 旧的 intro 动画处理（可能是遗留代码）
+	if !s.checkIntroAnimation(deltaTime) {
+		return
 	}
 
-	// Story 10.1: Check if game is paused
-	if s.gameState.IsPaused {
-		// 暂停时只更新 UI 系统（按钮交互、暂停菜单、对话框、滑块、复选框）
-		if s.buttonSystem != nil {
-			s.buttonSystem.Update(deltaTime)
-		}
-		// Story 20.5: 暂停菜单中的滑块和复选框交互
-		if s.sliderSystem != nil {
-			s.sliderSystem.Update(deltaTime)
-		}
-		if s.checkboxSystem != nil {
-			s.checkboxSystem.Update(deltaTime)
-		}
-		// ✅ ECS 架构修复: 更新对话框输入系统（暂停菜单可能包含对话框）
-		if s.dialogInputSystem != nil {
-			s.dialogInputSystem.Update(deltaTime)
-			s.entityManager.RemoveMarkedEntities()
-		}
-		// ✅ 暂停时也需要更新鼠标光标（按钮悬停效果）
-		s.updateMouseCursor()
-		return // 跳过所有游戏逻辑系统
-	}
-	// Story 8.2 QA改进：铺草皮动画系统更新（必须在开场动画之前）
-	if s.soddingSystem != nil {
-		s.soddingSystem.Update(deltaTime)
+	// Phase 6: 同步摄像机位置
+	s.syncCameraPosition()
+
+	// Phase 7: 游戏结束阶段处理
+	if !s.updateGameOverPhase(deltaTime) {
+		return
 	}
 
-	// Story 8.3: Check if opening animation is playing
-	if s.openingSystem != nil && !s.openingSystem.IsCompleted() {
-		// 开场动画期间，只更新镜头系统、开场动画系统和 Reanim 系统（僵尸动画需要）
-		s.cameraSystem.Update(deltaTime)
-		s.openingSystem.Update(deltaTime)
-		s.reanimSystem.Update(deltaTime) // 更新僵尸 idle 动画
+	// Phase 8: 背景音乐播放控制
+	s.updateBackgroundMusic()
 
-		// Story 8.12: 选卡阶段时额外更新选卡系统
-		if s.gameState.IsSeedSelectionActive() && s.seedChooserInputSystem != nil {
-			s.seedChooserInputSystem.Update(deltaTime)
-		}
-
-		// 同步镜头位置到本地 cameraX（用于渲染）
-		s.cameraX = s.gameState.CameraX
-		return // 暂停其他游戏系统
-	}
-
-	// 检查开场动画是否刚被跳过（ESC/Space）
-	// 如果是，跳过当前帧的输入处理，防止同一按键触发暂停菜单
-	skipInputThisFrame := false
-	if s.openingSystem != nil && s.openingSystem.WasSkipKeyConsumed() {
-		log.Printf("[GameScene] 开场动画跳过按键已消费，当前帧跳过输入处理")
-		skipInputThisFrame = true
-	}
-
-	// 开场动画刚完成，触发铺草皮动画（如果配置了且还未启动）
-	// 修正：检查 ShowSoddingAnim 和 SodRollAnimation 配置
-	if s.openingSystem != nil && s.openingSystem.IsCompleted() && !s.soddingAnimStarted && s.soddingSystem != nil && s.gameState.CurrentLevel != nil {
-		// 实时生成模式：不再预生成僵尸，由 WaveTimingSystem 触发时实时生成
-
-		// 检查是否应该播放铺草皮动画
-		shouldPlayAnim := s.gameState.CurrentLevel.ShowSoddingAnim || s.gameState.CurrentLevel.SodRollAnimation
-
-		if shouldPlayAnim {
-			log.Printf("[GameScene] 开场动画完成，启动铺草皮动画")
-
-			// 启动动画，传递启用的行列表、草皮位置和图片高度
-			enabledLanes := s.gameState.CurrentLevel.EnabledLanes
-			// Story 8.6 QA修正: 获取需要播放动画的行列表
-			animLanes := s.gameState.CurrentLevel.SoddingAnimLanes
-			// Story 11.4: 读取粒子特效配置
-			enableParticles := s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.SodRollParticles
-			s.soddingSystem.StartAnimation(func() {
-				// 动画完成回调：通知教学系统可以开始了
-				log.Printf("[GameScene] 铺草皮动画完成")
-
-				// Story 11.5 修复：动画完成后处理草皮叠加层
-				// 原理：动画期间使用叠加层裁剪显示，完成后将草皮合并到底层背景
-				// Story 8.2.1 修复：保留 sodRowImage 用于草坪闪烁效果
-				if s.soddedBackground != nil {
-					// Level 1-4: 有完整的已铺草皮背景，直接替换
-					log.Printf("[GameScene] 替换底层背景: IMAGE_BACKGROUND1UNSODDED → IMAGE_BACKGROUND1")
-					s.background = s.soddedBackground
-					s.soddedBackground = nil
-					s.preSoddedImage = nil
-					// Story 8.2.1: 保留 sodRowImage 用于草坪闪烁
-					log.Printf("[GameScene] 保留 sodRowImage 用于草坪闪烁效果")
-				} else if s.preSoddedImage != nil || s.sodRowImage != nil {
-					// Level 1-1, 1-2: 需要将草皮叠加层合并到底层背景
-					log.Printf("[GameScene] 合并草皮叠加层到底层背景")
-					mergedBg := s.createMergedBackground()
-					if mergedBg != nil {
-						// 原子操作：先替换背景，再清空preSoddedImage
-						s.background = mergedBg
-						s.preSoddedImage = nil
-						// Story 8.2.1: 保留 sodRowImage 用于草坪闪烁，不清空
-						log.Printf("[GameScene] 背景合并完成，保留 sodRowImage 用于草坪闪烁")
-					} else {
-						// 合并失败，保持叠加层不清空，避免草皮消失
-						log.Printf("[GameScene] 警告：合并背景失败，保持叠加层")
-					}
-				}
-
-				if s.tutorialSystem != nil {
-					s.tutorialSystem.OnSoddingComplete()
-				}
-				// Story 10.2: 铺草皮完成后创建除草车（原版行为）
-				s.initLawnmowers()
-
-				// 铺草皮完成后播放 ReadySetPlant 动画（仅限配置启用的关卡）
-				// 此时 UI（植物选择栏、除草车）已显示
-				if s.readySetPlantSystem != nil && s.gameState.CurrentLevel.ShowReadySetPlant {
-					s.readySetPlantSystem.Start()
-				}
-			}, enabledLanes, animLanes, s.sodOverlayX, float64(s.sodHeight), enableParticles)
-
-			s.soddingAnimStarted = true
-			// 标记开场动画系统为 nil，避免重复检查
-			s.openingSystem = nil
-			return // 等待铺草皮动画完成
-		} else {
-			// 不播放铺草皮动画，直接完成
-			log.Printf("[GameScene] 开场动画完成，关卡配置禁用铺草皮动画，跳过")
-			s.soddingAnimStarted = true
-			s.openingSystem = nil
-			// 立即初始化除草车（无需等待动画）
-			s.initLawnmowers()
-			// 通知教学系统
-			if s.tutorialSystem != nil {
-				s.tutorialSystem.OnSoddingComplete()
-			}
-
-			// 播放 ReadySetPlant 动画（仅限配置启用的关卡）
-			if s.readySetPlantSystem != nil && s.gameState.CurrentLevel.ShowReadySetPlant {
-				s.readySetPlantSystem.Start()
-			}
-			// 继续游戏流程，不return
-		}
-	}
-
-	// Story 8.3: 如果铺草皮动画正在播放，暂停其他游戏系统
-	if s.soddingSystem != nil && s.soddingSystem.IsPlaying() {
-		// 铺草皮动画期间，只更新铺草皮系统、镜头系统和 Reanim 系统（草皮卷动画需要）
-		s.cameraSystem.Update(deltaTime)
-		s.reanimSystem.Update(deltaTime)   // 更新草皮卷动画帧
-		s.particleSystem.Update(deltaTime) // Story 11.4: 更新粒子系统（土粒飞溅特效）
-		s.cameraX = s.gameState.CameraX
-		return // 暂停其他游戏系统（包括僵尸激活）
-	}
-
-	// 如果没有开场动画，使用延迟启动铺草皮动画（原逻辑）
-	// 修正：检查 ShowSoddingAnim 和 SodRollAnimation 配置
-	if s.openingSystem == nil && s.soddingSystem != nil && !s.soddingAnimStarted && s.gameState.CurrentLevel != nil {
-		// 检查是否应该播放铺草皮动画
-		shouldPlayAnim := s.gameState.CurrentLevel.ShowSoddingAnim || s.gameState.CurrentLevel.SodRollAnimation
-
-		if shouldPlayAnim && s.soddingAnimDelay >= 0 {
-			s.soddingAnimTimer += deltaTime
-			if s.soddingAnimTimer >= s.soddingAnimDelay {
-				log.Printf("[GameScene] 启动铺草皮动画（延迟 %.1f 秒后）", s.soddingAnimDelay)
-
-				// 启动动画，传递启用的行列表、草皮位置和图片高度
-				enabledLanes := s.gameState.CurrentLevel.EnabledLanes
-				// Story 8.6 QA修正: 获取需要播放动画的行列表
-				animLanes := s.gameState.CurrentLevel.SoddingAnimLanes
-				// Story 11.4: 读取粒子特效配置
-				enableParticles := s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.SodRollParticles
-				s.soddingSystem.StartAnimation(func() {
-					// 动画完成回调：通知教学系统可以开始了
-					log.Printf("[GameScene] 铺草皮动画完成")
-
-					// Story 11.5 修复：动画完成后处理草皮叠加层
-					// 原理：动画期间使用叠加层裁剪显示，完成后将草皮合并到底层背景
-					// Story 8.2.1 修复：保留 sodRowImage 用于草坪闪烁效果
-					if s.soddedBackground != nil {
-						// Level 1-4: 有完整的已铺草皮背景，直接替换
-						log.Printf("[GameScene] 替换底层背景: IMAGE_BACKGROUND1UNSODDED → IMAGE_BACKGROUND1")
-						s.background = s.soddedBackground
-						s.soddedBackground = nil
-						s.preSoddedImage = nil
-						// Story 8.2.1: 保留 sodRowImage 用于草坪闪烁
-						log.Printf("[GameScene] 保留 sodRowImage 用于草坪闪烁效果")
-					} else if s.preSoddedImage != nil || s.sodRowImage != nil {
-						// Level 1-1, 1-2: 需要将草皮叠加层合并到底层背景
-						log.Printf("[GameScene] 合并草皮叠加层到底层背景")
-						mergedBg := s.createMergedBackground()
-						if mergedBg != nil {
-							// 原子操作：先替换背景，再清空preSoddedImage
-							s.background = mergedBg
-							s.preSoddedImage = nil
-							// Story 8.2.1: 保留 sodRowImage 用于草坪闪烁，不清空
-							log.Printf("[GameScene] 背景合并完成，保留 sodRowImage 用于草坪闪烁")
-						} else {
-							// 合并失败，保持叠加层不清空，避免草皮消失
-							log.Printf("[GameScene] 警告：合并背景失败，保持叠加层")
-						}
-					}
-
-					if s.tutorialSystem != nil {
-						s.tutorialSystem.OnSoddingComplete()
-					}
-					// Story 10.2: 铺草皮完成后创建除草车（原版行为）
-					s.initLawnmowers()
-				}, enabledLanes, animLanes, s.sodOverlayX, float64(s.sodHeight), enableParticles)
-
-				s.soddingAnimStarted = true
-			}
-		} else if !shouldPlayAnim {
-			// 不播放铺草皮动画，但如果有 preSoddedLanes，需要显示预渲染的草皮
-			preSoddedLanes := s.gameState.CurrentLevel.PreSoddedLanes
-			if len(preSoddedLanes) > 0 {
-				// 有预铺草皮配置，需要显示草皮但不播放动画
-				// 将预渲染的背景副本（preSoddedImage）设置为永久可见
-				log.Printf("[GameScene] 关卡配置禁用动画，但有预铺草皮 %v，显示预渲染背景", preSoddedLanes)
-				// 注意：preSoddedImage 已在初始化时渲染好，这里不需要额外操作
-				// 只需确保在 Draw() 中能正确显示
-			} else {
-				log.Printf("[GameScene] 关卡配置禁用铺草皮动画，无预铺草皮，跳过")
-			}
-			s.soddingAnimStarted = true
-			// Story 19.x QA: 有预设植物的关卡（铲子教学关卡），延迟除草车创建到保龄球阶段
-			// 除草车应该在铲子教学完成后才出现
-			if len(s.gameState.CurrentLevel.PresetPlants) == 0 {
-				// 无预设植物的普通关卡：立即初始化除草车
-				s.initLawnmowers()
-			} else {
-				log.Printf("[GameScene] 预设植物关卡：除草车延迟到保龄球阶段创建")
-			}
-			// 通知教学系统
-			if s.tutorialSystem != nil {
-				s.tutorialSystem.OnSoddingComplete()
-			}
-		}
-	}
-
-	// Handle intro animation
-	if s.isIntroAnimPlaying {
-		s.updateIntroAnimation(deltaTime)
-		// 同步摄像机位置到全局状态（即使在动画期间也保持同步）
-		s.gameState.CameraX = s.cameraX
-		return // Don't update game systems during intro animation
-	}
-
-	// 同步摄像机位置到全局状态（供所有系统使用）
-	// Story 8.8: 如果游戏结束且 ZombiesWonPhaseSystem 激活，则反向同步（让系统控制摄像机）
-	if s.gameState.IsGameOver {
-		// 游戏结束时，ZombiesWonPhaseSystem 控制摄像机移动
-		// 所以需要反向同步：从 GameState.CameraX 更新到 s.cameraX
-		s.cameraX = s.gameState.CameraX
-	} else {
-		// 正常游戏时，GameScene 控制摄像机
-		s.gameState.CameraX = s.cameraX
-	}
-
-	// Story 5.5: Check if game is over (win or lose)
-	// If game is over, stop updating game systems but allow reward animation to play
-	if s.gameState.IsGameOver {
-		// 游戏结束时仍然更新奖励系统和必要的动画系统
-		// 这样玩家可以看到完整的奖励动画流程
-		s.rewardSystem.Update(deltaTime)   // 奖励动画系统（卡片包动画）
-		s.reanimSystem.Update(deltaTime)   // Reanim 系统（植物卡片动画）
-		s.particleSystem.Update(deltaTime) // 粒子系统（光晕效果）
-
-		// Story 10.6: 除草车系统（压扁动画需要继续播放）
-		if s.lawnmowerSystem != nil {
-			s.lawnmowerSystem.Update(deltaTime)
-		}
-
-		// Story 8.8: 僵尸获胜流程需要继续更新
-		if s.zombiesWonPhaseSystem != nil {
-			s.zombiesWonPhaseSystem.Update(deltaTime)
-		}
-		// Story 8.8: 触发僵尸需要继续移动（BehaviorSystem 会检测冻结状态）
-		s.behaviorSystem.Update(deltaTime)
-
-		// Story 8.8: 游戏结束时也需要更新对话框输入系统（处理按钮点击）
-		if s.dialogInputSystem != nil {
-			s.dialogInputSystem.Update(deltaTime)
-			s.entityManager.RemoveMarkedEntities()
-		}
-		// 更新鼠标光标（按钮悬停效果）
-		s.updateMouseCursor()
-
-		return // 停止其他游戏系统（僵尸移动、植物攻击等）
-	}
-
-	// 背景音乐播放：在所有开场动画完成后开始播放
-	// 检测条件：开场动画完成 + 铺草皮动画完成 + ReadySetPlant动画完成（如果有的话）
-	if !s.bgmStarted {
-		isOpeningComplete := s.openingSystem == nil || s.openingSystem.IsCompleted()
-		isSoddingComplete := s.soddingSystem == nil || !s.soddingSystem.IsPlaying()
-		isReadySetPlantComplete := s.readySetPlantSystem == nil || !s.readySetPlantSystem.IsPlaying()
-
-		// 所有开场动画完成后开始播放背景音乐
-		if isOpeningComplete && isSoddingComplete && isReadySetPlantComplete && s.seedBankSlideInCompleted {
-			if audioManager := s.gameState.GetAudioManager(); audioManager != nil {
-				audioManager.PlayMusic("SOUND_MAINMUSIC")
-				log.Printf("[GameScene] 开始播放背景音乐")
-			}
-			s.bgmStarted = true
-		}
-	}
-
-	// Update all ECS systems in order (order matters for correct game logic)
-	s.levelSystem.Update(deltaTime)                       // 0. Update level system (Story 5.5: wave spawning, victory/defeat)
-	s.waveSpawnSystem.UpdatePendingActivations(deltaTime) // 0.05. Update pending zombie activations (散落入场效果)
-	s.rewardSystem.Update(deltaTime)                      // 0.1. Update reward animation system (Story 8.3: 卡片包动画)
-	s.finalWaveWarningSystem.Update(deltaTime)            // 0.2. Update final wave warning (Story 11.3: 自动清理提示动画)
-	if s.zombiesWonPhaseSystem != nil {
-		s.zombiesWonPhaseSystem.Update(deltaTime) // 0.3. Update zombies won flow (Story 8.8: 僵尸获胜四阶段流程)
-	}
-	s.zombieLaneTransitionSystem.Update(deltaTime) // 0.5. Update zombie lane transitions (move to target lane before attacking)
-
-	// 植物选择栏滑入动画更新
-	// 在开场动画、��草皮动画、除草车入场动画、ReadySetPlant 动画全部完成后启动
-	s.updateSeedBankSlideIn(deltaTime)
-
-	// Story 3.1 架构优化：使用模块化方式更新植物选择栏
-	if s.plantSelectionModule != nil {
-		s.plantSelectionModule.Update(deltaTime) // 1. Update plant card states (before input)
-	}
-
-	// Story 19.2: 铲子槽位点击检测（在输入系统之前，优先处理铲子模式切换）
-	s.updateShovelSlotClick()
-
-	// Story 19.5: 传送带卡片点击检测
-	s.updateConveyorBeltClick()
-
-	// Story 19.2: 如果处于铲子模式，更新铲子交互系统
-	if s.shovelInteractionSystem != nil && s.shovelSelected {
-		s.shovelInteractionSystem.Update(deltaTime, s.cameraX)
-	}
-
-	// 2. Process player input (highest priority, 传递摄像机位置)
-	// 如果开场动画跳过按键刚被消费，跳过输入处理（防止 ESC 同时跳过动画和触发暂停）
-	if !skipInputThisFrame {
-		s.inputSystem.Update(deltaTime, s.cameraX)
-	}
-
-	// 3. Generate new suns
-	// 教学关卡：在第一次收集阳光后启用自动生成（由 TutorialSystem 控制）
-	// 非教学关卡：始终启用自动生成
-	s.sunSpawnSystem.Update(deltaTime)
-
-	s.sunMovementSystem.Update(deltaTime)   // 4. Move suns (includes collection animation)
-	s.sunCollectionSystem.Update(deltaTime) // 5. Check if collection is complete
-
-	// Story 8.9: 撑杆僵尸跳跃系统（必须在 BehaviorSystem 之前，检测植物触发跳跃）
-	if s.poleVaultSystem != nil {
-		s.poleVaultSystem.Update(deltaTime) // 5.5. Check pole vault jumps
-	}
-
-	s.behaviorSystem.Update(deltaTime) // 6. Update plant behaviors (Story 3.4)
-	// Story 10.2: Update lawnmower system (除草车系统)
-	if s.lawnmowerSystem != nil {
-		s.lawnmowerSystem.Update(deltaTime) // 6.5. Check lawnmower triggers and move lawnmowers
-	}
-	s.physicsSystem.Update(deltaTime) // 7. Check collisions (Story 4.3)
-
-	// Story 8.9: 减速效果系统（处理冰豌豆减速效果持续时间）
-	if s.slowEffectSystem != nil {
-		s.slowEffectSystem.Update(deltaTime) // 7.5. Update slow effects
-	}
-
-	// Story 8.11: 大嘴花系统（处理吞噬/撕咬/消化逻辑）
-	if s.chomperSystem != nil {
-		s.chomperSystem.Update(deltaTime) // 7.6. Update chomper states
-	}
-
-	// Story 6.3: Reanim 动画系统（替代旧的 AnimationSystem）
-	s.reanimSystem.Update(deltaTime) // 8. Update Reanim animation frames
-	// Story 8.3: ReadySetPlant 动画系统（铺草皮完成后播放）
-	if s.readySetPlantSystem != nil {
-		s.readySetPlantSystem.Update(deltaTime) // 8.5. Update ReadySetPlant animation duration
-	}
-
-	s.particleSystem.Update(deltaTime) // 9. Update particle effects (Story 7.2)
-	// 方案A+：闪烁效果系统
-	s.flashEffectSystem.Update(deltaTime) // 9.3. Update flash effects (hit feedback)
-	// Story 10.8: 更新阳光计数器闪烁计时器
-	s.gameState.UpdateSunFlash(deltaTime) // 9.4. Update sun flash timer (sun shortage feedback)
-	// Story 8.2: Tutorial system (only if active)
-	if s.tutorialSystem != nil {
-		s.tutorialSystem.Update(deltaTime) // 9.5. Update tutorial text display
-	}
-	// 更新所有教学文本的显示时间（包括 showPlacementHint 创建的临时文本）
-	s.renderSystem.UpdateTutorialTextTime(deltaTime)
-	// Story 19.3: Guided tutorial system (Level 1-5 shovel teaching)
-	if s.guidedTutorialSystem != nil {
-		s.guidedTutorialSystem.Update(deltaTime) // 9.6. Update guided tutorial state
-	}
-	// Story 19.4: Level phase system (phase transitions)
-	if s.levelPhaseSystem != nil {
-		s.levelPhaseSystem.Update(deltaTime) // 9.7. Update phase transition state
-	}
-	// Story 19.5: Conveyor belt system (card generation)
-	if s.conveyorBeltSystem != nil {
-		s.conveyorBeltSystem.Update(deltaTime) // 9.8. Update conveyor belt
-	}
-	// Story 19.6: Bowling nut system (rolling movement)
-	if s.bowlingNutSystem != nil {
-		s.bowlingNutSystem.Update(deltaTime) // 9.9. Update bowling nut rolling
-	}
-	// Story 19.1: Dave dialogue system (dialogue progression)
-	if s.daveDialogueSystem != nil {
-		s.daveDialogueSystem.Update(deltaTime) // 9.10. Update Dave dialogue
-	}
-	// 僵尸呻吟音效系统 - 环境音效
-	if s.zombieGroanSystem != nil {
-		s.zombieGroanSystem.Update(deltaTime)
-	}
-	// Story 3.2: 植物预览系统 - 更新预览位置（双图像支持）
-	s.plantPreviewSystem.Update(deltaTime) // 10. Update plant preview position (dual-image support)
-	s.lawnGridSystem.Update(deltaTime)     // 10.5. Update lawn flash animation (Story 8.2)
-	// ECS 按钮系统更新（交互检测）
-	if s.buttonSystem != nil {
-		s.buttonSystem.Update(deltaTime) // 10.7. Update button interactions (hover, click)
-	}
-	s.lifetimeSystem.Update(deltaTime)     // 11. Check for expired entities
-	s.entityManager.RemoveMarkedEntities() // 12. Clean up deleted entities (always last)
-
-	// 13. Update mouse cursor based on component states
-	s.updateMouseCursor()
+	// Phase 9: 核心游戏循环 - 更新所有 ECS 系统
+	s.updateGameplaySystems(deltaTime, s.cameraX, skipInputThisFrame)
 }
-
-// updateIntroAnimation updates the intro camera animation that showcases the entire lawn.
-// The animation has two phases:
-//   - Phase 1 (0.0-0.5): Camera scrolls from left edge (0) to right edge (maxCameraX)
-//   - Phase 2 (0.5-1.0): Camera scrolls back from right edge to gameplay position (GameCameraX)
-//
-// Both phases use an ease-out quadratic easing function for smooth motion.
-
-// easeOutQuad applies an ease-out quadratic easing function to the input value.
-// Formula: 1 - (1-t)^2
-// This creates a smooth deceleration effect.
-//
-// Parameters:
-//   - t: Input value in range [0, 1]
-//
-// Returns:
-//   - Eased value in range [0, 1]
 
 // Draw renders the game scene to the screen.
 // It draws the lawn background, all game entities, and UI elements in the correct order.
@@ -1361,206 +476,29 @@ func (s *GameScene) Update(deltaTime float64) {
 // 6. Plant preview - 植物拖拽预览
 // 7. Suns (阳光) - 最顶层，确保可点击
 func (s *GameScene) Draw(screen *ebiten.Image) {
-	// Layer 1: Draw lawn background
-	s.drawBackground(screen)
+	// 计算渲染上下文（UI 可见性状态）
+	ctx := s.calculateRenderContext()
 
-	// Story 19.4: Draw bowling red line (保龄球红线)
-	// 红线在背景之上、植物之下渲染
-	s.drawBowlingRedLine(screen)
+	// Layer 1: 背景层
+	s.drawBackgroundLayer(screen)
 
-	// Story 8.3.1: 开场动画或铺草皮动画期间隐藏 UI 元素
-	// 注意：需要检查 soddingAnimStarted 来避免开场动画完成和铺草皮动画开始之间的闪现
-	isOpeningPlaying := s.openingSystem != nil && !s.openingSystem.IsCompleted()
-	isSoddingPlaying := s.soddingSystem != nil && s.soddingSystem.IsPlaying()
-	// 如果有开场动画系统且铺草皮动画还未启动，也要隐藏 UI（过渡期间）
-	isWaitingForSodding := s.openingSystem != nil && s.openingSystem.IsCompleted() && !s.soddingAnimStarted
-	hideUI := isOpeningPlaying || isSoddingPlaying || isWaitingForSodding
+	// Layer 2-3: UI 基础层（SeedBank、Shovel、PlantCards）
+	s.drawUIBaseLayer(screen, ctx)
 
-	// 暂停菜单按钮需要在所有开场动画完成后才显示
-	// 包括：开场动画、铺草皮动画、除草车入场动画、ReadySetPlant 动画
-	isLawnmowerEntering := s.lawnmowerSystem != nil && !s.lawnmowerSystem.AreAllEntered()
-	isReadySetPlantPlaying := s.readySetPlantSystem != nil && s.readySetPlantSystem.IsPlaying()
-	hideMenuButton := hideUI || isLawnmowerEntering || isReadySetPlantPlaying
+	// Layer 4-4.5: 游戏世界层（Plants、Zombies、LawnFlash）
+	s.drawGameWorldLayer(screen)
 
-	// Level 1-5 特殊处理：菜单按钮在传送带滑入完成后才显示
-	// 不影响其他关卡的菜单显示逻辑
-	isShovelTutorialLevel := s.gameState.CurrentLevel != nil && len(s.gameState.CurrentLevel.PresetPlants) > 0
-	if isShovelTutorialLevel && !hideMenuButton {
-		// 检查传送带滑入是否完成
-		if s.levelPhaseSystem == nil || !s.levelPhaseSystem.IsConveyorBeltSlideComplete() {
-			hideMenuButton = true
-		}
-	}
+	// 选卡界面层（特殊渲染）
+	s.drawSeedChooserLayer(screen, ctx)
 
-	// Story 19.x: 铲子槽的显示逻辑与菜单按钮分离
-	// 对于有预设植物的关卡（Level 1-5），铲子槽在 Phase 1 已经显示
-	// 传送带滑入后创建除草车时，铲子槽不应因除草车入场动画而消失
-	// 只有菜单按钮需要等待除草车入场完成
-	hideShovel := hideUI || isReadySetPlantPlaying
-	// 非铲子教学关卡的普通流程：铲子槽与菜单按钮同时显示
-	if !isShovelTutorialLevel {
-		hideShovel = hideMenuButton
-	}
+	// Layer 5-8: UI 覆盖层（SunCounter、Particles、Preview、Suns）
+	s.drawUIOverlayLayer(screen, ctx)
 
-	// Layer 2: Draw UI base elements (seed bank, shovel, plant cards)
-	// 按照原版PVZ设计，UI元素在游戏世界实体下方渲染
-	if !hideUI {
-		s.drawSeedBank(screen)
+	// Layer 8.5-10.1: 教学和警告层
+	s.drawTutorialAndWarningLayer(screen, ctx)
 
-		// Story 19.5: 绘制传送带（在铲子和植物卡片之间）
-		s.drawConveyorBelt(screen)
-
-		// 铲子槽：对于铲子教学关卡，在除草车入场期间保持显示
-		if !hideShovel {
-			s.drawShovel(screen)
-		}
-
-		// 菜单按钮：需要等待所有开场动画完成后才显示（包括除草车入场和 ReadySetPlant）
-		if !hideMenuButton {
-			if s.buttonRenderSystem != nil {
-				s.buttonRenderSystem.Draw(screen)
-			}
-		}
-
-		// Layer 3: Draw plant cards (Story 3.1 架构优化)
-		// 在植物和僵尸下方渲染，符合原版PVZ设计
-		// Story 19.5: 保龄球模式不显示植物选择模块（使用传送带）
-		// 滑入动画：计算 Y 偏移量，与植物选择栏同步滑入
-		if s.plantSelectionModule != nil {
-			if s.gameState.CurrentLevel == nil || s.gameState.CurrentLevel.InitialSun != 0 {
-				// 计算滑入动画 Y 偏移
-				yOffset := s.getSeedBankCurrentY() - float64(config.SeedBankY)
-				s.plantSelectionModule.DrawWithOffset(screen, yOffset)
-			}
-		}
-	}
-
-	// Layer 4: Draw game world entities (plants, zombies, projectiles) - 不包括阳光
-	// 游戏实体在UI卡片上方，这样植物和僵尸可以被看清
-	// 传递 cameraX 以正确转换世界坐标到屏幕坐标
-	s.renderSystem.DrawGameWorld(screen, s.cameraX)
-
-	// 开场动画用户名显示（在游戏世界之后、其他UI之前）
-	// 显示 "{username}的房子" 文本，白色带黑色阴影
-	if s.openingSystem != nil {
-		s.openingSystem.Draw(screen)
-	}
-
-	// Story 8.12: 选卡界面渲染（在开场动画期间显示）
-	if s.gameState.IsSeedSelectionActive() && s.seedChooserRenderSystem != nil {
-		s.seedChooserRenderSystem.Draw(screen)
-	}
-
-	// Layer 4.5: Draw lawn flash effect (Story 8.2 教学)
-	// 草坪闪烁效果，用于教学提示玩家可以种植
-	s.drawLawnFlash(screen)
-
-	// Story 8.2.1: Draw card flash effect (教学)
-	// 卡片闪烁效果，用于提示玩家点击卡片
-	s.drawCardFlash(screen)
-
-	// Layer 5: Draw UI overlays (sun counter text)
-	// 文字始终在最上层以确保可读性
-	// Story 8.3.1: 开场动画或铺草皮动画期间隐藏阳光计数器
-	if !hideUI {
-		s.drawSunCounter(screen)
-	}
-
-	// Layer 6: Draw particle effects (Story 7.3)
-	// 只渲染游戏世界的粒子（爆炸、溅射等），过滤掉 UI 粒子
-	// UI 粒子（如奖励动画）由各自的系统在更高层级渲染
-	s.renderSystem.DrawGameWorldParticles(screen, s.cameraX)
-
-	// Layer 7: Draw plant preview (Story 3.2)
-	// 拖拽预览在所有内容上方
-	s.plantPreviewRenderSystem.Draw(screen, s.cameraX)
-
-	// Layer 7.5: Draw shovel interaction (Story 19.2)
-	// 铲子光标和植物高亮效果
-	if s.shovelInteractionSystem != nil && s.shovelSelected {
-		s.shovelInteractionSystem.Draw(screen, s.cameraX)
-	}
-
-	// Layer 7.6: Draw conveyor card preview (Story 19.5)
-	// 传送带卡片拖拽预览
-	s.drawConveyorCardPreview(screen)
-
-	// Layer 8: Draw suns (阳光) - 最顶层
-	// 阳光在最顶层以确保始终可点击
-	s.renderSystem.DrawSuns(screen, s.cameraX)
-
-	// Layer 8.5: Draw tutorial text (Story 8.2 + Story 19.x QA)
-	// 教学文本在阳光之下、UI之上
-	// 渲染所有 TutorialTextComponent 实体（包括临时提示文本）
-	// 优先使用 bowlingTutorialFont，其次 tutorialFont，最后 sunCounterFont
-	if s.bowlingTutorialFont != nil {
-		s.renderSystem.DrawTutorialText(screen, s.bowlingTutorialFont, s.bowlingTutorialFont)
-	} else if s.tutorialFont != nil {
-		s.renderSystem.DrawTutorialText(screen, s.tutorialFont, s.bowlingTutorialFont)
-	} else if s.sunCounterFont != nil {
-		s.renderSystem.DrawTutorialText(screen, s.sunCounterFont, nil)
-	}
-
-	// Layer 8.6: Draw UI particles (教学箭头、奖励粒子等)
-	// UI 粒子不受摄像机影响，渲染在教学文本之后
-	s.renderSystem.DrawParticles(screen, 0)
-
-	// Layer 9: Draw level progress bar (Story 5.5 - 正式版本)
-	// 右下角图形化进度条
-	// Story 8.3.1: 开场动画或铺草皮动画期间隐藏进度条
-	if !hideUI {
-		s.drawProgressBar(screen)
-	}
-
-	// Layer 10: Draw last wave warning (Story 5.5) - DISABLED for production
-	// 最后一波提示（如果需要显示）（开发调试用，已禁用）
-	// s.drawLastWaveWarning(screen) // 已禁用：改为使用 FinalWave.reanim 动画
-
-	// Layer 10.1: Draw huge wave warning (Story 17.7)
-	// 红字警告 "A Huge Wave of Zombies is Approaching!"
-	s.drawHugeWaveWarning(screen)
-
-	// Layer 10.5: Draw reward panel (Story 8.3 + 8.4)
-	// Story 8.4重构：RewardAnimationSystem完全封装奖励面板渲染
-	// 内部自动管理面板和植物卡片的渲染，调用者只需调用Draw方法
-	s.rewardSystem.Draw(screen)
-
-	// Story 8.3: 移除 "You Win" 覆盖层逻辑
-	// 奖励流程完成后通过"下一关"按钮进入下一关，不再显示 You Win
-	// Layer 11: Draw game result overlay (Story 5.5) - DISABLED for Story 8.3
-	// s.drawGameResultOverlay(screen) // 已禁用：改为通过奖励面板的"下一关"按钮进入下一关
-
-	// DEBUG: Draw particle test instructions (Story 7.4 debugging) - DISABLED
-	// s.drawParticleTestInstructions(screen)
-
-	// DEBUG: Draw grid boundaries and SodRoll debug lines (Story 3.3 debugging)
-	s.drawGridDebug(screen)
-
-	// Story 8.8: Draw UI elements (ZombiesWon animation, dialogs, etc.)
-	// 渲染所有标记为 UIComponent 的实体（包括 Dave Reanim）
-	// 手持物品（坚果）通过 InterlayerDrawRequests 在 Reanim 渲染过程中绘制
-	s.renderSystem.DrawUIElements(screen)
-
-	// Layer 10.2: Draw Dave dialogue bubble (Story 19.1)
-	// 对话气泡在 Dave Reanim 之后绘制
-	if s.daveDialogueSystem != nil {
-		s.daveDialogueSystem.Draw(screen)
-	}
-
-	// Story 8.8: Draw dialog boxes (game over dialog, etc.)
-	// 对话框在 UI 元素之后渲染，确保显示在最上层
-	if s.dialogRenderSystem != nil {
-		s.dialogRenderSystem.Draw(screen)
-	}
-
-	// Story 10.8: Draw Tooltip (植物卡片提示框)
-	// Tooltip 在对话框之后、暂停菜单之前渲染
-	s.drawTooltip(screen)
-
-	// Story 10.1: Draw pause menu (最顶层 - 在所有其他元素之上)
-	if s.pauseMenuModule != nil {
-		s.pauseMenuModule.Draw(screen)
-	}
+	// Layer 10.2+: 最顶层 UI（Reward、Dialogs、Tooltip、PauseMenu）
+	s.drawTopMostUILayer(screen)
 }
 
 // SaveOnExit 实现 game.Saveable 接口

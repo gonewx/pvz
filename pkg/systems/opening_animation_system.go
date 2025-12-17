@@ -10,6 +10,7 @@ import (
 	"github.com/gonewx/pvz/pkg/components"
 	"github.com/gonewx/pvz/pkg/config"
 	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/entities"
 	"github.com/gonewx/pvz/pkg/game"
 	"github.com/gonewx/pvz/pkg/types"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -133,6 +134,8 @@ func (oas *OpeningAnimationSystem) Update(dt float64) {
 		oas.updateCameraMoveRightState(openingComp)
 	case "showZombies":
 		oas.updateShowZombiesState(openingComp)
+	case "seedSelection":
+		oas.updateSeedSelectionState(openingComp)
 	case "cameraMoveLeft":
 		oas.updateCameraMoveLeftState(openingComp)
 	case "gameStart":
@@ -172,16 +175,48 @@ func (oas *OpeningAnimationSystem) updateCameraMoveRightState(openingComp *compo
 func (oas *OpeningAnimationSystem) updateShowZombiesState(openingComp *components.OpeningAnimationComponent) {
 	// 等待一定时间展示僵尸
 	if openingComp.ElapsedTime >= OpeningShowZombieTime {
+		// Story 8.12: 检查是否需要进入选卡阶段
+		if oas.levelConfig.EnableSeedSelection {
+			// 进入选卡阶段，不移动镜头
+			openingComp.State = "seedSelection"
+			openingComp.ElapsedTime = 0
+			oas.gameState.EnterSeedSelection()
+			log.Println("[OpeningAnimationSystem] State: showZombies → seedSelection (选卡系统启用)")
+		} else {
+			// 切换到镜头返回状态
+			openingComp.State = "cameraMoveLeft"
+			openingComp.ElapsedTime = 0
+
+			// 触发镜头返回到游戏位置（GameCameraX = 220）
+			// 僵尸会自然移出屏幕右侧（符合设计）
+			oas.cameraSystem.MoveTo(config.GameCameraX, 0, OpeningCameraSpeed)
+
+			log.Println("[OpeningAnimationSystem] State: showZombies → cameraMoveLeft")
+		}
+	}
+}
+
+// updateSeedSelectionState 处理选卡阶段状态。
+// Story 8.12: 玩家在选卡界面选择植物，点击"一起摇滚吧!"后进入镜头左移状态。
+func (oas *OpeningAnimationSystem) updateSeedSelectionState(openingComp *components.OpeningAnimationComponent) {
+	// 检查选卡是否已确认（玩家点击了"一起摇滚吧!"按钮）
+	if oas.gameState.IsSeedSelectionConfirmed() {
+		// 清理预览僵尸（选卡完成后不再需要展示）
+		oas.clearPreviewZombies(openingComp)
+
 		// 切换到镜头返回状态
 		openingComp.State = "cameraMoveLeft"
 		openingComp.ElapsedTime = 0
 
 		// 触发镜头返回到游戏位置（GameCameraX = 220）
-		// 僵尸会自然移出屏幕右侧（符合设计）
 		oas.cameraSystem.MoveTo(config.GameCameraX, 0, OpeningCameraSpeed)
 
-		log.Println("[OpeningAnimationSystem] State: showZombies → cameraMoveLeft")
+		// 完成选卡流程，重置 GameState 中的选卡阶段标志
+		oas.gameState.CompleteSeedSelection()
+
+		log.Println("[OpeningAnimationSystem] State: seedSelection → cameraMoveLeft (选卡确认)")
 	}
+	// 如果选卡未确认，保持当前状态等待玩家操作
 }
 
 // updateCameraMoveLeftState 处理镜头返回状态。
@@ -379,69 +414,45 @@ func (oas *OpeningAnimationSystem) spawnPreviewZombies(openingComp *components.O
 		// 完全随机选择行
 		lane := rand.Intn(config.GridRows)
 
-		// 计算Y坐标，加入随机垂直偏移（±12像素）
-		baseY := config.GridWorldStartY + float64(lane)*config.CellHeight + config.CellHeight/2 + config.ZombieVerticalOffset
-		yJitter := (rand.Float64() - 0.5) * 24
-		y := baseY + yJitter
-
 		// X坐标完全随机
 		x := config.ZombieSpawnMinX + rand.Float64()*(config.ZombieSpawnMaxX-config.ZombieSpawnMinX)
 
-		// 创建僵尸实体
-		zombieEntity := oas.entityManager.CreateEntity()
-
-		// 添加位置组件
-		ecs.AddComponent(oas.entityManager, zombieEntity, &components.PositionComponent{
-			X: x,
-			Y: y,
-		})
-
-		// 添加行为组件（特殊的预告行为，不移动、不攻击）
-		ecs.AddComponent(oas.entityManager, zombieEntity, &components.BehaviorComponent{
-			Type: components.BehaviorZombiePreview, // 使用预览行为，防止僵尸移动
-		})
-
-		// 根据僵尸类型获取对应的 UnitID（用于显示正确的装备外观）
+		// 根据僵尸类型获取对应的 UnitID
 		unitID := types.ZombieTypeToUnitID(zombieType)
 
-		// 添加 ReanimComponent 播放 idle 动画
-		// 所有僵尸类型都使用基础 "Zombie" 动画资源，通过 UnitID 控制装备显示
-		reanimXML := oas.resourceManager.GetReanimXML("Zombie")
-		partImages := oas.resourceManager.GetReanimPartImages("Zombie")
-		if reanimXML != nil && partImages != nil {
-			// Story 8.3.1: 使用精简的初始化
-			// 注意：MergedTracks 必须为 nil，让 PlayCombo 自动初始化轨道
-			reanimComp := &components.ReanimComponent{
-				ReanimName:        "Zombie",
-				ReanimXML:         reanimXML,
-				PartImages:        partImages,
-				MergedTracks:      nil, // Story 8.3.1: 必须为 nil，让 PlayCombo 初始化轨道
-				VisualTracks:      nil, // PlayCombo 会自动设置
-				LogicalTracks:     nil, // PlayCombo 会自动设置
-				CurrentFrame:      0,
-				FrameAccumulator:  0,
-				AnimationFPS:      12,
-				CurrentAnimations: []string{},
-				AnimVisiblesMap:   map[string][]int{},
-				IsLooping:         true,
-				IsFinished:        false,
-				LastRenderFrame:   -1, // 确保首次渲染时触发缓存构建
-			}
-			ecs.AddComponent(oas.entityManager, zombieEntity, reanimComp)
+		// 使用统一的僵尸工厂创建实体
+		factory, found := entities.GetZombieFactory(unitID)
+		if !found {
+			factory = entities.GetDefaultZombieFactory()
+		}
 
-			// 使用 AnimationCommand 组件播放配置的动画组合
-			// 根据僵尸类型使用对应的 UnitID，以显示正确的装备（路障/铁桶等）
-			ecs.AddComponent(oas.entityManager, zombieEntity, &components.AnimationCommandComponent{
-				UnitID:    unitID,
-				ComboName: "idle",
-				Processed: false,
-			})
+		zombieEntity, err := factory(oas.entityManager, oas.resourceManager, lane, x)
+		if err != nil {
+			log.Printf("[OpeningAnimationSystem] Failed to create preview zombie %d: %v", i, err)
+			continue
+		}
+
+		// 修改行为组件为预览模式（不移动、不攻击）
+		if behaviorComp, ok := ecs.GetComponent[*components.BehaviorComponent](oas.entityManager, zombieEntity); ok {
+			behaviorComp.Type = components.BehaviorZombiePreview
+		}
+
+		// 修改速度为0（预览僵尸不移动）
+		if velComp, ok := ecs.GetComponent[*components.VelocityComponent](oas.entityManager, zombieEntity); ok {
+			velComp.VX = 0
+			velComp.VY = 0
+		}
+
+		// 随机Y坐标偏移（±12像素），使预览更自然
+		if posComp, ok := ecs.GetComponent[*components.PositionComponent](oas.entityManager, zombieEntity); ok {
+			yJitter := (rand.Float64() - 0.5) * 24
+			posComp.Y += yJitter
 		}
 
 		// 保存僵尸实体ID
 		openingComp.ZombieEntities = append(openingComp.ZombieEntities, zombieEntity)
 
-		log.Printf("[OpeningAnimationSystem] Spawned preview zombie %d: type=%s, unitID=%s, lane=%d, x=%.0f, y=%.0f", i, zombieType, unitID, lane, x, y)
+		log.Printf("[OpeningAnimationSystem] Spawned preview zombie %d: type=%s, unitID=%s, lane=%d, x=%.0f", i, zombieType, unitID, lane, x)
 	}
 }
 
