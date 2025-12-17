@@ -6,6 +6,7 @@ import (
 
 	"github.com/gonewx/pvz/internal/reanim"
 	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/config"
 	"github.com/gonewx/pvz/pkg/ecs"
 	"github.com/gonewx/pvz/pkg/game"
 )
@@ -65,15 +66,16 @@ func NewSelectorScreenPartialEntity(
 	x, y float64,
 ) (ecs.EntityID, error) {
 	// 1. Get Reanim data from cache (already loaded by LoadReanimResources)
-	reanimXML := rm.GetReanimXML("SelectorScreen")
+	// 使用配置常量，避免硬编码资源名称
+	reanimXML := rm.GetReanimXML(config.ReanimNameSelectorScreen)
 	if reanimXML == nil {
-		return 0, fmt.Errorf("SelectorScreen.reanim not found in cache")
+		return 0, fmt.Errorf("%s.reanim not found in cache", config.ReanimNameSelectorScreen)
 	}
 
 	// 2. Get part images from cache
-	partImages := rm.GetReanimPartImages("SelectorScreen")
+	partImages := rm.GetReanimPartImages(config.ReanimNameSelectorScreen)
 	if partImages == nil {
-		return 0, fmt.Errorf("SelectorScreen part images not found in cache")
+		return 0, fmt.Errorf("%s part images not found in cache", config.ReanimNameSelectorScreen)
 	}
 
 	// 3. Create entity
@@ -88,7 +90,7 @@ func NewSelectorScreenPartialEntity(
 
 	reanimComp := &components.ReanimComponent{
 		// 基础数据
-		ReanimName:   "SelectorScreen", // For config lookup and debugging
+		ReanimName:   config.ReanimNameSelectorScreen, // For config lookup and debugging
 		ReanimXML:    reanimXML,
 		PartImages:   partImages,
 		MergedTracks: reanim.BuildMergedTracks(reanimXML),

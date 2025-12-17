@@ -51,18 +51,20 @@ func NewZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spawnX f
 
 	// Story 6.3: 使用 ReanimComponent 替代 AnimationComponent
 	// 从 ResourceManager 获取普通僵尸的 Reanim 数据和部件图片
-	reanimXML := rm.GetReanimXML("Zombie")
-	partImages := rm.GetReanimPartImages("Zombie")
+	// 使用僵尸注册表查询 ReanimName，避免硬编码
+	reanimName := config.GetZombieReanimName(types.ZombieBasic)
+	reanimXML := rm.GetReanimXML(reanimName)
+	partImages := rm.GetReanimPartImages(reanimName)
 
 	if reanimXML == nil || partImages == nil {
-		return 0, fmt.Errorf("failed to load Zombie Reanim resources")
+		return 0, fmt.Errorf("failed to load %s Reanim resources", reanimName)
 	}
 
 	// 添加基础 ReanimComponent
 	// LastGroundX/Y 初始化为 0.0，用于根运动计算
 	// LastAnimFrame 初始化为 -1，表示尚未开始动画
 	em.AddComponent(entityID, &components.ReanimComponent{
-		ReanimName:        "Zombie",
+		ReanimName:        reanimName,
 		ReanimXML:         reanimXML,
 		PartImages:        partImages,
 		LastGroundX:       0.0,
@@ -168,12 +170,14 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, 
 
 	// Story 6.3: 使用 ReanimComponent 替代 AnimationComponent
 	// 从 ResourceManager 获取僵尸的 Reanim 数据和部件图片
-	// 注意：路障僵尸使用基础僵尸的动画
-	reanimXML := rm.GetReanimXML("Zombie")
-	partImages := rm.GetReanimPartImages("Zombie")
+	// 注意：路障僵尸使用基础僵尸的动画（通过 UnitID 控制装备显示）
+	// 使用僵尸注册表查询 ReanimName，避免硬编码
+	reanimName := config.GetZombieReanimName(types.ZombieBasic)
+	reanimXML := rm.GetReanimXML(reanimName)
+	partImages := rm.GetReanimPartImages(reanimName)
 
 	if reanimXML == nil || partImages == nil {
-		return 0, fmt.Errorf("failed to load Zombie Reanim resources for Conehead")
+		return 0, fmt.Errorf("failed to load %s Reanim resources for Conehead", reanimName)
 	}
 
 	// 添加 ReanimComponent（路障僵尸：基础部件 + 路障）
@@ -181,7 +185,7 @@ func NewConeheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, 
 	// LastGroundX/Y 初始化为 0.0，用于根运动计算
 	// LastAnimFrame 初始化为 -1，表示尚未开始动画
 	em.AddComponent(entityID, &components.ReanimComponent{
-		ReanimName:        "Zombie",
+		ReanimName:        reanimName,
 		ReanimXML:         reanimXML,
 		PartImages:        partImages,
 		LastGroundX:       0.0,
@@ -294,12 +298,14 @@ func NewBucketheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int
 
 	// Story 6.3: 使用 ReanimComponent 替代 AnimationComponent
 	// 从 ResourceManager 获取僵尸的 Reanim 数据和部件图片
-	// 注意：铁桶僵尸使用基础僵尸的动画
-	reanimXML := rm.GetReanimXML("Zombie")
-	partImages := rm.GetReanimPartImages("Zombie")
+	// 注意：铁桶僵尸使用基础僵尸的动画（通过 UnitID 控制装备显示）
+	// 使用僵尸注册表查询 ReanimName，避免硬编码
+	reanimName := config.GetZombieReanimName(types.ZombieBasic)
+	reanimXML := rm.GetReanimXML(reanimName)
+	partImages := rm.GetReanimPartImages(reanimName)
 
 	if reanimXML == nil || partImages == nil {
-		return 0, fmt.Errorf("failed to load Zombie Reanim resources for Buckethead")
+		return 0, fmt.Errorf("failed to load %s Reanim resources for Buckethead", reanimName)
 	}
 
 	// 添加 ReanimComponent（铁桶僵尸：基础部件 + 铁桶）
@@ -307,7 +313,7 @@ func NewBucketheadZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int
 	// LastGroundX/Y 初始化为 0.0，用于根运动计算
 	// LastAnimFrame 初始化为 -1，表示尚未开始动画
 	em.AddComponent(entityID, &components.ReanimComponent{
-		ReanimName:        "Zombie",
+		ReanimName:        reanimName,
 		ReanimXML:         reanimXML,
 		PartImages:        partImages,
 		LastGroundX:       0.0,
@@ -419,16 +425,20 @@ func NewFlagZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spaw
 	})
 
 	// 从 ResourceManager 获取僵尸的 Reanim 数据和部件图片
-	reanimXML := rm.GetReanimXML("Zombie")
-	partImages := rm.GetReanimPartImages("Zombie")
+	// 旗帜僵尸使用基础僵尸的动画（通过 UnitID 控制旗帜手显示）
+	// 使用僵尸注册表查询 ReanimName，避免硬编码
+	reanimName := config.GetZombieReanimName(types.ZombieBasic)
+	reanimXML := rm.GetReanimXML(reanimName)
+	partImages := rm.GetReanimPartImages(reanimName)
 
 	if reanimXML == nil || partImages == nil {
-		return 0, fmt.Errorf("failed to load Zombie Reanim resources for Flag Zombie")
+		return 0, fmt.Errorf("failed to load %s Reanim resources for Flag Zombie", reanimName)
 	}
 
 	// 获取旗杆动画数据（用于轨道合并）
-	flagPoleReanimXML := rm.GetReanimXML("Zombie_FlagPole")
-	flagPolePartImages := rm.GetReanimPartImages("Zombie_FlagPole")
+	// 旗杆是特殊资源，使用配置常量
+	flagPoleReanimXML := rm.GetReanimXML(config.ReanimNameZombieFlagPole)
+	flagPolePartImages := rm.GetReanimPartImages(config.ReanimNameZombieFlagPole)
 
 	// 合并旗杆图片到主图片映射
 	if flagPolePartImages != nil {
@@ -439,7 +449,7 @@ func NewFlagZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row int, spaw
 
 	// 添加 ReanimComponent（旗帜僵尸：基础部件 + 旗帜手）
 	reanimComp := &components.ReanimComponent{
-		ReanimName:        "Zombie",
+		ReanimName:        reanimName,
 		ReanimXML:         reanimXML,
 		PartImages:        partImages,
 		LastGroundX:       0.0,
@@ -596,16 +606,18 @@ func NewPolevaulterZombieEntity(em *ecs.EntityManager, rm ResourceLoader, row in
 	})
 
 	// 从 ResourceManager 获取撑杆僵尸的 Reanim 数据和部件图片
-	reanimXML := rm.GetReanimXML("Zombie_polevaulter")
-	partImages := rm.GetReanimPartImages("Zombie_polevaulter")
+	// 使用僵尸注册表查询 ReanimName，避免硬编码
+	reanimName := config.GetZombieReanimName(types.ZombiePolevaulter)
+	reanimXML := rm.GetReanimXML(reanimName)
+	partImages := rm.GetReanimPartImages(reanimName)
 
 	if reanimXML == nil || partImages == nil {
-		return 0, fmt.Errorf("failed to load Zombie_polevaulter Reanim resources")
+		return 0, fmt.Errorf("failed to load %s Reanim resources", reanimName)
 	}
 
 	// 添加 ReanimComponent
 	ecs.AddComponent(em, entityID, &components.ReanimComponent{
-		ReanimName:        "Zombie_polevaulter",
+		ReanimName:        reanimName,
 		ReanimXML:         reanimXML,
 		PartImages:        partImages,
 		LastGroundX:       0.0,

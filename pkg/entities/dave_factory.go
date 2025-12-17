@@ -59,16 +59,17 @@ func NewCrazyDaveEntity(
 	})
 
 	// 从 ResourceManager 获取 CrazyDave 的 Reanim 数据和部件图片
-	reanimXML := rm.GetReanimXML("CrazyDave")
-	partImages := rm.GetReanimPartImages("CrazyDave")
+	// 使用配置常量，避免硬编码资源名称
+	reanimXML := rm.GetReanimXML(config.ReanimNameCrazyDave)
+	partImages := rm.GetReanimPartImages(config.ReanimNameCrazyDave)
 
 	if reanimXML == nil || partImages == nil {
-		return 0, fmt.Errorf("failed to load CrazyDave Reanim resources")
+		return 0, fmt.Errorf("failed to load %s Reanim resources", config.ReanimNameCrazyDave)
 	}
 
 	// 添加 ReanimComponent
 	em.AddComponent(entityID, &components.ReanimComponent{
-		ReanimName: "CrazyDave",
+		ReanimName: config.ReanimNameCrazyDave,
 		ReanimXML:  reanimXML,
 		PartImages: partImages,
 		IsLooping:  false, // 入场动画不循环，播放一次后由系统切换到 idle

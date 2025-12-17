@@ -6,6 +6,7 @@ import (
 
 	"github.com/gonewx/pvz/internal/reanim"
 	"github.com/gonewx/pvz/pkg/components"
+	"github.com/gonewx/pvz/pkg/config"
 	"github.com/gonewx/pvz/pkg/ecs"
 	"github.com/gonewx/pvz/pkg/game"
 )
@@ -31,15 +32,16 @@ import (
 // Story 12.6 Task 2.2: Create zombie hand entity in main menu
 func NewZombieHandEntity(em *ecs.EntityManager, rm *game.ResourceManager, x, y float64) (ecs.EntityID, error) {
 	// 1. Get Reanim data from cache (already loaded by LoadReanimResources)
-	reanimXML := rm.GetReanimXML("Zombie_hand")
+	// 使用配置常量，避免硬编码资源名称
+	reanimXML := rm.GetReanimXML(config.ReanimNameZombieHand)
 	if reanimXML == nil {
-		return 0, fmt.Errorf("Zombie_hand.reanim not found in cache")
+		return 0, fmt.Errorf("%s.reanim not found in cache", config.ReanimNameZombieHand)
 	}
 
 	// 2. Get part images from cache
-	partImages := rm.GetReanimPartImages("Zombie_hand")
+	partImages := rm.GetReanimPartImages(config.ReanimNameZombieHand)
 	if partImages == nil {
-		return 0, fmt.Errorf("Zombie_hand part images not found in cache")
+		return 0, fmt.Errorf("%s part images not found in cache", config.ReanimNameZombieHand)
 	}
 
 	// 3. Create entity
@@ -88,7 +90,7 @@ func NewZombieHandEntity(em *ecs.EntityManager, rm *game.ResourceManager, x, y f
 
 	reanimComp := &components.ReanimComponent{
 		// 基础数据
-		ReanimName:   "Zombie_hand",
+		ReanimName:   config.ReanimNameZombieHand,
 		ReanimXML:    reanimXML,
 		PartImages:   partImages,
 		MergedTracks: mergedTracks,

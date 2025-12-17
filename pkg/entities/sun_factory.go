@@ -48,8 +48,9 @@ func newSunEntityInternal(manager *ecs.EntityManager, rm *game.ResourceManager, 
 
 	// Story 8.2 QA修复：使用 Reanim 系统加载阳光动画
 	// Sun.reanim 包含3张图片的动画效果
-	reanimXML := rm.GetReanimXML("Sun")
-	reanimPartImages := rm.GetReanimPartImages("Sun")
+	// 使用配置常量，避免硬编码资源名称
+	reanimXML := rm.GetReanimXML(config.ReanimNameSun)
+	reanimPartImages := rm.GetReanimPartImages(config.ReanimNameSun)
 
 	log.Printf("[SunFactory] Creating sun entity ID=%d at (%.1f, %.1f)", id, startX, targetY)
 	log.Printf("[SunFactory] Reanim XML: %v, Part Images: %v", reanimXML != nil, reanimPartImages != nil)
@@ -69,7 +70,7 @@ func newSunEntityInternal(manager *ecs.EntityManager, rm *game.ResourceManager, 
 		log.Printf("[SunFactory] Adding ReanimComponent with full Reanim data")
 		// 添加基础 ReanimComponent，动画通过 AnimationCommandComponent 初始化
 		manager.AddComponent(id, &components.ReanimComponent{
-			ReanimName: "Sun",
+			ReanimName: config.ReanimNameSun,
 			ReanimXML:  reanimXML,
 			PartImages: reanimPartImages,
 			IsLooping:  true, // 循环播放

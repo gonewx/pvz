@@ -60,11 +60,12 @@ func NewLawnmowerEntity(
 
 	// Story 10.2: 使用 ReanimComponent 加载除草车动画
 	// 从 ResourceManager 获取除草车的 Reanim 数据和部件图片
-	reanimXML := rm.GetReanimXML("LawnMower")
-	partImages := rm.GetReanimPartImages("LawnMower")
+	// 使用配置常量，避免硬编码资源名称
+	reanimXML := rm.GetReanimXML(config.ReanimNameLawnMower)
+	partImages := rm.GetReanimPartImages(config.ReanimNameLawnMower)
 
 	if reanimXML == nil || partImages == nil {
-		return 0, fmt.Errorf("failed to load LawnMower Reanim resources")
+		return 0, fmt.Errorf("failed to load %s Reanim resources", config.ReanimNameLawnMower)
 	}
 
 	// 添加 ReanimComponent

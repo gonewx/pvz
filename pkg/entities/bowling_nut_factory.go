@@ -9,6 +9,7 @@ import (
 	"github.com/gonewx/pvz/pkg/components"
 	"github.com/gonewx/pvz/pkg/config"
 	"github.com/gonewx/pvz/pkg/ecs"
+	"github.com/gonewx/pvz/pkg/types"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -33,11 +34,13 @@ func NewBowlingNutEntity(em *ecs.EntityManager, rm ResourceLoader, row, col int,
 	worldY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2 + config.PlantOffsetY
 
 	// 加载 Wallnut Reanim 资源
-	reanimXML := rm.GetReanimXML("Wallnut")
-	partImages := rm.GetReanimPartImages("Wallnut")
+	// 保龄球坚果使用坚果墙的动画，通过植物注册表获取 ReanimName
+	reanimName := config.GetPlantReanimName(types.PlantWallnut)
+	reanimXML := rm.GetReanimXML(reanimName)
+	partImages := rm.GetReanimPartImages(reanimName)
 
 	if reanimXML == nil || partImages == nil {
-		return 0, fmt.Errorf("failed to load Wallnut Reanim resources for bowling nut")
+		return 0, fmt.Errorf("failed to load %s Reanim resources for bowling nut", reanimName)
 	}
 
 	// 从动画数据动态计算滚动速度
@@ -70,7 +73,7 @@ func NewBowlingNutEntity(em *ecs.EntityManager, rm ResourceLoader, row, col int,
 
 	// 添加 ReanimComponent
 	em.AddComponent(entityID, &components.ReanimComponent{
-		ReanimName: "Wallnut",
+		ReanimName: reanimName,
 		ReanimXML:  reanimXML,
 		PartImages: clonedPartImages,
 	})

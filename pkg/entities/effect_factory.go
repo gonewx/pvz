@@ -152,15 +152,16 @@ func CreateFinalWaveEntity(em *ecs.EntityManager, rm ResourceLoader, x, y float6
 	}
 
 	// 加载 FinalWave.reanim 数据
-	reanimXML := rm.GetReanimXML("FinalWave")
+	// 使用配置常量，避免硬编码资源名称
+	reanimXML := rm.GetReanimXML(config.ReanimNameFinalWave)
 	if reanimXML == nil {
-		return 0, fmt.Errorf("FinalWave.reanim not found in resource manager")
+		return 0, fmt.Errorf("%s.reanim not found in resource manager", config.ReanimNameFinalWave)
 	}
 
 	// 加载 FinalWave 部件图片
-	partImages := rm.GetReanimPartImages("FinalWave")
+	partImages := rm.GetReanimPartImages(config.ReanimNameFinalWave)
 	if partImages == nil || len(partImages) == 0 {
-		return 0, fmt.Errorf("FinalWave part images not found")
+		return 0, fmt.Errorf("%s part images not found", config.ReanimNameFinalWave)
 	}
 
 	// 创建实体
