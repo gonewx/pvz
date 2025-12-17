@@ -111,15 +111,22 @@ type PlantComponent struct {
 	// 用于控制动画状态（被啃食时停止摇晃动画，保持静止）
 	// 此字段为通用字段，适用于豌豆射手、向日葵等需要在被啃食时停止摇晃的植物
 	BeingEaten bool
+
+	// Story 8.12: 双发射手连发相关字段
+	// BurstShotsRemaining 剩余连发次数
+	// 双发射手每次攻击发射2颗豌豆，第一颗发射后此值为1，第二颗发射后为0
+	BurstShotsRemaining int
+
+	// BurstTimer 连发间隔计时器（秒）
+	// 控制双发射手两颗豌豆之间的发射间隔
+	BurstTimer float64
 }
 
 // Story 10.3: 射手类植物列表（用于判断是否需要攻击动画）
 var shooterPlants = map[PlantType]bool{
 	PlantPeashooter: true,
 	PlantSnowPea:    true, // Story 8.9: 寒冰射手
-	// 未来扩展：
-	// PlantRepeater:   true,
-	// PlantCabbagePult: true,
+	PlantRepeater:   true, // Story 8.12: 双发射手
 }
 
 // IsShooterPlant 判断植物是否是射手类（需要攻击动画）

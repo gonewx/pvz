@@ -22,6 +22,8 @@ const (
 	PlantSnowPea
 	// PlantChomper 大嘴花 (Story 8.11)
 	PlantChomper
+	// PlantRepeater 双发射手 (Story 8.12)
+	PlantRepeater
 )
 
 // String 返回植物类型的字符串表示
@@ -41,6 +43,8 @@ func (p PlantType) String() string {
 		return "SnowPea"
 	case PlantChomper:
 		return "Chomper"
+	case PlantRepeater:
+		return "Repeater"
 	default:
 		return "Unknown"
 	}

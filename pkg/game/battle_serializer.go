@@ -179,6 +179,14 @@ func (s *BattleSerializer) collectLevelState(gs *GameState, saveData *BattleSave
 	// 僵尸计数
 	saveData.TotalZombiesSpawned = gs.TotalZombiesSpawned
 	saveData.ZombiesKilled = gs.ZombiesKilled
+
+	// Story 8.12: 保存选卡系统选择的植物列表
+	selectedPlants := gs.GetSelectedPlants()
+	if len(selectedPlants) > 0 {
+		saveData.SelectedPlants = make([]string, len(selectedPlants))
+		copy(saveData.SelectedPlants, selectedPlants)
+		log.Printf("[BattleSerializer] Saving selected plants: %v", selectedPlants)
+	}
 }
 
 // collectPlantData 从 EntityManager 收集所有植物实体数据

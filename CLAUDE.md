@@ -142,18 +142,6 @@ make build-darwin-app  # 构建 macOS .app 包
 make build-apk         # 构建 Android APK
 ```
 
-## 编码规范
-
-### Go 代码风格
-
-- 使用 `gofmt` 格式化所有代码
-- 遵循 Go 命名约定：
-  - 包名: `snake_case`
-  - 结构体/接口: `PascalCase`
-  - 函数/方法: `PascalCase` (public), `camelCase` (private)
-  - 变量: `camelCase`
-  - 常量: `PascalCase`
-
 ### ECS 特定规范
 
 - **组件**: 仅包含字段，不包含方法
@@ -173,21 +161,6 @@ make build-apk         # 构建 Android APK
 | `Fixed` | 固定出怪列表 | 标准关卡的常规波次 |
 | `ExtraPoints` | 动态点数分配 | 1-10 传送带关卡 |
 | `Final` | 最终波 | 关卡最后一波 |
-
-### 场景类型 (Story 17.2)
-
-| 类型 | 章节 | RowMax | 特殊规则 |
-|------|------|--------|----------|
-| `day` | 白天 | 5 | 无 |
-| `night` | 黑夜 | 5 | 墓碑 |
-| `pool` | 泳池 | 6 | 第3,4行水路 |
-| `fog` | 雾夜 | 6 | 第3,4行水路 + 迷雾 |
-| `roof` | 屋顶 | 5 | 左5列斜坡 |
-| `moon` | 月夜 | 5 | 墓碑 |
-
-### 关卡配置覆盖
-
-如需为特定关卡覆盖默认规则，可在关卡配置中添加 `spawnRulesOverride` 字段（未来扩展）。
 
 ## 技术参考
 

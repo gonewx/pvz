@@ -186,6 +186,8 @@ func (s *GameScene) loadConveyorCardResources() {
 func (s *GameScene) loadSoddingResources() {
 	// Story 8.3: 加载 LoadingImages 资源组（包含按钮等 UI 资源）
 	// 包含 IMAGE_SEEDCHOOSER_BUTTON 等资源
+	// 注意：此资源组已在 initializeSystems 中提前加载（暂停菜单需要）
+	// 这里是二次检查，ResourceManager 有缓存机制不会重复加载
 	if err := s.resourceManager.LoadResourceGroup("LoadingImages"); err != nil {
 		log.Printf("Warning: Failed to load LoadingImages resources: %v", err)
 	} else {

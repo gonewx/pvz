@@ -211,8 +211,9 @@ func (oas *OpeningAnimationSystem) updateSeedSelectionState(openingComp *compone
 		// 触发镜头返回到游戏位置（GameCameraX = 220）
 		oas.cameraSystem.MoveTo(config.GameCameraX, 0, OpeningCameraSpeed)
 
-		// 完成选卡流程，重置 GameState 中的选卡阶段标志
-		oas.gameState.CompleteSeedSelection()
+		// Story 8.12: 不要在这里调用 CompleteSeedSelection()
+		// 保持 SeedSelectionConfirmed 状态，让 UI 在镜头左移期间显示
+		// CompleteSeedSelection() 将在 updateGameStartState() 中调用
 
 		log.Println("[OpeningAnimationSystem] State: seedSelection → cameraMoveLeft (选卡确认)")
 	}
@@ -339,6 +340,13 @@ func (oas *OpeningAnimationSystem) playReadySetPlantSound() {
 func (oas *OpeningAnimationSystem) updateGameStartState(openingComp *components.OpeningAnimationComponent) {
 	// Story 8.3.1: 清理预览僵尸（镜头返回后销毁独立的预览实体）
 	oas.clearPreviewZombies(openingComp)
+
+	// Story 8.12: 完成选卡流程（如果是选卡关卡）
+	// 此时镜头已回到游戏位置，可以重置选卡状态
+	if oas.levelConfig.EnableSeedSelection && oas.gameState.IsSeedSelectionConfirmed() {
+		oas.gameState.CompleteSeedSelection()
+		log.Println("[OpeningAnimationSystem] 选卡流程完成")
+	}
 
 	// 标记开场动画完成
 	openingComp.IsCompleted = true

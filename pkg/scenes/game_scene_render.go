@@ -26,19 +26,44 @@ type RenderContext struct {
 func (s *GameScene) calculateRenderContext() RenderContext {
 	ctx := RenderContext{}
 
+	// Story 8.12: 选卡关卡特殊处理
+	// 选卡确认后（镜头左移期间或之后），植物选择栏和菜单按钮应该立即显示
+	isSeedSelectionLevel := s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.EnableSeedSelection
+
+	// Story 8.12 修复：选卡关卡的 UI 显示条件
+	// 1. 选卡确认后（IsSeedSelectionConfirmed）：立即显示 UI
+	// 2. 开场动画完成后（即使 SeedSelectionPhase 已变为 None）：继续显示 UI
+	// 注意：CompleteSeedSelection() 会在开场动画完成时被调用，将 Phase 重置为 None
+	seedSelectionConfirmed := isSeedSelectionLevel && s.gameState.IsSeedSelectionConfirmed()
+	openingCompleted := s.openingSystem == nil || s.openingSystem.IsCompleted()
+	// 选卡关卡一旦开场动画完成，就认为 UI 应该显示
+	seedSelectionLevelUIReady := isSeedSelectionLevel && openingCompleted
+
 	// Story 8.3.1: 开场动画或铺草皮动画期间隐藏 UI 元素
 	// 注意：需要检查 soddingAnimStarted 来避免开场动画完成和铺草皮动画开始之间的闪现
 	isOpeningPlaying := s.openingSystem != nil && !s.openingSystem.IsCompleted()
 	isSoddingPlaying := s.soddingSystem != nil && s.soddingSystem.IsPlaying()
 	// 如果有开场动画系统且铺草皮动画还未启动，也要隐藏 UI（过渡期间）
 	isWaitingForSodding := s.openingSystem != nil && s.openingSystem.IsCompleted() && !s.soddingAnimStarted
-	ctx.hideUI = isOpeningPlaying || isSoddingPlaying || isWaitingForSodding
+
+	// Story 8.12: 选卡确认后或选卡关卡开场动画完成后，不再隐藏 UI
+	if seedSelectionConfirmed || seedSelectionLevelUIReady {
+		ctx.hideUI = false
+	} else {
+		ctx.hideUI = isOpeningPlaying || isSoddingPlaying || isWaitingForSodding
+	}
 
 	// 暂停菜单按钮需要在所有开场动画完成后才显示
 	// 包括：开场动画、铺草皮动画、除草车入场动画、ReadySetPlant 动画
 	isLawnmowerEntering := s.lawnmowerSystem != nil && !s.lawnmowerSystem.AreAllEntered()
 	isReadySetPlantPlaying := s.readySetPlantSystem != nil && s.readySetPlantSystem.IsPlaying()
-	ctx.hideMenuButton = ctx.hideUI || isLawnmowerEntering || isReadySetPlantPlaying
+
+	// Story 8.12: 选卡确认后或选卡关卡开场动画完成后，菜单按钮立即显示
+	if seedSelectionConfirmed || seedSelectionLevelUIReady {
+		ctx.hideMenuButton = false
+	} else {
+		ctx.hideMenuButton = ctx.hideUI || isLawnmowerEntering || isReadySetPlantPlaying
+	}
 
 	// Level 1-5 特殊处理：菜单按钮在传送带滑入完成后才显示
 	// 不影响其他关卡的菜单显示逻辑
@@ -54,9 +79,14 @@ func (s *GameScene) calculateRenderContext() RenderContext {
 	// 对于有预设植物的关卡（Level 1-5），铲子槽在 Phase 1 已经显示
 	// 传送带滑入后创建除草车时，铲子槽不应因除草车入场动画而消失
 	// 只有菜单按钮需要等待除草车入场完成
-	ctx.hideShovel = ctx.hideUI || isReadySetPlantPlaying
+	// Story 8.12: 选卡确认后，铲子槽也应该立即显示
+	if seedSelectionConfirmed || seedSelectionLevelUIReady {
+		ctx.hideShovel = false
+	} else {
+		ctx.hideShovel = ctx.hideUI || isReadySetPlantPlaying
+	}
 	// 非铲子教学关卡的普通流程：铲子槽与菜单按钮同时显示
-	if !isShovelTutorialLevel {
+	if !isShovelTutorialLevel && !seedSelectionConfirmed && !seedSelectionLevelUIReady {
 		ctx.hideShovel = ctx.hideMenuButton
 	}
 
@@ -105,12 +135,15 @@ func (s *GameScene) drawUIBaseLayer(screen *ebiten.Image, ctx RenderContext) {
 	// Layer 3: Draw plant cards (Story 3.1 架构优化)
 	// 在植物和僵尸下方渲染，符合原版PVZ设计
 	// Story 19.5: 保龄球模式不显示植物选择模块（使用传送带）
-	// 滑入动画：计算 Y 偏移量，与植物选择栏同步滑入
+	// Story 8.12: 选卡关卡使用水平滑动动画，非选卡关卡使用垂直滑入动画
 	if s.plantSelectionModule != nil {
 		if s.gameState.CurrentLevel == nil || s.gameState.CurrentLevel.InitialSun != 0 {
-			// 计算滑入动画 Y 偏移
+			// 计算滑动动画偏移量
+			// X 偏移：选卡关卡水平滑动时使用
+			xOffset := s.getSeedBankCurrentX() - float64(config.SeedBankX)
+			// Y 偏移：非选卡关卡垂直滑入时使用
 			yOffset := s.getSeedBankCurrentY() - float64(config.SeedBankY)
-			s.plantSelectionModule.DrawWithOffset(screen, yOffset)
+			s.plantSelectionModule.DrawWithXYOffset(screen, xOffset, yOffset)
 		}
 	}
 }

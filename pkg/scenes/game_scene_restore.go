@@ -74,6 +74,12 @@ func (s *GameScene) restoreBattleState() {
 	s.gameState.TotalZombiesSpawned = saveData.TotalZombiesSpawned
 	s.gameState.ZombiesKilled = saveData.ZombiesKilled
 
+	// Story 8.12: 恢复选卡系统选择的植物列表
+	if len(saveData.SelectedPlants) > 0 {
+		s.gameState.SetSelectedPlants(saveData.SelectedPlants)
+		log.Printf("[GameScene] 恢复选卡植物列表: %v", saveData.SelectedPlants)
+	}
+
 	log.Printf("[GameScene] 状态恢复: Sun=%d, Wave=%d, Time=%.1f, Killed=%d/%d",
 		s.gameState.Sun, s.gameState.CurrentWaveIndex, s.gameState.LevelTime,
 		s.gameState.ZombiesKilled, s.gameState.TotalZombiesInLevel)

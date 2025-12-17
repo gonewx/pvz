@@ -333,6 +333,16 @@
 *   **功能**: 在选卡界面，玩家可以看到右边的僵尸阵容， 鼠标悬停在僵尸上时有相应的 tip。样式和植物名称的tip一样。
 *   **重要性**: 玩家需要确认是否有“铁桶僵尸”，从而决定是否带“寒冰射手”或“大嘴花”。
 
+可能用到的图片资源：
+
+SeedChooser_Background.png
+SeedChooser_Button.png
+SeedChooser_Button2.png
+SeedChooser_Button2_Glow.png
+SeedChooser_Button_Disabled.png
+SeedChooser_Button_Glow.png
+SeedPacketSilhouette.png
+
 ---
 
 ### **给开发的修正口头语：**

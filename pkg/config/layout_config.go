@@ -198,7 +198,7 @@ const (
 
 	// PlantCardSpacing 卡片槽之间的间距（像素）
 	// 包含卡槽边框，每个卡槽约76px宽
-	PlantCardSpacing = 60
+	PlantCardSpacing = 59
 
 	// ShovelX 铲子X坐标（屏幕坐标，像素）
 	// 已废弃：现在铲子位置根据选择栏图片宽度动态计算
@@ -497,6 +497,17 @@ const (
 	// SeedBankSlideInStartY 植物选择栏滑入起始 Y 位置（屏幕外）
 	// 与 SeedBankHeight (87) 相关，从屏幕上方外侧开始
 	SeedBankSlideInStartY = -100.0
+
+	// ========== 选卡关卡水平滑动动画配置（Story 8.12）（可手工调节） ==========
+	// 选卡关卡在选卡确认后，植物选择栏需要从选卡界面位置（X=0）水平滑动到游戏正常位置（X=SeedBankX）
+
+	// SeedBankHorizontalSlideStartX 选卡关卡水平滑动起始 X 位置
+	// 与 SeedChooserPanelX (=0) 对齐
+	SeedBankHorizontalSlideStartX = 0.0
+
+	// SeedBankHorizontalSlideDuration 选卡关卡水平滑动时长（秒）
+	// 与镜头左移同步，使用较短时长
+	SeedBankHorizontalSlideDuration = 0.4
 
 	// BowlingRedLineColumn 红线位置（第 3 列和第 4 列之间）
 	// 红线 X 坐标 = GridWorldStartX + BowlingRedLineColumn * CellWidth

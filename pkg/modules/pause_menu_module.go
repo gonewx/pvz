@@ -296,6 +296,12 @@ func (m *PauseMenuModule) Update(deltaTime float64) {
 	// 从 GameState 同步暂停状态
 	isPaused := m.gameState.IsPaused
 
+	// DEBUG: 每帧输出暂停状态（仅当 isPaused 为 true 时）
+	if isPaused {
+		log.Printf("[PauseMenuModule] DEBUG Update: isPaused=%v, wasActive=%v, settingsPanelActive=%v",
+			isPaused, m.wasActive, m.settingsPanelModule.IsActive())
+	}
+
 	// 检测状态变化（处理 ESC 键触发的暂停/恢复）
 	if isPaused != m.wasActive {
 		if isPaused {
@@ -317,6 +323,7 @@ func (m *PauseMenuModule) Update(deltaTime float64) {
 	// 更新设置面板状态（委托给 SettingsPanelModule）
 	if isPaused {
 		if !m.settingsPanelModule.IsActive() {
+			log.Printf("[PauseMenuModule] DEBUG: Calling settingsPanelModule.Show()")
 			m.settingsPanelModule.Show()
 		}
 		m.showButtons()

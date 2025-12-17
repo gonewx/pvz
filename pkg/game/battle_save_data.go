@@ -37,6 +37,9 @@ type BattleSaveData struct {
 	ZombiesKilled       int     // 已消灭僵尸数
 	Sun                 int     // 当前阳光数量
 
+	// Story 8.12: 选卡系统选择的植物列表
+	SelectedPlants []string // 用户在选卡界面选择的植物ID列表
+
 	// 教学状态
 	Tutorial *TutorialSaveData // 教学进度数据（可选，非教学关卡为 nil）
 

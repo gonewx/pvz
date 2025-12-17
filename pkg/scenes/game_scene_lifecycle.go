@@ -48,6 +48,12 @@ func (s *GameScene) updateBattleSaveDialog(deltaTime float64) bool {
 // updatePauseMenu 处理暂停菜单逻辑
 // 返回 true 表示应继续后续更新，false 表示应停止
 func (s *GameScene) updatePauseMenu(deltaTime float64) bool {
+	// DEBUG: 输出暂停状态（仅当 IsPaused 为 true 时）
+	if s.gameState.IsPaused {
+		log.Printf("[GameScene] updatePauseMenu: IsPaused=%v, pauseMenuModule=%v",
+			s.gameState.IsPaused, s.pauseMenuModule != nil)
+	}
+
 	// DEBUG: Check for GameFreezeComponent on every frame to debug freeze issue
 	freezeEntities := ecs.GetEntitiesWith1[*components.GameFreezeComponent](s.entityManager)
 	if len(freezeEntities) > 0 && s.zombiesWonPhaseSystem == nil {
@@ -111,6 +117,32 @@ func (s *GameScene) updateOpeningPhase(deltaTime float64) bool {
 			s.updateMouseCursor()
 		}
 
+		// Story 8.12 修复: 选卡确认后、镜头返回期间就创建植物卡片
+		// 这样在镜头返回期间，植物选择栏和菜单按钮可以立即显示
+		isSeedSelectionLevel := s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.EnableSeedSelection
+		if isSeedSelectionLevel && s.gameState.IsSeedSelectionConfirmed() && s.plantSelectionModule == nil {
+			selectedPlants := s.gameState.GetSelectedPlants()
+			if len(selectedPlants) > 0 {
+				log.Printf("[GameScene] 选卡确认后创建植物卡片（镜头返回期间）: %v", selectedPlants)
+				s.initPlantCardsAfterSelection()
+			}
+		}
+
+		// Story 8.12: 选卡确认后更新水平滑动动画、植物选择栏和按钮系统
+		if isSeedSelectionLevel && s.gameState.IsSeedSelectionConfirmed() {
+			s.updateSeedBankHorizontalSlide(deltaTime)
+			// 更新植物选择栏模块（卡片冷却、状态等）
+			if s.plantSelectionModule != nil {
+				s.plantSelectionModule.Update(deltaTime)
+			}
+			// Story 8.12 修复: 选卡确认后也需要更新按钮系统（菜单按钮点击）
+			if s.buttonSystem != nil {
+				s.buttonSystem.Update(deltaTime)
+			}
+			// 更新鼠标光标
+			s.updateMouseCursor()
+		}
+
 		// 同步镜头位置到本地 cameraX（用于渲染）
 		s.cameraX = s.gameState.CameraX
 		return false // 暂停其他游戏系统
@@ -165,7 +197,22 @@ func (s *GameScene) triggerSoddingAnimation() {
 	// 检查是否应该播放铺草皮动画
 	shouldPlayAnim := s.gameState.CurrentLevel.ShowSoddingAnim || s.gameState.CurrentLevel.SodRollAnimation
 
+	// Story 8.12 修复：即使不需要铺草皮动画，也要标记为已启动
+	// 否则 isWaitingForSodding 会永远为 true，导致 UI 被隐藏
 	if !shouldPlayAnim {
+		s.soddingAnimStarted = true
+		log.Printf("[GameScene] 无需铺草皮动画，直接执行后续步骤")
+
+		// 通知教学系统
+		if s.tutorialSystem != nil {
+			s.tutorialSystem.OnSoddingComplete()
+		}
+
+		// 启动 ReadySetPlant 动画（如果需要）
+		s.startReadySetPlantAnimation()
+
+		// 创建除草车
+		s.createLawnmowers()
 		return
 	}
 
@@ -361,6 +408,10 @@ func (s *GameScene) updateGameplaySystems(deltaTime, cameraX float64, skipInputT
 	// 在开场动画、铺草皮动画、除草车入场动画、ReadySetPlant 动画全部完成后启动
 	s.updateSeedBankSlideIn(deltaTime)
 
+	// Story 8.12: 选卡关卡水平滑动动画更新
+	// 选卡确认后，植物选择栏从选卡位置水平滑动到正常游戏位置
+	s.updateSeedBankHorizontalSlide(deltaTime)
+
 	// Story 3.1 架构优化：使用模块化方式更新植物选择栏
 	if s.plantSelectionModule != nil {
 		s.plantSelectionModule.Update(deltaTime) // 1. Update plant card states (before input)
@@ -415,6 +466,11 @@ func (s *GameScene) updateGameplaySystems(deltaTime, cameraX float64, skipInputT
 
 	// Story 6.3: Reanim 动画系统（替代旧的 AnimationSystem）
 	s.reanimSystem.Update(deltaTime) // 8. Update Reanim animation frames
+
+	// Story 7.3: 粒子系统（种植效果、爆炸等）
+	if s.particleSystem != nil {
+		s.particleSystem.Update(deltaTime) // 8.1. Update particle emitters and particles
+	}
 	// Story 8.3: ReadySetPlant 动画系统（铺草皮完成后播放）
 	if s.readySetPlantSystem != nil {
 		s.readySetPlantSystem.Update(deltaTime) // 8.5. Update ReadySetPlant animation duration

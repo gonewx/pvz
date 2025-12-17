@@ -37,6 +37,7 @@ func getSunFlashColor(timer float64, cycle float64) color.Color {
 // If the seed bank image is not loaded, it draws a simple rectangle as fallback.
 // Story 19.5: 保龄球模式使用传送带，不显示植物选择栏
 // 滑入动画：从上向下滑入，类似传送带入场效果
+// Story 8.12: 选卡关卡使用水平滑动动画
 func (s *GameScene) drawSeedBank(screen *ebiten.Image) {
 	// Story 19.5: 保龄球模式（initialSun == 0）不显示植物选择栏
 	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.InitialSun == 0 {
@@ -49,18 +50,20 @@ func (s *GameScene) drawSeedBank(screen *ebiten.Image) {
 		return
 	}
 
-	// 获取当前滑入动画 Y 位置
+	// 获取当前动画位置
+	// Story 8.12: 选卡关卡使用水平滑动（动态 X），非选卡关卡使用垂直滑入（动态 Y）
+	currentX := s.getSeedBankCurrentX()
 	currentY := s.getSeedBankCurrentY()
 
 	if s.seedBank != nil {
-		// Draw the seed bank image at the top left corner
+		// Draw the seed bank image at the current position
 		op := &ebiten.DrawImageOptions{}
-		op.GeoM.Translate(config.SeedBankX, currentY)
+		op.GeoM.Translate(currentX, currentY)
 		screen.DrawImage(s.seedBank, op)
 	} else {
 		// Fallback: Draw a dark brown rectangle
 		ebitenutil.DrawRect(screen,
-			config.SeedBankX, currentY,
+			currentX, currentY,
 			config.SeedBankWidth, config.SeedBankHeight,
 			color.RGBA{R: 101, G: 67, B: 33, A: 255}) // Dark brown
 	}
@@ -73,6 +76,7 @@ func (s *GameScene) drawSeedBank(screen *ebiten.Image) {
 // Story 10.8: 添加阳光不足时的闪烁效果（红黑闪烁）
 // Story 19.10: 保龄球关卡（initialSun == 0）不显示阳光槽
 // 滑入动画：与植物选择栏同步滑入
+// Story 8.12: 选卡关卡使用水平滑动动画
 func (s *GameScene) drawSunCounter(screen *ebiten.Image) {
 	// Story 19.10: 保龄球关卡（initialSun == 0）不显示阳光槽
 	if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.InitialSun == 0 {
@@ -85,9 +89,23 @@ func (s *GameScene) drawSunCounter(screen *ebiten.Image) {
 		return
 	}
 
-	// 获取当前滑入动画 Y 位置
+	// 获取当前动画位置
+	// Story 8.12: 选卡关卡使用水平滑动（动态 X），非选卡关卡使用垂直滑入（动态 Y）
+	currentSeedBankX := s.getSeedBankCurrentX()
 	currentSeedBankY := s.getSeedBankCurrentY()
 
+	s.drawSunCounterAtPosition(screen, currentSeedBankX, currentSeedBankY)
+}
+
+// drawSunCounterAtY 在指定 Y 位置渲染阳光计数器
+// Story 8.12: 选卡阶段需要在固定位置渲染阳光计数器，不使用滑入动画位置
+func (s *GameScene) drawSunCounterAtY(screen *ebiten.Image, seedBankY float64) {
+	s.drawSunCounterAtPosition(screen, config.SeedBankX, seedBankY)
+}
+
+// drawSunCounterAtPosition 在指定位置渲染阳光计数器
+// Story 8.12: 选卡界面中 SeedBank 从 X=0 开始，需要自定义 X 偏移
+func (s *GameScene) drawSunCounterAtPosition(screen *ebiten.Image, seedBankX, seedBankY float64) {
 	// Get current sun value from game state
 	sunValue := s.gameState.GetSun()
 	sunText := fmt.Sprintf("%d", sunValue)
@@ -97,9 +115,9 @@ func (s *GameScene) drawSunCounter(screen *ebiten.Image) {
 		textWidth, _ := text.Measure(sunText, s.sunCounterFont, 0)
 
 		// Calculate centered position
-		// Base position is relative to SeedBank (使用动态 Y 位置)
-		centerX := float64(config.SeedBankX + config.SunCounterOffsetX)
-		centerY := currentSeedBankY + float64(config.SunCounterOffsetY)
+		// Base position is relative to SeedBank (使用自定义 X/Y 位置)
+		centerX := seedBankX + float64(config.SunCounterOffsetX)
+		centerY := seedBankY + float64(config.SunCounterOffsetY)
 
 		// Adjust X to center the text horizontally
 		sunDisplayX := centerX - textWidth/2
@@ -126,8 +144,8 @@ func (s *GameScene) drawSunCounter(screen *ebiten.Image) {
 	} else {
 		// Fallback: Use debug text if font failed to load
 		// Note: Debug text doesn't support centering easily
-		sunDisplayX := config.SeedBankX + config.SunCounterOffsetX
-		sunDisplayY := int(currentSeedBankY) + config.SunCounterOffsetY
+		sunDisplayX := int(seedBankX) + config.SunCounterOffsetX
+		sunDisplayY := int(seedBankY) + config.SunCounterOffsetY
 		ebitenutil.DebugPrintAt(screen, sunText, sunDisplayX, sunDisplayY)
 	}
 }

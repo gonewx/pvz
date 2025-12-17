@@ -136,6 +136,9 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 		case components.BehaviorPotatoMine:
 			// Story 8.9: 土豆地雷行为处理
 			s.handlePotatoMineBehavior(entityID, deltaTime)
+		case components.BehaviorRepeater:
+			// Story 8.12: 双发射手行为处理（与豌豆射手共用攻击检测逻辑）
+			s.handleRepeaterBehavior(entityID, deltaTime, allZombieEntityList)
 		default:
 			// 未知行为类型，记录警告
 			if s.logFrameCounter%LogOutputFrameInterval == 1 {
@@ -146,6 +149,13 @@ func (s *BehaviorSystem) Update(deltaTime float64) {
 
 	// 更新植物攻击动画状态（在所有行为处理之后）
 	for _, entityID := range plantEntityList {
+		// Story 8.12: 双发射手使用独立的攻击动画更新逻辑
+		if plant, ok := ecs.GetComponent[*components.PlantComponent](s.entityManager, entityID); ok {
+			if plant.PlantType == components.PlantRepeater {
+				s.updateRepeaterAttackAnimation(entityID, deltaTime)
+				continue
+			}
+		}
 		s.updatePlantAttackAnimation(entityID, deltaTime)
 	}
 

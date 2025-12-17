@@ -115,6 +115,14 @@ func (s *GameScene) updateMouseCursor() {
 		return
 	}
 
+	// 0.6. Story 8.12: 选卡界面悬停检测
+	// 选卡阶段时检测卡片和按钮的悬停状态
+	if s.gameState.IsSeedSelectionActive() && s.seedChooserInputSystem != nil {
+		if s.seedChooserInputSystem.ShouldShowHandCursor() {
+			cursorShape = ebiten.CursorShapePointer
+		}
+	}
+
 	// 1. Check if hovering over any panel button (pause menu, settings panel, menu button)
 	if cursorShape == ebiten.CursorShapeDefault {
 		panelButtons := ecs.GetEntitiesWith1[*components.ButtonComponent](s.entityManager)

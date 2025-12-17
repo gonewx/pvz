@@ -13,6 +13,8 @@ import (
 )
 
 // initPlantCardSystems 初始化植物选择栏模块
+// Story 8.12: 当启用选卡系统时，延迟创建卡片（等待选卡完成后调用 initPlantCardsAfterSelection）
+// 修复：如果有战斗存档，预先加载存档中的植物列表并创建卡片
 func (s *GameScene) initPlantCardSystems(rm *game.ResourceManager) {
 	levelConfig := s.gameState.CurrentLevel
 	if levelConfig == nil {
@@ -20,6 +22,44 @@ func (s *GameScene) initPlantCardSystems(rm *game.ResourceManager) {
 		levelConfig = &config.LevelConfig{
 			AvailablePlants: []string{"sunflower", "peashooter", "wallnut", "cherrybomb"},
 		}
+	}
+
+	// Story 8.12: 如果启用选卡系统，检查是否有战斗存档
+	// 如果有存档，预先加载存档中的植物列表并创建卡片（这样对话框显示时就能看到植物卡片）
+	if levelConfig.EnableSeedSelection {
+		// 检查是否有战斗存档
+		if s.hasBattleSave && s.battleSaveInfo != nil {
+			// 预先加载存档中的植物列表
+			s.preloadSelectedPlantsFromSave()
+			selectedPlants := s.gameState.GetSelectedPlants()
+			if len(selectedPlants) > 0 {
+				log.Printf("[GameScene] 选卡关卡有战斗存档，预先创建植物卡片: %v", selectedPlants)
+				// 创建植物选择栏模块
+				var err error
+				s.plantSelectionModule, err = modules.NewPlantSelectionModule(
+					s.entityManager,
+					s.gameState,
+					rm,
+					s.reanimSystem,
+					levelConfig,
+					s.plantCardFont,
+					config.SeedBankX,
+					config.SeedBankY,
+				)
+				if err != nil {
+					log.Printf("[GameScene] Error: Failed to initialize plant selection module from save: %v", err)
+				} else {
+					log.Printf("[GameScene] 从存档预先创建植物选择栏模块成功")
+					// 标记水平滑动动画为完成（存档恢复时不需要动画）
+					s.seedBankHorizontalSlideStarted = true
+					s.seedBankHorizontalSlideProgress = 1.0
+					s.seedBankHorizontalSlideCompleted = true
+				}
+				return
+			}
+		}
+		log.Printf("[GameScene] 启用选卡系统，延迟创建植物卡片")
+		return
 	}
 
 	// 创建植物选择栏模块
@@ -41,6 +81,66 @@ func (s *GameScene) initPlantCardSystems(rm *game.ResourceManager) {
 	}
 
 	log.Printf("[GameScene] Plant selection module initialized successfully")
+}
+
+// preloadSelectedPlantsFromSave 预先从存档加载选中的植物列表
+// 修复：在显示战斗存档对话框前，需要知道存档中选择了哪些植物
+func (s *GameScene) preloadSelectedPlantsFromSave() {
+	saveManager := s.gameState.GetSaveManager()
+	currentUser := saveManager.GetCurrentUser()
+	if currentUser == "" {
+		return
+	}
+
+	gdataManager := s.gameState.GetGdataManager()
+	if gdataManager == nil {
+		return
+	}
+
+	serializer := game.NewBattleSerializer(gdataManager)
+	saveData, err := serializer.LoadBattle(currentUser)
+	if err != nil {
+		log.Printf("[GameScene] Warning: Failed to preload battle save: %v", err)
+		return
+	}
+
+	if len(saveData.SelectedPlants) > 0 {
+		s.gameState.SetSelectedPlants(saveData.SelectedPlants)
+		log.Printf("[GameScene] 预先加载选卡植物列表: %v", saveData.SelectedPlants)
+	}
+}
+
+// initPlantCardsAfterSelection 选卡完成后初始化植物卡片
+// Story 8.12: 当启用选卡系统时，在选卡完成后调用此方法创建卡片
+func (s *GameScene) initPlantCardsAfterSelection() {
+	levelConfig := s.gameState.CurrentLevel
+	if levelConfig == nil {
+		return
+	}
+
+	// 如果模块已经存在，不重复创建
+	if s.plantSelectionModule != nil {
+		return
+	}
+
+	// 创建植物选择栏模块（此时 gameState.SelectedPlants 已有用户选择的植物）
+	var err error
+	s.plantSelectionModule, err = modules.NewPlantSelectionModule(
+		s.entityManager,
+		s.gameState,
+		s.resourceManager,
+		s.reanimSystem,
+		levelConfig,
+		s.plantCardFont,
+		config.SeedBankX,
+		config.SeedBankY,
+	)
+	if err != nil {
+		log.Printf("[GameScene] Error: Failed to initialize plant selection module after selection: %v", err)
+		return
+	}
+
+	log.Printf("[GameScene] 选卡完成后创建植物卡片: %v", s.gameState.GetSelectedPlants())
 }
 
 // initMenuButton 初始化菜单按钮（ECS 架构）
@@ -67,8 +167,13 @@ func (s *GameScene) initMenuButton(rm *game.ResourceManager) {
 		func() {
 			// Story 10.1: 点击菜单按钮打开暂停菜单
 			log.Printf("[GameScene] Menu button clicked! Opening pause menu...")
+			log.Printf("[GameScene] DEBUG: pauseMenuModule is nil: %v", s.pauseMenuModule == nil)
 			if s.pauseMenuModule != nil {
+				log.Printf("[GameScene] DEBUG: Calling pauseMenuModule.Show()")
 				s.pauseMenuModule.Show()
+				log.Printf("[GameScene] DEBUG: After pauseMenuModule.Show(), IsPaused=%v", s.gameState.IsPaused)
+			} else {
+				log.Printf("[GameScene] ERROR: pauseMenuModule is nil!")
 			}
 		},
 	)

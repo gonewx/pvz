@@ -124,11 +124,11 @@ func (m *PlantSelectionModule) createPlantCards(levelConfig *config.LevelConfig,
 		"cherrybomb": components.PlantCherryBomb,
 		"potatomine": components.PlantPotatoMine,
 		"snowpea":    components.PlantSnowPea,
-		"chomper":    components.PlantChomper, // Story 8.11
+		"chomper":    components.PlantChomper,
+		"repeater":   components.PlantRepeater, // Story 8.12
 		// TODO: 未来添加更多植物类型
-		// "repeater":      components.PlantRepeater,
 		// "puffshroom":    components.PlantPuffShroom,
-		// "sunshroom":     components.PlantSunShroom,
+		// "sunshroom":     components.PlantSunShRoom,
 		// "fumeshroom":    components.PlantFumeShroom,
 		// "gravebuster":   components.PlantGraveBuster,
 		// "hypnoshroom":   components.PlantHypnoShroom,
@@ -137,8 +137,16 @@ func (m *PlantSelectionModule) createPlantCards(levelConfig *config.LevelConfig,
 		// "doomshroom":    components.PlantDoomShroom,
 	}
 
-	// 获取本关可用植物列表
-	availablePlants := levelConfig.AvailablePlants
+	// Story 8.12: 获取本关可用植物列表
+	// 如果启用了选卡系统且玩家已选择植物，使用玩家选择的植物列表
+	// 否则使用关卡配置中的可用植物列表
+	var availablePlants []string
+	if levelConfig.EnableSeedSelection && len(m.gameState.GetSelectedPlants()) > 0 {
+		availablePlants = m.gameState.GetSelectedPlants()
+		log.Printf("[PlantSelectionModule] 使用玩家选择的植物: %v", availablePlants)
+	} else {
+		availablePlants = levelConfig.AvailablePlants
+	}
 
 	// Story 19.5: 保龄球模式（initialSun == 0）使用传送带，不创建植物卡片
 	if levelConfig.InitialSun == 0 && len(availablePlants) == 0 {
@@ -244,6 +252,16 @@ func (m *PlantSelectionModule) Draw(screen *ebiten.Image) {
 //   - yOffset: Y 轴偏移量（正值向下，负值向上）
 func (m *PlantSelectionModule) DrawWithOffset(screen *ebiten.Image, yOffset float64) {
 	m.cardRenderSystem.DrawWithOffset(screen, yOffset)
+}
+
+// DrawWithXYOffset 渲染所有植物卡片到屏幕，支持 X 和 Y 轴偏移
+// Story 8.12: 用于选卡关卡的水平滑动动画
+// 参数:
+//   - screen: 目标渲染屏幕
+//   - xOffset: X 轴偏移量（正值向右，负值向左）
+//   - yOffset: Y 轴偏移量（正值向下，负值向上）
+func (m *PlantSelectionModule) DrawWithXYOffset(screen *ebiten.Image, xOffset, yOffset float64) {
+	m.cardRenderSystem.DrawWithXYOffset(screen, xOffset, yOffset)
 }
 
 // GetSelectedPlants 获取当前已选择的植物列表

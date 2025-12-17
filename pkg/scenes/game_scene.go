@@ -68,6 +68,12 @@ type GameScene struct {
 	seedBankSlideInStarted   bool    // 滑入动画是否已启动
 	seedBankSlideInCompleted bool    // 滑入动画是否已完成
 
+	// Story 8.12: 选卡关卡水平滑动动画状态
+	// 选卡确认后，植物选择栏需要从选卡位置（X=0）水平滑动到正常游戏位置（X=SeedBankX）
+	seedBankHorizontalSlideProgress  float64 // 水平滑动动画进度 (0.0 - 1.0)
+	seedBankHorizontalSlideStarted   bool    // 水平滑动是否已启动
+	seedBankHorizontalSlideCompleted bool    // 水平滑动是否已完成
+
 	// Story 8.6 QA修正: 预渲染草皮支持
 	preSoddedImage *ebiten.Image // 预渲染的草皮图片(仅包含指定行的草皮)
 
@@ -372,6 +378,12 @@ func (s *GameScene) initializeSystems(rm *game.ResourceManager) {
 
 	// 游戏逻辑系统
 	s.initGameplaySystems(rm)
+
+	// Bug Fix: 在初始化 UI 系统之前加载 LoadingImages 资源组
+	// 暂停菜单模块需要 IMAGE_OPTIONS_BACKTOGAMEBUTTON0 等按钮图片
+	if err := rm.LoadResourceGroup("LoadingImages"); err != nil {
+		log.Printf("Warning: Failed to load LoadingImages resources before UI init: %v", err)
+	}
 
 	// UI 系统
 	s.initUISystems(rm)

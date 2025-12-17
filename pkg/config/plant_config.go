@@ -73,6 +73,16 @@ var PlantConfigs = map[types.PlantType]*PlantResourceConfig{
 		PreviewAnimation: "anim_idle", // 待机动画
 		HiddenTracks:     nil,         // 无需隐藏轨道
 	},
+	types.PlantRepeater: {
+		ResourceName:     "Peashooter",
+		ConfigID:         "repeater",
+		PreviewFrame:     0,
+		PreviewAnimation: "anim_full_idle",
+		HiddenTracks: []string{
+			"anim_blink",       // 隐藏眨眼轨道
+			"idle_shoot_blink", // 隐藏射击眨眼轨道
+		},
+	},
 }
 
 // GetPlantConfig 获取植物配置

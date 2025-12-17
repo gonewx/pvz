@@ -12,6 +12,20 @@ const (
 	// 原始卡片尺寸 100x140，缩放后 50x70
 	PlantCardScale = 0.50
 
+	// PlantCardOriginalWidth 卡片原始宽度（像素）
+	PlantCardOriginalWidth = 100.0
+
+	// PlantCardOriginalHeight 卡片原始高度（像素）
+	PlantCardOriginalHeight = 140.0
+
+	// PlantCardWidth 标准植物卡片宽度（缩放后，像素）
+	// 计算方式：PlantCardOriginalWidth * PlantCardScale = 100 * 0.50 = 50
+	PlantCardWidth = PlantCardOriginalWidth * PlantCardScale
+
+	// PlantCardHeight 标准植物卡片高度（缩放后，像素）
+	// 计算方式：PlantCardOriginalHeight * PlantCardScale = 140 * 0.50 = 70
+	PlantCardHeight = PlantCardOriginalHeight * PlantCardScale
+
 	// PlantCardBackgroundID 卡片背景图片资源ID
 	// 背景图尺寸：100x140 像素
 	PlantCardBackgroundID = "IMAGE_SEEDPACKET_LARGER"

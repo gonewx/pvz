@@ -10,6 +10,19 @@ import (
 	"github.com/quasilyte/gdata/v2"
 )
 
+// SeedSelectionPhase 选卡阶段枚举
+// Story 8.12: 定义选卡界面的不同阶段状态
+type SeedSelectionPhase int
+
+const (
+	// SeedSelectionNone 不在选卡阶段（正常游戏流程）
+	SeedSelectionNone SeedSelectionPhase = iota
+	// SeedSelectionActive 选卡界面激活中（玩家正在选择植物）
+	SeedSelectionActive
+	// SeedSelectionConfirmed 选卡完成（玩家点击了"一起摇滚吧!"）
+	SeedSelectionConfirmed
+)
+
 // GameState 存储全局游戏状态
 // 这是一个单例，用于管理跨场景和跨系统的全局状态数据
 type GameState struct {
@@ -21,6 +34,10 @@ type GameState struct {
 
 	// 摄像机位置（世界坐标系统）
 	CameraX float64 // 摄像机X位置，用于世界坐标和屏幕坐标转换
+
+	// Story 8.12: 选卡系统状态
+	SeedSelectionPhase SeedSelectionPhase // 选卡阶段状态
+	SeedChooserPlants  []string           // 选卡界面当前选中的植物列表（临时状态）
 
 	// Story 5.5: 关卡流程状态
 	CurrentLevel          *config.LevelConfig // 当前关卡配置
@@ -627,4 +644,95 @@ func (gs *GameState) SetAudioManager(am *AudioManager) {
 //   - *AudioManager: 音频管理器实例，如果未设置返回 nil
 func (gs *GameState) GetAudioManager() *AudioManager {
 	return gs.audioManager
+}
+
+// ========================================
+// Story 8.12: 选卡系统
+// ========================================
+
+// EnterSeedSelection 进入选卡阶段
+// 在开场动画僵尸预览结束后调用
+func (gs *GameState) EnterSeedSelection() {
+	gs.SeedSelectionPhase = SeedSelectionActive
+	gs.SeedChooserPlants = []string{}
+	log.Printf("[GameState] 进入选卡阶段")
+}
+
+// ExitSeedSelection 退出选卡阶段
+// 玩家点击"一起摇滚吧!"按钮后调用
+func (gs *GameState) ExitSeedSelection() {
+	gs.SeedSelectionPhase = SeedSelectionConfirmed
+	// 将选卡结果复制到 SelectedPlants（用于 GameScene 初始化卡槽）
+	gs.SelectedPlants = make([]string, len(gs.SeedChooserPlants))
+	copy(gs.SelectedPlants, gs.SeedChooserPlants)
+	log.Printf("[GameState] 退出选卡阶段，已选植物: %v", gs.SelectedPlants)
+}
+
+// CompleteSeedSelection 完成选卡流程
+// 镜头左移完成后调用，重置选卡状态
+func (gs *GameState) CompleteSeedSelection() {
+	gs.SeedSelectionPhase = SeedSelectionNone
+	gs.SeedChooserPlants = nil
+	log.Printf("[GameState] 选卡流程完成")
+}
+
+// IsSeedSelectionActive 检查是否处于选卡阶段
+func (gs *GameState) IsSeedSelectionActive() bool {
+	return gs.SeedSelectionPhase == SeedSelectionActive
+}
+
+// IsSeedSelectionConfirmed 检查选卡是否已确认
+func (gs *GameState) IsSeedSelectionConfirmed() bool {
+	return gs.SeedSelectionPhase == SeedSelectionConfirmed
+}
+
+// AddSeedChooserPlant 在选卡界面添加一个植物
+// 返回 true 表示添加成功，false 表示卡槽已满或植物已存在
+func (gs *GameState) AddSeedChooserPlant(plantID string) bool {
+	// 检查是否已满（最多6个）
+	if len(gs.SeedChooserPlants) >= 6 {
+		return false
+	}
+	// 检查是否已存在
+	for _, p := range gs.SeedChooserPlants {
+		if p == plantID {
+			return false
+		}
+	}
+	gs.SeedChooserPlants = append(gs.SeedChooserPlants, plantID)
+	log.Printf("[GameState] 选卡添加: %s, 当前选择: %v", plantID, gs.SeedChooserPlants)
+	return true
+}
+
+// RemoveSeedChooserPlant 从选卡界面移除一个植物
+// 返回 true 表示移除成功
+func (gs *GameState) RemoveSeedChooserPlant(plantID string) bool {
+	for i, p := range gs.SeedChooserPlants {
+		if p == plantID {
+			gs.SeedChooserPlants = append(gs.SeedChooserPlants[:i], gs.SeedChooserPlants[i+1:]...)
+			log.Printf("[GameState] 选卡移除: %s, 当前选择: %v", plantID, gs.SeedChooserPlants)
+			return true
+		}
+	}
+	return false
+}
+
+// GetSeedChooserPlants 获取选卡界面当前选中的植物列表
+func (gs *GameState) GetSeedChooserPlants() []string {
+	return gs.SeedChooserPlants
+}
+
+// IsSeedChooserFull 检查选卡槽位是否已满
+func (gs *GameState) IsSeedChooserFull() bool {
+	return len(gs.SeedChooserPlants) >= 6
+}
+
+// IsSeedChooserPlantSelected 检查某个植物是否已被选中
+func (gs *GameState) IsSeedChooserPlantSelected(plantID string) bool {
+	for _, p := range gs.SeedChooserPlants {
+		if p == plantID {
+			return true
+		}
+	}
+	return false
 }

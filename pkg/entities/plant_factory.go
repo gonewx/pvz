@@ -679,6 +679,99 @@ func NewChomperEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameSta
 	return entityID, nil
 }
 
+// NewRepeaterEntity 创建双发射手实体
+// Story 8.12: 双发射手每次攻击发射2颗豌豆，攻击力翻倍
+//
+// 参数:
+//   - em: 实体管理器
+//   - rm: 资源管理器（用于加载双发射手图像和 Reanim 资源）
+//   - gs: 游戏状态
+//   - rs: Reanim 系统（用于初始化动画）
+//   - col: 网格列索引 (0-8)
+//   - row: 网格行索引 (0-4)
+//
+// 返回:
+//   - ecs.EntityID: 创建的双发射手实体ID，如果失败返回 0
+//   - error: 如果创建失败返回错误信息
+func NewRepeaterEntity(em *ecs.EntityManager, rm ResourceLoader, gs *game.GameState, rs ReanimSystemInterface, col, row int) (ecs.EntityID, error) {
+	// 计算植物原点坐标（使用世界坐标系统）
+	worldCenterX := config.GridWorldStartX + float64(col)*config.CellWidth + config.CellWidth/2
+	worldCenterY := config.GridWorldStartY + float64(row)*config.CellHeight + config.CellHeight/2 + config.PlantOffsetY
+
+	// 创建实体
+	entityID := em.CreateEntity()
+
+	// Story 18.5: 添加植物标签组件（用于序列化时统一识别植物实体）
+	em.AddComponent(entityID, &components.PlantTagComponent{})
+
+	// 添加位置组件（使用世界坐标）
+	em.AddComponent(entityID, &components.PositionComponent{
+		X: worldCenterX,
+		Y: worldCenterY,
+	})
+
+	// 添加生命值组件
+	em.AddComponent(entityID, &components.HealthComponent{
+		CurrentHealth: config.RepeaterHealth,
+		MaxHealth:     config.RepeaterHealth,
+	})
+
+	// 添加植物组件（用于攻击动画状态管理）
+	em.AddComponent(entityID, &components.PlantComponent{
+		PlantType:       components.PlantRepeater,
+		GridRow:         row,
+		GridCol:         col,
+		AttackAnimState: components.AttackAnimIdle,
+		LastFiredFrame:  -1, // 初始化为 -1，表示还未发射过
+		BlinkTimer:      3.0,
+	})
+
+	// 添加行为组件（双发射手行为）
+	em.AddComponent(entityID, &components.BehaviorComponent{
+		Type: components.BehaviorRepeater,
+	})
+
+	// 从 ResourceManager 获取双发射手的 Reanim 数据和部件图片
+	// 注意：双发射手使用 "Peashooter"（双头豌豆射手）资源
+	reanimXML := rm.GetReanimXML("Peashooter")
+	partImages := rm.GetReanimPartImages("Peashooter")
+
+	if reanimXML == nil || partImages == nil {
+		return 0, fmt.Errorf("failed to load Peashooter (Repeater) Reanim resources")
+	}
+
+	// 添加基础的 ReanimComponent
+	em.AddComponent(entityID, &components.ReanimComponent{
+		ReanimName: "Peashooter",
+		ReanimXML:  reanimXML,
+		PartImages: partImages,
+	})
+
+	// 使用 PlayCombo API 播放默认动画
+	if err := rs.PlayCombo(entityID, "repeater", ""); err != nil {
+		return 0, fmt.Errorf("failed to play repeater default animation: %w", err)
+	}
+
+	log.Printf("[PlantFactory] 双发射手 %d: 成功使用集中配置文件创建动画", entityID)
+
+	// 添加碰撞组件
+	em.AddComponent(entityID, &components.CollisionComponent{
+		Width:  config.CellWidth * 0.8,
+		Height: config.CellHeight * 0.8,
+	})
+
+	// 添加阴影组件
+	shadowSize := config.GetShadowSize("repeater")
+	em.AddComponent(entityID, &components.ShadowComponent{
+		Width:   shadowSize.Width,
+		Height:  shadowSize.Height,
+		Alpha:   config.DefaultShadowAlpha,
+		OffsetY: 0,
+	})
+
+	return entityID, nil
+}
+
 // =============================================================================
 // Story 18.5: 植物工厂注册表
 // =============================================================================
@@ -716,6 +809,7 @@ var plantFactories = map[string]PlantFactory{
 	"potatomine": newPotatoMineFactory,
 	"snowpea":    newSnowPeaFactory,
 	"chomper":    newChomperFactory,
+	"repeater":   newRepeaterFactory, // Story 8.12
 }
 
 // 适配器函数：将统一签名适配到各具体工厂函数
@@ -750,6 +844,11 @@ func newSnowPeaFactory(deps PlantFactoryDeps, col, row int) (ecs.EntityID, error
 
 func newChomperFactory(deps PlantFactoryDeps, col, row int) (ecs.EntityID, error) {
 	return NewChomperEntity(deps.EntityManager, deps.ResourceLoader, deps.GameState, col, row)
+}
+
+func newRepeaterFactory(deps PlantFactoryDeps, col, row int) (ecs.EntityID, error) {
+	return NewRepeaterEntity(deps.EntityManager, deps.ResourceLoader, deps.GameState,
+		deps.ReanimSystem, col, row)
 }
 
 // GetPlantFactory 获取植物工厂函数

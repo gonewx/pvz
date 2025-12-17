@@ -94,6 +94,12 @@ type LevelConfig struct {
 	// 定义关卡中可出现的僵尸类型，用于 ExtraPoints 波次类型的动态僵尸分配
 	// 如 ["zombie", "conehead", "polevaulter"]
 	ZombiePool []string `yaml:"zombiePool"`
+
+	// Story 8.12: 选卡系统配置
+	// 是否启用选卡界面（1-8 及以后的关卡使用）
+	// 启用后：镜头右移预览僵尸 → 进入选卡界面 → 点击"一起摇滚吧!" → 镜头左移 → 开始游戏
+	// 禁用时（默认）：使用 AvailablePlants 固定植物列表
+	EnableSeedSelection bool `yaml:"enableSeedSelection"`
 }
 
 // PresetPlant 预设植物配置（Story 19.4）

@@ -508,9 +508,16 @@ func (m *SettingsPanelModule) hideUIElements() {
 func (m *SettingsPanelModule) Draw(screen *ebiten.Image) {
 	// 获取设置面板组件
 	settingsPanel, ok := ecs.GetComponent[*components.PauseMenuComponent](m.entityManager, m.settingsPanelEntity)
-	if !ok || !settingsPanel.IsActive {
+	if !ok {
+		log.Printf("[SettingsPanelModule] Draw: PauseMenuComponent not found for entity %d", m.settingsPanelEntity)
 		return
 	}
+	if !settingsPanel.IsActive {
+		log.Printf("[SettingsPanelModule] Draw: Panel not active (IsActive=%v)", settingsPanel.IsActive)
+		return
+	}
+
+	log.Printf("[SettingsPanelModule] Draw: Rendering panel (IsActive=%v)", settingsPanel.IsActive)
 
 	// 1. 渲染遮罩和墓碑背景
 	m.pauseMenuRenderSystem.Draw(screen)
@@ -652,10 +659,13 @@ func (m *SettingsPanelModule) drawCheckbox(screen *ebiten.Image, checkbox *compo
 //   - 设置 PauseMenuComponent.IsActive = true
 //   - UI 元素移动到正确位置
 func (m *SettingsPanelModule) Show() {
+	log.Printf("[SettingsPanelModule] Show() called, settingsPanelEntity=%d", m.settingsPanelEntity)
 	if settingsPanel, ok := ecs.GetComponent[*components.PauseMenuComponent](m.entityManager, m.settingsPanelEntity); ok {
 		settingsPanel.IsActive = true
 		m.showUIElements()
-		log.Printf("[SettingsPanelModule] Settings panel shown")
+		log.Printf("[SettingsPanelModule] Settings panel shown (IsActive=%v)", settingsPanel.IsActive)
+	} else {
+		log.Printf("[SettingsPanelModule] ERROR: PauseMenuComponent not found for entity %d", m.settingsPanelEntity)
 	}
 }
 

@@ -72,6 +72,9 @@ const (
 	// BehaviorChomper 大嘴花行为：检测前方僵尸，执行吞噬或撕咬攻击
 	// Story 8.11: 吞噬后进入 42 秒消化期，期间无法攻击
 	BehaviorChomper
+	// BehaviorRepeater 双发射手行为：与豌豆射手类似，但每次发射2颗豌豆
+	// Story 8.12: 第一颗和第二颗豌豆之间有短暂间隔
+	BehaviorRepeater
 )
 
 // ZombieAnimState 定义僵尸的动画状态

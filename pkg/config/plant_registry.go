@@ -25,6 +25,7 @@ var plantRegistry = []PlantInfo{
 	{Type: types.PlantPotatoMine, ID: "potatomine", ReanimName: "PotatoMine"},
 	{Type: types.PlantSnowPea, ID: "snowpea", ReanimName: "SnowPea"},
 	{Type: types.PlantChomper, ID: "chomper", ReanimName: "Chomper"},
+	{Type: types.PlantRepeater, ID: "repeater", ReanimName: "Peashooter"},
 }
 
 // 预构建的索引映射，避免每次查询都遍历
@@ -46,6 +47,7 @@ func init() {
 		types.PlantPotatoMine: PotatoMineSunCost,
 		types.PlantSnowPea:    SnowPeaSunCost,
 		types.PlantChomper:    ChomperSunCost,
+		types.PlantRepeater:   RepeaterSunCost,
 	}
 
 	// 构建索引映射
