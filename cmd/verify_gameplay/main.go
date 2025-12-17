@@ -87,6 +87,11 @@ type VerifyGameplayGame struct {
 
 	// 草坪网格实体
 	lawnGridEntityID ecs.EntityID
+
+	// 选卡系统
+	seedChooserRenderSystem *systems.SeedChooserRenderSystem
+	seedChooserInputSystem  *systems.SeedChooserInputSystem
+	seedChooserActive       bool // 选卡界面是否激活
 }
 
 // NewVerifyGameplayGame 创建验证游戏实例
@@ -230,6 +235,41 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 	// 创建 FlagWaveWarningSystem（手动触发模式）
 	flagWaveWarningSystem := systems.NewFlagWaveWarningSystem(em, nil, rm)
 
+	// 创建选卡系统
+	// 加载选卡界面字体
+	seedChooserTitleFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 20)
+	if err != nil {
+		log.Printf("Warning: Failed to load seed chooser title font: %v", err)
+	}
+	seedChooserSunFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", 14)
+	if err != nil {
+		log.Printf("Warning: Failed to load seed chooser sun font: %v", err)
+	}
+
+	// 创建选卡渲染系统（使用 nil 作为 levelConfig，让它使用默认植物列表）
+	seedChooserRenderSystem := systems.NewSeedChooserRenderSystem(
+		em,
+		gs,
+		rm,
+		systemManager.GetReanimSystem(),
+		nil, // 使用默认植物列表
+		seedChooserTitleFont,
+		seedChooserSunFont,
+	)
+	log.Println("[VerifyGameplay] 初始化选卡渲染系统")
+
+	// 创建选卡输入系统
+	seedChooserInputSystem := systems.NewSeedChooserInputSystem(
+		em,
+		gs,
+		seedChooserRenderSystem,
+		nil,
+	)
+	log.Println("[VerifyGameplay] 初始化选卡输入系统")
+
+	// 设置选卡输入系统引用（用于渲染系统获取飞行卡片状态）
+	systems.SetSeedChooserInputSystem(seedChooserInputSystem)
+
 	log.Println("╔════════════════════════════════════════════════════════╗")
 	log.Println("║              统一游戏验证程序                          ║")
 	log.Println("║        Story 22.1: SystemManager 统一管理             ║")
@@ -244,6 +284,7 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 	log.Println()
 	log.Println("【快捷键】")
 	log.Println("  1-5       - 选择对应植物卡片")
+	log.Println("  T         - 打开/关闭选卡界面")
 	log.Println("  S/P       - 选择/取消铲子")
 	log.Println("  F1-F5     - 触发对应行的除草车")
 	log.Println("  Shift+1-5 - 在对应行生成一个僵尸")
@@ -288,6 +329,10 @@ func NewVerifyGameplayGame() (*VerifyGameplayGame, error) {
 		shovel:                  shovel,
 		shovelSlotBounds:        shovelSlotBounds,
 		shovelInteractionSystem: systemManager.GetShovelInteractionSystem(),
+
+		// 选卡系统
+		seedChooserRenderSystem: seedChooserRenderSystem,
+		seedChooserInputSystem:  seedChooserInputSystem,
 	}
 
 	// 验证工具启用忽略冷却模式，可以随意种植
@@ -563,6 +608,11 @@ func (vg *VerifyGameplayGame) Update() error {
 		vg.clearAllZombies()
 	}
 
+	// T 打开/关闭选卡界面
+	if inpututil.IsKeyJustPressed(ebiten.KeyT) {
+		vg.toggleSeedChooser()
+	}
+
 	// S 选择/取消铲子
 	if inpututil.IsKeyJustPressed(ebiten.KeyS) {
 		vg.toggleShovel()
@@ -588,9 +638,19 @@ func (vg *VerifyGameplayGame) Update() error {
 	// 检测铲子槽位点击
 	vg.handleShovelClick()
 
+	// 选卡界面激活时，更新选卡输入系统
+	if vg.seedChooserActive {
+		vg.seedChooserInputSystem.Update(dt)
+
+		// 检测选卡确认（GameState 进入 Confirmed 状态）
+		if vg.gameState.IsSeedSelectionConfirmed() {
+			vg.confirmSeedSelection()
+		}
+	}
+
 	// 调用正式的 InputSystem 处理植物选择和种植逻辑
-	// 这会复用正式的逻辑，包括种植粒子效果
-	if vg.inputSystem != nil {
+	// 选卡界面激活时跳过，避免冲突
+	if vg.inputSystem != nil && !vg.seedChooserActive {
 		vg.inputSystem.Update(dt, vg.gameState.CameraX)
 	}
 
@@ -665,6 +725,11 @@ func (vg *VerifyGameplayGame) Draw(screen *ebiten.Image) {
 
 	// 绘制奖励动画
 	vg.rewardSystem.Draw(screen)
+
+	// 绘制选卡界面（在最上层）
+	if vg.seedChooserActive {
+		vg.seedChooserRenderSystem.Draw(screen)
+	}
 
 	// 绘制调试信息
 	vg.drawDebugInfo(screen)
@@ -757,6 +822,11 @@ func (vg *VerifyGameplayGame) drawHugeWaveWarningText(screen *ebiten.Image, warn
 
 // drawUI 绘制 UI 元素
 func (vg *VerifyGameplayGame) drawUI(screen *ebiten.Image) {
+	// 选卡界面激活时，隐藏植物选择栏
+	if vg.seedChooserActive {
+		return
+	}
+
 	// 绘制种子栏背景
 	if vg.seedBank != nil {
 		opts := &ebiten.DrawImageOptions{}
@@ -826,7 +896,8 @@ func (vg *VerifyGameplayGame) drawDebugInfo(screen *ebiten.Image) {
 
 	// 快捷键提示
 	hints := []string{
-		"1-5=选择植物 | S/P=铲子 | F1-F5=除草车 | Shift+1-5=生成僵尸 | R=奖励 | H=一大波 | G=自动生成 | C=清除",
+		"1-5=选择植物 | T=选卡界面 | S/P=铲子 | F1-F5=除草车 | Shift+1-5=生成僵尸",
+		"R=奖励 | H=一大波 | G=自动生成 | C=清除 | ESC=退出",
 	}
 
 	isPlanting, plantType := vg.gameState.GetPlantingMode()
@@ -910,6 +981,160 @@ func (vg *VerifyGameplayGame) handleShovelClick() {
 	// 检测是否点击了铲子槽位
 	if point.In(vg.shovelSlotBounds) {
 		vg.toggleShovel()
+	}
+}
+
+// ========================================
+// 选卡系统相关方法
+// ========================================
+
+// toggleSeedChooser 切换选卡界面显示状态
+func (vg *VerifyGameplayGame) toggleSeedChooser() {
+	if vg.seedChooserActive {
+		// 关闭选卡界面
+		vg.closeSeedChooser()
+	} else {
+		// 打开选卡界面
+		vg.openSeedChooser()
+	}
+}
+
+// openSeedChooser 打开选卡界面
+func (vg *VerifyGameplayGame) openSeedChooser() {
+	vg.seedChooserActive = true
+	// 进入选卡阶段（GameState 会管理选卡状态）
+	vg.gameState.EnterSeedSelection()
+
+	// 预填充当前卡槽中的植物
+	vg.prefillCurrentPlants()
+
+	// 取消当前的植物选择和铲子选择
+	vg.gameState.ExitPlantingMode()
+	vg.SetShovelSelected(false)
+	log.Println("[VerifyGameplay] 打开选卡界面")
+}
+
+// prefillCurrentPlants 预填充当前卡槽中的植物到选卡界面
+func (vg *VerifyGameplayGame) prefillCurrentPlants() {
+	// 植物类型到 ID 的映射
+	plantIDMap := map[components.PlantType]string{
+		components.PlantSunflower:  "sunflower",
+		components.PlantPeashooter: "peashooter",
+		components.PlantWallnut:    "wallnut",
+		components.PlantCherryBomb: "cherrybomb",
+		components.PlantPotatoMine: "potatomine",
+		components.PlantSnowPea:    "snowpea",
+		components.PlantChomper:    "chomper",
+		components.PlantRepeater:   "repeater",
+	}
+
+	// 遍历当前植物卡片实体，获取植物类型
+	for _, cardID := range vg.plantCards {
+		cardComp, ok := ecs.GetComponent[*components.PlantCardComponent](vg.entityManager, cardID)
+		if !ok {
+			continue
+		}
+		plantID, ok := plantIDMap[cardComp.PlantType]
+		if !ok {
+			continue
+		}
+		// 添加到选卡界面
+		vg.gameState.AddSeedChooserPlant(plantID)
+	}
+	log.Printf("[VerifyGameplay] 预填充当前植物: %v", vg.gameState.GetSeedChooserPlants())
+}
+
+// closeSeedChooser 关闭选卡界面并应用选择
+func (vg *VerifyGameplayGame) closeSeedChooser() {
+	// 获取当前选择的植物
+	selectedPlants := vg.gameState.GetSeedChooserPlants()
+
+	// 如果有选择植物，应用更改
+	if len(selectedPlants) > 0 {
+		log.Printf("[VerifyGameplay] 应用选卡: %v", selectedPlants)
+
+		// 删除旧的植物卡片实体
+		for _, cardID := range vg.plantCards {
+			vg.entityManager.DestroyEntity(cardID)
+		}
+		vg.entityManager.RemoveMarkedEntities()
+		vg.plantCards = nil
+
+		// 根据选中的植物创建新的卡片
+		vg.createPlantCardsFromSelection(selectedPlants)
+	}
+
+	vg.seedChooserActive = false
+	// 完成选卡流程
+	vg.gameState.CompleteSeedSelection()
+	log.Println("[VerifyGameplay] 关闭选卡界面")
+}
+
+// confirmSeedSelection 确认选卡并重建植物卡片
+func (vg *VerifyGameplayGame) confirmSeedSelection() {
+	// 获取选中的植物列表
+	selectedPlants := vg.gameState.GetSelectedPlants()
+	if len(selectedPlants) == 0 {
+		log.Println("[VerifyGameplay] 未选择任何植物，保持原有卡片")
+		vg.closeSeedChooser()
+		return
+	}
+
+	log.Printf("[VerifyGameplay] 选卡确认，选中植物: %v", selectedPlants)
+
+	// 删除旧的植物卡片实体
+	for _, cardID := range vg.plantCards {
+		vg.entityManager.DestroyEntity(cardID)
+	}
+	vg.entityManager.RemoveMarkedEntities()
+	vg.plantCards = nil
+
+	// 根据选中的植物创建新的卡片
+	vg.createPlantCardsFromSelection(selectedPlants)
+
+	// 关闭选卡界面
+	vg.closeSeedChooser()
+}
+
+// createPlantCardsFromSelection 根据选中的植物 ID 列表创建植物卡片
+func (vg *VerifyGameplayGame) createPlantCardsFromSelection(plantIDs []string) {
+	// 植物 ID 到类型的映射
+	plantTypeMap := map[string]components.PlantType{
+		"sunflower":  components.PlantSunflower,
+		"peashooter": components.PlantPeashooter,
+		"wallnut":    components.PlantWallnut,
+		"cherrybomb": components.PlantCherryBomb,
+		"potatomine": components.PlantPotatoMine,
+		"snowpea":    components.PlantSnowPea,
+		"chomper":    components.PlantChomper,
+		"repeater":   components.PlantRepeater,
+	}
+
+	startX := float64(config.SeedBankX + config.PlantCardStartOffsetX)
+	startY := float64(config.SeedBankY + config.PlantCardOffsetY)
+
+	for i, plantID := range plantIDs {
+		plantType, ok := plantTypeMap[plantID]
+		if !ok {
+			log.Printf("[VerifyGameplay] 未知植物类型: %s", plantID)
+			continue
+		}
+
+		x := startX + float64(i)*float64(config.PlantCardSpacing)
+		cardID, err := entities.NewPlantCardEntity(
+			vg.entityManager,
+			vg.resourceManager,
+			vg.reanimSystem,
+			plantType,
+			x, startY,
+			config.PlantCardScale,
+		)
+		if err != nil {
+			log.Printf("Warning: Failed to create plant card %s: %v", plantID, err)
+			continue
+		}
+		vg.plantCards = append(vg.plantCards, cardID)
+		log.Printf("[VerifyGameplay] Created plant card: %s (type=%d, entity=%d)", plantID, plantType, cardID)
 	}
 }
 
