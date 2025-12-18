@@ -501,3 +501,518 @@ func TestLevel1_10_Specification(t *testing.T) {
 		}
 	})
 }
+
+// ========================================
+// Story 8.15 QA修复：边界条件测试
+// ========================================
+
+// TestLevelConfigExists 测试关卡配置文件存在性检查
+// 注意：此测试只验证函数逻辑，不验证 embedded 包的初始化状态
+func TestLevelConfigExists(t *testing.T) {
+	t.Run("不存在的关卡", func(t *testing.T) {
+		// 测试不存在的关卡（这个测试在任何环境下都应该有效）
+		nonExistingLevels := []string{"99-99", "invalid", ""}
+		for _, levelID := range nonExistingLevels {
+			if LevelConfigExists(levelID) {
+				t.Errorf("Expected level %s to not exist", levelID)
+			}
+		}
+	})
+
+	// 注意：存在的关卡测试跳过，因为在单元测试环境下
+	// embedded 包未初始化时使用相对路径，与测试运行目录不匹配
+	// 但 LoadLevelConfig 测试已验证文件可以正确加载
+}
+
+// TestLevel1_10_ConveyorBeltEdgeCases 测试传送带配置边界条件
+// Story 8.15 QA修复：AC8 边界条件测试
+func TestLevel1_10_ConveyorBeltEdgeCases(t *testing.T) {
+	config, err := LoadLevelConfig("../../data/levels/level-1-10.yaml")
+	if err != nil {
+		t.Fatalf("Failed to load level-1-10.yaml: %v", err)
+	}
+
+	t.Run("传送带容量配置", func(t *testing.T) {
+		if config.ConveyorBelt.Capacity <= 0 {
+			t.Error("Expected conveyorBelt.capacity > 0")
+		}
+	})
+
+	t.Run("卡片生成间隔", func(t *testing.T) {
+		if config.ConveyorBelt.GenerationInterval <= 0 {
+			t.Error("Expected conveyorBelt.generationInterval > 0")
+		}
+	})
+
+	t.Run("阶段配置验证", func(t *testing.T) {
+		if len(config.ConveyorBelt.PhaseConfigs) > 0 {
+			for i, phase := range config.ConveyorBelt.PhaseConfigs {
+				if phase.ProgressThreshold < 0 || phase.ProgressThreshold > 1 {
+					t.Errorf("Phase %d: progressThreshold should be in [0, 1], got %f", i, phase.ProgressThreshold)
+				}
+				if phase.IntervalMin > phase.IntervalMax {
+					t.Errorf("Phase %d: intervalMin should be <= intervalMax", i)
+				}
+			}
+		}
+	})
+
+	t.Run("动态调节配置", func(t *testing.T) {
+		if config.ConveyorBelt.DynamicAdjustment != nil {
+			da := config.ConveyorBelt.DynamicAdjustment
+			if da.EmptyBeltThreshold < 0 {
+				t.Error("EmptyBeltThreshold should be >= 0")
+			}
+			if da.FullBeltThreshold < 0 {
+				t.Error("FullBeltThreshold should be >= 0")
+			}
+		}
+	})
+
+	t.Run("FirstWaveDelay配置", func(t *testing.T) {
+		// conveyor 模式可以设置 FirstWaveDelay 为 0
+		if config.FirstWaveDelay != nil && *config.FirstWaveDelay < 0 {
+			t.Error("FirstWaveDelay should be >= 0 or nil")
+		}
+	})
+}
+
+// TestValidateLevelConfig_EdgeCases 测试关卡配置验证边界条件
+func TestValidateLevelConfig_EdgeCases(t *testing.T) {
+	t.Run("空ID验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:   "",
+			Name: "Test Level",
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "Fixed", Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+			},
+		}
+		applyDefaults(config)
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for empty ID")
+		}
+	})
+
+	t.Run("空Name验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:   "test",
+			Name: "",
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "Fixed", Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+			},
+		}
+		applyDefaults(config)
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for empty Name")
+		}
+	})
+
+	t.Run("负Flags验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:    "test",
+			Name:  "Test Level",
+			Flags: -1,
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "Fixed", Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+			},
+		}
+		applyDefaults(config)
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for negative Flags")
+		}
+	})
+
+	t.Run("无效SceneType验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:        "test",
+			Name:      "Test Level",
+			SceneType: "invalid_scene",
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "Fixed", Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+			},
+		}
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for invalid SceneType")
+		}
+	})
+
+	t.Run("无效RowMax验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:     "test",
+			Name:   "Test Level",
+			RowMax: 7, // 超出范围
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "Fixed", Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+			},
+		}
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for invalid RowMax")
+		}
+	})
+
+	t.Run("空波次验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:    "test",
+			Name:  "Test Level",
+			Waves: []WaveConfig{},
+		}
+		applyDefaults(config)
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for empty Waves")
+		}
+	})
+
+	t.Run("无效波次类型验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:   "test",
+			Name: "Test Level",
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "InvalidType", Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+			},
+		}
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for invalid wave Type")
+		}
+	})
+
+	t.Run("无效LaneRestriction验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:   "test",
+			Name: "Test Level",
+			Waves: []WaveConfig{
+				{
+					WaveNum:         1,
+					Type:            "Fixed",
+					LaneRestriction: []int{0, 6}, // 无效行号
+					Zombies:         []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}},
+				},
+			},
+		}
+		applyDefaults(config)
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for invalid LaneRestriction")
+		}
+	})
+
+	t.Run("空僵尸组验证_Fixed类型", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:   "test",
+			Name: "Test Level",
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "Fixed", Zombies: []ZombieGroup{}}, // Fixed 类型需要僵尸
+			},
+		}
+		applyDefaults(config)
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for empty zombies in Fixed wave")
+		}
+	})
+
+	t.Run("空僵尸组验证_ExtraPoints类型", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:         "test",
+			Name:       "Test Level",
+			ZombiePool: []string{"basic"},
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "ExtraPoints", ExtraPoints: 10, Zombies: []ZombieGroup{}}, // ExtraPoints 允许空僵尸
+			},
+		}
+		applyDefaults(config)
+		err := validateLevelConfig(config)
+		if err != nil {
+			t.Errorf("ExtraPoints wave should allow empty zombies: %v", err)
+		}
+	})
+
+	t.Run("无效僵尸组类型验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:   "test",
+			Name: "Test Level",
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "Fixed", Zombies: []ZombieGroup{{Type: "", Lanes: []int{3}, Count: 1}}},
+			},
+		}
+		applyDefaults(config)
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for empty zombie type")
+		}
+	})
+
+	t.Run("无效僵尸行验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:   "test",
+			Name: "Test Level",
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "Fixed", Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{0}, Count: 1}}},
+			},
+		}
+		applyDefaults(config)
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for invalid zombie lane")
+		}
+	})
+
+	t.Run("无效僵尸数量验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:   "test",
+			Name: "Test Level",
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "Fixed", Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 0}}},
+			},
+		}
+		applyDefaults(config)
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for zero zombie count")
+		}
+	})
+
+	t.Run("无效EnabledLanes验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:           "test",
+			Name:         "Test Level",
+			EnabledLanes: []int{0, 6}, // 无效行号
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "Fixed", Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+			},
+		}
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for invalid EnabledLanes")
+		}
+	})
+
+	t.Run("无效OpeningType验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:          "test",
+			Name:        "Test Level",
+			OpeningType: "invalid_opening",
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "Fixed", Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+			},
+		}
+		applyDefaults(config)
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for invalid OpeningType")
+		}
+	})
+
+	t.Run("无效SpecialRules验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:           "test",
+			Name:         "Test Level",
+			SpecialRules: "invalid_rule",
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "Fixed", Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+			},
+		}
+		applyDefaults(config)
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for invalid SpecialRules")
+		}
+	})
+
+	t.Run("无效SoddingAnimLanes验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:               "test",
+			Name:             "Test Level",
+			SoddingAnimLanes: []int{0, 6}, // 无效行号
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "Fixed", Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+			},
+		}
+		applyDefaults(config)
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for invalid SoddingAnimLanes")
+		}
+	})
+
+	t.Run("无效PreSoddedLanes验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:             "test",
+			Name:           "Test Level",
+			PreSoddedLanes: []int{0, 6}, // 无效行号
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "Fixed", Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+			},
+		}
+		applyDefaults(config)
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for invalid PreSoddedLanes")
+		}
+	})
+
+	t.Run("无效PresetPlants行验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:   "test",
+			Name: "Test Level",
+			PresetPlants: []PresetPlant{
+				{Type: "peashooter", Row: 0, Col: 1}, // 无效行
+			},
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "Fixed", Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+			},
+		}
+		applyDefaults(config)
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for invalid PresetPlants row")
+		}
+	})
+
+	t.Run("无效PresetPlants列验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:   "test",
+			Name: "Test Level",
+			PresetPlants: []PresetPlant{
+				{Type: "peashooter", Row: 3, Col: 0}, // 无效列
+			},
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "Fixed", Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+			},
+		}
+		applyDefaults(config)
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for invalid PresetPlants col")
+		}
+	})
+
+	t.Run("空PresetPlants类型验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:   "test",
+			Name: "Test Level",
+			PresetPlants: []PresetPlant{
+				{Type: "", Row: 3, Col: 1}, // 空类型
+			},
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "Fixed", Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+			},
+		}
+		applyDefaults(config)
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for empty PresetPlants type")
+		}
+	})
+
+	t.Run("旗帜波FlagIndex验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:   "test",
+			Name: "Test Level",
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "Final", IsFlag: true, FlagIndex: 0, Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+			},
+		}
+		applyDefaults(config)
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for FlagIndex < 1 when IsFlag is true")
+		}
+	})
+
+	t.Run("负WaveNum验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:   "test",
+			Name: "Test Level",
+			Waves: []WaveConfig{
+				{WaveNum: -1, Type: "Fixed", Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+			},
+		}
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for negative WaveNum")
+		}
+	})
+
+	t.Run("负ExtraPoints验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:   "test",
+			Name: "Test Level",
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "ExtraPoints", ExtraPoints: -10, Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+			},
+		}
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for negative ExtraPoints")
+		}
+	})
+
+	t.Run("负SpawnInterval验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:   "test",
+			Name: "Test Level",
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "Fixed", Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1, SpawnInterval: -1.0}}},
+			},
+		}
+		applyDefaults(config)
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for negative SpawnInterval")
+		}
+	})
+
+	t.Run("空僵尸Lanes验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:   "test",
+			Name: "Test Level",
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "Fixed", Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{}, Count: 1}}},
+			},
+		}
+		applyDefaults(config)
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for empty zombie Lanes")
+		}
+	})
+
+	t.Run("RowMax为6时的僵尸行验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:     "test",
+			Name:   "Test Level",
+			RowMax: 6,
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "Fixed", Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{6}, Count: 1}}},
+			},
+		}
+		applyDefaults(config)
+		err := validateLevelConfig(config)
+		if err != nil {
+			t.Errorf("Lane 6 should be valid when RowMax is 6: %v", err)
+		}
+	})
+
+	t.Run("RowMax为6时超出行验证", func(t *testing.T) {
+		config := &LevelConfig{
+			ID:     "test",
+			Name:   "Test Level",
+			RowMax: 6,
+			Waves: []WaveConfig{
+				{WaveNum: 1, Type: "Fixed", LaneRestriction: []int{7}, Zombies: []ZombieGroup{{Type: "basic", Lanes: []int{3}, Count: 1}}},
+			},
+		}
+		applyDefaults(config)
+		err := validateLevelConfig(config)
+		if err == nil {
+			t.Error("Expected error for LaneRestriction > RowMax")
+		}
+	})
+}
