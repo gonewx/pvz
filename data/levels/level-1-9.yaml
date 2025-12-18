@@ -41,173 +41,173 @@ waves:
         lanes: [1, 2, 3, 4, 5]
         count: 1
 
-  # - waveNum: 2
-  #   type: "Fixed"
-  #   isFlag: false
-  #   zombies:
-  #     - type: "basic"
-  #       lanes: [1, 2, 3, 4, 5]
-  #       count: 1
+  - waveNum: 2
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
 
-  # - waveNum: 3
-  #   type: "Fixed"
-  #   isFlag: false
-  #   zombies:
-  #     - type: "basic"
-  #       lanes: [1, 2, 3, 4, 5]
-  #       count: 1
+  - waveNum: 3
+    type: "Fixed"
+    isFlag: false
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
 
-  # # Wave 4-6: ExtraPoints - 2 点动态分配
-  # - waveNum: 4
-  #   type: "ExtraPoints"
-  #   isFlag: false
-  #   extraPoints: 2
-  #   zombies: []
+  # Wave 4-6: ExtraPoints - 2 点动态分配
+  - waveNum: 4
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 2
+    zombies: []
 
-  # - waveNum: 5
-  #   type: "ExtraPoints"
-  #   isFlag: false
-  #   extraPoints: 2
-  #   zombies: []
+  - waveNum: 5
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 2
+    zombies: []
 
-  # - waveNum: 6
-  #   type: "ExtraPoints"
-  #   isFlag: false
-  #   extraPoints: 2
-  #   zombies: []
+  - waveNum: 6
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 2
+    zombies: []
 
-  # # Wave 7-9: 普通僵尸 + 2 点动态分配
-  # - waveNum: 7
-  #   type: "Fixed"
-  #   isFlag: false
-  #   extraPoints: 2
-  #   zombies:
-  #     - type: "basic"
-  #       lanes: [1, 2, 3, 4, 5]
-  #       count: 1
+  # Wave 7-9: 普通僵尸 + 2 点动态分配
+  - waveNum: 7
+    type: "Fixed"
+    isFlag: false
+    extraPoints: 2
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
 
-  # - waveNum: 8
-  #   type: "Fixed"
-  #   isFlag: false
-  #   extraPoints: 2
-  #   zombies:
-  #     - type: "basic"
-  #       lanes: [1, 2, 3, 4, 5]
-  #       count: 1
+  - waveNum: 8
+    type: "Fixed"
+    isFlag: false
+    extraPoints: 2
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
 
-  # - waveNum: 9
-  #   type: "Fixed"
-  #   isFlag: false
-  #   extraPoints: 2
-  #   zombies:
-  #     - type: "basic"
-  #       lanes: [1, 2, 3, 4, 5]
-  #       count: 1
+  - waveNum: 9
+    type: "Fixed"
+    isFlag: false
+    extraPoints: 2
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
 
-  # # Wave 10: 旗帜波 1 - basic x5 + flag + 4 点动态分配
-  # - waveNum: 10
-  #   type: "Final"
-  #   isFlag: true
-  #   flagIndex: 1
-  #   extraPoints: 4
-  #   zombies:
-  #     - type: "basic"
-  #       lanes: [1, 2, 3, 4, 5]
-  #       count: 5
-  #       spawnInterval: 1.0
-  #     - type: "flag"
-  #       lanes: [1, 2, 3, 4, 5]
-  #       count: 1
+  # Wave 10: 旗帜波 1 - basic x5 + flag + 4 点动态分配
+  - waveNum: 10
+    type: "Final"
+    isFlag: true
+    flagIndex: 1
+    extraPoints: 4
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 5
+        spawnInterval: 1.0
+      - type: "flag"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
 
-  # # Wave 11-12: ExtraPoints - 4 点动态分配
-  # - waveNum: 11
-  #   type: "ExtraPoints"
-  #   isFlag: false
-  #   extraPoints: 4
-  #   zombies: []
+  # Wave 11-12: ExtraPoints - 4 点动态分配
+  - waveNum: 11
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 4
+    zombies: []
 
-  # - waveNum: 12
-  #   type: "ExtraPoints"
-  #   isFlag: false
-  #   extraPoints: 4
-  #   zombies: []
+  - waveNum: 12
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 4
+    zombies: []
 
-  # # Wave 13-15: 普通僵尸 + 4 点动态分配
-  # - waveNum: 13
-  #   type: "Fixed"
-  #   isFlag: false
-  #   extraPoints: 4
-  #   zombies:
-  #     - type: "basic"
-  #       lanes: [1, 2, 3, 4, 5]
-  #       count: 1
+  # Wave 13-15: 普通僵尸 + 4 点动态分配
+  - waveNum: 13
+    type: "Fixed"
+    isFlag: false
+    extraPoints: 4
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
 
-  # - waveNum: 14
-  #   type: "Fixed"
-  #   isFlag: false
-  #   extraPoints: 4
-  #   zombies:
-  #     - type: "basic"
-  #       lanes: [1, 2, 3, 4, 5]
-  #       count: 1
+  - waveNum: 14
+    type: "Fixed"
+    isFlag: false
+    extraPoints: 4
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
 
-  # - waveNum: 15
-  #   type: "Fixed"
-  #   isFlag: false
-  #   extraPoints: 4
-  #   zombies:
-  #     - type: "basic"
-  #       lanes: [1, 2, 3, 4, 5]
-  #       count: 1
+  - waveNum: 15
+    type: "Fixed"
+    isFlag: false
+    extraPoints: 4
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
 
-  # # Wave 16-18: ExtraPoints - 6 点动态分配
-  # - waveNum: 16
-  #   type: "ExtraPoints"
-  #   isFlag: false
-  #   extraPoints: 6
-  #   zombies: []
+  # Wave 16-18: ExtraPoints - 6 点动态分配
+  - waveNum: 16
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 6
+    zombies: []
 
-  # - waveNum: 17
-  #   type: "ExtraPoints"
-  #   isFlag: false
-  #   extraPoints: 6
-  #   zombies: []
+  - waveNum: 17
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 6
+    zombies: []
 
-  # - waveNum: 18
-  #   type: "ExtraPoints"
-  #   isFlag: false
-  #   extraPoints: 6
-  #   zombies: []
+  - waveNum: 18
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 6
+    zombies: []
 
-  # # Wave 19: 普通僵尸 + 6 点动态分配
-  # - waveNum: 19
-  #   type: "Fixed"
-  #   isFlag: false
-  #   extraPoints: 6
-  #   zombies:
-  #     - type: "basic"
-  #       lanes: [1, 2, 3, 4, 5]
-  #       count: 1
+  # Wave 19: 普通僵尸 + 6 点动态分配
+  - waveNum: 19
+    type: "Fixed"
+    isFlag: false
+    extraPoints: 6
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
 
-  # # Wave 20: Final Wave - basic x9 + flag + conehead + polevaulter + buckethead
-  # - waveNum: 20
-  #   type: "Final"
-  #   isFlag: true
-  #   flagIndex: 2
-  #   zombies:
-  #     - type: "basic"
-  #       lanes: [1, 2, 3, 4, 5]
-  #       count: 9
-  #       spawnInterval: 1.0
-  #     - type: "flag"
-  #       lanes: [1, 2, 3, 4, 5]
-  #       count: 1
-  #     - type: "conehead"
-  #       lanes: [1, 2, 3, 4, 5]
-  #       count: 1
-  #     - type: "polevaulter"
-  #       lanes: [1, 2, 3, 4, 5]
-  #       count: 1
-  #     - type: "buckethead"
-  #       lanes: [1, 2, 3, 4, 5]
-  #       count: 1
+  # Wave 20: Final Wave - basic x9 + flag + conehead + polevaulter + buckethead
+  - waveNum: 20
+    type: "Final"
+    isFlag: true
+    flagIndex: 2
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 9
+        spawnInterval: 1.0
+      - type: "flag"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+      - type: "polevaulter"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+      - type: "buckethead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
