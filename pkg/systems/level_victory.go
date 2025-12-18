@@ -70,7 +70,12 @@ func (s *LevelSystem) checkVictoryCondition() {
 	}
 }
 
-// triggerRewardIfNeeded 检查是否有新植物或工具解锁，如果有则触发奖励动画
+// triggerRewardIfNeeded 检查是否有奖励需要显示，如果有则触发奖励动画
+//
+// 奖励优先级：
+// 1. 工具奖励（最高优先级，如铲子）
+// 2. 植物奖励（如新解锁的植物）
+// 3. 来信奖励（如 rewardType: "note"）
 func (s *LevelSystem) triggerRewardIfNeeded() {
 	if s.rewardSystem == nil {
 		return
@@ -95,6 +100,20 @@ func (s *LevelSystem) triggerRewardIfNeeded() {
 			hasReward = true
 			// 清除最后解锁标记（避免重复触发）
 			s.gameState.GetPlantUnlockManager().ClearLastUnlocked()
+		}
+	}
+
+	// Story 8.14: 如果没有工具或植物奖励，检查来信奖励
+	if !hasReward {
+		if s.gameState.CurrentLevel != nil && s.gameState.CurrentLevel.RewardType == "note" {
+			noteID := s.gameState.CurrentLevel.RewardNote
+			if noteID != "" {
+				log.Printf("[LevelSystem] Triggering reward animation for note: %s", noteID)
+				s.rewardSystem.TriggerReward("note", noteID)
+				hasReward = true
+			} else {
+				log.Printf("[LevelSystem] Warning: rewardType is 'note' but rewardNote is empty")
+			}
 		}
 	}
 

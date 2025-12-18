@@ -483,9 +483,10 @@ func (ras *RewardAnimationSystem) Draw(screen *ebiten.Image) {
 		}
 	}
 
-	// 2b. Phase 4: 渲染奖励面板（showing）在最上层
+	// 2b. Phase 4-5: 渲染奖励面板（showing/closing）在最上层
+	// closing 阶段也需要渲染面板（带淡出效果），否则游戏场景的菜单按钮会闪烁
 	// 来信奖励使用 notePanelModule，植物/工具奖励使用 panelRenderSystem
-	if ras.currentPhase == "showing" {
+	if ras.currentPhase == "showing" || ras.currentPhase == "closing" {
 		if ras.notePanelModule != nil {
 			// 来信奖励：渲染来信面板模块
 			ras.notePanelModule.Draw(screen)

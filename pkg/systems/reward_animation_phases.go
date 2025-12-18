@@ -506,6 +506,18 @@ func (ras *RewardAnimationSystem) cleanupAndSwitchToMainMenu() {
 func (ras *RewardAnimationSystem) updateClosingPhaseInternal(dt float64) {
 	ras.phaseElapsed += dt
 
+	// 更新面板淡出效果（从 1.0 淡出到 0.0）
+	// 这样在 closing 阶段渲染面板时会有淡出效果，避免菜单按钮闪烁
+	if ras.panelEntity != 0 {
+		if panelComp, ok := ecs.GetComponent[*components.RewardPanelComponent](ras.entityManager, ras.panelEntity); ok {
+			fadeProgress := ras.phaseElapsed / RewardFadeOutDuration
+			if fadeProgress > 1.0 {
+				fadeProgress = 1.0
+			}
+			panelComp.FadeAlpha = 1.0 - fadeProgress
+		}
+	}
+
 	// 检查完成
 	if ras.phaseElapsed >= RewardFadeOutDuration {
 		log.Printf("[RewardAnimationSystem] Phase 5 (closing) 完成，清理实体")
@@ -608,14 +620,14 @@ func (ras *RewardAnimationSystem) createRewardPanel(rewardType string, plantID s
 	}
 
 	ecs.AddComponent(ras.entityManager, ras.panelEntity, &components.RewardPanelComponent{
-		RewardType:         rewardType, // 新增：奖励类型
-		PlantID:            plantID,    // 设置 PlantID，让渲染系统自动加载图标
-		ToolID:             toolID,     // 新增：工具ID
-		PlantName:          rewardName, // 名称（植物或工具）
-		PlantDescription:   rewardDesc, // 描述（植物或工具）
-		SunCost:            sunCost,    // 设置阳光值（工具为0）
-		CardScale:          1.0,        // 卡片固定大小，不做动画
-		FadeAlpha:          0.0,        // 初始完全透明，用于淡入动画
+		RewardType:         rewardType,         // 新增：奖励类型
+		PlantID:            plantID,            // 设置 PlantID，让渲染系统自动加载图标
+		ToolID:             toolID,             // 新增：工具ID
+		PlantName:          rewardName,         // 名称（植物或工具）
+		PlantDescription:   rewardDesc,         // 描述（植物或工具）
+		SunCost:            sunCost,            // 设置阳光值（工具为0）
+		CardScale:          1.0,                // 卡片固定大小，不做动画
+		FadeAlpha:          0.0,                // 初始完全透明，用于淡入动画
 		ShowMainMenuButton: showMainMenuButton, // Story 8.13: 是否显示主菜单按钮
 		// 卡片位置由 RewardPanelRenderSystem 自动计算（水平居中）
 		IsVisible:     true,
@@ -741,18 +753,9 @@ func (ras *RewardAnimationSystem) createNotePanelModule() {
 func (ras *RewardAnimationSystem) cleanupNotePanelAndSwitchToNextLevel() {
 	log.Printf("[RewardAnimationSystem] 清理来信面板并切换到下一关")
 
-	// 清理来信面板
-	if ras.notePanelModule != nil {
-		ras.notePanelModule.Cleanup()
-		ras.notePanelModule = nil
-	}
-
-	// 重置状态
-	ras.isActive = false
-	ras.currentPhase = ""
-	ras.gameState.NoteFadeAlpha = 0
-
-	// 切换到下一关
+	// 先切换场景，防止在切换前的渲染帧中游戏场景 UI 闪烁
+	// 注意：场景切换后，整个 GameScene（包括 RewardAnimationSystem）会被销毁
+	// 所以不需要手动清理面板和重置状态
 	nextLevelID := ras.gameState.GetNextLevelID()
 	if nextLevelID != "" {
 		log.Printf("[RewardAnimationSystem] 切换到下一关: %s", nextLevelID)
@@ -771,18 +774,9 @@ func (ras *RewardAnimationSystem) cleanupNotePanelAndSwitchToNextLevel() {
 func (ras *RewardAnimationSystem) cleanupNotePanelAndSwitchToMainMenu() {
 	log.Printf("[RewardAnimationSystem] 清理来信面板并切换到主菜单")
 
-	// 清理来信面板
-	if ras.notePanelModule != nil {
-		ras.notePanelModule.Cleanup()
-		ras.notePanelModule = nil
-	}
-
-	// 重置状态
-	ras.isActive = false
-	ras.currentPhase = ""
-	ras.gameState.NoteFadeAlpha = 0
-
-	// 切换到主菜单
+	// 先切换场景，防止在切换前的渲染帧中游戏场景 UI 闪烁
+	// 注意：场景切换后，整个 GameScene（包括 RewardAnimationSystem）会被销毁
+	// 所以不需要手动清理面板和重置状态
 	if ras.sceneManager != nil {
 		ras.sceneManager.SwitchToMainMenu()
 	}

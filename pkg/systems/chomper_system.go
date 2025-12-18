@@ -272,6 +272,11 @@ func (s *ChomperSystem) dealSwallowDamage(zombieID ecs.EntityID) {
 		}
 	}
 
+	// 增加僵尸击杀计数（必须在删除实体之前调用）
+	if s.gameState != nil {
+		s.gameState.IncrementZombiesKilled()
+	}
+
 	// 直接删除僵尸实体（不播放死亡动画）
 	s.entityManager.DestroyEntity(zombieID)
 }
