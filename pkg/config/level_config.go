@@ -106,6 +106,17 @@ type LevelConfig struct {
 	// 教学关卡（1-1、1-2）设置为 false，避免玩家过早跳出教学流程
 	// 使用指针类型以区分"未设置"（nil → 默认 true）和"显式设置为 false"
 	ShowMainMenuButton *bool `yaml:"showMainMenuButton"`
+
+	// Story 8.14: 奖励类型扩展
+	// 奖励类型: "plant"（默认）、"tool"、"note"
+	// - "plant": 植物奖励（如向日葵、双发射手）
+	// - "tool": 工具奖励（如铲子）
+	// - "note": 僵尸来信奖励（如 Level 1-9 的预告信）
+	RewardType string `yaml:"rewardType"`
+
+	// RewardNote 来信ID（当 RewardType 为 "note" 时使用）
+	// 对应 ZombieNote{N}.png 中的后缀，如 "zombienote1" 对应 ZombieNote1.png
+	RewardNote string `yaml:"rewardNote"`
 }
 
 // PresetPlant 预设植物配置（Story 19.4）
@@ -332,6 +343,11 @@ func applyDefaults(config *LevelConfig) {
 		defaultTrue := true
 		config.ShowMainMenuButton = &defaultTrue
 	}
+
+	// Story 8.14: RewardType 默认为 "plant"
+	if config.RewardType == "" {
+		config.RewardType = "plant"
+	}
 }
 
 // validateLevelConfig 验证关卡配置的完整性和合法性
@@ -541,6 +557,21 @@ func validateLevelConfig(config *LevelConfig) error {
 		if plant.Col < 1 || plant.Col > GridColumns {
 			return fmt.Errorf("presetPlants[%d]: col must be between 1 and %d, got %d", i, GridColumns, plant.Col)
 		}
+	}
+
+	// Story 8.14: 验证 RewardType
+	validRewardTypes := map[string]bool{
+		"plant": true,
+		"tool":  true,
+		"note":  true,
+	}
+	if config.RewardType != "" && !validRewardTypes[config.RewardType] {
+		return fmt.Errorf("rewardType must be one of: plant, tool, note, got %q", config.RewardType)
+	}
+
+	// Story 8.14: 当 RewardType 为 "note" 时，RewardNote 必须非空
+	if config.RewardType == "note" && config.RewardNote == "" {
+		return fmt.Errorf("rewardNote is required when rewardType is 'note'")
 	}
 
 	return nil

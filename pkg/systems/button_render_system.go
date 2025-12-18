@@ -171,7 +171,7 @@ func (s *ButtonRenderSystem) drawSimpleButton(screen *ebiten.Image, button *comp
 	button.Height = float64(img.Bounds().Dy())
 }
 
-// drawButtonText 渲染按钮文字（自动居中，带阴影效果）
+// drawButtonText 渲染按钮文字（自动居中，可选阴影效果）
 func (s *ButtonRenderSystem) drawButtonText(screen *ebiten.Image, button *components.ButtonComponent, x, y float64) {
 	if button.Text == "" || button.Font == nil {
 		return
@@ -196,15 +196,19 @@ func (s *ButtonRenderSystem) drawButtonText(screen *ebiten.Image, button *compon
 	shadowOffsetY := 2.0
 
 	// 为了让"文字+阴影"整体看起来垂直居中，将主文字向上偏移阴影的一半
-	visualCenterOffsetY := -shadowOffsetY / 2.0
+	// 如果禁用阴影，则不需要偏移
+	visualCenterOffsetY := 0.0
+	if !button.NoTextShadow {
+		visualCenterOffsetY = -shadowOffsetY / 2.0
 
-	// 1. 先绘制阴影（深色文字，偏移位置）
-	shadowOp := &text.DrawOptions{}
-	shadowOp.LayoutOptions.PrimaryAlign = text.AlignCenter
-	shadowOp.LayoutOptions.SecondaryAlign = text.AlignCenter
-	shadowOp.GeoM.Translate(centerX+shadowOffsetX, centerY+shadowOffsetY+visualCenterOffsetY)
-	shadowOp.ColorScale.ScaleWithColor(color.RGBA{0, 0, 0, 180}) // 半透明黑色阴影
-	text.Draw(screen, button.Text, button.Font, shadowOp)
+		// 1. 先绘制阴影（深色文字，偏移位置）
+		shadowOp := &text.DrawOptions{}
+		shadowOp.LayoutOptions.PrimaryAlign = text.AlignCenter
+		shadowOp.LayoutOptions.SecondaryAlign = text.AlignCenter
+		shadowOp.GeoM.Translate(centerX+shadowOffsetX, centerY+shadowOffsetY+visualCenterOffsetY)
+		shadowOp.ColorScale.ScaleWithColor(color.RGBA{0, 0, 0, 180}) // 半透明黑色阴影
+		text.Draw(screen, button.Text, button.Font, shadowOp)
+	}
 
 	// 2. 再绘制主文字（向上偏移，使整体视觉居中）
 	op := &text.DrawOptions{}

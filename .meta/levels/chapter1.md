@@ -345,17 +345,6 @@ SeedPacketSilhouette.png
 
 ---
 
-### **给开发的修正口头语：**
-
-> “兄弟们，刚才那个文档漏了个大的。1-8 是**选卡界面**的首秀！
->
-> 这一关开始前，要把那个**植物选择菜单 (Seed Chooser)** 做出来。
-> 1.  先让戴夫出来废话两句，告诉玩家‘包背不动了，只能挑 6 个带’。
-> 2.  然后展示那个UI。
-> 3.  **最关键的**：这关一定要在预览里展示**铁桶僵尸**。如果玩家不看预览，随便选了 6 个卡结果没带控制（寒冰）或者秒杀（大嘴花/坚果），他进去会很难打。
->
-> 另外，记得处理一个逻辑：**如果卡槽没填满，‘Let's Rock’按钮是不能点的。** 必须逼着玩家选满 6 个。”
-
 ### **关卡 1-9**
 *   **场地布局**: 完整的5行草地。
 *   **波数/旗帜**: **共2面旗帜**。
@@ -363,11 +352,62 @@ SeedPacketSilhouette.png
 *   **新增僵尸**: 无。
 *   **核心教学/目的**: 综合测验。在进入第二章前，对第一章所有植物和僵尸进行一次总复习。
 *   **关卡流程与细节**: 本关会出现之前所有类型的僵尸（普通、路障、铁桶、撑杆），考验玩家构建综合防线的能力。
+*   **选卡系统**： 有和level 1-8 一样的选卡系统
+
+- 解锁预告信的表现和奖励动画弹出铲子的效果一样，包括弹出、鼠标样式、箭头和后面的光晕效果。点击后，没有移动的动画，直接消失，并播放`Starburst`粒子效果。然后画面淡出。然后画面淡出，再淡入预告信的奖励面板画面。预告信的奖励面板和前面关卡的奖励面板ui界面不同，要和主菜单界面中帮助按钮点击后的界面效果一样，草坪背景，显示`ZombieNote.jpg`
+`ZombieNote1.png` 叠加处理的信件，但下方按钮文字改为下一关。右上角显示主菜单按钮。屏幕信的上方要通过 lawnstring 模块显示`[FOUND_NOTE] (你发现了张便签：） ` 的字样。
+
+| Waves  | Non-dynamic zombies          | Ambush zombies | Note(s)        |
+| ------ | --- | -------------- | -------------- |
+| **1**  | basic | None           |    |
+| **2**  | basic | None           |    |
+| **3**  | basic | None           |    |
+| **4**  | None Guaranteed| None           | 2 extra points |
+| **5**  | None Guaranteed| None           | 2 extra points |
+| **6**  | None Guaranteed| None           | 2 extra points |
+| **7**  | basic | None           | 2 extra points |
+| **8**  | basic | None           | 2 extra points |
+| **9**  | basic | None           | 2 extra points |
+| **10** | basic x 5, flag,           | None           | 4 extra points |
+| **11** | None Guaranteed| None           | 4 extra points |
+| **12** | None Guaranteed| None           | 4 extra points |
+| **13** | basic | None           | 4 extra points |
+| **14** | basic | None           | 4 extra points |
+| **15** | basic | None           | 4 extra points |
+| **16** | None Guaranteed| None           | 6 extra points |
+| **17** | None Guaranteed| None           | 6 extra points |
+| **18** | None Guaranteed| None           | 6 extra points |
+| **19** | basic | None           | 6 extra points |
+| **20** | basic x 9, flag, Conehead, Pole Vaulting, Buckethead | None           | Final Wave     |
+
 
 ### **关卡 1-10**
 *   **场地布局**: 完整的5行草地。
-*   **波数/旗帜**: **特殊关卡 (传送带)**，没有旗帜，只有一个很长的进度条代表最终波。
+*   **特殊关卡 (传送带)**， 参考level 1-5 实现（只需要传送带环节， 不需要对话、铲子教学环节）。
 *   **解锁植物**: **小喷菇 (Puff-shroom)** - 游戏结束后获得。
 *   **新增僵尸**: 无。
 *   **核心教学/目的**: 引入“传送带”机制。在这种模式下，玩家无法控制经济和植物选择，纯粹考验临场应变和布局能力。
-*   **关卡流程与细节**: 左侧传送带会随机送来本章节已解锁的各种植物。玩家需要快速将它们放置在合适的位置，以应对持续不断的僵尸进攻。这是对第一章的终极考验。
+*   **关卡流程与细节**: 左侧传送带会随机送来本章节已解锁的各种植物（卡包不显示阳光值）。玩家需要快速将它们放置在合适的位置，以应对持续不断的僵尸进攻。这是对第一章的终极考验。
+
+| Waves  | Non-dynamic zombies| Ambush zombies | Note(s)|
+| ------ | --- | -------------- | -------------------------- |
+| **1**  | basic | None           | 2 extra points |
+| **2**  | basic | None           | 2 extra points |
+| **3**  | basic | None           | 2 extra points |
+| **4**  | None Guaranteed     | None           | 6 extra points|
+| **5**  | None Guaranteed     | None           | 6 extra points |
+| **6**  | None Guaranteed     | None           | 6 extra points |
+| **7**  | basic | None           | 8 extra points |
+| **8**  | basic | None           | 8 extra points |
+| **9**  | basic | None           | 8 extra points |
+| **10** | basic x 6, flag | None           | 14 extra points|
+| **11** | None Guaranteed     | None           | 12 extra points|
+| **12** | None Guaranteed     | None           | 12 extra points|
+| **13** | basic | None           | 14 extra points|
+| **14** | basic | None           | 14 extra points|
+| **15** | basic | None           | 14 extra points|
+| **16** | None Guaranteed     | None           | 18 extra points|
+| **17** | None Guaranteed     | None           | 18 extra points|
+| **18** | None Guaranteed     | None           | 18 extra points|
+| **19** | basic | None           | 20 extra points|
+| **20** | basic x 9 , flag, Conehead, Pole Vaulting, Buckethead | None | Final Wave 18 extra points |

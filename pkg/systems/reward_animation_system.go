@@ -85,6 +85,12 @@ type RewardAnimationSystem struct {
 	panelRenderSystem *RewardPanelRenderSystem // 奖励面板渲染系统（内部使用）
 	sunFont           *text.GoTextFaceSource   // 阳光数字字体源（用于渲染卡片）
 	sunFontSize       float64                  // 阳光字体大小
+
+	// Story 8.14: 僵尸来信面板模块（使用接口避免循环依赖）
+	notePanelModule   NotePanelModule   // 僵尸来信面板（来信奖励专用）
+	notePanelFactory  NotePanelFactory  // 来信面板工厂函数（外部注入）
+	currentNoteID     string            // 当前来信ID（保存用于面板创建）
+	currentRewardType string            // 当前奖励类型（保存用于面板创建）
 }
 
 // NewRewardAnimationSystem 创建新的奖励动画系统。
@@ -123,9 +129,20 @@ func NewRewardAnimationSystem(em *ecs.EntityManager, gs *game.GameState, rm *gam
 	}
 }
 
+// SetNotePanelFactory 设置来信面板工厂函数（Story 8.14）
+//
+// 由于 modules 和 systems 包之间存在循环依赖，使用工厂函数注入的方式
+// 打破依赖。调用方（通常是 scene 层）负责创建工厂函数并注入。
+//
+// 参数:
+//   - factory: 来信面板工厂函数
+func (ras *RewardAnimationSystem) SetNotePanelFactory(factory NotePanelFactory) {
+	ras.notePanelFactory = factory
+}
+
 // TriggerReward 触发奖励动画，开始卡片包弹出流程。
-// rewardType: 奖励类型（"plant" 或 "tool"）
-// rewardID: 奖励ID（植物ID如 "sunflower" 或工具ID如 "shovel"）
+// rewardType: 奖励类型（"plant"、"tool" 或 "note"）
+// rewardID: 奖励ID（植物ID如 "sunflower" 或工具ID如 "shovel" 或来信ID如 "zombienote1"）
 func (ras *RewardAnimationSystem) TriggerReward(rewardType string, rewardID string) {
 	if ras.isActive {
 		log.Printf("[RewardAnimationSystem] 奖励动画已在播放，忽略新触发")
@@ -134,11 +151,18 @@ func (ras *RewardAnimationSystem) TriggerReward(rewardType string, rewardID stri
 
 	log.Printf("[RewardAnimationSystem] 触发奖励动画，类型: %s, ID: %s", rewardType, rewardID)
 
+	// 保存奖励类型和ID（Story 8.14）
+	ras.currentRewardType = rewardType
+
 	// 根据类型选择粒子效果
 	var particleEffect string
-	if rewardType == "tool" {
+	switch rewardType {
+	case "tool":
 		particleEffect = "AwardPickupArrow" // 工具使用向下箭头粒子效果
-	} else {
+	case "note":
+		particleEffect = "SeedPacket" // 来信使用与植物相同的光晕效果（waiting阶段）
+		ras.currentNoteID = rewardID  // 保存来信ID
+	default:
 		particleEffect = "Award" // 植物使用默认光芒粒子效果
 	}
 
@@ -158,8 +182,8 @@ func (ras *RewardAnimationSystem) TriggerReward(rewardType string, rewardID stri
 	var targetX, targetY float64
 	var startScale, endScale float64
 
-	if rewardType == "tool" {
-		// 工具奖励：目标位置应与奖励面板中铲子的显示位置一致
+	if rewardType == "tool" || rewardType == "note" {
+		// 工具奖励和来信奖励：目标位置应与奖励面板中铲子的显示位置一致
 		// 奖励面板使用卡片显示区域（RewardPanelCardBox）的中心
 		bgWidth := config.RewardPanelBackgroundWidth
 		bgHeight := config.RewardPanelBackgroundHeight
@@ -170,11 +194,11 @@ func (ras *RewardAnimationSystem) TriggerReward(rewardType string, rewardID stri
 		boxCenterX := offsetX + config.RewardPanelCardBoxLeft + config.RewardPanelCardBoxWidth/2
 		boxCenterY := offsetY + config.RewardPanelCardBoxTop + config.RewardPanelCardBoxHeight/2
 
-		// 工具图标使用中心锚点绘制，所以目标位置就是中心坐标
+		// 工具/来信图标使用中心锚点绘制，所以目标位置就是中心坐标
 		targetX = boxCenterX
 		targetY = boxCenterY
 
-		// 工具奖励使用专用的缩放配置
+		// 工具/来信奖励使用专用的缩放配置
 		startScale = config.ShovelRewardStartScale // 约 0.56，与植物卡包视觉大小一致
 		endScale = config.ShovelRewardEndScale     // 1.0，与奖励面板中的显示一致
 	} else {
@@ -295,6 +319,19 @@ func (ras *RewardAnimationSystem) TriggerReward(rewardType string, rewardID stri
 		} else {
 			log.Printf("[RewardAnimationSystem] 警告：工具图片加载失败（ID: %s），只显示粒子效果", rewardID)
 		}
+	} else if rewardType == "note" {
+		// Story 8.14: 来信奖励 - 使用 SeedPacket_Larger.png 作为卡包图片
+		noteImage, err := ras.resourceManager.LoadImage("assets/images/SeedPacket_Larger.png")
+		if err != nil {
+			log.Printf("[RewardAnimationSystem] 警告：来信卡包图片加载失败: %v，只显示粒子效果", err)
+		} else {
+			ecs.AddComponent(ras.entityManager, ras.rewardEntity, &components.SpriteComponent{
+				Image: noteImage,
+			})
+			// 添加 UIComponent 标记，表示这是 UI 实体（不需要相机偏移）
+			ecs.AddComponent(ras.entityManager, ras.rewardEntity, &components.UIComponent{})
+			log.Printf("[RewardAnimationSystem] 来信奖励实体已创建（类型: %s, ID: %s），使用 SeedPacket_Larger.png", rewardType, rewardID)
+		}
 	}
 
 	// Phase 2: 粒子背景框效果（待实现）
@@ -321,12 +358,17 @@ func (ras *RewardAnimationSystem) Update(dt float64) {
 	var rewardComp *components.RewardAnimationComponent
 	var ok bool
 
-	if ras.currentPhase == "showing" || ras.currentPhase == "closing" {
-		// showing/closing 阶段：卡片包已消失，直接处理面板逻辑
-		if ras.currentPhase == "showing" {
+	if ras.currentPhase == "showing" || ras.currentPhase == "closing" || ras.currentPhase == "fadingOut" || ras.currentPhase == "fadingIn" {
+		// showing/closing/fadingOut/fadingIn 阶段：卡片包已消失，直接处理面板逻辑
+		switch ras.currentPhase {
+		case "showing":
 			ras.updateShowingPhaseInternal(dt)
-		} else if ras.currentPhase == "closing" {
+		case "closing":
 			ras.updateClosingPhaseInternal(dt)
+		case "fadingOut":
+			ras.updateFadingOutPhaseInternal(dt)
+		case "fadingIn":
+			ras.updateFadingInPhaseInternal(dt)
 		}
 		return
 	}

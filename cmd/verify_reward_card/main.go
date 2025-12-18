@@ -26,9 +26,15 @@ const (
 
 var (
 	// 命令行参数
-	plantID    = flag.String("plant", "sunflower", "植物ID (使用 --list 查看所有可用植物)")
+	plantID    = flag.String("plant", "", "植物ID (使用 --list 查看所有可用植物)")
+	toolID     = flag.String("tool", "", "工具ID (shovel)")
+	noteID     = flag.String("note", "", "来信ID (zombienote1, zombienote2, zombienote3, zombienote4)")
 	listPlants = flag.Bool("list", false, "列出所有可用植物")
 	verbose    = flag.Bool("verbose", false, "显示详细调试信息")
+
+	// 当前奖励类型和ID
+	rewardType string
+	rewardID   string
 )
 
 // VerifyGame 奖励卡片包动画验证游戏
@@ -106,7 +112,7 @@ func NewVerifyGame() (*VerifyGame, error) {
 	}
 
 	log.Println("[VerifyGame] 奖励卡片包动画验证程序已启动")
-	log.Printf("[VerifyGame] 测试植物: %s", *plantID)
+	log.Printf("[VerifyGame] 测试类型: %s, ID: %s", rewardType, rewardID)
 	log.Println("[VerifyGame] 快捷键: Space/Click=展开卡片, R=重启, Q=退出")
 
 	game := &VerifyGame{
@@ -123,8 +129,8 @@ func NewVerifyGame() (*VerifyGame, error) {
 	}
 
 	// 自动触发奖励动画（无需手动按T键）
-	log.Println("[VerifyGame] 自动触发奖励动画")
-	rewardSystem.TriggerReward("plant", *plantID)
+	log.Printf("[VerifyGame] 自动触发奖励动画 (类型: %s, ID: %s)", rewardType, rewardID)
+	rewardSystem.TriggerReward(rewardType, rewardID)
 	game.triggered = true
 
 	return game, nil
@@ -134,8 +140,8 @@ func NewVerifyGame() (*VerifyGame, error) {
 func (vg *VerifyGame) Update() error {
 	// 快捷键：T 键触发奖励
 	if inpututil.IsKeyJustPressed(ebiten.KeyT) && !vg.triggered {
-		log.Println("[VerifyGame] 手动触发奖励动画")
-		vg.rewardSystem.TriggerReward("plant", *plantID)
+		log.Printf("[VerifyGame] 手动触发奖励动画 (类型: %s, ID: %s)", rewardType, rewardID)
+		vg.rewardSystem.TriggerReward(rewardType, rewardID)
 		vg.triggered = true
 	}
 
@@ -233,6 +239,11 @@ func (vg *VerifyGame) reset() {
 
 	vg.triggered = false
 	vg.completed = false
+
+	// 自动触发
+	log.Printf("[VerifyGame] 重新触发奖励动画 (类型: %s, ID: %s)", rewardType, rewardID)
+	vg.rewardSystem.TriggerReward(rewardType, rewardID)
+	vg.triggered = true
 }
 
 // drawDebugInfo 绘制调试信息
@@ -263,11 +274,20 @@ func (vg *VerifyGame) drawDebugInfo(screen *ebiten.Image) {
 		posComp, _ := ecs.GetComponent[*components.PositionComponent](vg.entityManager, rewardEntity)
 
 		// 显示状态信息
+		var typeLabel string
+		switch rewardType {
+		case "tool":
+			typeLabel = "工具"
+		case "note":
+			typeLabel = "来信"
+		default:
+			typeLabel = "植物"
+		}
 		debugText = fmt.Sprintf(`奖励卡片包验证 - 完整场景模式
-植物: %s
+%s: %s
 阶段: %s (%.2fs)
 缩放: %.2f
-`, *plantID, rewardComp.Phase, rewardComp.ElapsedTime, rewardComp.Scale)
+`, typeLabel, rewardID, rewardComp.Phase, rewardComp.ElapsedTime, rewardComp.Scale)
 
 		if posComp != nil {
 			debugText += fmt.Sprintf("位置: (%.1f, %.1f)\n", posComp.X, posComp.Y)
@@ -294,10 +314,14 @@ func (vg *VerifyGame) drawDebugInfo(screen *ebiten.Image) {
 
 		// 阶段说明
 		phaseDesc := map[string]string{
-			"appearing": "Phase 1: 卡片弹出 (0.3s)",
-			"waiting":   "Phase 2: 等待点击 - 按 Space",
-			"expanding": "Phase 3: 展开动画 (2s)",
-			"showing":   "验证完成！",
+			"appearing":    "Phase 1: 卡片弹出 (0.3s)",
+			"waiting":      "Phase 2: 等待点击 - 按 Space",
+			"expanding":    "Phase 3: 展开动画 (2s)",
+			"pausing":      "Phase 3.5: 短暂停顿+粒子 (2.5s)",
+			"disappearing": "Phase 3.6: 卡片包消失 (1.0s)",
+			"fadingOut":    "Phase 3.7: 画面淡出 (0.5s) [来信专属]",
+			"fadingIn":     "Phase 3.8: 面板淡入 (0.5s) [来信专属]",
+			"showing":      "验证完成！",
 		}
 
 		if desc, exists := phaseDesc[rewardComp.Phase]; exists {
@@ -374,11 +398,64 @@ func main() {
 		os.Exit(0)
 	}
 
-	// 验证植物ID - 使用植物注册表
-	if config.GetPlantByID(*plantID) == nil {
-		fmt.Fprintf(os.Stderr, "错误: 无效的植物ID '%s'\n", *plantID)
-		fmt.Fprintln(os.Stderr, "使用 --list 查看所有可用植物")
+	// 验证参数：必须指定 --plant 或 --tool 或 --note 其中之一
+	validTools := map[string]bool{
+		"shovel": true,
+	}
+
+	validNotes := map[string]bool{
+		"zombienote1": true,
+		"zombienote2": true,
+		"zombienote3": true,
+		"zombienote4": true,
+	}
+
+	// 检查参数互斥
+	paramCount := 0
+	if *plantID != "" {
+		paramCount++
+	}
+	if *toolID != "" {
+		paramCount++
+	}
+	if *noteID != "" {
+		paramCount++
+	}
+
+	if paramCount > 1 {
+		fmt.Fprintln(os.Stderr, "错误: 不能同时指定 --plant、--tool 和 --note")
 		os.Exit(1)
+	}
+
+	if *plantID != "" {
+		// 使用植物注册表验证植物ID
+		if config.GetPlantByID(*plantID) == nil {
+			fmt.Fprintf(os.Stderr, "错误: 无效的植物ID '%s'\n", *plantID)
+			fmt.Fprintln(os.Stderr, "使用 --list 查看所有可用植物")
+			os.Exit(1)
+		}
+		rewardType = "plant"
+		rewardID = *plantID
+	} else if *toolID != "" {
+		if !validTools[*toolID] {
+			fmt.Fprintf(os.Stderr, "错误: 无效的工具ID '%s'\n", *toolID)
+			fmt.Fprintln(os.Stderr, "有效的工具ID: shovel")
+			os.Exit(1)
+		}
+		rewardType = "tool"
+		rewardID = *toolID
+	} else if *noteID != "" {
+		if !validNotes[*noteID] {
+			fmt.Fprintf(os.Stderr, "错误: 无效的来信ID '%s'\n", *noteID)
+			fmt.Fprintln(os.Stderr, "有效的来信ID: zombienote1, zombienote2, zombienote3, zombienote4")
+			os.Exit(1)
+		}
+		rewardType = "note"
+		rewardID = *noteID
+	} else {
+		// 默认测试向日葵
+		rewardType = "plant"
+		rewardID = "sunflower"
 	}
 
 	// 创建游戏实例
@@ -388,7 +465,16 @@ func main() {
 	}
 
 	// 设置窗口标题
-	ebiten.SetWindowTitle(fmt.Sprintf("奖励卡片包验证 - 完整场景 - %s", *plantID))
+	var title string
+	switch rewardType {
+	case "tool":
+		title = fmt.Sprintf("奖励卡片包验证 - 工具:%s", rewardID)
+	case "note":
+		title = fmt.Sprintf("奖励卡片包验证 - 来信:%s", rewardID)
+	default:
+		title = fmt.Sprintf("奖励卡片包验证 - 植物:%s", rewardID)
+	}
+	ebiten.SetWindowTitle(title)
 	ebiten.SetWindowSize(screenWidth, screenHeight)
 
 	// 运行游戏

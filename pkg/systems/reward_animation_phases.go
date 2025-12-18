@@ -128,7 +128,8 @@ func (ras *RewardAnimationSystem) updateWaitingPhase(dt float64, rewardComp *com
 }
 
 // updateExpandingPhase 处理卡片展开阶段（2秒）。
-// - Award.xml 粒子特效播放（12个光芒发射器跟随卡片移动）
+// - 植物/工具奖励：Award.xml 粒子特效播放（12个光芒发射器跟随卡片移动）
+// - 来信奖励：Starburst 粒子特效播放（Story 8.14）
 // - 卡片/工具放大到目标缩放
 // - 移动到目标位置
 func (ras *RewardAnimationSystem) updateExpandingPhase(dt float64, rewardComp *components.RewardAnimationComponent) {
@@ -181,6 +182,31 @@ func (ras *RewardAnimationSystem) updateExpandingPhase(dt float64, rewardComp *c
 		log.Printf("[RewardAnimationSystem] Phase 3 (expanding) 移动完成")
 		log.Printf("[RewardAnimationSystem] 最终位置: (%.1f, %.1f), 最终缩放: %.2f", posComp.X, posComp.Y, rewardComp.Scale)
 		log.Printf("[RewardAnimationSystem] 目标位置: (%.1f, %.1f)", rewardComp.TargetX, rewardComp.TargetY)
+
+		// Story 8.14: 来信奖励使用不同的流程
+		if rewardComp.RewardType == "note" {
+			// 来信奖励：清理卡包实体，进入 fadingOut 阶段
+			log.Printf("[RewardAnimationSystem] 来信奖励：进入 fadingOut 阶段")
+
+			// 清理粒子效果
+			ras.cleanupGlowParticles()
+
+			// 保存奖励信息
+			ras.currentRewardType = rewardComp.RewardType
+			ras.currentNoteID = rewardComp.PlantID // PlantID 字段存储了 noteID
+
+			// 清理卡包实体
+			if ras.rewardEntity != 0 {
+				ras.entityManager.DestroyEntity(ras.rewardEntity)
+				ras.entityManager.RemoveMarkedEntities()
+				ras.rewardEntity = 0
+			}
+
+			// 进入 fadingOut 阶段
+			ras.currentPhase = "fadingOut"
+			ras.phaseElapsed = 0
+			return
+		}
 
 		// Phase 3 完成，进入短暂停顿阶段（让玩家看清楚卡片包到达目标位置）
 		rewardComp.Phase = "pausing"
@@ -553,4 +579,167 @@ func (ras *RewardAnimationSystem) createRewardPanel(rewardType string, plantID s
 	})
 
 	log.Printf("[RewardAnimationSystem] 奖励面板已创建：%s - %s", rewardName, rewardDesc)
+}
+
+// ============================================================================
+// Story 8.14: 来信奖励专属阶段
+// ============================================================================
+
+// updateFadingOutPhaseInternal 处理淡出阶段（Story 8.14）
+// - 画面渐暗到黑色（0.5秒）
+// - 淡出完成后创建来信面板并进入 fadingIn 阶段
+func (ras *RewardAnimationSystem) updateFadingOutPhaseInternal(dt float64) {
+	ras.phaseElapsed += dt
+
+	// 计算淡出进度（0.0 → 1.0）
+	progress := ras.phaseElapsed / config.ZombieNoteFadeOutDuration
+	if progress > 1.0 {
+		progress = 1.0
+	}
+
+	// 保存淡出透明度（用于 Draw 方法绘制黑色遮罩）
+	// 通过 GameState 临时存储，因为此阶段没有 rewardComp
+	ras.gameState.NoteFadeAlpha = float32(progress)
+
+	// 检查完成
+	if ras.phaseElapsed >= config.ZombieNoteFadeOutDuration {
+		log.Printf("[RewardAnimationSystem] fadingOut 完成，创建来信面板并进入 fadingIn 阶段")
+
+		// 创建来信面板模块
+		ras.createNotePanelModule()
+
+		// 进入 fadingIn 阶段
+		ras.currentPhase = "fadingIn"
+		ras.phaseElapsed = 0
+	}
+}
+
+// updateFadingInPhaseInternal 处理淡入阶段（Story 8.14）
+// - 来信面板渐显（0.5秒）
+// - 淡入完成后进入 showing 阶段
+func (ras *RewardAnimationSystem) updateFadingInPhaseInternal(dt float64) {
+	ras.phaseElapsed += dt
+
+	// 计算淡入进度（0.0 → 1.0）
+	progress := ras.phaseElapsed / config.ZombieNoteFadeInDuration
+	if progress > 1.0 {
+		progress = 1.0
+	}
+
+	// 更新来信面板透明度
+	if ras.notePanelModule != nil {
+		ras.notePanelModule.SetFadeAlpha(progress)
+	}
+
+	// 黑色遮罩逐渐消失（1.0 → 0.0）
+	ras.gameState.NoteFadeAlpha = float32(1.0 - progress)
+
+	// 检查完成
+	if ras.phaseElapsed >= config.ZombieNoteFadeInDuration {
+		log.Printf("[RewardAnimationSystem] fadingIn 完成，进入 showing 阶段（来信面板）")
+
+		// 进入 showing 阶段
+		ras.currentPhase = "showing"
+		ras.phaseElapsed = 0
+
+		// 显示面板
+		if ras.notePanelModule != nil {
+			ras.notePanelModule.Show()
+		}
+	}
+}
+
+// createNotePanelModule 创建来信面板模块（Story 8.14）
+func (ras *RewardAnimationSystem) createNotePanelModule() {
+	if ras.notePanelModule != nil {
+		// 如果已存在，先清理
+		ras.notePanelModule.Cleanup()
+		ras.notePanelModule = nil
+	}
+
+	log.Printf("[RewardAnimationSystem] 创建来信面板模块，noteID: %s", ras.currentNoteID)
+
+	// 检查工厂函数是否已注入
+	if ras.notePanelFactory == nil {
+		log.Printf("[RewardAnimationSystem] 来信面板工厂未注入，跳过面板创建")
+		ras.cleanupNotePanelAndSwitchToNextLevel()
+		return
+	}
+
+	// 使用工厂函数创建来信面板
+	var err error
+	ras.notePanelModule, err = ras.notePanelFactory(
+		ras.currentNoteID,
+		func() {
+			// "下一关"按钮回调
+			log.Printf("[RewardAnimationSystem] 来信面板：点击下一关")
+			ras.cleanupNotePanelAndSwitchToNextLevel()
+		},
+		func() {
+			// "主菜单"按钮回调
+			log.Printf("[RewardAnimationSystem] 来信面板：点击主菜单")
+			ras.cleanupNotePanelAndSwitchToMainMenu()
+		},
+	)
+
+	if err != nil {
+		log.Printf("[RewardAnimationSystem] 创建来信面板失败: %v", err)
+		// 出错时直接切换到下一关
+		ras.cleanupNotePanelAndSwitchToNextLevel()
+		return
+	}
+
+	// 初始透明度为 0（将在 fadingIn 阶段逐渐增加）
+	ras.notePanelModule.SetFadeAlpha(0.0)
+}
+
+// cleanupNotePanelAndSwitchToNextLevel 清理来信面板并切换到下一关（Story 8.14）
+func (ras *RewardAnimationSystem) cleanupNotePanelAndSwitchToNextLevel() {
+	log.Printf("[RewardAnimationSystem] 清理来信面板并切换到下一关")
+
+	// 清理来信面板
+	if ras.notePanelModule != nil {
+		ras.notePanelModule.Cleanup()
+		ras.notePanelModule = nil
+	}
+
+	// 重置状态
+	ras.isActive = false
+	ras.currentPhase = ""
+	ras.gameState.NoteFadeAlpha = 0
+
+	// 切换到下一关
+	nextLevelID := ras.gameState.GetNextLevelID()
+	if nextLevelID != "" {
+		log.Printf("[RewardAnimationSystem] 切换到下一关: %s", nextLevelID)
+		if ras.sceneManager != nil {
+			ras.sceneManager.LoadLevel(nextLevelID)
+		}
+	} else {
+		log.Printf("[RewardAnimationSystem] 没有下一关，返回主菜单")
+		if ras.sceneManager != nil {
+			ras.sceneManager.SwitchToMainMenu()
+		}
+	}
+}
+
+// cleanupNotePanelAndSwitchToMainMenu 清理来信面板并切换到主菜单（Story 8.14）
+func (ras *RewardAnimationSystem) cleanupNotePanelAndSwitchToMainMenu() {
+	log.Printf("[RewardAnimationSystem] 清理来信面板并切换到主菜单")
+
+	// 清理来信面板
+	if ras.notePanelModule != nil {
+		ras.notePanelModule.Cleanup()
+		ras.notePanelModule = nil
+	}
+
+	// 重置状态
+	ras.isActive = false
+	ras.currentPhase = ""
+	ras.gameState.NoteFadeAlpha = 0
+
+	// 切换到主菜单
+	if ras.sceneManager != nil {
+		ras.sceneManager.SwitchToMainMenu()
+	}
 }

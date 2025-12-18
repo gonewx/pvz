@@ -5,8 +5,10 @@ import (
 
 	"github.com/gonewx/pvz/pkg/components"
 	"github.com/gonewx/pvz/pkg/config"
+	"github.com/gonewx/pvz/pkg/ecs"
 	"github.com/gonewx/pvz/pkg/entities"
 	"github.com/gonewx/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/modules"
 	"github.com/gonewx/pvz/pkg/systems"
 	"github.com/gonewx/pvz/pkg/systems/behavior"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -159,6 +161,27 @@ func (s *GameScene) initGameplaySystems(rm *game.ResourceManager) {
 		s.particleSystem,
 		s.renderSystem,
 	)
+
+	// Story 8.14: 注入来信面板工厂函数（打破循环依赖）
+	s.rewardSystem.SetNotePanelFactory(func(noteID string, onNextLevel func(), onMainMenu func()) (systems.NotePanelModule, error) {
+		return modules.NewZombieNotePanelModule(
+			s.entityManager,
+			s.resourceManager,
+			s.gameState,
+			func(screen *ebiten.Image, buttonEntity ecs.EntityID) {
+				// 按钮渲染回调：使用 ButtonRenderSystem 渲染按钮
+				if s.buttonRenderSystem != nil {
+					s.buttonRenderSystem.DrawButton(screen, buttonEntity)
+				}
+			},
+			WindowWidth,
+			WindowHeight,
+			noteID,
+			onNextLevel,
+			onMainMenu,
+		)
+	})
+
 	log.Printf("[GameScene] Initialized reward animation system")
 
 	// 初始化开场动画系统

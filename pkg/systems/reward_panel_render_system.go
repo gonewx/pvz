@@ -774,12 +774,12 @@ func (rprs *RewardPanelRenderSystem) drawMainMenuButton(screen *ebiten.Image, al
 		}
 	}
 
-	// 绘制按钮文字（"主菜单"，带阴影效果）
+	// 绘制按钮文字（"主菜单"，无阴影）
 	if rprs.buttonFont != nil {
 		buttonText := "主菜单"
 
 		// 按钮较小，使用较小的字体
-		smallFont, err := rprs.resourceManager.LoadFont("assets/fonts/SimHei.ttf", 12.0)
+		smallFont, err := rprs.resourceManager.LoadFont("assets/fonts/SimHei.ttf", config.RewardPanelMainMenuButtonFontSize)
 		if err != nil {
 			smallFont = rprs.buttonFont // 回退到默认按钮字体
 		}
@@ -789,7 +789,7 @@ func (rprs *RewardPanelRenderSystem) drawMainMenuButton(screen *ebiten.Image, al
 		textOp.GeoM.Translate(buttonX, buttonY)
 		textOp.PrimaryAlign = text.AlignCenter   // 水平居中
 		textOp.SecondaryAlign = text.AlignCenter // 垂直居中
-		textOp.ColorScale.ScaleWithColor(color.RGBA{0, 0, 0, 255})
+		textOp.ColorScale.ScaleWithColor(config.RewardPanelMainMenuButtonTextColor)
 		text.Draw(screen, buttonText, smallFont, textOp)
 	}
 }

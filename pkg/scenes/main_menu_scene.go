@@ -348,8 +348,9 @@ func NewMainMenuScene(rm *game.ResourceManager, sm *game.SceneManager) *MainMenu
 	helpPanel, err := modules.NewHelpPanelModule(
 		scene.entityManager,
 		rm,
-		scene.buttonSystem,
-		scene.buttonRenderSystem,
+		func(screen *ebiten.Image, buttonEntity ecs.EntityID) {
+			scene.buttonRenderSystem.DrawButton(screen, buttonEntity)
+		},
 		WindowWidth,
 		WindowHeight,
 		nil, // onClose callback (no special action needed)

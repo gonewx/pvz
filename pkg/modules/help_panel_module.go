@@ -2,6 +2,7 @@ package modules
 
 import (
 	"fmt"
+	"image"
 	"image/color"
 	"log"
 
@@ -9,7 +10,6 @@ import (
 	"github.com/gonewx/pvz/pkg/config"
 	"github.com/gonewx/pvz/pkg/ecs"
 	"github.com/gonewx/pvz/pkg/game"
-	"github.com/gonewx/pvz/pkg/systems"
 	"github.com/gonewx/pvz/pkg/utils"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -17,14 +17,16 @@ import (
 // HelpPanelModule 帮助面板模块
 //
 // 职责：
+//   - 加载草皮背景（从游戏背景图裁剪并缩放）
 //   - 加载便笺背景和帮助文本（使用 Alpha 蒙板叠加）
-//   - 创建和管理"确定"按钮
+//   - 创建和管理"主菜单"按钮
 //   - 处理面板显示/隐藏逻辑
-//   - 渲染遮罩、便笺背景、帮助文本和按钮
+//   - 渲染草皮背景、便笺背景、帮助文本和按钮
 //
 // 资源构成：
-//   - 便笺背景：ZombieNote.jpg + Alpha 蒙板 ZombieNote_.png
-//   - 帮助文本：ZombieNoteHelp.png + Alpha 蒙板 ZombieNoteHelpBlack.png
+//   - 草皮背景：从 IMAGE_BACKGROUND1 裁剪并缩放到全屏
+//   - 便笺背景：ZombieNote.jpg + ZombieNote_.png（Alpha 蒙板）
+//   - 帮助文本：ZombieNoteHelp.png（黑底白字 → 透明底黑字）
 //
 // 使用场景：
 //   - 主菜单场景：点击帮助按钮时显示
@@ -40,25 +42,28 @@ type HelpPanelModule struct {
 	// ECS 框架
 	entityManager *ecs.EntityManager
 
-	// 系统（内部管理）
-	buttonSystem       *systems.ButtonSystem       // 按钮交互（引用，不拥有）
-	buttonRenderSystem *systems.ButtonRenderSystem // 按钮渲染（引用，不拥有）
+	// 按钮渲染回调（避免循环导入）
+	drawButtonFunc func(screen *ebiten.Image, buttonEntity ecs.EntityID)
 
 	// 帮助面板实体
 	helpPanelEntity ecs.EntityID
 
 	// 按钮实体
-	confirmButtonEntity ecs.EntityID // "确定"按钮
+	confirmButtonEntity ecs.EntityID // "主菜单"按钮
 
-	// 原始图片（未合成，延迟处理避免 ReadPixels 错误）
-	bgJPG    *ebiten.Image // 便笺背景 JPG
-	bgMask   *ebiten.Image // 便笺背景 Alpha 蒙板
-	textPNG  *ebiten.Image // 帮助文本 PNG
-	textMask *ebiten.Image // 帮助文本 Alpha 蒙板
+	// 草皮背景（从 IMAGE_BACKGROUND1 裁剪并缩放到全屏）
+	lawnBackground *ebiten.Image
+
+	// 便笺背景原始图片
+	bgJPG  *ebiten.Image // 便笺背景 JPG
+	bgMask *ebiten.Image // 便笺背景 Alpha 蒙板
+
+	// 帮助文本原始图片
+	textPNG *ebiten.Image // 帮助文本 PNG
 
 	// 合成后的图片（首次 Draw 时生成）
 	backgroundImage *ebiten.Image // 便笺背景（RGB + Alpha 蒙板合成）
-	helpTextImage   *ebiten.Image // 帮助文本（RGB + Alpha 蒙板合成）
+	helpTextImage   *ebiten.Image // 帮助文本（黑底白字 → 透明底黑字）
 	composited      bool          // 是否已经合成（避免重复处理）
 
 	// 回调函数
@@ -67,6 +72,10 @@ type HelpPanelModule struct {
 	// 屏幕尺寸
 	windowWidth  int
 	windowHeight int
+
+	// 便笺面板尺寸
+	panelWidth  float64
+	panelHeight float64
 }
 
 // NewHelpPanelModule 创建帮助面板模块
@@ -74,8 +83,7 @@ type HelpPanelModule struct {
 // 参数:
 //   - em: EntityManager 实例
 //   - rm: ResourceManager 实例（用于加载图片资源）
-//   - buttonSystem: 按钮交互系统（引用，不拥有）
-//   - buttonRenderSystem: 按钮渲染系统（引用，不拥有）
+//   - drawButtonFunc: 按钮渲染回调函数（避免循环导入）
 //   - windowWidth, windowHeight: 游戏窗口尺寸
 //   - onClose: 关闭面板回调函数（可选）
 //
@@ -84,86 +92,133 @@ type HelpPanelModule struct {
 //   - error: 如果初始化失败
 //
 // 初始化流程：
-//  1. 加载便笺背景和 Alpha 蒙板，合成
-//  2. 加载帮助文本和 Alpha 蒙板，合成
-//  3. 创建"确定"按钮实体
-//  4. 创建帮助面板实体，添加 HelpPanelComponent
+//  1. 加载草皮背景（从 IMAGE_BACKGROUND1 裁剪并缩放到全屏）
+//  2. 加载便笺背景和 Alpha 蒙板
+//  3. 加载帮助文本
+//  4. 创建"主菜单"按钮实体
+//  5. 创建帮助面板实体
 //
 // Story 12.3: 对话框系统基础
 func NewHelpPanelModule(
 	em *ecs.EntityManager,
 	rm *game.ResourceManager,
-	buttonSystem *systems.ButtonSystem,
-	buttonRenderSystem *systems.ButtonRenderSystem,
+	drawButtonFunc func(screen *ebiten.Image, buttonEntity ecs.EntityID),
 	windowWidth, windowHeight int,
 	onClose func(),
 ) (*HelpPanelModule, error) {
 	module := &HelpPanelModule{
-		entityManager:      em,
-		buttonSystem:       buttonSystem,
-		buttonRenderSystem: buttonRenderSystem,
-		onClose:            onClose,
-		windowWidth:        windowWidth,
-		windowHeight:       windowHeight,
+		entityManager:  em,
+		drawButtonFunc: drawButtonFunc,
+		onClose:        onClose,
+		windowWidth:    windowWidth,
+		windowHeight:   windowHeight,
 	}
 
 	var err error
 
-	// 1. 加载便笺背景和 Alpha 蒙板（延迟处理，避免 ReadPixels 在游戏开始前调用）
-	log.Printf("[HelpPanelModule] Loading background images...")
-	module.bgJPG, err = rm.LoadImage("assets/images/ZombieNote.jpg")
+	// 1. 加载草皮背景（从 IMAGE_BACKGROUND1 裁剪并缩放到全屏）
+	log.Printf("[HelpPanelModule] Loading lawn background...")
+	bgImage, err := rm.LoadImageByID(config.NotePanelLawnBackgroundImage)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load %s: %w", config.NotePanelLawnBackgroundImage, err)
+	}
+	module.lawnBackground = cropAndScaleLawnBackground(bgImage, windowWidth, windowHeight)
+	log.Printf("[HelpPanelModule] Lawn background loaded and scaled to %dx%d", windowWidth, windowHeight)
+
+	// 2. 加载便笺背景和 Alpha 蒙板
+	log.Printf("[HelpPanelModule] Loading note background images...")
+	module.bgJPG, err = rm.LoadImage(config.ZombieNoteBackgroundJPG)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load ZombieNote.jpg: %w", err)
 	}
 
-	module.bgMask, err = rm.LoadImage("assets/images/ZombieNote_.png")
+	module.bgMask, err = rm.LoadImage(config.ZombieNoteBackgroundMask)
 	if err != nil {
 		log.Printf("[HelpPanelModule] Warning: Failed to load ZombieNote_.png: %v", err)
-		module.bgMask = nil // 没有蒙板就直接使用原图
+		module.bgMask = nil
 	}
 
-	// 2. 加载帮助文本（不需要蒙板，使用原图亮度作为 Alpha）
-	// ZombieNoteHelp.png：黑底白字
-	// ZombieNoteHelpBlack.png：全黑（无效的占位符）
-	// 处理目标：白字→黑字，黑底→透明
+	// 3. 加载帮助文本（黑底白字 → 透明底黑字）
 	log.Printf("[HelpPanelModule] Loading help text image...")
 	module.textPNG, err = rm.LoadImage("assets/images/ZombieNoteHelp.png")
 	if err != nil {
 		return nil, fmt.Errorf("failed to load ZombieNoteHelp.png: %w", err)
 	}
 
-	// 不需要加载蒙板（使用原图亮度作为 Alpha）
-	module.textMask = nil
+	// 4. 设置便笺面板尺寸（基于便笺背景图）
+	bgBounds := module.bgJPG.Bounds()
+	module.panelWidth = float64(bgBounds.Dx())
+	module.panelHeight = float64(bgBounds.Dy())
 
-	// Alpha Mask 合成将在首次 Draw() 时执行（此时游戏已经开始）
+	// Alpha Mask 合成将在首次 Draw() 时执行
 	module.composited = false
 
-	// 3. 创建"确定"按钮
+	// 5. 创建"主菜单"按钮
 	if err := module.createConfirmButton(rm); err != nil {
 		return nil, fmt.Errorf("failed to create confirm button: %w", err)
 	}
 
-	// 4. 创建帮助面板实体
+	// 6. 创建帮助面板实体
 	module.helpPanelEntity = em.CreateEntity()
 
-	// 获取背景图片尺寸（用于居中）
-	bgBounds := module.bgJPG.Bounds()
-	width := float64(bgBounds.Dx())
-	height := float64(bgBounds.Dy())
-
-	// 添加 HelpPanelComponent（此时图片还未合成，将在 Draw 时处理）
+	// 添加 HelpPanelComponent
 	ecs.AddComponent(em, module.helpPanelEntity, &components.HelpPanelComponent{
-		BackgroundImage:     nil, // 延迟合成
+		BackgroundImage:     module.lawnBackground,
 		HelpTextImage:       nil, // 延迟合成
 		ConfirmButtonEntity: uint64(module.confirmButtonEntity),
-		IsActive:            false, // 初始状态：未激活
-		Width:               width,
-		Height:              height,
+		IsActive:            false,
+		Width:               float64(windowWidth),
+		Height:              float64(windowHeight),
 	})
 
 	log.Printf("[HelpPanelModule] Initialized successfully")
 
 	return module, nil
+}
+
+// cropAndScaleLawnBackground 从背景图裁剪并缩放草皮区域到全屏
+//
+// 裁剪逻辑：
+//  1. 使用指定的起始点 (NotePanelLawnCropX, NotePanelLawnCropY) 和宽度 (NotePanelLawnCropWidth)
+//  2. 根据目标屏幕的宽高比自动计算裁剪高度
+//  3. 缩放到目标尺寸（因为比例相同，不会变形）
+//
+// 参数:
+//   - bgImage: 原始背景图 (IMAGE_BACKGROUND1)
+//   - targetWidth, targetHeight: 目标尺寸（窗口大小）
+//
+// 返回:
+//   - 裁剪并缩放后的图片
+func cropAndScaleLawnBackground(bgImage *ebiten.Image, targetWidth, targetHeight int) *ebiten.Image {
+	// 目标宽高比
+	targetRatio := float64(targetWidth) / float64(targetHeight)
+
+	// 起始点和宽度（从配置读取）
+	cropX := config.NotePanelLawnCropX
+	cropY := config.NotePanelLawnCropY
+	cropWidth := config.NotePanelLawnCropWidth
+
+	// 根据目标比例自动计算裁剪高度
+	cropHeight := int(float64(cropWidth) / targetRatio)
+
+	// 裁剪区域
+	cropRect := image.Rect(cropX, cropY, cropX+cropWidth, cropY+cropHeight)
+
+	// 裁剪图片
+	croppedImage := bgImage.SubImage(cropRect).(*ebiten.Image)
+
+	// 创建目标尺寸的图片
+	scaledImage := ebiten.NewImage(targetWidth, targetHeight)
+
+	// 计算缩放比例
+	scale := float64(targetWidth) / float64(cropWidth)
+
+	// 绘制缩放后的图片
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Scale(scale, scale)
+	scaledImage.DrawImage(croppedImage, op)
+
+	return scaledImage
 }
 
 // createConfirmButton 创建"主菜单"按钮（使用与奖励面板"下一关"按钮相同的样式）
@@ -172,20 +227,20 @@ func (m *HelpPanelModule) createConfirmButton(rm *game.ResourceManager) error {
 	hiddenX := -1000.0
 	hiddenY := -1000.0
 
-	// 加载按钮图片（直接使用图片路径，与奖励面板一致）
+	// 加载大按钮图片（与奖励面板下一关按钮一致）
 	buttonImage, err := rm.LoadImage("assets/images/SeedChooser_Button.png")
 	if err != nil {
 		return fmt.Errorf("failed to load SeedChooser_Button.png: %w", err)
 	}
 
-	// ✅ 加载按钮发光图片（悬停状态）
+	// 加载按钮发光图片（悬停状态）
 	buttonGlowImage, err := rm.LoadImage("assets/images/SeedChooser_Button_Glow.png")
 	if err != nil {
 		log.Printf("[HelpPanelModule] Warning: Failed to load SeedChooser_Button_Glow.png: %v", err)
 		buttonGlowImage = buttonImage // 降级使用普通图片
 	}
 
-	// 加载按钮文字字体（中文，使用奖励面板的字号）
+	// 加载按钮文字字体（使用奖励面板按钮字体大小）
 	buttonFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.RewardPanelButtonTextFontSize)
 	if err != nil {
 		log.Printf("[HelpPanelModule] Warning: Failed to load button font: %v", err)
@@ -205,17 +260,17 @@ func (m *HelpPanelModule) createConfirmButton(rm *game.ResourceManager) error {
 	buttonWidth := float64(buttonImage.Bounds().Dx())
 	buttonHeight := float64(buttonImage.Bounds().Dy())
 
-	// 添加按钮组件（简单图片按钮，与奖励面板样式一致）
+	// 添加按钮组件（大按钮样式，与奖励面板下一关按钮一致）
 	ecs.AddComponent(m.entityManager, m.confirmButtonEntity, &components.ButtonComponent{
 		Type:         components.ButtonTypeSimple,
 		NormalImage:  buttonImage,
-		HoverImage:   buttonGlowImage,            // ✅ 悬停时显示发光图片
-		PressedImage: buttonImage,                // ✅ 按下时仍使用普通图片（只有位移效果）
-		Text:         "主菜单",                      // 文字改为"主菜单"
-		Font:         buttonFont,                 // 中文字体
-		TextColor:    [4]uint8{255, 200, 0, 255}, // 橙黄色文字（与奖励面板一致）
-		Width:        buttonWidth,                // ✅ 初始化按钮尺寸
-		Height:       buttonHeight,               // ✅ 初始化按钮尺寸
+		HoverImage:   buttonGlowImage,
+		PressedImage: buttonImage,
+		Text:         "主菜单",
+		Font:         buttonFont,
+		TextColor:    [4]uint8{255, 200, 0, 255}, // 橙黄色文字
+		Width:        buttonWidth,
+		Height:       buttonHeight,
 		State:        components.UINormal,
 		Enabled:      true,
 		OnClick: func() {
@@ -257,12 +312,6 @@ func (m *HelpPanelModule) Update(deltaTime float64) {
 
 // showButton 显示"主菜单"按钮（移动到正确位置）
 func (m *HelpPanelModule) showButton() {
-	// 获取帮助面板组件（用于计算按钮位置）
-	helpPanel, ok := ecs.GetComponent[*components.HelpPanelComponent](m.entityManager, m.helpPanelEntity)
-	if !ok {
-		return
-	}
-
 	// 获取按钮组件
 	button, ok := ecs.GetComponent[*components.ButtonComponent](m.entityManager, m.confirmButtonEntity)
 	if !ok {
@@ -271,16 +320,13 @@ func (m *HelpPanelModule) showButton() {
 
 	// 屏幕中心位置
 	screenCenterX := float64(m.windowWidth) / 2.0
-	screenCenterY := float64(m.windowHeight) / 2.0
 
 	// 计算按钮宽度（简单图片按钮）
 	buttonWidth := float64(button.NormalImage.Bounds().Dx())
 
-	// 按钮位置：在便笺下方居中
-	// 便笺底部 Y 坐标 = 屏幕中心 Y + 便笺高度/2
-	panelBottomY := screenCenterY + helpPanel.Height/2.0
+	// 按钮位置：在屏幕下方居中
 	buttonX := screenCenterX - buttonWidth/2.0
-	buttonY := panelBottomY + 20.0 // 便笺下方 20 像素
+	buttonY := float64(m.windowHeight) - 80.0 // 距离屏幕底部 80 像素
 
 	// 更新按钮位置
 	if pos, ok := ecs.GetComponent[*components.PositionComponent](m.entityManager, m.confirmButtonEntity); ok {
@@ -304,7 +350,7 @@ func (m *HelpPanelModule) hideButton() {
 //
 // 职责：
 //   - 在首次 Draw 时调用（此时游戏已经开始，可以使用 ReadPixels）
-//   - 合成便笺背景
+//   - 合成便笺背景：ZombieNote.jpg + ZombieNote_.png（Alpha 蒙板）
 //   - 处理帮助文本：用亮度作为 Alpha，反转颜色（黑底白字 → 透明底黑字）
 //   - 更新 HelpPanelComponent 的图片引用
 //
@@ -316,35 +362,33 @@ func (m *HelpPanelModule) applyAlphaMasks() {
 		return // 已经合成过了
 	}
 
-	// 1. 合成便笺背景
+	// 1. 合成便笺背景（ZombieNote.jpg + ZombieNote_.png）
 	if m.bgMask != nil {
 		m.backgroundImage = utils.ApplyAlphaMask(m.bgJPG, m.bgMask)
-		log.Printf("[HelpPanelModule] Applied alpha mask to background")
+		log.Printf("[HelpPanelModule] Applied alpha mask to note background")
 	} else {
+		// 没有蒙板，直接使用原图
 		m.backgroundImage = m.bgJPG
-		log.Printf("[HelpPanelModule] Using original background (no mask)")
+		log.Printf("[HelpPanelModule] Using note background without mask")
 	}
 
 	// 2. 处理帮助文本：使用蒙板（像草皮渲染一样）
 	// 原图：黑底白字
 	// 策略：用原图自身作为蒙板（白色文字→不透明，黑色背景→透明）
 	// 然后将所有非透明像素设为黑色（不反转，直接设黑）
-
-	// 2.1 先应用蒙板（用原图自身作为蒙板，像草皮渲染一样）
 	maskedText := utils.ApplyAlphaMask(m.textPNG, m.textPNG)
 
-	// 2.2 将白色文字转为黑色（不反转，直接设为黑色）
+	// 3. 将白色文字转为黑色（不反转，直接设为黑色）
 	m.helpTextImage = m.convertToBlack(maskedText)
 	log.Printf("[HelpPanelModule] Applied alpha mask (self as mask) and converted to black")
 
-	// 3. 更新 HelpPanelComponent 的图片引用
+	// 4. 更新 HelpPanelComponent 的图片引用
 	helpPanel, ok := ecs.GetComponent[*components.HelpPanelComponent](m.entityManager, m.helpPanelEntity)
 	if ok {
-		helpPanel.BackgroundImage = m.backgroundImage
 		helpPanel.HelpTextImage = m.helpTextImage
 	}
 
-	// 4. 标记为已合成
+	// 5. 标记为已合成
 	m.composited = true
 	log.Printf("[HelpPanelModule] Image composition completed")
 }
@@ -403,10 +447,10 @@ func (m *HelpPanelModule) convertToBlack(src *ebiten.Image) *ebiten.Image {
 //   - screen: 目标渲染屏幕
 //
 // 渲染顺序：
-//  1. 半透明遮罩（覆盖整个屏幕）
+//  1. 草皮背景（全屏）
 //  2. 便笺背景（居中）
-//  3. 帮助文本（叠加在便笺上）
-//  4. "确定"按钮（在便笺下方）
+//  3. 帮助文本（在便笺上居中）
+//  4. "主菜单"按钮（在屏幕下方）
 func (m *HelpPanelModule) Draw(screen *ebiten.Image) {
 	// 获取帮助面板组件
 	helpPanel, ok := ecs.GetComponent[*components.HelpPanelComponent](m.entityManager, m.helpPanelEntity)
@@ -420,37 +464,38 @@ func (m *HelpPanelModule) Draw(screen *ebiten.Image) {
 		m.applyAlphaMasks()
 	}
 
-	// 1. 绘制半透明遮罩
-	m.drawOverlay(screen)
-
-	// 2. 计算居中位置
+	// 计算便笺面板居中位置
 	screenCenterX := float64(m.windowWidth) / 2.0
 	screenCenterY := float64(m.windowHeight) / 2.0
+	panelX := screenCenterX - m.panelWidth/2.0
+	panelY := screenCenterY - m.panelHeight/2.0
 
-	// 便笺背景居中
-	panelX := screenCenterX - helpPanel.Width/2.0
-	panelY := screenCenterY - helpPanel.Height/2.0
+	// 1. 绘制草皮背景（全屏，位置 0,0）
+	lawnOp := &ebiten.DrawImageOptions{}
+	screen.DrawImage(helpPanel.BackgroundImage, lawnOp)
 
-	// 3. 绘制便笺背景
-	bgOp := &ebiten.DrawImageOptions{}
-	bgOp.GeoM.Translate(panelX, panelY)
-	screen.DrawImage(helpPanel.BackgroundImage, bgOp)
+	// 2. 绘制便笺背景（居中）
+	if m.backgroundImage != nil {
+		bgOp := &ebiten.DrawImageOptions{}
+		bgOp.GeoM.Translate(panelX, panelY)
+		screen.DrawImage(m.backgroundImage, bgOp)
+	}
 
-	// 4. 绘制帮助文本（在便笺背景中央）
-	// 便笺背景：654x427，帮助文本：529x323
-	// 需要相对于便笺背景居中
-	textWidth := float64(helpPanel.HelpTextImage.Bounds().Dx())
-	textHeight := float64(helpPanel.HelpTextImage.Bounds().Dy())
-	textOffsetX := (helpPanel.Width - textWidth) / 2.0
-	textOffsetY := (helpPanel.Height - textHeight) / 2.0
+	// 3. 绘制帮助文本（在便笺上居中）
+	if helpPanel.HelpTextImage != nil {
+		textWidth := float64(helpPanel.HelpTextImage.Bounds().Dx())
+		textHeight := float64(helpPanel.HelpTextImage.Bounds().Dy())
+		textX := screenCenterX - textWidth/2.0
+		textY := screenCenterY - textHeight/2.0
 
-	textOp := &ebiten.DrawImageOptions{}
-	textOp.GeoM.Translate(panelX+textOffsetX, panelY+textOffsetY)
-	screen.DrawImage(helpPanel.HelpTextImage, textOp)
+		textOp := &ebiten.DrawImageOptions{}
+		textOp.GeoM.Translate(textX, textY)
+		screen.DrawImage(helpPanel.HelpTextImage, textOp)
+	}
 
-	// 5. 绘制"确定"按钮
-	if m.buttonRenderSystem != nil {
-		m.buttonRenderSystem.DrawButton(screen, m.confirmButtonEntity)
+	// 4. 绘制"主菜单"按钮
+	if m.drawButtonFunc != nil {
+		m.drawButtonFunc(screen, m.confirmButtonEntity)
 	}
 }
 

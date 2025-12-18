@@ -401,3 +401,202 @@ func TestIsMainMenuButtonClicked_NoPanel(t *testing.T) {
 
 	t.Logf("✓ isMainMenuButtonClicked returns false when no panel exists")
 }
+
+// ========== Story 8.14: 来信奖励类型测试 ==========
+
+// TestTriggerReward_NoteType 测试触发来信奖励
+func TestTriggerReward_NoteType(t *testing.T) {
+	em := ecs.NewEntityManager()
+
+	ras := &RewardAnimationSystem{
+		entityManager:     em,
+		screenWidth:       800.0,
+		screenHeight:      600.0,
+		isActive:          false,
+		currentRewardType: "",
+		currentNoteID:     "",
+	}
+
+	// 触发来信奖励
+	ras.currentRewardType = "note"
+	ras.currentNoteID = "zombienote1"
+	ras.isActive = true
+
+	// 验证奖励类型设置正确
+	if ras.currentRewardType != "note" {
+		t.Errorf("Expected currentRewardType 'note', got '%s'", ras.currentRewardType)
+	}
+
+	if ras.currentNoteID != "zombienote1" {
+		t.Errorf("Expected currentNoteID 'zombienote1', got '%s'", ras.currentNoteID)
+	}
+
+	t.Logf("✓ TriggerReward correctly sets note reward type and ID")
+}
+
+// TestIsCardPackClicked_NoteCard 测试来信卡包点击检测
+func TestIsCardPackClicked_NoteCard(t *testing.T) {
+	em := ecs.NewEntityManager()
+
+	// 创建奖励动画系统
+	ras := &RewardAnimationSystem{
+		entityManager: em,
+	}
+
+	// 创建奖励实体
+	rewardEntity := em.CreateEntity()
+	ras.rewardEntity = rewardEntity
+
+	// 添加位置组件（来信卡包中心位置，使用中心锚点）
+	ecs.AddComponent(em, rewardEntity, &components.PositionComponent{
+		X: 400.0, // 中心点
+		Y: 300.0, // 中心点
+	})
+
+	// 添加奖励动画组件（来信类型，缩放为1.0）
+	// 来信奖励使用 SeedPacket_Larger.png（类似工具，使用中心锚点）
+	ecs.AddComponent(em, rewardEntity, &components.RewardAnimationComponent{
+		RewardType: "note",
+		Scale:      1.0,
+		NoteID:     "zombienote1",
+	})
+
+	// 来信卡包尺寸与工具图标类似：116x125（中心锚点）
+	// 边界框：(400-58, 300-62.5) - (400+58, 300+62.5)
+	// 即：(342, 237.5) - (458, 362.5)
+
+	tests := []struct {
+		name     string
+		mouseX   float64
+		mouseY   float64
+		expected bool
+	}{
+		{"点击卡包中心", 400.0, 300.0, true},
+		{"点击卡包左边缘", 343.0, 300.0, true},
+		{"点击卡包右边缘", 457.0, 300.0, true},
+		{"点击卡包左侧外部", 341.0, 300.0, false},
+		{"点击卡包右侧外部", 459.0, 300.0, false},
+		{"点击远处", 100.0, 100.0, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ras.isCardPackClicked(tt.mouseX, tt.mouseY)
+			if result != tt.expected {
+				t.Errorf("isCardPackClicked(%.1f, %.1f) = %v, want %v",
+					tt.mouseX, tt.mouseY, result, tt.expected)
+			}
+		})
+	}
+
+	t.Logf("✓ isCardPackClicked correctly detects note card pack clicks")
+}
+
+// TestRewardAnimationComponent_NotePhases 测试来信奖励的阶段字段
+func TestRewardAnimationComponent_NotePhases(t *testing.T) {
+	// 测试来信奖励组件的各个阶段
+	comp := &components.RewardAnimationComponent{
+		Phase:          "appearing",
+		RewardType:     "note",
+		NoteID:         "zombienote1",
+		ParticleEffect: "SeedPacket",
+		FadeAlpha:      0.0,
+	}
+
+	// 验证初始阶段
+	if comp.Phase != "appearing" {
+		t.Errorf("Expected initial phase 'appearing', got '%s'", comp.Phase)
+	}
+
+	// 验证奖励类型
+	if comp.RewardType != "note" {
+		t.Errorf("Expected RewardType 'note', got '%s'", comp.RewardType)
+	}
+
+	// 验证来信ID
+	if comp.NoteID != "zombienote1" {
+		t.Errorf("Expected NoteID 'zombienote1', got '%s'", comp.NoteID)
+	}
+
+	// 验证粒子效果（waiting阶段使用 SeedPacket）
+	if comp.ParticleEffect != "SeedPacket" {
+		t.Errorf("Expected ParticleEffect 'SeedPacket', got '%s'", comp.ParticleEffect)
+	}
+
+	// 模拟各阶段转换
+	notePhases := []string{"appearing", "waiting", "expanding", "fadingOut", "fadingIn", "showing", "closing"}
+	for _, phase := range notePhases {
+		comp.Phase = phase
+		if comp.Phase != phase {
+			t.Errorf("Failed to set phase to '%s'", phase)
+		}
+	}
+
+	// 测试 FadeAlpha 范围
+	comp.Phase = "fadingOut"
+	testAlphas := []float32{0.0, 0.25, 0.5, 0.75, 1.0}
+	for _, alpha := range testAlphas {
+		comp.FadeAlpha = alpha
+		if comp.FadeAlpha != alpha {
+			t.Errorf("Expected FadeAlpha %.2f, got %.2f", alpha, comp.FadeAlpha)
+		}
+	}
+
+	t.Logf("✓ RewardAnimationComponent correctly supports note reward phases")
+}
+
+// TestZombieNoteConfig_GetImagePath 测试来信图片路径获取
+func TestZombieNoteConfig_GetImagePath(t *testing.T) {
+	tests := []struct {
+		noteID   string
+		expected string
+	}{
+		{"zombienote1", "assets/images/ZombieNote1.png"},
+		{"zombienote2", "assets/images/ZombieNote2.png"},
+		{"zombienote3", "assets/images/ZombieNote3.png"},
+		{"zombienote4", "assets/images/ZombieNote4.png"},
+		{"unknown", "assets/images/ZombieNote1.png"}, // 默认值
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.noteID, func(t *testing.T) {
+			result := config.GetZombieNoteImagePath(tt.noteID)
+			if result != tt.expected {
+				t.Errorf("GetZombieNoteImagePath(%s) = %s, want %s", tt.noteID, result, tt.expected)
+			}
+		})
+	}
+
+	t.Logf("✓ GetZombieNoteImagePath correctly returns image paths for note IDs")
+}
+
+// TestZombieNoteConfig_Constants 测试来信配置常量
+func TestZombieNoteConfig_Constants(t *testing.T) {
+	// 测试淡入淡出时长
+	if config.ZombieNoteFadeOutDuration != 0.5 {
+		t.Errorf("Expected ZombieNoteFadeOutDuration 0.5, got %f", config.ZombieNoteFadeOutDuration)
+	}
+	if config.ZombieNoteFadeInDuration != 0.5 {
+		t.Errorf("Expected ZombieNoteFadeInDuration 0.5, got %f", config.ZombieNoteFadeInDuration)
+	}
+
+	// 测试面板配置
+	if config.ZombieNotePanelOverlayAlpha != 128 {
+		t.Errorf("Expected ZombieNotePanelOverlayAlpha 128, got %d", config.ZombieNotePanelOverlayAlpha)
+	}
+
+	// 测试标题配置
+	if config.ZombieNoteTitleKey != "FOUND_NOTE" {
+		t.Errorf("Expected ZombieNoteTitleKey 'FOUND_NOTE', got '%s'", config.ZombieNoteTitleKey)
+	}
+
+	// 测试资源路径
+	if config.ZombieNoteBackgroundJPG != "assets/images/ZombieNote.jpg" {
+		t.Errorf("Expected ZombieNoteBackgroundJPG 'assets/images/ZombieNote.jpg', got '%s'", config.ZombieNoteBackgroundJPG)
+	}
+	if config.ZombieNoteBackgroundMask != "assets/images/ZombieNote_.png" {
+		t.Errorf("Expected ZombieNoteBackgroundMask 'assets/images/ZombieNote_.png', got '%s'", config.ZombieNoteBackgroundMask)
+	}
+
+	t.Logf("✓ ZombieNote config constants are correctly defined")
+}

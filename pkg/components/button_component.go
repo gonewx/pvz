@@ -52,6 +52,8 @@ type ButtonComponent struct {
 	Font *text.GoTextFace
 	// TextColor 文字颜色（RGBA）
 	TextColor [4]uint8 // R, G, B, A
+	// NoTextShadow 是否禁用文字阴影（默认 false，即显示阴影）
+	NoTextShadow bool
 
 	// ===== 按钮尺寸（自动计算）=====
 	// Width 按钮总宽度（像素，自动计算）

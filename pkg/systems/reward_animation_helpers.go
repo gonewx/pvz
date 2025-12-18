@@ -47,8 +47,8 @@ func (ras *RewardAnimationSystem) isCardPackClicked(mouseX, mouseY float64) bool
 	}
 
 	// 根据奖励类型计算边界框
-	if rewardComp.RewardType == "tool" {
-		// 工具图标：使用铲子图片尺寸 (116 x 125) * scale
+	if rewardComp.RewardType == "tool" || rewardComp.RewardType == "note" {
+		// 工具图标/来信卡包：使用铲子/卡包图片尺寸 (116 x 125) * scale
 		// 图标以中心点为锚点绘制
 		width := 116.0 * rewardComp.Scale
 		height := 125.0 * rewardComp.Scale
@@ -102,8 +102,8 @@ func (ras *RewardAnimationSystem) IsHoveringReward() bool {
 
 	// 根据奖励类型计算边界框
 	var width, height float64
-	if rewardComp.RewardType == "tool" {
-		// 工具图标：使用铲子图片尺寸 (116 x 125) * scale
+	if rewardComp.RewardType == "tool" || rewardComp.RewardType == "note" {
+		// 工具图标/来信卡包：使用铲子/卡包图片尺寸 (116 x 125) * scale
 		// 图标以中心点为锚点绘制
 		width = 116.0 * rewardComp.Scale
 		height = 125.0 * rewardComp.Scale
@@ -182,7 +182,8 @@ func easeOutQuad(t float64) float64 {
 // createAwardParticle 创建 Award 粒子特效（在玩家点击卡包后立即触发）
 // 粒子效果会根据奖励类型自动选择：
 //   - 植物奖励：Award（12个光芒发射器，360°星爆效果）
-//   - 工具奖励：AwardPickupArrow（光晕 + 向下箭头）
+//   - 工具奖励：Award（与植物奖励一致）
+//   - 来信奖励：Starburst（Story 8.14）
 func (ras *RewardAnimationSystem) createAwardParticle(rewardComp *components.RewardAnimationComponent) {
 	// 获取卡片位置
 	posComp, ok := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.rewardEntity)
@@ -202,13 +203,26 @@ func (ras *RewardAnimationSystem) createAwardParticle(rewardComp *components.Rew
 		cardHeight := float64(cardComp.BackgroundImage.Bounds().Dy()) * cardComp.CardScale
 		particleX += cardWidth / 2.0  // X：卡片水平中心
 		particleY += cardHeight / 2.0 // Y：卡片垂直中心
+	} else {
+		// 对于工具/来信奖励（使用 SpriteComponent），计算精灵中心
+		if spriteComp, ok := ecs.GetComponent[*components.SpriteComponent](ras.entityManager, ras.rewardEntity); ok && spriteComp.Image != nil {
+			spriteWidth := float64(spriteComp.Image.Bounds().Dx()) * rewardComp.Scale
+			spriteHeight := float64(spriteComp.Image.Bounds().Dy()) * rewardComp.Scale
+			particleX += spriteWidth / 2.0
+			particleY += spriteHeight / 2.0
+		}
 	}
 
-	// 确定使用的粒子效果名称
-	// expanding 阶段统一使用 Award（12个光芒），无论植物还是工具
-	particleEffectName := "Award"
+	// Story 8.14: 根据奖励类型选择粒子效果
+	var particleEffectName string
+	switch rewardComp.RewardType {
+	case "note":
+		particleEffectName = "Starburst" // 来信奖励使用星爆效果
+	default:
+		particleEffectName = "Award" // 植物/工具奖励使用12光芒效果
+	}
 
-	// 创建粒子特效（Award）
+	// 创建粒子特效
 	awardID, err := entities.CreateParticleEffect(
 		ras.entityManager,
 		ras.resourceManager,

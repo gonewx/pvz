@@ -1,5 +1,7 @@
 package config
 
+import "image/color"
+
 // 布局配置常量
 // 本文件定义了游戏场景中的布局参数，包括网格系统、UI元素位置等
 
@@ -622,9 +624,15 @@ const (
 	// RewardPanelMainMenuButtonY 主菜单按钮Y位置（相对于面板背景高度的比例）
 	// 0.08 表示按钮中心位于背景高度的 8% 位置（顶部区域）
 	// 建议值范围：0.05 - 0.15
+	RewardPanelMainMenuButtonY = 0.03
 
-	RewardPanelMainMenuButtonY = 0.05
+	// RewardPanelMainMenuButtonFontSize 主菜单按钮字体大小
+	// 小按钮使用较小的字体
+	RewardPanelMainMenuButtonFontSize = 12.0
 )
+
+// RewardPanelMainMenuButtonTextColor 主菜单按钮文字颜色（黑色）
+var RewardPanelMainMenuButtonTextColor = color.RGBA{0, 0, 0, 255}
 
 // CalculateBowlingNutSpeed 动态计算保龄球坚果滚动速度
 // 使位移速度与动画旋转速度同步，避免"滑步"效果

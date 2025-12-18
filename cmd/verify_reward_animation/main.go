@@ -28,9 +28,10 @@ var (
 	// 命令行参数
 	plantID    = flag.String("plant", "", "植物ID (使用 --list 查看所有可用植物)")
 	toolID     = flag.String("tool", "", "工具ID (shovel)")
+	noteID     = flag.String("note", "", "来信ID (zombienote1, zombienote2, zombienote3, zombienote4)")
 	listPlants = flag.Bool("list", false, "列出所有可用植物")
 	verbose    = flag.Bool("verbose", false, "显示详细调试信息")
-	rewardType string // 奖励类型: "plant" 或 "tool"
+	rewardType string // 奖励类型: "plant"、"tool" 或 "note"
 	rewardID   string // 奖励ID
 )
 
@@ -225,7 +226,14 @@ func (vg *VerifyRewardAnimationGame) Update() error {
 				log.Println("  ✅ Phase 3: expanding     - 移动+展开动画 (完成)")
 				log.Println("  ✅ Phase 3.5: pausing     - 短暂停顿+粒子 (完成)")
 				log.Println("  ✅ Phase 3.6: disappearing - 卡片包消失 (完成)")
-				log.Println("  ✅ Phase 4: showing       - 面板显示 (完成)")
+				if rewardType == "note" {
+					// 来信奖励有额外的淡入淡出阶段
+					log.Println("  ✅ Phase 3.7: fadingOut   - 画面淡出 (完成)")
+					log.Println("  ✅ Phase 3.8: fadingIn    - 面板淡入 (完成)")
+					log.Println("  ✅ Phase 4: showing       - 来信面板显示 (完成)")
+				} else {
+					log.Println("  ✅ Phase 4: showing       - 面板显示 (完成)")
+				}
 				log.Println()
 				log.Println("按 R 重启或 Q 退出")
 				log.Println("════════════════════════════════════════════════════════")
@@ -338,13 +346,32 @@ func main() {
 		os.Exit(0)
 	}
 
-	// 验证参数：必须指定 --plant 或 --tool 其中之一
+	// 验证参数：必须指定 --plant 或 --tool 或 --note 其中之一
 	validTools := map[string]bool{
 		"shovel": true,
 	}
 
-	if *plantID != "" && *toolID != "" {
-		fmt.Fprintln(os.Stderr, "错误: 不能同时指定 --plant 和 --tool")
+	validNotes := map[string]bool{
+		"zombienote1": true,
+		"zombienote2": true,
+		"zombienote3": true,
+		"zombienote4": true,
+	}
+
+	// 检查参数互斥
+	paramCount := 0
+	if *plantID != "" {
+		paramCount++
+	}
+	if *toolID != "" {
+		paramCount++
+	}
+	if *noteID != "" {
+		paramCount++
+	}
+
+	if paramCount > 1 {
+		fmt.Fprintln(os.Stderr, "错误: 不能同时指定 --plant、--tool 和 --note")
 		os.Exit(1)
 	}
 
@@ -365,6 +392,14 @@ func main() {
 		}
 		rewardType = "tool"
 		rewardID = *toolID
+	} else if *noteID != "" {
+		if !validNotes[*noteID] {
+			fmt.Fprintf(os.Stderr, "错误: 无效的来信ID '%s'\n", *noteID)
+			fmt.Fprintln(os.Stderr, "有效的来信ID: zombienote1, zombienote2, zombienote3, zombienote4")
+			os.Exit(1)
+		}
+		rewardType = "note"
+		rewardID = *noteID
 	} else {
 		// 默认测试向日葵
 		rewardType = "plant"
@@ -379,9 +414,12 @@ func main() {
 
 	// 设置窗口标题
 	var title string
-	if rewardType == "tool" {
+	switch rewardType {
+	case "tool":
 		title = fmt.Sprintf("完整奖励动画流程验证 - 工具:%s", rewardID)
-	} else {
+	case "note":
+		title = fmt.Sprintf("完整奖励动画流程验证 - 来信:%s", rewardID)
+	default:
 		title = fmt.Sprintf("完整奖励动画流程验证 - 植物:%s", rewardID)
 	}
 	ebiten.SetWindowTitle(title)

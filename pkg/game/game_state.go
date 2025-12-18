@@ -90,6 +90,10 @@ type GameState struct {
 	// 管理游戏中所有音效和背景音乐的播放，支持音量控制
 	// 需要通过 SetAudioManager 设置，由持有 ResourceManager 的组件初始化
 	audioManager *AudioManager
+
+	// Story 8.14: 来信奖励淡入淡出状态
+	// 用于 fadingOut/fadingIn 阶段的黑色遮罩透明度（0.0 - 1.0）
+	NoteFadeAlpha float32
 }
 
 // 全局单例实例（这是架构规范允许的唯一全局变量）
