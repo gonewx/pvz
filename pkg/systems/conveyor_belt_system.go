@@ -551,8 +551,21 @@ func (s *ConveyorBeltSystem) SetGenerationInterval(interval float64) {
 	}
 }
 
-// IsPlacementValid 检查放置位置是否有效（红线左侧）
+// IsPlacementValid 检查放置位置是否有效
+// Story 8.15: bowling 模式限制在红线左侧，conveyor 模式允许任意列
 func (s *ConveyorBeltSystem) IsPlacementValid(worldX float64) bool {
+	// 获取关卡配置（需要检查 gameState 是否为 nil）
+	var levelConfig *config.LevelConfig
+	if s.gameState != nil {
+		levelConfig = s.gameState.CurrentLevel
+	}
+
+	// conveyor 模式：无红线限制
+	if levelConfig != nil && levelConfig.SpecialRules == "conveyor" {
+		return true
+	}
+
+	// bowling 模式：红线限制
 	col := int((worldX - config.GridWorldStartX) / config.CellWidth)
 	return col >= 0 && col < config.BowlingRedLineColumn
 }
@@ -609,8 +622,16 @@ func (s *ConveyorBeltSystem) getCurrentPhase() int {
 }
 
 // getPhaseCardPool 获取当前阶段的卡片池
-// 根据阶段返回不同的爆炸坚果权重
+// Story 8.15: 区分 bowling 和 conveyor 模式
+// - bowling 模式：根据阶段返回不同的爆炸坚果权重
+// - conveyor 模式：使用关卡配置的完整卡片池
 func (s *ConveyorBeltSystem) getPhaseCardPool() []CardPoolEntry {
+	// Story 8.15: conveyor 模式直接使用配置的卡片池
+	if s.gameState != nil && s.gameState.CurrentLevel != nil &&
+		s.gameState.CurrentLevel.SpecialRules == "conveyor" {
+		return s.cardPool
+	}
+
 	// 如果没有配置阶段配置，使用默认卡片池
 	if len(s.phaseConfigs) == 0 {
 		return s.cardPool
@@ -642,7 +663,7 @@ func (s *ConveyorBeltSystem) getPhaseCardPool() []CardPoolEntry {
 		return s.cardPool
 	}
 
-	// 构建卡片池：普通坚果 + 爆炸坚果
+	// bowling 模式：构建卡片池（普通坚果 + 爆炸坚果）
 	wallnutWeight := 100 - currentConfig.ExplodeNutWeight
 	return []CardPoolEntry{
 		{Type: components.CardTypeWallnutBowling, Weight: wallnutWeight},

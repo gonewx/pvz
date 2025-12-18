@@ -152,6 +152,7 @@ func (s *GameScene) handleConveyorBeltClick(mouseX, mouseY int) bool {
 }
 
 // handleConveyorCardPlacement 处理传送带卡片放置，返回是否成功
+// Story 8.15: 支持 bowling 和 conveyor 两种模式
 func (s *GameScene) handleConveyorCardPlacement(worldX, worldY float64) bool {
 	if s.conveyorBeltSystem == nil {
 		return false
@@ -190,25 +191,57 @@ func (s *GameScene) handleConveyorCardPlacement(worldX, worldY float64) bool {
 		return false
 	}
 
-	isExplosive := removedCardType == components.CardTypeExplodeONut
+	var entityID ecs.EntityID
+	var err error
 
-	entityID, err := entities.NewBowlingNutEntity(
-		s.entityManager,
-		s.resourceManager,
-		row,
-		col,
-		isExplosive,
-	)
+	// Story 8.15: 根据 specialRules 区分处理
+	levelConfig := s.gameState.CurrentLevel
+	if levelConfig != nil && levelConfig.SpecialRules == "conveyor" {
+		// 传送带模式：使用植物工厂注册表创建植物
+		factory, ok := entities.GetPlantFactory(removedCardType)
+		if !ok {
+			log.Printf("[GameScene] 未知植物类型: %s", removedCardType)
+			s.conveyorBeltSystem.DeselectCard()
+			s.destroyConveyorCardPreview()
+			return false
+		}
+		deps := entities.PlantFactoryDeps{
+			EntityManager:  s.entityManager,
+			ResourceLoader: s.resourceManager,
+			GameState:      s.gameState,
+			ReanimSystem:   s.reanimSystem,
+		}
+		entityID, err = factory(deps, col, row)
+		if err != nil {
+			log.Printf("[GameScene] 创建植物失败: %v", err)
+			s.conveyorBeltSystem.DeselectCard()
+			s.destroyConveyorCardPreview()
+			return false
+		}
+		log.Printf("[GameScene] 放置植物: entityID=%d, type=%s, row=%d, col=%d",
+			entityID, removedCardType, row+1, col+1)
+	} else {
+		// 保龄球模式：创建保龄球坚果
+		isExplosive := removedCardType == components.CardTypeExplodeONut
 
-	if err != nil {
-		log.Printf("[GameScene] 创建保龄球坚果失败: %v", err)
-		s.conveyorBeltSystem.DeselectCard()
-		s.destroyConveyorCardPreview()
-		return false
+		entityID, err = entities.NewBowlingNutEntity(
+			s.entityManager,
+			s.resourceManager,
+			row,
+			col,
+			isExplosive,
+		)
+
+		if err != nil {
+			log.Printf("[GameScene] 创建保龄球坚果失败: %v", err)
+			s.conveyorBeltSystem.DeselectCard()
+			s.destroyConveyorCardPreview()
+			return false
+		}
+
+		log.Printf("[GameScene] 放置保龄球坚果: entityID=%d, type=%s, row=%d, col=%d",
+			entityID, removedCardType, row+1, col+1)
 	}
-
-	log.Printf("[GameScene] 放置保龄球坚果: entityID=%d, type=%s, row=%d, col=%d",
-		entityID, removedCardType, row+1, col+1)
 
 	s.conveyorBeltSystem.DeselectCard()
 	s.destroyConveyorCardPreview()
@@ -250,6 +283,7 @@ func (s *GameScene) isConveyorCardSelected() bool {
 }
 
 // createConveyorCardPreview 创建传送带卡片预览实体（复用 PlantPreviewComponent）
+// Story 8.15: 支持所有植物类型的预览图标
 func (s *GameScene) createConveyorCardPreview() {
 	// 先销毁已存在的预览
 	s.destroyConveyorCardPreview()
@@ -259,17 +293,23 @@ func (s *GameScene) createConveyorCardPreview() {
 		return
 	}
 
-	isExplosive := cardType == components.CardTypeExplodeONut
-
+	// Story 8.15: 从缓存中查找植物图标
 	var previewIcon *ebiten.Image
-	if isExplosive {
-		previewIcon = s.conveyorExplodeNutIcon
-	} else {
-		previewIcon = s.conveyorWallnutIcon
+	if s.conveyorPlantIcons != nil {
+		previewIcon = s.conveyorPlantIcons[cardType]
+	}
+	// 回退到坚果图标
+	isExplosive := cardType == components.CardTypeExplodeONut
+	if previewIcon == nil {
+		if isExplosive {
+			previewIcon = s.conveyorExplodeNutIcon
+		} else {
+			previewIcon = s.conveyorWallnutIcon
+		}
 	}
 
 	if previewIcon == nil {
-		log.Printf("[GameScene] No preview icon available for conveyor card")
+		log.Printf("[GameScene] No preview icon available for conveyor card: %s", cardType)
 		return
 	}
 
@@ -294,7 +334,7 @@ func (s *GameScene) createConveyorCardPreview() {
 		IsExplosive: isExplosive,
 	})
 
-	log.Printf("[GameScene] 创建传送带卡片预览: entityID=%d, explosive=%v", entityID, isExplosive)
+	log.Printf("[GameScene] 创建传送带卡片预览: entityID=%d, cardType=%s", entityID, cardType)
 }
 
 // destroyConveyorCardPreview 销毁传送带卡片预览实体
@@ -488,6 +528,7 @@ func (s *GameScene) updateConveyorDragPreview(dragInfo utils.DragInfo) {
 }
 
 // handleConveyorDragEnd 处理拖拽结束
+// Story 8.15: 支持 bowling 和 conveyor 两种模式
 func (s *GameScene) handleConveyorDragEnd(dragInfo utils.DragInfo) {
 	defer s.cancelConveyorDragPlanting()
 
@@ -521,23 +562,51 @@ func (s *GameScene) handleConveyorDragEnd(dragInfo utils.DragInfo) {
 		return
 	}
 
-	isExplosive := removedCardType == components.CardTypeExplodeONut
+	var entityID ecs.EntityID
+	var err error
 
-	entityID, err := entities.NewBowlingNutEntity(
-		s.entityManager,
-		s.resourceManager,
-		row,
-		col,
-		isExplosive,
-	)
+	// Story 8.15: 根据 specialRules 区分处理
+	levelConfig := s.gameState.CurrentLevel
+	if levelConfig != nil && levelConfig.SpecialRules == "conveyor" {
+		// 传送带模式：使用植物工厂注册表创建植物
+		factory, ok := entities.GetPlantFactory(removedCardType)
+		if !ok {
+			log.Printf("[GameScene] 传送带卡片拖拽结束: 未知植物类型: %s", removedCardType)
+			return
+		}
+		deps := entities.PlantFactoryDeps{
+			EntityManager:  s.entityManager,
+			ResourceLoader: s.resourceManager,
+			GameState:      s.gameState,
+			ReanimSystem:   s.reanimSystem,
+		}
+		entityID, err = factory(deps, col, row)
+		if err != nil {
+			log.Printf("[GameScene] 传送带卡片拖拽结束: 创建植物失败: %v", err)
+			return
+		}
+		log.Printf("[GameScene] 传送带卡片拖拽种植成功: entityID=%d, type=%s, row=%d, col=%d",
+			entityID, removedCardType, row+1, col+1)
+	} else {
+		// 保龄球模式：创建保龄球坚果
+		isExplosive := removedCardType == components.CardTypeExplodeONut
 
-	if err != nil {
-		log.Printf("[GameScene] 传送带卡片拖拽结束: 创建保龄球坚果失败: %v", err)
-		return
+		entityID, err = entities.NewBowlingNutEntity(
+			s.entityManager,
+			s.resourceManager,
+			row,
+			col,
+			isExplosive,
+		)
+
+		if err != nil {
+			log.Printf("[GameScene] 传送带卡片拖拽结束: 创建保龄球坚果失败: %v", err)
+			return
+		}
+
+		log.Printf("[GameScene] 传送带卡片拖拽种植成功: entityID=%d, type=%s, row=%d, col=%d",
+			entityID, removedCardType, row+1, col+1)
 	}
-
-	log.Printf("[GameScene] 传送带卡片拖拽种植成功: entityID=%d, type=%s, row=%d, col=%d",
-		entityID, removedCardType, row+1, col+1)
 }
 
 // cancelConveyorDragPlanting 取消拖拽种植模式

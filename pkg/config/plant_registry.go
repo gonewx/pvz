@@ -28,6 +28,7 @@ var plantRegistry = []PlantInfo{
 	{Type: types.PlantSnowPea, ID: "snowpea", ReanimName: "SnowPea", DisplayName: "寒冰射手"},
 	{Type: types.PlantChomper, ID: "chomper", ReanimName: "Chomper", DisplayName: "大嘴花"},
 	{Type: types.PlantRepeater, ID: "repeater", ReanimName: "PeaShooter", DisplayName: "双发射手"},
+	{Type: types.PlantPuffShroom, ID: "puffshroom", ReanimName: "Puffshroom", DisplayName: "小喷菇"},
 }
 
 // 预构建的索引映射，避免每次查询都遍历
@@ -53,6 +54,7 @@ func init() {
 		types.PlantSnowPea:    SnowPeaSunCost,
 		types.PlantChomper:    ChomperSunCost,
 		types.PlantRepeater:   RepeaterSunCost,
+		types.PlantPuffShroom: PuffShroomSunCost,
 	}
 
 	// 初始化冷却时间映射（引用现有常量）
@@ -65,6 +67,7 @@ func init() {
 		types.PlantSnowPea:    SnowPeaRechargeTime,
 		types.PlantChomper:    ChomperRechargeTime,
 		types.PlantRepeater:   RepeaterRechargeTime,
+		types.PlantPuffShroom: PuffShroomRechargeTime,
 	}
 
 	// 构建索引映射

@@ -83,6 +83,15 @@ var PlantConfigs = map[types.PlantType]*PlantResourceConfig{
 			"idle_shoot_blink", // 隐藏射击眨眼轨道
 		},
 	},
+	types.PlantPuffShroom: {
+		ResourceName:     "Puffshroom",
+		ConfigID:         "puffshroom",
+		PreviewFrame:     -1,          // 自动选择
+		PreviewAnimation: "anim_idle", // 待机动画
+		HiddenTracks: []string{
+			"anim_blink", // 隐藏眨眼轨道
+		},
+	},
 }
 
 // GetPlantConfig 获取植物配置

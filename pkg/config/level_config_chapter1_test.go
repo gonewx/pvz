@@ -369,3 +369,135 @@ func TestChapter1_ProgressiveUnlocks(t *testing.T) {
 		})
 	}
 }
+
+// TestLevel1_10_Specification 测试关卡 1-10 是否符合 Story 8.15 规范
+// Story 8.15: 传送带植物模式 - 第一章最终关卡
+func TestLevel1_10_Specification(t *testing.T) {
+	config, err := LoadLevelConfig("../../data/levels/level-1-10.yaml")
+	if err != nil {
+		t.Fatalf("Failed to load level-1-10.yaml: %v", err)
+	}
+
+	// 验证基本信息
+	t.Run("基本信息", func(t *testing.T) {
+		if config.ID != "1-10" {
+			t.Errorf("Expected ID '1-10', got '%s'", config.ID)
+		}
+		if config.SceneType != "day" {
+			t.Errorf("Expected sceneType 'day', got '%s'", config.SceneType)
+		}
+		if config.RowMax != 5 {
+			t.Errorf("Expected rowMax 5, got %d", config.RowMax)
+		}
+	})
+
+	// 验证旗帜数量：2 面旗帜
+	t.Run("旗帜配置", func(t *testing.T) {
+		if config.Flags != 2 {
+			t.Errorf("Expected 2 flags, got %d", config.Flags)
+		}
+	})
+
+	// 验证特殊规则：conveyor 模式
+	t.Run("特殊规则", func(t *testing.T) {
+		if config.SpecialRules != "conveyor" {
+			t.Errorf("Expected specialRules 'conveyor', got '%s'", config.SpecialRules)
+		}
+	})
+
+	// 验证初始阳光为 0
+	t.Run("初始阳光", func(t *testing.T) {
+		if config.InitialSun != 0 {
+			t.Errorf("Expected initialSun 0, got %d", config.InitialSun)
+		}
+	})
+
+	// 验证波次数量：20 波
+	t.Run("波次配置", func(t *testing.T) {
+		if len(config.Waves) != 20 {
+			t.Errorf("Expected 20 waves, got %d", len(config.Waves))
+		}
+
+		// 验证第 10 波和第 20 波是旗帜波
+		flagWaves := []int{10, 20}
+		for _, waveNum := range flagWaves {
+			wave := config.Waves[waveNum-1] // 0-based index
+			if !wave.IsFlag {
+				t.Errorf("Wave %d should be a flag wave", waveNum)
+			}
+			if wave.Type != "Final" {
+				t.Errorf("Wave %d should have type 'Final', got '%s'", waveNum, wave.Type)
+			}
+		}
+
+		// 验证所有波次都有 ExtraPoints（除了保底僵尸外都是动态分配）
+		for i, wave := range config.Waves {
+			if wave.Type == "ExtraPoints" || wave.Type == "Final" {
+				if wave.ExtraPoints <= 0 {
+					t.Errorf("Wave %d should have positive extraPoints, got %d", i+1, wave.ExtraPoints)
+				}
+			}
+		}
+	})
+
+	// 验证场地布局：完整 5 行草地
+	t.Run("场地布局", func(t *testing.T) {
+		expectedLanes := []int{1, 2, 3, 4, 5}
+		if len(config.EnabledLanes) != len(expectedLanes) {
+			t.Errorf("Expected %d enabled lanes, got %d", len(expectedLanes), len(config.EnabledLanes))
+		}
+		for i, lane := range expectedLanes {
+			if i >= len(config.EnabledLanes) || config.EnabledLanes[i] != lane {
+				t.Errorf("Expected lanes %v, got %v", expectedLanes, config.EnabledLanes)
+				break
+			}
+		}
+	})
+
+	// 验证传送带配置
+	t.Run("传送带配置", func(t *testing.T) {
+		if !config.ConveyorBelt.Enabled {
+			t.Error("Expected conveyorBelt.enabled to be true")
+		}
+		// 验证 7 种植物在卡片池中（排除向日葵，因为传送带模式无阳光经济）
+		expectedCards := map[string]bool{
+			"peashooter": true, "wallnut": true, "potatomine": true,
+			"snowpea": true, "chomper": true, "repeater": true, "cherrybomb": true,
+		}
+		if len(config.ConveyorBelt.CardPool) != 7 {
+			t.Errorf("Expected 7 card types in pool, got %d", len(config.ConveyorBelt.CardPool))
+		}
+		for _, card := range config.ConveyorBelt.CardPool {
+			if !expectedCards[card.Type] {
+				t.Errorf("Unexpected card type '%s' in pool", card.Type)
+			}
+			if card.Weight <= 0 {
+				t.Errorf("Card type '%s' should have positive weight", card.Type)
+			}
+		}
+	})
+
+	// 验证奖励植物：小喷菇
+	t.Run("奖励配置", func(t *testing.T) {
+		if config.RewardPlant != "puffshroom" {
+			t.Errorf("Expected rewardPlant 'puffshroom', got '%s'", config.RewardPlant)
+		}
+	})
+
+	// 验证僵尸池：basic, conehead, polevaulter, buckethead
+	t.Run("僵尸池", func(t *testing.T) {
+		expectedZombies := []string{"basic", "conehead", "polevaulter", "buckethead"}
+		if len(config.ZombiePool) != len(expectedZombies) {
+			t.Errorf("Expected %d zombie types in pool, got %d", len(expectedZombies), len(config.ZombiePool))
+		}
+		zombieSet := make(map[string]bool)
+		for _, zombie := range config.ZombiePool {
+			zombieSet[zombie] = true
+		}
+		for _, expected := range expectedZombies {
+			if !zombieSet[expected] {
+				t.Errorf("Expected zombie type '%s' in pool", expected)
+			}
+		}
+	})
+}

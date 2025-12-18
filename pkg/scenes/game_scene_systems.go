@@ -483,6 +483,12 @@ func (s *GameScene) setupSystemCallbacks() {
 		return
 	}
 
+	// Story 8.15: 传送带关卡直接激活，不需要阶段转换流程
+	if s.gameState.CurrentLevel.SpecialRules == "conveyor" {
+		s.setupConveyorLevelCallbacks()
+		return
+	}
+
 	// 设置强引导教学转场回调
 	s.guidedTutorialSystem.SetTransitionCallback(func() {
 		log.Printf("[GameScene] GuidedTutorial transition callback triggered")
@@ -520,6 +526,36 @@ func (s *GameScene) setupSystemCallbacks() {
 		s.initLawnmowers()
 		log.Printf("[GameScene] Lawnmowers initialized for bowling phase")
 	})
+}
+
+// setupConveyorLevelCallbacks 设置传送带关卡的回调（直接激活模式）
+// Story 8.15: 传送带关卡不需要两阶段流程，直接激活传送带和游戏
+func (s *GameScene) setupConveyorLevelCallbacks() {
+	log.Printf("[GameScene] Setting up conveyor level (direct activation mode)")
+
+	// 直接激活传送带模式（设置传送带可见、位置、阶段）
+	s.levelPhaseSystem.ActivateConveyorModeDirectly()
+
+	// 激活传送带系统
+	if s.conveyorBeltSystem != nil {
+		s.conveyorBeltSystem.Activate()
+		log.Printf("[GameScene] Conveyor belt system activated")
+	}
+
+	// conveyor 模式不启用红线（无放置限制）
+	if s.plantPreviewRenderSystem != nil {
+		s.plantPreviewRenderSystem.SetRedLineEnabled(false)
+	}
+
+	// 恢复波次计时
+	if s.levelSystem != nil {
+		s.levelSystem.ResumeWaveTiming()
+		log.Printf("[GameScene] Wave timing resumed for conveyor level")
+	}
+
+	// 初始化除草车
+	s.initLawnmowers()
+	log.Printf("[GameScene] Lawnmowers initialized for conveyor level")
 }
 
 // initLevelEntities 初始化关卡实体（预设植物、Dave对话等）

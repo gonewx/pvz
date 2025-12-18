@@ -6,6 +6,7 @@ import (
 	"github.com/gonewx/pvz/pkg/components"
 	"github.com/gonewx/pvz/pkg/config"
 	"github.com/gonewx/pvz/pkg/entities"
+	"github.com/gonewx/pvz/pkg/types"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -147,6 +148,7 @@ func (s *GameScene) loadResources() {
 
 // loadConveyorCardResources 加载传送带卡片渲染资源
 // 必须在 ReanimSystem 初始化后调用（需要使用 RenderPlantIcon）
+// Story 8.15: 根据关卡配置的卡片池动态加载所有需要的植物图标
 func (s *GameScene) loadConveyorCardResources() {
 	// 加载卡片背景框
 	cardBg, err := s.resourceManager.LoadImageByID(config.PlantCardBackgroundID)
@@ -157,7 +159,10 @@ func (s *GameScene) loadConveyorCardResources() {
 		log.Printf("[GameScene] Loaded conveyor card background")
 	}
 
-	// 使用 RenderPlantIcon 渲染坚果图标
+	// 初始化植物图标缓存
+	s.conveyorPlantIcons = make(map[string]*ebiten.Image)
+
+	// 使用 RenderPlantIcon 渲染坚果图标（保龄球模式需要）
 	wallnutIcon, err := entities.RenderPlantIcon(
 		s.entityManager,
 		s.resourceManager,
@@ -168,12 +173,50 @@ func (s *GameScene) loadConveyorCardResources() {
 		log.Printf("Warning: Failed to render wallnut icon for conveyor: %v", err)
 	} else {
 		s.conveyorWallnutIcon = wallnutIcon
+		s.conveyorPlantIcons[components.CardTypeWallnutBowling] = wallnutIcon
+		s.conveyorPlantIcons["wallnut"] = wallnutIcon
 		log.Printf("[GameScene] Rendered wallnut icon for conveyor cards")
 	}
 
 	// 爆炸坚果使用相同的图标（后续可以添加红色染色）
-	// 暂时复用普通坚果图标
 	s.conveyorExplodeNutIcon = s.conveyorWallnutIcon
+	s.conveyorPlantIcons[components.CardTypeExplodeONut] = s.conveyorWallnutIcon
+
+	// Story 8.15: 如果是传送带关卡，加载卡片池中所有植物的图标
+	levelConfig := s.gameState.CurrentLevel
+	if levelConfig != nil && levelConfig.SpecialRules == "conveyor" && levelConfig.ConveyorBelt != nil {
+		for _, entry := range levelConfig.ConveyorBelt.CardPool {
+			plantID := entry.Type
+			// 跳过已加载的图标
+			if _, exists := s.conveyorPlantIcons[plantID]; exists {
+				continue
+			}
+
+			// 将植物ID转换为PlantType
+			plantType := config.PlantIDToType(plantID)
+			if plantType == types.PlantUnknown {
+				log.Printf("[GameScene] Warning: Unknown plant type for conveyor card: %s", plantID)
+				continue
+			}
+
+			// 渲染植物图标
+			plantIcon, err := entities.RenderPlantIcon(
+				s.entityManager,
+				s.resourceManager,
+				s.reanimSystem,
+				plantType,
+			)
+			if err != nil {
+				log.Printf("[GameScene] Warning: Failed to render plant icon for %s: %v", plantID, err)
+				continue
+			}
+
+			s.conveyorPlantIcons[plantID] = plantIcon
+			log.Printf("[GameScene] Rendered plant icon for conveyor: %s", plantID)
+		}
+		log.Printf("[GameScene] Conveyor plant icons loaded: %d types", len(s.conveyorPlantIcons))
+	}
+
 	log.Printf("[GameScene] Conveyor card resources loaded")
 }
 

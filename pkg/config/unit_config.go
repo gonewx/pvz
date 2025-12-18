@@ -408,6 +408,24 @@ const (
 	RepeaterBurstInterval = 0.15
 )
 
+// Story 8.15: Level 1-10 奖励植物
+const (
+	// PuffShroomSunCost 小喷菇的阳光消耗
+	// 原版设计：夜间免费（0 阳光），白天需要咖啡豆唤醒
+	PuffShroomSunCost = 0
+
+	// PuffShroomRechargeTime 小喷菇的冷却时间（秒）
+	// 快速冷却类型
+	PuffShroomRechargeTime = 7.5
+
+	// PuffShroomHealth 小喷菇生命值
+	PuffShroomHealth = 300
+
+	// PuffShroomRange 小喷菇攻击范围（格子数）
+	// 原版设计：只能攻击 3 格以内的僵尸
+	PuffShroomRange = 3
+)
+
 // Cherry Bomb Configuration (樱桃炸弹配置)
 const (
 	// CherryBombSunCost 樱桃炸弹的阳光消耗

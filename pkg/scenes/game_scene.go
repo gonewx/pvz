@@ -51,9 +51,10 @@ type GameScene struct {
 	conveyorBelt         *ebiten.Image // Conveyor belt animation (传送带传动动画，6行纹理)
 
 	// 传送带卡片渲染资源（复用植物卡片渲染逻辑）
-	conveyorCardBackground *ebiten.Image // 卡片背景框（SeedPacket_Larger）
-	conveyorWallnutIcon    *ebiten.Image // 普通坚果图标
-	conveyorExplodeNutIcon *ebiten.Image // 爆炸坚果图标（红色版本）
+	conveyorCardBackground *ebiten.Image            // 卡片背景框（SeedPacket_Larger）
+	conveyorWallnutIcon    *ebiten.Image            // 普通坚果图标
+	conveyorExplodeNutIcon *ebiten.Image            // 爆炸坚果图标（红色版本）
+	conveyorPlantIcons     map[string]*ebiten.Image // Story 8.15: 传送带植物图标缓存（按植物ID索引）
 
 	// Story 8.2 QA改进：草皮叠加层（随动画进度渐进显示）
 	sodRowImage        *ebiten.Image // 草皮叠加图片（sod1row.jpg 或 sod3row.jpg）

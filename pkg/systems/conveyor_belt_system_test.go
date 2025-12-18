@@ -670,3 +670,105 @@ func TestConveyorBeltSystem_DynamicInterval(t *testing.T) {
 		}
 	}
 }
+
+// ========================================
+// Story 8.15: conveyor 模式放置测试
+// ========================================
+
+// createTestConveyorBeltSystemWithLevel 创建带关卡配置的测试系统
+func createTestConveyorBeltSystemWithLevel(levelConfig *config.LevelConfig) (*ConveyorBeltSystem, *ecs.EntityManager, *game.GameState) {
+	em := ecs.NewEntityManager()
+	gs := game.GetGameState()
+	gs.LoadLevel(levelConfig)
+	system := NewConveyorBeltSystem(em, gs, nil)
+	return system, em, gs
+}
+
+// TestConveyorBeltSystem_PlacementValidation_ConveyorMode 测试 conveyor 模式下的放置验证
+// Story 8.15: conveyor 模式允许任意列放置
+func TestConveyorBeltSystem_PlacementValidation_ConveyorMode(t *testing.T) {
+	// 设置 conveyor 模式
+	levelConfig := &config.LevelConfig{
+		ID:           "test-conveyor",
+		Name:         "Test Conveyor Level",
+		SpecialRules: "conveyor",
+	}
+	system, _, _ := createTestConveyorBeltSystemWithLevel(levelConfig)
+
+	// conveyor 模式：任意列都有效
+	testCases := []struct {
+		worldX   float64
+		col      int
+		expected bool
+	}{
+		{295.0, 0, true},  // 第 0 列（红线左侧）
+		{375.0, 1, true},  // 第 1 列（红线左侧）
+		{455.0, 2, true},  // 第 2 列（红线左侧）
+		{535.0, 3, true},  // 第 3 列（红线位置）
+		{615.0, 4, true},  // 第 4 列（红线右侧）
+		{695.0, 5, true},  // 第 5 列（红线右侧）
+		{855.0, 7, true},  // 第 7 列（红线右侧）
+		{935.0, 8, true},  // 第 8 列（最右列）
+	}
+
+	for _, tc := range testCases {
+		result := system.IsPlacementValid(tc.worldX)
+		if result != tc.expected {
+			t.Errorf("conveyor mode: worldX=%.1f (col %d): expected %v, got %v",
+				tc.worldX, tc.col, tc.expected, result)
+		}
+	}
+}
+
+// TestConveyorBeltSystem_PlacementValidation_BowlingMode 测试 bowling 模式下的放置验证
+// Story 8.15: bowling 模式只允许红线左侧放置
+func TestConveyorBeltSystem_PlacementValidation_BowlingMode(t *testing.T) {
+	// 设置 bowling 模式
+	levelConfig := &config.LevelConfig{
+		ID:           "test-bowling",
+		Name:         "Test Bowling Level",
+		SpecialRules: "bowling",
+	}
+	system, _, _ := createTestConveyorBeltSystemWithLevel(levelConfig)
+
+	// bowling 模式：只有红线左侧有效 (col < 3)
+	testCases := []struct {
+		worldX   float64
+		col      int
+		expected bool
+	}{
+		{295.0, 0, true},   // 第 0 列（红线左侧）- 有效
+		{375.0, 1, true},   // 第 1 列（红线左侧）- 有效
+		{455.0, 2, true},   // 第 2 列（红线左侧）- 有效
+		{535.0, 3, false},  // 第 3 列（红线位置）- 无效
+		{615.0, 4, false},  // 第 4 列（红线右侧）- 无效
+		{695.0, 5, false},  // 第 5 列（红线右侧）- 无效
+		{855.0, 7, false},  // 第 7 列（红线右侧）- 无效
+		{935.0, 8, false},  // 第 8 列（最右列）- 无效
+	}
+
+	for _, tc := range testCases {
+		result := system.IsPlacementValid(tc.worldX)
+		if result != tc.expected {
+			t.Errorf("bowling mode: worldX=%.1f (col %d): expected %v, got %v",
+				tc.worldX, tc.col, tc.expected, result)
+		}
+	}
+}
+
+// TestConveyorBeltSystem_PlacementValidation_NoLevelConfig 测试无关卡配置时的放置验证
+// 应该默认使用 bowling 模式的红线限制
+func TestConveyorBeltSystem_PlacementValidation_NoLevelConfig(t *testing.T) {
+	system, _ := createTestConveyorBeltSystem()
+
+	// 无关卡配置时，应该使用默认的 bowling 模式限制
+	// 第 0 列应该有效
+	if !system.IsPlacementValid(295.0) {
+		t.Error("Expected placement at column 0 to be valid without level config")
+	}
+
+	// 第 3 列应该无效（红线位置）
+	if system.IsPlacementValid(535.0) {
+		t.Error("Expected placement at column 3 to be invalid without level config")
+	}
+}

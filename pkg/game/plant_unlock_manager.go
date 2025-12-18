@@ -192,6 +192,10 @@ var PlantInfoMap = map[string]PlantInfo{
 		NameKey:        "REPEATER",
 		DescriptionKey: "REPEATER_TOOLTIP",
 	},
+	"puffshroom": {
+		NameKey:        "PUFF_SHROOM",
+		DescriptionKey: "PUFF_SHROOM_TOOLTIP",
+	},
 }
 
 // GetPlantInfo 获取植物的信息结构（名称和描述文本键）

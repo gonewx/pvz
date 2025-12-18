@@ -457,3 +457,34 @@ func (s *LevelPhaseSystem) IsInDaveDialogueStep() bool {
 	return phaseComp.PhaseState == components.PhaseStateTransitioning &&
 		phaseComp.TransitionStep == components.TransitionStepDaveDialogue
 }
+
+// ActivateConveyorModeDirectly 直接激活传送带模式（用于传送带关卡）
+//
+// Story 8.15: 传送带关卡不需要两阶段流程，直接激活传送带
+// 此方法跳过阶段转换，直接设置：
+// - 传送带可见
+// - 传送带位置为目标位置
+// - 当前阶段为 2
+// - 不显示红线（conveyor 模式无放置限制）
+func (s *LevelPhaseSystem) ActivateConveyorModeDirectly() {
+	phaseComp, ok := ecs.GetComponent[*components.LevelPhaseComponent](s.entityManager, s.phaseEntity)
+	if !ok {
+		log.Printf("[LevelPhaseSystem] ERROR: Cannot activate conveyor mode, phase component not found")
+		return
+	}
+
+	// 直接设置传送带可见和位置
+	phaseComp.ConveyorBeltVisible = true
+	phaseComp.ConveyorBeltY = config.ConveyorBeltTargetY
+
+	// 跳过阶段1，直接进入阶段2
+	phaseComp.CurrentPhase = 2
+	phaseComp.PhaseState = components.PhaseStateActive
+	phaseComp.TransitionStep = components.TransitionStepNone
+
+	// conveyor 模式不显示红线（无放置限制）
+	phaseComp.ShowRedLine = false
+
+	log.Printf("[LevelPhaseSystem] Conveyor mode activated directly: Phase=%d, ConveyorBeltVisible=%v, ConveyorBeltY=%.1f, ShowRedLine=%v",
+		phaseComp.CurrentPhase, phaseComp.ConveyorBeltVisible, phaseComp.ConveyorBeltY, phaseComp.ShowRedLine)
+}

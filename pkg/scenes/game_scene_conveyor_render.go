@@ -294,6 +294,7 @@ func (s *GameScene) drawConveyorCardClipped(screen *ebiten.Image, cardType strin
 }
 
 // drawConveyorCardWithImagesClipped 使用图像绘制带裁剪的传送带卡片
+// Story 8.15: 支持所有植物类型的图标渲染
 func (s *GameScene) drawConveyorCardWithImagesClipped(screen *ebiten.Image, cardType string, x, y, width, height float64, isSelected bool, clipRatio float64) {
 	// 计算卡片缩放因子
 	bgBounds := s.conveyorCardBackground.Bounds()
@@ -317,12 +318,19 @@ func (s *GameScene) drawConveyorCardWithImagesClipped(screen *ebiten.Image, card
 	screen.DrawImage(clippedBg, bgOp)
 
 	// 2. 绘制植物图标（需要判断是否在裁剪范围内）
+	// Story 8.15: 从缓存中查找植物图标
 	var plantIcon *ebiten.Image
-	switch cardType {
-	case components.CardTypeExplodeONut:
-		plantIcon = s.conveyorExplodeNutIcon
-	default:
-		plantIcon = s.conveyorWallnutIcon
+	if s.conveyorPlantIcons != nil {
+		plantIcon = s.conveyorPlantIcons[cardType]
+	}
+	// 回退到坚果图标
+	if plantIcon == nil {
+		switch cardType {
+		case components.CardTypeExplodeONut:
+			plantIcon = s.conveyorExplodeNutIcon
+		default:
+			plantIcon = s.conveyorWallnutIcon
+		}
 	}
 
 	if plantIcon != nil {
@@ -423,6 +431,7 @@ func (s *GameScene) drawConveyorCardFallbackClipped(screen *ebiten.Image, cardTy
 }
 
 // drawConveyorCardWithImages 使用图像绘制传送带卡片（背景框 + 图标 + 遮罩）
+// Story 8.15: 支持所有植物类型的图标渲染
 func (s *GameScene) drawConveyorCardWithImages(screen *ebiten.Image, cardType string, x, y, width, height float64, isSelected bool) {
 	// 计算卡片缩放因子
 	// 原始卡片背景尺寸约 100x140，传送带卡片目标尺寸由 width/height 决定
@@ -440,12 +449,19 @@ func (s *GameScene) drawConveyorCardWithImages(screen *ebiten.Image, cardType st
 	screen.DrawImage(s.conveyorCardBackground, bgOp)
 
 	// 2. 绘制植物图标
+	// Story 8.15: 从缓存中查找植物图标
 	var plantIcon *ebiten.Image
-	switch cardType {
-	case components.CardTypeExplodeONut:
-		plantIcon = s.conveyorExplodeNutIcon
-	default:
-		plantIcon = s.conveyorWallnutIcon
+	if s.conveyorPlantIcons != nil {
+		plantIcon = s.conveyorPlantIcons[cardType]
+	}
+	// 回退到坚果图标
+	if plantIcon == nil {
+		switch cardType {
+		case components.CardTypeExplodeONut:
+			plantIcon = s.conveyorExplodeNutIcon
+		default:
+			plantIcon = s.conveyorWallnutIcon
+		}
 	}
 
 	if plantIcon != nil {

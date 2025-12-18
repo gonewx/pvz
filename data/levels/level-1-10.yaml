@@ -1,0 +1,262 @@
+# Level 1-10: 传送带植物模式 (Story 8.15)
+# 第一章最终关卡 - 传送带挑战
+id: "1-10"
+name: "前院白天 1-10"
+description: "传送带植物模式 - 临场应变挑战"
+
+# === Story 17.2: 顶层字段 ===
+flags: 2                        # 2 面旗帜
+sceneType: "day"                # 场景类型: 白天前院
+rowMax: 5                       # 最大行数: 前院 5 行
+
+# === 开场配置 ===
+openingType: "standard"         # 标准开场动画
+enabledLanes: [1, 2, 3, 4, 5]   # 完整 5 行草地
+availablePlants: []             # 传送带模式不使用植物卡片选择
+skipOpening: false              # 使用标准开场动画
+initialSun: 0                   # 传送带模式不使用阳光
+
+# === 特殊规则 ===
+specialRules: "conveyor"        # 传送带模式（区别于 bowling）
+
+# === 草皮配置 ===
+backgroundImage: "IMAGE_BACKGROUND1"
+sodRowImage: ""                 # 无草皮叠加
+showSoddingAnim: false          # 无铺草皮动画
+
+# === 通关奖励 (Story 8.15) ===
+rewardPlant: "puffshroom"       # 完成后奖励小喷菇
+
+# === 传送带配置 ===
+conveyorBelt:
+  enabled: true
+  capacity: 10
+  generationInterval: 3.5
+  cardPool:
+    - type: "peashooter"
+      weight: 22
+    - type: "wallnut"
+      weight: 18
+    - type: "potatomine"
+      weight: 14
+    - type: "snowpea"
+      weight: 14
+    - type: "chomper"
+      weight: 12
+    - type: "repeater"
+      weight: 12
+    - type: "cherrybomb"
+      weight: 8
+  # 三阶段动态配置
+  phaseConfigs:
+    - progressThreshold: 0.0   # 前期 (0%-30%)
+      explodeNutWeight: 0      # 传送带模式不使用爆炸坚果权重
+      intervalMin: 3.5
+      intervalMax: 4.0
+    - progressThreshold: 0.3   # 中期 (30%-70%)
+      explodeNutWeight: 0
+      intervalMin: 3.0
+      intervalMax: 3.5
+    - progressThreshold: 0.7   # 终盘 (70%-100%)
+      explodeNutWeight: 0
+      intervalMin: 2.5
+      intervalMax: 3.0
+  # 动态调节参数
+  dynamicAdjustment:
+    emptyBeltThreshold: 5.0         # 空带保底阈值（秒）
+    fullBeltThreshold: 5.0          # 满带降频阈值（秒）
+    fullBeltThrottleMultiplier: 1.5 # 降频倍率
+    crisisExplodeNutCooldown: 0     # 传送带模式不使用危机爆炸坚果
+    crisisZombieCount: 0
+    crisisDistanceThreshold: 0
+
+# === 僵尸池 ===
+zombiePool: ["basic", "conehead", "polevaulter", "buckethead"]
+
+# === 波次配置 (2 面旗帜，20 波) ===
+# 参考 .meta/levels/chapter1.md 第 392-413 行
+# 所有波次使用 ExtraPoints 动态点数分配
+waves:
+  # Wave 1-3: basic 保底 + 2 点动态分配
+  - waveNum: 1
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 2
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+
+  - waveNum: 2
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 2
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+
+  - waveNum: 3
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 2
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+
+  # Wave 4-6: 纯动态分配 6 点
+  - waveNum: 4
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 6
+    zombies: []
+
+  - waveNum: 5
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 6
+    zombies: []
+
+  - waveNum: 6
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 6
+    zombies: []
+
+  # Wave 7-9: basic 保底 + 8 点动态分配
+  - waveNum: 7
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 8
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+
+  - waveNum: 8
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 8
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+
+  - waveNum: 9
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 8
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+
+  # Wave 10: 旗帜波 1 - basic x6 + flag + 14 点动态分配
+  - waveNum: 10
+    type: "Final"
+    isFlag: true
+    flagIndex: 1
+    extraPoints: 14
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 6
+        spawnInterval: 1.0
+      - type: "flag"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+
+  # Wave 11-12: 纯动态分配 12 点
+  - waveNum: 11
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 12
+    zombies: []
+
+  - waveNum: 12
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 12
+    zombies: []
+
+  # Wave 13-15: basic 保底 + 14 点动态分配
+  - waveNum: 13
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 14
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+
+  - waveNum: 14
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 14
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+
+  - waveNum: 15
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 14
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+
+  # Wave 16-18: 纯动态分配 18 点
+  - waveNum: 16
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 18
+    zombies: []
+
+  - waveNum: 17
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 18
+    zombies: []
+
+  - waveNum: 18
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 18
+    zombies: []
+
+  # Wave 19: basic 保底 + 20 点动态分配
+  - waveNum: 19
+    type: "ExtraPoints"
+    isFlag: false
+    extraPoints: 20
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+
+  # Wave 20: Final Wave - basic x9 + flag + conehead + polevaulter + buckethead + 18 点动态分配
+  - waveNum: 20
+    type: "Final"
+    isFlag: true
+    flagIndex: 2
+    extraPoints: 18
+    zombies:
+      - type: "basic"
+        lanes: [1, 2, 3, 4, 5]
+        count: 9
+        spawnInterval: 1.0
+      - type: "flag"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+      - type: "conehead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+      - type: "polevaulter"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
+      - type: "buckethead"
+        lanes: [1, 2, 3, 4, 5]
+        count: 1
