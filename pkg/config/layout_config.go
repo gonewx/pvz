@@ -624,7 +624,7 @@ const (
 	// RewardPanelMainMenuButtonY 主菜单按钮Y位置（相对于面板背景高度的比例）
 	// 0.08 表示按钮中心位于背景高度的 8% 位置（顶部区域）
 	// 建议值范围：0.05 - 0.15
-	RewardPanelMainMenuButtonY = 0.03
+	RewardPanelMainMenuButtonY = 0.05
 
 	// RewardPanelMainMenuButtonFontSize 主菜单按钮字体大小
 	// 小按钮使用较小的字体

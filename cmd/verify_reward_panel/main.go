@@ -196,14 +196,15 @@ func NewVerifyPanelGame() (*VerifyPanelGame, error) {
 
 		// 添加面板组件
 		ecs.AddComponent(em, panelEntity, &components.RewardPanelComponent{
-			PlantID:          panelID,
-			IsVisible:        true,
-			FadeAlpha:        1.0,
-			PlantIconTexture: nil,
-			PlantName:        plantName,
-			PlantDescription: plantDesc,
-			SunCost:          sunCost,
-			CardScale:        1.0,
+			PlantID:            panelID,
+			IsVisible:          true,
+			FadeAlpha:          1.0,
+			PlantIconTexture:   nil,
+			PlantName:          plantName,
+			PlantDescription:   plantDesc,
+			SunCost:            sunCost,
+			CardScale:          1.0,
+			ShowMainMenuButton: true, // 与 verify_reward_animation 保持一致
 		})
 
 		vpg.panelEntity = panelEntity

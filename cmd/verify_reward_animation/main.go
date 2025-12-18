@@ -12,6 +12,7 @@ import (
 	"github.com/gonewx/pvz/pkg/ecs"
 	"github.com/gonewx/pvz/pkg/entities"
 	"github.com/gonewx/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/modules"
 	"github.com/gonewx/pvz/pkg/systems"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
@@ -46,6 +47,8 @@ type VerifyRewardAnimationGame struct {
 	rewardSystem          *systems.RewardAnimationSystem // 奖励动画系统（Story 8.4重构：完全封装）
 	renderSystem          *systems.RenderSystem
 	plantCardRenderSystem *systems.PlantCardRenderSystem // 植物卡片渲染系统（测试用）
+	buttonSystem          *systems.ButtonSystem          // 按钮系统（来信面板需要）
+	buttonRenderSystem    *systems.ButtonRenderSystem    // 按钮渲染系统（来信面板需要）
 
 	debugFont *text.GoTextFace // 中文调试字体
 
@@ -98,6 +101,13 @@ func NewVerifyRewardAnimationGame() (*VerifyRewardAnimationGame, error) {
 	gs := game.GetGameState()
 	gs.CameraX = config.GameCameraX // 设置摄像机位置
 
+	// 加载 LawnStrings（用于奖励面板文本显示）
+	lawnStrings, err := game.NewLawnStrings("assets/properties/LawnStrings.txt")
+	if err != nil {
+		return nil, fmt.Errorf("failed to load LawnStrings: %w", err)
+	}
+	gs.LawnStrings = lawnStrings
+
 	// 创建音频管理器并设置到 GameState
 	audioManager := game.NewAudioManager(rm, nil)
 	gs.SetAudioManager(audioManager)
@@ -109,9 +119,34 @@ func NewVerifyRewardAnimationGame() (*VerifyRewardAnimationGame, error) {
 	particleSystem := systems.NewParticleSystem(em, rm) // 粒子系统用于光晕效果
 	renderSystem := systems.NewRenderSystem(em)
 
+	// 创建按钮系统（来信面板需要）
+	buttonSystem := systems.NewButtonSystem(em)
+	buttonRenderSystem := systems.NewButtonRenderSystem(em)
+
 	// Story 8.4重构：RewardAnimationSystem完全封装所有渲染逻辑
 	// 内部自动创建和管理所有渲染系统（Reanim、粒子、卡片、面板）
 	rewardSystem := systems.NewRewardAnimationSystem(em, gs, rm, nil, reanimSystem, particleSystem, renderSystem)
+
+	// Story 8.14: 注入来信面板工厂（使用真正的 ZombieNotePanelModule，与 verify_reward_panel 保持一致）
+	rewardSystem.SetNotePanelFactory(func(noteID string, onNextLevel func(), onMainMenu func()) (systems.NotePanelModule, error) {
+		// 创建按钮渲染回调函数
+		drawButtonFunc := func(screen *ebiten.Image, buttonEntity ecs.EntityID) {
+			buttonRenderSystem.DrawButton(screen, buttonEntity)
+		}
+
+		// 创建真正的 ZombieNotePanelModule
+		return modules.NewZombieNotePanelModule(
+			em,
+			rm,
+			gs,
+			drawButtonFunc,
+			screenWidth,
+			screenHeight,
+			noteID,
+			onNextLevel,
+			onMainMenu,
+		)
+	})
 
 	// 创建植物选择栏卡片（用于测试渲染顺序）
 	sunFont, err := rm.LoadFont("assets/fonts/SimHei.ttf", config.PlantCardSunCostFontSize)
@@ -160,6 +195,8 @@ func NewVerifyRewardAnimationGame() (*VerifyRewardAnimationGame, error) {
 		rewardSystem:          rewardSystem,
 		renderSystem:          renderSystem,
 		plantCardRenderSystem: plantCardRenderSystem,
+		buttonSystem:          buttonSystem,
+		buttonRenderSystem:    buttonRenderSystem,
 		debugFont:             debugFont,
 		triggered:             false,
 		completed:             false,
@@ -199,6 +236,7 @@ func (vg *VerifyRewardAnimationGame) Update() error {
 	dt := 1.0 / 60.0
 	vg.reanimSystem.Update(dt)
 	vg.particleSystem.Update(dt) // 更新粒子系统
+	vg.buttonSystem.Update(dt)   // 更新按钮系统（来信面板需要）
 
 	// 更新奖励系统（包含完整的 4 个阶段）
 	vg.rewardSystem.Update(dt)

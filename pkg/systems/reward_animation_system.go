@@ -235,6 +235,7 @@ func (ras *RewardAnimationSystem) TriggerReward(rewardType string, rewardID stri
 		RewardType:     rewardType,
 		PlantID:        rewardID,
 		ToolID:         rewardID,
+		NoteID:         rewardID, // Story 8.14: 来信奖励需要保存 noteID
 		ParticleEffect: particleEffect,
 	})
 
@@ -320,17 +321,17 @@ func (ras *RewardAnimationSystem) TriggerReward(rewardType string, rewardID stri
 			log.Printf("[RewardAnimationSystem] 警告：工具图片加载失败（ID: %s），只显示粒子效果", rewardID)
 		}
 	} else if rewardType == "note" {
-		// Story 8.14: 来信奖励 - 使用 SeedPacket_Larger.png 作为卡包图片
-		noteImage, err := ras.resourceManager.LoadImage("assets/images/SeedPacket_Larger.png")
+		// Story 8.14: 来信奖励 - 使用 ZombieNoteSmall.png 弹出
+		noteImage, err := ras.resourceManager.LoadImage("assets/images/ZombieNoteSmall.png")
 		if err != nil {
-			log.Printf("[RewardAnimationSystem] 警告：来信卡包图片加载失败: %v，只显示粒子效果", err)
+			log.Printf("[RewardAnimationSystem] 警告：来信图片加载失败: %v，只显示粒子效果", err)
 		} else {
 			ecs.AddComponent(ras.entityManager, ras.rewardEntity, &components.SpriteComponent{
 				Image: noteImage,
 			})
 			// 添加 UIComponent 标记，表示这是 UI 实体（不需要相机偏移）
 			ecs.AddComponent(ras.entityManager, ras.rewardEntity, &components.UIComponent{})
-			log.Printf("[RewardAnimationSystem] 来信奖励实体已创建（类型: %s, ID: %s），使用 SeedPacket_Larger.png", rewardType, rewardID)
+			log.Printf("[RewardAnimationSystem] 来信奖励实体已创建（类型: %s, ID: %s），使用 ZombieNoteSmall.png", rewardType, rewardID)
 		}
 	}
 
@@ -396,7 +397,10 @@ func (ras *RewardAnimationSystem) Update(dt float64) {
 	}
 
 	// 同步当前阶段到系统（用于Draw方法判断）
-	ras.currentPhase = rewardComp.Phase
+	// 注意：如果 currentPhase 已经被设置为 fadingOut/fadingIn（来信奖励），则不要覆盖
+	if ras.currentPhase != "fadingOut" && ras.currentPhase != "fadingIn" {
+		ras.currentPhase = rewardComp.Phase
+	}
 
 	// 更新粒子发射器位置（跟随卡片包）
 	//

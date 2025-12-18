@@ -454,16 +454,16 @@ func TestIsCardPackClicked_NoteCard(t *testing.T) {
 	})
 
 	// 添加奖励动画组件（来信类型，缩放为1.0）
-	// 来信奖励使用 SeedPacket_Larger.png（类似工具，使用中心锚点）
+	// 来信奖励使用 ZombieNoteSmall.png（尺寸 78x52，使用中心锚点）
 	ecs.AddComponent(em, rewardEntity, &components.RewardAnimationComponent{
 		RewardType: "note",
 		Scale:      1.0,
 		NoteID:     "zombienote1",
 	})
 
-	// 来信卡包尺寸与工具图标类似：116x125（中心锚点）
-	// 边界框：(400-58, 300-62.5) - (400+58, 300+62.5)
-	// 即：(342, 237.5) - (458, 362.5)
+	// 来信图片尺寸：78x52（中心锚点）
+	// 边界框：(400-39, 300-26) - (400+39, 300+26)
+	// 即：(361, 274) - (439, 326)
 
 	tests := []struct {
 		name     string
@@ -471,11 +471,11 @@ func TestIsCardPackClicked_NoteCard(t *testing.T) {
 		mouseY   float64
 		expected bool
 	}{
-		{"点击卡包中心", 400.0, 300.0, true},
-		{"点击卡包左边缘", 343.0, 300.0, true},
-		{"点击卡包右边缘", 457.0, 300.0, true},
-		{"点击卡包左侧外部", 341.0, 300.0, false},
-		{"点击卡包右侧外部", 459.0, 300.0, false},
+		{"点击来信中心", 400.0, 300.0, true},
+		{"点击来信左边缘", 362.0, 300.0, true},
+		{"点击来信右边缘", 438.0, 300.0, true},
+		{"点击来信左侧外部", 360.0, 300.0, false},
+		{"点击来信右侧外部", 440.0, 300.0, false},
 		{"点击远处", 100.0, 100.0, false},
 	}
 

@@ -54,10 +54,11 @@ func (ras *RewardAnimationSystem) updateAppearingPhase(dt float64, rewardComp *c
 		// 根据奖励类型创建不同的 waiting 阶段粒子效果
 		// - 植物奖励：SeedPacket（光晕 + 向下箭头）
 		// - 工具奖励：AwardPickupArrow（向下箭头）
+		// - 来信奖励：AwardPickupArrow（与工具奖励一致）
 		if ras.glowEntity == 0 {
 			var particleEffectName string
-			if rewardComp.RewardType == "tool" {
-				particleEffectName = "AwardPickupArrow" // 工具使用向下箭头
+			if rewardComp.RewardType == "tool" || rewardComp.RewardType == "note" {
+				particleEffectName = "AwardPickupArrow" // 工具/来信使用向下箭头
 			} else {
 				particleEffectName = "SeedPacket" // 植物使用光晕+箭头
 			}
@@ -116,11 +117,54 @@ func (ras *RewardAnimationSystem) updateWaitingPhase(dt float64, rewardComp *com
 			audioManager.PlaySound("SOUND_WINMUSIC")
 		}
 
+		// 清理 Phase 2 的光晕粒子（AwardPickupArrow）
+		ras.cleanupGlowParticles()
+
+		// Story 8.14: 来信奖励点击后直接消失，不需要移动动画
+		if rewardComp.RewardType == "note" {
+			log.Printf("[RewardAnimationSystem] 来信奖励：直接消失并播放 Starburst")
+
+			// 获取位置用于粒子效果
+			posComp, _ := ecs.GetComponent[*components.PositionComponent](ras.entityManager, ras.rewardEntity)
+			particleX, particleY := posComp.X, posComp.Y
+
+			// 保存奖励信息
+			ras.currentRewardType = rewardComp.RewardType
+			ras.currentNoteID = rewardComp.NoteID
+
+			// 立即清理来信实体（直接消失）
+			if ras.rewardEntity != 0 {
+				ras.entityManager.DestroyEntity(ras.rewardEntity)
+				ras.entityManager.RemoveMarkedEntities()
+				ras.rewardEntity = 0
+			}
+
+			// 创建 Starburst 粒子效果
+			starburstID, err := entities.CreateParticleEffect(
+				ras.entityManager,
+				ras.resourceManager,
+				"Starburst",
+				particleX,
+				particleY,
+				0.0,  // angleOffset = 0
+				true, // isUIParticle = true
+			)
+			if err != nil {
+				log.Printf("[RewardAnimationSystem] 创建 Starburst 粒子失败: %v", err)
+			} else {
+				ras.glowEntity = starburstID
+				log.Printf("[RewardAnimationSystem] 创建 Starburst 粒子成功, ID=%d", starburstID)
+			}
+
+			// 直接进入 fadingOut 阶段
+			ras.currentPhase = "fadingOut"
+			ras.phaseElapsed = 0
+			return
+		}
+
+		// 植物/工具奖励：正常进入 expanding 阶段
 		rewardComp.Phase = "expanding"
 		rewardComp.ElapsedTime = 0
-
-		// 清理 Phase 2 的光晕粒子（SeedPacket）
-		ras.cleanupGlowParticles()
 
 		// 立即创建 Award 粒子特效（点击后立即出现）
 		ras.createAwardParticle(rewardComp)

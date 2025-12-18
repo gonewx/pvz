@@ -1,6 +1,7 @@
 package systems
 
 import (
+	"image/color"
 	"log"
 
 	"github.com/gonewx/pvz/internal/reanim"
@@ -47,11 +48,25 @@ func (ras *RewardAnimationSystem) isCardPackClicked(mouseX, mouseY float64) bool
 	}
 
 	// 根据奖励类型计算边界框
-	if rewardComp.RewardType == "tool" || rewardComp.RewardType == "note" {
-		// 工具图标/来信卡包：使用铲子/卡包图片尺寸 (116 x 125) * scale
+	if rewardComp.RewardType == "tool" {
+		// 工具图标：使用铲子图片尺寸 (116 x 125) * scale
 		// 图标以中心点为锚点绘制
 		width := 116.0 * rewardComp.Scale
 		height := 125.0 * rewardComp.Scale
+		// 计算边界框（以中心点为锚点）
+		left := posComp.X - width/2
+		top := posComp.Y - height/2
+		right := posComp.X + width/2
+		bottom := posComp.Y + height/2
+		return mouseX >= left && mouseX <= right &&
+			mouseY >= top && mouseY <= bottom
+	}
+
+	if rewardComp.RewardType == "note" {
+		// 来信奖励：使用 ZombieNoteSmall.png 尺寸 (78 x 52) * scale
+		// 图标以中心点为锚点绘制
+		width := 78.0 * rewardComp.Scale
+		height := 52.0 * rewardComp.Scale
 		// 计算边界框（以中心点为锚点）
 		left := posComp.X - width/2
 		top := posComp.Y - height/2
@@ -102,11 +117,23 @@ func (ras *RewardAnimationSystem) IsHoveringReward() bool {
 
 	// 根据奖励类型计算边界框
 	var width, height float64
-	if rewardComp.RewardType == "tool" || rewardComp.RewardType == "note" {
-		// 工具图标/来信卡包：使用铲子/卡包图片尺寸 (116 x 125) * scale
+	if rewardComp.RewardType == "tool" {
+		// 工具图标：使用铲子图片尺寸 (116 x 125) * scale
 		// 图标以中心点为锚点绘制
 		width = 116.0 * rewardComp.Scale
 		height = 125.0 * rewardComp.Scale
+		// 计算边界框（以中心点为锚点）
+		left := posComp.X - width/2
+		top := posComp.Y - height/2
+		right := posComp.X + width/2
+		bottom := posComp.Y + height/2
+		return float64(mouseX) >= left && float64(mouseX) <= right &&
+			float64(mouseY) >= top && float64(mouseY) <= bottom
+	} else if rewardComp.RewardType == "note" {
+		// 来信奖励：使用 ZombieNoteSmall.png 尺寸 (78 x 52) * scale
+		// 图标以中心点为锚点绘制
+		width = 78.0 * rewardComp.Scale
+		height = 52.0 * rewardComp.Scale
 		// 计算边界框（以中心点为锚点）
 		left := posComp.X - width/2
 		top := posComp.Y - height/2
@@ -457,7 +484,39 @@ func (ras *RewardAnimationSystem) Draw(screen *ebiten.Image) {
 	}
 
 	// 2b. Phase 4: 渲染奖励面板（showing）在最上层
-	if ras.currentPhase == "showing" || ras.panelEntity != 0 {
-		ras.panelRenderSystem.Draw(screen)
+	// 来信奖励使用 notePanelModule，植物/工具奖励使用 panelRenderSystem
+	if ras.currentPhase == "showing" {
+		if ras.notePanelModule != nil {
+			// 来信奖励：渲染来信面板模块
+			ras.notePanelModule.Draw(screen)
+		} else if ras.panelEntity != 0 {
+			// 植物/工具奖励：渲染传统奖励面板
+			ras.panelRenderSystem.Draw(screen)
+		}
+	}
+
+	// 2c. fadingOut/fadingIn 阶段：渲染来信面板和黑色遮罩
+	if ras.currentPhase == "fadingOut" || ras.currentPhase == "fadingIn" {
+		fadeAlpha := ras.gameState.NoteFadeAlpha
+
+		if ras.currentPhase == "fadingOut" {
+			// fadingOut 阶段：渲染半透明黑色遮罩（背景渐暗）
+			if fadeAlpha > 0 {
+				blackOverlay := ebiten.NewImage(screen.Bounds().Dx(), screen.Bounds().Dy())
+				blackOverlay.Fill(color.RGBA{0, 0, 0, uint8(fadeAlpha * 255)})
+				screen.DrawImage(blackOverlay, nil)
+			}
+		} else {
+			// fadingIn 阶段：先绘制完全不透明的黑色背景，然后淡入面板
+			// 这样可以完全覆盖游戏背景，直接从黑屏过渡到面板
+			blackBg := ebiten.NewImage(screen.Bounds().Dx(), screen.Bounds().Dy())
+			blackBg.Fill(color.RGBA{0, 0, 0, 255})
+			screen.DrawImage(blackBg, nil)
+
+			// 在黑色背景上渲染来信面板（透明度由 notePanelModule.SetFadeAlpha 控制）
+			if ras.notePanelModule != nil {
+				ras.notePanelModule.Draw(screen)
+			}
+		}
 	}
 }
