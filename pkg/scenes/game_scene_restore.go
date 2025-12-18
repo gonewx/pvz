@@ -91,6 +91,9 @@ func (s *GameScene) restoreBattleState() {
 	s.restoreLawnmowers(saveData.Lawnmowers)
 	s.restorePlantCards(saveData.PlantCards)
 
+	// v7: 恢复已用除草车行号状态（解决存档恢复后僵尸胜利条件失效问题）
+	s.restoreUsedLawnmowerLanes(saveData.UsedLawnmowerLanes)
+
 	log.Printf("[GameScene] 实体恢复: Plants=%d, Zombies=%d, Suns=%d",
 		len(saveData.Plants), len(saveData.Zombies), len(saveData.Suns))
 
@@ -522,6 +525,44 @@ func (s *GameScene) restoreLawnmowers(lawnmowers []game.LawnmowerData) {
 		log.Printf("[GameScene] Restored lawnmower on lane %d at X=%.1f, triggered=%v, active=%v",
 			lmData.Lane, lmData.X, lmData.Triggered, lmData.Active)
 	}
+}
+
+// restoreUsedLawnmowerLanes 恢复已用除草车行号状态
+//
+// v7 新增：解决存档恢复后僵尸胜利条件失效问题
+//
+// 当除草车被触发并离开屏幕后，实体被删除，但 UsedLanes 状态需要被保存和恢复。
+// 这个状态用于失败条件判断：如果某行的除草车已经用过，僵尸再次进入该行会导致游戏失败。
+func (s *GameScene) restoreUsedLawnmowerLanes(usedLanes []int) {
+	if len(usedLanes) == 0 {
+		return
+	}
+
+	// 查找 LawnmowerStateComponent 实体
+	stateEntities := ecs.GetEntitiesWith1[*components.LawnmowerStateComponent](s.entityManager)
+	if len(stateEntities) == 0 {
+		log.Printf("[GameScene] Warning: No LawnmowerStateComponent found, cannot restore used lanes")
+		return
+	}
+
+	// 取第一个状态实体（由 LawnmowerSystem 创建）
+	stateEntity := stateEntities[0]
+	stateComp, ok := ecs.GetComponent[*components.LawnmowerStateComponent](s.entityManager, stateEntity)
+	if !ok {
+		log.Printf("[GameScene] Warning: Failed to get LawnmowerStateComponent")
+		return
+	}
+
+	// 恢复 UsedLanes
+	if stateComp.UsedLanes == nil {
+		stateComp.UsedLanes = make(map[int]bool)
+	}
+
+	for _, lane := range usedLanes {
+		stateComp.UsedLanes[lane] = true
+	}
+
+	log.Printf("[GameScene] Restored used lawnmower lanes: %v", usedLanes)
 }
 
 // restoreProgressBar 恢复进度条数据

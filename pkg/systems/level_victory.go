@@ -197,8 +197,12 @@ func (s *LevelSystem) checkDefeatWithLawnmower() {
 				s.triggerZombiesWonFlow(entityID)
 				return
 			} else {
-				// 除草车未使用，不触发失败（让除草车触发）
-				log.Printf("[LevelSystem] Zombie (ID:%d, type:%s) reached left boundary on lane %d, waiting for lawnmower to trigger", entityID, zombieTypeStr, lane)
+				// 除草车未使用，尝试强制触发该行的除草车
+				// 这是一个补救措施，防止僵尸"穿过"除草车而未触发碰撞检测
+				if s.lawnmowerSystem != nil {
+					s.lawnmowerSystem.ForceTriggerLawnmower(lane)
+					log.Printf("[LevelSystem] Zombie (ID:%d, type:%s) reached left boundary on lane %d, force triggering lawnmower", entityID, zombieTypeStr, lane)
+				}
 				// 注意：不 return，继续检查其他行是否有除草车用完的情况
 			}
 		}

@@ -78,6 +78,9 @@ func (s *BattleSerializer) SaveBattle(em *ecs.EntityManager, gs *GameState, user
 	saveData.Lawnmowers = s.collectLawnmowerData(em)
 	saveData.PlantCards = s.collectPlantCardData(em)
 
+	// v7: 收集已用除草车行号（解决存档恢复后僵尸胜利条件失效问题）
+	saveData.UsedLawnmowerLanes = s.collectUsedLawnmowerLanes(em)
+
 	// 收集教学状态（如果是教学关卡）
 	saveData.Tutorial = s.collectTutorialData(em)
 
@@ -115,6 +118,7 @@ func (s *BattleSerializer) SaveBattle(em *ecs.EntityManager, gs *GameState, user
 //
 // Story 20.3: 从 gdata 加载 gob 二进制数据并反序列化战斗数据。
 // v6: 支持 v5 和 v6 版本的向后兼容（v5 存档的 WaveSystemState 为 nil）
+// v7: 支持 v5-v7 版本的向后兼容（v5/v6 存档的 UsedLawnmowerLanes 为 nil）
 //
 // 参数：
 //   - username: 用户名，用于构建存储 key
@@ -142,8 +146,10 @@ func (s *BattleSerializer) LoadBattle(username string) (*BattleSaveData, error) 
 		return nil, fmt.Errorf("failed to decode save data: %w", err)
 	}
 
-	// v6: 版本兼容性检查 - 支持 v5 和 v6
-	// v5 存档可以加载，但 WaveSystemState 为 nil，恢复时需要使用推断逻辑
+	// v7: 版本兼容性检查 - 支持 v5 到 v7
+	// - v5 存档可以加载，但 WaveSystemState 和 UsedLawnmowerLanes 为 nil
+	// - v6 存档可以加载，但 UsedLawnmowerLanes 为 nil
+	// - 恢复时会使用推断逻辑或跳过相关恢复
 	if saveData.Version < 5 || saveData.Version > BattleSaveVersion {
 		return nil, fmt.Errorf("incompatible save version: %d (supported: 5-%d)",
 			saveData.Version, BattleSaveVersion)
@@ -151,7 +157,7 @@ func (s *BattleSerializer) LoadBattle(username string) (*BattleSaveData, error) 
 
 	// 记录版本信息
 	if saveData.Version < BattleSaveVersion {
-		log.Printf("[BattleSerializer] Loading legacy save (v%d), will use inference for WaveSystemState",
+		log.Printf("[BattleSerializer] Loading legacy save (v%d), some fields may be nil",
 			saveData.Version)
 	}
 
@@ -500,6 +506,43 @@ func (s *BattleSerializer) collectLawnmowerData(em *ecs.EntityManager) []Lawnmow
 	}
 
 	return lawnmowers
+}
+
+// collectUsedLawnmowerLanes 从 EntityManager 收集已用除草车行号
+//
+// v7 新增：解决存档恢复后僵尸胜利条件失效问题
+//
+// 查找 LawnmowerStateComponent 并提取 UsedLanes 中的行号列表。
+// 这些行号代表除草车已经触发并离开屏幕的行，僵尸再次进入这些行会导致游戏失败。
+func (s *BattleSerializer) collectUsedLawnmowerLanes(em *ecs.EntityManager) []int {
+	var usedLanes []int
+
+	// 查询所有拥有 LawnmowerStateComponent 的实体
+	entities := ecs.GetEntitiesWith1[*components.LawnmowerStateComponent](em)
+
+	if len(entities) == 0 {
+		return usedLanes
+	}
+
+	// 取第一个状态实体（通常只有一个）
+	stateEntity := entities[0]
+	stateComp, ok := ecs.GetComponent[*components.LawnmowerStateComponent](em, stateEntity)
+	if !ok {
+		return usedLanes
+	}
+
+	// 提取 UsedLanes map 中标记为 true 的行号
+	for lane, used := range stateComp.UsedLanes {
+		if used {
+			usedLanes = append(usedLanes, lane)
+		}
+	}
+
+	if len(usedLanes) > 0 {
+		log.Printf("[BattleSerializer] Collected used lawnmower lanes: %v", usedLanes)
+	}
+
+	return usedLanes
 }
 
 // collectPlantCardData 从 EntityManager 收集所有植物卡片冷却数据

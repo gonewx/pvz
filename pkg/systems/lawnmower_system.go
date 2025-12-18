@@ -209,6 +209,34 @@ func (s *LawnmowerSystem) triggerLawnmower(lane int) {
 	}
 }
 
+// ForceTriggerLawnmower 强制触发指定行的除草车（即使入场未完成）
+// 这是一个补救措施，当僵尸"穿过"除草车而碰撞检测失败时使用
+// 参数:
+//   - lane: 行号（1-5）
+func (s *LawnmowerSystem) ForceTriggerLawnmower(lane int) {
+	lawnmowers := ecs.GetEntitiesWith2[
+		*components.LawnmowerComponent,
+		*components.PositionComponent,
+	](s.entityManager)
+
+	for _, lawnmowerID := range lawnmowers {
+		lawnmower, _ := ecs.GetComponent[*components.LawnmowerComponent](s.entityManager, lawnmowerID)
+		pos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, lawnmowerID)
+
+		if lawnmower.Lane == lane && !lawnmower.IsTriggered {
+			// 如果还在入场中，强制完成入场
+			if lawnmower.IsEntering {
+				lawnmower.IsEntering = false
+				pos.X = lawnmower.EnterTargetX
+				log.Printf("[LawnmowerSystem] Force completed enter animation for lawnmower on lane %d", lane)
+			}
+			s.triggerLawnmowerByID(lawnmowerID, lawnmower)
+			log.Printf("[LawnmowerSystem] Force triggered lawnmower on lane %d", lane)
+			break
+		}
+	}
+}
+
 // triggerLawnmowerByID 通过实体ID直接触发除草车
 // 参数:
 //   - lawnmowerID: 除草车实体ID

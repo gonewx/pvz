@@ -11,7 +11,8 @@ import (
 // v4: 添加土豆地雷阶段支持（PotatoMinePhase, ArmingTimer）
 // v5: 添加植物卡片冷却状态支持（PlantCards）
 // v6: 添加波次系统状态支持（WaveSystemState）- 解决存档恢复后波次控制异常问题
-const BattleSaveVersion = 6
+// v7: 添加已用除草车行号列表（UsedLawnmowerLanes）- 修复存档恢复后僵尸胜利条件失效问题
+const BattleSaveVersion = 7
 
 // BattleSaveData 战斗存档数据结构
 //
@@ -50,6 +51,11 @@ type BattleSaveData struct {
 	Suns        []SunData        // 阳光数据
 	Lawnmowers  []LawnmowerData  // 除草车数据
 	PlantCards  []PlantCardData  // 植物卡片冷却状态
+
+	// v7: 已使用的除草车行号列表（解决存档恢复后僵尸胜利条件失效问题）
+	// 当除草车触发并离开屏幕后，实体被删除，但 UsedLanes 状态需要保留
+	// 用于失败条件判断：如果该行除草车已用，僵尸再次进入则游戏失败
+	UsedLawnmowerLanes []int // 已用除草车的行号列表（1-5）
 
 	// 保龄球模式数据（Level 1-5）
 	BowlingNuts    []BowlingNutData    // 保龄球坚果数据

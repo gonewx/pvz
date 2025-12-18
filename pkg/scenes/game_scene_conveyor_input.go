@@ -180,6 +180,17 @@ func (s *GameScene) handleConveyorCardPlacement(worldX, worldY float64) bool {
 		return false
 	}
 
+	// Story 8.15: conveyor 模式检查格子是否已被占用
+	levelConfig := s.gameState.CurrentLevel
+	if levelConfig != nil && levelConfig.SpecialRules == "conveyor" {
+		if s.lawnGridSystem != nil && s.lawnGridSystem.IsOccupied(s.lawnGridEntityID, col, row) {
+			log.Printf("[GameScene] 格子 (%d, %d) 已被占用，无法放置植物", col, row)
+			s.conveyorBeltSystem.DeselectCard()
+			s.destroyConveyorCardPreview()
+			return false
+		}
+	}
+
 	beltEntity := s.conveyorBeltSystem.GetBeltEntity()
 	beltComp, ok := ecs.GetComponent[*components.ConveyorBeltComponent](s.entityManager, beltEntity)
 	if !ok || beltComp.SelectedCardIndex < 0 {
@@ -195,7 +206,7 @@ func (s *GameScene) handleConveyorCardPlacement(worldX, worldY float64) bool {
 	var err error
 
 	// Story 8.15: 根据 specialRules 区分处理
-	levelConfig := s.gameState.CurrentLevel
+	// 注意：levelConfig 在前面检查格子占用时已经获取
 	if levelConfig != nil && levelConfig.SpecialRules == "conveyor" {
 		// 传送带模式：使用植物工厂注册表创建植物
 		factory, ok := entities.GetPlantFactory(removedCardType)
@@ -220,6 +231,24 @@ func (s *GameScene) handleConveyorCardPlacement(worldX, worldY float64) bool {
 		}
 		log.Printf("[GameScene] 放置植物: entityID=%d, type=%s, row=%d, col=%d",
 			entityID, removedCardType, row+1, col+1)
+
+		// 触发种植粒子效果
+		plantWorldX, plantWorldY := utils.GridToWorldCoords(
+			col, row,
+			config.GridWorldStartX, config.GridWorldStartY,
+			config.CellWidth, config.CellHeight,
+		)
+		_, err = entities.NewPlantingParticleEffect(s.entityManager, s.resourceManager, plantWorldX, plantWorldY)
+		if err != nil {
+			log.Printf("[GameScene] 警告：创建种植粒子效果失败: %v", err)
+		}
+
+		// 标记格子为占用
+		if s.lawnGridSystem != nil && s.lawnGridEntityID != 0 {
+			if err := s.lawnGridSystem.OccupyCell(s.lawnGridEntityID, col, row, entityID); err != nil {
+				log.Printf("[GameScene] 警告：标记格子占用失败: %v", err)
+			}
+		}
 	} else {
 		// 保龄球模式：创建保龄球坚果
 		isExplosive := removedCardType == components.CardTypeExplodeONut
@@ -556,6 +585,15 @@ func (s *GameScene) handleConveyorDragEnd(dragInfo utils.DragInfo) {
 		return
 	}
 
+	// Story 8.15: conveyor 模式检查格子是否已被占用
+	levelConfig := s.gameState.CurrentLevel
+	if levelConfig != nil && levelConfig.SpecialRules == "conveyor" {
+		if s.lawnGridSystem != nil && s.lawnGridSystem.IsOccupied(s.lawnGridEntityID, col, row) {
+			log.Printf("[GameScene] 传送带卡片拖拽结束: 格子 (%d, %d) 已被占用", col, row)
+			return
+		}
+	}
+
 	removedCardType := s.conveyorBeltSystem.RemoveCard(s.dragConveyorCardIndex)
 	if removedCardType == "" {
 		log.Printf("[GameScene] 传送带卡片拖拽结束: 移除卡片失败")
@@ -566,7 +604,7 @@ func (s *GameScene) handleConveyorDragEnd(dragInfo utils.DragInfo) {
 	var err error
 
 	// Story 8.15: 根据 specialRules 区分处理
-	levelConfig := s.gameState.CurrentLevel
+	// 注意：levelConfig 在前面检查格子占用时已经获取
 	if levelConfig != nil && levelConfig.SpecialRules == "conveyor" {
 		// 传送带模式：使用植物工厂注册表创建植物
 		factory, ok := entities.GetPlantFactory(removedCardType)
@@ -587,6 +625,24 @@ func (s *GameScene) handleConveyorDragEnd(dragInfo utils.DragInfo) {
 		}
 		log.Printf("[GameScene] 传送带卡片拖拽种植成功: entityID=%d, type=%s, row=%d, col=%d",
 			entityID, removedCardType, row+1, col+1)
+
+		// 触发种植粒子效果
+		plantWorldX, plantWorldY := utils.GridToWorldCoords(
+			col, row,
+			config.GridWorldStartX, config.GridWorldStartY,
+			config.CellWidth, config.CellHeight,
+		)
+		_, err = entities.NewPlantingParticleEffect(s.entityManager, s.resourceManager, plantWorldX, plantWorldY)
+		if err != nil {
+			log.Printf("[GameScene] 警告：创建种植粒子效果失败: %v", err)
+		}
+
+		// 标记格子为占用
+		if s.lawnGridSystem != nil && s.lawnGridEntityID != 0 {
+			if err := s.lawnGridSystem.OccupyCell(s.lawnGridEntityID, col, row, entityID); err != nil {
+				log.Printf("[GameScene] 警告：标记格子占用失败: %v", err)
+			}
+		}
 	} else {
 		// 保龄球模式：创建保龄球坚果
 		isExplosive := removedCardType == components.CardTypeExplodeONut
