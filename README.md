@@ -51,20 +51,29 @@ This project is a faithful recreation of the classic tower defense game "Plants 
 - ✅ **Animation Composition** - Multi-animation overlay, track binding, parent-child offsets
 - ✅ **Configuration-Driven Animations** - YAML configuration for animation compositions
 
-#### Plants (MVP Scope)
+#### Plants (Chapter 1)
 - 🌻 Sunflower
 - 🌱 Peashooter
 - 🛡️ Wall-nut
 - 💣 Cherry Bomb
+- 💥 Potato Mine
+- ❄️ Snow Pea
+- 🌱 Repeater
+- 🪴 Chomper
 
-#### Zombie Types
+#### Zombie Types (Chapter 1)
 - 🧟 Normal Zombie
 - 🚧 Conehead Zombie
+- 🪣 Buckethead Zombie
+- 🚩 Flag Zombie
+- 📰 Newspaper Zombie
+- 🏃 Pole Vaulting Zombie
 
 #### Level Content
-- ✅ **Chapter 1 (Front Yard Daytime)** - Levels 1-1 to 1-5
+- ✅ **Chapter 1 (Front Yard Daytime)** - Levels 1-1 to 1-10
 - ✅ **Tutorial System** - 1-1 single-row lawn guidance
 - ✅ **Special Level** - 1-5 Wall-nut Bowling
+- ✅ **Conveyor Level** - 1-10 Conveyor belt mechanics
 - ✅ **Opening Animation** - Camera pan, zombie preview
 - ✅ **Card Selection Screen** - Plant selection, unlock system
 
