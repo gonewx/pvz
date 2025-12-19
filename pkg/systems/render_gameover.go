@@ -41,15 +41,9 @@ func (s *RenderSystem) drawEntityWithClipping(screen *ebiten.Image, id ecs.Entit
 		return
 	}
 
-	// 只对僵尸应用剪裁（检查是否有 BehaviorComponent 且是僵尸类型）
-	behaviorComp, hasBehavior := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, id)
-	isZombie := hasBehavior && (behaviorComp.Type == components.BehaviorZombieBasic ||
-		behaviorComp.Type == components.BehaviorZombieEating ||
-		behaviorComp.Type == components.BehaviorZombieDying ||
-		behaviorComp.Type == components.BehaviorZombieSquashing ||
-		behaviorComp.Type == components.BehaviorZombieConehead ||
-		behaviorComp.Type == components.BehaviorZombieBuckethead ||
-		behaviorComp.Type == components.BehaviorZombieFlag)
+	// 只对僵尸应用剪裁（使用 ZombieTagComponent 统一判断）
+	// Story 8.16: 使用标签组件而非硬编码类型列表，新增僵尸类型自动被识别
+	_, isZombie := ecs.GetComponent[*components.ZombieTagComponent](s.entityManager, id)
 
 	if !isZombie {
 		// 非僵尸实体正常渲染

@@ -312,11 +312,11 @@ func (s *LevelSystem) updateGameTickCS(pb *components.LevelProgressBarComponent)
 // 参数:
 //   - pb: 进度条组件
 func (s *LevelSystem) updateWaveHealthTracking(pb *components.LevelProgressBarComponent) {
-	// 查询所有僵尸实体的血量
+	// 查询所有僵尸实体的血量（使用 ZombieTagComponent 统一判断）
 	totalHealth := 0.0
 
 	zombieEntities := ecs.GetEntitiesWith2[
-		*components.BehaviorComponent,
+		*components.ZombieTagComponent,
 		*components.HealthComponent,
 	](s.entityManager)
 
@@ -326,8 +326,8 @@ func (s *LevelSystem) updateWaveHealthTracking(pb *components.LevelProgressBarCo
 			continue
 		}
 
-		// 只统计僵尸类型
-		if !isZombieType(behavior.Type) {
+		// 排除死亡状态的僵尸
+		if behavior.Type.IsZombieDyingState() {
 			continue
 		}
 

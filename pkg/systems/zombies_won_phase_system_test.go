@@ -7,6 +7,7 @@ import (
 	"github.com/gonewx/pvz/pkg/config"
 	"github.com/gonewx/pvz/pkg/ecs"
 	"github.com/gonewx/pvz/pkg/game"
+	"github.com/gonewx/pvz/pkg/types"
 )
 
 // ========================================
@@ -375,4 +376,238 @@ func TestZombiesWonPhaseSystem_TargetPositionCalculation(t *testing.T) {
 	t.Logf("Target 2 X: %f", actualTarget2X)
 	t.Logf("GameOverDoorMaskX: %f, GameOverDoorMaskY: %f", config.GameOverDoorMaskX, config.GameOverDoorMaskY)
 	t.Logf("Offsets: Target1 X=%f, Y=%f; Target2 X=%f", Phase2ZombieTarget1OffsetX, Phase2ZombieTarget1OffsetY, Phase2ZombieTarget2OffsetX)
+}
+
+// ========================================
+// Story 8.16: 撑杆僵尸胜利动画特殊处理
+// ========================================
+
+// TestPhase2_PolevaulterSpecialHandling 测试撑杆僵尸位置传送
+func TestPhase2_PolevaulterSpecialHandling(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := &game.GameState{
+		CameraX: 400.0,
+	}
+	system := NewZombiesWonPhaseSystem(em, nil, gs, 800, 600)
+
+	// 创建撑杆僵尸（远离目标位置）
+	zombieID := em.CreateEntity()
+	ecs.AddComponent(em, zombieID, &components.PositionComponent{
+		X: 600.0, // 在屏幕右侧
+		Y: 300.0, // 不在目标 Y 位置
+	})
+	ecs.AddComponent(em, zombieID, &components.VelocityComponent{})
+	// 添加 BehaviorComponent 标识为撑杆僵尸
+	ecs.AddComponent(em, zombieID, &components.BehaviorComponent{
+		UnitID: types.UnitIDZombiePolevaulter,
+	})
+	// 添加 PoleVaultComponent（持杆状态）
+	ecs.AddComponent(em, zombieID, &components.PoleVaultComponent{
+		HasPole:   true,
+		IsJumping: false,
+	})
+
+	// 创建流程实体并直接进入 Phase 2
+	flowEntityID := em.CreateEntity()
+	phaseComp := &components.ZombiesWonPhaseComponent{
+		CurrentPhase:    2,
+		PhaseTimer:      0.0,
+		TriggerZombieID: zombieID,
+	}
+	ecs.AddComponent(em, flowEntityID, phaseComp)
+
+	// 执行一帧更新（触发 Phase 2 初始化逻辑）
+	system.Update(0.016)
+
+	// 验证位置已传送到第1个目标位置（门口）
+	posComp, ok := ecs.GetComponent[*components.PositionComponent](em, zombieID)
+	if !ok {
+		t.Fatalf("Position component not found")
+	}
+
+	target1X, target1Y := getZombieTarget1Position()
+	if posComp.X != target1X {
+		t.Errorf("Polevaulter should be teleported to target1X (door). Expected: %f, Got: %f", target1X, posComp.X)
+	}
+	if posComp.Y != target1Y {
+		t.Errorf("Polevaulter should be teleported to target1Y. Expected: %f, Got: %f", target1Y, posComp.Y)
+	}
+
+	// 验证 ZombieReachedTarget1 和 ZombieStartedWalking 已设置
+	if !phaseComp.ZombieReachedTarget1 {
+		t.Error("ZombieReachedTarget1 should be true after polevaulter special handling")
+	}
+	if !phaseComp.ZombieStartedWalking {
+		t.Error("ZombieStartedWalking should be true after polevaulter special handling")
+	}
+
+	t.Logf("Polevaulter teleported to door (%f, %f), target1X=%f, target1Y=%f",
+		posComp.X, posComp.Y, target1X, target1Y)
+}
+
+// TestPhase2_PolevaulterAnimationSwitch 测试撑杆僵尸动画切换
+func TestPhase2_PolevaulterAnimationSwitch(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := &game.GameState{
+		CameraX: 400.0,
+	}
+	system := NewZombiesWonPhaseSystem(em, nil, gs, 800, 600)
+
+	// 创建撑杆僵尸
+	zombieID := em.CreateEntity()
+	ecs.AddComponent(em, zombieID, &components.PositionComponent{
+		X: 600.0,
+		Y: 300.0,
+	})
+	ecs.AddComponent(em, zombieID, &components.VelocityComponent{})
+	ecs.AddComponent(em, zombieID, &components.BehaviorComponent{
+		UnitID: types.UnitIDZombiePolevaulter,
+	})
+	ecs.AddComponent(em, zombieID, &components.PoleVaultComponent{
+		HasPole:   true,
+		IsJumping: true, // 正在跳跃
+	})
+
+	// 创建流程实体并直接进入 Phase 2
+	flowEntityID := em.CreateEntity()
+	phaseComp := &components.ZombiesWonPhaseComponent{
+		CurrentPhase:    2,
+		PhaseTimer:      0.0,
+		TriggerZombieID: zombieID,
+	}
+	ecs.AddComponent(em, flowEntityID, phaseComp)
+
+	// 执行一帧更新
+	system.Update(0.016)
+
+	// 验证 AnimationCommandComponent 已添加
+	animCmd, ok := ecs.GetComponent[*components.AnimationCommandComponent](em, zombieID)
+	if !ok {
+		t.Fatal("AnimationCommandComponent should be added for polevaulter")
+	}
+
+	// 验证动画命令内容
+	if animCmd.UnitID != types.UnitIDZombiePolevaulter {
+		t.Errorf("AnimationCommand UnitID mismatch. Expected: %s, Got: %s",
+			types.UnitIDZombiePolevaulter, animCmd.UnitID)
+	}
+	if animCmd.ComboName != "walk" {
+		t.Errorf("AnimationCommand ComboName should be 'walk'. Got: %s", animCmd.ComboName)
+	}
+	if animCmd.Processed {
+		t.Error("AnimationCommand should not be processed yet")
+	}
+
+	t.Logf("Animation command: UnitID=%s, ComboName=%s, Processed=%v",
+		animCmd.UnitID, animCmd.ComboName, animCmd.Processed)
+}
+
+// TestPhase2_PolevaulterStateReset 测试撑杆僵尸状态重置
+func TestPhase2_PolevaulterStateReset(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := &game.GameState{
+		CameraX: 400.0,
+	}
+	system := NewZombiesWonPhaseSystem(em, nil, gs, 800, 600)
+
+	// 创建撑杆僵尸（持杆且正在跳跃）
+	zombieID := em.CreateEntity()
+	ecs.AddComponent(em, zombieID, &components.PositionComponent{
+		X: 600.0,
+		Y: 300.0,
+	})
+	ecs.AddComponent(em, zombieID, &components.VelocityComponent{})
+	ecs.AddComponent(em, zombieID, &components.BehaviorComponent{
+		UnitID: types.UnitIDZombiePolevaulter,
+	})
+	poleVault := &components.PoleVaultComponent{
+		HasPole:   true,
+		IsJumping: true,
+	}
+	ecs.AddComponent(em, zombieID, poleVault)
+
+	// 创建流程实体并直接进入 Phase 2
+	flowEntityID := em.CreateEntity()
+	phaseComp := &components.ZombiesWonPhaseComponent{
+		CurrentPhase:    2,
+		PhaseTimer:      0.0,
+		TriggerZombieID: zombieID,
+	}
+	ecs.AddComponent(em, flowEntityID, phaseComp)
+
+	// 执行一帧更新
+	system.Update(0.016)
+
+	// 验证撑杆状态已重置
+	if poleVault.HasPole {
+		t.Error("PoleVaultComponent.HasPole should be false after special handling")
+	}
+	if poleVault.IsJumping {
+		t.Error("PoleVaultComponent.IsJumping should be false after special handling")
+	}
+
+	t.Logf("Polevaulter state reset: HasPole=%v, IsJumping=%v",
+		poleVault.HasPole, poleVault.IsJumping)
+}
+
+// TestPhase2_NormalZombieUnchanged 测试普通僵尸行为不受影响
+func TestPhase2_NormalZombieUnchanged(t *testing.T) {
+	em := ecs.NewEntityManager()
+	gs := &game.GameState{
+		CameraX: 400.0,
+	}
+	system := NewZombiesWonPhaseSystem(em, nil, gs, 800, 600)
+
+	initialX := 500.0
+	initialY := 300.0
+
+	// 创建普通僵尸
+	zombieID := em.CreateEntity()
+	ecs.AddComponent(em, zombieID, &components.PositionComponent{
+		X: initialX,
+		Y: initialY,
+	})
+	ecs.AddComponent(em, zombieID, &components.VelocityComponent{})
+	// 添加 BehaviorComponent 标识为普通僵尸
+	ecs.AddComponent(em, zombieID, &components.BehaviorComponent{
+		UnitID: types.UnitIDZombie,
+	})
+
+	// 创建流程实体并直接进入 Phase 2
+	flowEntityID := em.CreateEntity()
+	phaseComp := &components.ZombiesWonPhaseComponent{
+		CurrentPhase:    2,
+		PhaseTimer:      0.0,
+		TriggerZombieID: zombieID,
+	}
+	ecs.AddComponent(em, flowEntityID, phaseComp)
+
+	// 执行一帧更新
+	system.Update(0.016)
+
+	// 验证位置没有被传送（仍在原位）
+	posComp, ok := ecs.GetComponent[*components.PositionComponent](em, zombieID)
+	if !ok {
+		t.Fatalf("Position component not found")
+	}
+
+	if posComp.X == initialX && posComp.Y == initialY {
+		// 普通僵尸位置不变，这是预期的（因为还没开始移动）
+		t.Logf("Normal zombie position unchanged: (%f, %f)", posComp.X, posComp.Y)
+	}
+
+	// 验证 ZombieReachedTarget1 未被特殊处理设置
+	// 普通僵尸需要通过正常的移动逻辑到达目标
+	if phaseComp.ZombieReachedTarget1 {
+		t.Error("ZombieReachedTarget1 should be false for normal zombie at initialization")
+	}
+
+	// 验证没有添加 AnimationCommandComponent（特殊处理不应用于普通僵尸）
+	_, hasAnimCmd := ecs.GetComponent[*components.AnimationCommandComponent](em, zombieID)
+	if hasAnimCmd {
+		t.Error("AnimationCommandComponent should not be added for normal zombie")
+	}
+
+	t.Logf("Normal zombie behavior unchanged. ZombieReachedTarget1=%v, AnimCmd=%v",
+		phaseComp.ZombieReachedTarget1, hasAnimCmd)
 }

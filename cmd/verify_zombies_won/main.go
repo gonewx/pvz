@@ -14,6 +14,7 @@ import (
 	"github.com/gonewx/pvz/pkg/game"
 	"github.com/gonewx/pvz/pkg/systems"
 	"github.com/gonewx/pvz/pkg/systems/behavior"
+	"github.com/gonewx/pvz/pkg/types"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -27,11 +28,12 @@ const (
 
 var (
 	// 命令行参数
-	skipPhase1 = flag.Bool("skip-phase1", false, "跳过 Phase 1（游戏冻结阶段）")
-	skipPhase2 = flag.Bool("skip-phase2", false, "跳过 Phase 2（僵尸入侵阶段）")
-	skipPhase3 = flag.Bool("skip-phase3", false, "跳过 Phase 3（惨叫动画阶段）")
-	fastMode   = flag.Bool("fast", false, "快速模式（缩短所有阶段时间）")
-	verbose    = flag.Bool("verbose", false, "显示详细调试信息")
+	skipPhase1  = flag.Bool("skip-phase1", false, "跳过 Phase 1（游戏冻结阶段）")
+	skipPhase2  = flag.Bool("skip-phase2", false, "跳过 Phase 2（僵尸入侵阶段）")
+	skipPhase3  = flag.Bool("skip-phase3", false, "跳过 Phase 3（惨叫动画阶段）")
+	fastMode    = flag.Bool("fast", false, "快速模式（缩短所有阶段时间）")
+	verbose     = flag.Bool("verbose", false, "显示详细调试信息")
+	polevaulter = flag.Bool("polevaulter", false, "使用撑杆僵尸测试 (Story 8.16)")
 )
 
 // VerifyZombiesWonGame 僵尸获胜流程验证游戏
@@ -59,6 +61,9 @@ type VerifyZombiesWonGame struct {
 
 	triggered bool // 是否已触发流程
 	completed bool // 是否已完成所有阶段
+
+	// Story 8.16: 撑杆僵尸模式
+	usePolevaulter bool // 是否使用撑杆僵尸测试
 }
 
 // NewVerifyZombiesWonGame 创建验证游戏实例
@@ -147,9 +152,20 @@ func NewVerifyZombiesWonGame() (*VerifyZombiesWonGame, error) {
 	dialogInputSystem := systems.NewDialogInputSystem(em)
 
 	log.Println("╔════════════════════════════════════════════════════════╗")
-	log.Println("║      僵尸获胜流程验证程序 (Story 8.8)                 ║")
+	log.Println("║      僵尸获胜流程验证程序 (Story 8.8 / 8.16)          ║")
 	log.Println("╚════════════════════════════════════════════════════════╝")
 	log.Println()
+
+	// Story 8.16: 撑杆僵尸模式
+	if *polevaulter {
+		log.Println("【模式】撑杆僵尸特殊处理验证 (Story 8.16)")
+		log.Println("  - 撑杆僵尸触发失败时的特殊处理：")
+		log.Println("    1. 直接传送到目标位置（跳过移动阶段）")
+		log.Println("    2. 强制切换为行走动画（无杆状态）")
+		log.Println("    3. 与摄像机左移同步走入房子")
+		log.Println()
+	}
+
 	log.Println("【验证流程】")
 	log.Println("  Phase 1: 游戏冻结 (1.5s)")
 	log.Println("    - 植物停止攻击动画")
@@ -187,6 +203,7 @@ func NewVerifyZombiesWonGame() (*VerifyZombiesWonGame, error) {
 		debugFont:         debugFont,
 		triggered:         false,
 		completed:         false,
+		usePolevaulter:    *polevaulter, // Story 8.16
 	}
 
 	// 创建测试场景
@@ -205,29 +222,60 @@ func NewVerifyZombiesWonGame() (*VerifyZombiesWonGame, error) {
 func (vg *VerifyZombiesWonGame) setupTestScene() {
 	// 创建测试用僵尸（从屏幕右侧开始）
 	var err error
-	vg.zombieID, err = entities.NewZombieEntity(vg.entityManager, vg.resourceManager, 0, 300.0)
-	if err != nil {
-		log.Printf("Warning: Failed to create zombie entity: %v", err)
-		// 创建简化版僵尸
-		vg.zombieID = vg.entityManager.CreateEntity()
-		ecs.AddComponent(vg.entityManager, vg.zombieID, &components.PositionComponent{
-			X: 150.0,
-			Y: 300.0,
-		})
+
+	// Story 8.16: 根据模式创建普通僵尸或撑杆僵尸
+	if vg.usePolevaulter {
+		// 创建撑杆僵尸
+		vg.zombieID, err = entities.NewPolevaulterZombieEntity(vg.entityManager, vg.resourceManager, 2, 600.0)
+		if err != nil {
+			log.Printf("Warning: Failed to create polevaulter zombie entity: %v", err)
+			// 回退到创建普通僵尸
+			vg.zombieID, err = entities.NewZombieEntity(vg.entityManager, vg.resourceManager, 0, 300.0)
+			if err != nil {
+				log.Printf("Warning: Fallback also failed: %v", err)
+			}
+		}
+		// 激活撑杆僵尸（设置速度和动画）
+		entities.ActivatePolevaulterZombie(vg.entityManager, vg.zombieID)
+		log.Println("[VerifyZombiesWon] 创建撑杆僵尸（持杆奔跑状态）")
+	} else {
+		// 创建普通僵尸
+		vg.zombieID, err = entities.NewZombieEntity(vg.entityManager, vg.resourceManager, 0, 300.0)
+		if err != nil {
+			log.Printf("Warning: Failed to create zombie entity: %v", err)
+			// 创建简化版僵尸
+			vg.zombieID = vg.entityManager.CreateEntity()
+			ecs.AddComponent(vg.entityManager, vg.zombieID, &components.PositionComponent{
+				X: 150.0,
+				Y: 300.0,
+			})
+		}
 	}
 
 	// 设置僵尸向左移动（激活状态）
 	vel, ok := ecs.GetComponent[*components.VelocityComponent](vg.entityManager, vg.zombieID)
 	if ok {
-		vel.VX = -30.0 // 标准僵尸移动速度
+		if vg.usePolevaulter {
+			vel.VX = -54.0 // 撑杆僵尸高速奔跑
+		} else {
+			vel.VX = -30.0 // 标准僵尸移动速度
+		}
 	}
 
-	// 播放行走动画
-	ecs.AddComponent(vg.entityManager, vg.zombieID, &components.AnimationCommandComponent{
-		UnitID:    "zombie",
-		ComboName: "walk",
-		Processed: false,
-	})
+	// 播放行走/奔跑动画
+	if vg.usePolevaulter {
+		ecs.AddComponent(vg.entityManager, vg.zombieID, &components.AnimationCommandComponent{
+			UnitID:    types.UnitIDZombiePolevaulter,
+			ComboName: "run", // 撑杆僵尸持杆奔跑
+			Processed: false,
+		})
+	} else {
+		ecs.AddComponent(vg.entityManager, vg.zombieID, &components.AnimationCommandComponent{
+			UnitID:    "zombie",
+			ComboName: "walk",
+			Processed: false,
+		})
+	}
 
 	// 创建测试用植物（验证冻结时停止动画）
 	vg.plantID = vg.entityManager.CreateEntity()
@@ -254,7 +302,11 @@ func (vg *VerifyZombiesWonGame) setupTestScene() {
 	})
 
 	log.Println("[VerifyZombiesWon] 测试场景创建完成")
-	log.Printf("  - 僵尸 ID: %d (位置: X=600, VX=-150)", vg.zombieID)
+	if vg.usePolevaulter {
+		log.Printf("  - 撑杆僵尸 ID: %d (位置: X=600, VX=-54, 持杆状态)", vg.zombieID)
+	} else {
+		log.Printf("  - 僵尸 ID: %d (位置: X=600, VX=-150)", vg.zombieID)
+	}
 	log.Printf("  - 植物 ID: %d (位置: X=400)", vg.plantID)
 	log.Printf("  - 子弹 ID: %d (位置: X=300)", vg.bulletID)
 }
@@ -318,16 +370,33 @@ func (vg *VerifyZombiesWonGame) onRetryClicked() {
 	log.Println("  - 模拟重新加载关卡...")
 	log.Println("  - 验证程序将重启")
 	log.Println()
-	log.Println("╔════════════════════════════════════════════════════════╗")
-	log.Println("║           ✅ 僵尸获胜流程验证完成！                   ║")
-	log.Println("╚════════════════════════════════════════════════════════╝")
-	log.Println()
-	log.Println("【验证成果】")
-	log.Println("  ✅ Phase 1: 游戏冻结 (完成)")
-	log.Println("  ✅ Phase 2: 僵尸入侵 (完成)")
-	log.Println("  ✅ Phase 3: 惨叫动画 (完成)")
-	log.Println("  ✅ Phase 4: 游戏结束对话框 (完成)")
-	log.Println("  ✅ 按钮交互: 鼠标悬停、按下、点击 (完成)")
+
+	if vg.usePolevaulter {
+		log.Println("╔════════════════════════════════════════════════════════╗")
+		log.Println("║      ✅ 撑杆僵尸获胜流程验证完成！(Story 8.16)        ║")
+		log.Println("╚════════════════════════════════════════════════════════╝")
+		log.Println()
+		log.Println("【验证成果】")
+		log.Println("  ✅ Phase 1: 游戏冻结 (完成)")
+		log.Println("  ✅ Phase 2: 僵尸入侵 - 撑杆僵尸特殊处理 (完成)")
+		log.Println("     - 位置传送到目标位置")
+		log.Println("     - 强制切换为行走动画")
+		log.Println("     - 撑杆状态重置 (HasPole=false, IsJumping=false)")
+		log.Println("  ✅ Phase 3: 惨叫动画 (完成)")
+		log.Println("  ✅ Phase 4: 游戏结束对话框 (完成)")
+		log.Println("  ✅ 按钮交互: 鼠标悬停、按下、点击 (完成)")
+	} else {
+		log.Println("╔════════════════════════════════════════════════════════╗")
+		log.Println("║           ✅ 僵尸获胜流程验证完成！                   ║")
+		log.Println("╚════════════════════════════════════════════════════════╝")
+		log.Println()
+		log.Println("【验证成果】")
+		log.Println("  ✅ Phase 1: 游戏冻结 (完成)")
+		log.Println("  ✅ Phase 2: 僵尸入侵 (完成)")
+		log.Println("  ✅ Phase 3: 惨叫动画 (完成)")
+		log.Println("  ✅ Phase 4: 游戏结束对话框 (完成)")
+		log.Println("  ✅ 按钮交互: 鼠标悬停、按下、点击 (完成)")
+	}
 	log.Println()
 	log.Println("【提示】")
 	log.Println("  - 按 R 重启验证 | 按 Q 退出")
@@ -554,8 +623,30 @@ func (vg *VerifyZombiesWonGame) drawDebugInfo(screen *ebiten.Image) {
 	y := 20.0
 
 	// 标题
-	vg.drawText(screen, "僵尸获胜流程验证 - Story 8.8", 10, y, color.RGBA{255, 255, 0, 255})
+	if vg.usePolevaulter {
+		vg.drawText(screen, "撑杆僵尸获胜流程验证 - Story 8.16", 10, y, color.RGBA{255, 200, 0, 255})
+	} else {
+		vg.drawText(screen, "僵尸获胜流程验证 - Story 8.8", 10, y, color.RGBA{255, 255, 0, 255})
+	}
 	y += 25
+
+	// Story 8.16: 撑杆僵尸状态显示
+	if vg.usePolevaulter {
+		poleVault, hasPole := ecs.GetComponent[*components.PoleVaultComponent](vg.entityManager, vg.zombieID)
+		if hasPole {
+			hasPoleText := "否"
+			if poleVault.HasPole {
+				hasPoleText = "是"
+			}
+			isJumpingText := "否"
+			if poleVault.IsJumping {
+				isJumpingText = "是"
+			}
+			statusText := fmt.Sprintf("撑杆状态: 持杆=%s 跳跃=%s", hasPoleText, isJumpingText)
+			vg.drawText(screen, statusText, 10, y, color.RGBA{255, 180, 100, 255})
+			y += 18
+		}
+	}
 
 	// 快捷键提示
 	if !vg.triggered {
@@ -586,6 +677,21 @@ func (vg *VerifyZombiesWonGame) drawDebugInfo(screen *ebiten.Image) {
 				cameraText := fmt.Sprintf("  - 摄像机位置: X=%.1f (目标: X=0)", vg.gameState.CameraX)
 				vg.drawText(screen, cameraText, 10, y, color.RGBA{200, 200, 200, 255})
 				y += 18
+
+				// Story 8.16: 显示撑杆僵尸特殊处理状态
+				if vg.usePolevaulter {
+					poleVault, hasPole := ecs.GetComponent[*components.PoleVaultComponent](vg.entityManager, vg.zombieID)
+					if hasPole {
+						if !poleVault.HasPole && !poleVault.IsJumping {
+							vg.drawText(screen, "  ✅ 撑杆已丢弃，正常行走", 10, y, color.RGBA{150, 255, 150, 255})
+							y += 18
+						}
+					}
+					if phaseComp.ZombieReachedTarget1 && phaseComp.ZombieStartedWalking {
+						vg.drawText(screen, "  ✅ 已传送并切换动画", 10, y, color.RGBA{150, 255, 150, 255})
+						y += 18
+					}
+				}
 			case 3:
 				vg.drawText(screen, "  - 播放惨叫和动画中...", 10, y, color.RGBA{200, 200, 200, 255})
 				y += 18
@@ -683,7 +789,11 @@ func main() {
 	}
 
 	// 设置窗口标题
-	ebiten.SetWindowTitle("僵尸获胜流程验证 - Story 8.8")
+	if *polevaulter {
+		ebiten.SetWindowTitle("撑杆僵尸获胜流程验证 - Story 8.16")
+	} else {
+		ebiten.SetWindowTitle("僵尸获胜流程验证 - Story 8.8")
+	}
 	ebiten.SetWindowSize(screenWidth, screenHeight)
 
 	// 运行游戏

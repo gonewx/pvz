@@ -139,28 +139,6 @@ func TestLawnmowerSystemCompletion(t *testing.T) {
 	}
 }
 
-// TestIsZombieType 测试僵尸类型判断
-func TestIsZombieType(t *testing.T) {
-	tests := []struct {
-		behaviorType components.BehaviorType
-		expected     bool
-	}{
-		{components.BehaviorZombieBasic, true},
-		{components.BehaviorZombieConehead, true},
-		{components.BehaviorZombieBuckethead, true},
-		{components.BehaviorPeashooter, false},
-		{components.BehaviorSunflower, false},
-		{components.BehaviorWallnut, false},
-	}
-
-	for _, tt := range tests {
-		result := isZombieType(tt.behaviorType)
-		if result != tt.expected {
-			t.Errorf("isZombieType(%v) = %v, expected %v", tt.behaviorType, result, tt.expected)
-		}
-	}
-}
-
 // TestLawnmowerSystemZombieCollision 测试除草车与僵尸碰撞
 // Story 10.6: 测试回退逻辑（无 ResourceManager 时使用旧的死亡动画）
 func TestLawnmowerSystemZombieCollision(t *testing.T) {
@@ -198,6 +176,7 @@ func TestLawnmowerSystemZombieCollision(t *testing.T) {
 		CurrentHealth: 270,
 		MaxHealth:     270,
 	})
+	ecs.AddComponent(em, zombieID, &components.ZombieTagComponent{})
 
 	// Story 10.6: 添加 ReanimComponent（回退逻辑需要）
 	ecs.AddComponent(em, zombieID, &components.ReanimComponent{
@@ -438,6 +417,7 @@ func TestSquashAnimation_EdgeCases(t *testing.T) {
 		zombieID := em.CreateEntity()
 		ecs.AddComponent(em, zombieID, &components.PositionComponent{X: 100, Y: 200})
 		ecs.AddComponent(em, zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	ecs.AddComponent(em, zombieID, &components.ZombieTagComponent{})
 		ecs.AddComponent(em, zombieID, &components.ReanimComponent{
 			ReanimName:        "Zombie",
 			CachedRenderData:  make([]components.RenderPartData, 0),
@@ -472,6 +452,7 @@ func TestSquashAnimation_EdgeCases(t *testing.T) {
 		zombieID := em.CreateEntity()
 		ecs.AddComponent(em, zombieID, &components.PositionComponent{X: 100, Y: 200})
 		ecs.AddComponent(em, zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	ecs.AddComponent(em, zombieID, &components.ZombieTagComponent{})
 		ecs.AddComponent(em, zombieID, &components.ReanimComponent{
 			ReanimName:        "Zombie",
 			CachedRenderData:  make([]components.RenderPartData, 1),
@@ -507,6 +488,7 @@ func TestSquashAnimation_EdgeCases(t *testing.T) {
 		zombieID := em.CreateEntity()
 		ecs.AddComponent(em, zombieID, &components.PositionComponent{X: 100, Y: 200})
 		ecs.AddComponent(em, zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	ecs.AddComponent(em, zombieID, &components.ZombieTagComponent{})
 		ecs.AddComponent(em, zombieID, &components.ReanimComponent{
 			ReanimName:        "Zombie",
 			CachedRenderData:  make([]components.RenderPartData, 1),
@@ -558,6 +540,7 @@ func TestLawnmowerSystem_EarlyParticleTrigger(t *testing.T) {
 	zombieID := em.CreateEntity()
 	ecs.AddComponent(em, zombieID, &components.PositionComponent{X: 100, Y: 200})
 	ecs.AddComponent(em, zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+ecs.AddComponent(em, zombieID, &components.ZombieTagComponent{})
 	ecs.AddComponent(em, zombieID, &components.ReanimComponent{
 		ReanimName:        "Zombie",
 		CachedRenderData:  make([]components.RenderPartData, 1),

@@ -188,6 +188,8 @@ func TestPhysicsSystem_BulletZombieCollision(t *testing.T) {
 		Width:  config.ZombieCollisionWidth,
 		Height: config.ZombieCollisionHeight,
 	})
+	em.AddComponent(zombieID, &components.ZombieTagComponent{})
+
 
 	// 执行物理更新
 	ps.Update(0.016)
@@ -262,6 +264,8 @@ func TestPhysicsSystem_NoCollision(t *testing.T) {
 		Width:  config.ZombieCollisionWidth,
 		Height: config.ZombieCollisionHeight,
 	})
+	em.AddComponent(zombieID, &components.ZombieTagComponent{})
+
 
 	// 执行物理更新
 	ps.Update(0.016)
@@ -318,6 +322,7 @@ func TestPhysicsSystem_BulletDamagesZombie(t *testing.T) {
 		CurrentHealth: 270,
 		MaxHealth:     270,
 	})
+	em.AddComponent(zombieID, &components.ZombieTagComponent{})
 
 	// 执行物理更新（会检测碰撞并减少生命值）
 	ps.Update(0.016)
@@ -364,6 +369,7 @@ func TestPhysicsSystem_MultipleHits(t *testing.T) {
 		CurrentHealth: 270,
 		MaxHealth:     270,
 	})
+	em.AddComponent(zombieID, &components.ZombieTagComponent{})
 
 	// 第一次击中
 	bullet1 := em.CreateEntity()
@@ -460,6 +466,7 @@ func TestPhysicsSystem_HitSoundPlays(t *testing.T) {
 		CurrentHealth: 270,
 		MaxHealth:     270,
 	})
+	em.AddComponent(zombieID, &components.ZombieTagComponent{})
 
 	// 执行物理更新（会触发音效播放）
 	// 注意：在测试环境中，音频资源可能不存在
@@ -535,6 +542,7 @@ func TestPeaHitParticleEffect(t *testing.T) {
 		CurrentHealth: 270,
 		MaxHealth:     270,
 	})
+	em.AddComponent(zombieID, &components.ZombieTagComponent{})
 
 	// 记录触发前的实体数量
 	initialEntityCount := countAllEntities(em)
@@ -651,6 +659,7 @@ func TestPeaHitParticleEffectErrorHandling(t *testing.T) {
 		CurrentHealth: 270,
 		MaxHealth:     270,
 	})
+	em.AddComponent(zombieID, &components.ZombieTagComponent{})
 
 	// 执行物理更新（粒子配置未加载，应该失败但不阻塞）
 	ps.Update(0.016)
@@ -706,6 +715,7 @@ func TestMultipleBulletsParticleEffects(t *testing.T) {
 		CurrentHealth: 270,
 		MaxHealth:     270,
 	})
+	em.AddComponent(zombieID, &components.ZombieTagComponent{})
 
 	// 第一发子弹击中
 	bullet1 := em.CreateEntity()
@@ -820,6 +830,7 @@ func TestPhysicsSystem_GameFreezeDeletesBullets(t *testing.T) {
 	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
 	em.AddComponent(zombieID, &components.PositionComponent{X: 600, Y: 250})
 	ecs.AddComponent(em, zombieID, &components.VelocityComponent{VX: -50, VY: 0})
+	ecs.AddComponent(em, zombieID, &components.ZombieTagComponent{})
 
 	// 添加 GameFreezeComponent
 	freezeEntityID := em.CreateEntity()
@@ -893,6 +904,7 @@ func TestPhysicsSystem_CrossLaneNoCollision(t *testing.T) {
 		CurrentHealth: 270,
 		MaxHealth:     270,
 	})
+	em.AddComponent(zombieID, &components.ZombieTagComponent{})
 
 	// 执行物理更新
 	ps.Update(0.016)
@@ -957,6 +969,7 @@ func TestPhysicsSystem_SameLaneCollision(t *testing.T) {
 		CurrentHealth: 270,
 		MaxHealth:     270,
 	})
+	em.AddComponent(zombieID, &components.ZombieTagComponent{})
 
 	// 执行物理更新
 	ps.Update(0.016)

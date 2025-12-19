@@ -176,9 +176,9 @@ func (s *BowlingNutSystem) checkCollisionWithNearestZombie(
 	nutLeft := nutPos.X - config.BowlingNutCollisionWidth/2
 	nutRight := nutPos.X + config.BowlingNutCollisionWidth/2
 
-	// 查询所有僵尸实体
+	// 查询所有僵尸实体（使用 ZombieTagComponent 统一判断）
 	zombieEntities := ecs.GetEntitiesWith3[
-		*components.BehaviorComponent,
+		*components.ZombieTagComponent,
 		*components.PositionComponent,
 		*components.CollisionComponent,
 	](s.entityManager)
@@ -186,8 +186,8 @@ func (s *BowlingNutSystem) checkCollisionWithNearestZombie(
 	for _, zombieID := range zombieEntities {
 		behavior, _ := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
 
-		// 检查是否是僵尸类型
-		if !s.isZombieType(behavior.Type) {
+		// 排除死亡状态的僵尸
+		if behavior.Type.IsZombieDyingState() {
 			continue
 		}
 
@@ -221,22 +221,6 @@ func (s *BowlingNutSystem) checkCollisionWithNearestZombie(
 	}
 
 	return nearestZombie
-}
-
-// isZombieType 检查行为类型是否是活着的僵尸（排除死亡状态）
-func (s *BowlingNutSystem) isZombieType(behaviorType components.BehaviorType) bool {
-	switch behaviorType {
-	case components.BehaviorZombieBasic,
-		components.BehaviorZombieEating,
-		components.BehaviorZombieConehead,
-		components.BehaviorZombieBuckethead,
-		components.BehaviorZombieFlag,
-		components.BehaviorZombiePolevaulter:
-		return true
-	default:
-		// 排除 BehaviorZombieDying, BehaviorZombieSquashing, BehaviorZombieDyingExplosion 等死亡状态
-		return false
-	}
 }
 
 // applyDamageToZombie 对僵尸造成碰撞伤害
@@ -491,15 +475,17 @@ func (s *BowlingNutSystem) playExplosionSound() {
 func (s *BowlingNutSystem) findNearestZombieDistance(row int, nutX float64) float64 {
 	minDist := math.MaxFloat64
 
+	// 查询所有僵尸实体（使用 ZombieTagComponent 统一判断）
 	zombieEntities := ecs.GetEntitiesWith2[
-		*components.BehaviorComponent,
+		*components.ZombieTagComponent,
 		*components.PositionComponent,
 	](s.entityManager)
 
 	for _, zombieID := range zombieEntities {
 		behavior, _ := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
 
-		if !s.isZombieType(behavior.Type) {
+		// 排除死亡状态的僵尸
+		if behavior.Type.IsZombieDyingState() {
 			continue
 		}
 

@@ -368,6 +368,7 @@ func TestBowlingIntegration_CollisionAndBounce(t *testing.T) {
 			OffsetX: 0,
 			OffsetY: 0,
 		})
+		em.AddComponent(zombieEntity, &components.ZombieTagComponent{})
 
 		// 更新系统
 		nutSystem.Update(0.016)
@@ -416,6 +417,7 @@ func TestBowlingIntegration_CollisionAndBounce(t *testing.T) {
 			OffsetX: 0,
 			OffsetY: 0,
 		})
+		em.AddComponent(zombieEntity, &components.ZombieTagComponent{})
 
 		// 更新系统
 		nutSystem.Update(0.016)
@@ -560,6 +562,7 @@ func TestBowlingIntegration_EdgeCases(t *testing.T) {
 		zombieEntity := em.CreateEntity()
 		em.AddComponent(zombieEntity, &components.PositionComponent{X: 510, Y: 328})
 		em.AddComponent(zombieEntity, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+	em.AddComponent(zombieEntity, &components.ZombieTagComponent{})
 		em.AddComponent(zombieEntity, &components.HealthComponent{MaxHealth: 5000, CurrentHealth: 5000})
 		em.AddComponent(zombieEntity, &components.CollisionComponent{Width: 50, Height: 80})
 

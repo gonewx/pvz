@@ -387,13 +387,12 @@ func (s *TutorialSystem) checkTriggerCondition(trigger string) bool {
 		return s.newPlantThisFrame
 
 	case "zombieSpawned":
-		// 检查是否有僵尸生成（通过 BehaviorComponent 查询）
-		behaviorEntities := ecs.GetEntitiesWith1[*components.BehaviorComponent](s.entityManager)
-		for _, entity := range behaviorEntities {
+		// 检查是否有僵尸生成（使用 ZombieTagComponent 统一判断）
+		zombieEntities := ecs.GetEntitiesWith1[*components.ZombieTagComponent](s.entityManager)
+		// 排除死亡状态和预览僵尸
+		for _, entity := range zombieEntities {
 			behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entity)
-			if ok && (behavior.Type == components.BehaviorZombieBasic ||
-				behavior.Type == components.BehaviorZombieConehead ||
-				behavior.Type == components.BehaviorZombieBuckethead) {
+			if ok && !behavior.Type.IsZombieDyingState() && behavior.Type != components.BehaviorZombiePreview {
 				return true
 			}
 		}
@@ -630,14 +629,13 @@ func (s *TutorialSystem) updateTrackingState() {
 	}
 	s.lastSunCount = currentSunCount
 
-	// 统计僵尸数量（通过 BehaviorComponent）
+	// 统计僵尸数量（使用 ZombieTagComponent 统一判断）
 	zombieCount := 0
-	behaviorEntities := ecs.GetEntitiesWith1[*components.BehaviorComponent](s.entityManager)
-	for _, entity := range behaviorEntities {
+	zombieEntities := ecs.GetEntitiesWith1[*components.ZombieTagComponent](s.entityManager)
+	for _, entity := range zombieEntities {
 		behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, entity)
-		if ok && (behavior.Type == components.BehaviorZombieBasic ||
-			behavior.Type == components.BehaviorZombieConehead ||
-			behavior.Type == components.BehaviorZombieBuckethead) {
+		// 排除死亡状态和预览僵尸
+		if ok && !behavior.Type.IsZombieDyingState() && behavior.Type != components.BehaviorZombiePreview {
 			zombieCount++
 		}
 	}

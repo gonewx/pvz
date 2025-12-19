@@ -278,6 +278,7 @@ func TestBowlingNutSystem_CollisionDetection(t *testing.T) {
 	zombieID := em.CreateEntity()
 	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY})
 	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+em.AddComponent(zombieID, &components.ZombieTagComponent{})
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
 	em.AddComponent(zombieID, &components.ZombieTagComponent{})
@@ -316,6 +317,7 @@ func TestBowlingNutSystem_ArmorDamage(t *testing.T) {
 	zombieID := em.CreateEntity()
 	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY})
 	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieConehead})
+em.AddComponent(zombieID, &components.ZombieTagComponent{})
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(zombieID, &components.ArmorComponent{CurrentArmor: 370, MaxArmor: 370})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
@@ -358,6 +360,7 @@ func TestBowlingNutSystem_BucketheadZombieArmorDamage(t *testing.T) {
 	zombieID := em.CreateEntity()
 	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY})
 	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBuckethead})
+em.AddComponent(zombieID, &components.ZombieTagComponent{})
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(zombieID, &components.ArmorComponent{CurrentArmor: 1100, MaxArmor: 1100})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
@@ -392,6 +395,7 @@ func TestBowlingNutSystem_BounceDirection_NearestZombie(t *testing.T) {
 	zombie1ID := em.CreateEntity()
 	em.AddComponent(zombie1ID, &components.PositionComponent{X: 900.0, Y: row1Y})
 	em.AddComponent(zombie1ID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+em.AddComponent(zombie1ID, &components.ZombieTagComponent{})
 	em.AddComponent(zombie1ID, &components.HealthComponent{CurrentHealth: 270})
 	em.AddComponent(zombie1ID, &components.CollisionComponent{Width: 40, Height: 115})
 
@@ -401,6 +405,7 @@ func TestBowlingNutSystem_BounceDirection_NearestZombie(t *testing.T) {
 	zombie3ID := em.CreateEntity()
 	em.AddComponent(zombie3ID, &components.PositionComponent{X: 600.0, Y: row3Y})
 	em.AddComponent(zombie3ID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+em.AddComponent(zombie3ID, &components.ZombieTagComponent{})
 	em.AddComponent(zombie3ID, &components.HealthComponent{CurrentHealth: 270})
 	em.AddComponent(zombie3ID, &components.CollisionComponent{Width: 40, Height: 115})
 
@@ -467,6 +472,7 @@ func TestBowlingNutSystem_BounceCountIncrement(t *testing.T) {
 	zombieID := em.CreateEntity()
 	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY})
 	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+em.AddComponent(zombieID, &components.ZombieTagComponent{})
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
 	em.AddComponent(zombieID, &components.ZombieTagComponent{})
@@ -502,6 +508,7 @@ func TestBowlingNutSystem_CollisionCooldown(t *testing.T) {
 	zombieID := em.CreateEntity()
 	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY})
 	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+em.AddComponent(zombieID, &components.ZombieTagComponent{})
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
 	em.AddComponent(zombieID, &components.ZombieTagComponent{})
@@ -578,6 +585,7 @@ func TestBowlingNutSystem_ExplosiveNut_DestroyedOnCollision(t *testing.T) {
 	zombieID := em.CreateEntity()
 	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY})
 	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+em.AddComponent(zombieID, &components.ZombieTagComponent{})
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
 	em.AddComponent(zombieID, &components.ZombieTagComponent{})
@@ -615,6 +623,7 @@ func TestBowlingNutSystem_FlashEffectAdded(t *testing.T) {
 	zombieID := em.CreateEntity()
 	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY})
 	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+em.AddComponent(zombieID, &components.ZombieTagComponent{})
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
 	em.AddComponent(zombieID, &components.ZombieTagComponent{})
@@ -629,34 +638,6 @@ func TestBowlingNutSystem_FlashEffectAdded(t *testing.T) {
 	}
 	if !flashComp.IsActive {
 		t.Error("FlashEffectComponent should be active")
-	}
-}
-
-// TestBowlingNutSystem_IsZombieType 测试僵尸类型检测
-// 只有活着的僵尸才返回true，死亡中的僵尸返回false（避免无效碰撞）
-func TestBowlingNutSystem_IsZombieType(t *testing.T) {
-	em := ecs.NewEntityManager()
-	system := NewBowlingNutSystem(em, nil)
-
-	tests := []struct {
-		behaviorType components.BehaviorType
-		expected     bool
-	}{
-		{components.BehaviorZombieBasic, true},
-		{components.BehaviorZombieEating, true},
-		{components.BehaviorZombieDying, false}, // 死亡中的僵尸不参与碰撞检测
-		{components.BehaviorZombieConehead, true},
-		{components.BehaviorZombieBuckethead, true},
-		{components.BehaviorZombieFlag, true},
-		{components.BehaviorPeaProjectile, false},
-		{components.BehaviorPeashooter, false},
-	}
-
-	for _, test := range tests {
-		result := system.isZombieType(test.behaviorType)
-		if result != test.expected {
-			t.Errorf("isZombieType(%v) = %v, want %v", test.behaviorType, result, test.expected)
-		}
 	}
 }
 
@@ -729,6 +710,7 @@ func TestBowlingNutSystem_ExplosiveNut_AreaDamage(t *testing.T) {
 	targetID := em.CreateEntity()
 	em.AddComponent(targetID, &components.PositionComponent{X: 510.0, Y: targetY})
 	em.AddComponent(targetID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+em.AddComponent(targetID, &components.ZombieTagComponent{})
 	em.AddComponent(targetID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(targetID, &components.CollisionComponent{Width: 40, Height: 115})
 	em.AddComponent(targetID, &components.ZombieTagComponent{})
@@ -738,6 +720,7 @@ func TestBowlingNutSystem_ExplosiveNut_AreaDamage(t *testing.T) {
 	adjacentID := em.CreateEntity()
 	em.AddComponent(adjacentID, &components.PositionComponent{X: 520.0, Y: row1Y})
 	em.AddComponent(adjacentID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+em.AddComponent(adjacentID, &components.ZombieTagComponent{})
 	em.AddComponent(adjacentID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(adjacentID, &components.CollisionComponent{Width: 40, Height: 115})
 	em.AddComponent(adjacentID, &components.ZombieTagComponent{})
@@ -746,6 +729,7 @@ func TestBowlingNutSystem_ExplosiveNut_AreaDamage(t *testing.T) {
 	farID := em.CreateEntity()
 	em.AddComponent(farID, &components.PositionComponent{X: 800.0, Y: nutY}) // 距离 300 像素
 	em.AddComponent(farID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+em.AddComponent(farID, &components.ZombieTagComponent{})
 	em.AddComponent(farID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(farID, &components.CollisionComponent{Width: 40, Height: 115})
 	em.AddComponent(farID, &components.ZombieTagComponent{})
@@ -794,6 +778,7 @@ func TestBowlingNutSystem_ExplosiveNut_NoBounce(t *testing.T) {
 	zombieID := em.CreateEntity()
 	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY})
 	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+em.AddComponent(zombieID, &components.ZombieTagComponent{})
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
 	em.AddComponent(zombieID, &components.ZombieTagComponent{})
@@ -833,6 +818,7 @@ func TestBowlingNutSystem_ExplosiveNut_Damage1800(t *testing.T) {
 	zombieID := em.CreateEntity()
 	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY})
 	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBuckethead})
+em.AddComponent(zombieID, &components.ZombieTagComponent{})
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(zombieID, &components.ArmorComponent{CurrentArmor: 1100, MaxArmor: 1100})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
@@ -881,6 +867,7 @@ func TestBowlingNutSystem_ExplosiveNut_BounceCountNotIncreased(t *testing.T) {
 	zombieID := em.CreateEntity()
 	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY})
 	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+em.AddComponent(zombieID, &components.ZombieTagComponent{})
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
 	em.AddComponent(zombieID, &components.ZombieTagComponent{})
@@ -923,6 +910,7 @@ func TestBowlingNutSystem_ExplosiveNut_ArmorPriority(t *testing.T) {
 	zombieID := em.CreateEntity()
 	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY})
 	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieConehead})
+em.AddComponent(zombieID, &components.ZombieTagComponent{})
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(zombieID, &components.ArmorComponent{CurrentArmor: 370, MaxArmor: 370})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
@@ -967,6 +955,7 @@ func TestBowlingNutSystem_ExplosiveNut_FlashEffect(t *testing.T) {
 	zombieID := em.CreateEntity()
 	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY})
 	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+em.AddComponent(zombieID, &components.ZombieTagComponent{})
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
 	em.AddComponent(zombieID, &components.ZombieTagComponent{})
@@ -1174,6 +1163,7 @@ func TestBowlingNutSystem_ContinueBounce_StopsOnCollision(t *testing.T) {
 	zombieID := em.CreateEntity()
 	em.AddComponent(zombieID, &components.PositionComponent{X: 510.0, Y: nutY}) // 同行碰撞
 	em.AddComponent(zombieID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+em.AddComponent(zombieID, &components.ZombieTagComponent{})
 	em.AddComponent(zombieID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(zombieID, &components.CollisionComponent{Width: 40, Height: 115})
 	em.AddComponent(zombieID, &components.ZombieTagComponent{})
@@ -1183,6 +1173,7 @@ func TestBowlingNutSystem_ContinueBounce_StopsOnCollision(t *testing.T) {
 	zombie3ID := em.CreateEntity()
 	em.AddComponent(zombie3ID, &components.PositionComponent{X: 520.0, Y: row3Y})
 	em.AddComponent(zombie3ID, &components.BehaviorComponent{Type: components.BehaviorZombieBasic})
+em.AddComponent(zombie3ID, &components.ZombieTagComponent{})
 	em.AddComponent(zombie3ID, &components.HealthComponent{CurrentHealth: 270, MaxHealth: 270})
 	em.AddComponent(zombie3ID, &components.CollisionComponent{Width: 40, Height: 115})
 

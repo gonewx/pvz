@@ -114,23 +114,9 @@ func (s *RenderSystem) drawZombieShadowsWithClipping(screen *ebiten.Image, zombi
 
 	// 遍历所有僵尸实体，渲染阴影
 	for _, id := range zombieEntities {
-		// 只渲染有 BehaviorComponent 且是僵尸类型的实体
-		behaviorComp, hasBehavior := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, id)
-		if !hasBehavior {
-			continue
-		}
-
-		// 检查是否是僵尸类型
-		isZombie := behaviorComp.Type == components.BehaviorZombieBasic ||
-			behaviorComp.Type == components.BehaviorZombieEating ||
-			behaviorComp.Type == components.BehaviorZombieDying ||
-			behaviorComp.Type == components.BehaviorZombieSquashing ||
-			behaviorComp.Type == components.BehaviorZombieConehead ||
-			behaviorComp.Type == components.BehaviorZombieBuckethead ||
-			behaviorComp.Type == components.BehaviorZombieFlag ||
-			behaviorComp.Type == components.BehaviorZombiePolevaulter ||
-			behaviorComp.Type == components.BehaviorZombiePreview
-
+		// 使用 ZombieTagComponent 统一判断是否是僵尸
+		// Story 8.16: 使用标签组件而非硬编码类型列表，新增僵尸类型自动被识别
+		_, isZombie := ecs.GetComponent[*components.ZombieTagComponent](s.entityManager, id)
 		if !isZombie {
 			continue
 		}

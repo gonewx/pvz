@@ -128,9 +128,9 @@ func (s *LawnmowerSystem) checkTriggerConditions() {
 		*components.PositionComponent,
 	](s.entityManager)
 
-	// 获取所有僵尸实体
+	// 获取所有僵尸实体（使用 ZombieTagComponent 统一判断）
 	zombieEntities := ecs.GetEntitiesWith2[
-		*components.BehaviorComponent,
+		*components.ZombieTagComponent,
 		*components.PositionComponent,
 	](s.entityManager)
 
@@ -154,8 +154,8 @@ func (s *LawnmowerSystem) checkTriggerConditions() {
 			behavior, _ := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
 			zombiePos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
 
-			// 只检查僵尸类型（跳过植物等其他实体）
-			if !isZombieType(behavior.Type) {
+			// 排除死亡状态的僵尸
+			if behavior.Type.IsZombieDyingState() {
 				continue
 			}
 
@@ -290,9 +290,9 @@ func (s *LawnmowerSystem) checkZombieCollisions() {
 		*components.PositionComponent,
 	](s.entityManager)
 
-	// 获取所有僵尸实体
+	// 获取所有僵尸实体（使用 ZombieTagComponent 统一判断）
 	zombieEntities := ecs.GetEntitiesWith3[
-		*components.BehaviorComponent,
+		*components.ZombieTagComponent,
 		*components.PositionComponent,
 		*components.HealthComponent,
 	](s.entityManager)
@@ -312,8 +312,8 @@ func (s *LawnmowerSystem) checkZombieCollisions() {
 			zombiePos, _ := ecs.GetComponent[*components.PositionComponent](s.entityManager, zombieID)
 			health, _ := ecs.GetComponent[*components.HealthComponent](s.entityManager, zombieID)
 
-			// 只检查僵尸类型
-			if !isZombieType(behavior.Type) {
+			// 排除死亡状态的僵尸
+			if behavior.Type.IsZombieDyingState() {
 				continue
 			}
 

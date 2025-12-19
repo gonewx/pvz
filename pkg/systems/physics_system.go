@@ -118,16 +118,24 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 		if behavior.Type == components.BehaviorPeaProjectile ||
 			behavior.Type == components.BehaviorSnowPeaProjectile {
 			bullets = append(bullets, entityID)
-		} else if behavior.Type == components.BehaviorZombieBasic ||
-			behavior.Type == components.BehaviorZombieEating ||
-			behavior.Type == components.BehaviorZombieConehead ||
-			behavior.Type == components.BehaviorZombieBuckethead ||
-			behavior.Type == components.BehaviorZombieFlag ||
-			behavior.Type == components.BehaviorZombiePolevaulter {
-			// 包括移动中的僵尸、啃食中的僵尸（普通、路障、铁桶、旗帜、撑杆）
-			zombies = append(zombies, entityID)
-		} else if behavior.Type == components.BehaviorZombieDying {
-			// 死亡动画早期（身体还直立）仍可被子弹命中
+			continue
+		}
+
+		// 使用 ZombieTagComponent 统一判断是否是僵尸
+		_, isZombie := ecs.GetComponent[*components.ZombieTagComponent](ps.em, entityID)
+		if !isZombie {
+			continue
+		}
+
+		// BehaviorZombieSquashing 和 BehaviorZombieDyingExplosion 完全不参与碰撞
+		// 这些状态的僵尸已经在专门的死亡流程中，不应再被子弹命中
+		if behavior.Type == components.BehaviorZombieSquashing ||
+			behavior.Type == components.BehaviorZombieDyingExplosion {
+			continue
+		}
+
+		// BehaviorZombieDying 特殊处理：死亡动画早期仍可被子弹命中
+		if behavior.Type == components.BehaviorZombieDying {
 			// 检查动画播放进度，只有进度小于阈值时才参与碰撞
 			reanim, hasReanim := ecs.GetComponent[*components.ReanimComponent](ps.em, entityID)
 			if hasReanim && len(reanim.CurrentAnimations) > 0 {
@@ -141,9 +149,11 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 					}
 				}
 			}
+			continue
 		}
-		// 注意：BehaviorZombieSquashing 和 BehaviorZombieDyingExplosion 完全不参与碰撞
-		// 这些状态的僵尸已经在专门的死亡流程中，不应再被子弹命中
+
+		// 其他活跃状态的僵尸（移动、啃食等）
+		zombies = append(zombies, entityID)
 	}
 
 	// 嵌套遍历检测碰撞

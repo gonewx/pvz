@@ -253,6 +253,47 @@ func (s *ZombiesWonPhaseSystem) updatePhase2ZombieEntry(
 			}
 		}
 
+		// Story 8.16: 撑杆僵尸特殊处理
+		// 撑杆僵尸的造型与普通僵尸差异较大（持杆跑步、跳跃姿态）
+		// 在 Phase 2 开始时检测触发僵尸类型，对撑杆僵尸执行特殊处理：
+		// 1. 直接传送到第1个目标位置（门口），跳过从远处移动的阶段
+		// 2. 强制切换为行走动画（无杆状态）
+		// 3. 与摄像机左移同步，从门口向左走入房子
+		behaviorComp, hasBehaviorComp := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, phaseComp.TriggerZombieID)
+		if hasBehaviorComp && behaviorComp.UnitID == types.UnitIDZombiePolevaulter {
+			log.Printf("[ZombiesWonPhaseSystem] 检测到撑杆僵尸，执行特殊处理")
+
+			// 计算目标位置
+			target1X := config.GameOverDoorMaskX + Phase2ZombieTarget1OffsetX
+			target1Y := config.GameOverDoorMaskY + Phase2ZombieTarget1OffsetY
+
+			// 传送到第1个目标位置（门口），让玩家看到行走进入房子的过程
+			if posComp, ok := ecs.GetComponent[*components.PositionComponent](s.entityManager, phaseComp.TriggerZombieID); ok {
+				posComp.X = target1X
+				posComp.Y = target1Y
+				log.Printf("[ZombiesWonPhaseSystem] 撑杆僵尸传送到门口 (%.2f, %.2f)", posComp.X, posComp.Y)
+			}
+
+			// 强制切换为行走动画（无杆状态）
+			ecs.AddComponent(s.entityManager, phaseComp.TriggerZombieID, &components.AnimationCommandComponent{
+				UnitID:    types.UnitIDZombiePolevaulter,
+				ComboName: "walk",
+				Processed: false,
+			})
+			log.Printf("[ZombiesWonPhaseSystem] 撑杆僵尸切换为 walk 动画")
+
+			// 确保撑杆状态已重置
+			if poleVault, ok := ecs.GetComponent[*components.PoleVaultComponent](s.entityManager, phaseComp.TriggerZombieID); ok {
+				poleVault.HasPole = false
+				poleVault.IsJumping = false
+				log.Printf("[ZombiesWonPhaseSystem] 撑杆僵尸状态重置: HasPole=false, IsJumping=false")
+			}
+
+			// 标记已到达门口，触发继续向左走入房子
+			phaseComp.ZombieReachedTarget1 = true
+			phaseComp.ZombieStartedWalking = true
+			log.Printf("[ZombiesWonPhaseSystem] 撑杆僵尸特殊处理完成，继续向左走入房子")
+		}
 	}
 
 	// ========================================

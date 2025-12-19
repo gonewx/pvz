@@ -155,9 +155,9 @@ func (s *LevelSystem) checkDefeatWithLawnmower() {
 		return
 	}
 
-	// 查询所有僵尸实体
+	// 查询所有僵尸实体（使用 ZombieTagComponent 统一判断）
 	zombieEntities := ecs.GetEntitiesWith2[
-		*components.BehaviorComponent,
+		*components.ZombieTagComponent,
 		*components.PositionComponent,
 	](s.entityManager)
 
@@ -168,8 +168,8 @@ func (s *LevelSystem) checkDefeatWithLawnmower() {
 			continue
 		}
 
-		// 只检查僵尸类型的实体
-		if !isZombieType(behavior.Type) {
+		// 排除死亡状态的僵尸
+		if behavior.Type.IsZombieDyingState() {
 			continue
 		}
 
@@ -212,8 +212,9 @@ func (s *LevelSystem) checkDefeatWithLawnmower() {
 // checkDefeatWithoutLawnmower 检查失败条件（无除草车，原逻辑）
 // Story 17.9: 使用类型化进家边界
 func (s *LevelSystem) checkDefeatWithoutLawnmower() {
+	// 查询所有僵尸实体（使用 ZombieTagComponent 统一判断）
 	zombieEntities := ecs.GetEntitiesWith2[
-		*components.BehaviorComponent,
+		*components.ZombieTagComponent,
 		*components.PositionComponent,
 	](s.entityManager)
 
@@ -223,7 +224,8 @@ func (s *LevelSystem) checkDefeatWithoutLawnmower() {
 			continue
 		}
 
-		if !isZombieType(behavior.Type) {
+		// 排除死亡状态的僵尸
+		if behavior.Type.IsZombieDyingState() {
 			continue
 		}
 
@@ -306,17 +308,6 @@ func (s *LevelSystem) getEntityLane(y float64) int {
 	}
 
 	return lane
-}
-
-// isZombieType 判断行为类型是否是僵尸（包括各种活跃状态）
-// 返回 true 的状态会被除草车消灭
-func isZombieType(behaviorType components.BehaviorType) bool {
-	return behaviorType == components.BehaviorZombieBasic ||
-		behaviorType == components.BehaviorZombieEating ||
-		behaviorType == components.BehaviorZombieConehead ||
-		behaviorType == components.BehaviorZombieBuckethead ||
-		behaviorType == components.BehaviorZombieFlag ||
-		behaviorType == components.BehaviorZombiePolevaulter
 }
 
 // triggerFinalWaveWarning 已废弃：统一由 FlagWaveWarningSystem 处理

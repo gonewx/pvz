@@ -238,9 +238,9 @@ func (s *LevelSystem) checkAcceleratedRefresh() {
 // 返回：
 //   - bool: true 表示本波僵尸已全部消灭
 func (s *LevelSystem) areCurrentWaveZombiesCleared() bool {
-	// 查询所有活跃僵尸
+	// 查询所有活跃僵尸（使用 ZombieTagComponent 统一判断）
 	zombieEntities := ecs.GetEntitiesWith2[
-		*components.BehaviorComponent,
+		*components.ZombieTagComponent,
 		*components.PositionComponent,
 	](s.entityManager)
 
@@ -250,8 +250,8 @@ func (s *LevelSystem) areCurrentWaveZombiesCleared() bool {
 			continue
 		}
 
-		// 只检查僵尸类型
-		if !isZombieType(behavior.Type) {
+		// 排除死亡状态的僵尸
+		if behavior.Type.IsZombieDyingState() {
 			continue
 		}
 
