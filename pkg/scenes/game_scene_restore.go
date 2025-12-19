@@ -486,6 +486,8 @@ func (s *GameScene) restoreLawnmowers(lawnmowers []game.LawnmowerData) {
 		// 跳过已触发且激活的除草车（已经移出屏幕）
 		if lmData.Triggered && lmData.Active && lmData.X > float64(WindowWidth)+100 {
 			log.Printf("[GameScene] Skipping lawnmower on lane %d (already moved off-screen)", lmData.Lane)
+			// 标记该 lane 为已使用（修复：存档时割草机正在移动但还未被系统删除的情况）
+			s.markLawnmowerLaneAsUsed(lmData.Lane)
 			continue
 		}
 
@@ -563,6 +565,35 @@ func (s *GameScene) restoreUsedLawnmowerLanes(usedLanes []int) {
 	}
 
 	log.Printf("[GameScene] Restored used lawnmower lanes: %v", usedLanes)
+}
+
+// markLawnmowerLaneAsUsed 标记指定行的除草车为已使用
+//
+// 用于处理存档恢复时割草机已跑出屏幕的情况：
+// 存档时割草机可能正在移动但还未被系统删除，此时 UsedLanes 中还没有该 lane。
+// 恢复时跳过创建实体后，需要手动标记该 lane 为已使用，否则僵尸到达边界时
+// 会尝试触发不存在的割草机，导致每帧重复打印日志。
+func (s *GameScene) markLawnmowerLaneAsUsed(lane int) {
+	// 查找 LawnmowerStateComponent 实体
+	stateEntities := ecs.GetEntitiesWith1[*components.LawnmowerStateComponent](s.entityManager)
+	if len(stateEntities) == 0 {
+		log.Printf("[GameScene] Warning: No LawnmowerStateComponent found, cannot mark lane %d as used", lane)
+		return
+	}
+
+	stateEntity := stateEntities[0]
+	stateComp, ok := ecs.GetComponent[*components.LawnmowerStateComponent](s.entityManager, stateEntity)
+	if !ok {
+		log.Printf("[GameScene] Warning: Failed to get LawnmowerStateComponent")
+		return
+	}
+
+	if stateComp.UsedLanes == nil {
+		stateComp.UsedLanes = make(map[int]bool)
+	}
+
+	stateComp.UsedLanes[lane] = true
+	log.Printf("[GameScene] Marked lawnmower lane %d as used (off-screen at restore time)", lane)
 }
 
 // restoreProgressBar 恢复进度条数据
