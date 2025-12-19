@@ -371,6 +371,7 @@ func (s *GameScene) updateGameOverPhase(deltaTime float64) bool {
 }
 
 // updateBackgroundMusic 处理背景音乐播放控制
+// 统一管理所有关卡类型的背景音乐播放时机
 func (s *GameScene) updateBackgroundMusic() {
 	if s.bgmStarted {
 		return // 背景音乐已启动
@@ -382,14 +383,32 @@ func (s *GameScene) updateBackgroundMusic() {
 	isSoddingComplete := s.soddingSystem == nil || !s.soddingSystem.IsPlaying()
 	isReadySetPlantComplete := s.readySetPlantSystem == nil || !s.readySetPlantSystem.IsPlaying()
 
+	// 判断 UI 滑入动画是否完成（统一管理不同关卡类型）
+	isUISlideInComplete := s.isUISlideInComplete()
+
 	// 所有开场动画完成后开始播放背景音乐
-	if isOpeningComplete && isSoddingComplete && isReadySetPlantComplete && s.seedBankSlideInCompleted {
+	if isOpeningComplete && isSoddingComplete && isReadySetPlantComplete && isUISlideInComplete {
 		if audioManager := s.gameState.GetAudioManager(); audioManager != nil {
 			audioManager.PlayMusic("SOUND_MAINMUSIC")
 			log.Printf("[GameScene] 开始播放背景音乐")
 		}
 		s.bgmStarted = true
 	}
+}
+
+// isUISlideInComplete 判断 UI 滑入动画是否完成（统一管理不同关卡类型）
+// - 传送带/保龄球关卡：等待传送带滑入完成
+// - 其他关卡：等待植物选择栏滑入完成
+func (s *GameScene) isUISlideInComplete() bool {
+	if s.gameState.CurrentLevel != nil {
+		specialRules := s.gameState.CurrentLevel.SpecialRules
+		// 传送带关卡和保龄球关卡都使用传送带滑入动画
+		if specialRules == "conveyor" || specialRules == "bowling" {
+			return s.levelPhaseSystem != nil && s.levelPhaseSystem.IsConveyorBeltSlideComplete()
+		}
+	}
+	// 其他关卡：检查植物选择栏滑入是否完成
+	return s.seedBankSlideInCompleted
 }
 
 // updateGameplaySystems 更新所有核心游戏系统
