@@ -231,7 +231,7 @@ func (s *ChomperSystem) findNearestZombieInRange(pos *components.PositionCompone
 		if distance <= maxRange && distance < nearestDistance {
 			// 检查僵尸是否处于活动状态（不是死亡中）
 			behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
-			if ok && (behavior.Type == components.BehaviorZombieDying || behavior.Type == components.BehaviorZombieDyingExplosion) {
+			if ok && behavior.Type.IsZombieDyingState() {
 				continue // 跳过死亡中的僵尸
 			}
 
@@ -265,6 +265,24 @@ func (s *ChomperSystem) canSwallowZombie(zombieID ecs.EntityID) bool {
 
 // dealSwallowDamage 对目标造成吞噬伤害（僵尸直接消失）
 func (s *ChomperSystem) dealSwallowDamage(zombieID ecs.EntityID) {
+	// 检查僵尸是否还存在（可能已被其他大嘴花吞噬或其他方式杀死）
+	if !s.entityManager.EntityExists(zombieID) {
+		log.Printf("[ChomperSystem] 僵尸 %d 已不存在，跳过吞噬", zombieID)
+		return
+	}
+
+	// 检查僵尸是否已处于死亡状态（避免重复计数）
+	behavior, ok := ecs.GetComponent[*components.BehaviorComponent](s.entityManager, zombieID)
+	if ok && behavior.Type.IsZombieDyingState() {
+		log.Printf("[ChomperSystem] 僵尸 %d 已在死亡状态，跳过吞噬", zombieID)
+		return
+	}
+
+	// 立即设置死亡状态，防止同一帧内其他攻击重复处理
+	if ok {
+		behavior.Type = components.BehaviorZombieDying
+	}
+
 	// 播放吞噬音效
 	if s.gameState != nil {
 		if audioManager := s.gameState.GetAudioManager(); audioManager != nil {

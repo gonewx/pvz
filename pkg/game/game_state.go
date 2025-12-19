@@ -379,10 +379,11 @@ func (gs *GameState) CheckVictory() bool {
 
 	// 胜利条件：
 	// 1. 所有波次已生成（allWavesSpawned = true）
-	// 2. 场上没有存活的僵尸（TotalZombiesSpawned - ZombiesKilled == 0）
+	// 2. 场上没有存活的僵尸（TotalZombiesSpawned - ZombiesKilled <= 0）
 	// 注意：必须消灭所有已激活的僵尸，而不是配置中的僵尸数量
+	// 使用 <= 0 而非 == 0，处理可能的计数误差（如重复计数导致 ZombiesKilled > TotalZombiesSpawned）
 	zombiesOnField := gs.TotalZombiesSpawned - gs.ZombiesKilled
-	result := allWavesSpawned && gs.TotalZombiesSpawned > 0 && zombiesOnField == 0
+	result := allWavesSpawned && gs.TotalZombiesSpawned > 0 && zombiesOnField <= 0
 
 	// 调试日志：当接近胜利条件时输出
 	if allWavesSpawned || zombiesOnField <= 2 {

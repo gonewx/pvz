@@ -317,8 +317,13 @@ func (s *LawnmowerSystem) checkZombieCollisions() {
 				continue
 			}
 
-			// 跳过已死亡的僵尸
+			// 跳过已死亡的僵尸（健康值检查）
 			if health.CurrentHealth <= 0 {
+				continue
+			}
+
+			// 跳过已处于死亡状态的僵尸（避免重复计数）
+			if behavior.Type.IsZombieDyingState() {
 				continue
 			}
 

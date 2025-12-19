@@ -77,6 +77,15 @@ const (
 	BehaviorRepeater
 )
 
+// IsZombieDyingState 检查僵尸是否处于任何死亡状态
+// 包括：BehaviorZombieDying、BehaviorZombieSquashing、BehaviorZombieDyingExplosion
+// 用于统一判断僵尸是否应该被跳过（避免重复计数和重复攻击）
+func (bt BehaviorType) IsZombieDyingState() bool {
+	return bt == BehaviorZombieDying ||
+		bt == BehaviorZombieSquashing ||
+		bt == BehaviorZombieDyingExplosion
+}
+
 // ZombieAnimState 定义僵尸的动画状态
 type ZombieAnimState int
 

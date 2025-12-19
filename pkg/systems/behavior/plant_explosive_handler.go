@@ -84,8 +84,8 @@ func (s *BehaviorSystem) triggerCherryBombExplosion(entityID ecs.EntityID) {
 			continue
 		}
 
-		// 跳过已死亡的僵尸
-		if behavior.Type == components.BehaviorZombieDying || behavior.Type == components.BehaviorZombieDyingExplosion {
+		// 跳过已死亡的僵尸（使用统一的死亡状态判断）
+		if behavior.Type.IsZombieDyingState() {
 			continue
 		}
 
@@ -339,8 +339,8 @@ func (s *BehaviorSystem) handlePotatoMineArmedPhase(entityID ecs.EntityID, plant
 			continue
 		}
 
-		// 跳过已死亡的僵尸
-		if behavior.Type == components.BehaviorZombieDying || behavior.Type == components.BehaviorZombieDyingExplosion {
+		// 跳过已死亡的僵尸（使用统一的死亡状态判断）
+		if behavior.Type.IsZombieDyingState() {
 			continue
 		}
 
@@ -517,8 +517,8 @@ func (s *BehaviorSystem) triggerPotatoMineExplosion(entityID ecs.EntityID, explo
 			continue
 		}
 
-		// 跳过已死亡的僵尸
-		if behavior.Type == components.BehaviorZombieDying || behavior.Type == components.BehaviorZombieDyingExplosion {
+		// 跳过已死亡的僵尸（使用统一的死亡状态判断）
+		if behavior.Type.IsZombieDyingState() {
 			continue
 		}
 

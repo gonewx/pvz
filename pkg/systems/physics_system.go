@@ -142,6 +142,8 @@ func (ps *PhysicsSystem) Update(deltaTime float64) {
 				}
 			}
 		}
+		// 注意：BehaviorZombieSquashing 和 BehaviorZombieDyingExplosion 完全不参与碰撞
+		// 这些状态的僵尸已经在专门的死亡流程中，不应再被子弹命中
 	}
 
 	// 嵌套遍历检测碰撞

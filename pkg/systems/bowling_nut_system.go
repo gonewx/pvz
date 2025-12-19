@@ -336,8 +336,8 @@ func (s *BowlingNutSystem) triggerExplosion(entityID ecs.EntityID, posComp *comp
 			continue
 		}
 
-		// 跳过已死亡的僵尸（与樱桃炸弹保持一致）
-		if behavior.Type == components.BehaviorZombieDying || behavior.Type == components.BehaviorZombieDyingExplosion {
+		// 跳过已死亡的僵尸（使用统一的死亡状态判断）
+		if behavior.Type.IsZombieDyingState() {
 			continue
 		}
 

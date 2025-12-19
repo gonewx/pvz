@@ -140,8 +140,8 @@ type EntityManager struct {
 	nextID uint64
 	// 实体-组件映射: EntityID -> ComponentType -> Component实例
 	components map[EntityID]map[reflect.Type]interface{}
-	// 待删除的实体ID列表
-	entitiesToDestroy []EntityID
+	// 待删除的实体ID集合（使用 map 实现 O(1) 查找）
+	entitiesToDestroy map[EntityID]bool
 }
 
 // NewEntityManager 创建一个新的 EntityManager 实例
@@ -149,7 +149,7 @@ func NewEntityManager() *EntityManager {
 	return &EntityManager{
 		nextID:            1, // ID从1开始,0保留为无效ID
 		components:        make(map[EntityID]map[reflect.Type]interface{}),
-		entitiesToDestroy: make([]EntityID, 0),
+		entitiesToDestroy: make(map[EntityID]bool),
 	}
 }
 
@@ -162,8 +162,28 @@ func (em *EntityManager) CreateEntity() EntityID {
 }
 
 // DestroyEntity 标记实体待删除(不立即删除)
+// 如果实体已被标记删除，不会重复标记
 func (em *EntityManager) DestroyEntity(id EntityID) {
-	em.entitiesToDestroy = append(em.entitiesToDestroy, id)
+	// 检查实体是否存在且未被标记删除
+	if _, exists := em.components[id]; exists {
+		em.entitiesToDestroy[id] = true
+	}
+}
+
+// IsMarkedForDestruction 检查实体是否已被标记待删除
+func (em *EntityManager) IsMarkedForDestruction(id EntityID) bool {
+	return em.entitiesToDestroy[id]
+}
+
+// EntityExists 检查实体是否存在且未被标记删除
+// 返回 true 表示实体存在且可以安全操作
+func (em *EntityManager) EntityExists(id EntityID) bool {
+	_, exists := em.components[id]
+	if !exists {
+		return false
+	}
+	// 已标记删除的实体视为不存在
+	return !em.entitiesToDestroy[id]
 }
 
 // AddComponent 为实体添加组件
@@ -218,10 +238,11 @@ func (em *EntityManager) HasComponent(id EntityID, componentType reflect.Type) b
 
 // RemoveMarkedEntities 清理所有标记删除的实体
 func (em *EntityManager) RemoveMarkedEntities() {
-	for _, id := range em.entitiesToDestroy {
+	for id := range em.entitiesToDestroy {
 		delete(em.components, id)
 	}
-	em.entitiesToDestroy = em.entitiesToDestroy[:0] // 清空切片
+	// 清空待删除集合
+	em.entitiesToDestroy = make(map[EntityID]bool)
 }
 
 // GetEntitiesWith 查询拥有指定组件类型组合的所有实体
