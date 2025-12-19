@@ -151,10 +151,9 @@ func (sm *SceneManager) Update(deltaTime float64) {
 // Draw renders the currently active scene to the provided screen.
 // If no scene is active, this method does nothing.
 func (sm *SceneManager) Draw(screen *ebiten.Image) {
-	// 如果有待切换的场景，跳过当前帧的渲染，避免闪现旧场景
-	if sm.hasPendingLevelChange || sm.hasPendingMainMenu {
-		return
-	}
+	// 注意：即使有待切换的场景，也继续渲染当前场景
+	// 这样可以让 UI 元素（如奖励面板）在场景切换前保持显示，避免黑屏
+	// 奖励面板在 showing 阶段是完全不透明的，会覆盖游戏背景
 	if sm.currentScene != nil {
 		sm.currentScene.Draw(screen)
 	}

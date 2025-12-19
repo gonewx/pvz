@@ -369,15 +369,15 @@ func (ras *RewardAnimationSystem) updateShowingPhaseInternal(dt float64) {
 
 		// 检查是否点击了"下一关"按钮
 		if ras.isNextLevelButtonClicked(float64(mouseX), float64(mouseY)) {
-			log.Printf("[RewardAnimationSystem] 玩家点击\"下一关\"按钮，准备切换场景")
+			log.Printf("[RewardAnimationSystem] 玩家点击\"下一关\"按钮，直接切换场景")
 
 			// 播放点击按钮音效（使用 AudioManager 统一管理 - Story 10.9）
 			if audioManager := game.GetGameState().GetAudioManager(); audioManager != nil {
 				audioManager.PlaySound("SOUND_TAP2")
 			}
 
-			ras.currentPhase = "closing"
-			ras.phaseElapsed = 0
+			// 直接切换到下一关（不需要淡出动画，避免闪现当前关卡画面）
+			ras.cleanupAndSwitchToNextLevel()
 			return // 避免同时处理多个按钮
 		}
 
@@ -497,6 +497,34 @@ func (ras *RewardAnimationSystem) cleanupAndSwitchToMainMenu() {
 	}
 
 	log.Printf("[RewardAnimationSystem] 已返回主菜单")
+}
+
+// cleanupAndSwitchToNextLevel 清理资源并切换到下一关
+// 直接切换，无淡出动画，避免闪现当前关卡画面
+func (ras *RewardAnimationSystem) cleanupAndSwitchToNextLevel() {
+	log.Printf("[RewardAnimationSystem] 切换到下一关")
+
+	// 注意：不在这里清理实体和设置 isActive = false
+	// 让场景切换时自动丢弃旧场景（包括所有实体）
+	// 这样在场景切换的过渡帧中，奖励面板仍然会渲染，避免黑屏
+
+	// 切换到下一关
+	nextLevelID := ras.gameState.GetNextLevelID()
+	if nextLevelID != "" {
+		log.Printf("[RewardAnimationSystem] 切换到下一关: %s", nextLevelID)
+		if ras.sceneManager != nil {
+			ras.sceneManager.LoadLevel(nextLevelID)
+		} else {
+			log.Printf("[RewardAnimationSystem] SceneManager 为 nil，跳过场景切换（可能在测试环境）")
+		}
+	} else {
+		log.Printf("[RewardAnimationSystem] 没有下一关，返回主菜单")
+		if ras.sceneManager != nil {
+			ras.sceneManager.SwitchToMainMenu()
+		} else {
+			log.Printf("[RewardAnimationSystem] SceneManager 为 nil，跳过主菜单切换（可能在测试环境）")
+		}
+	}
 }
 
 // updateClosingPhaseInternal 处理关闭奖励面板阶段（0.5秒，内部版本）。
