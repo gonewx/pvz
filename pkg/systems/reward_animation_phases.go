@@ -362,10 +362,10 @@ func (ras *RewardAnimationSystem) updateShowingPhaseInternal(dt float64) {
 	}
 
 	// 检测点击（支持触摸和鼠标）
-	justPressed, _, _ := utils.IsPointerJustPressed()
+	// 重要：必须使用 IsPointerJustPressed 返回的坐标，不能再调用 GetPointerPosition
+	// 因为在移动端快速点击时，触摸可能在下一帧就结束，GetPointerPosition 会返回错误位置
+	justPressed, mouseX, mouseY := utils.IsPointerJustPressed()
 	if justPressed {
-		// 获取鼠标点击位置
-		mouseX, mouseY := utils.GetPointerPosition()
 
 		// 检查是否点击了"下一关"按钮
 		if ras.isNextLevelButtonClicked(float64(mouseX), float64(mouseY)) {
