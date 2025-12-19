@@ -163,6 +163,7 @@ type LawnmowerData struct {
 type PlantCardData struct {
 	PlantType       string  // 植物类型ID，如 "Peashooter", "Sunflower"
 	CurrentCooldown float64 // 当前剩余冷却时间（秒）
+	IsReady         bool    // 卡片是否已就绪（冷却完成，不考虑阳光）
 }
 
 // BattleSaveInfo 战斗存档信息预览

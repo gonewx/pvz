@@ -957,15 +957,18 @@ func (s *GameScene) restoreGuidedTutorial(guidedData *game.GuidedTutorialData) {
 	guidedComp.TutorialTextKey = guidedData.TutorialTextKey
 }
 
-// restorePlantCards 恢复植物卡片冷却状态
+// restorePlantCards 恢复植物卡片状态
+//
+// 恢复卡片的冷却时间和就绪状态，确保存档恢复后卡片可用性正确
 func (s *GameScene) restorePlantCards(plantCards []game.PlantCardData) {
 	if len(plantCards) == 0 {
 		return
 	}
 
-	cooldownMap := make(map[string]float64)
+	// 创建卡片状态映射
+	cardStateMap := make(map[string]game.PlantCardData)
 	for _, cardData := range plantCards {
-		cooldownMap[cardData.PlantType] = cardData.CurrentCooldown
+		cardStateMap[cardData.PlantType] = cardData
 	}
 
 	cardEntities := ecs.GetEntitiesWith1[*components.PlantCardComponent](s.entityManager)
@@ -976,9 +979,15 @@ func (s *GameScene) restorePlantCards(plantCards []game.PlantCardData) {
 		}
 
 		plantTypeStr := cardComp.PlantType.String()
-		if cooldown, exists := cooldownMap[plantTypeStr]; exists {
-			cardComp.CurrentCooldown = cooldown
-			cardComp.IsAvailable = false
+		if cardState, exists := cardStateMap[plantTypeStr]; exists {
+			cardComp.CurrentCooldown = cardState.CurrentCooldown
+			// 如果卡片已就绪（冷却完成），暂时标记为可用
+			// 实际可用性将由 PlantCardSystem 根据阳光数量重新计算
+			if cardState.IsReady {
+				cardComp.CurrentCooldown = 0
+			}
+			log.Printf("[GameScene] 恢复卡片 %s: cooldown=%.2f, isReady=%v",
+				plantTypeStr, cardComp.CurrentCooldown, cardState.IsReady)
 		}
 	}
 }

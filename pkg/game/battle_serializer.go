@@ -545,9 +545,9 @@ func (s *BattleSerializer) collectUsedLawnmowerLanes(em *ecs.EntityManager) []in
 	return usedLanes
 }
 
-// collectPlantCardData 从 EntityManager 收集所有植物卡片冷却数据
+// collectPlantCardData 从 EntityManager 收集所有植物卡片状态
 //
-// 只收集正在冷却中的卡片（CurrentCooldown > 0）
+// 保存所有卡片的冷却和就绪状态，确保存档恢复后卡片状态正确
 func (s *BattleSerializer) collectPlantCardData(em *ecs.EntityManager) []PlantCardData {
 	var plantCards []PlantCardData
 
@@ -560,15 +560,15 @@ func (s *BattleSerializer) collectPlantCardData(em *ecs.EntityManager) []PlantCa
 			continue
 		}
 
-		// 只保存正在冷却中的卡片
-		if cardComp.CurrentCooldown > 0 {
-			plantCards = append(plantCards, PlantCardData{
-				PlantType:       cardComp.PlantType.String(),
-				CurrentCooldown: cardComp.CurrentCooldown,
-			})
-			log.Printf("[BattleSerializer] Saving plant card %s cooldown: %.2f",
-				cardComp.PlantType.String(), cardComp.CurrentCooldown)
-		}
+		// 保存所有卡片的状态（包括已就绪和冷却中的）
+		isReady := cardComp.CurrentCooldown <= 0
+		plantCards = append(plantCards, PlantCardData{
+			PlantType:       cardComp.PlantType.String(),
+			CurrentCooldown: cardComp.CurrentCooldown,
+			IsReady:         isReady,
+		})
+		log.Printf("[BattleSerializer] Saving plant card %s: cooldown=%.2f, isReady=%v",
+			cardComp.PlantType.String(), cardComp.CurrentCooldown, isReady)
 	}
 
 	return plantCards

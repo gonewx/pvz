@@ -12,3 +12,6 @@ adb shell run-as com.decker.pvz cp /data/local/tmp/{username} /data/data/com.dec
 # 删除存档
 adb shell run-as com.decker.pvz rm /data/data/com.decker.pvz/saves/{username}
 adb shell run-as com.decker.pvz rm /data/data/com.decker.pvz/saves/{username}_battle
+
+# 安装apk
+adb install -r build/pvz.apk
